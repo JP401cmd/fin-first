@@ -1475,41 +1475,53 @@ export default function GidsPage() {
           icon={Settings}
           title="Profiel & Instellingen"
           color="var(--ink-2)"
+          valueText="Jouw data is van jou. Je bepaalt wat je invoert, wie het ziet, en wanneer je het verwijdert. Volledige controle, altijd."
           description={
             <>
-              <strong>Jouw data, jouw controle.</strong> Je profiel bevat de
-              persoonlijke gegevens die de basis vormen voor alle berekeningen in
-              TriFinity: <strong>naam</strong>, <strong>geboortedatum</strong>,{" "}
-              <strong>pensioenleeftijd</strong>, <strong>inkomen</strong> en
-              huishoudsamenstelling. Deze gegevens bepalen je
-              vrijheidstijdberekeningen, FIRE-prognoses en soevereiniteitsniveau.
-              {" "}
+              Je profiel bevat de persoonlijke gegevens die de basis vormen voor
+              alle berekeningen in TriFinity: <strong>naam</strong>,{" "}
+              <strong>geboortedatum</strong>,{" "}
+              <strong>pensioenleeftijd</strong>, <strong>inkomen</strong> en{" "}
+              <strong>huishoudtype</strong>. Deze gegevens bepalen je
+              vrijheidstijdberekeningen, FIRE-prognoses (FIRE-leeftijd,
+              pensioen-AOW) en soevereiniteitsniveau.
+              <br />
+              <br />
+              <strong>Profielgegevens</strong> \u2014 Ga naar Identiteit \u2192
+              Profiel om je persoonlijke info en huishoudprofiel te beheren. Je
+              geboortedatum en pensioenleeftijd zijn de benchmark waartegen je
+              FIRE-projectie wordt berekend.
+              <br />
+              <br />
               Je{" "}
               <strong>soevereiniteitsniveau</strong> (van Herstel tot Meesterschap)
               wordt automatisch berekend op basis van je financi\u00eble positie en
               ontgrendelt progressief nieuwe functies en widgets.
-              In <strong>Instellingen</strong> beheer je alles vanuit \u00e9\u00e9n
-              hub: notificatievoorkeuren, widget-selectie, FIRE-parameters (verwacht
-              rendement, inflatie, eindstrategie), weergaveopties (typografie,
-              modulekleuren) en gegevensbeheer.
-              {" "}
-              TriFinity respecteert je <strong>data-eigenaarschap</strong>{" "}
-              volledig. Je kunt op elk moment al je gegevens exporteren als
-              JSON-bestand \u2014 transacties, budgetten, vermogen, doelen, alles. En
-              als je wilt stoppen, kun je je account volledig verwijderen via
-              Instellingen \u2192 Gegevens. Je data is van jou, altijd.
+              <br />
+              <br />
+              <strong>Data-eigenaarschap</strong> \u2014 TriFinity respecteert je
+              data volledig. Je kunt op elk moment al je gegevens{" "}
+              <strong>exporteren</strong> als bestand \u2014 transacties, budgetten,
+              vermogen, doelen, alles. Je bezit je eigen financi\u00eble
+              geschiedenis.
+              <br />
+              <br />
+              <strong>Account verwijderen</strong> \u2014 Wil je stoppen? Verwijder
+              je account via Instellingen \u2192 Gegevens en al je data wordt
+              permanent gewist. Geen verborgen kopie\u00ebn, geen schaduw-archieven.
+              Jouw data, jouw keuze.
             </>
           }
           howTo={{
             steps: [
               "Ga naar Identiteit \u2192 Profiel om je persoonlijke gegevens te bekijken en bewerken",
-              "Pas je naam, geboortedatum, pensioenleeftijd en inkomen aan \u2014 deze sturen al je berekeningen",
-              "Ga naar Identiteit \u2192 Instellingen voor alle app-instellingen op \u00e9\u00e9n plek",
-              "Sectie C (FIRE) is het belangrijkst: stel hier je verwacht rendement, inflatie en eindstrategie in",
-              "Sectie D (Weergave) laat je de app personaliseren met eigen modulekleuren",
-              "Sectie E (Gegevens) biedt data-export en account-verwijdering \u2014 jouw data, jouw keuze",
+              "Vul je naam, geboortedatum en geschat maandelijks inkomen in \u2014 deze sturen al je berekeningen",
+              "Stel je gewenste pensioenleeftijd in \u2014 dit is de benchmark voor je FIRE-projectie",
+              "Bekijk je soevereiniteitsniveau \u2014 dit groeit automatisch naarmate je financi\u00eble positie verbetert",
+              "Exporteer al je data als bestand via Instellingen \u2192 Gegevens \u2014 je bezit je eigen geschiedenis",
+              "Account verwijderen: via Instellingen \u2192 Gegevens wordt al je data permanent gewist",
             ],
-            tip: "Controleer je profielgegevens en FIRE-parameters minstens jaarlijks. Je geboortedatum en pensioenleeftijd bepalen je hele FIRE-tijdlijn, en je verwacht rendement kan veranderen met je beleggingsstrategie.",
+            tip: "Controleer je profielgegevens en FIRE-parameters minstens jaarlijks. Je geboortedatum en pensioenleeftijd bepalen je hele FIRE-tijdlijn.",
           }}
         />
 
@@ -1519,38 +1531,61 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              <strong>Maak de app helemaal van jou.</strong> In Instellingen pas
-              je TriFinity aan op jouw wensen en situatie. Alles is gebundeld in
-              vijf secties op \u00e9\u00e9n overzichtelijke pagina.
-              {" "}
-              <strong>Widgets</strong>: kies welke widgets op je dashboard
-              verschijnen. Schakel ze aan of uit, en ontdek nieuwe widgets
-              naarmate je soevereiniteitsniveau stijgt. Elk widget-formaat (mini,
-              quarter, half, full) past zich automatisch aan je scherm aan.
-              {" "}
-              <strong>FIRE-parameters</strong>: stel je verwacht bruto rendement
-              en inflatie in. Deze twee getallen sturen al je
-              FIRE-berekeningen, projecties en scenario&apos;s. Kies ook je
-              eindstrategie: eeuwig kapitaal behouden (perpetual), nalatenschap
-              achterlaten (legacy) of vermogen opgebruiken (deplete).
-              {" "}
-              <strong>Weergave</strong>: personaliseer je modulekleuren voor De
-              Kern, De Wil en De Horizon. Kies uit vooraf samengestelde paletten
-              of stel je eigen kleuren in.
-              {" "}
-              <strong>Notificaties</strong>: bepaal welke meldingen je wilt
-              ontvangen \u2014 budgetgrenzen, vermogensmijlpalen, level-ups en
-              aanbevelingen. Per type aan of uitzetten.
+              <strong>
+                Maak TriFinity helemaal van jou. Van de kleuren tot de
+                berekeningen \u2014 alles is aanpasbaar.
+              </strong>{" "}
+              Ga naar Identiteit \u2192 Instellingen voor zes secties met alle
+              configuratiemogelijkheden op \u00e9\u00e9n pagina.
+              <br />
+              <br />
+              <strong>A) Notificaties</strong>: kies welke meldingen je wilt
+              ontvangen \u2014 budgetwaarschuwingen, mijlpalen, AI-inzichten en
+              sync-updates. Per type aan of uit. Stel apart in voor
+              partner-transacties en check-in reminders.
+              <br />
+              <br />
+              <strong>B) Widgets</strong>: schakel widgets aan of uit, kies het
+              formaat (mini, quarter, half of full) en bepaal de volgorde op je
+              De Wil-pagina. Ontdek nieuwe widgets naarmate je
+              soevereiniteitsniveau stijgt.
+              <br />
+              <br />
+              <strong>C) FIRE-parameters</strong>: stel je verwacht rendement in
+              (standaard 7%) en inflatie (standaard 2%). Deze twee percentages
+              bepalen al je FIRE-berekeningen, projecties en scenario&apos;s.
+              Kies je onttrekkingsstrategie: eeuwig kapitaal behouden
+              (perpetual), nalatenschap achterlaten (legacy) of vermogen
+              opgebruiken (deplete). Configureer ook de Box 3-methode en
+              retirement expense method.
+              <br />
+              <br />
+              <strong>D) Weergave</strong>: kies een typografisch thema
+              (Editorial, Andada of Digital). Pas de kleuren van elke module aan
+              \u2014 Kern, Wil en Horizon \u2014 met voorgedefinieerde paletten of eigen
+              kleuren. Stel kleuren in per budgetcategorie en per
+              soevereiniteitsfase.
+              <br />
+              <br />
+              <strong>E) Gegevens</strong>: beheer je profiel, exporteer al je
+              data als JSON of verwijder je account. Volledige controle over je
+              eigen gegevens.
+              <br />
+              <br />
+              <strong>F) Privacy &amp; AI</strong>: schakel Will en alle
+              AI-features aan of uit via \u00e9\u00e9n toggle. Stel
+              huishoud-privacyvoorkeuren in \u2014 bepaal wat je partner kan zien.
             </>
           }
           howTo={{
             steps: [
-              "Ga naar Identiteit \u2192 Instellingen om alle opties op \u00e9\u00e9n plek te zien",
-              "Sectie A (Notificaties): kies per type welke meldingen je wilt ontvangen",
-              "Sectie B (Widgets): schakel widgets aan/uit en ontdek nieuwe opties per niveau",
-              "Sectie C (FIRE): stel verwacht rendement, inflatie en eindstrategie in \u2014 dit stuurt al je prognoses",
-              "Sectie D (Weergave): pas modulekleuren aan met voorgedefinieerde of eigen kleuren",
-              "Sectie E (Gegevens): exporteer al je data of verwijder je account",
+              "Ga naar Identiteit \u2192 Instellingen. Zes secties met alle configuratiemogelijkheden",
+              "FIRE-parameters (C): stel je verwacht rendement in (standaard 7%) en inflatie (standaard 2%). Deze percentages bepalen al je FIRE-berekeningen. Kies je onttrekkingsstrategie (perpetual/legacy/deplete)",
+              "Weergave (D): kies een typografisch thema (Editorial, Andada of Digital). Pas de kleuren van elke module aan (Kern, Wil, Horizon). Kies kleuren per budgetcategorie",
+              "Widgets (B): schakel widgets aan of uit, kies het formaat (mini/quarter/half/full), en bepaal de volgorde op je De Wil-pagina",
+              "Notificaties (A): kies welke meldingen je wilt ontvangen: budgetwaarschuwingen, mijlpalen, AI-inzichten, sync-updates. Stel apart in voor partner-transacties",
+              "AI (F): schakel Will en AI-features aan of uit via \u00e9\u00e9n toggle",
+              "Gegevens (E): exporteer al je data of verwijder je account",
             ],
             tip: "Begin met de FIRE-parameters \u2014 die hebben de grootste impact op al je berekeningen. Een verschil van 1% rendement kan je FIRE-datum jaren verschuiven.",
           }}
