@@ -2972,6 +2972,22 @@
 ### Notes for Next Session
 - Port 3000 used this session
 - TrendChart component is a pure UI component (no database interaction)
+
+## Session 2026-03-16 - Feature #78
+
+### Feature #78: Widget-catalog + persistence: holding_fav:* support - PASSING
+- Updated HOLDING_FAV_SIZES from ['mini', 'quarter'] to ['quarter', 'half', 'full'] (geen mini)
+- mergeWidgetPrefs already had holding_fav:* preservation (line 658)
+- Added holding_fav:* prefix to widgets API route filter (line 20)
+- Added holding_fav:* handling to lookupSizes in auto-dashboard-builder (line 318)
+- draggable-widget-grid size selector already works via undefined fallback to ['quarter', 'half', 'full']
+- Zero TypeScript errors in changed files
+- Zero console errors in browser
+- Commit: 18fa00d6
+
+### Current Status
+- 1 feature completed this session (#78)
+- 85/95 features passing (89.5%)
 - Component supports: 3 chart modes, 3 module colors, multi-series, hover tooltips, projected data, custom formatting
 - Not yet integrated into existing app pages (still using custom inline SVG charts on /horizon)
 - Future enhancement: replace inline ResilienceTrendChart and FireAgeTrendChart with TrendChart component
