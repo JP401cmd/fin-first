@@ -1080,16 +1080,44 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              TriFinity stuurt je meldingen wanneer het ertoe doet: budgetgrenzen die naderen, ongebruikelijke transacties, vermogensmijlpalen die je bereikt, level-ups in je soevereiniteit, en aanbevelingen die klaarstaan. Urgente alerts verschijnen bovenaan, dagelijkse meldingen daaronder, en eerdere meldingen zijn per dag terug te bladeren. Per type kun je meldingen aan of uitzetten.
+              <strong>Weet wat belangrijk is zonder constant te checken.</strong>{" "}
+              TriFinity houdt je financiën in de gaten en stuurt alleen een
+              melding als er iets is dat je aandacht verdient. Zo hoef je niet
+              dagelijks alles zelf te controleren — de app doet het voor je.
+              {" "}
+              Er zijn zeven soorten meldingen.{" "}
+              <strong>Budget alerts</strong> waarschuwen als je een budgetgrens
+              nadert of overschrijdt.{" "}
+              <strong>Synchronisatie</strong> laat je weten wanneer je
+              bankconnectie is bijgewerkt of aandacht nodig heeft.{" "}
+              <strong>Aanbevelingen</strong> geven financiële tips en suggesties
+              op basis van je data.{" "}
+              <strong>Inzichten</strong> signaleren patronen in je uitgaven die
+              je misschien over het hoofd ziet — denk aan ongebruikelijke
+              transacties of afwijkende maanden.{" "}
+              <strong>Level-ups</strong> melden wanneer je soevereiniteitsniveau
+              stijgt en nieuwe widgets ontgrendelt.{" "}
+              <strong>Horizon-alerts</strong> gaan over je FIRE-prognose:
+              aandachtspunten en vrijheidswaarschuwingen.{" "}
+              <strong>Prijs-alerts</strong> triggeren bij koersbewegingen of
+              allocatiedrift in je holdings.
+              {" "}
+              Urgente meldingen verschijnen bovenaan, dagelijkse daaronder, en
+              eerdere meldingen kun je per dag terugbladeren. In{" "}
+              <strong>Instellingen → Notificaties</strong> schakel je per type
+              meldingen aan of uit — zo ontvang je alleen wat voor jou relevant
+              is.
             </>
           }
           howTo={{
             steps: [
-              'Meldingen verschijnen via het bel-icoon in de navigatiebalk',
-              'Tik op een melding om naar het relevante onderdeel te gaan',
-              'Beheer je meldingsvoorkeuren via Identiteit → Instellingen → Notificaties',
+              "Meldingen verschijnen via het bel-icoon in de navigatiebalk — een badge toont het aantal ongelezen",
+              "Tik op een melding om direct naar het relevante onderdeel te navigeren (budget, holding, vermogen)",
+              "Ga naar Identiteit → Instellingen → Notificaties om per type te kiezen welke meldingen je wilt ontvangen",
+              "Schakel budget alerts en level-ups in om gemotiveerd te blijven zonder overweldigd te raken",
+              "Stel prijs-alerts in op je holdings-pagina voor koerswaarschuwingen en allocatiedrift",
             ],
-            tip: 'Laat budgetalerts en mijlpalen aan staan — ze houden je gemotiveerd zonder overweldigd te raken.',
+            tip: "Begin met alle meldingen aan en schakel na een week uit wat je niet nodig hebt. Zo ontdek je welke alerts echt waarde toevoegen aan je financiële routine.",
           }}
         />
 
@@ -1206,29 +1234,40 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              Nodig je partner uit voor een gedeeld huishouden en beheer samen je
-              financi\u00ebn met respect voor individuele privacy. Per categorie
-              (vermogen, schulden, inkomsten) kies je het{" "}
-              <strong>zichtbaarheidsniveau</strong>: volledig (alles delen), totalen
-              (alleen bedragen, geen details) of verborgen. De kostenverdeling is
-              configureerbaar: gelijk of naar rato, met een primaire betaler voor
-              gezamenlijke lasten.
+              Samen financiële vrijheid bereiken — dat is de kern van het
+              huishoudperspectief. Nodig je partner uit en beheer jullie
+              financiën samen, met respect voor individuele privacy. Per
+              bezitting, rekening of schuld kies je het{" "}
+              <strong>eigenaarschap</strong>: persoonlijk (alleen voor jou
+              zichtbaar), gedeeld (zichtbaar voor jullie beiden) of verborgen.
+              Per categorie (vermogen, schulden, inkomsten) stel je het{" "}
+              <strong>zichtbaarheidsniveau</strong> in: volledig, alleen totalen
+              of volledig verborgen.
               {" "}
-              <strong>Gedeelde doelen</strong>, gezamenlijke FIRE-berekeningen en
-              huishoudperspectief op je dashboard maken financieel samenwerken
-              concreet. Wissel op elke pagina tussen je persoonlijke en
-              huishoudperspectief.
+              <strong>Gedeeld vermogen</strong> combineert jullie gezamenlijke
+              rekeningen, beleggingen en vastgoed tot één huishoud-netto-vermogen
+              — uitgedrukt in gezamenlijke vrijheidstijd. De kostenverdeling is
+              configureerbaar: gelijk of naar rato van inkomen, met een primaire
+              betaler voor gezamenlijke lasten. <strong>Gedeelde doelen</strong>{" "}
+              laten jullie samen sparen naar een gemeenschappelijk doel.
+              {" "}
+              De <strong>gezamenlijke FIRE-projectie</strong> berekent jullie pad
+              naar financiële vrijheid met twee inkomens, gedeelde uitgaven en
+              gecombineerd vermogen. Op elke pagina wissel je via een toggle
+              tussen je persoonlijke en huishoudperspectief.
             </>
           }
           howTo={{
             steps: [
               "Ga naar Identiteit \u2192 Delen en nodig je partner uit via e-mailadres",
               "Je partner ontvangt een uitnodigingslink en maakt een eigen account aan",
-              "Stel de kostenverdeling in (50/50 of aangepast percentage) en kies de primaire betaler",
+              "Stel het huishouden in: kies een huishoudnaam en configureer de kostenverdeling (50/50 of aangepast percentage)",
+              "Markeer rekeningen en bezittingen als persoonlijk of gedeeld \u2014 dit bepaalt wat je partner kan zien",
               "Configureer per categorie het privacyniveau: volledig, totalen of verborgen",
+              "Bekijk de gezamenlijke FIRE-projectie op De Horizon \u2014 twee inkomens, gedeelde uitgaven, \u00e9\u00e9n vrijheidsdatum",
               "Wissel op elke pagina tussen persoonlijk en huishoudperspectief via de toggle",
             ],
-            tip: "Bespreek samen welk privacyniveau jullie prettig vinden voordat je het instelt. Financieel vertrouwen groeit geleidelijk.",
+            tip: "Bespreek samen welk privacyniveau jullie prettig vinden voordat je het instelt. Begin met totalen delen en breid uit als het vertrouwen groeit.",
           }}
         />
 
