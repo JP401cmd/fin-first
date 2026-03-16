@@ -466,16 +466,19 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                Will analyseert je financi\u00eble situatie en genereert persoonlijke
-                aanbevelingen in vijf categorie\u00ebn: bespaartips,
+                Voorstellen zijn concrete acties die je vrijheidstijd vergroten.
+                Will analyseert je <strong>uitgavenpatronen</strong>,{" "}
+                <strong>doelen</strong> en financi\u00eble situatie en genereert
+                persoonlijke aanbevelingen in vijf categorie\u00ebn: bespaartips,
                 schuld-optimalisatie, beleggingskansen, inkomensmogelijkheden en
-                gedragsaanpassingen. Elke aanbeveling toont de geschatte impact in{" "}
-                <strong>vrijheidsdagen per jaar</strong> \u2014 zo weet je precies
-                wat het je oplevert.
+                gedragsaanpassingen. Elke aanbeveling toont de geschatte impact
+                in <strong>vrijheidsdagen per jaar</strong> en laat zien{" "}
+                <strong>hoeveel maanden eerder vrij</strong> je wordt als je het
+                voorstel uitvoert \u2014 zo weet je precies wat het je oplevert.
                 {" "}
                 Voorstellen komen binnen als inzichten die je kunt{" "}
-                <strong>accepteren</strong> (wordt een actie),{" "}
-                <strong>uitstellen</strong> (bewaar voor later) of{" "}
+                <strong>accepteren</strong> (wordt direct een actie op je
+                kanban-bord), <strong>uitstellen</strong> (bewaar voor later) of{" "}
                 <strong>afwijzen</strong>. De prioriteitsscore bepaalt welke
                 bovenaan staan: voorstellen met de hoogste vrijheidstijd-impact
                 verschijnen eerst. Naarmate je meer gegevens toevoegt, worden de
@@ -485,9 +488,9 @@ export default function GidsPage() {
             howTo={{
               steps: [
                 "Ga naar De Wil \u2014 je voorstellen staan in de kolom \u201cInzicht\u201d",
-                "Tik op \u201c+ Analyseren\u201d om Will nieuwe aanbevelingen te laten genereren op basis van je huidige data",
-                "Bekijk per voorstel de vrijheidsdagen-impact en de onderbouwing",
-                "Kies: accepteren (wordt actie), uitstellen (komt later terug) of afwijzen (verdwijnt)",
+                "Tik op \u201c+ Analyseren\u201d om Will nieuwe aanbevelingen te laten genereren op basis van je uitgavenpatronen en doelen",
+                "Bekijk per voorstel de vrijheidsdagen-impact en hoeveel maanden eerder vrij je wordt",
+                "Kies: accepteren (wordt actie op je kanban-bord), uitstellen (komt later terug) of afwijzen (verdwijnt)",
               ],
               tip: "Accepteer eerst de voorstellen met de hoogste vrijheidsdagen-impact \u2014 die leveren het snelst resultaat op.",
             }}
