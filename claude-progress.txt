@@ -1,3 +1,43 @@
+## Session 2026-03-16 - Features #83, #84, #85
+
+### Feature #83: Scheduled automatische prijsupdates - PASSING
+- Created cron endpoint at /api/holdings/refresh-prices/cron/route.ts
+- Pattern: same as /api/snapshots/cron (CRON_SECRET + service role key)
+- Fetches all active holdings with ticker across all users
+- Deduplicates tickers to minimize Yahoo Finance API calls
+- Respects rate limits: 200ms delay between requests
+- Updates: current_price, previous_close, daily_change_percent, last_price_update, currency
+- Syncs parent asset values after all price updates
+- Added to proxy.ts publicPaths for middleware bypass
+- Created vercel.json with cron schedule: hourly 08:00-22:00 weekdays
+- Verified endpoint responds correctly
+
+### Feature #84: Echte benchmark data ipv synthetische - PASSING
+- Added fetchRealBenchmarkData to lib/benchmark-comparison.ts
+- Uses Yahoo Finance chart API with monthly interval for AEX, IWDA.AS, GSPC
+- 1-hour in-memory cache with TTL for benchmark data
+- compareToBenchmarks now accepts optional realBenchmarkData parameter
+- Falls back to synthetic generateBenchmarkData when real data unavailable
+- Added dataSource field to ComparisonResult
+- Chart shows asterisk next to benchmark names using synthetic data
+- Added footnote disclaimer when any benchmark uses synthetic data
+
+### Feature #85: Valuta-ondersteuning voor holdings - PASSING
+- Created migration: add_holdings_currency (TEXT NOT NULL DEFAULT EUR)
+- Created lib/forex.ts: Yahoo Finance forex pairs, 1-hour cache, 20+ fallback rates
+- Price refresh (manual + cron) now detects and stores currency from Yahoo Finance
+- Holdings creation/update API accepts optional currency parameter
+- holdings-sync.ts converts foreign currencies to EUR using getEURRateSync
+- GET /api/holdings calculates totalValue/totalCost with EUR conversion
+- Holdings list shows currency badge for non-EUR holdings
+- Holding detail page: dynamic currency in all KPI cards
+- Currency badge shown next to ticker on detail page
+
+### Current Status
+- 3 features completed this session (#83, #84, #85)
+- Zero console errors
+- Commit: 1ef31001
+
 ## Session 2026-03-16 - Feature #4
 
 ### Feature #4: ReisStapSection component - PASSING
