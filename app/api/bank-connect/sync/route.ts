@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { getBaseUrls, getAccountTransactions, refreshAccessToken } from '@/lib/truelayer/client'
 import { mapTransactions } from '@/lib/truelayer/mapper'
-import { categorizeTransaction, type CategoryCorrection } from '@/lib/parsers/categorize'
+import { categorizeTransaction, buildFrequencyMap, type CategoryCorrection } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
 
 export async function POST(req: Request) {
@@ -133,6 +133,9 @@ export async function POST(req: Request) {
     const newTransactions = parsed.filter((p) => !existingHashSet.has(p.import_hash))
     const duplicateCount = parsed.length - newTransactions.length
 
+    // Build frequency map for smart matching
+    const freqMap = await buildFrequencyMap(user.id, supabase)
+
     // Categorize and batch insert
     const BATCH_SIZE = 50
     let insertedCount = 0
@@ -146,7 +149,10 @@ export async function POST(req: Request) {
           tx.counterparty_name,
           tx.amount,
           (budgets ?? []) as Budget[],
-          (corrections ?? []) as CategoryCorrection[]
+          (corrections ?? []) as CategoryCorrection[],
+          undefined,
+          tx.counterparty_iban,
+          freqMap,
         )
 
         return {
@@ -162,7 +168,7 @@ export async function POST(req: Request) {
           import_hash: tx.import_hash,
           is_income: tx.amount > 0,
           budget_id: cat.budget_id,
-          category_source: cat.budget_id ? 'rule' as const : 'import' as const,
+          category_source: cat.category_source ?? (cat.budget_id ? 'rule' : 'import'),
         }
       })
 

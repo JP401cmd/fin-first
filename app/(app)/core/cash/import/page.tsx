@@ -13,7 +13,7 @@ import { parseCSV, getCSVHeaders, getCSVPreview } from '@/lib/parsers/csv'
 import { parseOFX } from '@/lib/parsers/ofx'
 import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
-import { categorizeTransaction, isOwnAccountTransfer, type CategoryCorrection } from '@/lib/parsers/categorize'
+import { categorizeTransaction, isOwnAccountTransfer, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 
@@ -91,8 +91,9 @@ export default function ImportPage() {
   const [loading, setLoading] = useState(true)
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, failed: 0 })
   const [importedBatchIndex, setImportedBatchIndex] = useState(0)
+  const [importStartTime, setImportStartTime] = useState<number | null>(null)
   const [isNetworkError, setIsNetworkError] = useState(false)
   const [error, setError] = useState('')
   const [fileName, setFileName] = useState('')
@@ -103,13 +104,19 @@ export default function ImportPage() {
   const [csvPreview, setCsvPreview] = useState<string[][]>([])
   const [showColumnMapping, setShowColumnMapping] = useState(false)
   const [corrections, setCorrections] = useState<CategoryCorrection[]>([])
+  const [freqMap, setFreqMap] = useState<Map<string, FrequencyMatch>>(new Map())
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
   const [aiSuggestions, setAiSuggestions] = useState<Map<string, AISuggestion>>(new Map())
   const [aiLoading, setAiLoading] = useState(false)
   const [aiReady, setAiReady] = useState(false)
   const [aiError, setAiError] = useState(false)
+  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, skippedHighConf: 0 })
+  const [aiFailedBatches, setAiFailedBatches] = useState<Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string; amount: number; reference: string }> }>>([])
+  const [aiRetrying, setAiRetrying] = useState(false)
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
   const [checkingDups, setCheckingDups] = useState(false)
+  const PAGE_SIZE = 50
+  const [currentPage, setCurrentPage] = useState(0)
 
   const loadInitialData = useCallback(async () => {
     setLoading(true)
@@ -164,6 +171,11 @@ export default function ImportPage() {
         setCorrections(correctionsRes.data as CategoryCorrection[])
       }
 
+      // Build frequency map from historical transactions (async, non-blocking)
+      if (user) {
+        buildFrequencyMap(user.id, supabase).then(fm => setFreqMap(fm)).catch(() => { /* non-critical */ })
+      }
+
       setLoading(false)
     } catch (err) {
       if (isNetworkFailure(err)) {
@@ -180,48 +192,126 @@ export default function ImportPage() {
     loadInitialData()
   }, [loadInitialData])
 
-  async function enrichWithAI(importRows: ImportRow[]) {
-    const toEnrich = importRows.filter((r) => !r.isTransfer && r.confidence < 0.7)
-    if (toEnrich.length === 0) return
+  // Semaphore for limiting concurrent AI requests
+  async function runWithConcurrency<T>(
+    tasks: (() => Promise<T>)[],
+    maxConcurrent: number,
+    onComplete: (index: number) => void,
+  ): Promise<PromiseSettledResult<T>[]> {
+    const results: PromiseSettledResult<T>[] = new Array(tasks.length)
+    let nextIndex = 0
+
+    async function runNext(): Promise<void> {
+      while (nextIndex < tasks.length) {
+        const idx = nextIndex++
+        try {
+          const value = await tasks[idx]()
+          results[idx] = { status: 'fulfilled', value }
+        } catch (reason) {
+          results[idx] = { status: 'rejected', reason }
+        }
+        onComplete(idx)
+      }
+    }
+
+    const workers = Array.from({ length: Math.min(maxConcurrent, tasks.length) }, () => runNext())
+    await Promise.all(workers)
+    return results
+  }
+
+  async function enrichWithAI(importRows: ImportRow[], retryPayloads?: typeof aiFailedBatches) {
+    // Feature #101: Skip AI for high-confidence rule matches (>= 0.8)
+    const allNonTransfer = importRows.filter((r) => !r.isTransfer)
+    const highConfidence = allNonTransfer.filter((r) => r.confidence >= 0.8)
+    const toEnrich = retryPayloads
+      ? [] // when retrying, we use retryPayloads directly
+      : allNonTransfer.filter((r) => r.confidence < 0.8)
+
+    if (!retryPayloads && toEnrich.length === 0) return
 
     setAiLoading(true)
     setAiReady(false)
     setAiError(false)
-    setAiSuggestions(new Map())
+    if (!retryPayloads) {
+      setAiSuggestions(new Map())
+      setAiFailedBatches([])
+    }
+    setAiRetrying(!!retryPayloads)
 
     try {
-      const payload = toEnrich.map((r) => ({
-        import_hash: r.import_hash,
-        description: r.description,
-        counterparty_name: r.counterparty_name,
-        amount: r.amount,
-        reference: r.reference,
-      }))
+      // Build batches of 20
+      let batches: Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string; amount: number; reference: string }> }>
 
-      const allResults: AISuggestion[] = []
-      for (let i = 0; i < payload.length; i += 20) {
+      if (retryPayloads) {
+        batches = retryPayloads.map((b, i) => ({ index: i, payload: b.payload }))
+      } else {
+        const payload = toEnrich.map((r) => ({
+          import_hash: r.import_hash,
+          description: r.description,
+          counterparty_name: r.counterparty_name,
+          amount: r.amount,
+          reference: r.reference,
+        }))
+
+        batches = []
+        for (let i = 0; i < payload.length; i += 20) {
+          batches.push({ index: batches.length, payload: payload.slice(i, i + 20) })
+        }
+      }
+
+      const totalTxCount = batches.reduce((sum, b) => sum + b.payload.length, 0)
+      setAiProgress({ current: 0, total: totalTxCount, skippedHighConf: retryPayloads ? 0 : highConfidence.length })
+
+      let completedTxCount = 0
+
+      // Feature #100: Parallel AI categorization with concurrency limiter (max 3)
+      const tasks = batches.map((batch) => async () => {
         const res = await fetch('/api/ai/categorize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transactions: payload.slice(i, i + 20) }),
+          body: JSON.stringify({ transactions: batch.payload }),
         })
         if (!res.ok) throw new Error('AI niet beschikbaar')
-        const data = await res.json() as { results: AISuggestion[] }
-        allResults.push(...data.results)
-      }
+        return await res.json() as { results: AISuggestion[] }
+      })
 
-      const map = new Map<string, AISuggestion>()
+      const results = await runWithConcurrency(tasks, 3, (idx) => {
+        completedTxCount += batches[idx].payload.length
+        setAiProgress((prev) => ({ ...prev, current: completedTxCount }))
+      })
+
+      // Collect successes and failures
+      const allResults: AISuggestion[] = []
+      const failed: typeof aiFailedBatches = []
+
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') {
+          allResults.push(...result.value.results)
+        } else {
+          failed.push(batches[idx])
+        }
+      })
+
+      // Merge with existing suggestions (important for retry flow)
+      const map = new Map<string, AISuggestion>(retryPayloads ? aiSuggestions : [])
       for (const s of allResults) {
         if (s.budget_id && s.confidence >= 0.5) {
           map.set(s.import_hash, s)
         }
       }
       setAiSuggestions(map)
+      setAiFailedBatches(failed)
       setAiReady(true)
+
+      // If all batches failed, show error
+      if (allResults.length === 0 && failed.length > 0) {
+        setAiError(true)
+      }
     } catch {
       setAiError(true)
     } finally {
       setAiLoading(false)
+      setAiRetrying(false)
     }
   }
 
@@ -240,6 +330,7 @@ export default function ImportPage() {
     // If called with fresh rows after parsing, set them immediately and go to step 2
     if (rowsParam) {
       setRows(rowsParam)
+      setCurrentPage(0)
       setStep(2)
     }
 
@@ -445,7 +536,7 @@ export default function ImportPage() {
         const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
         const cat = isTransfer
           ? { budget_id: null, confidence: 1.0, budgetName: null }
-          : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections)
+          : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections, undefined, tx.counterparty_iban, freqMap)
         return {
           ...tx,
           budget_id: cat.budget_id,
@@ -494,7 +585,7 @@ export default function ImportPage() {
         const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
         const cat = isTransfer
           ? { budget_id: null, confidence: 1.0, budgetName: null }
-          : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections)
+          : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections, undefined, tx.counterparty_iban, freqMap)
         return {
           ...tx,
           budget_id: cat.budget_id,
@@ -674,14 +765,16 @@ export default function ImportPage() {
       transaction_type: r.isTransfer ? 'transfer' : r.transaction_type,
     }))
 
-    const BATCH_SIZE = 50
+    const BATCH_SIZE = 100
     const batches: typeof insertRows[] = []
     for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
       batches.push(insertRows.slice(i, i + BATCH_SIZE))
     }
 
     const startBatch = retryFromBatch ?? importedBatchIndex
-    setImportProgress({ current: startBatch * BATCH_SIZE, total: insertRows.length })
+    setImportProgress({ current: startBatch * BATCH_SIZE, total: insertRows.length, failed: 0 })
+    setImportStartTime(Date.now())
+    let failedCount = 0
 
     for (let batchIdx = startBatch; batchIdx < batches.length; batchIdx++) {
       try {
@@ -693,7 +786,7 @@ export default function ImportPage() {
           if (isNetworkFailure(insertError)) {
             const imported = batchIdx * BATCH_SIZE
             setImportedBatchIndex(batchIdx)
-            setImportProgress({ current: imported, total: insertRows.length })
+            setImportProgress({ current: imported, total: insertRows.length, failed: failedCount })
             setIsNetworkError(true)
             setError(
               imported > 0
@@ -710,7 +803,7 @@ export default function ImportPage() {
       } catch (err) {
         const imported = batchIdx * BATCH_SIZE
         setImportedBatchIndex(batchIdx)
-        setImportProgress({ current: imported, total: insertRows.length })
+        setImportProgress({ current: imported, total: insertRows.length, failed: failedCount })
 
         if (isNetworkFailure(err)) {
           setIsNetworkError(true)
@@ -727,11 +820,12 @@ export default function ImportPage() {
       }
 
       const progressCount = Math.min((batchIdx + 1) * BATCH_SIZE, insertRows.length)
-      setImportProgress({ current: progressCount, total: insertRows.length })
+      setImportProgress({ current: progressCount, total: insertRows.length, failed: failedCount })
       setImportedBatchIndex(batchIdx + 1)
     }
 
     setImportedBatchIndex(0)
+    setImportStartTime(null)
     setStep(4)
     setImporting(false)
 
@@ -745,6 +839,36 @@ export default function ImportPage() {
   const toImportCount = rows.filter((r) => !r.skipImport).length
   const totalBij = rows.filter((r) => !r.skipImport && r.amount > 0).reduce((s, r) => s + r.amount, 0)
   const totalAf = rows.filter((r) => !r.skipImport && r.amount < 0).reduce((s, r) => s + r.amount, 0)
+
+  // Pagination helper for step 2 and step 3 tables
+  function PaginationBar({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
+    if (totalPages <= 1) return null
+    return (
+      <div className="flex items-center justify-between border-t border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-2">
+        <span className="text-xs text-[var(--ink-3)]">
+          Pagina {page + 1} van {totalPages}
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={page === 0}
+            onClick={() => onPageChange(page - 1)}
+            className="rounded border border-[var(--border-md)] px-3 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--paper)] disabled:opacity-40"
+          >
+            Vorige
+          </button>
+          <button
+            type="button"
+            disabled={page >= totalPages - 1}
+            onClick={() => onPageChange(page + 1)}
+            className="rounded border border-[var(--border-md)] px-3 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--paper)] disabled:opacity-40"
+          >
+            Volgende
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (loading && !error) {
     return (
@@ -1142,7 +1266,7 @@ export default function ImportPage() {
                   )}
                 </div>
                 <button
-                  onClick={() => setStep(3)}
+                  onClick={() => { setCurrentPage(0); setStep(3) }}
                   className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
                 >
                   Volgende: categoriseren
@@ -1156,58 +1280,69 @@ export default function ImportPage() {
                 </div>
               )}
 
-              <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
-                <table className="w-full text-sm">
-                  <thead className="bg-[var(--subtle)] text-left">
-                    <tr>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Importeer</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {rows.map((row, idx) => (
-                      <tr key={idx} className={`${row.skipImport ? 'bg-[var(--subtle)] opacity-60' : 'hover:bg-[var(--subtle)]'}`}>
-                        <td className="px-4 py-2">
-                          <input
-                            type="checkbox"
-                            checked={!row.skipImport}
-                            onChange={() => toggleSkip(idx)}
-                            className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
-                          />
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
-                          {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                        </td>
-                        <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
-                          {row.description}
-                          {row.counterparty_name && (
-                            <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
-                          )}
-                        </td>
-                        <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
-                          row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
-                        }`}>
-                          {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
-                        </td>
-                        <td className="px-4 py-2">
-                          {row.isDuplicate ? (
-                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-                              Duplicaat
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                              Nieuw
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {(() => {
+                const step2TotalPages = Math.ceil(rows.length / PAGE_SIZE)
+                const step2PageRows = rows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+                const step2Offset = currentPage * PAGE_SIZE
+                return (
+                  <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
+                    <table className="w-full text-sm">
+                      <thead className="bg-[var(--subtle)] text-left">
+                        <tr>
+                          <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Importeer</th>
+                          <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
+                          <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
+                          <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
+                          <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {step2PageRows.map((row, localIdx) => {
+                          const realIdx = step2Offset + localIdx
+                          return (
+                            <tr key={realIdx} className={`${row.skipImport ? 'bg-[var(--subtle)] opacity-60' : 'hover:bg-[var(--subtle)]'}`}>
+                              <td className="px-4 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={!row.skipImport}
+                                  onChange={() => toggleSkip(realIdx)}
+                                  className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
+                                />
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
+                                {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                              </td>
+                              <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
+                                {row.description}
+                                {row.counterparty_name && (
+                                  <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
+                                )}
+                              </td>
+                              <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
+                                row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
+                              }`}>
+                                {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
+                              </td>
+                              <td className="px-4 py-2">
+                                {row.isDuplicate ? (
+                                  <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                                    Duplicaat
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                    Nieuw
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                    <PaginationBar page={currentPage} totalPages={step2TotalPages} onPageChange={setCurrentPage} />
+                  </div>
+                )
+              })()}
             </>
           )}
         </div>
@@ -1253,55 +1388,122 @@ export default function ImportPage() {
           </div>
 
           {/* Import progress */}
-          {importing && importProgress.total > 0 && (
-            <div className="rounded-lg border border-kern-200 bg-kern-50 p-4">
-              <div className="flex justify-between text-xs text-kern-700 mb-1">
-                <span>Importeren: {importProgress.current} van {importProgress.total} transacties...</span>
-                <span>{Math.round((importProgress.current / importProgress.total) * 100)}%</span>
+          {importing && importProgress.total > 0 && (() => {
+            const pct = Math.round((importProgress.current / importProgress.total) * 100)
+            const batchNum = Math.ceil(importProgress.current / 50) || 1
+            const totalBatches = Math.ceil(importProgress.total / 50)
+            const elapsed = importStartTime ? (Date.now() - importStartTime) / 1000 : 0
+            const rate = elapsed > 0 && importProgress.current > 0 ? importProgress.current / elapsed : 0
+            const remaining = rate > 0 ? Math.ceil((importProgress.total - importProgress.current) / rate) : null
+            const remainingStr = remaining !== null && remaining > 0
+              ? remaining >= 60
+                ? `~${Math.ceil(remaining / 60)} min resterend`
+                : `~${remaining}s resterend`
+              : null
+            return (
+              <div className="rounded-lg border border-kern-200 bg-kern-50 p-4">
+                <div className="flex justify-between text-xs text-kern-700 mb-1.5">
+                  <span className="font-medium">
+                    Importeren: {importProgress.current} van {importProgress.total} transacties
+                    <span className="text-[var(--ink-4)] ml-1.5">(batch {batchNum}/{totalBatches})</span>
+                  </span>
+                  <span className="font-mono tabular-nums font-semibold">{pct}%</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-kern-200 overflow-hidden">
+                  <div
+                    className="h-2.5 rounded-full bg-kern-500"
+                    style={{
+                      width: `${(importProgress.current / importProgress.total) * 100}%`,
+                      transition: 'width 0.4s ease-out',
+                    }}
+                  />
+                </div>
+                {remainingStr && (
+                  <p className="mt-1.5 text-[11px] text-[var(--ink-4)]">{remainingStr}</p>
+                )}
               </div>
-              <div className="h-2 rounded-full bg-kern-200">
-                <div
-                  className="h-2 rounded-full bg-kern-500 transition-all"
-                  style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
+            )
+          })()}
 
-          {/* AI loading banner */}
+          {/* AI loading banner with batch progress */}
           {aiLoading && (
-            <div className="flex items-center gap-3 rounded-[var(--r-lg)] border border-dashed border-kern-200 bg-kern-50/50 px-4 py-3">
-              <Loader2 className="h-4 w-4 animate-spin text-kern-500 shrink-0" />
-              <p className="text-sm text-kern-700">
-                Will analyseert — {rows.filter((r) => !r.isTransfer && r.confidence < 0.7 && !r.skipImport).length} transacties worden bekeken…
-              </p>
+            <div className="rounded-[var(--r-lg)] border border-dashed border-kern-200 bg-kern-50/50 px-4 py-3 space-y-2">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-kern-500 shrink-0" />
+                <p className="text-sm text-kern-700">
+                  {aiRetrying ? 'Will herprobeert gefaalde batches…' : (
+                    aiProgress.total > 0
+                      ? <>Will categoriseert… <span className="font-mono tabular-nums font-medium">{aiProgress.current}</span> van <span className="font-mono tabular-nums font-medium">{aiProgress.total}</span> transacties</>
+                      : <>Will analyseert…</>
+                  )}
+                </p>
+              </div>
+              {aiProgress.total > 0 && (
+                <div className="h-1.5 rounded-full bg-kern-200 overflow-hidden">
+                  <div
+                    className="h-1.5 rounded-full bg-kern-500"
+                    style={{
+                      width: `${(aiProgress.current / aiProgress.total) * 100}%`,
+                      transition: 'width 0.4s ease-out',
+                    }}
+                  />
+                </div>
+              )}
+              {aiProgress.skippedHighConf > 0 && (
+                <p className="text-[11px] text-[var(--ink-4)]">
+                  {aiProgress.skippedHighConf} transacties automatisch herkend (overgeslagen)
+                </p>
+              )}
             </div>
           )}
 
           {/* AI ready banner */}
           {aiReady && aiSuggestions.size > 0 && (
-            <div className="flex items-center justify-between gap-3 rounded-[var(--r-lg)] border border-kern-300 bg-kern-50 px-4 py-3">
-              <div className="flex items-center gap-3">
-                <Sparkles className="h-4 w-4 text-kern-600 shrink-0" />
-                <p className="text-sm font-medium text-kern-700">
-                  Will heeft {aiSuggestions.size} {aiSuggestions.size === 1 ? 'voorstel' : 'voorstellen'}
-                </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3 rounded-[var(--r-lg)] border border-kern-300 bg-kern-50 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-4 w-4 text-kern-600 shrink-0" />
+                  <p className="text-sm font-medium text-kern-700">
+                    Will heeft {aiSuggestions.size} {aiSuggestions.size === 1 ? 'voorstel' : 'voorstellen'}
+                    {aiProgress.skippedHighConf > 0 && (
+                      <span className="text-[var(--ink-3)] font-normal ml-1">
+                        · {aiProgress.skippedHighConf} automatisch herkend
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRows((prev) => prev.map((r) => {
+                      const s = aiSuggestions.get(r.import_hash)
+                      if (!s || !s.budget_id) return r
+                      const budget = budgets.find((b) => b.id === s.budget_id)
+                      return { ...r, budget_id: s.budget_id, budgetName: budget?.name ?? null, confidence: s.confidence, aiAccepted: true }
+                    }))
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Alles goedkeuren
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setRows((prev) => prev.map((r) => {
-                    const s = aiSuggestions.get(r.import_hash)
-                    if (!s || !s.budget_id) return r
-                    const budget = budgets.find((b) => b.id === s.budget_id)
-                    return { ...r, budget_id: s.budget_id, budgetName: budget?.name ?? null, confidence: s.confidence, aiAccepted: true }
-                  }))
-                }}
-                className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
-              >
-                <Check className="h-3.5 w-3.5" />
-                Alles goedkeuren
-              </button>
+              {/* Failed batches retry button */}
+              {aiFailedBatches.length > 0 && (
+                <div className="flex items-center justify-between gap-3 rounded-[var(--r-lg)] border border-orange-200 bg-orange-50 px-4 py-3">
+                  <p className="text-sm text-orange-700">
+                    {aiFailedBatches.reduce((sum, b) => sum + b.payload.length, 0)} transacties konden niet gecategoriseerd worden
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void enrichWithAI(rows.filter(r => !r.skipImport), aiFailedBatches)}
+                    className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Opnieuw proberen
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1354,159 +1556,194 @@ export default function ImportPage() {
             </div>
           )}
 
-          {/* Categorization table — only non-skipped rows */}
-          <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--subtle)] text-left">
-                <tr>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Budget</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Match</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {rows.map((row, realIdx) => {
-                  if (row.skipImport) return null
-                  return (
-                    <tr key={realIdx} className={row.isTransfer ? 'bg-[var(--subtle)]/50' : 'hover:bg-[var(--subtle)]'}>
-                      <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
-                        {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                      </td>
-                      <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
-                        {row.description}
-                        {row.counterparty_name && (
-                          <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
-                        )}
-                      </td>
-                      <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
-                        row.isTransfer ? 'text-[var(--ink-2)]' : row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
-                      }`}>
-                        {!row.isTransfer && (row.amount > 0 ? '+' : '')}{formatCurrency(row.amount)}
-                      </td>
-                      <td className="px-4 py-2">
-                        {row.isTransfer ? (
-                          <div className="flex items-center gap-2">
-                            <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">
-                              Eigen rekening
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setRows((prev) => prev.map((r, i) =>
-                                i === realIdx ? { ...r, isTransfer: false, transaction_type: null } : r
-                              ))}
-                              className="text-[11px] italic text-[var(--ink-4)] hover:text-kern-600 font-[var(--font-source-serif)]"
-                            >
-                              Toch als uitgave?
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {/* AI proposal block */}
-                            {(() => {
-                              const s = aiSuggestions.get(row.import_hash)
-                              if (!s?.budget_id) return null
-                              if (row.aiAccepted) {
-                                return (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
-                                    <Check className="h-2.5 w-2.5" />
-                                    Gekeurd
-                                  </span>
-                                )
-                              }
-                              return (
-                                <div className="rounded border border-dashed border-kern-200 bg-kern-50/50 px-2 py-1.5">
-                                  <p className="font-[var(--font-source-serif)] text-[10px] italic text-[var(--ink-3)] line-clamp-1">{s.reasoning}</p>
-                                  <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                    <span className="inline-flex items-center gap-0.5 rounded-full bg-kern-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[.06em] text-kern-700">
-                                      <Sparkles className="h-2.5 w-2.5" />
-                                      Will
-                                    </span>
-                                    <span className="text-[10px] font-medium text-[var(--ink-2)]">
-                                      {budgets.find((b) => b.id === s.budget_id)?.name}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => updateRowBudget(realIdx, s.budget_id!, 'ai')}
-                                      className="rounded-full bg-kern-600 px-2 py-0.5 text-[9px] font-medium text-white hover:bg-kern-700"
-                                    >
-                                      OK?
-                                    </button>
-                                  </div>
-                                </div>
-                              )
-                            })()}
-                            <select
-                              value={row.budget_id ?? ''}
-                              onChange={(e) => {
-                                if (e.target.value === '__transfer__') {
-                                  setRows((prev) => prev.map((r, i) => i === realIdx ? { ...r, isTransfer: true, transaction_type: 'transfer', budget_id: null, budgetName: null } : r))
-                                } else {
-                                  updateRowBudget(realIdx, e.target.value, 'user')
-                                }
-                              }}
-                              className="w-full max-w-[200px] rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
-                            >
-                              <option value="">Niet gecategoriseerd</option>
-                              <option value="__transfer__">↔ Eigen overboeking</option>
-                              {budgetGroups
-                                .filter((group) => group.children.length > 0)
-                                .map((group) => (
-                                <optgroup key={group.parent.id} label={group.parent.name}>
-                                  {group.children.map((child) => (
-                                    <option key={child.id} value={child.id}>{child.name}</option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        {row.isTransfer ? (
-                          <ArrowLeftRight className="mx-auto h-4 w-4 text-[var(--ink-3)]" />
-                        ) : row.confidence >= 0.9 ? (
-                          <Check className="mx-auto h-4 w-4 text-emerald-500" />
-                        ) : row.confidence >= 0.5 ? (
-                          <AlertTriangle className="mx-auto h-4 w-4 text-orange-500" />
-                        ) : (
-                          <X className="mx-auto h-4 w-4 text-red-400" />
-                        )}
-                      </td>
+          {/* Categorization table — only non-skipped rows, paginated */}
+          {(() => {
+            const visibleRows = rows.map((row, idx) => ({ row, realIdx: idx })).filter(({ row }) => !row.skipImport)
+            const step3TotalPages = Math.ceil(visibleRows.length / PAGE_SIZE)
+            const step3PageRows = visibleRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+            return (
+              <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
+                <table className="w-full text-sm">
+                  <thead className="bg-[var(--subtle)] text-left">
+                    <tr>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Budget</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Match</th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {step3PageRows.map(({ row, realIdx }) => (
+                      <tr key={realIdx} className={row.isTransfer ? 'bg-[var(--subtle)]/50' : 'hover:bg-[var(--subtle)]'}>
+                        <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
+                          {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                        </td>
+                        <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
+                          {row.description}
+                          {row.counterparty_name && (
+                            <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
+                          )}
+                        </td>
+                        <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
+                          row.isTransfer ? 'text-[var(--ink-2)]' : row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
+                        }`}>
+                          {!row.isTransfer && (row.amount > 0 ? '+' : '')}{formatCurrency(row.amount)}
+                        </td>
+                        <td className="px-4 py-2">
+                          {row.isTransfer ? (
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">
+                                Eigen rekening
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setRows((prev) => prev.map((r, i) =>
+                                  i === realIdx ? { ...r, isTransfer: false, transaction_type: null } : r
+                                ))}
+                                className="text-[11px] italic text-[var(--ink-4)] hover:text-kern-600 font-[var(--font-source-serif)]"
+                              >
+                                Toch als uitgave?
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {/* AI proposal block */}
+                              {(() => {
+                                const s = aiSuggestions.get(row.import_hash)
+                                if (!s?.budget_id) return null
+                                if (row.aiAccepted) {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                                      <Check className="h-2.5 w-2.5" />
+                                      Gekeurd
+                                    </span>
+                                  )
+                                }
+                                return (
+                                  <div className="rounded border border-dashed border-kern-200 bg-kern-50/50 px-2 py-1.5">
+                                    <p className="font-[var(--font-source-serif)] text-[10px] italic text-[var(--ink-3)] line-clamp-1">{s.reasoning}</p>
+                                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                      <span className="inline-flex items-center gap-0.5 rounded-full bg-kern-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[.06em] text-kern-700">
+                                        <Sparkles className="h-2.5 w-2.5" />
+                                        Will
+                                      </span>
+                                      <span className="text-[10px] font-medium text-[var(--ink-2)]">
+                                        {budgets.find((b) => b.id === s.budget_id)?.name}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => updateRowBudget(realIdx, s.budget_id!, 'ai')}
+                                        className="rounded-full bg-kern-600 px-2 py-0.5 text-[9px] font-medium text-white hover:bg-kern-700"
+                                      >
+                                        OK?
+                                      </button>
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                              <select
+                                value={row.budget_id ?? ''}
+                                onChange={(e) => {
+                                  if (e.target.value === '__transfer__') {
+                                    setRows((prev) => prev.map((r, i) => i === realIdx ? { ...r, isTransfer: true, transaction_type: 'transfer', budget_id: null, budgetName: null } : r))
+                                  } else {
+                                    updateRowBudget(realIdx, e.target.value, 'user')
+                                  }
+                                }}
+                                className="w-full max-w-[200px] rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
+                              >
+                                <option value="">Niet gecategoriseerd</option>
+                                <option value="__transfer__">↔ Eigen overboeking</option>
+                                {budgetGroups
+                                  .filter((group) => group.children.length > 0)
+                                  .map((group) => (
+                                  <optgroup key={group.parent.id} label={group.parent.name}>
+                                    {group.children.map((child) => (
+                                      <option key={child.id} value={child.id}>{child.name}</option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          {row.isTransfer ? (
+                            <ArrowLeftRight className="mx-auto h-4 w-4 text-[var(--ink-3)]" />
+                          ) : row.confidence >= 0.9 ? (
+                            <Check className="mx-auto h-4 w-4 text-emerald-500" />
+                          ) : row.confidence >= 0.5 ? (
+                            <AlertTriangle className="mx-auto h-4 w-4 text-orange-500" />
+                          ) : (
+                            <X className="mx-auto h-4 w-4 text-red-400" />
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <PaginationBar page={currentPage} totalPages={step3TotalPages} onPageChange={setCurrentPage} />
+              </div>
+            )
+          })()}
         </div>
       )}
 
       {/* Step 4: Success */}
-      {step === 4 && (
-        <div className="rounded-[var(--r-lg)] border border-emerald-200 bg-emerald-50 p-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
-            <Check className="h-6 w-6 text-emerald-600" />
-          </div>
-          <h2 className="text-xl font-bold text-[var(--ink)]">Import geslaagd!</h2>
-          <p className="mt-2 text-sm text-[var(--ink-2)]">
-            <strong>{toImportCount}</strong> transacties geïmporteerd.
-          </p>
-          <div className="mt-2 flex justify-center gap-6 text-sm text-[var(--ink-3)]">
-            <span>Totaal bij: <strong className="text-emerald-600">{formatCurrency(totalBij)}</strong></span>
-            <span>Totaal af: <strong className="text-red-600">{formatCurrency(Math.abs(totalAf))}</strong></span>
-          </div>
-          <div className="mt-3 sm:mt-6">
-            <Link
-              href="/core/cash"
-              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
-            >
-              Naar Cash overzicht
-            </Link>
-          </div>
-        </div>
-      )}
+      {step === 4 &&
+        (() => {
+          const skippedCount = rows.filter((r) => r.skipImport).length
+          const importedCount = toImportCount - importProgress.failed
+          return (
+            <div className="rounded-[var(--r-lg)] border border-emerald-200 bg-emerald-50 p-8 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+                <Check className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h2 className="text-xl font-bold text-[var(--ink)]">Import geslaagd!</h2>
+              <p className="mt-2 text-sm text-[var(--ink-2)]">
+                <strong>{importedCount}</strong> transacties geïmporteerd.
+              </p>
+              <div className="mt-3 flex justify-center flex-wrap gap-3 text-xs">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 font-medium">
+                  <Check className="h-3 w-3" /> {importedCount} geïmporteerd
+                </span>
+                {skippedCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--subtle)] px-3 py-1 text-[var(--ink-3)] font-medium">
+                    {skippedCount} overgeslagen
+                  </span>
+                )}
+                {importProgress.failed > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-red-700 font-medium">
+                    {importProgress.failed} mislukt
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 flex justify-center gap-6 text-sm text-[var(--ink-3)]">
+                <span>
+                  Totaal bij:{' '}
+                  <strong className="text-emerald-600 font-mono tabular-nums">
+                    {formatCurrency(totalBij)}
+                  </strong>
+                </span>
+                <span>
+                  Totaal af:{' '}
+                  <strong className="text-red-600 font-mono tabular-nums">
+                    {formatCurrency(Math.abs(totalAf))}
+                  </strong>
+                </span>
+              </div>
+              <div className="mt-3 sm:mt-6">
+                <Link
+                  href="/core/cash"
+                  className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                >
+                  Naar Cash overzicht
+                </Link>
+              </div>
+            </div>
+          )
+        })()}
     </div>
   )
 }
