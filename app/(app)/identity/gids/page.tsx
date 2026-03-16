@@ -38,6 +38,7 @@ import GuideFaq from "@/components/app/guide-faq";
 import GuideProTips from "@/components/app/guide-pro-tips";
 import ReisStapSection from "@/components/app/reis-stap-section";
 import GuideTopicCard from "@/components/app/guide-topic-card";
+import GuideNaslagwerk from "@/components/app/guide-naslagwerk";
 
 /* ── Types ─────────────────────── */
 
@@ -182,20 +183,24 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Je cashpositie is het fundament van je vermogen — het startpunt van elke berekening. Voeg je <strong>betaal- en spaarrekeningen</strong> toe en houd je saldo actueel. Koppel je bank via <strong>TrueLayer</strong> voor automatische synchronisatie, of importeer transacties handmatig via <strong>MT940, CSV of OFX</strong>. Bij het uploaden doorloop je een stap-voor-stap proces: bestand selecteren, rekening kiezen, transacties reviewen en importeren.
-                {' '}
-                Zodra je transacties binnenkomen, categoriseert de AI ze automatisch met een <strong>betrouwbaarheidsscore</strong>. Drie categorisatiebronnen werken samen: <strong>tegenpartijregels</strong> (IBAN en naam), <strong>frequentie-matching</strong> (patronen uit je historie) en <strong>AI-analyse</strong> voor nieuwe transacties. Elke handmatige correctie wordt opgeslagen als regel en automatisch toegepast bij toekomstige imports — zo wordt het systeem steeds slimmer. <strong>Duplicaatdetectie</strong> voorkomt dubbele boekingen en <strong>transfer matching</strong> herkent overboekingen tussen eigen rekeningen. Het resultaat: een compleet, opgeschoond kasoverzicht als basis voor al je budgetten en vrijheidsberekeningen.
+                Je bankrekeningen zijn het fundament. Elke euro die binnenkomt of vertrekt vertelt een verhaal over waar je tijd naartoe gaat.
+                <br /><br />
+                Voeg je <strong>betaal-, spaar-, gezamenlijke, bedrijfs- of overige rekeningen</strong> toe en houd je saldo actueel. Koppel je bank via <strong>TrueLayer</strong> voor automatische synchronisatie (max 10× per dag), of importeer transacties handmatig via de <strong>4-staps import-wizard</strong>: bestand selecteren (MT940, CSV of OFX), rekening kiezen, transacties reviewen en importeren. CSV-presets voor <strong>ING, Rabobank, ABN AMRO en PayPal</strong> worden automatisch herkend.
+                <br /><br />
+                Zodra je transacties binnenkomen, worden ze automatisch gecategoriseerd via drie methoden: (1) <strong>eerdere correcties</strong> (hoogste prioriteit), (2) <strong>keyword-herkenning</strong> (47 regels voor salaris, boodschappen, energie, etc.) en (3) <strong>AI-categorisatie</strong> voor onbekende transacties. Elke handmatige correctie wordt opgeslagen als regel en automatisch toegepast bij toekomstige imports — zo wordt het systeem steeds slimmer.
+                <br /><br />
+                <strong>Duplicaatdetectie</strong> via SHA-256 hash voorkomt dubbele boekingen. <strong>Eigen overboekingen</strong> tussen je rekeningen worden automatisch herkend en gekoppeld, zodat ze niet dubbel tellen in je budget. Het resultaat: een compleet, opgeschoond kasoverzicht als basis voor al je budgetten en vrijheidsberekeningen.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Kern → Cash en voeg je betaal- en spaarrekeningen toe (betaalrekening, spaarrekening, gezamenlijk, etc.)",
-                "Voer het huidige saldo in — dit is je startpunt voor vermogensberekeningen",
-                "Koppel via TrueLayer voor automatisch bijwerken: kies je bank, log in, en je transacties worden gesynchroniseerd",
-                "Of importeer handmatig: ga naar Cash → Import, selecteer een MT940/CSV/OFX bestand, kies de rekening, en review de transacties voor import",
-                "Controleer de AI-categorisatie — de betrouwbaarheidsscore toont hoe zeker elke toewijzing is, sorteer op laagste confidence om onzekere matches te reviewen",
+                "Rekening toevoegen: Ga naar De Kern → Cash → Nieuwe rekening. Kies het type (betaal, spaar, gezamenlijk, bedrijf of overig), voer IBAN en startsaldo in",
+                "Transacties importeren: Ga naar Cash → Importeren. Sleep je bankbestand (MT940, CSV of OFX) in het uploadveld — de app herkent automatisch het formaat en je bank (ING, Rabobank, ABN AMRO, PayPal)",
+                "Controleer de transacties in de review-stap, pas categorieën aan waar nodig, en importeer",
+                "Bankconnectie: Koppel je bank via De Kern → Cash → Verbinden. Je wordt doorgestuurd naar je bank voor toestemming, daarna synchroniseren transacties automatisch",
+                "Automatische categorisatie: bij import worden transacties gekoppeld aan budgetten via (1) eerdere correcties, (2) keyword-herkenning en (3) AI voor onbekende transacties",
                 "Corrigeer waar nodig — elke correctie wordt automatisch een regel die bij volgende imports direct wordt toegepast",
-                "Stel tegenpartijregels in voor terugkerende betalingen (bijv. Albert Heijn → Boodschappen) op basis van naam of IBAN",
+                "Eigen overboekingen tussen je rekeningen worden automatisch herkend en gekoppeld, zodat ze niet dubbel tellen in je budget",
               ],
               tip: "Importeer minimaal 3 maanden aan transacties — dan herkent de AI je vaste patronen en wordt de categorisatie steeds nauwkeuriger.",
             }}
@@ -207,19 +212,23 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Registreer al je bezittingen over <strong>13 types</strong>: spaargeld, beleggingen, crypto, vastgoed, eigen woning, pensioenfondsen, lijfrente, levensverzekeringen, deelnemingen, vorderingen, DGA-leningen, opties en overig. Elk type heeft eigen velden, waarderingslogica en fiscale classificatie. Per bezitting zie je niet alleen de huidige waarde, maar ook hoeveel <strong>vrijheidstijd</strong> die vertegenwoordigt.
-                {' '}
-                Op de <strong>holdings-pagina</strong> volg je individuele posities met actuele koersen, rendement per periode en portfolio-allocatie. Importeer je posities in bulk via <strong>broker-import</strong>: upload een CSV van <strong>DEGIRO, Saxo of ING Beleggen</strong> en je holdings worden automatisch aangemaakt met de juiste koersen en aantallen. Vergelijk je rendement met een <strong>benchmark</strong> om te zien of je de markt bijhoudt. <strong>Dividendtracking</strong> toont je passief inkomen per bezitting. Voer periodiek een <strong>herwaardering</strong> uit om je vastgoed en overige bezittingen actueel te houden — je ziet direct het effect op je nettovermogen en vrijheidstijd.
+                Al je bezittingen op één plek — van je spaarrekening tot je ETF-portfolio, van je huis tot je crypto. Samen vormen ze je <strong>opgeslagen tijd</strong>.
+                <br /><br />
+                Registreer bezittingen over <strong>11 types</strong>: cash, spaarrekening, belegging (ETF/indexfonds/aandelen/obligaties), pensioen (uitkerings-/premieregeling/lijfrente), vastgoed, crypto, voertuig, fysiek bezit, deelneming, levensverzekering en vordering. Elk type heeft eigen velden, waarderingslogica en fiscale classificatie.
+                <br /><br />
+                Binnen beleggingen kun je <strong>individuele holdings</strong> toevoegen met naam, ticker of ISIN, aantal stuks en aankoopprijs. Registreer <strong>koop-, verkoop- en dividendtransacties</strong> voor nauwkeurig rendement per positie. Importeer je posities in bulk via <strong>broker-import</strong>: upload een CSV van <strong>DEGIRO, Saxo Bank of ING Beleggen</strong> — de app herkent je broker automatisch aan de kolomkoppen en importeert posities en transacties.
+                <br /><br />
+                Twee views geven je overzicht: het <strong>Vermogen-overzicht</strong> toont al je bezittingen per type, terwijl het <strong>Holdings-overzicht</strong> je totale beleggingsportfolio toont met allocatie-donut, rendement en dividendhistorie. Update waardes handmatig of via de <strong>maandelijkse check-in</strong> — elke waardering wordt opgeslagen als snapshot voor historisch verloop. Markeer een holding als <strong>favoriet</strong> en volg hem als widget op je dashboard.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Kern → Bezittingen en voeg je eerste bezitting toe (bijv. beleggingsrekening)",
-                "Kies het juiste type — elk type heeft eigen velden zoals ISIN, rendement, of WOZ-waarde",
-                "Voeg holdings toe aan je beleggingsrekening om individuele posities te volgen",
-                "Of importeer in bulk: upload een CSV van DEGIRO, Saxo of ING Beleggen via de broker-import knop",
-                "Vergelijk je rendement met de benchmark op de holdings-pagina",
-                "Werk waarderingen periodiek bij via herwaardering — vooral voor vastgoed en overige bezittingen",
+                "Ga naar De Kern → Vermogen → Nieuw. Kies het type (belegging, vastgoed, crypto, etc.), geef een naam en huidige waarde op. Stel het risicoprofiel in (laag/middel/hoog).",
+                "Bij beleggingen: voeg individuele holdings toe met naam, ticker/ISIN, aantal stuks en aankoopprijs. Registreer koop-, verkoop- en dividendtransacties voor nauwkeurig rendement.",
+                "Of importeer in bulk: ga naar Vermogen → Holdings → Importeren. Upload je CSV-export van DEGIRO, Saxo Bank of ING Beleggen — de app herkent je broker automatisch.",
+                "Het Vermogen-overzicht toont al je bezittingen per type. Het Holdings-overzicht toont je totale beleggingsportfolio met allocatie (donut), rendement en dividendhistorie.",
+                "Update waardes handmatig of via de maandelijkse check-in. Elke waardering wordt opgeslagen als snapshot voor historisch verloop.",
+                "Markeer een holding als favoriet en volg hem als widget op je dashboard.",
               ],
               tip: "Begin met je drie grootste bezittingen — dat dekt vaak 80% van je vermogen en geeft direct een realistisch vrijheidsbeeld.",
             }}
@@ -330,14 +339,14 @@ export default function GidsPage() {
             }
             howTo={{
               steps: [
-                "Ga naar De Kern → Budgetten — je standaardplan staat klaar met 6 categorieën",
-                "Stel per categorie een doeltype in: vast bedrag (bijv. €400/mnd), percentage van inkomen (bijv. 30%) of flexibel (geen limiet, alleen tracking)",
-                "Kies het interval (maand, kwartaal, jaar) en overschotgedrag (reset, doorschuiven of beleggen)",
+                "Budgetplan opzetten: Ga naar De Kern → Budgetten → Nieuw budget. Kies een categorie (boodschappen, wonen, vervoer, etc.), stel een maandlimiet in en koppel het aan je transacties",
+                "Doeltypes kiezen: vast bedrag per maand (bijv. €400), percentage van inkomen (bijv. 30%) of flexibel zonder limiet — zo past je plan bij jouw situatie",
+                "Parent-budgetten groeperen subcategorieën: bijv. 'Wonen' bevat huur + energie + water. Zo houd je overzicht zonder detail te verliezen",
                 "Markeer elke categorie als essentieel of niet-essentieel — dit beïnvloedt je FIRE-berekening direct",
-                "Na transactie-import worden uitgaven automatisch gekoppeld via AI-categorisatie",
-                "Bekijk je voortgang in boom-, donut- of sparkline-weergave en tik op een categorie voor de kassabon-details",
-                "Vergelijk maanden onderling om trends te ontdekken — de maandrapportage toont verschuivingen in je bestedingspatroon",
-                "Markeer een budget als favoriet (♥) om het als widget op je dashboard te pinnen",
+                "Na transactie-import worden uitgaven automatisch gekoppeld via AI-categorisatie en frequentie-matching",
+                "Analyse: tik op een bedrag om de kassabon te openen — een gedetailleerde breakdown van alle transacties binnen dat budget. Vergelijk maand-op-maand met trendgrafieken",
+                "Bekijk je voortgang in boom-, donut- of sparkline-weergave en vergelijk maanden onderling om patronen te ontdekken",
+                "Favorieten: markeer een budget als favoriet (♥) en het verschijnt automatisch als widget op De Wil-pagina in 4 formaten (mini, quarter, half, full)",
               ],
               tip: "Begin simpel — pas alleen de limieten aan van je top-5 uitgavencategorieën. De rest verfijn je later.",
             }}
@@ -1414,7 +1423,7 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              Je financiën altijd bij de hand — TriFinity is volledig De{" "}
+              Je financiën altijd bij de hand — TriFinity is volledig{" "}
               <strong>bottom navigation</strong> geeft je met \u00e9\u00e9n tik
               toegang tot De Kern, De Wil en De Horizon \u2014 kleurgecodeerd per
               module. Alle touch targets zijn minimaal 44px, modals schuiven als{" "}
@@ -1433,6 +1442,9 @@ export default function GidsPage() {
           }}
         />
       </div>
+
+      {/* ── Naslagwerk (module-based topic index) ── */}
+      <GuideNaslagwerk />
 
       {/* ── 4. Kernconcepten ── */}
       <ConceptFlipCards />
