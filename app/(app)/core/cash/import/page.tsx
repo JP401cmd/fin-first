@@ -1566,11 +1566,32 @@ export default function ImportPage() {
             </div>
           )}
 
-          {/* Categorization table — only non-skipped rows, paginated */}
+          {/* Confidence filter buttons */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-medium text-[var(--ink-3)]">Filter:</span>
+            {([['all', 'Alles'], ['low', 'Lage confidence'], ['none', 'Zonder budget']] as const).map(([key, label]) => {
+              const count = key === 'all'
+                ? rows.filter((r) => !r.skipImport).length
+                : key === 'low'
+                  ? rows.filter((r) => !r.skipImport && !r.isTransfer && r.confidence > 0 && r.confidence < 0.9).length
+                  : rows.filter((r) => !r.skipImport && !r.isTransfer && !r.budget_id).length
+              return (
+                <button key={key} type="button"
+                  onClick={() => { setConfidenceFilter(key); setCurrentPage(0) }}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${confidenceFilter === key ? 'bg-kern-600 text-white' : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'}`}
+                >{label} ({count})</button>
+              )
+            })}
+          </div>
+
+          {/* Categorization table — filtered, sorted by confidence, paginated */}
           {(() => {
-            const visibleRows = rows.map((row, idx) => ({ row, realIdx: idx })).filter(({ row }) => !row.skipImport)
-            const step3TotalPages = Math.ceil(visibleRows.length / PAGE_SIZE)
-            const step3PageRows = visibleRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+            const allVisible = rows.map((row, idx) => ({ row, realIdx: idx })).filter(({ row }) => !row.skipImport)
+            const filteredRows = confidenceFilter === 'all' ? allVisible : confidenceFilter === 'low' ? allVisible.filter(({ row }) => !row.isTransfer && row.confidence > 0 && row.confidence < 0.9) : allVisible.filter(({ row }) => !row.isTransfer && !row.budget_id)
+            const sortedRows = [...filteredRows].sort((a, b) => { if (a.row.isTransfer !== b.row.isTransfer) return a.row.isTransfer ? 1 : -1; return a.row.confidence - b.row.confidence })
+            const step3TotalPages = Math.ceil(sortedRows.length / PAGE_SIZE)
+            const step3PageRows = sortedRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+            const SRC: Record<string, string> = { correction: 'Correctieregel', frequency: 'Frequentie', rule: 'Trefwoord', ai: 'AI (Will)', user: 'Handmatig', transfer: 'Eigen rekening' }
             return (
               <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
                 <table className="w-full text-sm">
@@ -1580,6 +1601,7 @@ export default function ImportPage() {
                       <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
                       <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
                       <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Budget</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Bron</th>
                       <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Match</th>
                     </tr>
                   </thead>
