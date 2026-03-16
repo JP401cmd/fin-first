@@ -1,3 +1,24 @@
+## Session 2026-03-16 - Features #51, #52, #53
+
+### Feature #51: nibud_benchmark: voeg quarter-formaat toe - PASSING
+- Added 'quarter' to sizes array in widget-catalog.ts
+- Quarter variant already existed in component code
+
+### Feature #52: weekoverzicht: vergelijking met vorige week + full layout fix - PASSING
+- Added prevWeekCategoryMap for per-category previous week tracking
+- Extended topCategories with prevAmount field
+- Created DeltaIndicator component with trend arrows + percentage
+- Half/Full: per-category delta indicators, compact layout
+
+### Feature #53: huishouden_vergelijking: voeg quarter-formaat toe - PASSING
+- Added 'quarter' to sizes in widget-catalog.ts
+- Enhanced quarter variant with ratio bar + percentage split
+
+### Current Status
+- 3 features completed this session (#51, #52, #53)
+- Zero TypeScript errors
+- Commit: 7d386103
+
 ## Session 2026-03-16 - Features #48, #49, #50
 
 ### Feature #48: netto_vermogen: getallen bij trendlijn + half verticaal passen - PASSING
