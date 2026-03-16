@@ -283,13 +283,16 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Je nettovermogen is je totale financiële positie in één getal:{" "}
-                <strong>bezittingen minus schulden</strong>. Het is het fundament van je financiële
-                vrijheid — elke euro netto vermogen staat voor opgeslagen levenstijd. TriFinity
-                maakt automatisch snapshots van je vermogensontwikkeling, zodat je over maanden en
-                jaren kunt terugkijken hoe je groeit. Per snapshot zie je niet alleen het bedrag,
-                maar ook je vrijheidspercentage, spaarquote, veerkrachtscore en geschatte
-                FIRE-leeftijd.
+                <strong>
+                  Eén getal dat je hele financiële positie samenvat. Niet om te
+                  oordelen, maar om richting te zien.
+                </strong>
+                <br /><br />
+                <strong>Berekening:</strong> Netto vermogen = al je bezittingen minus al
+                je schulden. Per item kun je instellen hoeveel procent meetelt
+                (0–100%) — bijvoorbeeld je auto voor 50% omdat de waarde daalt, of je
+                eigen woning voor 80%. Zo krijg je een realistisch beeld van je
+                werkelijke financiële positie.
                 <br />
                 <br />
                 De <strong>vermogensgrafiek</strong> toont je historisch verloop met maandelijkse
@@ -419,32 +422,48 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Maandelijks 10 minuten voor financiële rust. De check-in is jouw
-                vaste moment om stil te staan bij je geld — niet om te stressen,
-                maar om <strong>grip te houden</strong>. Een 7-stappen wizard
-                begeleidt je: terugblik op vorige maand (vermogenswijziging,
-                inkomsten, uitgaven, gewonnen vrijheidsdagen), bezittingen
-                bijwerken, schulden bijwerken, doelen checken, budgetten
-                evalueren, vooruitblik op komende maand, en een moment voor
-                reflectie met vrije notities.
-                {' '}
-                Will bereidt <strong>gespreksstarters</strong> voor op basis van
-                je recente financiële veranderingen — ideaal als startpunt voor
-                reflectie of een gesprek met je partner. Je kunt eerdere
-                check-ins terugbladeren om je <strong>groei over maanden</strong>{' '}
-                te zien. Het resultaat: altijd actuele data voor betere
-                projecties, eerder herkennen van patronen, en het vertrouwen dat
-                je financiën kloppen.
+                Tien minuten per maand. Dat is alles wat het kost om grip te
+                houden op je financiële koers. De check-in is je maandelijkse
+                kompasmoment — een begeleide flow van{' '}
+                <strong>7 stappen</strong> die je door alles heen leidt wat
+                aandacht nodig heeft.
+                <br />
+                <br />
+                <strong>Stap 1 — Terugblik:</strong> Zie in één oogopslag hoe
+                vorige maand was. Netto vermogen, inkomen vs. uitgaven,
+                spaarquote, voltooide acties, en gewonnen vrijheidsdagen — alles
+                naast elkaar zodat je direct ziet waar je staat.
+                <br />
+                <strong>Stappen 2–5 — Bijwerken:</strong> Update je bezittingen
+                (huidige waarde), schulden (openstaand saldo), doelen
+                (voortgang), en budgetten (eventuele aanpassingen). Elke stap
+                toont wat er veranderd is zodat je weet wat aandacht verdient.
+                <br />
+                <strong>Stap 6 — Vooruitblik:</strong> Je FIRE-leeftijd wordt
+                herberekend met de nieuwste data. Aandachtspunten tonen waar
+                actie nodig is — een budget overschreden, een doel dat
+                achterloopt, een trendlijn die afvlakt.
+                <br />
+                <strong>Stap 7 — Reflectie:</strong> Schrijf op hoe de maand
+                voelde. AI-gespreksstarterskaarten helpen je op gang — gebaseerd
+                op je financiële veranderingen. Ideaal als startpunt voor een
+                gesprek met je partner.
+                <br />
+                <br />
+                Al je eerdere check-ins zijn opvraagbaar via{' '}
+                <strong>Check-in → Historie</strong>. Vergelijk maanden en zie
+                patronen over tijd — van spaarquote-trends tot hoe je reflecties
+                evolueren.
               </>
             }
             howTo={{
               steps: [
-                'Ga naar De Kern → Check-in (of volg de herinnering in je meldingen)',
-                'Stap 1: Bekijk de terugblik — vergelijk vorige maand met nu (vermogen, inkomsten, uitgaven, vrijheidsdagen)',
-                'Stap 2-3: Werk bezittingen en schulden bij — zo blijft je nettovermogen actueel',
-                'Stap 4-5: Check je doelen en evalueer je budgetten — liggen ze op koers?',
-                'Stap 6: Bekijk de vooruitblik met komende rekeningen en levensgebeurtenissen',
-                'Stap 7: Schrijf een korte reflectie — wat ging goed, wat kan beter?',
+                'Starten: Ga naar De Kern → Check-in (of volg de herinnering in je meldingen). Je doorloopt 7 stappen in een begeleide flow.',
+                'Stap 1 Terugblik: Bekijk netto vermogen, inkomen, uitgaven, spaarquote, voltooide acties en gewonnen vrijheidsdagen van vorige maand.',
+                'Stappen 2–5 Bijwerken: Werk bezittingen (waarde), schulden (saldo), doelen (voortgang) en budgetten (aanpassingen) bij. Elke stap toont wat veranderd is.',
+                'Stap 6 Vooruitblik: Bekijk je herberekende FIRE-leeftijd en aandachtspunten waar actie nodig is (budget overschreden, doel achterloopt).',
+                'Stap 7 Reflectie: Schrijf op hoe de maand voelde. AI-gespreksstarterskaarten helpen je op gang — gebaseerd op je financiële veranderingen.',
+                'Historie: Blader terug door eerdere check-ins via Check-in → Historie. Vergelijk maanden en zie patronen over tijd.',
               ],
               tip: 'Plan je check-in op een vaste dag (bijv. de eerste zondag van de maand). Routine maakt het moeiteloos — en na drie maanden wil je niet meer zonder.',
             }}
@@ -1050,27 +1069,35 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              TriFinity is gebouwd rond \u00e9\u00e9n kernidee:{" "}
-              <strong>geld is opgeslagen tijd</strong>. Elke euro die je
-              verdient, spaart of investeert vertegenwoordigt een stukje
-              levenstijd \u2014 tijd die je later kunt besteden aan wat \u00e9cht
-              belangrijk voor je is. Daarom rekent TriFinity alles om naar{" "}
-              <strong>vrijheidstijd</strong>: dagen, maanden en jaren van
-              financi\u00eble onafhankelijkheid.
+              TriFinity is geen budgetapp. Het is een vrijheidsapp. Elke euro die
+              je verdient, uitgeeft of spaart wordt vertaald naar tijd \u2014 je
+              meest waardevolle bezit. Het kernprincipe:{" "}
+              <strong>geld is opgeslagen tijd</strong>. Daarom rekent TriFinity elk
+              bedrag om naar <strong>vrijheidstijd</strong>: dagen, maanden en jaren
+              van financi\u00eble onafhankelijkheid. \u20ac500 besparen betekent X
+              dagen eerder vrij. Een abonnement van \u20ac30 per maand kost Y
+              vrijheidsdagen per jaar. Zo worden abstracte bedragen tastbaar.
               {" "}
-              De app is opgebouwd uit drie modules die samen je volledige
-              financi\u00eble reis dekken. <strong>De Kern</strong> (weten) geeft
-              je helder inzicht in wat je hebt, uitgeeft en verschuldigd bent.{" "}
-              <strong>De Wil</strong> (willen) vertaalt dat inzicht naar concrete
-              acties, aanbevelingen en doelen. <strong>De Horizon</strong>{" "}
-              (dromen) projecteert je toekomst: wanneer ben je financieel vrij,
-              en welke scenario&apos;s zijn er?
+              De app is opgebouwd uit drie modules.{" "}
+              <strong>De Kern</strong> is je financi\u00eble fundament:
+              bankrekeningen, vermogen, schulden en budget \u2014 weten waar je
+              staat.{" "}
+              <strong>De Wil</strong> is je actiemotor: voorstellen, doelen en
+              acties \u2014 onderneem wat nodig is.{" "}
+              <strong>De Horizon</strong> is je toekomstvisie: FIRE-projectie,
+              scenario\u2019s en simulaties \u2014 kijk vooruit naar volledige
+              vrijheid.
               {" "}
-              Anders dan traditionele budgetapps stuurt TriFinity niet op
-              schuldgevoel of restrictie. Geen rode waarschuwingen als je
-              &quot;te veel&quot; uitgeeft \u2014 wel perspectief. Elke
-              financi\u00eble keuze wordt vertaald in vrijheidstijd, zodat je
-              zelf kunt beslissen wat die tijd je waard is.
+              Anders dan traditionele budgetapps geeft TriFinity geen rode
+              waarschuwingen of schuldgevoel. Het toont feiten en mogelijkheden.
+              Jij kiest wat vrijheid voor jou betekent. Elke financi\u00eble keuze
+              wordt vertaald in vrijheidstijd, zodat je zelf kunt beslissen wat die
+              tijd je waard is.
+              {" "}
+              Naarmate je meer data invoert, ontgrendel je diepere inzichten via het{" "}
+              <strong>sovereignty-groeipad</strong>: van basis-overzicht (Recovery)
+              via Stability en Momentum naar Mastery \u2014 met volledige
+              FIRE-projectie en Monte Carlo simulatie.
             </>
           }
           howTo={{
@@ -1084,6 +1111,7 @@ export default function GidsPage() {
             tip: "Denk bij elke uitgave niet in euro\u2019s, maar in vrijheidstijd. Die \u20ac50 is misschien een halve dag \u2014 is dat het waard voor jou?",
           }}
         />
+
 
         <GuideTopicCard
           icon={Rss}
