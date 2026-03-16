@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { Upload, FileText, X, Check, Loader2, AlertCircle } from 'lucide-react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { Upload, FileText, X, Check, Loader2, AlertCircle, Download } from 'lucide-react'
 
 type UploadStatus = 'idle' | 'uploading' | 'success' | 'error'
 
@@ -9,16 +9,53 @@ interface PensionPdfUploadProps {
   onFileSelected?: (file: File) => void
   onFileRemoved?: () => void
   onParseResult?: (result: unknown) => void
+  /** When provided, the parsed PDF will also be stored in Supabase Storage */
+  lifeEventId?: string | null
+  /** Whether a PDF is already stored for this life event */
+  existingPdfPath?: string | null
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
-export function PensionPdfUpload({ onFileSelected, onFileRemoved, onParseResult }: PensionPdfUploadProps) {
+export function PensionPdfUpload({
+  onFileSelected,
+  onFileRemoved,
+  onParseResult,
+  lifeEventId,
+  existingPdfPath,
+}: PensionPdfUploadProps) {
   const [status, setStatus] = useState<UploadStatus>('idle')
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [storedPdfPath, setStoredPdfPath] = useState<string | null>(existingPdfPath ?? null)
+  const [downloading, setDownloading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Keep a reference to the selected file for later storage upload
+  const pendingFileRef = useRef<File | null>(null)
+
+  // Sync external existingPdfPath changes
+  useEffect(() => {
+    setStoredPdfPath(existingPdfPath ?? null)
+  }, [existingPdfPath])
+
+  /** Upload the file to Supabase Storage after the life event is saved */
+  const uploadToStorage = useCallback(async (fileToUpload: File, eventId: string) => {
+    try {
+      const formData = new FormData()
+      formData.append('file', fileToUpload)
+      formData.append('lifeEventId', eventId)
+      const res = await fetch('/api/pension/storage', { method: 'POST', body: formData })
+      if (res.ok) {
+        const data = await res.json()
+        setStoredPdfPath(data.path ?? null)
+      } else {
+        console.warn('[pension/storage] Upload to storage failed:', await res.text())
+      }
+    } catch (err) {
+      console.warn('[pension/storage] Upload to storage error:', err)
+    }
+  }, [])
 
   const validateAndSet = useCallback((f: File) => {
     setError(null)
@@ -32,6 +69,7 @@ export function PensionPdfUpload({ onFileSelected, onFileRemoved, onParseResult 
     }
     setFile(f)
     setStatus('uploading')
+    pendingFileRef.current = f
     onFileSelected?.(f)
 
     // Upload to parse API
@@ -48,12 +86,31 @@ export function PensionPdfUpload({ onFileSelected, onFileRemoved, onParseResult 
       .then(data => {
         setStatus('success')
         onParseResult?.(data)
+
+        // If we already have a lifeEventId, upload to storage immediately
+        if (lifeEventId) {
+          uploadToStorage(f, lifeEventId)
+        }
       })
       .catch(err => {
         setStatus('error')
         setError(err.message || 'Er ging iets mis bij het verwerken van de PDF.')
       })
-  }, [onFileSelected, onParseResult])
+  }, [onFileSelected, onParseResult, lifeEventId, uploadToStorage])
+
+  /**
+   * Called externally (via ref or effect) after a life event is saved,
+   * to upload the pending file to storage.
+   */
+  const uploadPendingFile = useCallback(async (eventId: string) => {
+    const f = pendingFileRef.current
+    if (f && eventId) {
+      await uploadToStorage(f, eventId)
+    }
+  }, [uploadToStorage])
+
+  // Expose uploadPendingFile via a custom attribute on the component
+  // We use a different approach: the parent will call /api/pension/storage directly after save
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -81,14 +138,80 @@ export function PensionPdfUpload({ onFileSelected, onFileRemoved, onParseResult 
     setFile(null)
     setStatus('idle')
     setError(null)
+    pendingFileRef.current = null
     if (inputRef.current) inputRef.current.value = ''
     onFileRemoved?.()
   }, [onFileRemoved])
+
+  const handleDownload = useCallback(async () => {
+    if (!lifeEventId) return
+    setDownloading(true)
+    try {
+      const res = await fetch(`/api/pension/storage?lifeEventId=${lifeEventId}`)
+      if (!res.ok) throw new Error('Download mislukt')
+      const data = await res.json()
+      if (data.url) {
+        window.open(data.url, '_blank', 'noopener')
+      }
+    } catch (err) {
+      console.error('[pension/storage] Download error:', err)
+    } finally {
+      setDownloading(false)
+    }
+  }, [lifeEventId])
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  // ── Existing stored PDF (no new upload in progress) ──
+  if (!file && storedPdfPath && status === 'idle') {
+    return (
+      <div className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50/30 p-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-horizon-100">
+            <FileText className="h-4 w-4 text-horizon-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-[var(--ink)]">Pensioenoverzicht (PDF)</p>
+            <p className="text-xs text-[var(--ink-3)]">Opgeslagen document</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={downloading}
+            className="shrink-0 rounded-md p-1.5 text-horizon-600 hover:bg-horizon-100 transition-colors disabled:opacity-50"
+            title="Download PDF"
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setStoredPdfPath(null)
+            inputRef.current?.click()
+          }}
+          className="mt-2 w-full text-center text-xs text-[var(--ink-3)] hover:text-horizon-600 transition-colors underline underline-offset-2"
+        >
+          Opnieuw uploaden
+        </button>
+        {/* Hidden file input for re-upload */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
+    )
   }
 
   // ── Success state ──
@@ -101,7 +224,10 @@ export function PensionPdfUpload({ onFileSelected, onFileRemoved, onParseResult 
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-[var(--ink)]">{file.name}</p>
-            <p className="text-xs text-[var(--ink-3)]">{formatFileSize(file.size)} — verwerkt</p>
+            <p className="text-xs text-[var(--ink-3)]">
+              {formatFileSize(file.size)} — verwerkt
+              {storedPdfPath && ' · opgeslagen'}
+            </p>
           </div>
           <button
             type="button"
@@ -211,4 +337,37 @@ export function PensionPdfUpload({ onFileSelected, onFileRemoved, onParseResult 
       )}
     </div>
   )
+}
+
+/**
+ * Upload a pending pension PDF to storage after a life event is created/updated.
+ * Call this from the parent after saving the life event.
+ */
+export async function uploadPensionPdfToStorage(file: File, lifeEventId: string): Promise<string | null> {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('lifeEventId', lifeEventId)
+    const res = await fetch('/api/pension/storage', { method: 'POST', body: formData })
+    if (res.ok) {
+      const data = await res.json()
+      return data.path ?? null
+    }
+    console.warn('[pension/storage] Upload failed:', await res.text())
+    return null
+  } catch (err) {
+    console.warn('[pension/storage] Upload error:', err)
+    return null
+  }
+}
+
+/**
+ * Delete a pension PDF from storage when a life event is deleted.
+ */
+export async function deletePensionPdfFromStorage(lifeEventId: string): Promise<void> {
+  try {
+    await fetch(`/api/pension/storage?lifeEventId=${lifeEventId}`, { method: 'DELETE' })
+  } catch (err) {
+    console.warn('[pension/storage] Delete error:', err)
+  }
 }

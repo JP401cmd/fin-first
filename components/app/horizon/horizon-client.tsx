@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
@@ -40,6 +40,7 @@ import {
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties,
   ChevronDown, ChevronUp, ExternalLink,
+  Download, Loader2, FileText,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -48,7 +49,7 @@ import { FeatureGate } from '@/components/app/feature-gate'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { SimChartModal } from '@/components/app/horizon/sim-chart-widget'
-import { PensionPdfUpload } from '@/components/app/horizon/pension-pdf-upload'
+import { PensionPdfUpload, uploadPensionPdfToStorage, deletePensionPdfFromStorage } from '@/components/app/horizon/pension-pdf-upload'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
@@ -177,6 +178,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   } | null>(null)
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set())
   const [selectedRegelingIndex, setSelectedRegelingIndex] = useState(0)
+  const pendingPensionFileRef = useRef<File | null>(null)
 
   // Compact life events UI state
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
@@ -1308,6 +1310,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       metadata: metaWithCashflows,
     }
 
+    let savedEventId: string | null = null
+
     if (editingEvent) {
       const { error: updateError } = await supabase.from('life_events').update(payload).eq('id', editingEvent.id)
       if (updateError) {
@@ -1315,13 +1319,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         setFormErrors([`Bijwerken mislukt: ${updateError.message || updateError.code || 'Onbekende fout'}`])
         return
       }
+      savedEventId = editingEvent.id
     } else {
-      const { error: insertError } = await supabase.from('life_events').insert(payload)
+      const { data: insertedData, error: insertError } = await supabase.from('life_events').insert(payload).select('id').single()
       if (insertError) {
         console.error('Failed to save life event:', insertError.message, insertError.code, insertError.details)
         setFormErrors([`Opslaan mislukt: ${insertError.message || insertError.code || 'Onbekende fout'}`])
         return
       }
+      savedEventId = insertedData?.id ?? null
+    }
+
+    // Upload pending pension PDF to storage after save
+    if (savedEventId && pendingPensionFileRef.current && (formType === 'pension' || formType === 'early_retirement')) {
+      await uploadPensionPdfToStorage(pendingPensionFileRef.current, savedEventId)
+      pendingPensionFileRef.current = null
     }
 
     setShowForm(false)
@@ -1335,6 +1347,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     setPensionParseResult(null)
     setAutoFilledFields(new Set())
     setSelectedRegelingIndex(0)
+    pendingPensionFileRef.current = null
     if (selectedEventId) {
       setSelectedEventId(null)
       setViewModalMode('view')
@@ -1344,6 +1357,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   async function deleteEvent(id: string) {
     const supabase = createClient()
+    // Check if the event has a stored pension PDF — clean it up
+    const eventToDelete = events.find(e => e.id === id)
+    if (eventToDelete?.metadata?.pensionPdfPath) {
+      await deletePensionPdfFromStorage(id)
+    }
     const { error } = await supabase.from('life_events').delete().eq('id', id)
     if (error) console.error('Failed to delete life event:', error)
     loadData()
@@ -2012,6 +2030,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     <p className="text-sm text-[var(--ink-2)] italic">{String(selectedEvent.metadata.toelichting)}</p>
                   ) : null}
 
+                  {/* Pension PDF download link */}
+                  {selectedEvent.metadata?.pensionPdfPath && (
+                    <PensionPdfDownloadLink lifeEventId={selectedEvent.id} />
+                  )}
+
                   {/* Metadata details */}
                   {evCatalog?.fields && evCatalog.fields.length > 0 && (() => {
                     const visibleFields = evCatalog.fields!.filter(field => {
@@ -2428,9 +2451,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               <>
                 <PensionInstructionPanel />
                 <PensionPdfUpload
-                  onFileSelected={(f) => console.log('[pension] PDF selected:', f.name)}
+                  lifeEventId={editingEvent?.id ?? null}
+                  existingPdfPath={editingEvent?.metadata?.pensionPdfPath as string | null ?? null}
+                  onFileSelected={(f) => {
+                    console.log('[pension] PDF selected:', f.name)
+                    pendingPensionFileRef.current = f
+                  }}
                   onFileRemoved={() => {
                     console.log('[pension] PDF removed')
+                    pendingPensionFileRef.current = null
                     setPensionParseResult(null)
                     setAutoFilledFields(new Set())
                     setSelectedRegelingIndex(0)
@@ -5211,6 +5240,51 @@ function PensionParseSummaryCard({
 }
 
 // ── Pension instruction panel ────────────────────────────────
+
+function PensionPdfDownloadLink({ lifeEventId }: { lifeEventId: string }) {
+  const [downloading, setDownloading] = useState(false)
+
+  async function handleDownload() {
+    setDownloading(true)
+    try {
+      const res = await fetch(`/api/pension/storage?lifeEventId=${lifeEventId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.url) window.open(data.url, '_blank', 'noopener')
+    } catch (err) {
+      console.error('[pension] Download error:', err)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <div className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50/30 p-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-horizon-100">
+          <FileText className="h-4 w-4 text-horizon-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-[var(--ink)]">Pensioenoverzicht (PDF)</p>
+          <p className="text-xs text-[var(--ink-3)]">Origineel document</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-horizon-700 hover:bg-horizon-100 transition-colors disabled:opacity-50"
+        >
+          {downloading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          Download
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function PensionInstructionPanel() {
   const [open, setOpen] = useState(false)
