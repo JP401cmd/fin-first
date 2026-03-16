@@ -950,9 +950,10 @@ export default function GidsPage() {
             howTo={{
               steps: [
                 "Tik op het chat-icoon rechtsonder op elke pagina",
-                "Stel een vraag of beschrijf een situatie \u2014 Will past zich aan op de context van de pagina",
+                "Stel een vraag over je scenario \u2014 Will past zich aan op de context en geeft persoonlijk advies",
                 "In een What-If: beschrijf je droom (\u201cIk wil over 5 jaar een huis kopen\u201d) en Will vertaalt het naar events",
                 "Vraag om een reality-check: \u201cIs mijn plan realistisch?\u201d \u2014 Will analyseert je data en geeft eerlijk antwoord",
+                "Will combineert je financi\u00eble data met je scenario om concreet advies te geven dat past bij jouw situatie",
               ],
               tip: "Will wordt slimmer naarmate je meer data hebt. Begin met een eenvoudige vraag: \u201cWat is het belangrijkste dat ik nu kan doen?\u201d",
             }}
@@ -1032,6 +1033,44 @@ export default function GidsPage() {
               "Nieuwe artikelen verschijnen dagelijks automatisch op basis van actueel nieuws",
             ],
             tip: "Lees elke ochtend 2-3 artikelen bij je koffie. Het kost 5 minuten en houdt je financieel scherp \u2014 zonder zelf nieuwssites af te struinen.",
+          }}
+        />
+
+        <GuideTopicCard
+          icon={Sparkles}
+          title="Will — je AI-assistent"
+          color="var(--ink-2)"
+          description={
+            <>
+              Will is je eigen financiële adviseur die jouw situatie kent. Hij
+              heeft drie persoonlijkheden:{" "}
+              <strong>FHIN</strong> (De Kern) beantwoordt vragen over je
+              vermogen, uitgaven en transacties.{" "}
+              <strong>FINN</strong> (De Wil) geeft concrete aanbevelingen en
+              actieplannen.{" "}
+              <strong>FFIN</strong> (De Horizon) helpt je dromen vertalen naar
+              financiële plannen en scenario&apos;s.
+              {" "}
+              Will gebruikt uitsluitend jouw data binnen TriFinity: transacties,
+              budgetten, vermogen, doelen, levensgebeurtenissen en
+              FIRE-parameters. <strong>Niets wordt extern gedeeld</strong> —
+              alle communicatie blijft binnen je account en gevoelige gegevens
+              worden automatisch gemaskeerd. Will is{" "}
+              <strong>context-aware</strong>: op elke pagina weet hij welke data
+              relevant is en past hij zijn antwoorden aan op wat je aan het doen
+              bent.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Tik op het chat-icoon rechtsonder op elke pagina om Will te openen",
+              "Stel een vraag in je eigen woorden \u2014 Will begrijpt natuurlijke taal en past zich aan op de context",
+              "Vraag over je budget: \u201cHoeveel geef ik uit aan boodschappen?\u201d \u2014 Will analyseert je transacties",
+              "Vraag over je vermogen: \u201cHoe staat mijn netto vermogen ervoor?\u201d \u2014 Will toont trends en mijlpalen",
+              "Vraag over FIRE: \u201cWanneer ben ik financieel vrij?\u201d \u2014 Will berekent scenario\u2019s met jouw parameters",
+              "Beschrijf een droom: \u201cIk wil over 5 jaar een huis kopen\u201d \u2014 Will vertaalt het naar een concreet plan",
+            ],
+            tip: "Will wordt slimmer naarmate je meer data hebt. Begin met een eenvoudige vraag: \u201cWat is het belangrijkste dat ik nu kan doen?\u201d",
           }}
         />
 
