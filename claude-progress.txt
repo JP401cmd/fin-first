@@ -13382,3 +13382,55 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#97, #98)
 - 98/175 features passing (56.0%)
+
+## Session 2026-03-16 - Features #102, #103
+
+### Feature #102: Voortgangsbalk bij batch-import - PASSING
+- Added `failed` count to importProgress state: { current, total, failed }
+- Added importStartTime state for estimated remaining time calculation
+- Enhanced progress bar with batch number (batch X/Y), percentage, estimated remaining time
+- Smooth animated progress bar with `transition: width 0.4s ease-out`
+- Completion summary (Step 4) shows pill badges: imported/skipped/failed counts
+- Money amounts use font-mono tabular-nums styling
+
+### Feature #103: Fout-herstel en retry per batch - PASSING
+- Added failedBatches state: tracks batchIdx, error message, retry count, rows per failed batch
+- Batch loop now continues on error instead of stopping (pushes to newFailedBatches)
+- retryFailedBatches() function retries only failed batches
+- Max 2 retries per batch, then permanently marked as failed
+- Retry button with loading state (Loader2 spinner)
+- Expandable failed batch details section with error messages per batch
+- Shows "Max pogingen bereikt" for batches exceeding retry limit
+- Transfer linking only runs when some batches succeeded
+
+### Current Status
+- 2 features completed this session (#102, #103)
+- Zero TypeScript errors in changed files
+- Zero console errors verified via browser
+- Commit: efdb6847
+
+## Session 2026-03-16 - Features #99, #106
+
+### Feature #99: Correcties tabel verrijken met IBAN-matching - PASSING
+- Added 'counterparty_iban' as match_field option in CategoryCorrection type
+- Updated categorizeTransaction(): IBAN corrections checked first (sub-priority 1a) before name (1b) and description (1c)
+- IBAN comparison normalized: strip spaces, uppercase
+- CategoryRulesSheet: added IBAN option in match field selector with IBAN placeholder text
+- AI categorize sheet: auto-saves IBAN correction alongside name correction when IBAN available
+- Transfer confirm sheet: auto-saves IBAN correction when dismissing transfer as expense
+- Commit: 768ab0fe
+
+### Feature #106: Budget confidence dashboard in import review - PASSING
+- Added category_source field to ImportRow type
+- Added "Bron" (source) column in review table showing categorization source: Correctieregel/Frequentie/Trefwoord/AI/Handmatig
+- Color-coded source badges: green (90%+), yellow (70-90%), orange (<70%), red (no match)
+- Match column enhanced: confidence percentage shown numerically below icon
+- Added filter buttons bar: Alles / Lage confidence / Zonder budget with live counts
+- Sorted rows by lowest confidence first so user reviews uncertain matches first
+- Tooltip on source/match cells: "Herkend via [bron]: [reden]"
+- Transfers pinned to bottom of sorted list
+
+### Current Status
+- 2 features completed this session (#99, #106)
+- Zero TypeScript errors in all changed files
+- Zero console errors verified via browser
