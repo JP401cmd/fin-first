@@ -1318,42 +1318,48 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              <strong>Weet wat belangrijk is zonder constant te checken.</strong>{" "}
-              TriFinity houdt je financiën in de gaten en stuurt alleen een
-              melding als er iets is dat je aandacht verdient. Zo hoef je niet
-              dagelijks alles zelf te controleren — de app doet het voor je.
-              {" "}
-              Er zijn zeven soorten meldingen.{" "}
-              <strong>Budget alerts</strong> waarschuwen als je een budgetgrens
-              nadert of overschrijdt.{" "}
-              <strong>Synchronisatie</strong> laat je weten wanneer je
-              bankconnectie is bijgewerkt of aandacht nodig heeft.{" "}
-              <strong>Aanbevelingen</strong> geven financiële tips en suggesties
-              op basis van je data.{" "}
-              <strong>Inzichten</strong> signaleren patronen in je uitgaven die
-              je misschien over het hoofd ziet — denk aan ongebruikelijke
-              transacties of afwijkende maanden.{" "}
-              <strong>Level-ups</strong> melden wanneer je soevereiniteitsniveau
-              stijgt en nieuwe widgets ontgrendelt.{" "}
-              <strong>Horizon-alerts</strong> gaan over je FIRE-prognose:
-              aandachtspunten en vrijheidswaarschuwingen.{" "}
-              <strong>Prijs-alerts</strong> triggeren bij koersbewegingen of
+              <strong>
+                Weet wat belangrijk is zonder constant te checken. Meldingen
+                komen naar jou — alleen de dingen die ertoe doen.
+              </strong>
+              <br />
+              <br />
+              <strong>Soorten meldingen:</strong>{" "}
+              <strong>Budgetwaarschuwing</strong> — je nadert of overschrijdt een
+              limiet.{" "}
+              <strong>Mijlpaal bereikt</strong> — nieuw vermogensrecord of
+              soevereiniteitsniveau gestegen.{" "}
+              <strong>AI-inzicht</strong> — Will heeft iets ontdekt in je
+              patronen of uitgaven.{" "}
+              <strong>Sync voltooid</strong> — bankdata is bijgewerkt of
+              connectie vraagt aandacht.{" "}
+              <strong>Belegging alert</strong> — significante koersbeweging of
               allocatiedrift in je holdings.
-              {" "}
-              Urgente meldingen verschijnen bovenaan, dagelijkse daaronder, en
-              eerdere meldingen kun je per dag terugbladeren. In{" "}
-              <strong>Instellingen → Notificaties</strong> schakel je per type
-              meldingen aan of uit — zo ontvang je alleen wat voor jou relevant
-              is.
+              <br />
+              <br />
+              <strong>Instellen:</strong> ga naar Identiteit → Instellingen
+              → Notificaties. Schakel per type aan of uit. Kies of je een
+              maandelijkse check-in herinnering wilt ontvangen.
+              <br />
+              <br />
+              <strong>Partner-meldingen:</strong> stel apart in of je meldingen
+              krijgt over transacties van je partner: altijd (all_shared), alleen
+              boven een bedrag (threshold), per categorie (categories), of nooit
+              (disabled).
+              <br />
+              <br />
+              <strong>Widget:</strong> de meldingen-widget op De Wil toont je
+              recente meldingen in een compact overzicht.
             </>
           }
           howTo={{
             steps: [
               "Meldingen verschijnen via het bel-icoon in de navigatiebalk — een badge toont het aantal ongelezen",
               "Tik op een melding om direct naar het relevante onderdeel te navigeren (budget, holding, vermogen)",
-              "Ga naar Identiteit → Instellingen → Notificaties om per type te kiezen welke meldingen je wilt ontvangen",
-              "Schakel budget alerts en level-ups in om gemotiveerd te blijven zonder overweldigd te raken",
+              "Ga naar Identiteit → Instellingen → Notificaties. Schakel per type aan of uit. Kies of je een maandelijkse check-in herinnering wilt",
+              "Partner-meldingen: stel in of je meldingen krijgt over transacties van je partner — altijd, boven een bedrag, per categorie, of nooit",
               "Stel prijs-alerts in op je holdings-pagina voor koerswaarschuwingen en allocatiedrift",
+              "De meldingen-widget op De Wil toont je recente meldingen in een compact overzicht",
             ],
             tip: "Begin met alle meldingen aan en schakel na een week uit wat je niet nodig hebt. Zo ontdek je welke alerts echt waarde toevoegen aan je financiële routine.",
           }}
