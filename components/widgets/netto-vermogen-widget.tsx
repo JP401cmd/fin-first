@@ -39,8 +39,8 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
   const freedomTime = dailyExp > 0 ? calculateFreedomTime(Math.abs(netWorth), dailyExp) : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
-  // SVG height varies by widget size: taller for full, compact for half
-  const SVG_H = size === 'full' ? 48 : 36
+  // SVG height varies by widget size: taller for full, roomier for half to prevent clipping
+  const SVG_H = size === 'full' ? 48 : 44
 
   const { ref, hasEntered } = useInViewAnimation({ duration: 1000 })
 
@@ -76,7 +76,7 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
     const minVal = Math.min(...allValues, 0)
     const range = maxVal - minVal || 1
 
-    const pad = { top: 5, bottom: 8, left: 0, right: 0 }
+    const pad = { top: 10, bottom: 6, left: 0, right: 0 }
     const chartH = SVG_H - pad.top - pad.bottom
     const chartW = SVG_W - pad.left - pad.right
 
@@ -108,11 +108,20 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
     const currentDotX = histPts[histPts.length - 1].x
     const currentDotY = histPts[histPts.length - 1].y
 
-    return { histPath, forecastPath, histFill, currentX, currentDotX, currentDotY, pad, chartH }
+    // Value labels for start and end of trendline
+    const startValue = histData[0]
+    const endValue = netWorth
+    const forecastEndValue = forecastData[forecastData.length - 1]
+    const startY = histPts[0].y
+    const endY = histPts[histPts.length - 1].y
+    const forecastEndY = forecastPts[forecastPts.length - 1].y
+    const forecastEndX = forecastPts[forecastPts.length - 1].x
+
+    return { histPath, forecastPath, histFill, currentX, currentDotX, currentDotY, pad, chartH, startValue, endValue, forecastEndValue, startY, endY, forecastEndY, forecastEndX }
   }, [netWorthHistory, netWorth, monthlyGrowthRate, SVG_H])
 
-  // Show axis labels only for full-size widgets (half-size is too compact)
-  const showAxisLabels = size === 'full' && sparkline !== null
+  // Show axis labels for half and full sizes where sparkline is visible
+  const showAxisLabels = (size === 'full' || size === 'half') && sparkline !== null
 
   // MoM delta: compare current netWorth with last month's snapshot
   const momDelta = useMemo(() => {
@@ -292,6 +301,54 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
                   transition: hasEntered ? 'opacity 80ms ease-out 500ms' : 'none',
                 }}
               />
+
+              {/* Value label at start of trendline */}
+              <text
+                x={sparkline.pad.left + 1}
+                y={Math.max(sparkline.startY - 4, sparkline.pad.top + 6)}
+                fill="var(--ink-4)"
+                fontSize="7"
+                fontFamily="var(--font-mono), ui-monospace, monospace"
+                opacity={hasEntered ? 1 : 0}
+                style={{
+                  transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none',
+                }}
+              >
+                {formatCurrency(sparkline.startValue)}
+              </text>
+
+              {/* Value label at current position (end of historical) */}
+              <text
+                x={sparkline.currentDotX}
+                y={Math.max(sparkline.endY - 5, sparkline.pad.top + 6)}
+                fill="var(--kern-t)"
+                fontSize="7.5"
+                fontFamily="var(--font-mono), ui-monospace, monospace"
+                fontWeight="600"
+                textAnchor="middle"
+                opacity={hasEntered ? 1 : 0}
+                style={{
+                  transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none',
+                }}
+              >
+                {formatCurrency(sparkline.endValue)}
+              </text>
+
+              {/* Value label at end of forecast */}
+              <text
+                x={sparkline.forecastEndX - 1}
+                y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)}
+                fill="var(--hor-t)"
+                fontSize="7"
+                fontFamily="var(--font-mono), ui-monospace, monospace"
+                textAnchor="end"
+                opacity={hasEntered ? 0.7 : 0}
+                style={{
+                  transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none',
+                }}
+              >
+                {formatCurrency(sparkline.forecastEndValue)}
+              </text>
             </svg>
 
             {showAxisLabels && (
