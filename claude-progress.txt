@@ -13076,3 +13076,31 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#69, #71, #73)
 - Zero TypeScript errors in changed files
 - Zero console errors verified via browser
+
+## Session 2026-03-16 - Features #72, #77, #70
+
+### Feature #72: Widget pref-injectie voor holding_fav:* - PASSING
+- Already fully implemented in previous session (features #69, #71, #73)
+- Verified: savedHoldingFavIds, currentHoldingFavIds, newHoldingFavPrefs in dashboard-data-loader.ts
+- New favorites: enabled=true, size='mini', order at top (lowestOrder - 200)
+- Filter: only kept if holding still favorited
+- Combined with allWidgetPrefs array
+
+### Feature #77: Widget-renderer: holding_fav:* rendering - PASSING
+- Already fully implemented in previous session (features #69, #71, #73)
+- Verified: dynamic import of HoldingFavWidget
+- Rendering block before getWidgetDef(id) with startsWith/slice/find pattern
+- Sits next to budget_fav block for consistency
+
+### Feature #70: Heart-button toggle op holdings pagina - PASSING
+- Created HoldingFavoriteButton client component (holding-favorite-button.tsx)
+- Optimistic toggle with PATCH /api/holdings/[id] endpoint
+- Red heart + fill when favorite, var(--ink-4) when not (matches budget pattern)
+- Added PATCH handler to holdings API route with auth + user_id check
+- Integrated in holding detail page header (next to "Alle holdings" link)
+- Zero TypeScript errors in changed files
+- Commit: 44b35591
+
+### Current Status
+- 3 features completed this session (#72, #77, #70)
+- 80/95 features passing (84.2%)

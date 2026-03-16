@@ -1817,7 +1817,7 @@ function HoldingTransactionForm({
   useEffect(() => {
     async function loadHistory() {
       try {
-        const res = await fetch(`/api/holding-transactions?holding_id=${holding.id}`)
+        const res = await fetch(`/api/holdings/${holding.id}/transactions`)
         if (res.ok) {
           const data = await res.json()
           setTransactions(data.transactions || [])
@@ -1860,11 +1860,10 @@ function HoldingTransactionForm({
     setError(null)
 
     try {
-      const res = await fetch('/api/holding-transactions', {
+      const res = await fetch(`/api/holdings/${holding.id}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          holding_id: holding.id,
           type: txType,
           units: Number(units),
           price_per_unit: Number(pricePerUnit),

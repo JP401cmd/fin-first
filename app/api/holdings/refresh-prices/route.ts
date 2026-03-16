@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchPriceData } from '@/lib/price-feed'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
+import { storeSingleDayPrice } from '@/lib/historical-prices'
 
 /**
  * POST /api/holdings/refresh-prices — Attempt to refresh prices for holdings.
@@ -125,6 +126,17 @@ export async function POST(request: NextRequest) {
               await syncAssetValueFromHoldings(supabase, holdingFull.asset_id, user.id)
             }
           }
+
+          // Store today's closing price in the holding_prices table for charting
+          storeSingleDayPrice(
+            supabase,
+            holding.id,
+            priceData.price,
+            undefined,
+            priceData.currency || 'EUR',
+          ).catch(() => {
+            // Non-critical — don't fail the refresh if price storage fails
+          })
 
           results.push({
             id: holding.id,

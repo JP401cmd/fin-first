@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 
 /**
  * Compute running P&L for a list of transactions.
@@ -321,6 +322,141 @@ export async function POST(
       source,
       holding_updated: false,
     }, { status: 201 })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Onbekende fout'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+/**
+ * Replay all transactions for a holding chronologically and compute the final
+ * units and avg_purchase_price. This is the single source of truth after any
+ * transaction mutation (especially DELETE).
+ *
+ * Rules:
+ *   - buy: weighted average price, units increase
+ *   - sell: units decrease, avg stays the same
+ *   - dividend: no effect on units/avg
+ */
+function replayTransactions(
+  transactions: Array<{ type: string; units: number; price_per_unit: number; date: string; created_at: string }>
+): { units: number; avgPurchasePrice: number } {
+  const sorted = [...transactions].sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date)
+    if (dateCompare !== 0) return dateCompare
+    return (a.created_at || '').localeCompare(b.created_at || '')
+  })
+
+  let units = 0
+  let avgPrice = 0
+
+  for (const tx of sorted) {
+    const numUnits = Number(tx.units) || 0
+    const numPrice = Number(tx.price_per_unit) || 0
+
+    if (tx.type === 'buy') {
+      const newUnits = units + numUnits
+      avgPrice = newUnits > 0
+        ? (units * avgPrice + numUnits * numPrice) / newUnits
+        : numPrice
+      units = newUnits
+    } else if (tx.type === 'sell') {
+      units = Math.max(0, units - numUnits)
+      if (units <= 0) {
+        units = 0
+        avgPrice = 0
+      }
+    }
+  }
+
+  return {
+    units: parseFloat(units.toFixed(6)),
+    avgPurchasePrice: parseFloat(avgPrice.toFixed(4)),
+  }
+}
+
+/**
+ * DELETE /api/holdings/[id]/transactions?tx_id=<uuid>
+ *
+ * Delete a holding transaction and replay remaining transactions to recalculate
+ * the holding's units and avg_purchase_price.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  }
+
+  const { id: holdingId } = await params
+  const { searchParams } = new URL(request.url)
+  const txId = searchParams.get('tx_id')
+
+  if (!txId) {
+    return NextResponse.json({ error: 'tx_id is verplicht' }, { status: 400 })
+  }
+
+  if (!holdingId) {
+    return NextResponse.json({ error: 'Holding ID is verplicht' }, { status: 400 })
+  }
+
+  try {
+    // 1. Delete the transaction
+    const { error } = await supabase
+      .from('holding_transactions')
+      .delete()
+      .eq('id', txId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // 2. Replay remaining transactions to recalculate holding
+    const { data: remaining } = await supabase
+      .from('holding_transactions')
+      .select('type, units, price_per_unit, date, created_at')
+      .eq('holding_id', holdingId)
+      .eq('user_id', user.id)
+      .order('date', { ascending: true })
+      .order('created_at', { ascending: true })
+
+    const { units: newUnits, avgPurchasePrice: newAvg } = replayTransactions(remaining || [])
+
+    // 3. Update the holding with recalculated values
+    const { error: updateErr } = await supabase
+      .from('holdings')
+      .update({
+        units: newUnits,
+        avg_purchase_price: newAvg,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', holdingId)
+      .eq('user_id', user.id)
+
+    // 4. Sync parent asset value
+    const { data: holding } = await supabase
+      .from('holdings')
+      .select('asset_id')
+      .eq('id', holdingId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (holding?.asset_id) {
+      await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
+    }
+
+    return NextResponse.json({
+      success: true,
+      holding_updated: !updateErr,
+      new_units: newUnits,
+      new_avg_price: newAvg,
+      asset_synced: !!holding?.asset_id,
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
     return NextResponse.json({ error: message }, { status: 500 })
