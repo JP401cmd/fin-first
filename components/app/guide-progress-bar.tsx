@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Landmark, ArrowLeftRight, Zap, Compass, Sparkles } from 'lucide-react'
+import { Check, Landmark, Receipt, Zap, Compass } from 'lucide-react'
 
 /* ── Types ─────────────────────── */
 
@@ -27,7 +27,7 @@ interface ReisStap {
 
 const REIS_STAPPEN: ReisStap[] = [
   {
-    label: 'Bezittingen of schulden',
+    label: 'Weet waar je staat',
     icon: Landmark,
     color: 'var(--color-kern-400)',
     bgColor: 'var(--color-kern-50)',
@@ -35,15 +35,15 @@ const REIS_STAPPEN: ReisStap[] = [
     scrollTarget: 1,
   },
   {
-    label: 'Transacties importeren',
-    icon: ArrowLeftRight,
+    label: 'Begrijp je patronen',
+    icon: Receipt,
     color: 'var(--color-kern-400)',
     bgColor: 'var(--color-kern-50)',
     check: (s) => s.hasTransactions,
     scrollTarget: 2,
   },
   {
-    label: 'Eerste actie afgerond',
+    label: 'Onderneem actie',
     icon: Zap,
     color: 'var(--color-wil-400)',
     bgColor: 'var(--color-wil-50)',
@@ -51,19 +51,11 @@ const REIS_STAPPEN: ReisStap[] = [
     scrollTarget: 3,
   },
   {
-    label: 'FIRE-projectie bekeken',
+    label: 'Kijk vooruit',
     icon: Compass,
     color: 'var(--color-horizon-400)',
     bgColor: 'var(--color-horizon-50)',
-    check: (s) => s.hasFireData,
-    scrollTarget: 4,
-  },
-  {
-    label: 'Levensgebeurtenis gepland',
-    icon: Sparkles,
-    color: 'var(--color-horizon-400)',
-    bgColor: 'var(--color-horizon-50)',
-    check: (s) => s.hasLifeEvents,
+    check: (s) => s.hasFireData || s.hasLifeEvents,
     scrollTarget: 4,
   },
 ]
