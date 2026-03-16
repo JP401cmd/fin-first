@@ -269,7 +269,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Vermogenspad',
     description: 'Gesimuleerd vermogenspad naar FIRE en daarna',
     module: 'horizon',
-    sizes: ['half', 'full'],
+    sizes: ['quarter', 'half', 'full'],
     defaultSize: 'half',
     minLevel: 1,
     requiredPhase: 'Stability',

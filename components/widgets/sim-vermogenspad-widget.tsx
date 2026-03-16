@@ -105,11 +105,16 @@ export function SimVermogenspadWidget({ size, data, href }: Props) {
               />
             )}
           </svg>
-          {fireAgeFractional != null && (
-            <p className="text-[10px] text-horizon-600 font-mono font-semibold mt-0.5">
-              FIRE {Math.round(fireAgeFractional)}j
+          <div className="mt-0.5 flex items-center justify-between">
+            <p className="font-mono text-[11px] font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(simRows[simRows.length - 1].endPortfolio)}
             </p>
-          )}
+            {fireAgeFractional != null && (
+              <p className="text-[10px] text-horizon-600 font-mono font-semibold">
+                FIRE {Math.round(fireAgeFractional)}j
+              </p>
+            )}
+          </div>
         </div>
       </WidgetShell>
     )

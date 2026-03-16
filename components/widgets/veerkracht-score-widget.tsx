@@ -90,13 +90,13 @@ function SubFactorCard({ label, score, maxScore, description }: {
   const barColor = pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-horizon-500' : 'bg-red-500'
 
   return (
-    <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] p-2.5">
+    <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] p-2">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-[var(--ink-2)]">{label}</span>
-        <span className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">{score}/{maxScore}</span>
+        <span className="text-[10px] font-medium text-[var(--ink-2)]">{label}</span>
+        <span className="font-mono text-[10px] font-semibold tabular-nums text-[var(--ink)]">{score}/{maxScore}</span>
       </div>
-      <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">{description}</p>
-      <div className="mt-1.5 h-1 w-full rounded-full bg-[var(--subtle)]">
+      <p className="mt-0.5 text-[9px] text-[var(--ink-3)]">{description}</p>
+      <div className="mt-1 h-1 w-full rounded-full bg-[var(--subtle)]">
         <div className={`h-1 rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -258,21 +258,21 @@ export function VeerkrachtScoreWidget({ size, data, href }: Props) {
   return (
     <WidgetShell module="horizon" size={size} kicker="Veerkracht Score" href={href}>
       {/* Top: Gauge + label + trend */}
-      <div className="flex items-start gap-4">
-        <HalfGauge score={score} size={160} />
-        <div className="flex-1 pt-3">
-          <p className={`font-mono text-xl font-semibold ${scoreColor}`}>{bd.label}</p>
-          <p className="text-xs text-[var(--ink-3)] mt-0.5">
+      <div className="flex items-start gap-3">
+        <HalfGauge score={score} size={120} />
+        <div className="flex-1 pt-2">
+          <p className={`font-mono text-lg font-semibold ${scoreColor}`}>{bd.label}</p>
+          <p className="text-[11px] text-[var(--ink-3)] mt-0.5">
             {monthsCovered.toFixed(1)} maanden buffer
           </p>
           {/* Trend direction */}
-          <div className="mt-2 flex items-center gap-1.5">
+          <div className="mt-1.5 flex items-center gap-1.5">
             {trend.direction === 'up' ? (
-              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+              <TrendingUp className="h-3 w-3 text-emerald-500" />
             ) : (
-              <ArrowRight className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+              <ArrowRight className="h-3 w-3 text-[var(--ink-3)]" />
             )}
-            <span className={`text-[11px] font-medium ${
+            <span className={`text-[10px] font-medium ${
               trend.direction === 'up' ? 'text-emerald-600' : 'text-[var(--ink-3)]'
             }`}>
               {trend.direction === 'up' ? '\u2191' : '\u2192'} {trend.label}
@@ -282,7 +282,7 @@ export function VeerkrachtScoreWidget({ size, data, href }: Props) {
       </div>
 
       {/* Sub-factor detail cards (2x2 grid) */}
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
         <SubFactorCard
           label="Noodfonds"
           score={bd.emergency}
@@ -311,14 +311,14 @@ export function VeerkrachtScoreWidget({ size, data, href }: Props) {
 
       {/* Tips for improvement */}
       {tips.length > 0 && (
-        <div className="mt-3 rounded-[var(--r-sm)] border border-horizon-200 bg-horizon-50/50 p-2.5">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Lightbulb className="h-3.5 w-3.5 text-horizon-500" />
-            <span className="text-[11px] font-semibold text-horizon-700">Tips</span>
+        <div className="mt-2 rounded-[var(--r-sm)] border border-horizon-200 bg-horizon-50/50 p-2">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Lightbulb className="h-3 w-3 text-horizon-500" />
+            <span className="text-[10px] font-semibold text-horizon-700">Tips</span>
           </div>
-          <ul className="space-y-1">
+          <ul className="space-y-0.5">
             {tips.map((tip, i) => (
-              <li key={i} className="text-[11px] text-[var(--ink-2)] leading-relaxed">
+              <li key={i} className="text-[10px] text-[var(--ink-2)] leading-snug">
                 {tip}
               </li>
             ))}
@@ -327,7 +327,7 @@ export function VeerkrachtScoreWidget({ size, data, href }: Props) {
       )}
 
       {/* CTA */}
-      <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
+      <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
         Bekijk veerkracht details &rarr;
       </p>
     </WidgetShell>

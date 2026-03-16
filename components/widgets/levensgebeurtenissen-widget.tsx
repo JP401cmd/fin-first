@@ -206,19 +206,19 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
   const rawMax = Math.max(...allPts.map(([, v]) => v), 1)
   const maxVal = rawMax * 1.08
 
-  // ── Half: chart matching full aspect ratio ──────────────
+  // ── Half: compact chart that fits vertically ───────────
   if (size === 'half') {
     const W = 280
-    const H = 130
-    const PAD = { top: 8, right: 8, bottom: 16, left: 34 }
+    const H = 110
+    const PAD = { top: 6, right: 6, bottom: 13, left: 30 }
     const innerW = W - PAD.left - PAD.right
     const innerH = H - PAD.top - PAD.bottom
 
     const toX = (age: number) => PAD.left + ((age - minAge) / ageSpan) * innerW
     const toY = (val: number) => PAD.top + innerH - (val / maxVal) * innerH
 
-    // Y-axis ticks (4 ticks like full/SimChart)
-    const yTicks = [0, 0.33, 0.66, 1.0].map(f => ({ val: maxVal * f, y: toY(maxVal * f) }))
+    // Y-axis ticks (3 ticks for compact view)
+    const yTicks = [0, 0.5, 1.0].map(f => ({ val: maxVal * f, y: toY(maxVal * f) }))
     // X-axis age ticks
     const xStep = ageSpan <= 40 ? 10 : 20
     const xTicks: number[] = []
@@ -227,8 +227,8 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
     const fireX = fireAgeFractional != null ? toX(fireAgeFractional) : null
 
     // Row-stacking for event labels
-    const MIN_X_GAP = 24
-    const ROW_H = 8
+    const MIN_X_GAP = 22
+    const ROW_H = 7
     const evtXs = events.map(e => toX(e.targetAge!))
     const rows: number[] = []
     for (let i = 0; i < events.length; i++) {
@@ -241,7 +241,7 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
 
     return (
       <WidgetShell module="horizon" size={size} kicker="Levensgebeurtenissen" href={href}>
-        <div ref={ref} className="mt-1">
+        <div ref={ref} className="mt-0.5">
           <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible" aria-label="Levensgebeurtenissen vermogenspad">
             {/* Grid */}
             {yTicks.map(({ val, y }) => (
@@ -250,14 +250,14 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
             ))}
             {/* Y-axis labels */}
             {yTicks.filter(t => t.val > 0).map(({ val, y }) => (
-              <text key={val} x={PAD.left - 3} y={y + 3} textAnchor="end" fontSize="6"
+              <text key={val} x={PAD.left - 2} y={y + 2.5} textAnchor="end" fontSize="5"
                 fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
                 {fmtCompact(val)}
               </text>
             ))}
             {/* X-axis labels */}
             {xTicks.map(age => (
-              <text key={age} x={toX(age)} y={H - 2} textAnchor="middle" fontSize="6"
+              <text key={age} x={toX(age)} y={H - 2} textAnchor="middle" fontSize="5"
                 fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
                 {age}
               </text>
@@ -269,7 +269,7 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
             {/* Accumulation path */}
             {accPts.length > 1 && (
               <path d={pointsToPath(accPts, toX, toY)} fill="none"
-                stroke={COLOR_OPBOUW} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                stroke={COLOR_OPBOUW} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
                 pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
                 style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1)' : 'none' }}
               />
@@ -277,7 +277,7 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
             {/* Decumulation path */}
             {decPts.length > 1 && (
               <path d={pointsToPath(decPts, toX, toY)} fill="none"
-                stroke={COLOR_AFBOUW} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                stroke={COLOR_AFBOUW} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
                 pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
                 style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1) 0.1s' : 'none' }}
               />
@@ -285,7 +285,7 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
             {/* No FIRE: grey single line */}
             {fireIdx === -1 && allPts.length > 1 && (
               <path d={pointsToPath(allPts, toX, toY)} fill="none"
-                stroke="var(--ink-3)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                stroke="var(--ink-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
                 pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
                 style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1)' : 'none' }}
               />
@@ -299,7 +299,7 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
                   style={{ opacity: hasEntered ? 0.7 : 0, transition: 'opacity 300ms ease 700ms' }}
                 />
                 <circle cx={fireX} cy={toY(interpAt(simRows, fireAgeFractional) ?? 0)}
-                  r="3.5" fill={COLOR_OPBOUW} stroke="white" strokeWidth="1"
+                  r="3" fill={COLOR_OPBOUW} stroke="white" strokeWidth="0.8"
                   style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 750ms' }}
                 />
               </>
@@ -312,16 +312,16 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
               const cx = toX(evt.targetAge!)
               const cy = toY(portfolio)
               const row = rows[i] ?? 0
-              const name = evt.name.length > 9 ? evt.name.slice(0, 8) + '…' : evt.name
+              const name = evt.name.length > 8 ? evt.name.slice(0, 7) + '…' : evt.name
               return (
                 <g key={evt.id} style={{
                   opacity: hasEntered ? 1 : 0,
                   transition: `opacity 200ms ease ${700 + i * 80}ms`,
                 }}>
-                  <circle cx={cx} cy={cy} r="3.5" fill="white" />
-                  <circle cx={cx} cy={cy} r="2.8"
+                  <circle cx={cx} cy={cy} r="3" fill="white" />
+                  <circle cx={cx} cy={cy} r="2.4"
                     fill={evt.impactType === 'positive' ? COLOR_POS : COLOR_NEG} />
-                  <text x={cx} y={cy + 8 + row * ROW_H} textAnchor="middle" fontSize="5.5"
+                  <text x={cx} y={cy + 7 + row * ROW_H} textAnchor="middle" fontSize="5"
                     fontWeight="500" fill="var(--ink-3)" fontFamily="var(--font-inter, sans-serif)">
                     {name}
                   </text>
@@ -329,10 +329,10 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
               )
             })}
           </svg>
-          <div className="mt-0.5 flex items-center justify-between">
-            <p className="text-[10px] text-[var(--ink-4)] font-mono">{minAge}j — {maxAge}j</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] text-[var(--ink-4)] font-mono">{minAge}j — {maxAge}j</p>
             {fireAgeFractional != null && (
-              <p className="text-[10px] font-mono font-semibold" style={{ color: COLOR_OPBOUW }}>
+              <p className="text-[9px] font-mono font-semibold" style={{ color: COLOR_OPBOUW }}>
                 FIRE {Math.round(fireAgeFractional)}j
               </p>
             )}
