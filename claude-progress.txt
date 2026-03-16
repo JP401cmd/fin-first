@@ -1,3 +1,24 @@
+## Session 2026-03-16 - Features #20, #21
+
+### Feature #20: Content: Droomscenario / What-If - PASSING
+- Already implemented in gids page (lines 664-696)
+- GuideTopicCard with MessageSquare icon in reis-stap 5
+- Description covers: 5 sliders, quick presets, split-view comparison, SimChart with percentiles, partner perspective
+- 5 how-steps + tip present
+- Marked as passing (was implemented by previous session but status wasn't synced)
+
+### Feature #21: Content: Will AI-chat - PASSING
+- Already implemented in gids page (lines 698-729)
+- GuideTopicCard with MessageSquare icon in reis-stap 5
+- Description covers: 3 personalities (FHIN/FINN/FFIN), context-aware, scenario integration, PII masking
+- 4 how-steps + tip present
+- Marked as passing (was implemented by previous session but status wasn't synced)
+
+### Current Status
+- 2 features verified and marked passing this session (#20, #21)
+- No code changes needed (verification-only features)
+- Progress: 46/47 features passing (97.9%)
+
 ## Session 2026-03-16 - Features #46, #47
 
 ### Feature #46: Nieuwe widget: Weekoverzicht - PASSING
@@ -12753,3 +12774,17 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#43, #44, #45)
 - Zero TypeScript errors in all changed files
 - All widgets follow existing patterns (WidgetShell, design tokens, editorial style)
+
+## Session 2026-03-16 - Feature #19
+
+### Feature #19: Content: Onttrekkingsstrategie - PASSING
+- Already fully implemented in gids page (lines 615-647)
+- GuideTopicCard with ArrowDownToLine icon in reis-stap 4 (Kijk vooruit)
+- Description (level 1): 4 methoden (4%-regel, dynamisch, vloer-plafond, bucket), simulatie, vergelijking, jaarlijks inkomen, flexibiliteit
+- How-steps (level 2): 4 numbered steps + tip about bucket-strategie
+- Import verified: ArrowDownToLine from lucide-react
+- No code changes needed (verification-only)
+
+### Current Status
+- 1 feature verified and marked passing (#19)
+- 45/47 features passing (95.7%)
