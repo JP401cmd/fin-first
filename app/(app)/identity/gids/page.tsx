@@ -16,6 +16,14 @@ import {
   RefreshCw,
   Bell,
   FileText,
+  Sparkles,
+  Target,
+  LineChart,
+  ArrowDownToLine,
+  Newspaper,
+  Users,
+  Settings,
+  Smartphone,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -357,24 +365,130 @@ export default function GidsPage() {
           isComplete={!!progress?.steps.hasCompletedActions}
         >
           <GuideTopicCard
-            icon={LayoutDashboard}
-            title="Widgets op De Wil"
+            icon={Sparkles}
+            title="Voorstellen"
             color="var(--color-wil-400)"
             description={
               <>
-                De Wil is je persoonlijke commandocentrum — geen los dashboard, maar de plek waar inzicht overgaat in actie. De bovenste helft bestaat uit meer dan <strong>26 widgets</strong>: compacte kaarten die je financiële situatie in real-time samenvatten. Van netto vermogen en vrijheidsdagen tot sparklines, budgetbalken en FIRE-prognoses. Daaronder vind je het actiecentrum: <strong>Inzicht → Actie → Resultaat</strong>.
-                {' '}
-                Bovenaan De Wil schakel je met de <strong>DAIshboard-toggle</strong> naar een AI-samengestelde briefing met tot 23 kaarttypes. Widgets komen in formaten van mini tot volledig en je <strong>soevereiniteitsniveau</strong> bepaalt welke beschikbaar zijn — hogere niveaus ontgrendelen geavanceerde inzichten zoals backtesting en scenarioanalyse. De volgorde pas je aan via <strong>drag-and-drop</strong> en je voorkeuren worden opgeslagen in je profiel.
+                Will analyseert je financi\u00eble situatie en genereert persoonlijke
+                aanbevelingen in vijf categorie\u00ebn: bespaartips,
+                schuld-optimalisatie, beleggingskansen, inkomensmogelijkheden en
+                gedragsaanpassingen. Elke aanbeveling toont de geschatte impact in{" "}
+                <strong>vrijheidsdagen per jaar</strong> \u2014 zo weet je precies
+                wat het je oplevert.
+                {" "}
+                Voorstellen komen binnen als inzichten die je kunt{" "}
+                <strong>accepteren</strong> (wordt een actie),{" "}
+                <strong>uitstellen</strong> (bewaar voor later) of{" "}
+                <strong>afwijzen</strong>. De prioriteitsscore bepaalt welke
+                bovenaan staan: voorstellen met de hoogste vrijheidstijd-impact
+                verschijnen eerst. Naarmate je meer gegevens toevoegt, worden de
+                aanbevelingen specifieker en waardevoller.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Wil — je widgets staan bovenaan de pagina",
-                "Wissel naar DAIshboard-modus via de toggle voor een AI-samengestelde briefing",
-                "Ga naar Identiteit → Instellingen → Widgets om widgets aan/uit te zetten en de volgorde aan te passen",
-                "Nieuwe widgets ontgrendelen automatisch bij een hoger soevereiniteitsniveau",
+                "Ga naar De Wil \u2014 je voorstellen staan in de kolom \u201cInzicht\u201d",
+                "Tik op \u201c+ Analyseren\u201d om Will nieuwe aanbevelingen te laten genereren op basis van je huidige data",
+                "Bekijk per voorstel de vrijheidsdagen-impact en de onderbouwing",
+                "Kies: accepteren (wordt actie), uitstellen (komt later terug) of afwijzen (verdwijnt)",
               ],
-              tip: "Begin met de standaard 7 widgets. Voeg pas meer toe als je weet welke inzichten je dagelijks wilt zien.",
+              tip: "Accepteer eerst de voorstellen met de hoogste vrijheidsdagen-impact \u2014 die leveren het snelst resultaat op.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Zap}
+            title="Acties"
+            color="var(--color-wil-400)"
+            description={
+              <>
+                Je persoonlijke actiebord werkt als een kanban: drie kolommen \u2014{" "}
+                <strong>open</strong>, <strong>uitgesteld</strong> en{" "}
+                <strong>voltooid</strong>. Acties komen binnen via geaccepteerde
+                voorstellen of je maakt ze zelf aan. Elke actie heeft een
+                vrijheidsdagen-impact, een bron (Will, check-in of handmatig) en
+                optioneel een deadline.
+                {" "}
+                Het afronden van acties is waar de magie zit: elke voltooide actie
+                levert <strong>vrijheidsdagen</strong> op die meetellen in je
+                totaal. Je ziet je gewonnen dagen oplopen en je FIRE-datum
+                verschuiven. Het is gamification met echte impact \u2014 niet voor
+                punten, maar voor je toekomst.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Wil \u2014 je acties staan in de middelste kolom \u201cActie\u201d",
+                "Tik op een actie voor details, vrijheidsdagen-impact en instructies",
+                "Markeer een actie als voltooid wanneer je hem hebt uitgevoerd",
+                "Maak handmatige acties aan met \u201c+ Nieuwe actie\u201d voor eigen financi\u00eble stappen",
+                "Uitgestelde acties verplaats je terug naar open wanneer je eraan toe bent",
+              ],
+              tip: "Plan elke week \u00e9\u00e9n actie in. Consistent kleine stappen > af en toe een sprint.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Target}
+            title="Doelen"
+            color="var(--color-wil-400)"
+            description={
+              <>
+                Stel concrete financi\u00eble doelen met een doelbedrag en
+                einddatum. TriFinity kent <strong>10 doeltypes</strong>: spaardoel,
+                schuldaflossing, nettovermogen, vrijheidsdagen, spaarquote, belegd
+                vermogen, passief inkomen, noodfonds, salaris en vrij. Koppel een
+                doel aan een bezitting of schuld en de voortgang wordt automatisch
+                bijgehouden.
+                {" "}
+                Per doel zie je hoeveel je al hebt bereikt, of je{" "}
+                <strong>op schema</strong> ligt, en wat de verwachte einddatum is
+                bij het huidige tempo. Doelen zijn persoonlijk of gedeeld met je
+                huishouden \u2014 zo werken jullie samen aan een gezamenlijke
+                toekomst.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Wil \u2192 Resultaat kolom en tik op \u201c+ Nieuw doel\u201d",
+                "Kies het doeltype (spaardoel, schuldaflossing, nettovermogen, etc.)",
+                "Vul het doelbedrag en de gewenste einddatum in",
+                "Koppel optioneel aan een bezitting (bijv. je spaarrekening) of schuld (bijv. je studielening) voor automatische voortgang",
+                "Bekijk je voortgang op het doelen-dashboard \u2014 de on-track indicator toont of je op schema ligt",
+              ],
+              tip: "E\u00e9n helder doel werkt beter dan vijf vage. Begin met je noodfonds of je grootste schuld.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={RefreshCw}
+            title="Abonnementen"
+            color="var(--color-wil-400)"
+            description={
+              <>
+                TriFinity scant automatisch 12 maanden transactiegeschiedenis op
+                terugkerende patronen. Abonnementen, lidmaatschappen en vaste
+                lasten worden gedetecteerd met een{" "}
+                <strong>betrouwbaarheidsniveau</strong> (hoog, middel, laag) en
+                frequentie (wekelijks, maandelijks, per kwartaal, jaarlijks). Je
+                ziet het totale maandbedrag aan abonnementen en hoeveel{" "}
+                <strong>vrijheidsdagen</strong> die je per jaar kosten.
+                {" "}
+                Het <strong>opzegadvies</strong> toont welke abonnementen je het
+                minst gebruikt of de slechtste prijs-kwaliteitverhouding hebben.
+                Soms is het schrappen van twee vergeten abonnementen genoeg om een
+                halve vrijheidsdag per maand te winnen.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Importeer minimaal 3 maanden transacties \u2014 hoe meer, hoe beter de detectie",
+                "Ga naar De Wil \u2014 je abonnementen staan onderaan de pagina",
+                "Bekijk de gedetecteerde abonnementen met frequentie en maandbedrag",
+                "Tik op een abonnement voor de opzegflow met details en vrijheidsdagen-impact",
+              ],
+              tip: "Check je abonnementen elk kwartaal. Vergeten streamingdiensten en ongebruikte sportschoolpassen zijn de meest voorkomende tijdlekken.",
             }}
           />
         </ReisStapSection>
