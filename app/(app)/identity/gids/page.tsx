@@ -293,31 +293,42 @@ export default function GidsPage() {
                 (0–100%) — bijvoorbeeld je auto voor 50% omdat de waarde daalt, of je
                 eigen woning voor 80%. Zo krijg je een realistisch beeld van je
                 werkelijke financiële positie.
-                <br />
-                <br />
-                De <strong>vermogensgrafiek</strong> toont je historisch verloop met maandelijkse
-                datapunten — zo zie je seizoenspatronen, dips en groeiversnellingen in één
-                oogopslag. De <strong>samenstelling</strong> laat zien hoe je vermogen is opgebouwd:
-                cash (betaal- en spaarrekeningen) + beleggingen + vastgoed + pensioen − schulden =
-                nettovermogen. Zo ontdek je of je vermogen goed gespreid is of te afhankelijk van
-                één pijler.
-                <br />
-                <br />
-                Bij elke nieuwe piek detecteert TriFinity automatisch een{" "}
-                <strong>mijlpaal</strong> — een nieuw vermogensrecord. Deze mijlpalen verschijnen
-                in je tijdlijn en meldingen, zodat je ziet wanneer je een nieuw hoogterecord
-                bereikt en hoe lang het duurde om daar te komen.
+                <br /><br />
+                <strong>Vermogensgrafiek:</strong> Op het dashboard toont de{" "}
+                <em>netto_vermogen</em>-widget je vermogen als trendlijn over de
+                afgelopen maanden. Tik op een punt om de samenstelling op dat moment
+                te zien — zo zie je seizoenspatronen, dips en groeiversnellingen in
+                één oogopslag.
+                <br /><br />
+                <strong>Snapshots:</strong> Elke maand bij je check-in wordt een
+                snapshot opgeslagen. Zo bouw je een betrouwbare historische lijn op,
+                ook als waardes tussentijds schommelen. Per snapshot zie je niet
+                alleen het bedrag, maar ook je vrijheidspercentage, spaarquote en
+                geschatte FIRE-leeftijd.
+                <br /><br />
+                <strong>Samenstelling:</strong> De breakdown toont: cash + spaar +
+                beleggingen + vastgoed + crypto + overig − hypotheek − leningen −
+                studieschuld = netto vermogen. Zo ontdek je of je vermogen goed
+                gespreid is of te afhankelijk van één pijler.
+                <br /><br />
+                <strong>Mijlpalen:</strong> De app detecteert automatisch nieuwe
+                records en meldt wanneer je een mijlpaal bereikt (bijv. eerste
+                €10.000, €50.000, €100.000). Deze mijlpalen verschijnen in je
+                tijdlijn en meldingen, zodat je ziet hoe lang het duurde om daar te
+                komen. De <em>jouw_pad</em>-widget op /identity toont je vermogen op
+                een temporale tijdlijn.
               </>
             }
             howTo={{
               steps: [
-                "Je nettovermogen wordt automatisch berekend zodra je bezittingen en schulden hebt toegevoegd",
-                "Bij elke herwaardering maakt TriFinity een balanssnapshot — je ziet het bedrag, de samenstelling en je vrijheidstijd",
-                "Bekijk de vermogensgrafiek op De Kern voor je historisch verloop met maandelijkse snapshots",
-                "Analyseer de samenstelling: hoeveel zit in cash, beleggingen, vastgoed en pensioen versus schulden",
-                "Vergelijk periodes om trends te ontdekken — mijlpalen markeren automatisch nieuwe vermogensrecords",
+                "Je nettovermogen wordt automatisch berekend zodra je bezittingen en schulden hebt toegevoegd — elk item heeft een inclusiepercentage (0–100%)",
+                "Bij elke check-in maakt TriFinity een balanssnapshot — je ziet het bedrag, de samenstelling en je vrijheidstijd",
+                "Bekijk de netto_vermogen-widget op het dashboard voor je trendlijn over de afgelopen maanden",
+                "Tik op een datapunt in de vermogensgrafiek om de samenstelling op dat moment te zien",
+                "Analyseer de breakdown: cash + spaar + beleggingen + vastgoed + crypto + overig − schulden = netto vermogen",
+                "Nieuwe vermogensrecords worden automatisch als mijlpaal gemarkeerd — check je tijdlijn en meldingen",
               ],
-              tip: "De maandelijkse check-in is het ideale moment om je vermogen bij te werken en je voortgang te zien.",
+              tip: "De maandelijkse check-in is het ideale moment om je vermogen bij te werken. Stel het inclusiepercentage per bezitting in voor een realistisch beeld.",
             }}
           />
         </ReisStapSection>
@@ -475,15 +486,18 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                De Kern groeit mee met jouw behoeften. We werken aan nieuwe
-                mogelijkheden om je financiële fundament nog sterker te maken —
-                denk aan <strong>automatische banksynchronisatie</strong> zodat je
-                saldi en transacties vanzelf binnenkomen, slimmere herkenning van{' '}
-                <strong>terugkerende transacties</strong> die automatisch
-                gekoppeld worden aan de juiste budgetten, en uitgebreidere{' '}
-                <strong>rapportages</strong> waarmee je dieper in je patronen
-                kunt duiken. Houd de gids in de gaten — nieuwe features
-                verschijnen hier zodra ze klaar zijn.
+                We bouwen continu aan De Kern. Dit staat op de planning:
+                <br />
+                <br />• <strong>Automatische banksynchronisatie</strong> — saldi
+                en transacties komen vanzelf binnen, zonder handmatige import.
+                <br />• <strong>Slimmere terugkerende transacties</strong> —
+                automatische herkenning en koppeling aan de juiste budgetten.
+                <br />• <strong>Zelflerende categorisatie</strong> — hoe meer je
+                importeert, hoe slimmer de toewijzing wordt.
+                <br />
+                <br />
+                Heb je een idee? Laat het ons weten — De Kern groeit mee met
+                jouw behoeften.
               </>
             }
           />
@@ -523,33 +537,34 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                Voorstellen zijn concrete acties die je vrijheidstijd vergroten.
-                Will analyseert je <strong>uitgavenpatronen</strong>,{" "}
-                <strong>doelen</strong> en financi\u00eble situatie en genereert
-                persoonlijke aanbevelingen in vijf categorie\u00ebn: bespaartips,
-                schuld-optimalisatie, beleggingskansen, inkomensmogelijkheden en
-                gedragsaanpassingen. Elke aanbeveling toont de geschatte impact
-                in <strong>vrijheidsdagen per jaar</strong> en laat zien{" "}
-                <strong>hoeveel maanden eerder vrij</strong> je wordt als je het
-                voorstel uitvoert \u2014 zo weet je precies wat het je oplevert.
+                Voorstellen zijn concrete stappen die je vrijheidstijd
+                vergroten. Geen vaag advies, maar acties met een berekende
+                impact: &ldquo;Dit bespaart je 3 maanden.&rdquo; Will
+                analyseert je <strong>uitgavenpatronen</strong>,{" "}
+                <strong>doelen</strong> en financi&euml;le situatie en genereert
+                persoonlijke aanbevelingen in vijf categorie&euml;n:
+                belegging-optimalisatie, schuld-aflossing, doel-activering,
+                budget-setup en veerkracht-verbetering. Elk voorstel toont{" "}
+                <strong>wat je kunt doen</strong>, <strong>waarom het helpt</strong>,
+                en <strong>hoeveel vrijheidstijd het oplevert</strong> &mdash;
+                gebaseerd op je werkelijke cijfers, niet op aannames.
                 {" "}
-                Voorstellen komen binnen als inzichten die je kunt{" "}
-                <strong>accepteren</strong> (wordt direct een actie op je
-                kanban-bord), <strong>uitstellen</strong> (bewaar voor later) of{" "}
-                <strong>afwijzen</strong>. De prioriteitsscore bepaalt welke
-                bovenaan staan: voorstellen met de hoogste vrijheidstijd-impact
-                verschijnen eerst. Naarmate je meer gegevens toevoegt, worden de
-                aanbevelingen specifieker en waardevoller.
+                Voorstellen komen van de <strong>AI</strong> (automatisch), van{" "}
+                <strong>Will</strong> (via chat), of je maakt ze{" "}
+                <strong>zelf</strong> aan. Bij accepteren wordt het voorstel
+                omgezet in een actie op je kanban-bord. Je kunt het ook
+                uitstellen of afwijzen &mdash; je feedback maakt toekomstige
+                voorstellen beter.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Wil \u2014 je voorstellen staan in de kolom \u201cInzicht\u201d",
-                "Tik op \u201c+ Analyseren\u201d om Will nieuwe aanbevelingen te laten genereren op basis van je uitgavenpatronen en doelen",
-                "Bekijk per voorstel de vrijheidsdagen-impact en hoeveel maanden eerder vrij je wordt",
-                "Kies: accepteren (wordt actie op je kanban-bord), uitstellen (komt later terug) of afwijzen (verdwijnt)",
+                "Bekijken \u2014 Ga naar De Wil \u2192 Voorstellen. Elk voorstel toont wat je kunt doen, waarom het helpt, en hoeveel vrijheidstijd het oplevert.",
+                "Impact \u2014 De AI berekent per voorstel hoeveel maanden eerder je financieel vrij bent als je het uitvoert. Gebaseerd op je werkelijke cijfers, niet op aannames.",
+                "Accepteren \u2014 Tik op accepteren en het voorstel wordt een actie op je kanban-bord. Je kunt het ook uitstellen of afwijzen \u2014 je feedback maakt toekomstige voorstellen beter.",
+                "Bronnen \u2014 Voorstellen komen van de AI (automatisch), van Will (via chat), of je maakt ze zelf aan.",
               ],
-              tip: "Accepteer eerst de voorstellen met de hoogste vrijheidsdagen-impact \u2014 die leveren het snelst resultaat op.",
+              tip: "Accepteer eerst de voorstellen met de hoogste vrijheidstijd-impact \u2014 die leveren het snelst resultaat op.",
             }}
           />
 
@@ -698,31 +713,30 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                Elke dag een persoonlijke financi&euml;le update &mdash; dat is
-                je briefing. Schakel je dashboard over naar{" "}
-                <strong>DAIshboard-modus</strong> en Will componeert een
+                Elke dag een persoonlijke financi&euml;le update. Geen generiek
+                nieuws, maar inzichten gebaseerd op <strong>j&oacute;uw</strong>{" "}
+                cijfers, <strong>j&oacute;uw</strong> doelen,{" "}
+                <strong>j&oacute;uw</strong> situatie. Schakel je dashboard over
+                naar <strong>DAIshboard-modus</strong> en Will componeert een
                 AI-samengestelde briefing op basis van je actuele data. De
-                briefing bevat tot <strong>23 verschillende kaarttypes</strong>:
-                metrics, sparklines, mijlpalen, budgetbalken, inzichten,
-                checklists, vergelijkingen en doelvoortgang. De inhoud past zich
-                aan: &apos;s ochtends focus op de dag, aan het einde van de
-                maand op je maandresultaat.
-                {" "}
-                Will analyseert je transacties, vermogensmutaties,
-                budgetvoortgang en FIRE-prognose en selecteert de meest
-                relevante inzichten. De briefing wordt{" "}
-                <strong>progressief geladen</strong> &mdash; kaarten verschijnen
-                zodra ze klaar zijn. Na 24 uur verschijnt een stale-banner zodat
-                je weet dat de data niet meer actueel is. Ververs handmatig
-                wanneer je wilt.
+                briefing bevat inzichten over je{" "}
+                <strong>budget</strong> (overschrijdingen, trends),{" "}
+                <strong>vermogen</strong> (veranderingen, rendement), en{" "}
+                <strong>acties</strong> (wat kun je vandaag doen).
+                Context-afhankelijk: rond salarisdag andere inzichten dan eind
+                van de maand. Kaarten verschijnen &eacute;&eacute;n voor
+                &eacute;&eacute;n terwijl de AI je data analyseert &mdash;{" "}
+                <strong>progressief geladen</strong> zodat je niet hoeft te
+                wachten. Na 24 uur verschijnt een stale-banner zodat je weet dat
+                de data niet meer actueel is.
               </>
             }
             howTo={{
               steps: [
-                "Op je dashboard: wissel naar DAIshboard-modus via de toggle bovenaan",
-                "De briefing genereert automatisch \u2014 kaarten verschijnen progressief zodra ze klaar zijn",
+                "Openen \u2014 Ga naar Berichten of tik op de briefing-kaart op De Wil. Je ziet kaarten die \u00e9\u00e9n voor \u00e9\u00e9n verschijnen terwijl de AI je data analyseert.",
+                "Inhoud \u2014 De briefing bevat inzichten over je budget (overschrijdingen, trends), vermogen (veranderingen, rendement), en acties (wat kun je vandaag doen). Context-afhankelijk: rond salarisdag andere inzichten dan eind van de maand.",
+                "Verversen \u2014 Tik op verversen voor een nieuwe briefing. De AI kijkt opnieuw naar je actuele data en genereert verse inzichten.",
                 "Scroll door je persoonlijke briefing en tik op kaarten voor meer detail",
-                "Ververs de briefing handmatig wanneer je nieuwe data hebt toegevoegd",
                 "Na 24 uur verschijnt een stale-banner \u2014 ververs voor actuele inzichten",
               ],
               tip: "Check je briefing elke ochtend als financi\u00eble routine \u2014 het kost 30 seconden en houdt je scherp op je financi\u00eble voortgang.",
