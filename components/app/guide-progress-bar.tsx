@@ -20,6 +20,7 @@ interface ReisStap {
   color: string      // module accent color
   bgColor: string    // light bg for filled state
   check: (steps: GuideProgressSteps) => boolean
+  scrollTarget: number  // reis-stap number to scroll to
 }
 
 /* ── Reis-stappen definitie ─────────────────────── */
@@ -31,6 +32,7 @@ const REIS_STAPPEN: ReisStap[] = [
     color: 'var(--color-kern-400)',
     bgColor: 'var(--color-kern-50)',
     check: (s) => s.hasAssets || s.hasDebts,
+    scrollTarget: 1,
   },
   {
     label: 'Transacties importeren',
@@ -38,6 +40,7 @@ const REIS_STAPPEN: ReisStap[] = [
     color: 'var(--color-kern-400)',
     bgColor: 'var(--color-kern-50)',
     check: (s) => s.hasTransactions,
+    scrollTarget: 2,
   },
   {
     label: 'Eerste actie afgerond',
@@ -45,6 +48,7 @@ const REIS_STAPPEN: ReisStap[] = [
     color: 'var(--color-wil-400)',
     bgColor: 'var(--color-wil-50)',
     check: (s) => s.hasCompletedActions,
+    scrollTarget: 3,
   },
   {
     label: 'FIRE-projectie bekeken',
@@ -52,6 +56,7 @@ const REIS_STAPPEN: ReisStap[] = [
     color: 'var(--color-horizon-400)',
     bgColor: 'var(--color-horizon-50)',
     check: (s) => s.hasFireData,
+    scrollTarget: 4,
   },
   {
     label: 'Levensgebeurtenis gepland',
@@ -59,6 +64,7 @@ const REIS_STAPPEN: ReisStap[] = [
     color: 'var(--color-horizon-400)',
     bgColor: 'var(--color-horizon-50)',
     check: (s) => s.hasLifeEvents,
+    scrollTarget: 4,
   },
 ]
 
@@ -124,7 +130,7 @@ export function GuideProgressBar() {
               key={i}
               type="button"
               aria-label={`Ga naar stap ${i + 1}: ${stap.label}`}
-              onClick={() => scrollToStep(i + 1)}
+              onClick={() => scrollToStep(stap.scrollTarget)}
               className="relative h-2 flex-1 rounded-full overflow-hidden cursor-pointer transition-opacity hover:opacity-80"
               style={{
                 backgroundColor: 'var(--border-ed)',
@@ -154,7 +160,7 @@ export function GuideProgressBar() {
               key={i}
               type="button"
               aria-label={`Ga naar stap ${i + 1}: ${stap.label}`}
-              onClick={() => scrollToStep(i + 1)}
+              onClick={() => scrollToStep(stap.scrollTarget)}
               className="flex flex-1 flex-col items-center gap-1 cursor-pointer group"
             >
               <div

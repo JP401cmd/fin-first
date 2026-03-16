@@ -1,3 +1,91 @@
+## Session 2026-03-16 - Features #29, #22, #33
+
+### Feature #29: Content: Mobiel - PASSING
+- Replaced GuideAccordion (alg-mobiel) with GuideTopicCard
+- Description: bottom navigation, 44px touch targets, BottomSheets, responsive widgets
+- How-steps: 3 steps (bottom nav, BottomSheet interaction, rotate/scroll)
+- Tip: Zet op homescreen als webapp
+- Note: Page was restructured by another agent mid-session; original Algemeen section removed
+
+### Feature #22: Content: Dashboard & Widgets - PASSING
+- Added GuideTopicCard in Algemeen section
+- Description: 26+ widgets, sizing, soevereiniteitsniveau-gating, drag-and-drop, widgetvoorkeuren
+- How-steps: 4 steps (view dashboard, edit mode, settings, sovereignty level)
+- Tip: Begin met standaard 7 widgets
+- Note: Page was restructured by another agent; content was in Algemeen section before restructure
+
+### Feature #33: Content: Widgets op De Wil - PASSING
+- Added GuideTopicCard inside Step 3 "Onderneem actie" ReisStapSection
+- Description: 26+ widgets on De Wil, not separate dashboard, DAIshboard-toggle, gating, drag-and-drop
+- How-steps: 4 steps (go to De Wil, DAIshboard toggle, settings, auto-unlock)
+- Tip: Begin met standaard 7 widgets
+- Added LayoutDashboard import
+- Committed as part of another agent's restructure commit
+
+### Current Status
+- 3 features completed this session (#29, #22, #33)
+- Zero TypeScript errors
+- Page structure changed significantly during session by parallel agents
+
+## Session 2026-03-16 - Features #26, #27, #28
+
+### Feature #26: Content: Rapporten - PASSING
+- Replaced GuideAccordion (alg-rapporten) with GuideTopicCard
+- Description: 3 report types (periode, balans, budget), AI-inleiding, opgeslagen rapporten
+- 4 how-to steps + tip about monthly check-in routine
+- Commit: 17bcefb5
+
+### Feature #27: Content: Profiel & Instellingen - PASSING
+- Replaced two GuideAccordions (alg-profiel + alg-instellingen) with single GuideTopicCard
+- Description: persoonlijke gegevens, soevereiniteitsniveaus, 5 instellingen-secties, kleurpersonalisatie
+- 4 how-to steps + tip about geboortedatum/inkomen first
+- Commit: 17bcefb5
+
+### Feature #28: Content: Huishouden & Partner - PASSING
+- Replaced GuideAccordion (alg-huishouden) with GuideTopicCard
+- Description: uitnodiging, privacy levels, kostenverdeling, gedeelde doelen, perspectief toggle
+- 5 how-to steps + tip about discussing privacy settings together
+- Commit: 17bcefb5
+
+### Current Status
+- 3 features completed this session (#26, #27, #28)
+- Zero TypeScript errors
+- All changes in gids/page.tsx only
+
+## Session 2026-03-16 - Features #2, #3, #4
+
+### Feature #2: GuideHowTo component - PASSING
+- Created components/app/guide-how-to.tsx
+- Props: steps (string[]), tip (string optional), color (string optional)
+- Numbered steps with module-color accent circles
+- Optional tip box with Lightbulb icon, subtle bg, italic text
+- Responsive, accessible, matches existing ReisStapCard pattern
+
+### Feature #3: GuideTopicCard component - PASSING
+- Created components/app/guide-topic-card.tsx
+- Props: icon, title, description (ReactNode), howTo ({steps, tip}), color
+- Level 1: icon + title + value-first description (always visible)
+- Level 2: collapsible "Hoe werkt het?" dropdown using GuideHowTo
+- Own useState per card (not single-accordion)
+- Animated with grid-template-rows transition
+- ChevronDown rotates on open/close
+- Uses card-editorial, var(--ink), var(--border-ed), var(--subtle), var(--r-sm)
+
+### Feature #4: ReisStapSection component - PASSING
+- Created components/app/reis-stap-section.tsx
+- Props: id, step, icon, title, color, subtitle, statusLines, valueSentence, ctaLabel, ctaHref, isComplete, children
+- Accent bar in module color, step number badge, icon, title
+- Motivational subtitle, personal status lines with font-mono numbers
+- Italic value sentence (font-serif), CTA button in module color
+- scroll-mt-24 + id for progress bar linking
+- Children slot for nested GuideTopicCards
+- Commit: 63213cf0
+
+### Current Status
+- 3 features completed this session (#2, #3, #4)
+- Zero TypeScript errors
+- Could not verify via browser (auth-gated page)
+
 ## Session 2026-03-16 - Feature #1
 
 ### Feature #1: App Onderzoek - PASSING
@@ -12280,3 +12368,75 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#4, #5)
 - No code changes needed (verification-only features)
+
+## Session 2026-03-16 - Feature #5
+
+### Feature #5: Voortgangsbalk klikbaar maken - PASSING
+- Changed progress bar segments from div to button elements with onClick handlers
+- Added scrollToStep() function: document.getElementById(`guide-reis-${stepNumber}`) + scrollIntoView({ behavior: 'smooth', block: 'start' })
+- Progress bar segments: cursor-pointer, transition-opacity, hover:opacity-80
+- Step icon buttons: cursor-pointer, group class, group-hover:scale-110 on icon circle, group-hover:text-[var(--ink)] on label
+- Added aria-label on all buttons: "Ga naar stap {n}: {label}"
+- Added type="button" on all button elements
+- Added pointer-events-none on inner fill div to not interfere with button clicks
+- Added id="guide-reis-1" through "guide-reis-5" on ReisStapCard components via new optional id prop
+- Added scroll-mt-28 class to ReisStapCard root div for proper scroll offset under sticky header
+- Zero TypeScript errors in changed files
+- Could not verify via browser (Supabase auth required)
+- Commit: de3a8c68
+
+### Current Status
+- 1 feature completed this session (#5)
+- Zero TypeScript errors
+
+## Session 2026-03-16 - Features #23, #24, #25
+
+### Feature #23: Content: DAIshboard / Briefing - PASSING
+- Added GuideTopicCard with Sparkles icon in Algemeen section of gids page
+- Description (level 1): AI-briefing, 23 card types, progressive loading, temporal awareness, session memory, stale-banner
+- How-steps (level 2): 3 numbered steps (toggle mode, auto-generate, scroll/tap cards)
+- Tip: "Check je briefing elke ochtend als financiële routine"
+- Imported GuideTopicCard component into gids page
+
+### Feature #24: Content: Check-in - PASSING
+- Added GuideTopicCard with RefreshCw icon in Algemeen section
+- Description (level 1): 7-step wizard, conversation starters, historical browsing, month comparison
+- How-steps (level 2): 5 numbered steps (navigate, review, update, preview, reflect)
+- Tip: "Plan je check-in op een vaste dag"
+
+### Feature #25: Content: Meldingen - PASSING
+- Replaced old GuideAccordion with GuideTopicCard using Bell icon
+- Description (level 1): budget alerts, milestones, anomalies, level-ups, urgency sorting, per-type preferences
+- How-steps (level 2): 3 numbered steps (bell icon, tap to navigate, manage preferences)
+- Tip: "Laat budgetalerts en mijlpalen aan staan"
+
+### Current Status
+- 3 features completed this session (#23, #24, #25)
+- Zero TypeScript errors in changed files
+- Could not verify via browser (Supabase auth required, no test credentials)
+- Commit: 228cf742
+
+## Session 2026-03-16 - Features #6, #7, #8
+
+### Feature #6: Content: Cash rekeningen - PASSING
+- Updated GuideTopicCard description with TrueLayer, MT940/CSV/OFX, AI-categorisatie, betrouwbaarheidsscores
+- Added: duplicaatdetectie, transfer matching, tegenpartijregels
+- 5 how-steps + tip, integrated in reis-stap 1
+- Commit: 14d1366c
+
+### Feature #7: Content: Vermogensbeheer - PASSING
+- Updated GuideTopicCard description with 13 asset types, holdings page, benchmark, dividendtracking
+- Added: herwaardering, vrijheidstijd per bezitting
+- 5 how-steps + tip, integrated in reis-stap 1
+- Commit: 14d1366c
+
+### Feature #8: Content: Schuldenbeheer - PASSING
+- Updated GuideTopicCard description with 11 schuldtypes, NHG, belastingaftrek
+- Added: sneeuwbal/lawine strategieën, simulatie extra aflossingen, partnerverdeling
+- 5 how-steps + tip, integrated in reis-stap 1
+- Commit: 14d1366c
+
+### Current Status
+- 3 features completed this session (#6, #7, #8)
+- Zero TypeScript errors in changed files
+- All cards integrated as GuideTopicCard in ReisStapSection (reis-stap 1)
