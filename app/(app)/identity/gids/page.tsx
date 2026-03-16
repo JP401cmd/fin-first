@@ -574,32 +574,54 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                Van inzicht naar actie \u2014 het actiebord is waar je voorstellen
-                omzet in concrete stappen. Je persoonlijke kanban-bord heeft drie
-                kolommen: <strong>open</strong> (te doen),{" "}
-                <strong>uitgesteld</strong> (bewaard voor later) en{" "}
-                <strong>voltooid</strong> (afgerond). Sleep acties tussen kolommen
-                met <strong>drag &amp; drop</strong> om je voortgang bij te houden.
-                Acties komen binnen via geaccepteerde voorstellen of je maakt ze
-                zelf handmatig aan. Elke actie heeft een vrijheidsdagen-impact,
-                een bron (Will, check-in of handmatig) en optioneel een deadline.
-                {" "}
-                Het afronden van acties is waar de magie zit: elke voltooide actie
-                levert <strong>vrijheidsdagen</strong> op die meetellen in je
-                totaal. Je ziet je gewonnen dagen oplopen en je FIRE-datum
-                verschuiven. Het is gamification met echte impact \u2014 niet voor
-                punten, maar voor je toekomst.
+                <strong>
+                  Inzicht zonder actie verandert niets. Het actiebord is waar je
+                  goede voornemens concrete stappen worden.
+                </strong>
+                <br />
+                <br />
+                <strong>Overzicht</strong> \u2014 Ga naar De Wil \u2192 Acties en
+                je ziet je open acties op een kanban-bord. Elke actie heeft vier
+                mogelijke statussen: <strong>open</strong> (te doen),{" "}
+                <strong>postponed</strong> (uitgesteld voor later),{" "}
+                <strong>completed</strong> (voltooid) en{" "}
+                <strong>rejected</strong> (afgewezen). Per actie zie je de
+                beschrijving, de bron (<em>ai</em> = AI-gegenereerd,{" "}
+                <em>manual</em> = handmatig, <em>chat</em> = via Will) en de
+                geschatte <strong>vrijheidsdagen</strong> die je wint bij
+                voltooiing. Filter op status om focus te houden.
+                <br />
+                <br />
+                <strong>Aanmaken</strong> \u2014 Maak zelf een actie aan, accepteer
+                een AI-voorstel vanuit Voorstellen, of laat acties automatisch
+                verschijnen uit je Will-gesprekken. Elke bron krijgt een label
+                zodat je altijd weet waar een actie vandaan komt.
+                <br />
+                <br />
+                <strong>Voltooien</strong> \u2014 Markeer een actie als voltooid en
+                de gewonnen vrijheidsdagen worden opgeteld bij je maandtotaal.
+                Voltooide acties verhuizen naar het archief, waar je je voortgang
+                over tijd terugziet. Je FIRE-datum verschuift mee met elke
+                voltooide actie.
+                <br />
+                <br />
+                <strong>Uitstellen of afwijzen</strong> \u2014 Niet nu? Stel een
+                actie uit \u2014 hij blijft zichtbaar maar staat niet in de weg.
+                Niet relevant? Wijs af en de actie verdwijnt uit je actieve lijst.
+                Prioritering gaat via sort_order, zodat de belangrijkste acties
+                bovenaan staan.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Wil \u2014 je acties staan in de middelste kolom \u201cActie\u201d",
-                "Maak een nieuwe actie aan met \u201c+ Nieuwe actie\u201d of accepteer een voorstel \u2014 beide verschijnen in de kolom \u201cOpen\u201d",
-                "Sleep acties tussen kolommen: van open naar uitgesteld, of direct naar voltooid",
-                "Tik op een actie voor details, vrijheidsdagen-impact en instructies",
-                "Markeer een actie als voltooid wanneer je hem hebt uitgevoerd \u2014 je gewonnen vrijheidsdagen tellen mee",
+                "Bekijken \u2014 Ga naar De Wil \u2192 Acties. Je ziet je open acties met per actie de vrijheidsdagen-impact en de bron.",
+                "Aanmaken \u2014 Tik op \u201c+ Nieuwe actie\u201d om er zelf een aan te maken, of accepteer een AI-voorstel. Acties uit Will-gesprekken verschijnen automatisch.",
+                "Voltooien \u2014 Markeer een actie als voltooid. De gewonnen vrijheidsdagen worden opgeteld bij je maandtotaal en de actie verhuist naar het archief.",
+                "Uitstellen \u2014 Tik op \u201cUitstellen\u201d als je een actie wilt bewaren voor later. Hij blijft zichtbaar maar staat niet in de weg.",
+                "Afwijzen \u2014 Niet relevant? Wijs een actie af. Afgewezen acties verdwijnen uit je actieve lijst.",
+                "Widgets \u2014 Bekijk je voortgang via de widgets: acties (overzicht), beslissingspatronen (patronen in je keuzes) en vrijheidsdagen_maand (maandtotaal gewonnen dagen).",
               ],
-              tip: "Plan elke week \u00e9\u00e9n actie in. Consistent kleine stappen > af en toe een sprint.",
+              tip: "Plan elke week \u00e9\u00e9n actie in. Consistent kleine stappen leveren meer vrijheidstijd op dan af en toe een sprint.",
             }}
           />
 
