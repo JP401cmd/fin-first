@@ -165,15 +165,15 @@ export default async function AppLayout({
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
                   <DashboardTypeProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
-                      <ChatLayoutWrapper>
-                        <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+                      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+                        <ChatLayoutWrapper>
                           <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
                           <DailyExpenseProvider>
                             <main className="pb-20 md:pb-0">{children}</main>
-                            <BottomNav />
                           </DailyExpenseProvider>
-                        </FeatureAccessProvider>
-                      </ChatLayoutWrapper>
+                        </ChatLayoutWrapper>
+                        <BottomNav />
+                      </FeatureAccessProvider>
                       <ChatPanel />
                     </div>
                   </DashboardTypeProvider>

@@ -55,7 +55,10 @@
       "Bash(playwright-cli open:*)",
       "Bash(playwright-cli run-code:*)",
       "Bash(playwright-cli close:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(playwright-cli goto:*)",
+      "Bash(playwright-cli eval:*)",
+      "Bash(playwright-cli resize:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

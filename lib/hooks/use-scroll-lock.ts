@@ -1,4 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
+
+/**
+ * useLayoutEffect on client (fires before paint), useEffect on server (avoids SSR warning).
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 let lockCount = 0
 let savedScrollTop = 0
@@ -16,8 +22,10 @@ function lock() {
       container.style.overflow = 'hidden'
       container.scrollTop = savedScrollTop
     }
-    document.documentElement.style.overflow = 'hidden'
-    document.body.style.overflow = 'hidden'
+    // NOTE: body/html overflow is NOT locked — ChatLayoutWrapper (position:fixed,
+    // inset:0) is the sole scroll container. Touching body/html overflow triggers
+    // iOS Safari to re-evaluate position:fixed descendants (BottomNav), causing
+    // them to visually jump.
   }
 }
 
@@ -29,13 +37,11 @@ function unlock() {
       container.style.overflow = ''
       container.scrollTop = savedScrollTop
     }
-    document.documentElement.style.overflow = ''
-    document.body.style.overflow = ''
   }
 }
 
 export function useScrollLock(active: boolean) {
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (active) {
       lock()
       return () => unlock()

@@ -32,7 +32,7 @@ export function BottomNav() {
     : tabs
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t-2 border-[var(--border-md)] bg-[var(--paper)]/90 backdrop-blur-md safe-bottom md:hidden">
+    <nav className="fixed bottom-0 left-0 z-40 border-t-2 border-[var(--border-md)] bg-[var(--paper)]/90 backdrop-blur-md safe-bottom transition-[right] duration-300 md:hidden" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
       <div className="flex items-center justify-around" style={{ height: 'var(--bottom-nav-height)' }}>
         {visibleTabs.map((tab) => {
           const isActive = pathname.startsWith(tab.href)
