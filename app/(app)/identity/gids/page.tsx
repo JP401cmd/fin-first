@@ -25,6 +25,8 @@ import {
   Settings,
   Smartphone,
   Rocket,
+  Sun,
+  Rss,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -601,33 +603,36 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                Je dashboard is je persoonlijke financi&euml;le cockpit &mdash;
-                een verzameling widgets die je in &eacute;&eacute;n oogopslag
-                laten zien hoe je er financieel voor staat. Elke widget toont een
-                specifiek inzicht: van nettovermogen en budgetvoortgang tot
-                FIRE-prognose en actielijst. Widgets komen in{" "}
-                <strong>vier formaten</strong>: <strong>mini</strong> (1&times;1)
-                voor compacte cijfers, <strong>quarter</strong> (1&times;2) voor
-                een enkel KPI met context, <strong>half</strong> (2&times;2) voor
-                grafieken en lijsten, en <strong>full</strong> (4&times;2) voor
-                uitgebreide overzichten met meerdere datapunten.
+                De Wil is jouw cockpit. Kies welke informatie je ziet, in welk
+                formaat, en in welke volgorde. Geen widget is verplicht &mdash;
+                jij bepaalt wat belangrijk is. De app bevat{" "}
+                <strong>46+ widgets</strong> verdeeld over vier modules:{" "}
+                <strong>kern</strong> (nettovermogen, cashflow, budgetten),{" "}
+                <strong>wil</strong> (acties, doelen, voorstellen),{" "}
+                <strong>horizon</strong> (FIRE, Monte Carlo, scenario&rsquo;s) en{" "}
+                <strong>cross</strong> (meldingen, pad, volgende stap). Elke
+                widget heeft tot vier formaten: <strong>mini</strong>{" "}
+                (1&times;1) toont &eacute;&eacute;n kerngetal,{" "}
+                <strong>quarter</strong> (1&times;2) voegt een
+                mini-visualisatie toe, <strong>half</strong> (2&times;2) geeft
+                ruimte voor trends en vergelijkingen, en <strong>full</strong>{" "}
+                (4&times;2) toont het complete plaatje met details.
                 {" "}
-                Personaliseer je cockpit door widgets te{" "}
-                <strong>slepen</strong> naar de gewenste positie, formaten aan te
-                passen en favoriete budgetten of holdings als eigen widget toe te
-                voegen. Schakel widgets aan of uit via Instellingen &mdash; zo
-                zie je alleen wat voor jou relevant is. Nieuwe widgets
-                ontgrendelen automatisch naarmate je soevereiniteitsniveau
-                stijgt.
+                Markeer een budget of holding als <strong>favoriet</strong> en
+                het verschijnt automatisch als widget op je dashboard.
+                Unfavoriten = widget verdwijnt. Standaard staan{" "}
+                <strong>7 widgets</strong> aan; geavanceerde widgets
+                ontgrendelen automatisch naarmate je meer data invoert en je
+                soevereiniteitsniveau stijgt.
               </>
             }
             howTo={{
               steps: [
-                "Je dashboard is je startpagina na inloggen \u2014 alle widgets staan hier",
-                "Sleep widgets naar een andere positie door ze vast te houden en te verplaatsen",
-                "Kies het juiste formaat per widget: mini (1\u00d71), quarter (1\u00d72), half (2\u00d72) of full (4\u00d72)",
-                "Voeg favoriete budgetten of holdings toe als persoonlijke widget via het dashboard",
-                "Ga naar Identiteit \u2192 Instellingen \u2192 Widgets om widgets aan/uit te zetten",
+                "Formaten \u2014 Elk widget heeft tot 4 formaten. Mini toont \u00e9\u00e9n kerngetal. Quarter voegt een mini-grafiek toe. Half geeft ruimte voor trends en vergelijkingen. Full toont het complete plaatje met details.",
+                "Herschikken \u2014 Houd een widget ingedrukt en sleep het naar een nieuwe positie. De indeling wordt automatisch opgeslagen.",
+                "Aan/uitzetten \u2014 Ga naar Identiteit \u2192 Instellingen \u2192 Widgets. Schakel widgets aan of uit en kies per widget het gewenste formaat.",
+                "Favorieten als widget \u2014 Markeer een budget of holding als favoriet, en het verschijnt automatisch als widget op je dashboard. Unfavoriten = widget verdwijnt.",
+                "Unlock \u2014 Sommige widgets worden pas beschikbaar naarmate je meer data invoert. Begin met de basis en ontgrendel geavanceerde widgets automatisch.",
               ],
               tip: "Begin met de standaard 7 widgets. Voeg pas meer toe als je weet welke inzichten je dagelijks wilt zien \u2014 minder is meer.",
             }}
@@ -731,27 +736,33 @@ export default function GidsPage() {
             description={
               <>
                 De FIRE-berekening beantwoordt de belangrijkste vraag:{" "}
-                <strong>wanneer dekt je vermogen je uitgaven voor altijd?</strong>{" "}
-                TriFinity berekent drie scenario&apos;s \u2014 pessimistisch,
-                verwacht en optimistisch \u2014 op basis van je huidige vermogen,
-                spaarquote, verwacht rendement en uitgavenpatroon. Je ziet je
-                verwachte FIRE-leeftijd, de countdown in jaren/maanden/dagen, en
-                het vermogenspad over 30+ jaar.
+                <strong>wanneer ben je financieel vrij?</strong> TriFinity toont
+                je netto vermogensgrafiek over 30+ jaar met drie scenario&apos;s
+                \u2014 pessimistisch, verwacht en optimistisch \u2014 op basis
+                van je huidige vermogen, spaarquote, verwacht rendement en
+                uitgavenpatroon. Je ziet je verwachte FIRE-leeftijd, de countdown
+                in jaren/maanden/dagen, en het volledige vermogenspad tot aan je
+                financi\u00eble vrijheid.
                 {" "}
-                De berekening is volledig configureerbaar: stel je eigen verwacht
-                rendement en inflatiepercentage in via{" "}
-                <strong>Instellingen</strong>. Kies je FIRE-eindstrategie:{" "}
-                <strong>perpetueel</strong> (eeuwig leven van je vermogen),{" "}
-                <strong>legacy</strong> (nalaten aan erfgenamen) of{" "}
-                <strong>deplete</strong> (alles opmaken voor een bepaalde leeftijd).
-                Box 3 belasting wordt automatisch meegerekend in de simulatie.
+                De kern van de berekening is de{" "}
+                <strong>Safe Withdrawal Rate (SWR)</strong>: je jaarlijkse
+                uitgaven gedeeld door de SWR bepaalt hoeveel vermogen je nodig
+                hebt. Stel je eigen <strong>verwacht rendement</strong> en{" "}
+                <strong>inflatiepercentage</strong> in via Instellingen \u2014
+                deze parameters bepalen direct je projectie. Kies je
+                FIRE-eindstrategie: <strong>perpetueel</strong> (eeuwig leven van
+                je vermogen), <strong>legacy</strong> (nalaten aan erfgenamen) of{" "}
+                <strong>deplete</strong> (alles opmaken voor een bepaalde
+                leeftijd). Box 3 belasting wordt automatisch meegerekend in de
+                simulatie.
               </>
             }
             howTo={{
               steps: [
                 "Ga naar De Horizon \u2014 je FIRE-prognose wordt automatisch berekend zodra je vermogen en uitgaven hebt ingevuld",
-                "Bekijk de drie scenario\u2019s (pessimistisch/verwacht/optimistisch) met elk een FIRE-leeftijd en vermogenspad",
-                "Pas je verwacht rendement en inflatie aan via Identiteit \u2192 Instellingen \u2192 FIRE Instellingen",
+                "Lees de vermogensgrafiek: de x-as toont je leeftijd, de y-as je vermogen. De drie lijnen zijn pessimistisch, verwacht en optimistisch",
+                "Vergelijk de scenario\u2019s: elk heeft een eigen FIRE-leeftijd en vermogenspad \u2014 zo zie je de bandbreedte van je toekomst",
+                "Pas je verwacht rendement, inflatie en SWR aan via Identiteit \u2192 Instellingen \u2192 FIRE Instellingen",
                 "Kies je eindstrategie: perpetueel, legacy of deplete \u2014 elk verandert je benodigd vermogen",
                 "Bekijk de countdown: hoeveel jaar, maanden en dagen tot je FIRE-datum",
               ],
@@ -767,16 +778,20 @@ export default function GidsPage() {
               <>
                 Het leven verloopt niet in een rechte lijn \u2014 en je
                 financi\u00ebn ook niet. Voeg toekomstige gebeurtenissen toe die je
-                financi\u00eble pad be\u00efnvloeden: kinderen krijgen, verhuizen,
+                financi\u00eble pad be\u00efnvloeden: een{" "}
+                <strong>kind</strong> krijgen (hogere maandlasten), een{" "}
+                <strong>huis</strong> kopen (grote aankoop + hypotheek),{" "}
+                <strong>pensioen</strong> ontvangen (extra inkomen na AOW-leeftijd),
                 trouwen, studie betalen, eerder stoppen met werken, een wereldreis
-                maken, een erfenis ontvangen. TriFinity heeft een catalogus van{" "}
+                maken of een erfenis ontvangen. TriFinity heeft een catalogus van{" "}
                 <strong>50+ voorgedefinieerde events</strong> met realistische
                 cashflow-schattingen.
                 {" "}
-                Elke levensgebeurtenis <strong>verschuift je FIRE-datum</strong>. Je
-                ziet het cumulatieve effect: als je over 3 jaar een kind krijgt en
-                over 5 jaar een huis koopt, wat doet dat met je prognose? Zo maak
-                je bewuste keuzes over je toekomst in plaats van verrassingen.
+                Elke levensgebeurtenis <strong>verschuift je FIRE-datum</strong> en
+                is zichtbaar als markering op je vermogensgrafiek. Je ziet het
+                cumulatieve effect: als je over 3 jaar een kind krijgt en over 5
+                jaar een huis koopt, wat doet dat met je projectie? Zo maak je
+                bewuste keuzes over je toekomst in plaats van verrassingen.
               </>
             }
             howTo={{
@@ -800,22 +815,25 @@ export default function GidsPage() {
                 E\u00e9n prognose is een gok \u2014 duizend prognoses zijn een
                 strategie. De <strong>Monte Carlo simulatie</strong> draait 1.000
                 willekeurige marktscenario&apos;s en toont hoe robuust je plan is.
-                Je ziet het slagingspercentage (in hoeveel scenario&apos;s haal je
-                FIRE), de spreiding van mogelijke FIRE-leeftijden (p10, p25, p50,
-                p75, p90) en het vermogenspad per percentiel.
+                Je ziet de <strong>slaagkans</strong> (in hoeveel scenario&apos;s
+                haal je FIRE), de <strong>bandbreedtes</strong> van mogelijke
+                FIRE-leeftijden (p10, p25, p50, p75, p90) en het vermogenspad per
+                percentiel \u2014 van het slechtste tot het beste geval.
                 {" "}
                 De <strong>backtesting</strong> voegt historische realiteit toe: hoe
                 zou je plan het hebben gedaan tijdens de dotcom-crash, de
-                financi\u00eble crisis van 2008 of de COVID-dip? De backtestscore
-                geeft je een concreet getal: het percentage historische
-                crisisperiodes waarin je plan overeind bleef.
+                financi\u00eble crisis van 2008 of de COVID-dip? Je ziet hoe
+                betrouwbaar je plan is op basis van \u00e9chte historische data.
+                De backtestscore geeft je een concreet getal: het percentage
+                historische crisisperiodes waarin je plan overeind bleef.
               </>
             }
             howTo={{
               steps: [
                 "Ga naar De Horizon \u2014 de Monte Carlo simulatie draait automatisch op basis van je huidige data",
-                "Bekijk het slagingspercentage en de spreiding van FIRE-leeftijden",
-                "De backtestscore toont hoe je plan presteert onder historische crises",
+                "Bekijk de slaagkans: in hoeveel van de 1.000 simulaties bereik je FIRE?",
+                "Lees de bandbreedtes: p10 (worst case) tot p90 (best case) tonen de spreiding van mogelijke uitkomsten",
+                "De backtestscore toont hoe betrouwbaar je plan is: het percentage historische crises waarin het overeind bleef",
                 "Pas je rendementsverwachting of spaarquote aan en zie het effect op de slaagkans direct veranderen",
               ],
               tip: "Een slaagkans boven 80% is solide. Onder 60% wil je je plan aanpassen \u2014 meer sparen, langer werken of zuiniger leven na FIRE.",
@@ -943,6 +961,78 @@ export default function GidsPage() {
       {/* ── Overal ── */}
       <p className="label-editorial mb-3 text-[var(--ink-3)]">Overal</p>
       <div className="mb-6 grid grid-cols-1 gap-2 sm:mb-8 lg:grid-cols-2">
+        <GuideTopicCard
+          icon={Sun}
+          title="Vrijheidsinsteek"
+          color="var(--ink-2)"
+          description={
+            <>
+              TriFinity is gebouwd rond \u00e9\u00e9n kernidee:{" "}
+              <strong>geld is opgeslagen tijd</strong>. Elke euro die je
+              verdient, spaart of investeert vertegenwoordigt een stukje
+              levenstijd \u2014 tijd die je later kunt besteden aan wat \u00e9cht
+              belangrijk voor je is. Daarom rekent TriFinity alles om naar{" "}
+              <strong>vrijheidstijd</strong>: dagen, maanden en jaren van
+              financi\u00eble onafhankelijkheid.
+              {" "}
+              De app is opgebouwd uit drie modules die samen je volledige
+              financi\u00eble reis dekken. <strong>De Kern</strong> (weten) geeft
+              je helder inzicht in wat je hebt, uitgeeft en verschuldigd bent.{" "}
+              <strong>De Wil</strong> (willen) vertaalt dat inzicht naar concrete
+              acties, aanbevelingen en doelen. <strong>De Horizon</strong>{" "}
+              (dromen) projecteert je toekomst: wanneer ben je financieel vrij,
+              en welke scenario&apos;s zijn er?
+              {" "}
+              Anders dan traditionele budgetapps stuurt TriFinity niet op
+              schuldgevoel of restrictie. Geen rode waarschuwingen als je
+              &quot;te veel&quot; uitgeeft \u2014 wel perspectief. Elke
+              financi\u00eble keuze wordt vertaald in vrijheidstijd, zodat je
+              zelf kunt beslissen wat die tijd je waard is.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Elk bedrag boven \u20ac100 toont automatisch de vrijheidstijd-equivalent",
+              "Je netto vermogen wordt uitgedrukt in jaren en maanden vrijheid",
+              "Budgetuitgaven tonen hoeveel vrijheidsdagen ze kosten per maand",
+              "Je FIRE-doelbedrag is het moment van volledige vrijheid",
+              "Schulden worden geframed als vrijheid die je terugkoopt door af te lossen",
+            ],
+            tip: "Denk bij elke uitgave niet in euro\u2019s, maar in vrijheidstijd. Die \u20ac50 is misschien een halve dag \u2014 is dat het waard voor jou?",
+          }}
+        />
+
+        <GuideTopicCard
+          icon={Rss}
+          title="TriFinity Post"
+          color="var(--ink-2)"
+          description={
+            <>
+              <strong>TriFinity Post</strong> is je persoonlijke financi\u00eble
+              nieuwsfeed \u2014 actueel nieuws en artikelen die relevant zijn
+              voor jouw situatie. De AI analyseert financieel nieuws en schrijft
+              samenvattingen die rekening houden met je portfolio, vermogen en
+              doelen. Zo lees je niet zomaar nieuws, maar nieuws dat er voor jou
+              toe doet.
+              {" "}
+              Artikelen worden <strong>dagelijks automatisch gegenereerd</strong>{" "}
+              en verschijnen als kaarten die je kunt openen en lezen. De inhoud
+              is altijd gepersonaliseerd: als rentestanden veranderen en jij een
+              hypotheek hebt, legt de AI uit wat dat voor jou betekent. Als
+              markten bewegen en jij belegt, krijg je context bij de cijfers.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Open TriFinity Post via het nieuwsicoon in de navigatie of het dashboard",
+              "Scroll door de artikelkaarten \u2014 elk artikel is een korte, leesbare samenvatting",
+              "Tik op een artikel om het volledige stuk te lezen met persoonlijke context",
+              "Nieuwe artikelen verschijnen dagelijks automatisch op basis van actueel nieuws",
+            ],
+            tip: "Lees elke ochtend 2-3 artikelen bij je koffie. Het kost 5 minuten en houdt je financieel scherp \u2014 zonder zelf nieuwssites af te struinen.",
+          }}
+        />
+
         <GuideTopicCard
           icon={Bell}
           title="Meldingen"
