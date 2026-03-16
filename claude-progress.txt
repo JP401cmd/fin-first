@@ -1,3 +1,26 @@
+## Session 2026-03-16 - Feature #42
+
+### Feature #42: Merge abonnementen en terugkerende_transacties widgets - PASSING
+- Created vaste-lasten-widget.tsx combining both widgets into one "Vaste Lasten" widget
+- Two sections in full view: "Abonnementen" (digital subscriptions) + "Overige vaste lasten" (housing, insurance, etc.)
+- Category classification via isAbonnement() function (telecom, streaming, software, app categories)
+- Category icons from terugkerende-transacties-widget preserved (Home, Car, Zap, Heart, Smartphone, etc.)
+- All 4 size variants working: mini (total), quarter (count), half (top 4 mixed), full (grouped sections)
+- Updated widget-catalog.ts: single vaste_lasten entry replaces both old entries
+- Updated widget-renderer.tsx: VasteLastenWidget dynamic import + switch case
+- Updated feature-registry.ts: cashflow/ai_analyse widgets arrays updated
+- Updated auto-dashboard-builder.ts: focus boost + popularity scores consolidated
+- Updated test-kern-widgets/page.tsx: old widget IDs replaced
+- Added graceful migration in mergeWidgetPrefs: old prefs auto-map to vaste_lasten with deduplication
+- Zero TypeScript errors, zero console errors
+- All 8 draggable-widget-grid tests passing
+- Verified rendering via browser on test-kern-widgets page
+- Commit: 3a55c78b
+
+### Current Status
+- 1 feature completed this session (#42)
+- 32/47 features passing (68%)
+
 ## Session 2026-03-16 - Features #30, #31, #32
 
 ### Feature #30: Pagina-assemblage: Hero + Voortgangsbalk + Reis-stappen 1-2 - PASSING
