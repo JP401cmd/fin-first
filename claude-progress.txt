@@ -1,3 +1,35 @@
+## Session 2026-03-16 - Features #86, #87, #88
+
+### Feature #86: Broker CSV import (DEGIRO, Saxo, ING) - PASSING
+- Created lib/parsers/broker-csv.ts: parser for DEGIRO (portfolio + transactions), Saxo Bank, ING Beleggen
+- Auto-detects broker from CSV header fingerprints
+- Handles Dutch number formatting (1.234,56) and date parsing (DD-MM-YYYY)
+- Created app/api/holdings/import/route.ts: bulk import API with duplicate detection + merge
+- Created app/(app)/core/assets/holdings/import/page.tsx: 3-step wizard (upload, preview, result)
+- Added CSV import button to holdings page header and empty state
+- Commit: 1aa0c3ad
+
+### Feature #87: Historische prijsopslag voor waardegrafiek - PASSING
+- Created supabase/migrations/20260316300001_create_holding_prices.sql
+- Created lib/historical-prices.ts: Yahoo Finance historical data fetcher + Supabase storage
+- Updated value-history API to use holding_prices table (with transaction fallback)
+- Auto-backfill on first view of a holding with ticker but no stored prices
+- Daily price refresh now stores prices via storeSingleDayPrice
+- Commit: incorporated by another agent in c8b3fabe
+
+### Feature #88: Box 3 belastingberekening per holding - PASSING
+- Created lib/box3-holdings.ts: calculateHoldingBox3 + calculatePortfolioBox3
+- Distributes heffingsvrij vermogen proportionally across holdings by value share
+- Added Box 3 impact card to holding detail page (annual tax, effective rate, forfait rate)
+- Added portfolio-wide Box 3 summary to holdings overview
+- Uses existing BOX3_PARAMS from box3-data.ts (2025/2026 rates)
+- Commit: 1618e4e3
+
+### Current Status
+- 3 features completed this session (#86, #87, #88)
+- Zero TypeScript errors in all changed files
+- Could not verify via browser (Supabase auth required, no test credentials)
+
 ## Session 2026-03-16 - Features #91, #92, #93
 
 ### Feature #91: Instructiepanel mijnpensioenoverzicht.nl - PASSING
