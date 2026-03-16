@@ -1165,6 +1165,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Build daily expense map for current week (Mon=0 .. Sun=6)
   const dailyExpenseMap = new Map<string, number>()
   const weekCategoryMap = new Map<string, number>()
+  const prevWeekCategoryMap = new Map<string, number>()
   let weekExpensesTotal = 0
   let weekIncomeTotal = 0
   let prevWeekExpensesTotal = 0
@@ -1200,7 +1201,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     }
     // Previous week (expenses only for comparison)
     if (d >= prevWeekStartStr && d < weekStartStr && amt < 0) {
-      prevWeekExpensesTotal += Math.abs(amt)
+      const absAmt = Math.abs(amt)
+      prevWeekExpensesTotal += absAmt
+      if (tx.budget_id) {
+        const catName = budgetNameMap.get(tx.budget_id) ?? 'Overig'
+        prevWeekCategoryMap.set(catName, (prevWeekCategoryMap.get(catName) ?? 0) + absAmt)
+      }
     }
   }
 
@@ -1226,7 +1232,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const topWeekCategories = Array.from(weekCategoryMap.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
-    .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
+    .map(([name, amount]) => ({
+      name,
+      amount: Math.round(amount * 100) / 100,
+      prevAmount: Math.round((prevWeekCategoryMap.get(name) ?? 0) * 100) / 100,
+    }))
 
   const weekOverview: WeekOverviewData = {
     weekExpenses: Math.round(weekExpensesTotal * 100) / 100,

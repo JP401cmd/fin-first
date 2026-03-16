@@ -416,7 +416,7 @@ export interface WeekOverviewData {
   dailyExpenses: { day: string; label: string; amount: number }[]
   weekBudget: number
   prevWeekExpenses: number
-  topCategories: { name: string; amount: number }[]
+  topCategories: { name: string; amount: number; prevAmount: number }[]
 }
 
 export interface HouseholdActivityItem {

@@ -419,7 +419,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Huishouden Vergelijking',
     description: 'Vrijheidstijd per partner naast elkaar',
     module: 'kern',
-    sizes: ['half', 'full'],
+    sizes: ['quarter', 'half', 'full'],
     defaultSize: 'half',
     minLevel: -2,
   },

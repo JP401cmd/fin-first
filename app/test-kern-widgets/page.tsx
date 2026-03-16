@@ -195,9 +195,9 @@ const MOCK_DATA: DashboardData = {
     weekBudget: 461.89,
     prevWeekExpenses: 398.00,
     topCategories: [
-      { name: 'Boodschappen', amount: 145.20 },
-      { name: 'Horeca', amount: 95.00 },
-      { name: 'Transport', amount: 61.30 },
+      { name: 'Boodschappen', amount: 145.20, prevAmount: 132.50 },
+      { name: 'Horeca', amount: 95.00, prevAmount: 110.00 },
+      { name: 'Transport', amount: 61.30, prevAmount: 58.00 },
     ],
   },
 }

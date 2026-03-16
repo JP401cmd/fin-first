@@ -58,14 +58,24 @@ export function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Quarter size ────────────────────────────────────────────
+  // ── Quarter size: compact comparison with ratio bar ─────────
   if (size === 'quarter') {
+    const totalAbs = Math.abs(myNetWorth) + Math.abs(partnerNetWorth)
+    const myPct = totalAbs > 0 ? Math.round((Math.abs(myNetWorth) / totalAbs) * 100) : 50
+
     return (
-      <WidgetShell module="kern" size={size} kicker="Huishouden Vergelijking" href={href}>
+      <WidgetShell module="kern" size={size} kicker="Huishouden" href={href}>
         <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
           {formatCurrency(ho.netWorth)}
         </p>
-        <p className="mt-1 text-[11px] text-[var(--ink-3)]">Gecombineerd</p>
+        <div className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+          <div className="h-full bg-kern-400" style={{ width: `${myPct}%` }} />
+          <div className="h-full bg-wil-400" style={{ width: `${100 - myPct}%` }} />
+        </div>
+        <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--ink-3)]">
+          <span>Jij <span className="font-mono tabular-nums">{myPct}%</span></span>
+          <span>{partnerName ?? 'Partner'} <span className="font-mono tabular-nums">{100 - myPct}%</span></span>
+        </div>
       </WidgetShell>
     )
   }
