@@ -1,3 +1,46 @@
+## Session 2026-03-16 - Features #67, #68
+
+### Feature #67: Progress bar titels gelijkstellen aan staptitels - PASSING
+- Changed REIS_STAPPEN from 5 to 4 items
+- Labels now match section titles: 'Weet waar je staat', 'Begrijp je patronen', 'Onderneem actie', 'Kijk vooruit'
+- Icons match sections: Landmark, Receipt, Zap, Compass
+- Merged step 5 check (hasLifeEvents) into step 4: hasFireData || hasLifeEvents
+- Colors: kern-400 (steps 1-2), wil-400 (step 3), horizon-400 (step 4)
+- Commit: b59df852
+
+### Feature #68: Actieve stap visueel markeren in progress bar - PASSING
+- Added useActiveStep() hook with IntersectionObserver on guide-reis-1 through guide-reis-4
+- Multiple thresholds (0, 0.1, 0.25, 0.5, 0.75, 1) for smooth tracking
+- rootMargin '-80px 0px -20% 0px' accounts for sticky header
+- Active step visual: 2px ring (box-shadow) around icon, larger circle (28px vs 24px), bold label (fontWeight 600)
+- Active progress bar segment: taller (4px vs 3px), translucent color fill for incomplete steps
+- Smooth CSS transitions (duration-300 on icons, duration-200 on labels, 0.3s ease on opacity)
+- Zero TypeScript errors
+- Commit: 6b74306e
+
+### Current Status
+- 2 features completed this session (#67, #68)
+- 65/68 features passing (95.6%)
+
+## Session 2026-03-16 - Features #60, #61, #62
+
+### Feature #60: beslissingspatronen: voeg quarter-formaat toe - PASSING
+- Added 'quarter' to allowedSizes in widget-catalog.ts
+- Quarter variant already implemented in beslissingspatronen-widget.tsx (total days + pattern count + top type)
+
+### Feature #61: vrijheidsdagen_maand: voeg quarter-formaat toe - PASSING
+- Added 'quarter' to allowedSizes in widget-catalog.ts
+- Quarter variant already implemented in vrijheidsdagen-maand-widget.tsx (days + compact bar chart)
+
+### Feature #62: wilskracht: voeg quarter-formaat toe - PASSING
+- Added 'quarter' to allowedSizes in widget-catalog.ts
+- Quarter variant already implemented in wilskracht-widget.tsx (score letter + label + completion bar)
+
+### Status
+- 3 features completed this session (#60, #61, #62)
+- Zero TypeScript errors
+- Commit: 847ddc55
+
 ## Session 2026-03-16 - Features #51, #52, #53
 
 ### Feature #51: nibud_benchmark: voeg quarter-formaat toe - PASSING
@@ -12843,3 +12886,60 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature verified and marked passing (#19)
 - 45/47 features passing (95.7%)
+
+## Session 2026-03-16 - Features #57, #58, #59
+
+### Feature #57: trend_sparen: getallen bij de trendlijn - PASSING
+- Enabled showLabels on quarter-size sparkline in BudgetTrendWidget (was only half/full)
+- Increased quarter sparkline dimensions from 120x24 to 140x28 to accommodate labels
+- Added Y-position clamping for start/end labels to prevent SVG overflow at small heights
+- Labels use formatCompact (e.g., "1.2k") with font-mono styling
+- Start label: --ink-3 color, end label: type-specific stroke color with font-weight 600
+
+### Feature #58: trend_schulden: getallen bij de trendlijn - PASSING
+- Uses same shared BudgetTrendWidget component as trend_sparen
+- Changes from #57 automatically apply to all budget types (income, expense, savings, debt)
+- No additional code changes needed
+
+### Feature #59: doelen full: content naar boven schuiven - PASSING
+- Summary row: reduced p-3 mb-3 to px-3 py-2 mb-2 (less vertical whitespace)
+- Summary numbers: text-2xl to text-xl (smaller footprint)
+- Removed mt-0.5 from summary labels
+- GoalCard: p-3 to px-2.5 py-2, reduced internal gaps (mb-2 to mb-1.5)
+- GoalCard name: text-sm to text-[13px], amount text: text-[11px] to text-[10px]
+- All goals now fit better within the full widget frame without clipping
+
+### Current Status
+- 3 features completed this session (#57, #58, #59)
+- Zero TypeScript errors in changed files
+- Commit: 6b5a63eb
+
+## Session 2026-03-16 - Features #63, #64, #65
+
+### Feature #63: levensgebeurtenissen: voeg quarter toe + half verticaal schalen - PASSING
+- Added 'quarter' to allowedSizes in widget-catalog.ts (quarter variant code already existed)
+- Compact half-size: H 130→110, reduced padding (top 8→6, bottom 16→13, left 34→30)
+- Half Y-axis: 3 ticks instead of 4 for compactness
+- Smaller fonts in half: labels 6→5px, event names 5.5→5px
+- Thinner strokes in half: 2.2→1.8
+- Smaller event dots: r 3.5→3, inner 2.8→2.4
+- Footer text 10→9px, removed mt-0.5 margin
+
+### Feature #64: veerkracht_score full: verticaal kleiner schalen - PASSING
+- Gauge size reduced 160→120
+- Top section: gap-4→3, pt-3→2, text-xl→lg, text-xs→[11px]
+- Trend icons: h-3.5→3, text-[11px]→[10px]
+- Sub-factor grid: mt-3→2, gap-2→1.5
+- SubFactorCard: p-2.5→2, label 11→10px, score 12→10px, description 10→9px, bar mt-1.5→1
+- Tips section: mt-3→2, p-2.5→2, icon 3.5→3, heading 11→10px, items 11→10px, leading-relaxed→snug, space-y-1→0.5
+- CTA: mt-2→1.5, text-[12px]→[11px]
+
+### Feature #65: sim_vermogenspad: voeg quarter toe met vermogenslijn - PASSING
+- Added 'quarter' to allowedSizes in widget-catalog.ts (quarter variant code already existed)
+- Enhanced quarter variant: added end portfolio amount as kern metric below sparkline
+- Shows end amount (formatCurrency) on left + FIRE age on right
+
+### Current Status
+- 3 features completed this session (#63, #64, #65)
+- Zero TypeScript errors in changed files
+- Commit: 4d085a52
