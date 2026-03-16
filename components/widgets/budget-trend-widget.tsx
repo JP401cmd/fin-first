@@ -114,6 +114,13 @@ function Sparkline({
   const lastVal = points[points.length - 1].value
   const fontSize = height >= 50 ? 8 : 7
 
+  // Clamp label Y so it stays within the SVG bounds (min fontSize from top, max height - 2 from bottom)
+  const firstY = toY(firstVal)
+  const lastY = toY(lastVal)
+  const startLabelY = Math.max(fontSize + 1, Math.min(firstY - 4, height - 2))
+  // End label: position beside the line endpoint, clamped to bounds
+  const endLabelY = Math.max(fontSize + 1, Math.min(lastY + 3, height - 2))
+
   return (
     <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} className="block">
       {/* Gradient fill under line */}
@@ -155,7 +162,7 @@ function Sparkline({
         <>
           <text
             x={toX(0)}
-            y={toY(firstVal) - 4}
+            y={startLabelY}
             fontSize={fontSize}
             fill="var(--ink-3)"
             fontFamily="var(--font-mono)"
@@ -165,7 +172,7 @@ function Sparkline({
           </text>
           <text
             x={toX(points.length - 1) + 4}
-            y={toY(lastVal) + 3}
+            y={endLabelY}
             fontSize={fontSize}
             fill={strokeColor}
             fontFamily="var(--font-mono)"
@@ -267,11 +274,12 @@ export function BudgetTrendWidget({ budgetType, size, data, href }: Props) {
             <div className="mt-auto">
               <Sparkline
                 points={sparkData6}
-                width={120}
-                height={24}
+                width={140}
+                height={28}
                 strokeColor={config.strokeColor}
                 fillColor={config.fillColor}
                 hasEntered={hasEntered}
+                showLabels
               />
             </div>
           )}

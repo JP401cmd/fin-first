@@ -95,15 +95,15 @@ function GoalCard({ goal, index, hasEntered }: { goal: TopGoal; index: number; h
 
   return (
     <div
-      className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3"
+      className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-2.5 py-2"
       style={{
         animation: hasEntered ? `fadeUp 0.4s ease-out ${index * 60}ms both` : 'none',
         opacity: hasEntered ? undefined : 0,
       }}
     >
       {/* Naam + tag + percentage */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="flex-1 min-w-0 text-sm font-medium text-[var(--ink)] leading-tight">
+      <div className="flex items-start justify-between gap-1.5 mb-1.5">
+        <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--ink)] leading-tight">
           {goal.name}
         </span>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -119,7 +119,7 @@ function GoalCard({ goal, index, hasEntered }: { goal: TopGoal; index: number; h
       </div>
 
       {/* Voortgangsbalk */}
-      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] mb-2">
+      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] mb-1.5">
         <div
           className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
           style={{
@@ -133,7 +133,7 @@ function GoalCard({ goal, index, hasEntered }: { goal: TopGoal; index: number; h
 
       {/* Bedrag + deadline */}
       <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)] truncate">
+        <p className="font-mono text-[10px] tabular-nums text-[var(--ink-3)] truncate">
           {formatGoalValue(goal.current_value, goal.goal_type as GoalType, goal.custom_unit)} / {formatGoalValue(goal.target_value, goal.goal_type as GoalType, goal.custom_unit)}
         </p>
         {eta && (
@@ -298,19 +298,19 @@ export function DoelenWidget({ size, data, href }: Props) {
           <EmptyState full />
         ) : (
           <>
-            {/* Summary row */}
-            <div className="grid grid-cols-3 divide-x divide-dashed divide-[var(--border-ed)] border border-dashed border-[var(--border-ed)] rounded-[var(--r)] p-3 mb-3">
+            {/* Summary row — compact */}
+            <div className="grid grid-cols-3 divide-x divide-dashed divide-[var(--border-ed)] border border-dashed border-[var(--border-ed)] rounded-[var(--r)] px-3 py-2 mb-2">
               <div className="flex flex-col items-center pr-3">
-                <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{goals}</span>
-                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans mt-0.5 text-center">DOELEN</span>
+                <span className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">{goals}</span>
+                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans text-center">DOELEN</span>
               </div>
               <div className="flex flex-col items-center px-3">
-                <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{avgPct}%</span>
-                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans mt-0.5 text-center leading-tight">GEM. VOORTGANG</span>
+                <span className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">{avgPct}%</span>
+                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans text-center leading-tight">GEM. VOORTGANG</span>
               </div>
               <div className="flex flex-col items-center pl-3">
-                <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{completedGoals}</span>
-                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans mt-0.5 text-center">BEHAALD</span>
+                <span className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">{completedGoals}</span>
+                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans text-center">BEHAALD</span>
               </div>
             </div>
 
