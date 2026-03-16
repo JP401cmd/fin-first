@@ -513,7 +513,139 @@ export default function GidsPage() {
           ctaLabel="Bekijk je prognose"
           ctaHref="/horizon"
           isComplete={!!progress?.steps.hasFireData && !!progress?.steps.hasLifeEvents}
-        />
+        >
+          <GuideTopicCard
+            icon={Compass}
+            title="FIRE-projectie"
+            color="var(--color-horizon-400)"
+            description={
+              <>
+                De FIRE-berekening beantwoordt de belangrijkste vraag:{" "}
+                <strong>wanneer dekt je vermogen je uitgaven voor altijd?</strong>{" "}
+                TriFinity berekent drie scenario&apos;s \u2014 pessimistisch,
+                verwacht en optimistisch \u2014 op basis van je huidige vermogen,
+                spaarquote, verwacht rendement en uitgavenpatroon. Je ziet je
+                verwachte FIRE-leeftijd, de countdown in jaren/maanden/dagen, en
+                het vermogenspad over 30+ jaar.
+                {" "}
+                De berekening is volledig configureerbaar: stel je eigen verwacht
+                rendement en inflatiepercentage in via{" "}
+                <strong>Instellingen</strong>. Kies je FIRE-eindstrategie:{" "}
+                <strong>perpetueel</strong> (eeuwig leven van je vermogen),{" "}
+                <strong>legacy</strong> (nalaten aan erfgenamen) of{" "}
+                <strong>deplete</strong> (alles opmaken voor een bepaalde leeftijd).
+                Box 3 belasting wordt automatisch meegerekend in de simulatie.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Horizon \u2014 je FIRE-prognose wordt automatisch berekend zodra je vermogen en uitgaven hebt ingevuld",
+                "Bekijk de drie scenario\u2019s (pessimistisch/verwacht/optimistisch) met elk een FIRE-leeftijd en vermogenspad",
+                "Pas je verwacht rendement en inflatie aan via Identiteit \u2192 Instellingen \u2192 FIRE Instellingen",
+                "Kies je eindstrategie: perpetueel, legacy of deplete \u2014 elk verandert je benodigd vermogen",
+                "Bekijk de countdown: hoeveel jaar, maanden en dagen tot je FIRE-datum",
+              ],
+              tip: "Je FIRE-leeftijd is geen lot \u2014 het is een kompas. Elke verhoging van je spaarquote met 1% verschuift de datum.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Sparkles}
+            title="Levensgebeurtenissen"
+            color="var(--color-horizon-400)"
+            description={
+              <>
+                Het leven verloopt niet in een rechte lijn \u2014 en je
+                financi\u00ebn ook niet. Voeg toekomstige gebeurtenissen toe die je
+                financi\u00eble pad be\u00efnvloeden: kinderen krijgen, verhuizen,
+                trouwen, studie betalen, eerder stoppen met werken, een wereldreis
+                maken, een erfenis ontvangen. TriFinity heeft een catalogus van{" "}
+                <strong>50+ voorgedefinieerde events</strong> met realistische
+                cashflow-schattingen.
+                {" "}
+                Elke levensgebeurtenis <strong>verschuift je FIRE-datum</strong>. Je
+                ziet het cumulatieve effect: als je over 3 jaar een kind krijgt en
+                over 5 jaar een huis koopt, wat doet dat met je prognose? Zo maak
+                je bewuste keuzes over je toekomst in plaats van verrassingen.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Horizon en scroll naar levensgebeurtenissen",
+                "Tik op \u201c+ Event\u201d en kies uit de catalogus of maak een eigen gebeurtenis",
+                "Stel de verwachte datum en het financi\u00eble effect in (eenmalig bedrag, maandelijkse kosten of inkomsten)",
+                "Bekijk direct het effect op je FIRE-datum en vermogenspad",
+                "Versleep events in de tijd of schakel ze uit om scenario\u2019s te vergelijken",
+              ],
+              tip: "Voeg ook positieve events toe \u2014 een salarisverhoging, een erfenis of een zijproject. Het gaat niet alleen om kosten.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={LineChart}
+            title="Monte Carlo & backtesting"
+            color="var(--color-horizon-400)"
+            description={
+              <>
+                E\u00e9n prognose is een gok \u2014 duizend prognoses zijn een
+                strategie. De <strong>Monte Carlo simulatie</strong> draait 1.000
+                willekeurige marktscenario&apos;s en toont hoe robuust je plan is.
+                Je ziet het slagingspercentage (in hoeveel scenario&apos;s haal je
+                FIRE), de spreiding van mogelijke FIRE-leeftijden (p10, p25, p50,
+                p75, p90) en het vermogenspad per percentiel.
+                {" "}
+                De <strong>backtesting</strong> voegt historische realiteit toe: hoe
+                zou je plan het hebben gedaan tijdens de dotcom-crash, de
+                financi\u00eble crisis van 2008 of de COVID-dip? De backtestscore
+                geeft je een concreet getal: het percentage historische
+                crisisperiodes waarin je plan overeind bleef.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Horizon \u2014 de Monte Carlo simulatie draait automatisch op basis van je huidige data",
+                "Bekijk het slagingspercentage en de spreiding van FIRE-leeftijden",
+                "De backtestscore toont hoe je plan presteert onder historische crises",
+                "Pas je rendementsverwachting of spaarquote aan en zie het effect op de slaagkans direct veranderen",
+              ],
+              tip: "Een slaagkans boven 80% is solide. Onder 60% wil je je plan aanpassen \u2014 meer sparen, langer werken of zuiniger leven na FIRE.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={ArrowDownToLine}
+            title="Onttrekkingsstrategie"
+            color="var(--color-horizon-400)"
+            description={
+              <>
+                Je hebt FIRE bereikt \u2014 en dan? Je onttrekkingsstrategie
+                bepaalt hoe je je vermogen opneemt zonder dat het opraakt. TriFinity
+                biedt vier methoden: de klassieke{" "}
+                <strong>4%-regel</strong> (vast percentage per jaar),{" "}
+                <strong>dynamische onttrekking</strong> (past mee met
+                marktprestaties), de{" "}
+                <strong>vloer-plafondmethode</strong> (minimum gegarandeerd, extra
+                in goede jaren) en de{" "}
+                <strong>bucket-strategie</strong> (drie emmers: cash voor nu,
+                obligaties voor 5 jaar, aandelen voor de lange termijn).
+                {" "}
+                Elke strategie toont hoelang je vermogen meegaat, hoeveel
+                flexibiliteit je hebt in slechte marktjaren, en wat je jaarlijkse
+                inkomen wordt. Zo kies je niet op gevoel maar op basis van
+                simulatie.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Horizon \u2192 Onttrekkingsstrategie",
+                "Vergelijk de vier methoden naast elkaar met je eigen vermogen en uitgaven",
+                "Bekijk per strategie het gesimuleerde vermogensverloop en jaarlijkse inkomen",
+                "Kies de strategie die past bij je risicoprofiel \u2014 conservatief (bucket), flexibel (dynamisch) of eenvoudig (4%-regel)",
+              ],
+              tip: "De bucket-strategie is het meest intu\u00eftief: je hebt altijd 2\u20133 jaar cash bij de hand, ongeacht wat de markt doet.",
+            }}
+          />
+        </ReisStapSection>
 
         {/* ── Stap 5: Droom en plan ── */}
         <ReisStapSection
@@ -528,7 +660,74 @@ export default function GidsPage() {
           ctaLabel="Start een scenario"
           ctaHref="/horizon/whatif"
           isComplete={false}
-        />
+        >
+          <GuideTopicCard
+            icon={MessageSquare}
+            title="Droomscenario / What-If"
+            color="var(--color-horizon-400)"
+            description={
+              <>
+                Wat als je 20% meer zou verdienen? Wat als je over 3 jaar parttime
+                gaat werken? Wat als je emigreert naar Portugal? De{" "}
+                <strong>What-If builder</strong> laat je experimenteren met
+                alternatieve toekomsten via vijf schuifbalken: inkomen, werkdagen,
+                spaarquote, rendement en uitgaven. Kies een snelpreset
+                (optimistisch, verwacht, pessimistisch) of stel alles handmatig in.
+                {" "}
+                Je ziet direct het effect op je <strong>FIRE-datum</strong>,
+                vermogenspad en slaagkans. Voeg levensgebeurtenissen toe aan je
+                scenario en vergelijk het naast je huidige baseline in een{" "}
+                <strong>split-view</strong>. De SimChart toont beide paden met
+                percentiellijnen, zodat je niet alleen het verwachte maar ook het
+                beste en slechtste geval ziet \u2014 inclusief partnerperspectief
+                bij een huishouden.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Horizon \u2192 What-If",
+                "Versleep de schuifbalken voor inkomen, werkdagen, spaarquote, rendement en uitgaven",
+                "Of kies een snelpreset (optimist, koershouder, zuinig) als startpunt",
+                "Voeg levensgebeurtenissen toe aan je scenario om hun impact te zien",
+                "Open de vergelijkingsmodal om je scenario naast je huidige situatie te leggen",
+              ],
+              tip: "Probeer: \u201cWat als ik mijn spaarquote met 10% verhoog en over 5 jaar een kind krijg?\u201d \u2014 de combinatie geeft het eerlijkste beeld.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={MessageSquare}
+            title="Will AI-chat"
+            color="var(--color-horizon-400)"
+            description={
+              <>
+                Will is je persoonlijke financi\u00eble gesprekspartner met drie
+                persoonlijkheden. <strong>FHIN</strong> (De Kern) analyseert je data
+                en beantwoordt vragen over je vermogen en uitgaven.{" "}
+                <strong>FINN</strong> (De Wil) zet je aan tot actie met concrete
+                aanbevelingen. <strong>FFIN</strong> (De Horizon) helpt je dromen
+                vertalen naar financi\u00eble plannen \u2014 beschrijf je ideale
+                toekomst en hij berekent wat het kost en wanneer het haalbaar is.
+                {" "}
+                Will is <strong>context-aware</strong>: hij weet altijd op welke
+                pagina je bent en welke data relevant is. Open de chat rechtsonder
+                voor hulp die past bij wat je aan het doen bent. In een What-If
+                scenario kan Will je droom direct omzetten naar levensgebeurtenissen
+                met FIRE-impact. Je privacy is gewaarborgd \u2014 gevoelige
+                gegevens worden gemaskeerd in alle communicatie.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Tik op het chat-icoon rechtsonder op elke pagina",
+                "Stel een vraag of beschrijf een situatie \u2014 Will past zich aan op de context van de pagina",
+                "In een What-If: beschrijf je droom (\u201cIk wil over 5 jaar een huis kopen\u201d) en Will vertaalt het naar events",
+                "Vraag om een reality-check: \u201cIs mijn plan realistisch?\u201d \u2014 Will analyseert je data en geeft eerlijk antwoord",
+              ],
+              tip: "Will wordt slimmer naarmate je meer data hebt. Begin met een eenvoudige vraag: \u201cWat is het belangrijkste dat ik nu kan doen?\u201d",
+            }}
+          />
+        </ReisStapSection>
       </div>
 
       {/* ── Overal ── */}
@@ -595,6 +794,148 @@ export default function GidsPage() {
               'Bewaar het rapport om het later terug te lezen of te vergelijken met eerdere periodes',
             ],
             tip: 'Genereer na elke maandelijkse check-in een perioderapport. Zo bouw je een financieel archief op dat je groei over maanden en jaren zichtbaar maakt.',
+          }}
+        />
+
+        <GuideTopicCard
+          icon={LayoutDashboard}
+          title="Dashboard & Widgets"
+          color="var(--ink-2)"
+          description={
+            <>
+              Je dashboard is je persoonlijke cockpit \u2014 meer dan{" "}
+              <strong>26 widgets</strong> geven je in \u00e9\u00e9n oogopslag
+              inzicht in je vermogen, budget, acties, FIRE-prognose en voortgang.
+              Widgets vari\u00ebren in grootte (mini tot volledig) en ontgrendelen
+              progressief naarmate je soevereiniteitsniveau stijgt. Sleep ze in de
+              volgorde die voor jou werkt, schakel uit wat je niet nodig hebt, en
+              ontdek nieuwe widgets zodra je een niveau stijgt.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Je dashboard is je startpagina na inloggen",
+              "Ga naar Identiteit \u2192 Instellingen \u2192 Widgets om widgets aan/uit te zetten en de volgorde aan te passen",
+              "Nieuwe widgets ontgrendelen automatisch bij een hoger soevereiniteitsniveau",
+              "Sleep widgets naar een andere positie op het dashboard zelf",
+            ],
+            tip: "Begin met de standaard 7 widgets. Voeg pas meer toe als je weet welke inzichten je dagelijks wilt zien.",
+          }}
+        />
+
+        <GuideTopicCard
+          icon={Newspaper}
+          title="DAIshboard / Briefing"
+          color="var(--ink-2)"
+          description={
+            <>
+              Schakel over naar de <strong>DAIshboard-modus</strong> en je
+              dashboard transformeert in een AI-samengestelde briefing. Will
+              analyseert je financi\u00eble data en componeert een persoonlijk
+              overzicht met tot <strong>23 verschillende kaarttypes</strong>:
+              metrics, sparklines, mijlpalen, inzichten, checklists,
+              vergelijkingen, doelvoortgang, budgetbalken en meer. De briefing
+              wordt progressief geladen \u2014 kaarten verschijnen zodra ze klaar
+              zijn.
+              {" "}
+              Elke briefing is <strong>tijdsbewust</strong>: &apos;s ochtends focus
+              op de dag, aan het einde van de maand op je maandresultaat. De
+              briefing onthoudt wat je eerder hebt gezien en varieert de inhoud. Na
+              24 uur verschijnt een stale-banner zodat je weet dat de data niet
+              meer actueel is.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Op je dashboard: wissel naar DAIshboard-modus via de toggle bovenaan",
+              "De briefing genereert automatisch \u2014 kaarten verschijnen progressief",
+              "Scroll door je persoonlijke briefing en tik op kaarten voor meer detail",
+            ],
+            tip: "Check je briefing elke ochtend als financi\u00eble routine \u2014 het kost 30 seconden en houdt je scherp.",
+          }}
+        />
+
+        <GuideTopicCard
+          icon={Settings}
+          title="Profiel & Instellingen"
+          color="var(--ink-2)"
+          description={
+            <>
+              Je profiel bevat de basis voor alle berekeningen: naam,
+              geboortedatum, inkomen en huishoudsamenstelling. Je{" "}
+              <strong>soevereiniteitsniveau</strong> (van Herstel tot Meesterschap)
+              wordt automatisch berekend en ontgrendelt progressief nieuwe functies.
+              In <strong>Instellingen</strong> beheer je alles vanuit \u00e9\u00e9n
+              hub: notificatievoorkeuren, widget-selectie, FIRE-parameters (verwacht
+              rendement, inflatie, eindstrategie), weergaveopties (typografie,
+              modulekleuren) en gegevensbeheer (export, verwijdering).
+            </>
+          }
+          howTo={{
+            steps: [
+              "Ga naar Identiteit \u2192 Profiel voor je persoonlijke gegevens en huishoudprofiel",
+              "Ga naar Identiteit \u2192 Instellingen voor alle app-instellingen op \u00e9\u00e9n plek",
+              "Sectie C (FIRE) is het belangrijkst: stel hier je verwacht rendement, inflatie en eindstrategie in",
+              "Sectie D (Weergave) laat je de app personaliseren met eigen kleuren",
+            ],
+            tip: "Controleer je FIRE-parameters minstens jaarlijks \u2014 je verwacht rendement kan veranderen met je beleggingsstrategie.",
+          }}
+        />
+
+        <GuideTopicCard
+          icon={Users}
+          title="Huishouden & Partner"
+          color="var(--ink-2)"
+          description={
+            <>
+              Nodig je partner uit voor een gedeeld huishouden en beheer samen je
+              financi\u00ebn met respect voor individuele privacy. Per categorie
+              (vermogen, schulden, inkomsten) kies je het{" "}
+              <strong>zichtbaarheidsniveau</strong>: volledig (alles delen), totalen
+              (alleen bedragen, geen details) of verborgen. De kostenverdeling is
+              configureerbaar: gelijk of naar rato, met een primaire betaler voor
+              gezamenlijke lasten.
+              {" "}
+              <strong>Gedeelde doelen</strong>, gezamenlijke FIRE-berekeningen en
+              huishoudperspectief op je dashboard maken financieel samenwerken
+              concreet. Wissel op elke pagina tussen je persoonlijke en
+              huishoudperspectief.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Ga naar Identiteit \u2192 Delen en nodig je partner uit via e-mailadres",
+              "Je partner ontvangt een uitnodigingslink en maakt een eigen account aan",
+              "Stel de kostenverdeling in (50/50 of aangepast percentage) en kies de primaire betaler",
+              "Configureer per categorie het privacyniveau: volledig, totalen of verborgen",
+              "Wissel op elke pagina tussen persoonlijk en huishoudperspectief via de toggle",
+            ],
+            tip: "Bespreek samen welk privacyniveau jullie prettig vinden voordat je het instelt. Financieel vertrouwen groeit geleidelijk.",
+          }}
+        />
+
+        <GuideTopicCard
+          icon={Smartphone}
+          title="Mobiel"
+          color="var(--ink-2)"
+          description={
+            <>
+              TriFinity is volledig geoptimaliseerd voor je telefoon. De{" "}
+              <strong>bottom navigation</strong> geeft je met \u00e9\u00e9n tik
+              toegang tot De Kern, De Wil en De Horizon \u2014 kleurgecodeerd per
+              module. Alle touch targets zijn minimaal 44px, modals schuiven als{" "}
+              <strong>BottomSheets</strong> van onderen omhoog en kunnen worden
+              weggeveegd. Widgets passen zich automatisch aan het kleinere scherm
+              aan en tab-gebaseerde layouts houden de navigatie overzichtelijk.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Open TriFinity in je mobiele browser \u2014 de app past zich automatisch aan",
+              "Gebruik de bottom navigation onderaan om tussen modules te wisselen",
+              "Veeg BottomSheets naar beneden om ze te sluiten",
+            ],
+            tip: "Voeg TriFinity toe aan je startscherm voor een app-achtige ervaring zonder download.",
           }}
         />
       </div>
