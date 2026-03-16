@@ -16,6 +16,7 @@ import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { categorizeTransaction, isOwnAccountTransfer, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
+import { useToast } from '@/components/app/toast-provider'
 
 type Account = {
   id: string
@@ -35,10 +36,12 @@ type ImportRow = ParsedTransaction & {
   budget_id: string | null
   budgetName: string | null
   confidence: number
+  category_source: string | null
   isDuplicate: boolean
   skipImport: boolean
   isTransfer: boolean
   aiAccepted?: boolean
+  userManuallyChanged?: boolean
 }
 
 type BulkApplyPrompt = {
@@ -81,6 +84,7 @@ function formatCurrency(value: number): string {
 
 export default function ImportPage() {
   const router = useRouter()
+  const { addToast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState(1)
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -117,6 +121,7 @@ export default function ImportPage() {
   const [checkingDups, setCheckingDups] = useState(false)
   const PAGE_SIZE = 50
   const [currentPage, setCurrentPage] = useState(0)
+  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'low' | 'none'>('all')
 
   const loadInitialData = useCallback(async () => {
     setLoading(true)
@@ -535,13 +540,14 @@ export default function ImportPage() {
       const importRows: ImportRow[] = parsed.map((tx) => {
         const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
         const cat = isTransfer
-          ? { budget_id: null, confidence: 1.0, budgetName: null }
+          ? { budget_id: null, confidence: 1.0, budgetName: null, category_source: 'transfer' }
           : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections, undefined, tx.counterparty_iban, freqMap)
         return {
           ...tx,
           budget_id: cat.budget_id,
           budgetName: cat.budgetName,
           confidence: cat.confidence,
+          category_source: cat.category_source ?? null,
           isDuplicate: false,
           skipImport: false,
           isTransfer,
@@ -584,13 +590,14 @@ export default function ImportPage() {
       const importRows: ImportRow[] = parsed.map((tx) => {
         const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
         const cat = isTransfer
-          ? { budget_id: null, confidence: 1.0, budgetName: null }
+          ? { budget_id: null, confidence: 1.0, budgetName: null, category_source: 'transfer' }
           : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections, undefined, tx.counterparty_iban, freqMap)
         return {
           ...tx,
           budget_id: cat.budget_id,
           budgetName: cat.budgetName,
           confidence: cat.confidence,
+          category_source: cat.category_source ?? null,
           isDuplicate: false,
           skipImport: false,
           isTransfer,
@@ -643,6 +650,7 @@ export default function ImportPage() {
         budget_id: budgetId || null,
         budgetName: budget?.name ?? null,
         confidence: budgetId ? 1.0 : 0,
+        category_source: budgetId ? source : null,
         aiAccepted: source === 'ai',
       }
     }))
@@ -1390,8 +1398,8 @@ export default function ImportPage() {
           {/* Import progress */}
           {importing && importProgress.total > 0 && (() => {
             const pct = Math.round((importProgress.current / importProgress.total) * 100)
-            const batchNum = Math.ceil(importProgress.current / 50) || 1
-            const totalBatches = Math.ceil(importProgress.total / 50)
+            const batchNum = Math.ceil(importProgress.current / 100) || 1
+            const totalBatches = Math.ceil(importProgress.total / 100)
             const elapsed = importStartTime ? (Date.now() - importStartTime) / 1000 : 0
             const rate = elapsed > 0 && importProgress.current > 0 ? importProgress.current / elapsed : 0
             const remaining = rate > 0 ? Math.ceil((importProgress.total - importProgress.current) / rate) : null
@@ -1479,7 +1487,7 @@ export default function ImportPage() {
                       const s = aiSuggestions.get(r.import_hash)
                       if (!s || !s.budget_id) return r
                       const budget = budgets.find((b) => b.id === s.budget_id)
-                      return { ...r, budget_id: s.budget_id, budgetName: budget?.name ?? null, confidence: s.confidence, aiAccepted: true }
+                      return { ...r, budget_id: s.budget_id, budgetName: budget?.name ?? null, confidence: s.confidence, category_source: 'ai', aiAccepted: true }
                     }))
                   }}
                   className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
