@@ -1,3 +1,25 @@
+## Session 2026-03-17 - Features #174, #175
+
+### Feature #174: Levensgebeurtenis: Begrafenis / Uitvaart - PASSING
+- Added `begrafenis` entry to LIFE_EVENT_CATALOG with icon Flower2, group 'leven', defaultCost 9000
+- 6 metadata fields: uitvaartType (select: Begraven/Crematie/Natuurbegraven), uitvaartkosten (number €9000), heeftVerzekering (toggle), verzekeringDekking (number), grafrechtenJaar (number 20), extraWensen (number)
+- Added BegrafenisMetadata interface to horizon-data.ts
+- Added 'begrafenis: BegrafenisMetadata' to LifeEventMetadataMap type
+- Implemented cost calculation in lifeEventsToCashflows: eenmalig = uitvaartkosten + extraWensen + grafrechten - verzekeringDekking
+- Conditional grafrechten: only for 'begraven' or 'natuurbegraven' (not crematie), ~€150/jaar × grafrechtenJaar
+- Added Flower2 icon to EVENT_ICONS in log-timeline.tsx
+- Added 'begrafenis' to suggest-life-event.ts event_type list
+
+### Feature #175: Levensgebeurtenis: Begrafenis toevoegen aan catalogus - PASSING
+- Duplicate of #174 — all requirements already implemented
+- BegrafenisMetadata, LifeEventMetadataMap entry, LIFE_EVENT_CATALOG entry, AI tool enum all done
+
+### Current Status
+- 2 features completed this session (#174, #175)
+- Zero TypeScript errors
+- Could not browser-test due to Supabase auth (no working credentials)
+- Commit: 290aaffc
+
 ## Session 2026-03-17 - Feature #172
 
 ### Feature #172: Abonnementen klikbaar naar OpzegModal op De Wil - PASSING
@@ -14135,3 +14157,24 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#169, #170)
 - Zero TypeScript errors
 - Commit: 098b58f4
+
+## Session 2026-03-17 - Features #167, #168
+
+### Feature #167: Gids content: App instellingen - PASSING
+- Updated existing GuideTopicCard with enriched content covering all 6 settings sections
+- Waarde-tekst: "Maak TriFinity helemaal van jou. Van de kleuren tot de berekeningen — alles is aanpasbaar."
+- Six sections: A) Notificaties (partner-transacties, check-in reminders), B) Widgets (formaat, volgorde), C) FIRE-parameters (7%/2%, onttrekkingsstrategie, Box 3, retirement expense), D) Weergave (thema Editorial/Andada/Digital, modulekleuren, budgetcategorie-kleuren, fase-kleuren), E) Gegevens (profiel, export, verwijderen), F) Privacy & AI (Will toggle, huishoud-privacy)
+- HowTo expanded to 7 steps covering all sections
+
+### Feature #168: Gids content: Meldingen - PASSING
+- Updated existing GuideTopicCard with enriched content
+- Waarde-tekst: "Weet wat belangrijk is zonder constant te checken. Meldingen komen naar jou — alleen de dingen die ertoe doen."
+- 5 notification types: Budgetwaarschuwing, Mijlpaal bereikt, AI-inzicht, Sync voltooid, Belegging alert
+- Partner-meldingen: 4 modes (all_shared, threshold, categories, disabled)
+- Check-in herinnering, meldingen-widget reference
+- HowTo expanded to 6 steps
+
+### Current Status
+- 2 features completed this session (#167, #168)
+- Zero TypeScript errors
+- Commit: 9a2eeeaf
