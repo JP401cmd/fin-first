@@ -13309,3 +13309,20 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 95/95 features passing (100%)
 - All features complete!
+
+## Session 2026-03-16 - Feature #96
+
+### Feature #96: Breadcrumb dynamic import tegen Turbopack module-leak - PASSING
+- Replaced static `import { Breadcrumb }` with `dynamic(() => import(...).then(m => ({ default: m.Breadcrumb })), { ssr: false })` in both:
+  - app/(app)/core/layout.tsx
+  - app/(app)/identity/layout.tsx
+- Added `import dynamic from 'next/dynamic'` to both files
+- Cleared .next cache and restarted dev server
+- Zero TypeScript errors in modified files
+- No "module factory is not available" errors on /login
+- Breadcrumb still renders correctly on /core/* and /identity/* routes (behind auth redirect)
+- Commit: 156a8449
+
+### Current Status
+- 96/96 features passing (100%)
+- All features complete!
