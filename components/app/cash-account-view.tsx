@@ -88,11 +88,13 @@ export function CashAccountView({
   backHref = '/core/assets',
   backLabel = 'Assets',
   embedded = false,
+  onNavigateToAccount,
 }: {
   accountId?: string
   backHref?: string
   backLabel?: string
   embedded?: boolean
+  onNavigateToAccount?: (accountId: string | undefined) => void
 }) {
   const isCombined = !accountId
   const router = useRouter()
@@ -918,6 +920,17 @@ export function CashAccountView({
 
   return (
     <div className={embedded ? '' : 'mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8'}>
+      {/* Back to combined — embedded single account */}
+      {embedded && !isCombined && onNavigateToAccount && (
+        <button
+          onClick={() => onNavigateToAccount(undefined)}
+          className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] shadow-[var(--s0)] transition-all hover:shadow-[var(--s1)] hover:text-[var(--ink)]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Alle rekeningen
+        </button>
+      )}
+
       {/* Back button */}
       {!embedded && (
         <Link
@@ -993,6 +1006,60 @@ export function CashAccountView({
         </div>
       </section>
 
+      {/* Accounts overview — combined mode only, only when navigation callback is provided */}
+      {isCombined && allAccounts.length > 0 && onNavigateToAccount && (
+        <section className="mt-3 sm:mt-6" data-testid="accounts-overview">
+          <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
+            {/* Totaal header */}
+            <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-kern-500" />
+                <span className="text-sm font-semibold text-[var(--ink-2)]">Rekeningoverzicht</span>
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-sm font-bold tabular-nums text-[var(--ink)]">
+                  {formatCurrency(Number(account.balance))}
+                </span>
+                <span className="ml-2 text-xs text-[var(--ink-3)]">totaal</span>
+              </div>
+            </div>
+
+            {/* Per-account rows */}
+            {allAccounts.map((acc, idx) => {
+              const typeLabel = ACCOUNT_TYPES.find(t => t.value === acc.account_type)?.label ?? acc.account_type
+              return (
+                <button
+                  key={acc.id}
+                  onClick={() => onNavigateToAccount(acc.id)}
+                  className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)] ${
+                    idx < allAccounts.length - 1 ? 'border-b border-[var(--border-ed)]' : ''
+                  }`}
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] bg-kern-50">
+                    <Wallet className="h-4 w-4 text-kern-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[var(--ink)]">{acc.name}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--ink-3)]">{typeLabel}</span>
+                      {acc.iban && (
+                        <span className="text-xs text-[var(--ink-4)]">{acc.iban}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${
+                    Number(acc.balance) >= 0 ? 'text-[var(--ink)]' : 'text-red-600'
+                  }`}>
+                    {formatCurrency(Number(acc.balance))}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Action bar */}
       <div className="mt-3 sm:mt-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -1043,8 +1110,8 @@ export function CashAccountView({
         </div>
       </div>
 
-      {/* Bank connections */}
-      {gcEnabled && (
+      {/* Bank connections — hidden in combined embedded mode */}
+      {gcEnabled && !isCombined && (
         <section className="mt-3 sm:mt-6">
           <button
             onClick={() => setShowBankConnections((v) => !v)}

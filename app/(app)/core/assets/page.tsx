@@ -52,6 +52,7 @@ export default function AssetsPage({ initialAssetId }: { initialAssetId?: string
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const [showCashModal, setShowCashModal] = useState(false)
+  const [cashAccountId, setCashAccountId] = useState<string | undefined>(undefined)
   const [budgetingActive, setBudgetingActive] = useState(true)
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
@@ -776,11 +777,16 @@ export default function AssetsPage({ initialAssetId }: { initialAssetId?: string
       {/* Combined cash view modal */}
       <FullScreenModal
         open={showCashModal}
-        onClose={() => setShowCashModal(false)}
+        onClose={() => { setShowCashModal(false); setCashAccountId(undefined) }}
         title="Cash"
         href="/core/cash"
       >
-        <CashAccountView embedded />
+        <CashAccountView
+          key={cashAccountId ?? 'combined'}
+          embedded
+          accountId={cashAccountId}
+          onNavigateToAccount={(id) => setCashAccountId(id)}
+        />
       </FullScreenModal>
     </div>
   )
