@@ -1,3 +1,68 @@
+## Session 2026-03-17 - Feature #172
+
+### Feature #172: Abonnementen klikbaar naar OpzegModal op De Wil - PASSING
+- Added onClick + onKeyDown handlers to each subscription row in will-landing.tsx sectie 4
+- Each click constructs CancellationMetadata from SubscriptionItem (name, monthlyAmount, frequency, userProfile.full_name)
+- Sets opzegSubscription state so OpzegModal receives actual subscription object (was null before)
+- Visual affordances: cursor-pointer, hover:bg-[var(--subtle)], transition-colors, ChevronRight icon
+- Keyboard accessible: role="button", tabIndex={0}, Enter/Space support
+- OpzegModal onClose and onSavedToActionList both clear opzegTarget + opzegSubscription
+- Zero TypeScript errors (tsc --noEmit clean)
+- Page compiles successfully (307 auth redirect)
+- Could not browser-test full flow due to Supabase email rate limit (auth blocked)
+- Commit: 97779829
+
+### Current Status
+- 164/175 features passing (93.7%)
+
+## Session 2026-03-17 - Features #165, #166
+
+### Feature #165: Gids content: Huishouden & partner - PASSING
+- Added valueText: "Financiële vrijheid bereik je samen..."
+- Restructured description: Verdeling (4 split-modes), Privacy per categorie (5 cats × 3 levels), Eigenaarschap, Gezamenlijke FIRE, Meldingen (4 modes), Widgets
+- Updated howTo: 7 steps covering partner invite, verdeling, eigenaarschap, privacy, meldingen, FIRE
+- Updated navigation path: Identiteit → Profiel → Huishouden
+
+### Feature #166: Gids content: Profiel instellingen - PASSING
+- Added valueText: "Jouw data is van jou..."
+- Restructured description: Profielgegevens, Soevereiniteitsniveau, Data-eigenaarschap (export), Account verwijderen
+- Updated howTo: 6 steps covering profiel, pensioenleeftijd, sovereignty, export, deletion
+- Commit: a46f3a3e
+
+## Session 2026-03-17 - Features #160, #161
+
+### Feature #160: Gids content: Onttrekkingsstrategie - PASSING
+- Added valueText: "FIRE bereiken is één ding. Weten hoe je je vermogen veilig opneemt is minstens zo belangrijk."
+- Restructured description with <br> paragraphs for 3 strategies: Perpetual (~4% opnemen, vermogen intact), Legacy (vastgesteld bedrag nalaten), Deplete (vermogen af tot €0)
+- Added Instellen paragraph: Identiteit → Instellingen → FIRE-parameters sectie C
+- Added SWR-monitor paragraph: widget toont huidige vs benodigde onttrekking, Box 3 gecorrigeerd
+- Expanded howTo to 6 steps including Legacy/Deplete specific configuration + SWR-monitor widget
+- All 7 feature steps verified as covered
+
+### Feature #161: Gids content: Horizon overig - PASSING
+- Updated existing "Wat komt er nog?" teaser card in De Horizon section
+- Changed intro from "steeds slimmer" to "steeds scherper. Dit staat op de planning:"
+- Replaced Glijpad-visualisatie with Pensioensimulatie (AOW + aanvullend pensioen + lijfrente)
+- Replaced Pensioen-integratie with Internationale belastingvergelijking (Portugal, België, Duitsland)
+- Kept Scenario-vergelijker as third teaser
+- All 3 feature steps verified as covered
+
+### Current Status
+- 2 features completed this session (#160, #161)
+- Zero TypeScript errors (page compiles, 307 auth redirect)
+- Commit: 58e60d9b
+
+## Session 2026-03-17 - Features #147, #148
+
+### Feature #147: Gids content: Netto vermogen - PASSING
+- Enhanced GuideTopicCard: waarde-tekst, berekening (inclusiepercentage 0–100%), vermogensgrafiek (netto_vermogen widget), snapshots (check-in), samenstelling breakdown, mijlpalen (€10k/€50k/€100k + jouw_pad widget)
+- 6 howTo steps + updated tip
+
+### Feature #148: Gids content: Belasting - PASSING
+- Enhanced GuideTopicCard: waarde-tekst, Box 3 (heffingsvrij €57k, fictief rendement), fictief rendement (3 categorieën), partner-optimalisatie, box3_drag widget, Box 2 (DGA-leningdrempel)
+- 6 howTo steps + tip over scenariomodel
+- Commit: 9ea0238f
+
 ## Session 2026-03-17 - Features #142, #171
 
 ### Feature #142: Gids pagina: module-gebaseerde naslagwerk-indeling - PASSING
@@ -13968,3 +14033,105 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#154, #155)
 - Zero TypeScript errors
 - Commit: 491d943c
+
+## Session 2026-03-17 - Features #156, #157
+
+### Feature #156: Gids content: Abonnementen - PASSING
+- Updated existing Abonnementen GuideTopicCard in De Wil section
+- Waarde-tekst: "Abonnementen zijn stille geldlekken. €15 per maand klinkt onschuldig, maar het kost je 2 dagen vrijheid per jaar. Elke. Jaar. Weer."
+- Description: frequenties (wekelijks/maandelijks/kwartaal/jaarlijks), handmatig toevoegen, jaarlijkse kosten + vrijheidsdagen impact, opzegadvies
+- Gerelateerde widgets: vaste_lasten + noodfonds
+- HowTo: 4 structured steps (Overzicht/Detectie/Impact/Opzeggen) + updated tip with €15/maand = 2 dagen
+
+### Feature #157: Gids content: Wil overig - PASSING
+- Updated existing "Dit komt eraan" teaser card in De Wil section
+- Changed intro to: "De Wil groeit mee met jou. Dit staat op de planning:"
+- 3 toekomstige features: Uitgavenpatronen, Financieel rapport, Huishouden-samenwerking
+- Last GuideTopicCard in De Wil sectie (confirmed)
+
+### Current Status
+- 2 features completed this session (#156, #157)
+- Zero TypeScript errors
+- Commit: 8643579c
+
+## Session 2026-03-17 - Features #158, #159
+
+### Feature #158: Gids content: FIRE-projectie met levensgebeurtenissen - PASSING
+- Updated ReisStapSection valueSentence to required waarde-tekst about De Horizon
+- Enhanced FIRE-projectie card: simpler framing ("op welke leeftijd..."), added 4%-10% rendement scenario range
+- Updated Levensgebeurtenissen card: specific costs (kind €800/maand, huis eenmalige kosten, pensioen AOW-inkomen)
+- Enhanced Monte Carlo card: "1000 simulaties met willekeurige rendementen", "In 85% van de gevallen red je het"
+- Enhanced Backtesting: "stel je was 30 jaar geleden begonnen" framing
+- SWR content already comprehensive (Box 3 + inflatie + effectieve SWR lager dan 4%)
+- All 8 feature steps verified as covered
+
+### Feature #159: Gids content: Droomscenario - PASSING
+- Rewrote Droomscenario / What-If GuideTopicCard in De Horizon Stap 5
+- Waarde-tekst: "Wat als je minder gaat werken? Wat als je een bonus krijgt? Het droomscenario laat je experimenteren zonder risico."
+- Five sliders: maandelijks inkomen, werkdagen/week (0-5), spaarquote (%), verwacht rendement (%), extra maandelijkse inleg
+- Presets: sabbatical, bonus, loonsverhoging, minder werken
+- Kassabon-vergelijking: baseline vs what-if per regel
+- Will-chat integratie: AI kent scenario-aanpassingen, geeft gerichte suggesties
+- HowTo expanded to 6 steps covering all feature requirements
+- All 7 feature steps verified as covered
+
+### Current Status
+- 2 features completed this session (#158, #159)
+- Zero TypeScript errors
+- Commit: a12c1b9c
+
+## Session 2026-03-17 - Features #163, #164
+
+### Feature #163: Gids content: TriFinity Post - PASSING
+- Updated existing GuideTopicCard with enriched content
+- Added valueText prop to GuideTopicCard component (was silently ignored before)
+- Waarde-tekst: "Financieel nieuws dat er toe doet — voor jou..."
+- Personalisatie: AI kent beleggingen, budget, doelen — AEX/energieprijzen/ECB voorbeelden
+- Progressive loading: artikelen verschijnen één voor één met CSS-animaties
+- Dagelijks vers: verversen voor nieuwe content
+- HowTo restructured: 4 steps covering openen, lezen, personalisatie, verversen
+
+### Feature #164: Gids content: Will (AI-assistent) - PASSING
+- Updated existing Will GuideTopicCard with enriched content
+- Waarde-tekst: "Will is je persoonlijke financiële adviseur..."
+- Openen: Will-knop rechtsonder + menu, beschikbaar op elke pagina
+- Vragen stellen: 3 concrete voorbeeldvragen met werkelijke cijfers
+- Acties: voorstellen die als actie op je bord verschijnen
+- Scenario-modus: Droomscenario context-aware advies
+- Privacy: niet opgeslagen buiten sessie, uitschakelen via Instellingen
+- HowTo restructured: 5 steps covering all feature requirements
+
+### GuideTopicCard component enhancement
+- Added optional `valueText` prop: bold value-first sentence shown above description
+- Renders as font-medium text in --ink color for visual hierarchy
+
+### Current Status
+- 2 features completed this session (#163, #164)
+- Zero TypeScript errors
+- Commit: 40ac9974
+
+## Session 2026-03-17 - Features #169, #170
+
+### Feature #169: Gids content: Rapporten - PASSING
+- Updated existing Rapporten GuideTopicCard in Overal section
+- Waarde-tekst: "Soms wil je het grotere plaatje. Rapporten geven je een diepere analyse — per maand, kwartaal of jaar."
+- Three report types: balansrapport (vermogensopbouw over tijd), budgetrapport (uitgaven per categorie met trends), jaaroverzicht (complete samenvatting)
+- Periodes: maand (24 maanden terug), kwartaal (8 kwartalen), jaar (5 jaar)
+- Configureerbare secties: je bepaalt zelf welke onderdelen je wilt zien
+- AI-samenvatting: opt-in, Will benoemt patronen en bijzonderheden
+- Download als PDF voor administratie
+- HowTo restructured to 6 steps: Openen, Balansrapport, Budgetrapport, Jaaroverzicht, AI-samenvatting, Download
+
+### Feature #170: Gids content: Mobiel - PASSING
+- Updated existing Mobiel GuideTopicCard in Overal section
+- Waarde-tekst: "Je financiën altijd bij de hand. TriFinity werkt volledig op je telefoon — geen app store nodig, gewoon installeren vanuit je browser."
+- PWA install instructions: iOS (deel-knop → Zet op beginscherm) + Android (menu → Installeren)
+- Widget scaling: full→half, quarter→mini, drag & drop on mobile
+- Touch: tik op bedragen voor kassabon-details (BottomSheet), veeg door grafieken, sleep widgets
+- Alles beschikbaar: importeren, check-in, Will-chat, scenario's — layout past aan, functionaliteit niet
+- HowTo restructured to 4 steps: Installeren, Widgets op mobiel, Touch, Alles beschikbaar
+
+### Current Status
+- 2 features completed this session (#169, #170)
+- Zero TypeScript errors
+- Commit: 098b58f4
