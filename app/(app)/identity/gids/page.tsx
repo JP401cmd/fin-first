@@ -50,6 +50,7 @@ interface GuideProgress {
 /* ── Reis-stap card component ─────────────────────── */
 
 function ReisStapCard({
+  id,
   icon: Icon,
   title,
   color,
@@ -60,6 +61,7 @@ function ReisStapCard({
   ctaHref,
   isComplete,
 }: {
+  id?: string
   icon: LucideIcon
   title: string
   color: string
@@ -71,7 +73,7 @@ function ReisStapCard({
   isComplete: boolean
 }) {
   return (
-    <div className="card-editorial overflow-hidden">
+    <div id={id} className="card-editorial overflow-hidden scroll-mt-28">
       {/* Top accent bar */}
       <div className="h-[3px]" style={{ backgroundColor: color }} />
 
@@ -331,6 +333,7 @@ export default function GidsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {/* Stap 1: Weet waar je staat */}
             <ReisStapCard
+              id="guide-reis-1"
               icon={Landmark}
               title="Weet waar je staat"
               color="var(--color-kern-400)"
@@ -360,6 +363,7 @@ export default function GidsPage() {
 
             {/* Stap 2: Begrijp je patronen */}
             <ReisStapCard
+              id="guide-reis-2"
               icon={Receipt}
               title="Begrijp je patronen"
               color="var(--color-kern-400)"
@@ -395,6 +399,7 @@ export default function GidsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {/* Stap 3: Onderneem actie */}
             <ReisStapCard
+              id="guide-reis-3"
               icon={Zap}
               title="Onderneem actie"
               color="var(--color-wil-400)"
@@ -432,6 +437,7 @@ export default function GidsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {/* Stap 4: Kijk vooruit */}
             <ReisStapCard
+              id="guide-reis-4"
               icon={Compass}
               title="Kijk vooruit"
               color="var(--color-horizon-400)"
@@ -457,6 +463,7 @@ export default function GidsPage() {
 
             {/* Stap 5: Droom en plan */}
             <ReisStapCard
+              id="guide-reis-5"
               icon={MessageSquare}
               title="Droom en plan"
               color="var(--color-horizon-400)"

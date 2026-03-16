@@ -64,6 +64,13 @@ const REIS_STAPPEN: ReisStap[] = [
 
 /* ── Component ─────────────────────── */
 
+function scrollToStep(stepNumber: number) {
+  const el = document.getElementById(`guide-reis-${stepNumber}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
 export function GuideProgressBar() {
   const [steps, setSteps] = useState<GuideProgressSteps | null>(null)
   const [animate, setAnimate] = useState(false)
@@ -113,15 +120,18 @@ export function GuideProgressBar() {
         {REIS_STAPPEN.map((stap, i) => {
           const isDone = stap.check(steps)
           return (
-            <div
+            <button
               key={i}
-              className="relative h-2 flex-1 rounded-full overflow-hidden"
+              type="button"
+              aria-label={`Ga naar stap ${i + 1}: ${stap.label}`}
+              onClick={() => scrollToStep(i + 1)}
+              className="relative h-2 flex-1 rounded-full overflow-hidden cursor-pointer transition-opacity hover:opacity-80"
               style={{
                 backgroundColor: 'var(--border-ed)',
               }}
             >
               <div
-                className="absolute inset-0 rounded-full"
+                className="absolute inset-0 rounded-full pointer-events-none"
                 style={{
                   backgroundColor: isDone ? stap.color : 'transparent',
                   transform: animate && isDone ? 'scaleX(1)' : 'scaleX(0)',
@@ -129,7 +139,7 @@ export function GuideProgressBar() {
                   transition: `transform 0.5s ease-out ${i * 0.12}s`,
                 }}
               />
-            </div>
+            </button>
           )
         })}
       </div>
@@ -140,9 +150,15 @@ export function GuideProgressBar() {
           const isDone = stap.check(steps)
           const Icon = stap.icon
           return (
-            <div key={i} className="flex flex-1 flex-col items-center gap-1">
+            <button
+              key={i}
+              type="button"
+              aria-label={`Ga naar stap ${i + 1}: ${stap.label}`}
+              onClick={() => scrollToStep(i + 1)}
+              className="flex flex-1 flex-col items-center gap-1 cursor-pointer group"
+            >
               <div
-                className="flex h-6 w-6 items-center justify-center rounded-full transition-all duration-300"
+                className="flex h-6 w-6 items-center justify-center rounded-full transition-all duration-300 group-hover:scale-110"
                 style={{
                   backgroundColor: isDone ? stap.bgColor : 'var(--subtle)',
                   color: isDone ? stap.color : 'var(--ink-4)',
@@ -156,14 +172,14 @@ export function GuideProgressBar() {
                 )}
               </div>
               <span
-                className="text-center text-[10px] sm:text-[11px] leading-tight"
+                className="text-center text-[10px] sm:text-[11px] leading-tight group-hover:text-[var(--ink)]"
                 style={{
                   color: isDone ? 'var(--ink-2)' : 'var(--ink-4)',
                 }}
               >
                 {stap.label}
               </span>
-            </div>
+            </button>
           )
         })}
       </div>
