@@ -12943,3 +12943,22 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#63, #64, #65)
 - Zero TypeScript errors in changed files
 - Commit: 4d085a52
+
+## Session 2026-03-16 - Feature #66
+
+### Feature #66: inflatie_impact: mini in lijn met widget + half getallen toevoegen - PASSING
+- Mini: already consistent with all other mini-widgets (font-mono text-[15px] font-semibold tabular-nums pattern)
+- Half: replaced separate milestone list with inline SVG labels on the curve
+  - Milestone dots at year 0, 10, 20, 30 directly on the declining curve
+  - Currency value labels (€1.000, €817, €668, €545 at 2%) positioned above/below curve
+  - Year indicators (10j, 20j, 30j) below value labels
+  - Start label: bold + --ink, end label: bold + horizon-700, middle: regular + --ink-3
+  - Compact footnote: "Koopkracht van €1.000 over 30 jaar"
+  - Increased SVG viewBox from 200x80 to 240x90 for label accommodation
+- Zero TypeScript errors
+- Could not verify via browser (Supabase auth required)
+- Commit: f043fb43
+
+### Current Status
+- 1 feature completed this session (#66)
+- Zero TypeScript errors
