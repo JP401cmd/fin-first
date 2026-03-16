@@ -1021,65 +1021,50 @@ export default function GidsPage() {
             }}
           />
 
-          <GuideAccordion
-            id="alg-huishouden"
-            icon={<Users className="h-4 w-4" />}
-            title="Huishouden / partner"
-            tagline="Gedeeld financieel beheer"
+          <GuideTopicCard
+            icon={Users}
+            title="Huishouden & Partner"
             color="var(--ink-2)"
-            open={guideSection === 'alg-huishouden'}
-            onToggle={() => setGuideSection(guideSection === 'alg-huishouden' ? null : 'alg-huishouden')}
-          >
-            <div className="space-y-2">
-              <GuideFeature title="Partner uitnodigen">
-                Nodig je partner uit voor een gedeeld huishouden. Beheer samen je financiën met respect voor individuele privacy.
-              </GuideFeature>
-              <GuideFeature title="Kostenverdeling en perspectief">
-                Verdeel kosten, vergelijk individuele bijdragen en wissel van perspectief tussen persoonlijk en huishouden.
-              </GuideFeature>
-            </div>
-          </GuideAccordion>
+            description={
+              <>
+                Financiën delen zonder privacy op te geven. Nodig je partner uit voor een gedeeld huishouden en bepaal samen wie wat ziet. Elk van jullie kiest per categorie een <strong>privacyniveau</strong>: volledig delen, alleen totalen tonen, of volledig verbergen — zodat jullie samenwerken op jullie eigen voorwaarden.
+                {' '}
+                De <strong>kostenverdeling</strong> laat zien wie wat bijdraagt aan gedeelde uitgaven, en de <strong>perspectief-toggle</strong> wisselt je hele dashboard tussen je persoonlijke situatie en het huishoudtotaal. Gedeelde doelen werken samen aan één doel met individuele voortgang. Alles dat je partner deelt verschijnt naadloos naast je eigen data — je hoeft niets handmatig te combineren.
+              </>
+            }
+            howTo={{
+              steps: [
+                'Ga naar Identiteit → Profiel en nodig je partner uit via e-mail',
+                'Stel per categorie je privacyniveau in: volledig, totalen of verborgen',
+                'Bekijk de kostenverdeling op de Kern-overzichtspagina',
+                'Wissel tussen persoonlijk en huishouden-perspectief via de toggle in de navigatie',
+                'Maak gedeelde doelen aan — jullie voortgang wordt automatisch gecombineerd',
+              ],
+              tip: 'Bespreek je privacyinstellingen samen voordat je begint. Transparantie over grenzen voorkomt verrassingen en bouwt vertrouwen op.',
+            }}
+          />
 
-          <GuideAccordion
-            id="alg-profiel"
-            icon={<User className="h-4 w-4" />}
-            title="Profiel instellingen"
-            tagline="Persoonlijke gegevens en soevereiniteit"
+          <GuideTopicCard
+            icon={User}
+            title="Profiel & Instellingen"
             color="var(--ink-2)"
-            open={guideSection === 'alg-profiel'}
-            onToggle={() => setGuideSection(guideSection === 'alg-profiel' ? null : 'alg-profiel')}
-          >
-            <div className="space-y-2">
-              <GuideFeature title="Persoonlijke gegevens">
-                Je naam, geboortedatum, inkomen en huishoudprofiel. Deze gegevens vormen de basis voor alle berekeningen.
-              </GuideFeature>
-              <GuideFeature title="Soevereiniteitsniveaus">
-                Van Herstel tot Meesterschap — je niveau wordt automatisch berekend op basis van je financiële gezondheid en ontgrendelt progressief nieuwe functies.
-              </GuideFeature>
-            </div>
-          </GuideAccordion>
-
-          <GuideAccordion
-            id="alg-instellingen"
-            icon={<Settings className="h-4 w-4" />}
-            title="App instellingen"
-            tagline="Widgets, FIRE-parameters en weergave"
-            color="var(--ink-2)"
-            open={guideSection === 'alg-instellingen'}
-            onToggle={() => setGuideSection(guideSection === 'alg-instellingen' ? null : 'alg-instellingen')}
-          >
-            <div className="space-y-2">
-              <GuideFeature title="Widgets beheer">
-                Kies welke widgets je op je dashboard wilt zien en in welke volgorde. Meer dan 25 widgets beschikbaar.
-              </GuideFeature>
-              <GuideFeature title="FIRE-parameters">
-                Stel je verwacht rendement en inflatiepercentage in. Deze parameters beïnvloeden al je FIRE-berekeningen en projecties.
-              </GuideFeature>
-              <GuideFeature title="Weergave en data">
-                Pas de weergave aan, exporteer je data en beheer je notificatievoorkeuren.
-              </GuideFeature>
-            </div>
-          </GuideAccordion>
+            description={
+              <>
+                Je profiel vormt het fundament van al je berekeningen: naam, geboortedatum, inkomen en huishoudsamenstelling bepalen hoe TriFinity je vrijheidstijd berekent. Je <strong>soevereiniteitsniveau</strong> — van Herstel tot Meesterschap — wordt automatisch bepaald op basis van je financiële gezondheid en ontgrendelt progressief nieuwe functies en diepere inzichten.
+                {' '}
+                De instellingen-hub bundelt vijf secties op één plek: <strong>notificaties</strong> (wat wil je horen?), <strong>widgets</strong> (welke kaarten op je dashboard?), <strong>FIRE-parameters</strong> (verwacht rendement en inflatie), <strong>weergave</strong> (kleurpersonalisatie met vooraf ingestelde paletten) en <strong>gegevens</strong> (export en databeheer). Alles is optioneel — de standaardinstellingen werken direct.
+              </>
+            }
+            howTo={{
+              steps: [
+                'Ga naar Identiteit → Profiel om je persoonlijke gegevens en huishoudprofiel bij te werken',
+                'Bekijk je soevereiniteitsniveau op de Identiteit-overzichtspagina — het stijgt automatisch mee',
+                'Open Identiteit → Instellingen voor widgets, FIRE-parameters, kleuren en notificaties',
+                'Pas je dashboardkleuren aan via Weergave — kies uit vooraf ingestelde paletten of stel je eigen accent in',
+              ],
+              tip: 'Vul je geboortedatum en netto maandinkomen als eerste in — vrijwel elke berekening in TriFinity bouwt daarop voort.',
+            }}
+          />
 
           <GuideTopicCard
             icon={Bell}
@@ -1100,43 +1085,48 @@ export default function GidsPage() {
             }}
           />
 
-          <GuideAccordion
-            id="alg-rapporten"
-            icon={<FileText className="h-4 w-4" />}
+          <GuideTopicCard
+            icon={FileText}
             title="Rapporten"
-            tagline="Balans, budget en jaaroverzicht"
             color="var(--ink-2)"
-            open={guideSection === 'alg-rapporten'}
-            onToggle={() => setGuideSection(guideSection === 'alg-rapporten' ? null : 'alg-rapporten')}
-          >
-            <div className="space-y-2">
-              <GuideFeature title="Balansrapport">
-                Een overzicht van al je bezittingen en schulden op een peildatum — je persoonlijke balans in vrijheidstijd.
-              </GuideFeature>
-              <GuideFeature title="Budgetrapport en jaaroverzicht">
-                Gedetailleerde rapportages van je uitgaven per categorie en een jaarlijks totaaloverzicht met trends en hoogtepunten.
-              </GuideFeature>
-            </div>
-          </GuideAccordion>
+            description={
+              <>
+                Vertaal je financiële data naar leesbare rapporten die je kunt bewaren en terugbladeren. Drie rapporttypes geven je overzicht vanuit verschillende invalshoeken: een <strong>perioderapport</strong> vat je inkomsten, uitgaven en vermogensverandering samen over een maand, kwartaal of jaar. Het <strong>balansrapport</strong> toont al je bezittingen en schulden op één peildatum — je vermogen uitgedrukt in vrijheidstijd. En het <strong>budgetrapport</strong> laat zien hoe je werkelijke uitgaven zich verhouden tot je budgetgrenzen per categorie.
+                {' '}
+                Elk rapport begint met een AI-inleiding: Will schrijft een korte, persoonlijke samenvatting van de belangrijkste bevindingen. Eenmaal gegenereerd kun je rapporten opslaan en later terugvinden op je rapportages-overzichtspagina.
+              </>
+            }
+            howTo={{
+              steps: [
+                'Ga naar Rapportages via het profielmenu of de navigatie',
+                'Kies je rapporttype (periode, balans of budget) en selecteer de gewenste periode',
+                'Genereer het rapport — Will schrijft automatisch een persoonlijke inleiding',
+                'Bewaar het rapport om het later terug te lezen of te vergelijken met eerdere periodes',
+              ],
+              tip: 'Genereer na elke maandelijkse check-in een perioderapport. Zo bouw je een financieel archief op dat je groei over maanden en jaren zichtbaar maakt.',
+            }}
+          />
 
-          <GuideAccordion
-            id="alg-mobiel"
-            icon={<Smartphone className="h-4 w-4" />}
+          <GuideTopicCard
+            icon={Smartphone}
             title="Mobiel"
-            tagline="App-ervaring op je telefoon"
             color="var(--ink-2)"
-            open={guideSection === 'alg-mobiel'}
-            onToggle={() => setGuideSection(guideSection === 'alg-mobiel' ? null : 'alg-mobiel')}
-          >
-            <div className="space-y-2">
-              <GuideFeature title="Mobiele navigatie">
-                Op mobiel gebruik je de bottom navigation om snel tussen modules te wisselen. Alle touch targets zijn minimaal 44px voor comfortabel gebruik.
-              </GuideFeature>
-              <GuideFeature title="Responsive ervaring">
-                Alle pagina&apos;s en modals zijn geoptimaliseerd voor kleine schermen. BottomSheets schuiven van onderen omhoog en kunnen worden weggeveegd.
-              </GuideFeature>
-            </div>
-          </GuideAccordion>
+            description={
+              <>
+                TriFinity is volledig geoptimaliseerd voor je telefoon. Onderaan het scherm vind je de bottom navigation waarmee je met één tik wisselt tussen De Kern, De Wil en De Horizon. Alle knoppen en interactieve elementen hebben een minimum touch target van 44px voor comfortabel gebruik — ook met je duim.
+                {' '}
+                Detail-schermen openen als BottomSheets die van onderen omhoog schuiven en met een veeg weer sluiten. Widgets op je dashboard schalen automatisch mee en herordenen zich in een enkele kolom. Grafieken, tabellen en kassabonnen zijn responsive: ze passen zich aan zonder dat je hoeft te scrollen of te zoomen.
+              </>
+            }
+            howTo={{
+              steps: [
+                'Gebruik de bottom navigation onderaan om tussen modules te wisselen',
+                'Tik op een widget of kassabon — het detail opent als BottomSheet die je kunt wegvegen',
+                'Draai je telefoon voor brede grafieken, of scroll verticaal door compacte kaarten',
+              ],
+              tip: 'Zet TriFinity op je homescreen als webapp — zo heb je je financiële overzicht altijd binnen handbereik.',
+            }}
+          />
         </div>
       </div>
 
