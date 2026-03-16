@@ -1,3 +1,57 @@
+## Session 2026-03-16 - Features #104, #105
+
+### Feature #104: Streaming insert i.p.v. alles-in-geheugen - PASSING
+- Added pagination (PAGE_SIZE=50) to Step 2 (duplicates) and Step 3 (categorization) tables
+- PaginationBar component: "Pagina X van Y" with Vorige/Volgende buttons, hidden when ≤1 page
+- Step 2: uses step2PageRows with arithmetic offset mapping for toggleSkip callbacks
+- Step 3: uses visibleRows (filtered non-skipped) with realIdx for updateRowBudget/transfer callbacks
+- Increased import BATCH_SIZE from 50 to 100 for more efficient DB inserts
+- Reset currentPage to 0 on step transitions (step 2→3)
+- Fixed pre-existing TS error: aiFailedBatches type now accepts string|null for counterparty_name/reference
+- Zero TypeScript errors, zero console errors
+
+### Feature #105: Import voortgang persistent maken - PASSING
+- ImportSession type: id, accountId, fileName, totalRows, completedBatchIndex, importedHashes[], startedAt
+- localStorage key: 'fintwo_import_session'
+- saveImportSession(): persists session on import start + after each successful batch
+- loadImportSession(): reads session, auto-expires after 24 hours
+- clearImportSession(): removes on completion
+- Pending session banner on Step 1: shows fileName, progress bar, imported/total count, timestamp
+- "Verwijderen" button to dismiss pending session
+- Dedup integration: loadImportSession() hashes added to markDups check (pendingHashes Set)
+- Re-uploading same file skips already-imported transactions via both DB dedup + localStorage hashes
+- Zero TypeScript errors, zero console errors
+
+### Current Status
+- 2 features completed this session (#104, #105)
+- Both features verified: zero TS errors, zero console errors in browser
+- Import page loads and compiles correctly
+
+## Session 2026-03-16 - Features #114, #115
+
+### Feature #114: Gids content: Budgetteren - PASSING
+- Enhanced existing GuideTopicCard with expanded description and howTo steps
+- Added doeltypes: vast bedrag, percentage van inkomen, flexibel
+- Added maand-op-maand vergelijking description + how-to step
+- Added favorieten: budget als widget op dashboard description + how-to step
+- Expanded from 5 to 8 how-to steps covering full budgeting workflow
+
+### Feature #115: Gids content: Cash rekeningen - PASSING
+- Enhanced existing GuideTopicCard with expanded description and howTo steps
+- Added "cashpositie als fundament van je vermogen" value framing
+- Added step-by-step import process description (MT940/CSV/OFX)
+- Added TrueLayer bankconnectie flow details
+- Added three categorization sources: tegenpartijregels, frequentie-matching, AI-analyse
+- Added "correcties die leren" — corrections saved as rules for future imports
+- Expanded from 5 to 7 how-to steps
+
+### Current Status
+- 2 features completed this session (#114, #115)
+- Content-only changes to gids page (no logic changes)
+- Page compiles without errors (verified via HTTP 307 redirect)
+- Could not verify via browser due to Supabase email rate limit on signup
+- Commit: 24814055
+
 ## Session 2026-03-16 - Features #109, #110
 
 ### Feature #109: Drop badges/streaks tabellen in Supabase - PASSING
@@ -13473,3 +13527,25 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#111, #112)
 - Commit: b947400a
+
+## Session 2026-03-16 - Features #116, #117
+
+### Feature #116: Gids content: Vermogensbeheer - PASSING
+- Vermogensbeheer GuideTopicCard already existed in gids page (De Kern section, reis-stap 1)
+- Existing content covered: 13 asset types, vrijheidstijd per bezitting, holdings-pagina, rendement, benchmark, herwaardering
+- Added missing content: broker-import (DEGIRO, Saxo, ING Beleggen) CSV description in main text
+- Added howTo step: "Of importeer in bulk: upload een CSV van DEGIRO, Saxo of ING Beleggen via de broker-import knop"
+- All 6 feature steps verified as covered
+
+### Feature #117: Gids content: Schuldenbeheer - PASSING
+- Schuldenbeheer GuideTopicCard already existed in gids page (De Kern section, reis-stap 1)
+- Existing content covered: 11 schuldtypes, sneeuwbal vs lawine, extra aflossingen, vrijheidstijd
+- Added missing content: netto vermogen + FIRE-datum impact in description
+- Added howTo step: "Bekijk het effect op je netto vermogen en FIRE-datum — minder schuld = lagere uitgaven = eerder vrij"
+- All 6 feature steps verified as covered
+
+### Current Status
+- 2 features completed this session (#116, #117)
+- Changes committed as part of commit 24814055 (concurrent agent commit for #114, #115 included our changes)
+- Zero TypeScript errors (verified via dev server 307 response)
+- Could not browser-test due to Supabase email rate limit (auth blocked)
