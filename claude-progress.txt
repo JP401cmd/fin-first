@@ -1,3 +1,34 @@
+## Session 2026-03-16 - Features #79, #82, #80
+
+### Feature #79: Migreer ontbrekende kolommen naar holdings tabel - PASSING
+- Created migration: 20260316100001_add_holdings_classification_and_target_allocations.sql
+- ALTER TABLE holdings ADD COLUMN: asset_class TEXT, sector TEXT, geography TEXT, previous_close NUMERIC, daily_change_percent NUMERIC
+- CREATE TABLE target_allocations with RLS policies (SELECT/INSERT/UPDATE/DELETE scoped to user_id)
+- All columns nullable — existing holdings unaffected
+- Commit: c3f705c7
+
+### Feature #82: Verwijder per-request table existence checks - PASSING
+- Removed holdingsTableExists() function from 9 API routes and pages
+- Removed all assets/valuations fallback paths (holdings table is now guaranteed)
+- Simplified portfolio-allocation to single query with classification columns
+- Removed fallback try/catch for previous_close/daily_change_percent in refresh-prices
+- Files modified: holdings/route.ts, holding-transactions/route.ts, holdings/[id]/route.ts, holdings/[id]/value-history/route.ts, holdings/[id]/transactions/route.ts, holdings/refresh-prices/route.ts, portfolio-allocation/route.ts, verify-duplicate-holdings/route.ts, holdings/[id]/page.tsx
+- Zero TypeScript errors, zero console errors
+- Commit: d7cfd718
+
+### Feature #80: Consolideer dubbele transactie-endpoints - PASSING
+- Added DELETE handler to /api/holdings/[id]/transactions with replayTransactions logic + syncAssetValueFromHoldings
+- Migrated holdings page (2 fetch calls) from /api/holding-transactions to /api/holdings/[id]/transactions
+- Removed holding_id from POST body (now in URL path)
+- Deleted deprecated app/api/holding-transactions/route.ts
+- All transaction flows (GET list, POST create, DELETE) now via /api/holdings/[id]/transactions
+- Zero TypeScript errors, zero console errors
+- Commit: c8b3fabe
+
+### Current Status
+- 3 features completed this session (#79, #82, #80)
+- Zero TypeScript errors across all changed files
+
 ## Session 2026-03-16 - Features #83, #84, #85
 
 ### Feature #83: Scheduled automatische prijsupdates - PASSING
