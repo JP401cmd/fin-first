@@ -118,16 +118,10 @@ const MOCK_DATA: DashboardData = {
   ],
   notifications: [
     { id: 'n1', type: 'budget', message: 'Je boodschappenbudget is 80% op', severity: 'warning', createdAt: '2026-03-07T10:00:00Z' },
-    { id: 'n2', type: 'streak', message: 'Login streak: 12 weken!', severity: 'info', createdAt: '2026-03-06T08:00:00Z' },
+    { id: 'n2', type: 'milestone', message: 'Login streak: 12 weken!', severity: 'info', createdAt: '2026-03-06T08:00:00Z' },
     { id: 'n3', type: 'anomaly', message: 'Ongebruikelijke betaling van €450 gedetecteerd', severity: 'critical', createdAt: '2026-03-05T14:00:00Z' },
     { id: 'n4', type: 'positive', message: 'Je spaarquote is gestegen naar 32%', severity: 'info', createdAt: '2026-03-04T09:00:00Z' },
     { id: 'n5', type: 'milestone', message: 'Netto vermogen boven €125.000!', severity: 'info', createdAt: '2026-03-03T12:00:00Z' },
-  ],
-  badgeSummary: { earned: 5, total: 20, latestBadge: { name: 'Spaarmeester', icon: '\u{1F3C6}', earnedAt: '2026-03-01' }, nearestBadge: { name: 'Budget Ninja', progress: 0.72 } },
-  streaks: [
-    { type: 'login', currentCount: 12, longestCount: 18, lastActivityDate: '2026-03-07' },
-    { type: 'budget', currentCount: 4, longestCount: 8, lastActivityDate: '2026-03-07' },
-    { type: 'action', currentCount: 2, longestCount: 5, lastActivityDate: '2026-03-06' },
   ],
   aiInsights: [
     { id: 'ai1', text: 'Je energiekosten liggen 15% boven het landelijk gemiddelde. Overweeg een overstap.', module: 'kern', createdAt: '2026-03-07T10:00:00Z' },
@@ -209,8 +203,6 @@ const WIL_WIDGETS = [
 
 const CROSS_WIDGETS = [
   'meldingen',
-  'badges',
-  'streaks',
   'ai_inzicht',
   'jouw_pad',
   'agenda',

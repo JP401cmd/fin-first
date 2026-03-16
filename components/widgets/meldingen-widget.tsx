@@ -12,8 +12,6 @@ interface Props {
 
 const TYPE_ICONS: Record<Notification['type'], string> = {
   budget: '\u26a0\ufe0f',
-  badge: '\ud83c\udfc6',
-  streak: '\ud83d\udd25',
   milestone: '\ud83d\udcca',
   positive: '\u2705',
   anomaly: '\ud83d\udea8',
@@ -21,8 +19,6 @@ const TYPE_ICONS: Record<Notification['type'], string> = {
 
 const TYPE_LABELS: Record<Notification['type'], string> = {
   budget: 'Budget',
-  badge: 'Badge',
-  streak: 'Streak',
   milestone: 'Mijlpaal',
   positive: 'Positief',
   anomaly: 'Ongebruikelijk',

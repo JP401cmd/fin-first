@@ -13,7 +13,7 @@ import type {
   TopRecommendation,
   TopLifeEvent,
   Notification,
-  StreakData,
+
   AiInsight,
   NextStep,
   UpcomingEvent,
@@ -97,7 +97,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     goalsResult, recurringResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
     bankAccountsResult, favBudgetsResult, prevMonthTxResult,
-    badgesResult, userBadgesResult, userStreaksResult, nextStepCompletionsResult,
+    nextStepCompletionsResult,
     expenseTx12Result,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
@@ -121,9 +121,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
     supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
     supabase.from('transactions').select('amount, transaction_type, budget_id').gte('date', prevMonthStart).lt('date', monthStart),
-    supabase.from('badges').select('id, slug, name, icon, category, criteria_type, sort_order'),
-    supabase.from('user_badges').select('id, badge_id, earned_at'),
-    supabase.from('user_streaks').select('id, streak_type, current_count, longest_count, last_activity_date'),
     supabase.from('next_step_completions').select('step_key, dismissed'),
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
   ])
@@ -686,7 +683,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       }
     })
 
-  // ── Notifications: derived from budget alerts, streaks, milestones ──
+  // ── Notifications: derived from budget alerts, milestones ──
   const notifications: Notification[] = []
   // Budget overspending alerts
   for (const [type, vals] of Object.entries(budgetTotals) as [string, { limit: number; spent: number }][]) {
@@ -767,52 +764,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     }
   }
 
-  // ── Badge Summary: from user_badges + badges ──────────────
-  const allBadges = (badgesResult.data ?? []) as { id: string; slug: string; name: string; icon: string; category: string; sort_order: number }[]
-  const earnedBadges = (userBadgesResult.data ?? []) as { id: string; badge_id: string; earned_at: string }[]
-  const earnedBadgeIds = new Set(earnedBadges.map(ub => ub.badge_id))
-  const latestEarned = earnedBadges.length > 0
-    ? [...earnedBadges].sort((a, b) => new Date(b.earned_at).getTime() - new Date(a.earned_at).getTime())[0]
-    : null
-  const latestBadgeDef = latestEarned ? allBadges.find(b => b.id === latestEarned.badge_id) : null
-  const badgeSummary = {
-    earned: earnedBadges.length,
-    total: allBadges.length,
-    latestBadge: latestBadgeDef && latestEarned
-      ? { name: latestBadgeDef.name, icon: latestBadgeDef.icon, earnedAt: latestEarned.earned_at }
-      : null,
-    nearestBadge: (() => {
-      // Find first unearned badge by sort_order as "nearest"
-      const unearned = allBadges
-        .filter(b => !earnedBadgeIds.has(b.id))
-        .sort((a, b) => a.sort_order - b.sort_order)
-      if (unearned.length === 0) return null
-      // Estimate progress (simple: earned count / total as proxy)
-      const progress = allBadges.length > 0 ? Math.round((earnedBadges.length / allBadges.length) * 100) : 0
-      return { name: unearned[0].name, progress: Math.min(progress, 99) }
-    })(),
-  }
 
-  // ── Streaks: from user_streaks ──────────────────────────────
-  const rawStreaks = (userStreaksResult.data ?? []) as { id: string; streak_type: string; current_count: number; longest_count: number; last_activity_date: string | null }[]
-  const streaks: StreakData[] = rawStreaks.map(s => ({
-    type: (s.streak_type === 'budget_compliance' ? 'budget' : s.streak_type === 'action_completion' ? 'action' : 'login') as 'login' | 'budget' | 'action',
-    currentCount: s.current_count,
-    longestCount: s.longest_count,
-    lastActivityDate: s.last_activity_date ?? new Date().toISOString().split('T')[0],
-  }))
-  // Streak notifications
-  for (const s of streaks) {
-    if (s.currentCount >= 7 && s.currentCount === s.longestCount) {
-      notifications.push({
-        id: `streak-record-${s.type}`,
-        type: 'streak',
-        message: `Nieuw record! ${s.currentCount} dagen ${s.type === 'login' ? 'ingelogd' : s.type === 'budget' ? 'budget op orde' : 'acties voltooid'} op rij.`,
-        severity: 'info',
-        createdAt: new Date().toISOString(),
-      })
-    }
-  }
 
   // ── AI Insights: derived from financial data (no DB table) ──
   const aiInsights: AiInsight[] = []
@@ -1263,8 +1215,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     allBudgets,
     // Real widget data from queries and computations
     notifications,
-    badgeSummary,
-    streaks,
+
+
     aiInsights,
     nextSteps,
     monthSummary,

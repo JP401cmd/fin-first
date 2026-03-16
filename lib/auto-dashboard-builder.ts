@@ -95,8 +95,6 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   ai_inzicht: 4,
   holdings: 3,
   belasting_box3: 3,
-  streaks: 3,
-  badges: 3,
   monte_carlo: 3,
   backtesting_score: 3,
   box3_drag: 3,

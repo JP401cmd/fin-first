@@ -84,12 +84,6 @@ const BudgetFavWidget = dynamic(() =>
 const MeldingenWidget = dynamic(() =>
   import('./meldingen-widget').then(m => ({ default: m.MeldingenWidget }))
 )
-const BadgesWidget = dynamic(() =>
-  import('./badges-widget').then(m => ({ default: m.BadgesWidget }))
-)
-const StreaksWidget = dynamic(() =>
-  import('./streaks-widget').then(m => ({ default: m.StreaksWidget }))
-)
 const AiInzichtWidget = dynamic(() =>
   import('./ai-inzicht-widget').then(m => ({ default: m.AiInzichtWidget }))
 )
@@ -197,26 +191,14 @@ export interface TopLifeEvent {
 
 export interface Notification {
   id: string
-  type: 'budget' | 'streak' | 'milestone' | 'anomaly' | 'badge' | 'positive'
+  type: 'budget' | 'milestone' | 'anomaly' | 'positive'
   message: string
   severity: 'info' | 'warning' | 'critical'
   createdAt: string
   actionHref?: string
 }
 
-export interface BadgeSummary {
-  earned: number
-  total: number
-  latestBadge: { name: string; icon: string; earnedAt: string } | null
-  nearestBadge: { name: string; progress: number } | null
-}
 
-export interface StreakData {
-  type: 'login' | 'budget' | 'action'
-  currentCount: number
-  longestCount: number
-  lastActivityDate: string
-}
 
 export interface AiInsight {
   id: string
@@ -354,8 +336,8 @@ export interface DashboardData {
   }[]
   // New widget data fields
   notifications: Notification[]
-  badgeSummary: BadgeSummary
-  streaks: StreakData[]
+
+
   aiInsights: AiInsight[]
   nextSteps: NextStep[]
   monthSummary: MonthSummary
@@ -505,10 +487,6 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <BacktestingScoreWidget size={size} data={data} href={href} />
     case 'meldingen':
       return <MeldingenWidget size={size} data={data} href={href} />
-    case 'badges':
-      return <BadgesWidget size={size} data={data} href={href} />
-    case 'streaks':
-      return <StreaksWidget size={size} data={data} href={href} />
     case 'ai_inzicht':
       return <AiInzichtWidget size={size} data={data} href={href} />
     case 'volgende_stap':

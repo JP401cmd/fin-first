@@ -136,17 +136,6 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     lines.push('')
   }
 
-  // Streaks
-  if (data.streaks && data.streaks.length > 0) {
-    lines.push('STREAKS:')
-    for (const s of data.streaks) {
-      if (s.currentCount > 0) {
-        const typeLabel = s.type === 'login' ? 'Inlog' : s.type === 'budget' ? 'Budget' : 'Actie'
-        lines.push(`- ${typeLabel}: ${s.currentCount} dagen (record: ${s.longestCount})`)
-      }
-    }
-    lines.push('')
-  }
 
   // Notifications (urgent, max 3)
   if (data.notifications && data.notifications.length > 0) {
@@ -163,18 +152,6 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     }
   }
 
-  // Badges
-  if (data.badgeSummary) {
-    const bs = data.badgeSummary
-    lines.push(`BADGES: ${bs.earned}/${bs.total} behaald`)
-    if (bs.latestBadge) {
-      lines.push(`- Laatste: ${bs.latestBadge.name} (${bs.latestBadge.earnedAt})`)
-    }
-    if (bs.nearestBadge) {
-      lines.push(`- Bijna: ${bs.nearestBadge.name} (${bs.nearestBadge.progress}%)`)
-    }
-    lines.push('')
-  }
 
   // Actions
   lines.push(`OPENSTAANDE ACTIES: ${data.openActions ?? 0}`)

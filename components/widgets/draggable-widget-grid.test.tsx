@@ -104,8 +104,6 @@ const mockData: DashboardData = {
   favoriteBudgets: [],
   allBudgets: [] as { id: string; name: string; icon: string; budgetType: 'income' | 'expense' | 'savings' | 'debt'; isFavorite: boolean; parentId: string | null }[],
   notifications: [],
-  badgeSummary: { earned: 0, total: 0, latestBadge: null, nearestBadge: null },
-  streaks: [],
   aiInsights: [],
   nextSteps: [],
   monthSummary: { netWorthDelta: 0, freedomDaysWon: 0, savingsRate: 0, budgetScore: 0, prevMonthComparison: 0 },

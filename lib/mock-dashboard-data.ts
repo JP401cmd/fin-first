@@ -161,20 +161,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'n3', type: 'positive', message: 'Spaarquote deze maand 27% — boven je doel van 25%', severity: 'info', createdAt: '2026-03-04T09:00:00Z' },
   ],
 
-  // Badges
-  badgeSummary: {
-    earned: 7,
-    total: 24,
-    latestBadge: { name: 'Budgetmeester', icon: 'award', earnedAt: '2026-02-28T12:00:00Z' },
-    nearestBadge: { name: 'Spaarster', progress: 0.82 },
-  },
 
-  // Streaks
-  streaks: [
-    { type: 'login', currentCount: 14, longestCount: 31, lastActivityDate: '2026-03-07' },
-    { type: 'budget', currentCount: 3, longestCount: 6, lastActivityDate: '2026-03-01' },
-    { type: 'action', currentCount: 2, longestCount: 5, lastActivityDate: '2026-03-05' },
-  ],
 
   // AI Insights
   aiInsights: [
