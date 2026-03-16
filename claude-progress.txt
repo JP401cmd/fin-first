@@ -14178,3 +14178,19 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#167, #168)
 - Zero TypeScript errors
 - Commit: 9a2eeeaf
+
+## Session 2026-03-17 - Feature #173
+
+### Feature #173: Cash rekeningen openen in modal i.p.v. pagina-navigatie - PASSING
+- Added accounts overview section in CashAccountView combined mode
+- Wired up cashAccountId state in assets/page.tsx FullScreenModal
+- key prop ensures full remount on account switch
+- Modal close resets cashAccountId
+- Pre-existing: onNavigateToAccount prop, back button, bank connections hidden in combined mode
+- Standalone /core/assets/cash/[accountId] page unaffected
+- Zero TypeScript errors
+- Commit: 54c7f011
+
+### Current Status
+- 1 feature completed this session
+- 173/175 features passing (98.9%)
