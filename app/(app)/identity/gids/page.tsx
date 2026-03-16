@@ -24,6 +24,7 @@ import {
   Users,
   Settings,
   Smartphone,
+  Rocket,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -667,6 +668,38 @@ export default function GidsPage() {
               ],
               tip: "Check je briefing elke ochtend als financi\u00eble routine \u2014 het kost 30 seconden en houdt je scherp op je financi\u00eble voortgang.",
             }}
+          />
+
+          <GuideTopicCard
+            icon={Rocket}
+            title="Dit komt eraan"
+            color="var(--color-wil-400)"
+            description={
+              <>
+                De Wil groeit mee met jou. Dit zijn features die we aan het
+                bouwen zijn:
+                <ul className="mt-2 list-disc pl-4 space-y-1">
+                  <li>
+                    <strong>Uitgavenpatronen</strong> &mdash; automatische
+                    detectie van trends in je bestedingen: stijgende
+                    categorie&euml;n, seizoenspatronen en afwijkingen van je
+                    gemiddelde, vertaald naar vrijheidsdagen-impact.
+                  </li>
+                  <li>
+                    <strong>Financieel rapport</strong> &mdash; een maandelijks
+                    overzicht van je voortgang: nettovermogen-ontwikkeling,
+                    spaarquote, bereikte doelen en gewonnen vrijheidstijd
+                    &mdash; exporteerbaar als PDF.
+                  </li>
+                  <li>
+                    <strong>Huishouden-samenwerking</strong> &mdash; deel
+                    doelen, budgetten en acties met je partner. Gezamenlijke
+                    voortgang, gedeelde mijlpalen en samen werken aan
+                    financi&euml;le vrijheid.
+                  </li>
+                </ul>
+              </>
+            }
           />
         </ReisStapSection>
 
