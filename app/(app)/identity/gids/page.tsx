@@ -391,39 +391,49 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Weet wat je betaalt en hoe je optimaliseert. TriFinity berekent automatisch
-                je <strong>Box 3</strong> vermogensrendementsheffing op basis van het{" "}
-                <strong>fictief rendement</strong> per vermogenstype: spaargeld wordt belast
-                tegen een lager forfait (~1,03%), beleggingen tegen een hoger forfait (~6,04%)
-                en overige bezittingen (vastgoed, crypto) tegen het beleggingsforfait. Schulden
-                boven de drempel verlagen je grondslag.
-                <br />
-                <br />
-                Je hebt recht op een <strong>heffingsvrij vermogen</strong> van ~€57.000 per
-                persoon (peiljaar 2025). Met een fiscaal partner verdubbelt dit naar ~€114.000.
-                Pas als je netto vermogen daarboven uitkomt, betaal je 36% belasting over het
-                fictieve rendement. De <strong>partneroptimalisatie</strong> berekent automatisch
-                de fiscaal voordeligste verdeling van jullie gezamenlijke grondslag — dat kan
-                honderden euro&apos;s per jaar schelen.
-                <br />
-                <br />
-                Vergelijk <strong>twee belastingjaren</strong> naast elkaar om tariefwijzigingen
-                te zien en gebruik het <strong>scenariomodel</strong> om te simuleren wat er
-                verandert als je vermogen groeit of verschuift tussen sparen en beleggen. Voor
-                DGA&apos;s berekent TriFinity ook <strong>Box 2</strong>: aanmerkelijk belang,
-                dividenduitkeringen en de wet excessief lenen bij een eigen BV.
+                <strong>
+                  Belasting is onvermijdelijk, maar slim plannen niet. Weet precies
+                  wat je betaalt en waar de ruimte zit.
+                </strong>
+                <br /><br />
+                <strong>Box 3:</strong> De Belastingdienst belast je vermogen boven het
+                heffingsvrij vermogen (~€57.000 per persoon, 2026). Je betaalt belasting
+                over een <strong>fictief rendement</strong> — niet over je werkelijke
+                winst. De app berekent dit automatisch op basis van je ingevoerde
+                vermogen.
+                <br /><br />
+                <strong>Fictief rendement:</strong> De Belastingdienst hanteert drie
+                categorieën met verschillende percentages: spaargeld (laag fictief
+                rendement, ~1,03%), beleggingen (hoger, ~6,04%) en overig (schulden
+                aftrekbaar). De app splitst je vermogen automatisch over deze
+                categorieën en berekent het tarief van 36%.
+                <br /><br />
+                <strong>Partner-optimalisatie:</strong> Bij een fiscaal partner kun je
+                vermogen verdelen voor een lager totaal — het heffingsvrij vermogen
+                verdubbelt naar ~€114.000. De app toont de optimale verdeling van jullie
+                gezamenlijke grondslag, wat honderden euro&apos;s per jaar kan schelen.
+                <br /><br />
+                <strong>Box 3 drag-widget:</strong> De <em>box3_drag</em>-widget toont
+                hoeveel van je vermogensgroei naar belasting gaat — uitgedrukt als
+                percentage van je vermogen én als verloren vrijheidsdagen. Zo zie je
+                direct de impact van belasting op je pad naar financiële vrijheid.
+                <br /><br />
+                <strong>Box 2:</strong> Bij deelnemingen (BV, holding) berekent de app
+                Box 2 belasting op dividend en vervreemding, inclusief de
+                DGA-leningdrempel (wet excessief lenen). Relevant als je eigen vermogen
+                deels in een BV-structuur zit.
               </>
             }
             howTo={{
               steps: [
                 "Ga naar De Kern → Belasting — je Box 3 wordt automatisch berekend op basis van je geregistreerde bezittingen en schulden",
-                "Controleer de classificatie: spaargeld (laag forfait), beleggingen (hoog forfait) en vrijgestelde bezittingen worden automatisch ingedeeld",
-                "Bekijk je heffingsvrij vermogen — €57.000 per persoon, €114.000 met fiscaal partner — en hoeveel je daarboven betaalt",
-                "Wissel tussen belastingjaren (2025/2026) om het verschil in forfaittarieven en vrijstellingen te vergelijken",
-                "Activeer \"Partner\" om de optimale verdeling van de grondslag te berekenen — verschuif spaargeld naar de partner met lagere grondslag",
-                "Open het scenariomodel om te simuleren wat er verandert bij meer spaargeld, meer beleggingen of hogere schulden",
+                "Controleer de classificatie: spaargeld (laag forfait ~1,03%), beleggingen (hoog forfait ~6,04%) en schulden (aftrekbaar) worden automatisch ingedeeld",
+                "Bekijk je heffingsvrij vermogen — €57.000 per persoon, €114.000 met fiscaal partner — en hoeveel je daarboven betaalt over fictief rendement",
+                "Activeer partneroptimalisatie om de fiscaal voordeligste verdeling van jullie grondslag te berekenen",
+                "Check de box3_drag-widget op je dashboard — deze toont je belastingdruk als percentage van je vermogen en als verloren vrijheidsdagen",
+                "Bij een BV of holding: bekijk de Box 2 berekening met DGA-leningdrempel en dividendbelasting",
               ],
-              tip: "Verschuif vermogen van beleggingen naar spaargeld (of andersom) in het scenariomodel om te zien welk forfait je het minste kost. Elke €10.000 verschuiving kan tientallen euro's per jaar schelen.",
+              tip: "Verschuif vermogen tussen sparen en beleggen in het scenariomodel om te zien welk fictief rendement je het minste kost. Elke €10.000 verschuiving kan tientallen euro's per jaar schelen.",
             }}
           />
 
@@ -631,27 +641,50 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                Stel concrete financi\u00eble doelen met een doelbedrag en
-                einddatum. TriFinity kent <strong>10 doeltypes</strong>: spaardoel,
-                schuldaflossing, nettovermogen, vrijheidsdagen, spaarquote, belegd
-                vermogen, passief inkomen, noodfonds, salaris en vrij. Koppel een
-                doel aan een bezitting of schuld en de voortgang wordt automatisch
-                bijgehouden.
-                {" "}
-                Per doel zie je hoeveel je al hebt bereikt, of je{" "}
-                <strong>op schema</strong> ligt, en wat de verwachte einddatum is
-                bij het huidige tempo. Doelen zijn persoonlijk of gedeeld met je
-                huishouden \u2014 zo werken jullie samen aan een gezamenlijke
-                toekomst.
+                <strong>
+                  Een doel zonder plan is een wens. Koppel je doel aan een bedrag,
+                  een deadline, en een rekening \u2014 en zie je voortgang groeien.
+                </strong>
+                <br />
+                <br />
+                <strong>Doel aanmaken</strong> \u2014 Ga naar De Wil \u2192 Doelen
+                \u2192 Nieuw. Kies uit <strong>8 doeltypes</strong>:{" "}
+                <em>savings_goal</em> (spaardoel), <em>debt_payoff</em>{" "}
+                (schuldaflossing), <em>wealth_milestone</em>{" "}
+                (vermogensmijlpaal), <em>income_goal</em> (inkomensdoel),{" "}
+                <em>spending_reduction</em> (uitgavenreductie),{" "}
+                <em>investment_return</em> (beleggingsrendement),{" "}
+                <em>net_worth_target</em> (nettovermogensdoel) en{" "}
+                <em>custom</em> (vrij). Stel een doelbedrag en deadline in, en
+                geef je doel optioneel een eigen kleur en icoon.
+                <br />
+                <br />
+                <strong>Koppeling</strong> \u2014 Koppel je doel aan een
+                spaarrekening, belegging of schuld. De voortgang wordt dan
+                automatisch bijgewerkt op basis van het werkelijke saldo \u2014 je
+                hoeft niets handmatig bij te houden.
+                <br />
+                <br />
+                <strong>Voortgang</strong> \u2014 Een visuele progressbar toont
+                hoeveel procent je hebt bereikt. De formule: (huidig bedrag
+                \u2212 startbedrag) / (doelbedrag \u2212 startbedrag) \u00d7 100%.
+                De verwachte einddatum wordt berekend op basis van je huidige
+                tempo, zodat je ziet of je <strong>op schema</strong> ligt.
+                <br />
+                <br />
+                <strong>Check-in</strong> \u2014 Bij je maandelijkse check-in (stap
+                4) update je de voortgang van al je doelen in \u00e9\u00e9n keer.
+                Zo houd je alles actueel zonder apart elke rekening te checken.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Wil \u2192 Resultaat kolom en tik op \u201c+ Nieuw doel\u201d",
-                "Kies het doeltype (spaardoel, schuldaflossing, nettovermogen, etc.)",
-                "Vul het doelbedrag en de gewenste einddatum in",
-                "Koppel optioneel aan een bezitting (bijv. je spaarrekening) of schuld (bijv. je studielening) voor automatische voortgang",
-                "Bekijk je voortgang op het doelen-dashboard \u2014 de on-track indicator toont of je op schema ligt",
+                "Aanmaken \u2014 Ga naar De Wil \u2192 Doelen \u2192 Nieuw. Kies het type (spaardoel, schuld aflossen, vermogensmijlpaal, etc.) en stel een doelbedrag en deadline in.",
+                "Koppelen \u2014 Koppel je doel aan een spaarrekening of asset. De voortgang wordt automatisch bijgewerkt op basis van het werkelijke saldo.",
+                "Personaliseren \u2014 Geef je doel een eigen kleur en icoon zodat je het direct herkent op je dashboard.",
+                "Voortgang bekijken \u2014 De progressbar toont je percentage. De verwachte einddatum berekent of je op schema ligt bij het huidige tempo.",
+                "Check-in \u2014 Bij je maandelijkse check-in (stap 4) update je alle doelen in \u00e9\u00e9n keer.",
+                "Widget \u2014 Voeg de doelen-widget toe aan je dashboard om je voortgang altijd in beeld te hebben.",
               ],
               tip: "E\u00e9n helder doel werkt beter dan vijf vage. Begin met je noodfonds of je grootste schuld.",
             }}
