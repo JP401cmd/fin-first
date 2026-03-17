@@ -1,3 +1,19 @@
+## Session 2026-03-17 - Feature #178
+
+### Feature #178: Indicator voor transacties in andere maanden op cash-pagina's - PASSING
+- Added `hasOtherMonthTx` and `latestTxDate` state to both CashAccountView and CashOverview
+- When current month has 0 transactions, queries latest transaction date (without date filter)
+- Shows hint: "Geen transacties in [maand]. Er zijn transacties in andere maanden — gebruik ◀ ▶ om te navigeren."
+- Added "Ga naar recentste transactie" button that jumps to the month of the latest transaction
+- CashAccountView: hint shown in empty state (between filter reset and default empty message)
+- CashOverview: hint shown below Netto resultaat section
+- Zero TypeScript errors (tsc --noEmit clean)
+- Changes committed in 0e974721 (merged with concurrent agent's #176 commit)
+
+### Current Status
+- 1 feature completed this session (#178)
+- 176/178 features passing (98.9%)
+
 ## Session 2026-03-17 - Features #176, #177
 
 ### Feature #176: Na import navigeren naar rekeningdetail met juiste maand - PASSING
