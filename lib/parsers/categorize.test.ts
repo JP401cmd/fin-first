@@ -106,7 +106,7 @@ describe('categorizeTransaction with freqMap', () => {
     )
     expect(result.budget_id).toBe('b-food')
     expect(result.confidence).toBe(1.0)
-    expect(result.category_source).toBe('correction')
+    expect(result.category_source).toBe('manual')
   })
 
   it('falls back to keyword rules when no frequency match', () => {

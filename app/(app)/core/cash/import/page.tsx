@@ -1946,7 +1946,7 @@ export default function ImportPage() {
             const sortedRows = [...filteredRows].sort((a, b) => { if (a.row.isTransfer !== b.row.isTransfer) return a.row.isTransfer ? 1 : -1; return a.row.confidence - b.row.confidence })
             const step3TotalPages = Math.ceil(sortedRows.length / PAGE_SIZE)
             const step3PageRows = sortedRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
-            const SRC: Record<string, string> = { correction: 'Correctieregel', frequency: 'Frequentie', rule: 'Trefwoord', ai: 'AI (Will)', user: 'Handmatig', transfer: 'Eigen rekening' }
+            const SRC: Record<string, string> = { manual: 'Correctieregel', frequency: 'Frequentie', rule: 'Trefwoord', ai: 'AI (Will)', user: 'Handmatig', transfer: 'Eigen rekening' }
             return (
               <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
                 <table className="w-full text-sm">

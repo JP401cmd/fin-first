@@ -243,7 +243,7 @@ export function categorizeTransaction(
       for (const c of corrections) {
         if (c.match_field === 'counterparty_iban' && c.match_value.replace(/\s/g, '').toUpperCase() === normalizedIban) {
           const budget = idMap.get(c.budget_id)
-          return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null, category_source: 'correction' }
+          return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null, category_source: 'manual' }
         }
       }
     }
@@ -252,11 +252,11 @@ export function categorizeTransaction(
       const needle = c.match_value.toLowerCase()
       if (c.match_field === 'counterparty_name' && counterparty && counterparty.toLowerCase() === needle) {
         const budget = idMap.get(c.budget_id)
-        return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null, category_source: 'correction' }
+        return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null, category_source: 'manual' }
       }
       if (c.match_field === 'description' && description.toLowerCase().includes(needle)) {
         const budget = idMap.get(c.budget_id)
-        return { budget_id: c.budget_id, confidence: 0.95, budgetName: budget?.name ?? null, category_source: 'correction' }
+        return { budget_id: c.budget_id, confidence: 0.95, budgetName: budget?.name ?? null, category_source: 'manual' }
       }
     }
   }
