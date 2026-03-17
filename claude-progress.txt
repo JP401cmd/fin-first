@@ -14492,3 +14492,22 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#196)
 - 193/196 features passing (98.5%)
+
+## Session 2026-03-17 - Feature #195
+
+### Feature #195: BottomSheet swipe-to-dismiss vanuit content bij scroll-top - PASSING
+- Added contentRef to scrollable content div for scrollTop detection
+- Added handleContentTouchStart on content area (separate from drag handle)
+- Gesture decision system: 'undecided' → 'scroll' or 'drag' with 5px threshold
+- Content touch at scrollTop === 0 + swipe down → activates drag-dismiss
+- Content touch with scroll position > 0 or swipe up → normal scroll
+- Decision locked once made, preventing scroll/drag conflicts mid-gesture
+- Existing drag handle behavior completely unchanged
+- Zero TypeScript errors
+- Commit: 2f9881d7
+
+### Current Status
+- 1 feature completed this session (#195)
+- Could not browser-test due to Supabase auth rate limit (all credentials rejected)
+- TypeScript compilation clean, dev server compiles pages using BottomSheet
+- This is a touch gesture feature — Playwright on desktop cannot simulate touch events anyway
