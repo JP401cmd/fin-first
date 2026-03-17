@@ -563,20 +563,27 @@ export async function seedPersonaData(
       const assetId = assetNameToId[h.assetName]
       if (!assetId) continue
 
+      const holdingRow: Record<string, unknown> = {
+        user_id: userId,
+        asset_id: assetId,
+        ticker: h.ticker,
+        isin: h.isin,
+        name: h.name,
+        units: h.units,
+        avg_purchase_price: h.avg_purchase_price,
+        current_price: h.current_price,
+        purchase_date: monthsAgoDate(h.purchase_date_monthsAgo),
+        is_active: true,
+      }
+      if (h.asset_class) holdingRow.asset_class = h.asset_class
+      if (h.sector !== undefined) holdingRow.sector = h.sector
+      if (h.geography) holdingRow.geography = h.geography
+      if (h.is_favorite != null) holdingRow.is_favorite = h.is_favorite
+      if (h.currency) holdingRow.currency = h.currency
+
       const { data: holdingData, error: holdingErr } = await supabase
         .from('holdings')
-        .insert({
-          user_id: userId,
-          asset_id: assetId,
-          ticker: h.ticker,
-          isin: h.isin,
-          name: h.name,
-          units: h.units,
-          avg_purchase_price: h.avg_purchase_price,
-          current_price: h.current_price,
-          purchase_date: monthsAgoDate(h.purchase_date_monthsAgo),
-          is_active: true,
-        })
+        .insert(holdingRow)
         .select('id')
         .single()
       if (holdingErr) throw new Error(`Holding "${h.name}" insert mislukt: ${holdingErr.message}`)
