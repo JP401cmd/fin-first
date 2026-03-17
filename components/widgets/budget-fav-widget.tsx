@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { formatCurrency } from '@/lib/format'
 import { isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
@@ -15,7 +16,7 @@ interface FavBudget {
   spent: number
 }
 
-export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: FavBudget }) {
+export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: FavBudget }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
   const pct = budget.limit > 0 ? Math.min(budget.spent / budget.limit, 1) : 0
   const isOver = budget.spent > budget.limit && budget.limit > 0
@@ -257,4 +258,4 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
       </div>
     </WidgetShell>
   )
-}
+})

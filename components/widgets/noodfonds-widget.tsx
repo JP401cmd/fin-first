@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -17,7 +18,7 @@ function progressColor(months: number): { text: string; bar: string; bg: string 
   return { text: 'text-red-600', bar: 'bg-red-500', bg: 'bg-red-50' }
 }
 
-export function NoodfondsWidget({ size, data, href }: Props) {
+export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href }: Props) {
   const { emergencyFund } = data
   const { currentAmount, targetAmount, monthsCovered, targetMonths, isComplete } = emergencyFund
   const pct = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0
@@ -205,4 +206,4 @@ export function NoodfondsWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -9,7 +10,7 @@ interface Props {
   href?: string
 }
 
-export function Box3DragWidget({ size, data, href }: Props) {
+export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }: Props) {
   const { totalAssets, yearlyMustExpenses, box3Tax } = data
 
   // Use pre-computed Box 3 tax (full calculateBox3 calculation)
@@ -160,4 +161,4 @@ export function Box3DragWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

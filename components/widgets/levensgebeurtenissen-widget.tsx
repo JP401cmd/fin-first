@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopLifeEvent } from './widget-renderer'
@@ -84,7 +85,7 @@ function buildPts(simRows: { age: number; endPortfolio: number; phase: string }[
   return pts
 }
 
-export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
+export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidget({ size, data, href }: Props) {
   const { simRows, fireAgeFractional, topLifeEvents, lifeEvents } = data
   const { ref, hasEntered } = useInViewAnimation({ duration: 800 })
 
@@ -508,7 +509,7 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})
 
 // ── Text fallback (no simRows available) ──────────────────
 function TextFallback({

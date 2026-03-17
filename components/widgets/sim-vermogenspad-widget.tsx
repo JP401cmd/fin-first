@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -12,7 +13,7 @@ interface Props {
   href?: string
 }
 
-export function SimVermogenspadWidget({ size, data, href }: Props) {
+export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size, data, href }: Props) {
   const { simRows, fireAgeFractional } = data
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
 
@@ -297,4 +298,4 @@ export function SimVermogenspadWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

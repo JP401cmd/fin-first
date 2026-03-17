@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency } from '@/lib/format'
@@ -14,7 +15,7 @@ interface Props {
 /** Heffingsvrij vermogen 2025 (single, without partner). */
 const VRIJSTELLING = 57_684
 
-export function BelastingBox3Widget({ size, data, href }: Props) {
+export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, data, href }: Props) {
   const { totalAssets, monthlyExpenses, box3Tax } = data
 
   // ── Box 3 breakdown calculation ──────────────────────────
@@ -145,4 +146,5 @@ export function BelastingBox3Widget({ size, data, href }: Props) {
       </p>
     </WidgetShell>
   )
-}
+})
+

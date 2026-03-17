@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Shield, TrendingUp, ArrowRight, Lightbulb } from 'lucide-react'
@@ -182,7 +183,7 @@ function computeTrend(data: DashboardData): { direction: 'up' | 'stable'; label:
   return { direction: 'stable', label: 'Stabiel' }
 }
 
-export function VeerkrachtScoreWidget({ size, data, href }: Props) {
+export const VeerkrachtScoreWidget = memo(function VeerkrachtScoreWidget({ size, data, href }: Props) {
   const { monthsCovered, totalAssets, totalDebts, monthSummary } = data
   const savingsRate = monthSummary.savingsRate
 
@@ -332,4 +333,4 @@ export function VeerkrachtScoreWidget({ size, data, href }: Props) {
       </p>
     </WidgetShell>
   )
-}
+})

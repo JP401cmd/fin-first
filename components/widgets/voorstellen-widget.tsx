@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Lightbulb } from 'lucide-react'
@@ -62,7 +63,7 @@ function FullRecommendationRow({ rec, index }: { rec: TopRecommendation; index: 
   )
 }
 
-export function VoorstellenWidget({ size, data, href }: Props) {
+export const VoorstellenWidget = memo(function VoorstellenWidget({ size, data, href }: Props) {
   const { recommendations, topRecommendations } = data
 
   const topPriority = topRecommendations?.[0]?.priority ?? null
@@ -166,4 +167,4 @@ export function VoorstellenWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

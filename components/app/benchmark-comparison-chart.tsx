@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, memo } from 'react'
 import {
   type ComparisonResult,
   type TimePeriod,
@@ -22,7 +22,7 @@ interface BenchmarkComparisonChartProps {
   loading?: boolean
 }
 
-export function BenchmarkComparisonChart({
+export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
   comparison,
   onPeriodChange,
   activePeriod,
@@ -514,4 +514,4 @@ export function BenchmarkComparisonChart({
       )}
     </div>
   )
-}
+})

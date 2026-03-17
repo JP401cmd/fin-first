@@ -1,11 +1,12 @@
 'use client'
 
+import { memo } from 'react'
 import { simulatePayoff, payoffSummary } from '@/lib/debt-data'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
-export function DebtPayoffTrajectoryChart({
+export const DebtPayoffTrajectoryChart = memo(function DebtPayoffTrajectoryChart({
   snowballMonths,
   avalancheMonths,
   snowballSummary,
@@ -248,9 +249,9 @@ export function DebtPayoffTrajectoryChart({
       </svg>
     </div>
   )
-}
+})
 
-export function StrategyComparisonMessage({
+export const StrategyComparisonMessage = memo(function StrategyComparisonMessage({
   snowballSummary,
   avalancheSummary,
   dailyExpenses,
@@ -336,4 +337,4 @@ export function StrategyComparisonMessage({
       )}
     </div>
   )
-}
+})

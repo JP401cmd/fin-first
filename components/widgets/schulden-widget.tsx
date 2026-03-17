@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -9,7 +10,7 @@ interface Props {
   href?: string
 }
 
-export function SchuldenWidget({ size, data, href }: Props) {
+export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }: Props) {
   const { totalDebts, totalAssets, monthlyExpenses, budgetTotals } = data
 
   if (size === 'mini') {
@@ -170,4 +171,4 @@ export function SchuldenWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -11,7 +12,7 @@ interface Props {
   href?: string
 }
 
-export function SpaarquoteWidget({ size, data, href }: Props) {
+export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, href }: Props) {
   const { monthlyIncome, monthlyExpenses, monthlySavingsBudgetSpent } = data
   const savings = monthlyIncome - monthlyExpenses + monthlySavingsBudgetSpent
   const rate = data.savingsRate6m
@@ -225,4 +226,4 @@ export function SpaarquoteWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

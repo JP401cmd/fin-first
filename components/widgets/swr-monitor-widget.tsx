@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -25,7 +26,7 @@ function formatPct(value: number, decimals = 2): string {
   return (value * 100).toFixed(decimals) + '%'
 }
 
-export function SwrMonitorWidget({ size, data, href }: Props) {
+export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, href }: Props) {
   const { grossReturn, inflationRate, netWorth, monthlyExpenses, fireTarget } = data
 
   // Effective SWR from user's parameters
@@ -235,4 +236,4 @@ export function SwrMonitorWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import type { NetWorthProjectionResult } from '@/lib/net-worth-projection'
 import { formatProjectedValue, getProjectionMessage } from '@/lib/net-worth-projection'
 import { TrendingUp, TrendingDown, Target, Info } from 'lucide-react'
@@ -12,7 +12,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
  *
  * Short-term tactical view (differs from Horizon's 30-year strategic projection).
  */
-export function NetWorthProjectionChart({
+export const NetWorthProjectionChart = memo(function NetWorthProjectionChart({
   projection,
 }: {
   projection: NetWorthProjectionResult
@@ -377,7 +377,7 @@ export function NetWorthProjectionChart({
       </div>
     </div>
   )
-}
+})
 
 function ProjectionBadge({
   label,

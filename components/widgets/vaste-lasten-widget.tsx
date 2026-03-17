@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -64,7 +65,7 @@ function ItemRow({ t }: { t: TopRecurringTransaction }) {
 
 // ── Main widget component ────────────────────────────────────
 
-export function VasteLastenWidget({ size, data, href }: Props) {
+export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, href }: Props) {
   const { recurringTransactions, totalRecurringAmount, topRecurringTransactions, monthlyExpenses, monthlyIncome } = data
 
   const dailyExp = monthlyExpenses / 30
@@ -212,4 +213,4 @@ export function VasteLastenWidget({ size, data, href }: Props) {
       </p>
     </WidgetShell>
   )
-}
+})

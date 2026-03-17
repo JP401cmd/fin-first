@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -10,7 +11,7 @@ interface Props {
   href?: string
 }
 
-export function PensioenAowWidget({ size, data, href }: Props) {
+export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, href }: Props) {
   const currentAge = data.currentAge
   const aowAge = NL_AOW_AGE
   const yearsToAow = currentAge != null ? Math.max(0, aowAge - currentAge) : null
@@ -204,4 +205,4 @@ export function PensioenAowWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

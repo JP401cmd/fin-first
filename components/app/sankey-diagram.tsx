@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, memo } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
@@ -489,7 +489,7 @@ function EuroCoin({
   )
 }
 
-export function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio = 2.5, onNodeClick, showAnimatedCoins = true }: SankeyDiagramProps) {
+export const SankeyDiagram = memo(function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio = 2.5, onNodeClick, showAnimatedCoins = true }: SankeyDiagramProps) {
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
@@ -695,4 +695,4 @@ export function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio =
     </div>
     </div>
   )
-}
+})

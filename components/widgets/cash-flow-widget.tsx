@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -172,7 +173,7 @@ function ComparisonBar({ label, current, previous, color, hasEntered }: Comparis
 
 // ── Main widget ──
 
-export function CashFlowWidget({ size, data, href }: Props) {
+export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }: Props) {
   const { monthlyIncome, monthlyExpenses, budgetTotals, prevMonthIncome, prevMonthExpenses } = data
   const cashFlow = monthlyIncome - monthlyExpenses
   const isPositive = cashFlow >= 0
@@ -350,4 +351,4 @@ export function CashFlowWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

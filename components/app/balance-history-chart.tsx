@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatCurrency } from '@/lib/format'
 import type { EntityBalanceHistory } from '@/lib/net-worth-data'
@@ -58,7 +58,7 @@ type BalanceHistoryChartProps = {
 
 // ── Component ───────────────────────────────────────────────────
 
-export function BalanceHistoryChart({
+export const BalanceHistoryChart = memo(function BalanceHistoryChart({
   entities,
   title = 'Vermogensopbouw',
   className,
@@ -396,4 +396,4 @@ export function BalanceHistoryChart({
       </div>
     </div>
   )
-}
+})

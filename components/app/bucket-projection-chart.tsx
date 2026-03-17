@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import type { BucketProjectionResult, BucketRow } from '@/lib/bucket-projection'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import { formatCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
@@ -27,7 +27,7 @@ const CHART_VIEWS = Object.keys(CHART_VIEW_LABELS) as ChartView[]
  * 3. Inkomen & spaarquote — income + savings projection
  * 4. Box 3 belasting — annual Box 3 tax
  */
-export function BucketProjectionChart({
+export const BucketProjectionChart = memo(function BucketProjectionChart({
   projection,
   dailyExpenses,
   fireTarget,
@@ -909,7 +909,7 @@ export function BucketProjectionChart({
       {renderBadges()}
     </div>
   )
-}
+})
 
 function ProjectionBadge({
   label,

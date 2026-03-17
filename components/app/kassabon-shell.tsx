@@ -1,4 +1,6 @@
-export function KassabonShell({ children, className }: { children: React.ReactNode; className?: string }) {
+import { memo } from 'react'
+
+export const KassabonShell = memo(function KassabonShell({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div
       className={[
@@ -11,4 +13,4 @@ export function KassabonShell({ children, className }: { children: React.ReactNo
       {children}
     </div>
   )
-}
+})

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -32,7 +33,7 @@ function DeltaIndicator({ current, previous, compact = false }: { current: numbe
   )
 }
 
-export function WeekoverzichtWidget({ size, data, href }: Props) {
+export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, data, href }: Props) {
   const { weekOverview } = data
   const { weekExpenses, weekBudget, dailyExpenses, prevWeekExpenses, topCategories } = weekOverview
 
@@ -250,4 +251,4 @@ export function WeekoverzichtWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

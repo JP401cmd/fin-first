@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -9,7 +10,7 @@ interface Props {
   href?: string
 }
 
-export function PassiefInkomenWidget({ size, data, href }: Props) {
+export const PassiefInkomenWidget = memo(function PassiefInkomenWidget({ size, data, href }: Props) {
   const { fireProjResult, monthlyExpenses } = data
 
   const current = fireProjResult.monthlyPassiveIncome ?? 0
@@ -155,4 +156,4 @@ export function PassiefInkomenWidget({ size, data, href }: Props) {
       </p>
     </WidgetShell>
   )
-}
+})

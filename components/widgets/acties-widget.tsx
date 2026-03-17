@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopAction } from './widget-renderer'
@@ -49,7 +50,7 @@ function ActionRow({ action, index, hasEntered }: { action: TopAction; index: nu
   )
 }
 
-export function ActiesWidget({ size, data, href }: Props) {
+export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Props) {
   const { openActions, totalFreedomDaysOpen, completedActionsThisMonth, topOpenActions, recentCompletedActions } = data
   const { ref: containerRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
@@ -169,4 +170,4 @@ export function ActiesWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

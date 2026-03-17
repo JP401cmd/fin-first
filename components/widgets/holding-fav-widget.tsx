@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -80,7 +81,7 @@ function KpiCell({ label, value, color }: { label: string; value: string; color?
   )
 }
 
-export function HoldingFavWidget({ size, holding }: { size: WidgetSize; holding: FavoriteHolding }) {
+export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }: { size: WidgetSize; holding: FavoriteHolding }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 400 })
   const isPositive = holding.dailyChangePct >= 0
   const changeSign = isPositive ? '+' : ''
@@ -252,4 +253,4 @@ export function HoldingFavWidget({ size, holding }: { size: WidgetSize; holding:
       </div>
     </WidgetShell>
   )
-}
+})

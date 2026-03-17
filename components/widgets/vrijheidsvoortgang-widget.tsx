@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency } from '@/lib/format'
@@ -13,7 +14,7 @@ interface Props {
   href?: string
 }
 
-export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
+export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({ size, data, href }: Props) {
   const { netWorth, fireTarget, freedomPct, fireProjResult, simRequiredPortfolio } = data
   const effectiveFire = simRequiredPortfolio ?? fireTarget
   const effectivePct = effectiveFire > 0 ? Math.min((netWorth / effectiveFire) * 100, 100) : freedomPct
@@ -225,4 +226,4 @@ export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

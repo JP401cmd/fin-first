@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency } from '@/lib/format'
@@ -33,7 +34,7 @@ function computeNibudComparison(monthlyExpenses: number, budgetTotals: Dashboard
   }))
 }
 
-export function NibudBenchmarkWidget({ size, data, href }: Props) {
+export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, data, href }: Props) {
   const { monthlyExpenses, budgetTotals } = data
   const comparison = computeNibudComparison(monthlyExpenses, budgetTotals)
   const overCount = comparison.filter((c) => c.overNorm).length
@@ -185,4 +186,4 @@ export function NibudBenchmarkWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

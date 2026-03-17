@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Compass } from 'lucide-react'
@@ -10,7 +11,7 @@ interface Props {
   href?: string
 }
 
-export function FirePrognoseWidget({ size, data, href }: Props) {
+export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data, href }: Props) {
   const { fireProjResult, freedomPct, fireAgeFractional, simFireCountdown } = data
   const cd = simFireCountdown ?? fireProjResult
 
@@ -191,4 +192,4 @@ export function FirePrognoseWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

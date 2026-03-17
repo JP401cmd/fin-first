@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -35,7 +36,7 @@ interface Props {
   href?: string
 }
 
-export function HoldingsWidget({ size, data, href }: Props) {
+export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }: Props) {
   const { assetsByType, monthlyExpenses, monthlyContributions } = data
 
   const investmentAssets = assetsByType.filter(a => INVESTMENT_TYPES.has(a.type))
@@ -172,4 +173,4 @@ export function HoldingsWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

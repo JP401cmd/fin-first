@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -172,7 +173,7 @@ function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
 
 // ── Hoofd-component ────────────────────────────────────────────
 
-export function BudgettenWidget({ size, data, href }: Props) {
+export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href }: Props) {
   const isFullSize       = size === 'full'
   const { budgetTotals, monthlyExpenses } = data
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
@@ -380,4 +381,4 @@ export function BudgettenWidget({ size, data, href }: Props) {
 
     </WidgetShell>
   )
-}
+})

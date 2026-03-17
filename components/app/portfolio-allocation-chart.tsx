@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { Target, ArrowRightLeft, BarChart3, Globe, Briefcase, Edit3, Check, Info } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -262,7 +262,7 @@ function TargetEditor({
 
 // ── Main Component ──────────────────────────────────────────
 
-export default function PortfolioAllocationVisualization({
+const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisualization({
   holdings,
   totalValue,
 }: {
@@ -493,4 +493,6 @@ export default function PortfolioAllocationVisualization({
       )}
     </div>
   )
-}
+})
+
+export default PortfolioAllocationVisualization

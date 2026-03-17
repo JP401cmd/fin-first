@@ -271,7 +271,7 @@ export function categorizeTransaction(
           budget_id: freqResult.budget_id,
           confidence: freqResult.confidence,
           budgetName: budget.name ?? null,
-          category_source: 'frequency',
+          category_source: 'rule',
         }
       }
     }

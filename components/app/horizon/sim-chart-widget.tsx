@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, memo } from 'react'
 import { AlertTriangle, TrendingUp, TableProperties, ChevronDown, ChevronUp } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -49,7 +49,7 @@ export interface SimChartModalProps {
   yearlyExpenses: number
 }
 
-export function SimChartModal({
+export const SimChartModal = memo(function SimChartModal({
   open,
   onClose,
   simResult,
@@ -416,7 +416,7 @@ export function SimChartModal({
       </div>
     </BottomSheet>
   )
-}
+})
 
 // ── SimChartWidget ────────────────────────────────────────────────────────────
 // Volledige card-wrapper versie (voor standalone gebruik buiten de hero).
@@ -430,7 +430,7 @@ export interface SimChartWidgetProps {
   className?: string
 }
 
-export function SimChartWidget({
+export const SimChartWidget = memo(function SimChartWidget({
   simResult,
   cashflows,
   currentAge,
@@ -580,4 +580,4 @@ export function SimChartWidget({
       />
     </>
   )
-}
+})

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -37,7 +38,7 @@ function formatTimestamp(dateStr: string): string {
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 }
 
-export function MeldingenWidget({ size, data, href }: Props) {
+export const MeldingenWidget = memo(function MeldingenWidget({ size, data, href }: Props) {
   const { notifications } = data
   const count = notifications.length
   const critical = notifications.filter(n => n.severity === 'critical').length
@@ -149,4 +150,4 @@ export function MeldingenWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

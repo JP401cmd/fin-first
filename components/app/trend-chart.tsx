@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, memo } from 'react'
 import type { DomainColor } from '@/lib/navigation'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
@@ -120,7 +120,7 @@ function getSeriesColor(
 
 // ── Component ────────────────────────────────────────────────
 
-export function TrendChart({
+export const TrendChart = memo(function TrendChart({
   series,
   mode,
   moduleColor = 'amber',
@@ -748,4 +748,4 @@ export function TrendChart({
       )}
     </div>
   )
-}
+})

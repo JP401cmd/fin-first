@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -8,7 +9,7 @@ interface Props {
   href?: string
 }
 
-export function VrijheidsScenarioWidget({ size, data, href }: Props) {
+export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ size, data, href }: Props) {
   const { fireRange } = data
 
   if (!fireRange) {
@@ -94,7 +95,7 @@ export function VrijheidsScenarioWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})
 
 // ── Mini SVG: 3 markers on an age axis ──────────────────────────
 function ScenarioAxis({ pesAge, expAge, optAge }: { pesAge: number; expAge: number; optAge: number }) {

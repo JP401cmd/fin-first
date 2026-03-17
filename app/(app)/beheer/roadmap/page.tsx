@@ -3,12 +3,47 @@
    Vergelijking met 30+ budgeting & wealth management apps
    ───────────────────────────────────────────────────────────── */
 
-const FASE_A_FEATURES = [
+type Feature = {
+  readonly nr: number
+  readonly name: string
+  readonly description: string
+  readonly werking: string
+  readonly afhankelijkheden: readonly string[]
+  readonly technisch: string
+  readonly waardeGebruiker: string
+  readonly aandachtspunten: readonly string[]
+  readonly competitors: string
+  readonly priority: string
+}
+
+const FASE_A_FEATURES: readonly Feature[] = [
   {
     nr: 1,
     name: 'Pensioen Unified Timeline',
     description:
-      'AOW-leeftijd, werkgeverspensioen (UPO) en eigen vermogen op een geintegreerde tijdlijn. De AOW-tabel en pensioen PDF upload bestaan al \u2014 maar een visuele tijdlijn die toont \u201cMet 52 FIRE, AOW bridge 52\u201367 uit eigen vermogen, dan AOW + pensioen erbij\u201d ontbreekt. Dit is de ontbrekende schakel die De Horizon compleet maakt.',
+      'AOW-leeftijd, werkgeverspensioen (UPO) en eigen vermogen op een ge\u00efntegreerde tijdlijn. De AOW-tabel en pensioen PDF upload bestaan al \u2014 maar een visuele tijdlijn die toont \u201cMet 52 FIRE, AOW bridge 52\u201367 uit eigen vermogen, dan AOW + pensioen erbij\u201d ontbreekt. Dit is de ontbrekende schakel die De Horizon compleet maakt.',
+    werking:
+      'Een interactieve tijdlijn die drie inkomstenbronnen visueel combineert: (1) eigen vermogen/beleggingen tot FIRE-datum, (2) AOW vanaf AOW-leeftijd, (3) werkgeverspensioen vanaf pensioendatum. De gebruiker ziet precies wanneer elke bron inschakelt en hoeveel \u201cbridge-vermogen\u201d nodig is om de periode tussen FIRE en AOW te overbruggen. Sliders voor FIRE-leeftijd, pensioenleeftijd en bestedingsniveau maken scenario\u2019s direct zichtbaar.',
+    afhankelijkheden: [
+      'lib/aow-leeftijd.ts (AOW leeftijdstabel)',
+      'lib/fire-simulation.ts (runSimulation)',
+      'lib/horizon-data.ts (computeFireProjection, computeFireRange)',
+      'app/api/pension/parse (UPO PDF parsing)',
+      'profiles.fire_end_strategy',
+      'profiles.expected_return',
+      'profiles.inflation_rate',
+    ],
+    technisch:
+      'Nieuwe component pension-timeline.tsx in De Horizon module. Combineert drie datastreams: (a) FIRE simulatie output (vermogenspad), (b) AOW bedragen uit aow-leeftijd.ts (enkel/samenwonend), (c) geparsed pensioen uit pension_documents. Berekent bridge-bedrag = jaarlijkse uitgaven \u00d7 (AOW-leeftijd \u2212 FIRE-leeftijd) \u2212 pensioeninkomen in die periode. Visualisatie als gestapeld area chart met drie kleuren. Nieuwe API route /api/pension/timeline die alles samenvoegt.',
+    waardeGebruiker:
+      'Beantwoordt de #1 vraag van Nederlandse FIRE-planners: \u201cHeb ik genoeg om de periode tot mijn AOW te overbruggen?\u201d Maakt de abstracte FIRE-berekening concreet en actionable. Reduceert angst over \u201chet gat\u201d tussen stoppen met werken en pensioen.',
+    aandachtspunten: [
+      'Pensioen PDF parsing is complex en foutgevoelig (wisselende UPO formats).',
+      'Werkgeverspensioen kan variabele opbouw hebben.',
+      'Gebruikers zonder UPO upload moeten handmatig bedrag kunnen invoeren.',
+      'AOW-leeftijd kan politiek wijzigen.',
+      'Partnersituatie (AOW enkel vs samenwonend) moet correct meegenomen worden.',
+    ],
     competitors: 'Boldin (Social Security Explorer), ProjectionLab (pensioen modeling)',
     priority: 'Hoog',
   },
@@ -17,6 +52,25 @@ const FASE_A_FEATURES = [
     name: 'Rebalancing Alerts & Advies',
     description:
       'De target_allocations tabel bestaat al in de database maar wordt nog niet actief gebruikt. Activeer dit: toon wanneer de portefeuille meer dan X% afwijkt van de target allocatie, en geef een concreet rebalancing advies (welke holdings kopen/verkopen). Integreer met de meldingen-widget.',
+    werking:
+      'Gebruiker stelt target allocatie in per asset class (bijv. 80% aandelen, 10% obligaties, 10% cash). Het systeem vergelijkt dit continu met de werkelijke allocatie uit de holdings. Bij afwijking > drempel (instelbaar, bijv. 5%) verschijnt een alert met concreet advies: \u201cVerkoop \u20acX aan [holding A] en koop \u20acY aan [holding B] om terug in balans te komen.\u201d Optioneel: rebalancing-reminder in de maandelijkse check-in.',
+    afhankelijkheden: [
+      'target_allocations tabel (bestaat in DB)',
+      'components/app/portfolio-allocation-chart.tsx',
+      'holdings tabel met asset_class/sector/geography velden',
+      'lib/price-feed.ts (actuele waardes)',
+      'app/api/notifications (meldingen-systeem)',
+    ],
+    technisch:
+      'Nieuwe lib/rebalancing.ts module met: computeDrift(holdings, targets) \u2192 DriftResult[], suggestTrades(drift, constraints) \u2192 Trade[]. Drift berekening: werkelijke % per asset_class vs target %. Trade suggestie houdt rekening met minimale transactiegrootte en belastingimpact (Box 3 peildatum). Nieuwe widget rebalancing (half-size) met drift-visualisatie. Alert via bestaand notificatie-systeem. API route /api/rebalancing/check aangeroepen door cron of bij dashboard-load.',
+    waardeGebruiker:
+      'Voorkomt dat emotioneel beleggen (bijv. alles in tech na rally) de portefeuille uit balans brengt. Bespaart tijd en geld die anders naar een financieel adviseur gaat. Wetenschappelijk bewezen dat regelmatig rebalancen risico verlaagt zonder rendement significant te verlagen.',
+    aandachtspunten: [
+      'Box 3 peildatum (1 januari) be\u00efnvloedt timing van rebalancing \u2014 verkopen vlak voor peildatum kan belastingvoordeel opleveren.',
+      'Transactiekosten meenemen in advies.',
+      'Holdings zonder asset_class classificatie moeten eerst ingevuld worden.',
+      'Niet alle gebruikers hebben target allocatie ingesteld \u2014 progressive disclosure nodig.',
+    ],
     competitors:
       'Wealthfront (automatisch), Betterment (automatisch), Empower (Investment Checkup)',
     priority: 'Hoog',
@@ -26,6 +80,26 @@ const FASE_A_FEATURES = [
     name: 'Fee Analyzer (TER Impact)',
     description:
       'Bereken de totale jaarlijkse kosten van de beleggingsportefeuille op basis van TER (Total Expense Ratio) per holding. Toon het effect op de FIRE-datum: \u201cJe betaalt \u20acX/jaar aan fondsbeheer \u2014 dit kost je Y maanden vrijheid over 20 jaar.\u201d Holdings data met ISIN/ticker is er al \u2014 koppel aan een TER database of laat gebruikers TER per holding invoeren.',
+    werking:
+      'Overzicht van alle beleggingskosten: TER per holding, gewogen gemiddelde TER van totale portefeuille, en \u2014 cruciaal \u2014 het effect op de FIRE-datum. \u201cJe portefeuille kost \u20ac1.847/jaar aan beheerkosten. Over 20 jaar is dit \u20ac48.000 aan gemist rendement \u2014 dat zijn 14 maanden extra werken.\u201d Vergelijking met goedkopere alternatieven (bijv. Vanguard FTSE All-World TER 0.22% vs actief fonds TER 1.5%).',
+    afhankelijkheden: [
+      'holdings tabel (ticker, ISIN, current_value)',
+      'lib/price-feed.ts',
+      'lib/horizon-data.ts (FIRE berekening voor impact)',
+      'lib/format.ts (calculateFreedomTime voor vrijheidstijd-impact)',
+      'lib/fire-simulation.ts (simulatie met/zonder fees)',
+    ],
+    technisch:
+      'Nieuw veld ter (decimal) op holdings tabel (migratie nodig). Optioneel: auto-lookup via ISIN uit externe TER database (OpenFIGI of Morningstar API, of handmatig bijgehouden JSON). Nieuwe lib/fee-analysis.ts: computePortfolioFees(holdings) \u2192 { totalAnnualFee, weightedTER, feeImpactOnFire }. Fee impact = verschil in FIRE-datum tussen simulatie met en zonder fees. Nieuwe widget fee_analyzer (half-size). Detail modal met per-holding breakdown en goedkopere alternatieven.',
+    waardeGebruiker:
+      'De meeste beleggers weten niet hoeveel ze betalen aan fondsbeheer. Empower\u2019s Fee Analyzer is een van hun meest gewaardeerde features \u2014 het opent ogen. Voor FIRE-strijders is elk 0.1% TER reductie = maanden eerder vrij. Direct actionable: \u201cSwitch van fonds X naar Y en bespaar Z maanden.\u201d',
+    aandachtspunten: [
+      'TER data actueel houden is een uitdaging.',
+      'Niet alle holdings hebben een ISIN (individuele aandelen bijv.).',
+      'Tracking difference vs TER discussie \u2014 TER is niet de volledige kostenmaat.',
+      'Alternatieven-suggestie moet voorzichtig (geen financieel advies, disclaimer).',
+      'Sommige fondsen zijn niet vrij verhandelbaar (pensioen, verzekeringen).',
+    ],
     competitors: 'Empower (Fee Analyzer \u2014 best-in-class), Wealthica (fee reporting)',
     priority: 'Hoog',
   },
@@ -34,26 +108,87 @@ const FASE_A_FEATURES = [
     name: 'Tijd-prijskaartje op Transacties',
     description:
       'De vrijheidstijd-filosofie (\u201cgeld is opgeslagen tijd\u201d) consequent doorvoeren naar individuele transacties. Elke transactie toont automatisch hoeveel uur/dagen werk het kostte, gebaseerd op het netto-uurloon. FreedomTimeBadge en calculateFreedomTime bestaan al \u2014 maar worden nog niet op transactieniveau getoond. Dit maakt de filosofie tastbaar in het dagelijks gebruik.',
+    werking:
+      'Elke transactie in het overzicht toont naast het eurobedrag een subtiel \u201ctijd-label\u201d: \u201c\u2615 \u20ac4,50 \u00b7 12 min\u201d of \u201c\ud83c\udfe0 \u20ac1.250 \u00b7 3,4 dagen\u201d. Gebaseerd op het netto-uurloon van de gebruiker (berekend uit maandelijks netto-inkomen / werkuren). In de transactie-detailview een uitgebreidere weergave: \u201cDeze Bol.com bestelling van \u20ac89 kostte je 4 uur en 12 minuten werk. Dat is 0,6% van je maandelijkse vrijheidstijd.\u201d',
+    afhankelijkheden: [
+      'lib/format.ts (calculateFreedomTime, formatFreedomTimeString \u2014 bestaan al)',
+      'components/app/freedom-time-label.tsx (FreedomTimeBadge \u2014 bestaat al)',
+      'profiles tabel (netto maandinkomen)',
+      'transacties tabel',
+      'budget categorie\u00ebn voor context',
+    ],
+    technisch:
+      'Minimale technische impact. Bereken netto-uurloon: nettoInkomen / (werkdagen \u00d7 8) uit profiel data. Voeg <FreedomTimeBadge amount={transaction.amount} /> toe aan transactie-rijen in components/app/transaction-row.tsx en transaction detail view. Optioneel: groepeer per dag/week en toon \u201cDeze week werkte je effectief X uur voor je uitgaven.\u201d Geen nieuwe API nodig \u2014 puur frontend berekening.',
+    waardeGebruiker:
+      'Maakt de kernfilosofie van TriFinity (\u201cgeld is opgeslagen tijd\u201d) tastbaar in het dagelijks gebruik. Psychologisch krachtig: \u201cwil ik echt 45 minuten werken voor deze lunch?\u201d Onderzoek toont dat \u201ctime framing\u201d van geld leidt tot bewuster uitgavegedrag. Dit is TriFinity\u2019s meest onderscheidende feature \u2014 geen concurrent doet dit.',
+    aandachtspunten: [
+      'Niet iedereen heeft een vast uurloon (ZZP, parttimers, pensioen).',
+      'Fallback nodig voor gebruikers zonder inkomendata.',
+      'Kan confronterend overkomen \u2014 maak het subtiel en optioneel uitschakelbaar.',
+      'Grote bedragen (huur, hypotheek) kunnen demotiverend werken \u2014 context toevoegen (\u201cdit is je woonlasten, een basisbehoefte\u201d).',
+    ],
     competitors: 'Niemand \u2014 dit is uniek voor TriFinity',
     priority: 'Middel',
   },
   {
     nr: 5,
-    name: 'Financiele Gezondheids-score',
+    name: 'Financi\u00eble Gezondheids-score',
     description:
-      'Een samenvattend getal (0\u2013100) dat de complete financiele gezondheid weergeeft. Combineer: spaarquote, schuldratio, noodfonds-dekking, FIRE-voortgang, portefeuille-diversificatie, budget-discipline. De veerkracht_score widget bestaat al (0\u2013100 resilience) \u2014 maar een bredere \u201cfinancial health score\u201d die ook gedrag en planning meeneemt ontbreekt. Toon trend over tijd.',
+      'Een samenvattend getal (0\u2013100) dat de complete financi\u00eble gezondheid weergeeft. Combineer: spaarquote, schuldratio, noodfonds-dekking, FIRE-voortgang, portefeuille-diversificatie, budget-discipline. De veerkracht_score widget bestaat al (0\u2013100 resilience) \u2014 maar een bredere \u201cfinancial health score\u201d die ook gedrag en planning meeneemt ontbreekt. Toon trend over tijd.',
+    werking:
+      'E\u00e9n getal van 0-100 dat de complete financi\u00eble gezondheid samenvat, opgebouwd uit 6 pilaren: (1) Spaarquote (hoe goed spaar je?), (2) Schuldratio (schulden vs vermogen), (3) Noodfonds (maanden dekking), (4) FIRE-voortgang (% van doel), (5) Diversificatie (portefeuille spreiding), (6) Budget-discipline (% binnen budget). Elke pilaar is een sub-score 0-100. Toon trend over maanden en vergelijk met vorige maand. Pilaar-drill-down toont wat de score omhoog kan brengen.',
+    afhankelijkheden: [
+      'lib/horizon-data.ts (computeResilienceScore \u2014 0-100, bestaat al maar meet alleen veerkracht)',
+      'lib/core-metrics.ts (net worth, savings rate, freedom percentage)',
+      'budget alerts systeem',
+      'holdings voor diversificatie',
+      'noodfonds widget logica',
+      'net_worth_snapshots voor trend',
+    ],
+    technisch:
+      'Nieuwe lib/financial-health.ts: computeHealthScore(data: DashboardData) \u2192 { total: number, pillars: Pillar[], trend: number[] }. Elke pilaar heeft eigen weging (bijv. spaarquote 25%, schuld 20%, noodfonds 15%, FIRE 20%, diversificatie 10%, budget 10%). Score-algoritme: per pilaar een curve (bijv. spaarquote 30%+ = score 100, 20% = 80, 10% = 50, 0% = 0). Totaalscore is gewogen gemiddelde. Nieuwe widget gezondheids_score (half-size) met radar/spider chart voor de 6 pilaren. Snapshot monthly via bestaand cron.',
+    waardeGebruiker:
+      'E\u00e9n blik vertelt je hoe je ervoor staat \u2014 geen 10 dashboards nodig. Gamification-element: score verbeteren is motiverend. De trend toont vooruitgang over tijd, zelfs als absolute getallen nog laag zijn. Beginner-vriendelijk: iemand met \u20ac500 spaargeld kan toch een score van 60 hebben als de ratio\u2019s goed zijn.',
+    aandachtspunten: [
+      'Weging van pilaren is subjectief \u2014 wat is \u201cgezond\u201d?',
+      'Verschillende levensfasen hebben verschillende normen (student vs gezin vs pre-pensioen).',
+      'Soevereiniteitsniveaus overlappen deels \u2014 onderscheid duidelijk maken.',
+      'Score moet motiveren, niet ontmoedigen \u2014 framing als \u201cgroeipad\u201d niet als \u201crapport cijfer\u201d.',
+      'NIBUD-normen als basis voor wat \u201cgezond\u201d is in NL context.',
+    ],
     competitors:
       'Niemand doet dit goed \u2014 Credit Karma heeft credit score maar dat is anders',
     priority: 'Middel',
   },
-] as const
+]
 
-const FASE_B_FEATURES = [
+const FASE_B_FEATURES: readonly Feature[] = [
   {
     nr: 6,
     name: 'Vermogensaanwasbelasting 2027 Simulator',
     description:
       'Nederland schakelt per 2027 over van forfaitair rendement naar belasting op werkelijk rendement (vermogensaanwasbelasting). Geen enkele app of tool bereidt gebruikers hierop voor. Bouw een simulator die toont: \u201cOnder het huidige systeem betaal je \u20acX, onder het nieuwe systeem \u20acY \u2014 dit is het effect op je FIRE-datum.\u201d Dit is een first-mover kans met directe PR-waarde.',
+    werking:
+      'Side-by-side vergelijking van het huidige Box 3 systeem (forfaitair rendement) met het geplande nieuwe systeem (werkelijk rendement). Gebruiker ziet: \u201cIn 2026 betaal je \u20acX aan Box 3. Onder het nieuwe systeem zou je \u20acY betalen.\u201d Inclusief scenario\u2019s: bull market (hoog werkelijk rendement \u2192 meer belasting), bear market (laag/negatief rendement \u2192 minder belasting), en het effect op de FIRE-datum in elk scenario. Tijdlijn die toont wanneer het nieuwe systeem voordeliger is.',
+    afhankelijkheden: [
+      'lib/box3-data.ts (huidig Box 3 berekening \u2014 volledig)',
+      'lib/box3-holdings.ts (Box 3 per portefeuille)',
+      'holdings tabel (werkelijke rendementen)',
+      'lib/fire-simulation.ts (FIRE impact)',
+      'lib/horizon-data.ts (scenario berekeningen)',
+      'net_worth_snapshots (historisch rendement als proxy)',
+    ],
+    technisch:
+      'Nieuwe lib/box3-aanwas.ts met het nieuwe belastingmodel. Kernverschil: huidig systeem belast fictief rendement (sparen 0.36%, beleggen 6.04% in 2025), nieuw systeem belast werkelijk rendement tegen vast tarief (~36%). Nodig: computeAanwasBelasting(holdings, actualReturns) \u2192 number. Vergelijkingsmodule: compareBox3Systems(portfolio, scenarios) \u2192 Comparison. Nieuwe pagina /horizon/box3-2027 of modal op bestaande belasting pagina. Widget box3_2027 (quarter-size) met samenvatting.',
+    waardeGebruiker:
+      'Niemand bereidt gebruikers voor op deze grote belastingwijziging. Early adopters die dit begrijpen kunnen hun portefeuille optimaliseren (bijv. meer naar spaarrekening als rendement laag is). PR-waarde: \u201cTriFinity is de eerste app die je laat zien wat de vermogensaanwasbelasting voor jou betekent.\u201d Direct relevant voor 2M+ Nederlanders met Box 3 vermogen.',
+    aandachtspunten: [
+      'Wetgeving is nog niet definitief \u2014 disclaimer nodig.',
+      'Werkelijk rendement tracking vereist betrouwbare historische data per holding.',
+      'Politieke wijzigingen kunnen model invalideren.',
+      'Complexiteit: ongerealiseerde winsten, verliesverrekening, overgangsrecht.',
+      'Start simpel met grove berekening, verfijn later.',
+    ],
     competitors: 'Niemand \u2014 er bestaan alleen basis webtools van de Belastingdienst',
     priority: 'Hoog',
   },
@@ -61,7 +196,28 @@ const FASE_B_FEATURES = [
     nr: 7,
     name: 'Hypotheek: Aflossen vs Beleggen',
     description:
-      'De grootste financiele vraag voor Nederlandse huishoudens: \u201cmoet ik extra aflossen op mijn hypotheek of dat geld beleggen?\u201d Bouw een vergelijkingsmodule die beide scenario\u2019s doorrekent inclusief hypotheekrenteaftrek, Box 3 impact, risico, en effect op FIRE-datum. Schulden- en beleggingsmodule bestaan al \u2014 de vergelijking ontbreekt.',
+      'De grootste financi\u00eble vraag voor Nederlandse huishoudens: \u201cmoet ik extra aflossen op mijn hypotheek of dat geld beleggen?\u201d Bouw een vergelijkingsmodule die beide scenario\u2019s doorrekent inclusief hypotheekrenteaftrek, Box 3 impact, risico, en effect op FIRE-datum. Schulden- en beleggingsmodule bestaan al \u2014 de vergelijking ontbreekt.',
+    werking:
+      'Interactieve vergelijking: \u201cIk heb \u20ac500/maand extra. Wat als ik dit gebruik om extra af te lossen op mijn hypotheek vs beleggen?\u201d Twee scenario\u2019s naast elkaar met dezelfde tijdshorizon. Toont: eindvermogen, risiconiveau, belastingeffect (hypotheekrenteaftrek verlies bij aflossing, Box 3 impact bij beleggen), totale rentekosten bespaard, en \u2014 cruciaal \u2014 het effect op de FIRE-datum. Sliders voor extra bedrag, rente, verwacht rendement.',
+    afhankelijkheden: [
+      'app/(app)/core/debts/page.tsx (schulden module \u2014 hypotheek type bestaat)',
+      'lib/fire-simulation.ts',
+      'lib/horizon-data.ts',
+      'lib/box3-data.ts (Box 3 impact van extra beleggingen)',
+      'profiles (huidige hypotheek rente, type: annu\u00efteit/lineair/aflossingsvrij)',
+      'holdings module voor beleggingsscenario',
+    ],
+    technisch:
+      'Nieuwe lib/mortgage-optimizer.ts: compareMortgageVsInvest(params) \u2192 { aflossing: Scenario, beleggen: Scenario, breakeven: number }. Aflossingsscenario: bereken restschuld, totale rente bespaard, verlies hypotheekrenteaftrek (marginaal tarief \u00d7 rente). Beleggingsscenario: bereken verwacht eindvermogen (Monte Carlo), Box 3 belasting over groei. Breakeven: bij welk rendement is beleggen voordeliger dan aflossen? Nieuwe pagina /horizon/hypotheek of modal in De Horizon. Integratie met What-If planner.',
+    waardeGebruiker:
+      'De #1 financi\u00eble vraag in Nederland \u2014 iedereen met een hypotheek worstelt hiermee. Adviseurs rekenen \u20ac200+ voor dit advies. TriFinity kan dit gratis bieden met de data die er al is. Direct actionable: \u201cBij jouw hypotheekrente van 3.2% en verwacht rendement van 7% is beleggen \u20acX voordeliger over 20 jaar.\u201d',
+    aandachtspunten: [
+      'Geen financieel advies \u2014 duidelijke disclaimer.',
+      'Hypotheekrenteaftrek regels zijn complex (eigenwoningforfait, maximale aftrekperiode, Hillen-regeling uitfasering).',
+      'Risicovergelijking is niet eerlijk: aflossen is risicovrij, beleggen niet.',
+      'Emotionele factor: schuldvrij zijn heeft psychologische waarde die niet in euro\u2019s uit te drukken is.',
+      'Partnersituatie (gezamenlijke hypotheek) meenemen.',
+    ],
     competitors:
       'Boldin (real estate modeling), Wealthfront (home purchase planning), diverse NL hypotheek-vergelijkers (maar zonder FIRE-integratie)',
     priority: 'Hoog',
@@ -71,6 +227,27 @@ const FASE_B_FEATURES = [
     name: 'Toeslagen Simulator',
     description:
       'Veel Nederlanders ontvangen huurtoeslag, zorgtoeslag of kindgebonden budget. Vermogensgroei kan leiden tot verlies van toeslagen \u2014 een verborgen \u201cbelasting\u201d die niemand berekent. Simuleer: \u201cBij \u20acX vermogen verlies je \u20acY aan toeslagen per jaar.\u201d Dit helpt gebruikers bij de timing van vermogensopbouw en de beslissing of snel sparen altijd slim is.',
+    werking:
+      'Simuleer het effect van vermogensgroei op toeslagen. Vier toeslagen gemodelleerd: zorgtoeslag, huurtoeslag, kindgebonden budget, kinderopvangtoeslag. Inputvelden: verwacht vermogen op peildatum, inkomen, gezinssituatie. Output: \u201cBij \u20acX vermogen verlies je \u20acY aan zorgtoeslag en \u20acZ aan huurtoeslag per jaar \u2014 netto-effect op je vrijheidstijd: A maanden.\u201d Waarschuwing wanneer vermogensdrempel genaderd wordt. Toon de \u201ctoeslagen-klif\u201d: het punt waarop \u20ac1 extra vermogen honderden euro\u2019s aan toeslagen kost.',
+    afhankelijkheden: [
+      'profiles tabel (huishoudtype, kinderen)',
+      'lib/format.ts (formatCurrency, calculateFreedomTime)',
+      'lib/fire-simulation.ts (integratie in FIRE-projectie)',
+      'asset totalen uit dashboard data',
+      'inkomen data uit budgets',
+    ],
+    technisch:
+      'Nieuwe lib/toeslagen.ts met: berekenZorgtoeslag(inkomen, vermogen, partner) \u2192 number, berekenHuurtoeslag(inkomen, vermogen, huur, leeftijd, gezin) \u2192 number, berekenKindgebondenBudget(inkomen, kinderen) \u2192 number, berekenToeslagenKlif(currentVermogen, inkomen, gezin) \u2192 KlifAnalyse. Toeslagengrenzen als configureerbare constanten (jaarlijks bijwerken). Nieuwe pagina /core/belasting/toeslagen of sectie op bestaande belasting pagina. Widget toeslagen_impact (quarter-size).',
+    waardeGebruiker:
+      'Verborgen \u201cbelasting\u201d die de meeste mensen niet berekenen. Kan leiden tot onverwachte terugvorderingen. Vooral relevant voor starters en jonge gezinnen die net beginnen met vermogensopbouw. Helpt bij timing-beslissingen: \u201cIs het slim om dit jaar \u20ac5.000 extra te sparen als ik daardoor \u20ac2.000 aan toeslagen verlies?\u201d',
+    aandachtspunten: [
+      'Toeslagen-regels wijzigen jaarlijks \u2014 onderhoudslast.',
+      'Vermogenstoets verschilt per toeslag.',
+      'Huurtoeslag kent complexe regels (passend toewijzen, huurgrens).',
+      'Niet iedereen ontvangt toeslagen \u2014 relevantie-check nodig.',
+      'Politiek gevoelig onderwerp \u2014 neutraal presenteren.',
+      'Disclaimer: \u201cDit is een indicatie, niet een offici\u00eble berekening.\u201d',
+    ],
     competitors: 'Niemand \u2014 alleen losse webtools van toeslagen.nl',
     priority: 'Middel',
   },
@@ -79,6 +256,26 @@ const FASE_B_FEATURES = [
     name: 'Zorgkosten Planning',
     description:
       'NL-specifiek: eigen risico optimalisatie (\u20ac385 vs \u20ac885), aanvullende verzekering kosten-baten analyse, zorgtoeslag drempelberekening. Jaarlijks terugkerende keuze die veel Nederlanders verkeerd maken. Integreer met de budget-module (categorie zorg) en de check-in.',
+    werking:
+      'Jaarlijkse zorgverzekering-optimizer: (1) Eigen risico analyse \u2014 bij hoeveel zorggebruik is \u20ac885 eigen risico voordeliger dan \u20ac385? Breakeven-punt berekenen op basis van historisch zorggebruik. (2) Aanvullende verzekering kosten-baten \u2014 hoeveel kost de aanvullende per jaar vs verwachte claims. (3) Zorgtoeslag drempel \u2014 effect van inkomen/vermogen op recht op zorgtoeslag. (4) Maandelijkse premie vergelijking (integratie met budget-categorie zorg).',
+    afhankelijkheden: [
+      'budgets tabel (categorie zorg/gezondheid)',
+      'transacties (historische zorguitgaven)',
+      'lib/toeslagen.ts (als feature #8 gebouwd)',
+      'profiles (leeftijd, gezinssituatie)',
+      'check-in systeem (jaarlijkse reminder in november)',
+    ],
+    technisch:
+      'Nieuwe lib/zorgkosten.ts: berekenEigenRisicoBreakeven(historischZorggebruik) \u2192 { breakeven: number, advies: \'laag\' | \'hoog\' }, analyseAanvullend(premie, verwachteClaims) \u2192 KostenBaten. Zorggebruik afleiden uit transacties met categorie \u201cgezondheid/zorg\u201d minus premie. Reminder-systeem: notificatie in november \u201cTijd om je zorgverzekering te reviewen \u2014 bekijk je analyse.\u201d Pagina /core/belasting/zorgkosten of sectie binnen instellingen.',
+    waardeGebruiker:
+      '85% van de Nederlanders maakt een suboptimale eigen-risico keuze (bron: Zorgwijzer). Gemiddelde besparing bij juiste keuze: \u20ac100-300/jaar. Jaarlijks terugkerende waarde \u2014 gebruiker komt elk jaar terug. Combineert goed met check-in systeem.',
+    aandachtspunten: [
+      'Historische zorguitgaven zijn privacygevoelig.',
+      'Zorggebruik is onvoorspelbaar (ongeluk, ziekte).',
+      'Premies vari\u00ebren per verzekeraar \u2014 geen vergelijker bouwen, alleen eigen keuze optimaliseren.',
+      'Niet-medisch advies disclaimer.',
+      'Collectieve verzekeringen via werkgever meenemen.',
+    ],
     competitors:
       'Boldin (US healthcare/Medicare \u2014 niet NL), Financieel Fit (verzekeringsfocus maar geen planning)',
     priority: 'Middel',
@@ -87,18 +284,58 @@ const FASE_B_FEATURES = [
     nr: 10,
     name: 'Box 2 \u2194 Box 3 Optimalisatie (DGA Planning)',
     description:
-      'Voor DGA\u2019s/ondernemers: wanneer dividend uitkeren uit de BV? Hoeveel in Box 2 laten vs overhevelen naar prive (Box 3)? Optimale timing van BV-liquidatie bij FIRE. De Box 2 module bestaat al \u2014 maar de strategische planning \u201cwanneer en hoeveel\u201d ontbreekt. Relevant voor ~400.000 DGA\u2019s in Nederland.',
+      'Voor DGA\u2019s/ondernemers: wanneer dividend uitkeren uit de BV? Hoeveel in Box 2 laten vs overhevelen naar priv\u00e9 (Box 3)? Optimale timing van BV-liquidatie bij FIRE. De Box 2 module bestaat al \u2014 maar de strategische planning \u201cwanneer en hoeveel\u201d ontbreekt. Relevant voor ~400.000 DGA\u2019s in Nederland.',
+    werking:
+      'Planning tool voor DGA\u2019s: \u201cIk heb \u20ac200.000 in mijn BV. Wanneer en hoeveel moet ik als dividend uitkeren?\u201d Simuleer meerdere strategie\u00ebn: (a) alles nu uitkeren, (b) gespreid over X jaar, (c) BV-liquidatie bij FIRE. Per strategie: Box 2 belasting, Box 3 impact na uitkering, DGA-lening impact (excessief lenen regeling), en netto-effect op FIRE-datum. Tijdlijn met optimale uitkeer-momenten.',
+    afhankelijkheden: [
+      'lib/box2-data.ts (Box 2 berekening \u2014 bestaat, dual bracket 24.5%/33%)',
+      'lib/box3-data.ts (Box 3 impact na uitkering)',
+      'assets tabel (type deelneming met subtypes BV/startup)',
+      'lib/fire-simulation.ts (FIRE impact)',
+      'schulden tabel (type dga_schuld)',
+    ],
+    technisch:
+      'Nieuwe lib/dga-optimizer.ts: simulateDividendStrategy(bvVermogen, strategies, taxParams) \u2192 StrategyResult[]. Strategy types: lump_sum, annual_spread, fire_liquidation, minimal_salary. Per strategy berekenen: Box 2 belasting per jaar (24.5% tot \u20ac67.000, 33% daarboven), Box 3 impact van ontvangen vermogen, DGA-lening toets (max \u20ac500.000 norm 2024). Visualisatie: gestapeld staafdiagram per jaar met netto-ontvangst na belasting. Nieuwe pagina /horizon/dga of uitbreiding van bestaande Box 2 sectie.',
+    waardeGebruiker:
+      '~400.000 DGA\u2019s in Nederland hebben dit vraagstuk. Fiscalisten rekenen \u20ac200-500/uur voor dit advies. Een DGA met \u20ac500.000 in de BV kan \u20ac10.000-50.000 besparen door optimale timing. Extreem relevant voor FIRE-strijdende ondernemers.',
+    aandachtspunten: [
+      'Geen fiscaal advies \u2014 disclaimer essentieel.',
+      'Regels wijzigen frequent (DGA-lening regeling, tarief wijzigingen).',
+      'AB-verlies verrekening is complex.',
+      'Gebruikersaantallen DGA\u2019s klein maar waarde per gebruiker hoog \u2014 overweeg als premium feature.',
+      'BV kan ook andere activiteiten hebben (vastgoed, pensioen-BV) \u2014 vereenvoudigen tot vermogenscomponent.',
+    ],
     competitors: 'Niemand \u2014 fiscalisten doen dit handmatig voor \u20ac200+/uur',
     priority: 'Middel',
   },
-] as const
+]
 
-const FASE_C_FEATURES = [
+const FASE_C_FEATURES: readonly Feature[] = [
   {
     nr: 11,
     name: 'Cashflow Forecasting (30/60/90 dagen)',
     description:
       'Vooruitkijkend saldo: wanneer worden welke rekeningen afgeschreven, wanneer komt salaris, wat is het verwachte saldo over 30/60/90 dagen? Gebruik recurring transaction detection (bestaat al) om een voorspelling te bouwen. Waarschuw bij verwachte negatieve saldi. Monarch en Simplifi bieden dit \u2014 het is een \u201csticky\u201d feature die dagelijks gebruik stimuleert.',
+    werking:
+      'Visueel overzicht van verwachte inkomsten en uitgaven voor de komende 30, 60 en 90 dagen. Tijdlijn toont: verwacht saldo per dag, geplande afschrijvingen (huur, hypotheek, verzekeringen, abonnementen), verwachte inkomsten (salaris, toeslagen), en eenmalige geplande uitgaven. Waarschuwing bij verwacht negatief saldo: \u201cOp 15 maart zakt je saldo naar -\u20ac200 \u2014 plan nu een buffer.\u201d',
+    afhankelijkheden: [
+      'lib/recurring-detection.ts (bestaat \u2014 detecteert terugkerende patronen)',
+      'lib/budget-forecast.ts (bestaat \u2014 budget voorspelling)',
+      'transacties tabel (historische patronen)',
+      'bank_accounts (huidige saldi)',
+      'lib/spending-patterns.ts (seizoenspatronen)',
+    ],
+    technisch:
+      'Nieuwe lib/cashflow-forecast.ts: forecastCashflow(accounts, recurring, scheduled, days) \u2192 ForecastDay[]. Per dag: opening saldo + verwachte inkomsten \u2212 verwachte uitgaven = closing saldo. Recurring items uit recurring-detection.ts met confidence > 0.7. Aanvullen met handmatig geplande items (life events, eenmalige uitgaven). Visualisatie: lijn/area chart met saldo over tijd, rode zone bij negatief. Nieuwe widget cashflow_forecast (half-size). Integratie met meldingen: alert bij verwacht negatief saldo.',
+    waardeGebruiker:
+      'Voorkomt roodstaan en onverwachte tekorten. \u201cSticky\u201d feature die dagelijks gebruik stimuleert. Monarch Money noemt dit hun meest gebruikte feature na de basis budgetting. Vooral waardevol voor huishoudens met variabel inkomen (ZZP, freelance).',
+    aandachtspunten: [
+      'Nauwkeurigheid hangt af van kwaliteit recurring detection.',
+      'Variabele bedragen (energierekening, boodschappen) zijn lastig te voorspellen \u2014 gebruik ranges/confidence.',
+      'Eenmalige grote uitgaven (vakantie, reparatie) verstoren het model \u2014 handmatige invoer nodig.',
+      'Salarisdatum kan verschuiven (weekend, feestdag).',
+      'Performance: forecast berekening moet snel zijn (<100ms).',
+    ],
     competitors:
       'Monarch Money (cashflow forecasting), Simplifi (12-maanden forecast), PocketGuard (bill calendar)',
     priority: 'Hoog',
@@ -108,6 +345,27 @@ const FASE_C_FEATURES = [
     name: 'Besteedbaar Inkomen (\u201cHoeveel kan ik uitgeven?\u201d)',
     description:
       'Een groot getal bovenaan: \u201cJe kunt vandaag nog \u20acX vrij besteden.\u201d Berekend uit: saldo \u2212 gereserveerd voor vaste lasten \u2212 spaardoelen \u2212 buffer. PocketGuard noemt dit \u201cIn My Pocket\u201d en het is hun meest geliefde feature. Simpel maar krachtig \u2014 beantwoordt de #1 vraag die mensen aan hun budget-app stellen.',
+    werking:
+      'E\u00e9n prominent getal op het dashboard: \u201cJe kunt vandaag nog \u20ac847 vrij besteden deze maand.\u201d Berekening: maandelijks netto-inkomen \u2212 vaste lasten (huur, hypotheek, verzekeringen, abonnementen) \u2212 spaardoelen \u2212 al gedane variabele uitgaven deze maand = vrij besteedbaar. Dagelijkse update. Optioneel: \u201cper dag\u201d weergave: \u201cJe hebt nog \u20ac47/dag tot einde maand.\u201d Kleur-indicatie: groen (>30% budget over), oranje (10-30%), rood (<10%).',
+    afhankelijkheden: [
+      'lib/budget-forecast.ts (budgetberekeningen)',
+      'lib/recurring-detection.ts (vaste lasten detectie)',
+      'budgets tabel (maandelijkse limieten)',
+      'transacties (al gedane uitgaven)',
+      'goals (spaardoelen met maandelijkse target)',
+      'bank_accounts (saldi)',
+    ],
+    technisch:
+      'Nieuwe lib/besteedbaar.ts: berekenBesteedbaar(inkomen, vasteLasten, spaardoelen, uitgavenDezeMaand, dagenResterend) \u2192 { bedrag: number, perDag: number, status: \'groen\'|\'oranje\'|\'rood\' }. Vaste lasten = recurring met categorie-hint \'rent\', \'mortgage\', \'insurance\', \'subscription\' + budget-categorie \'vaste lasten\'. Spaardoelen = actieve goals met maandelijkse contribution. Nieuwe widget besteedbaar (mini of quarter-size) \u2014 prominent op dashboard. Optioneel integreren in bestaande quick_glance of netto_resultaat widget.',
+    waardeGebruiker:
+      'Beantwoordt de #1 vraag die mensen stellen: \u201cHoeveel kan ik uitgeven?\u201d PocketGuard\u2019s \u201cIn My Pocket\u201d is hun meest geliefde feature. Reduceert budget-stress door \u00e9\u00e9n duidelijk getal. Stimuleert bewust uitgeven zonder constant het budget te hoeven checken.',
+    aandachtspunten: [
+      'Definitie \u201cvrij besteedbaar\u201d is persoonlijk \u2014 wat is een vaste last?',
+      'Gebruikers met meerdere rekeningen: optellen of per rekening?',
+      'Onregelmatig inkomen (ZZP) maakt berekening lastiger \u2014 gebruik gemiddelde of laat gebruiker invoeren.',
+      'Geplande maar nog niet afgeschreven vaste lasten meetellen.',
+      'Credit card uitgaven die later afgeschreven worden.',
+    ],
     competitors:
       'PocketGuard (\u201cIn My Pocket\u201d / \u201cLeftover\u201d), Simplifi (Spending Plan daily available)',
     priority: 'Hoog',
@@ -116,7 +374,28 @@ const FASE_C_FEATURES = [
     nr: 13,
     name: 'Spending Patterns AI',
     description:
-      'Machine learning die patronen herkent in uitgaven: seizoenseffecten, lifestyle inflation, categorie-verschuivingen, anomalieen. \u201cJe besteedt 30% meer aan boodschappen dan 3 maanden geleden\u201d of \u201cJe horeca-uitgaven stijgen elk kwartaal.\u201d Spending patterns lib bestaat al (lib/spending-patterns.ts) \u2014 activeren en uitbreiden met AI.',
+      'Machine learning die patronen herkent in uitgaven: seizoenseffecten, lifestyle inflation, categorie-verschuivingen, anomalie\u00ebn. \u201cJe besteedt 30% meer aan boodschappen dan 3 maanden geleden\u201d of \u201cJe horeca-uitgaven stijgen elk kwartaal.\u201d Spending patterns lib bestaat al (lib/spending-patterns.ts) \u2014 activeren en uitbreiden met AI.',
+    werking:
+      'AI-gestuurde analyse die patronen ontdekt in uitgavengedrag: (1) Seizoenseffecten: \u201cDecember kost je historisch 40% meer \u2014 wil je een reservering instellen?\u201d (2) Lifestyle inflation: \u201cJe variabele uitgaven zijn de afgelopen 6 maanden met 12% gestegen.\u201d (3) Anomalie\u00ebn: \u201cJe boodschappenuitgaven waren deze week \u20ac85 hoger dan gemiddeld.\u201d (4) Categorie-trends: \u201cHoreca +23% vs vorig kwartaal.\u201d (5) Merchant-patronen: \u201cJe besteedt \u20ac180/maand bij Albert Heijn \u2014 dat is meer dan 80% van vergelijkbare huishoudens.\u201d',
+    afhankelijkheden: [
+      'lib/spending-patterns.ts (bestaat \u2014 basispatronen)',
+      'lib/recurring-detection.ts (frequentie-analyse)',
+      'transacties (6+ maanden historie nodig)',
+      'app/api/ai/chat (AI chat systeem)',
+      'briefing systeem (patronen \u2192 briefing cards)',
+      'lib/nibud/reference-data.ts (benchmark data)',
+    ],
+    technisch:
+      'Uitbreiden lib/spending-patterns.ts met: detectSeasonality(transactions, months) \u2192 SeasonalPattern[], detectLifestyleInflation(transactions, window) \u2192 InflationTrend, detectAnomalies(transactions, category, sigma) \u2192 Anomaly[]. AI-laag: feed patronen aan Will voor menselijke uitleg en aanbevelingen. Integratie met briefing: patronen als briefing cards (type: \'insight\'). Integratie met voorstellen-systeem: \u201cStel een seizoensbudget in voor december.\u201d Minimum data-vereiste: 3 maanden voor basis, 12 maanden voor seizoenspatronen.',
+    waardeGebruiker:
+      'Maakt onbewust gedrag zichtbaar. Lifestyle inflation is de grootste vijand van FIRE \u2014 als je het niet meet, kun je het niet stoppen. Seizoensadviezen voorkomen budget-overschrijdingen. Anomalie-detectie vangt fouten op (dubbele afschrijvingen, fraude).',
+    aandachtspunten: [
+      'Minimaal 3-6 maanden data nodig \u2014 nieuwe gebruikers zien weinig.',
+      'False positives bij anomalie\u00ebn (vakantie is geen anomalie).',
+      'Privacy: merchant-level analyse alleen lokaal, niet naar AI sturen.',
+      'Performance: patronen berekenen over grote transactie-sets kan traag zijn \u2014 cache/batch verwerking.',
+      'Niet te veel meldingen genereren \u2014 \u201cnotification fatigue\u201d voorkomen.',
+    ],
     competitors: 'Copilot Money (per-user ML model \u2014 best-in-class), Monarch (AI insights)',
     priority: 'Middel',
   },
@@ -125,6 +404,27 @@ const FASE_C_FEATURES = [
     name: 'Financieel Rapport PDF Export',
     description:
       'Genereer een professioneel PDF-rapport met vermogensoverzicht, budget performance, FIRE-voortgang, en trends. Bruikbaar voor: hypotheekadviseur, financieel planner, partner, of eigen archief. Rapportages module bestaat al \u2014 PDF export toevoegen.',
+    werking:
+      'Genereer een professioneel PDF-rapport met: (1) Samenvatting: netto vermogen, spaarquote, FIRE-voortgang, gezondheids-score. (2) Vermogensoverzicht: bezittingen, schulden, netto vermogen trend. (3) Budget performance: per categorie, vs vorige periode, vs NIBUD norm. (4) Beleggingsoverzicht: portefeuille allocatie, rendement, kosten. (5) FIRE-projectie: scenario\u2019s, vrijheidstijdlijn, mijlpalen. Beschikbaar als maand-, kwartaal- en jaarrapport. Geoptimaliseerd voor printen en delen.',
+    afhankelijkheden: [
+      'app/(app)/rapportages/ (rapportages module \u2014 bestaat)',
+      'app/api/report/ (balans en budget reports \u2014 bestaan)',
+      'alle dashboard data (DashboardData type)',
+      'lib/format.ts (formattering)',
+      'lib/core-metrics.ts (kerngetallen)',
+    ],
+    technisch:
+      'Twee opties: (a) Server-side PDF generatie met @react-pdf/renderer \u2014 React components die direct PDF renderen. (b) Client-side met html2canvas + jsPDF \u2014 screenshot van bestaande rapportage-pagina\u2019s. Optie (a) is professioneler maar meer werk. Nieuwe API route /api/report/pdf die rapport-data bundelt en PDF streamt. Template in TriFinity huisstijl: editorial design, fonts, module kleuren. Pagina-indeling: cover page, inhoudsopgave, secties met page breaks. Nieuwe knop \u201cDownload PDF\u201d op rapportages pagina.',
+    waardeGebruiker:
+      'Hypotheekaanvraag: adviseur vraagt om financieel overzicht \u2014 druk af als PDF. Partner overtuigen: \u201cKijk, zo staan we ervoor.\u201d Eigen archief: jaarlijks rapport voor de administratie. Financieel planner: deel je situatie professioneel. Vergroot het \u201cserieuze\u201d gevoel van de app.',
+    aandachtspunten: [
+      'PDF generatie kan traag zijn \u2014 async verwerken met progress indicator.',
+      'Privacy: welke data staat in het PDF? Gebruiker moet kunnen kiezen (zonder schulden, zonder beleggingsdetail etc.).',
+      'Bestandsgrootte beperken (<5MB).',
+      'Charts moeten als vectorafbeeldingen (SVG) in PDF \u2014 niet als pixels.',
+      'Localisatie: alle bedragen in NL notatie.',
+      'Watermark met datum/tijd voor versioning.',
+    ],
     competitors:
       'Simplifi (tax reports), Boldin (comprehensive reports), Kubera (Excel/ZIP export)',
     priority: 'Middel',
@@ -134,18 +434,59 @@ const FASE_C_FEATURES = [
     name: 'Community Benchmarks (Anoniem)',
     description:
       'Anonieme, privacy-first vergelijking: \u201cHoe doe ik het vergeleken met andere FIRE-strijders in mijn leeftijdscategorie?\u201d Vergelijk op basis van: spaarquote, FIRE-voortgang, portefeuille-allocatie. NIBUD benchmark bestaat al voor budgetten \u2014 dit is de FIRE-equivalent. Kan starten met aggregated data, geen individuele gegevens delen.',
+    werking:
+      'Anonieme vergelijking met andere TriFinity-gebruikers in dezelfde levensfase. Benchmarks op: (1) Spaarquote (percentiel: \u201cJe spaarquote van 34% is hoger dan 78% van gebruikers in jouw leeftijdscategorie\u201d), (2) FIRE-voortgang (% van doel), (3) Portefeuille-allocatie (gemiddelde verdeling), (4) Budget-discipline (% binnen budget), (5) Schuldniveau. Cohorten op basis van leeftijd + huishoudtype + inkomenscategorie. Geen individuele data \u2014 alleen aggregates (mediaan, percentielen).',
+    afhankelijkheden: [
+      'lib/nibud/reference-data.ts (bestaande NIBUD benchmark \u2014 model hiervoor)',
+      'profiles (leeftijd, huishoudtype)',
+      'lib/core-metrics.ts (kerngetallen)',
+      'net_worth_snapshots (voor trends)',
+      'Supabase (aggregatie queries)',
+    ],
+    technisch:
+      'Twee fasen: Fase 1 \u2014 statische benchmarks op basis van NIBUD data en FIRE-community gemiddelden (CBS data). Fase 2 \u2014 echte aggregatie uit TriFinity data (vereist voldoende gebruikers, minimaal ~100 per cohort). Nieuwe lib/community-benchmarks.ts: getPercentile(metric, value, cohort) \u2192 number. Supabase edge function voor privacy-veilige aggregatie: SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY savings_rate) FROM snapshots WHERE age_group = $1. Nieuwe widget community_benchmark (half-size). Privacyprotocol: k-anonymiteit (minimaal 20 gebruikers per cohort), geen individuele data opvraagbaar, opt-in.',
+    waardeGebruiker:
+      'Sociale vergelijking is een krachtige motivator. \u201cBen ik normaal?\u201d is een universele vraag. NIBUD benchmark bestaat al voor budgetten \u2014 dit is de FIRE-equivalent. Gamification: stijgen in percentiel voelt als progressie.',
+    aandachtspunten: [
+      'Privacy is kritiek \u2014 GDPR-compliant, opt-in, k-anonymiteit.',
+      'Te weinig gebruikers in beginfase \u2014 start met statische benchmarks.',
+      'Vergelijking kan demotiveren (\u201cik sta er slechter voor dan gemiddeld\u201d) \u2014 framing als \u201cgroeikans\u201d niet als \u201cranking\u201d.',
+      'Niet vergelijken op absolute bedragen (inkomensverschillen) maar op ratio\u2019s.',
+      'Manipulation: gebruikers die extreme data invoeren verstoren aggregaten \u2014 outlier detection nodig.',
+    ],
     competitors:
       'Niemand doet dit goed \u2014 Boldin heeft een PeerScore maar beperkt',
     priority: 'Laag',
   },
-] as const
+]
 
-const FASE_D_FEATURES = [
+const FASE_D_FEATURES: readonly Feature[] = [
   {
     nr: 16,
-    name: 'Document Vault / Financiele Kluis',
+    name: 'Document Vault / Financi\u00eble Kluis',
     description:
-      'Alle financiele documenten op een plek: polissen, testamenten, contracten, jaaropgaves, belastingaangiftes. Pensioen PDF opslag bestaat al via Supabase Storage \u2014 uitbreiden naar een volledige kluis met categorisatie, vervaldatum-alerts, en delen met partner. Kubera vraagt $249/jaar voor vergelijkbare functionaliteit.',
+      'Alle financi\u00eble documenten op \u00e9\u00e9n plek: polissen, testamenten, contracten, jaaropgaves, belastingaangiftes. Pensioen PDF opslag bestaat al via Supabase Storage \u2014 uitbreiden naar een volledige kluis met categorisatie, vervaldatum-alerts, en delen met partner. Kubera vraagt $249/jaar voor vergelijkbare functionaliteit.',
+    werking:
+      'Beveiligde opslagplaats voor alle financi\u00eble documenten, georganiseerd per categorie: polissen (zorg, inboedel, aansprakelijkheid, overlijden), contracten (hypotheek, huur, arbeidsovereenkomst), belasting (aangiftes, aanslagen, jaaropgaves), pensioen (UPO\u2019s, pensioenoverzichten), testament/notarieel, overig. Per document: upload, titel, categorie, vervaldatum, notities. Automatische reminder bij naderende vervaldatum. Delen met partner (huishouden-integratie). Zoekfunctie over document-titels.',
+    afhankelijkheden: [
+      'Supabase Storage (bucket pension_documents bestaat al \u2014 uitbreiden)',
+      'app/api/household/ (huishouden-systeem)',
+      'meldingen-systeem (vervaldatum alerts)',
+      'profiles (partner-koppeling)',
+    ],
+    technisch:
+      'Nieuw Supabase Storage bucket financial_documents met RLS policies. Nieuwe tabel documents: id, user_id, title, category, file_path, mime_type, size_bytes, expiry_date, notes, shared_with_partner, created_at. Categorie\u00ebn als enum. API routes: /api/documents (CRUD), /api/documents/[id]/download. Max bestandsgrootte: 10MB per document, 100MB per gebruiker. Encryptie: Supabase storage is al encrypted at rest. Nieuwe pagina /identity/kluis of /core/documenten. RLS: gebruiker ziet alleen eigen documenten + gedeelde partner-documenten.',
+    waardeGebruiker:
+      '\u201cWaar is mijn polis?\u201d \u2014 universeel probleem. Kubera vraagt $249/jaar voor vergelijkbare functionaliteit. Vervaldatum-alerts voorkomen onbewust onverzekerd zijn. Compleet financieel overzicht: niet alleen cijfers maar ook de onderliggende documenten. Bij overlijden: partner heeft direct toegang tot alle documenten.',
+    aandachtspunten: [
+      'Privacy en security zijn kritiek \u2014 financi\u00eble documenten zijn zeer gevoelig.',
+      'Supabase Storage encryptie is voldoende maar communiceer dit duidelijk.',
+      'Bestandsformaten: PDF, JPG, PNG als minimum \u2014 geen executables.',
+      'Virus scanning overwegen.',
+      'Storage kosten bij schaling.',
+      'GDPR: recht op verwijdering moet alle documenten includeren.',
+      'Backups: documenten moeten mee in data export.',
+    ],
     competitors: 'Kubera (encrypted document vault \u2014 premium feature)',
     priority: 'Middel',
   },
@@ -154,6 +495,28 @@ const FASE_D_FEATURES = [
     name: 'Nalatenschapsplanning (\u201cDead Man\u2019s Switch\u201d)',
     description:
       'Bij langdurige inactiviteit automatisch een vertrouwenspersoon informeren. Stel in: \u201cAls ik 30 dagen niet inlog, stuur een email naar [partner] met toegang tot mijn financieel overzicht.\u201d Inclusief: wie krijgt wat, waar staan de documenten, contactgegevens adviseurs. Huishouden-systeem en delen-functionaliteit bestaan al \u2014 uitbreiden met inactiviteit-detectie.',
+    werking:
+      'Configureerbaar inactiviteits-detectiesysteem: (1) Stel een vertrouwenspersoon in (naam, email, relatie). (2) Kies inactiviteitsperiode (14/30/60/90 dagen). (3) Na de inactiviteitsperiode: eerst een reeks herinneringen aan de gebruiker (\u201cBen je er nog?\u201d). (4) Als geen reactie: email naar vertrouwenspersoon met een beveiligde link naar een beperkt financieel overzicht. (5) Overzicht bevat: netto vermogen samenvatting, lijst van rekeningen/instellingen, contactgegevens adviseurs, link naar document vault.',
+    afhankelijkheden: [
+      'Supabase Auth (laatste login tracking)',
+      'app/api/household/ (huishouden-systeem)',
+      'app/(app)/identity/delen/ (delen-functionaliteit)',
+      'document vault (feature #16, optioneel)',
+      'meldingen-systeem',
+      'email systeem (Supabase of externe provider)',
+    ],
+    technisch:
+      'Nieuwe tabel beneficiary_settings: id, user_id, contact_name, contact_email, contact_relation, inactivity_days, is_active, last_check_at, status (active|warning|triggered). Cron job (dagelijks): check profiles.last_sign_in_at vs inactivity_days. Escalatie: dag 1-3 na trigger \u2192 email naar gebruiker (\u201cJe bent X dagen niet ingelogd\u201d). Dag 4+ \u2192 email naar vertrouwenspersoon met secure token. Secure overzicht: tijdelijke pagina /share/beneficiary/[token] met beperkte data (netto vermogen, rekeningen-lijst, geen transactiedetail). Token verloopt na 30 dagen. API: /api/beneficiary (CRUD settings), /api/beneficiary/verify (token verificatie).',
+    waardeGebruiker:
+      'Kubera\u2019s \u201cLife Beat\u201d is hun meest genoemde differentiator. Psychologische rust: \u201cAls mij iets overkomt, weet mijn partner waar alles staat.\u201d Relevant voor: alleenstaanden, oudere gebruikers, mensen met complex financieel leven. Combinatie met document vault maakt het compleet.',
+    aandachtspunten: [
+      'False positives: vakantie zonder internet \u2260 overlijden \u2014 daarom eerst herinneringen aan gebruiker.',
+      'Email deliverability: vertrouwenspersoon email moet aankomen (SPF/DKIM).',
+      'Beveiligde link moet echt veilig zijn \u2014 rate limiting, IP logging.',
+      'Ethische overwegingen: hoe communiceer je dit feature tactful? Niet \u201cals je doodgaat\u201d maar \u201cvoor je gemoedsrust\u201d.',
+      'GDPR: vertrouwenspersoon data verwerking.',
+      'Periodieke test: laat gebruiker een test-email versturen.',
+    ],
     competitors:
       'Kubera (\u201cLife Beat\u201d / Dead Man\u2019s Switch \u2014 hun meest onderscheidende feature)',
     priority: 'Middel',
@@ -162,7 +525,27 @@ const FASE_D_FEATURES = [
     nr: 18,
     name: 'Internationale Belasting Vergelijking',
     description:
-      'Voor FIRE-emigranten: vergelijk je belastingdruk in NL vs Portugal vs Spanje vs Belgie vs Duitsland. Hoeveel sneller bereik je FIRE in een ander land? Box 3 engine bestaat \u2014 bouw vergelijkbare engines voor populaire FIRE-bestemmingen. Relevant voor de groeiende groep digital nomads en FIRE-emigranten.',
+      'Voor FIRE-emigranten: vergelijk je belastingdruk in NL vs Portugal vs Spanje vs Belgi\u00eb vs Duitsland. Hoeveel sneller bereik je FIRE in een ander land? Box 3 engine bestaat \u2014 bouw vergelijkbare engines voor populaire FIRE-bestemmingen. Relevant voor de groeiende groep digital nomads en FIRE-emigranten.',
+    werking:
+      'Vergelijk je belastingdruk als FIRE-emigrant in populaire bestemmingen: Nederland, Portugal, Spanje, Belgi\u00eb, Duitsland, Griekenland, Itali\u00eb. Per land: vermogensbelasting equivalent, inkomstenbelasting op onttrekkingen, totale jaarlijkse belastingdruk, en het effect op je FIRE-datum/benodigde vermogen. \u201cIn Portugal bereik je FIRE 3 jaar eerder door het NHR-regime\u201d of \u201cBelgi\u00eb heeft geen vermogensbelasting \u2014 je bespaart \u20acX/jaar.\u201d',
+    afhankelijkheden: [
+      'lib/box3-data.ts (NL belasting als baseline)',
+      'lib/fire-simulation.ts (FIRE berekening per land)',
+      'lib/horizon-data.ts (scenario berekeningen)',
+    ],
+    technisch:
+      'Nieuwe lib/international-tax/ directory met per-land modules: portugal.ts, spain.ts, belgium.ts, germany.ts, greece.ts, italy.ts. Elk module: computeAnnualTax(portfolio, withdrawals, income) \u2192 TaxResult. Hoofd-module: lib/international-tax/compare.ts: compareTaxRegimes(profile, countries) \u2192 CountryComparison[]. Focus op vermogensbelasting + onttrekkingsbelasting (de twee grootste posten voor FIRE). Vereenvoudigd model \u2014 geen volledige belastingaangifte-simulatie. Nieuwe pagina /horizon/emigratie met kaart/tabel vergelijking.',
+    waardeGebruiker:
+      'Groeiende trend van FIRE-emigratie (Portugal, Griekenland populair). Belasting is vaak de #1 factor in landkeuze. Huidige informatie is verspreid over blogs en forums \u2014 geen tool die het doorrekent. Kan duizenden euro\u2019s per jaar verschil maken.',
+    aandachtspunten: [
+      'Belastingwetgeving wijzigt constant per land \u2014 onderhoudslast is hoog.',
+      'Portugal NHR-regime is afgeschaft/gewijzigd \u2014 actueel houden.',
+      'Sociale premies, zorgkosten en levenskosten zijn ook factoren \u2014 niet alleen belasting.',
+      'Geen emigratie-advies \u2014 disclaimer.',
+      'Dubbele belastingverdragen zijn complex.',
+      'Start met 3-4 landen, breid later uit.',
+      'Model moet vereenvoudigd maar niet misleidend zijn.',
+    ],
     competitors:
       'Niemand \u2014 ProjectionLab heeft tax presets voor enkele landen maar geen vergelijking',
     priority: 'Laag',
@@ -172,6 +555,26 @@ const FASE_D_FEATURES = [
     name: 'API voor Derden',
     description:
       'Open API waarmee power users en developers eigen integraties kunnen bouwen: spreadsheet-koppelingen, custom dashboards, automatiseringen. YNAB\u2019s API is een van hun meest gewaardeerde features bij de tech-savvy FIRE-community. Start met read-only endpoints voor saldi, transacties, en FIRE-metrics.',
+    werking:
+      'RESTful API waarmee geauthenticeerde gebruikers hun eigen financi\u00eble data kunnen opvragen: saldi, transacties, netto vermogen, FIRE-metrics, budget status. Use cases: Google Sheets integratie, Home Assistant dashboard, custom scripts, Zapier/Make automations. Read-only in eerste fase. API key per gebruiker, rate limited, HTTPS only.',
+    afhankelijkheden: [
+      'Supabase Auth (token verificatie)',
+      'alle bestaande API routes (intern hergebruik)',
+      'profiles tabel (API key storage)',
+    ],
+    technisch:
+      'Nieuwe API namespace: /api/v1/ met routes: /accounts, /transactions, /net-worth, /fire-metrics, /budgets, /holdings. Authenticatie: Bearer token (API key). Nieuwe tabel api_keys: id, user_id, key_hash, name, created_at, last_used_at, rate_limit. Rate limiting: 100 requests/uur default. Response format: JSON met paginatie. Versioning: /api/v1/ prefix. Documentatie: auto-generated OpenAPI spec. Middleware: lib/api/auth.ts voor API key validatie. Swagger UI op /api/docs.',
+    waardeGebruiker:
+      'YNAB\u2019s API is een van hun meest gewaardeerde features bij de tech-savvy FIRE-community. Power users bouwen eigen dashboards, spreadsheets, en automatiseringen. Community-effect: developers bouwen integraties die TriFinity waardevoller maken voor iedereen. Spreadsheet-coupling is de #1 requested feature bij finance apps.',
+    aandachtspunten: [
+      'Security: API keys moeten gehasht opgeslagen worden.',
+      'Rate limiting voorkomt misbruik.',
+      'Scope: welke data is toegankelijk? Geen schrijf-operaties in V1.',
+      'GDPR: data portabiliteit is een recht \u2014 API faciliteert dit.',
+      'Versioning: backward compatibility bewaken.',
+      'Documentatie-onderhoud.',
+      'Performance: voorkom dat API-gebruikers de database overbelasten.',
+    ],
     competitors:
       'YNAB (public API), Kubera (first-party API), Wealthica (developer API + add-ons), Actual Budget (local API)',
     priority: 'Laag',
@@ -181,10 +584,31 @@ const FASE_D_FEATURES = [
     name: 'Schenkbelasting Planner',
     description:
       'Optimale timing en strategie voor schenken aan kinderen of familie. Jaarlijkse vrijstellingen, eenmalig verhoogde vrijstelling, effect op eigen FIRE-datum vs voordeel voor ontvanger. Life events module heeft al schenkbelasting calculator \u2014 uitbreiden naar een volledige planner met meerjarenadvies.',
+    werking:
+      'Meerjarenplanner voor schenkingen aan kinderen of familie: (1) Overzicht jaarlijkse vrijstellingen per relatie (kind, kleinkind, overig). (2) Eenmalig verhoogde vrijstelling (waar nog van toepassing). (3) Schenking-scenario\u2019s: \u201cAls je 10 jaar lang \u20ac6.035/jaar schenkt aan elk kind, bespaar je \u20acX aan erfbelasting en het kost je Y maanden FIRE-tijd.\u201d (4) Effect op eigen FIRE-datum vs voordeel voor ontvanger. (5) Optimale timing: wanneer beginnen met schenken?',
+    afhankelijkheden: [
+      'lib/horizon-data.ts (LIFE_EVENT_CATALOG \u2014 schenkbelasting calculator bestaat al)',
+      'lib/fire-simulation.ts (FIRE impact)',
+      'profiles (kinderen data uit huishouden)',
+      'lib/format.ts (formattering)',
+    ],
+    technisch:
+      'Uitbreiden bestaande schenkbelasting calculator in lib/horizon-data.ts. Nieuwe lib/schenk-planner.ts: planSchenkingen(kinderen, vrijstellingen, horizon, eigenVermogen) \u2192 SchenkPlan. SchenkPlan bevat per jaar: schenking per kind, totale schenking, schenkbelasting, eigen vermogen na schenking, FIRE-datum impact. Vergelijk strategie\u00ebn: (a) niet schenken (meer erfbelasting later), (b) jaarlijks maximaal vrijgesteld, (c) eenmalig groot (met belasting). Erfbelasting-besparing berekenen: berekenErfbelasting(nalatenschap, relatie) \u2192 number. Nieuwe pagina /horizon/schenken of modal in life events.',
+    waardeGebruiker:
+      'Erfbelasting in NL is 10-40% \u2014 optimaal schenken kan tienduizenden euro\u2019s besparen. Fiscalisten rekenen \u20ac200+/uur voor schenkingsadvies. Emotioneel beladen onderwerp: \u201cHoeveel kan ik weggeven zonder mijn eigen FIRE in gevaar te brengen?\u201d TriFinity beantwoordt dit data-driven.',
+    aandachtspunten: [
+      'Vrijstellingsbedragen wijzigen jaarlijks \u2014 onderhoud nodig.',
+      'Jubelton is afgeschaft \u2014 niet meer aanbieden.',
+      'Fiscale partnersituatie be\u00efnvloedt vrijstellingen.',
+      'Schenkingen uit voorgaande jaren tellen mee bij erfbelasting \u2014 complexe verrekening.',
+      'Niet-financieel advies disclaimer.',
+      'Overgangsrecht en anti-misbruikbepalingen.',
+      'Schenking kan ongedaan gemaakt worden door schuldeisers \u2014 waarschuwing.',
+    ],
     competitors: 'Niemand \u2014 fiscalisten bieden dit als betaalde dienst',
     priority: 'Laag',
   },
-] as const
+]
 
 /* ── Priority badge colors ────────────────────────────────── */
 function PriorityBadge({ priority }: { priority: string }) {
@@ -202,39 +626,119 @@ function PriorityBadge({ priority }: { priority: string }) {
   )
 }
 
-/* ── Feature card ─────────────────────────────────────────── */
+/* ── Feature card (collapsible details) ───────────────────── */
 function FeatureCard({
   nr,
   name,
   description,
+  werking,
+  afhankelijkheden,
+  technisch,
+  waardeGebruiker,
+  aandachtspunten,
   competitors,
   priority,
-}: {
-  nr: number
-  name: string
-  description: string
-  competitors: string
-  priority: string
-}) {
+}: Feature) {
   return (
-    <div className="flex gap-4 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-colors hover:bg-[var(--subtle)]">
-      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--subtle)] font-mono text-sm font-bold tabular-nums text-[var(--ink-2)]">
-        {nr}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+    <details className="group rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:bg-[var(--subtle)]">
+      {/* Collapsed summary: number, name, priority */}
+      <summary className="flex cursor-pointer select-none items-center gap-4 p-4">
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--subtle)] font-mono text-sm font-bold tabular-nums text-[var(--ink-2)]">
+          {nr}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <p className="font-display text-sm font-bold text-[var(--ink)]">{name}</p>
           <PriorityBadge priority={priority} />
         </div>
-        <p className="mb-2.5 font-serif text-[13px] leading-relaxed text-[var(--ink-2)]">
+        <span className="flex-shrink-0 text-[var(--ink-4)] transition-transform group-open:rotate-90">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </summary>
+
+      {/* Expanded detail sections */}
+      <div className="space-y-5 border-t border-[var(--border-ed)] px-4 pb-5 pt-4">
+        {/* Description */}
+        <p className="font-serif text-[13px] leading-relaxed text-[var(--ink-2)]">
           {description}
         </p>
-        <p className="text-[11px] text-[var(--ink-3)]">
-          <span className="font-semibold text-[var(--ink-2)]">Wie heeft het:</span>{' '}
-          {competitors}
-        </p>
+
+        {/* Werking */}
+        <div>
+          <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Werking
+          </p>
+          <p className="font-serif text-[13px] leading-relaxed text-[var(--ink-2)]">
+            {werking}
+          </p>
+        </div>
+
+        {/* Afhankelijkheden */}
+        <div>
+          <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Afhankelijkheden
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {afhankelijkheden.map((dep) => (
+              <span
+                key={dep}
+                className="rounded bg-[var(--subtle)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--ink-2)]"
+              >
+                {dep}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Technisch */}
+        <div>
+          <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Technisch
+          </p>
+          <p className="font-serif text-[13px] leading-relaxed text-[var(--ink-2)]">
+            {technisch}
+          </p>
+        </div>
+
+        {/* Waarde gebruiker */}
+        <div>
+          <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Waarde gebruiker
+          </p>
+          <p className="font-serif text-[13px] leading-relaxed text-[var(--ink-2)]">
+            {waardeGebruiker}
+          </p>
+        </div>
+
+        {/* Aandachtspunten */}
+        <div>
+          <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Aandachtspunten
+          </p>
+          <ul className="list-inside list-disc space-y-0.5">
+            {aandachtspunten.map((punt) => (
+              <li
+                key={punt}
+                className="font-serif text-[13px] leading-relaxed text-[var(--ink-3)]"
+              >
+                {punt}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Wie heeft het */}
+        <div>
+          <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Wie heeft het
+          </p>
+          <p className="font-serif text-[13px] leading-relaxed text-[var(--ink-2)]">
+            {competitors}
+          </p>
+        </div>
       </div>
-    </div>
+    </details>
   )
 }
 
@@ -252,13 +756,7 @@ function PhaseSection({
   subtitle: string
   accentColor: string
   accentBg: string
-  features: ReadonlyArray<{
-    readonly nr: number
-    readonly name: string
-    readonly description: string
-    readonly competitors: string
-    readonly priority: string
-  }>
+  features: readonly Feature[]
 }) {
   return (
     <section

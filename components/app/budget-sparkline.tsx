@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 export type SparklineDataPoint = {
@@ -66,7 +66,7 @@ function calculateTrend(values: number[]): 'up' | 'down' | 'flat' {
  *
  * Handles sparse data (< 12 months) gracefully.
  */
-export function BudgetSparkline({
+export const BudgetSparkline = memo(function BudgetSparkline({
   data,
   width = 120,
   height = 32,
@@ -253,12 +253,12 @@ export function BudgetSparkline({
       </svg>
     </div>
   )
-}
+})
 
 /**
  * Compact sparkline with trend label for use in cards and lists
  */
-export function SparklineWithLabel({
+export const SparklineWithLabel = memo(function SparklineWithLabel({
   data,
   width = 80,
   height = 24,
@@ -302,6 +302,6 @@ export function SparklineWithLabel({
       )}
     </div>
   )
-}
+})
 
 export { calculateTrend }

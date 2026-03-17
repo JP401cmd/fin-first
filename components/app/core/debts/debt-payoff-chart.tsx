@@ -1,10 +1,11 @@
 'use client'
 
+import { memo } from 'react'
 import type { Debt } from '@/lib/debt-data'
 import { simulatePayoff } from '@/lib/debt-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
-export function PayoffChart({ months, debts }: { months: ReturnType<typeof simulatePayoff>; debts: Debt[] }) {
+export const PayoffChart = memo(function PayoffChart({ months, debts }: { months: ReturnType<typeof simulatePayoff>; debts: Debt[] }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 500 })
   if (months.length === 0) return null
 
@@ -107,4 +108,4 @@ export function PayoffChart({ months, debts }: { months: ReturnType<typeof simul
     </svg>
     </div>
   )
-}
+})

@@ -87,7 +87,7 @@ describe('categorizeTransaction with freqMap', () => {
     )
     expect(result.budget_id).toBe('b-freq')
     expect(result.confidence).toBe(0.83)
-    expect(result.category_source).toBe('frequency')
+    expect(result.category_source).toBe('rule')
   })
 
   it('corrections take priority over frequency match', () => {

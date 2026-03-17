@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -35,7 +36,7 @@ interface Props {
   href?: string
 }
 
-export function AssetsWidget({ size, data, href }: Props) {
+export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Props) {
   const { totalAssets, monthlyContributions, monthlyExpenses, assetsByType, totalPurchaseValue } = data
 
   if (totalAssets === 0 && assetsByType.length === 0) {
@@ -193,4 +194,4 @@ export function AssetsWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

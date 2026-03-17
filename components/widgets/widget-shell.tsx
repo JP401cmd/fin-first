@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Link from 'next/link'
 import { Lock, ArrowRight } from 'lucide-react'
 import type { WidgetModule, WidgetSize } from '@/lib/widget-catalog'
@@ -48,7 +49,7 @@ interface WidgetShellProps {
   kickerPosition?: 'top' | 'left'
 }
 
-export function WidgetShell({ module, size, kicker, href, onClick, children, className = '', kickerPosition = 'top' }: WidgetShellProps) {
+export const WidgetShell = memo(function WidgetShell({ module, size, kicker, href, onClick, children, className = '', kickerPosition = 'top' }: WidgetShellProps) {
   const accent = MODULE_ACCENT[module]
   const hoverBorder = MODULE_HOVER_BORDER[module]
   const kickerColor = MODULE_KICKER[module]
@@ -168,7 +169,7 @@ export function WidgetShell({ module, size, kicker, href, onClick, children, cla
       {content}
     </div>
   )
-}
+})
 
 // ── LockedWidgetShell ─────────────────────────────────────────
 
@@ -179,7 +180,7 @@ interface LockedWidgetShellProps {
   requiredPhase: string
 }
 
-export function LockedWidgetShell({ module, size, name, requiredPhase }: LockedWidgetShellProps) {
+export const LockedWidgetShell = memo(function LockedWidgetShell({ module, size, name, requiredPhase }: LockedWidgetShellProps) {
   const accent = MODULE_ACCENT[module]
   const minH = SIZE_HEIGHT[size]
   const isMini = size === 'mini'
@@ -215,4 +216,4 @@ export function LockedWidgetShell({ module, size, name, requiredPhase }: LockedW
       </div>
     </div>
   )
-}
+})

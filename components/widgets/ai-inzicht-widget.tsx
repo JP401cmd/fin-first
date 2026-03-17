@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -34,7 +35,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function AiInzichtWidget({ size, data, href }: Props) {
+export const AiInzichtWidget = memo(function AiInzichtWidget({ size, data, href }: Props) {
   const { aiInsights } = data
 
   if (aiInsights.length === 0) {
@@ -151,4 +152,4 @@ export function AiInzichtWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

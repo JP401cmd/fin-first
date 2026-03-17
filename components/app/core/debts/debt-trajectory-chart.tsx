@@ -1,11 +1,12 @@
 'use client'
 
+import { memo } from 'react'
 import type { Debt } from '@/lib/debt-data'
 import { amortizationSchedule, linearAmortization, interestOnlySchedule } from '@/lib/debt-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { Valuation } from './debt-types'
 
-export function DebtTrajectoryChart({
+export const DebtTrajectoryChart = memo(function DebtTrajectoryChart({
   debt,
   valuations,
 }: {
@@ -273,4 +274,4 @@ export function DebtTrajectoryChart({
       </svg>
     </div>
   )
-}
+})

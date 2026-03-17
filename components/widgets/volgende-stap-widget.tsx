@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, NextStep } from './widget-renderer'
@@ -28,7 +29,7 @@ function StepCard({ step }: { step: NextStep }) {
   )
 }
 
-export function VolgendeStapWidget({ size, data, href }: Props) {
+export const VolgendeStapWidget = memo(function VolgendeStapWidget({ size, data, href }: Props) {
   const { nextSteps } = data
   const active = nextSteps.filter(s => !s.dismissed)
 
@@ -126,4 +127,4 @@ export function VolgendeStapWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

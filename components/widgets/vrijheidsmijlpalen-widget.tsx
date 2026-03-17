@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -23,7 +24,7 @@ function yearsToDate(years: number): string {
   return d.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
 }
 
-export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
+export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
   const { freedomPct, fireTarget, netWorth, fireProjResult, simRequiredPortfolio, simFireCountdown } = data
   const effectiveFire = simRequiredPortfolio ?? fireTarget
   const effectivePct = effectiveFire > 0 ? Math.min((netWorth / effectiveFire) * 100, 100) : freedomPct
@@ -128,4 +129,4 @@ export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

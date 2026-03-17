@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
@@ -36,7 +36,7 @@ export type MonteCarloOverlay = {
 
 // ── SimChart ────────────────────────────────────────────────────────────────
 
-export function SimChart({
+export const SimChart = memo(function SimChart({
   rows,
   fireAge,
   fireAgeFractional,
@@ -796,7 +796,7 @@ export function SimChart({
       )}
     </div>
   )
-}
+})
 
 // ── Scenario variant builder ────────────────────────────────────────────────
 

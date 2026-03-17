@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -74,7 +74,7 @@ interface Props {
   href?: string
 }
 
-export function BerichtenWidget({ size, href }: Props) {
+export const BerichtenWidget = memo(function BerichtenWidget({ size, href }: Props) {
   const news = useNewsCache()
   const edition = getEditionNumber()
 
@@ -208,4 +208,4 @@ export function BerichtenWidget({ size, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

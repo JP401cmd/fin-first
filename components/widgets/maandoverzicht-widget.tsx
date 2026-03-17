@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -43,7 +44,7 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   )
 }
 
-export function MaandoverzichtWidget({ size, data, href }: Props) {
+export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, data, href }: Props) {
   const { monthSummary, netWorthHistory } = data
   const { netWorthDelta, freedomDaysWon, savingsRate, budgetScore, prevMonthComparison } = monthSummary
   const deltaPositive = netWorthDelta >= 0
@@ -248,4 +249,4 @@ export function MaandoverzichtWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

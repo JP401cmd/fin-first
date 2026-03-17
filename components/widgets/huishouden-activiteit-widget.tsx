@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -20,7 +21,7 @@ function formatDateShort(dateStr: string): string {
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 }
 
-export function HuishoudenActiviteitWidget({ size, data, href }: Props) {
+export const HuishoudenActiviteitWidget = memo(function HuishoudenActiviteitWidget({ size, data, href }: Props) {
   const { perspective, isHousehold } = usePerspective()
 
   const items = data.householdActivity ?? []
@@ -135,4 +136,4 @@ export function HuishoudenActiviteitWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

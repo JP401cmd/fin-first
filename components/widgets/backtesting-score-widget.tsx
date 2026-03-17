@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -9,7 +10,7 @@ interface Props {
   href?: string
 }
 
-export function BacktestingScoreWidget({ size, data, href }: Props) {
+export const BacktestingScoreWidget = memo(function BacktestingScoreWidget({ size, data, href }: Props) {
   const { backtestSuccessRate, backtestNamedPaths } = data
 
   if (backtestSuccessRate == null) {
@@ -94,4 +95,4 @@ export function BacktestingScoreWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

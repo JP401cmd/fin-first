@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -23,7 +24,7 @@ function typeLabel(type: string): string {
   return TYPE_LABELS[type] ?? type
 }
 
-export function BeslissingspatronenWidget({ size, data, href }: Props) {
+export const BeslissingspatronenWidget = memo(function BeslissingspatronenWidget({ size, data, href }: Props) {
   const { decisionPatterns } = data
 
   // Sort descending by days won
@@ -106,4 +107,4 @@ export function BeslissingspatronenWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

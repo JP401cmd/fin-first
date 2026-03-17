@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -14,7 +15,7 @@ interface Props {
   href?: string
 }
 
-export function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
+export const HuishoudenVergelijkingWidget = memo(function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
   const { perspective, isHousehold, partnerName } = usePerspective()
 
   const dailyExp = data.monthlyExpenses / 30
@@ -157,4 +158,4 @@ export function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

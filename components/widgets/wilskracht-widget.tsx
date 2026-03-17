@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Sparkles } from 'lucide-react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -17,7 +18,7 @@ interface WilskrachtWidgetProps {
   href?: string
 }
 
-export function WilskrachtWidget({ size, data, href }: WilskrachtWidgetProps) {
+export const WilskrachtWidget = memo(function WilskrachtWidget({ size, data, href }: WilskrachtWidgetProps) {
   const {
     willpowerScore,
     completionRatio,
@@ -159,4 +160,4 @@ export function WilskrachtWidget({ size, data, href }: WilskrachtWidgetProps) {
       </div>
     </WidgetShell>
   )
-}
+})

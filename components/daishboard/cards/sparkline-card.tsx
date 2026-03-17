@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { BriefingCard } from '../briefing-card'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { SparklineCardSpec, SparklineDataKey } from '@/lib/briefing/types'
@@ -26,7 +26,7 @@ const W = 180
 const H = 48
 const PAD = { top: 4, bottom: 4, left: 0, right: 0 }
 
-export function SparklineCard({ spec, data }: Props) {
+export const SparklineCard = memo(function SparklineCard({ spec, data }: Props) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1000 })
 
   const history = getHistoryData(data, spec.dataKey)
@@ -92,4 +92,4 @@ export function SparklineCard({ spec, data }: Props) {
       </div>
     </BriefingCard>
   )
-}
+})

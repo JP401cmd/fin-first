@@ -56,12 +56,14 @@ export default async function AppLayout({
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
-  const [profileRes, assetsRes, debtsRes, txRes, matrixRes] = await Promise.all([
+  const [profileRes, assetsRes, debtsRes, txRes, matrixRes, lastLevelRes] = await Promise.all([
     supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences').eq('id', user.id).single(),
     supabase.from('assets').select('current_value').eq('user_id', user.id).eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type').eq('user_id', user.id).eq('is_active', true),
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
     supabase.from('app_settings').select('value').eq('key', 'unified_feature_matrix').maybeSingle(),
+    // Sovereignty level change detection (was sequential — moved into batch)
+    supabase.from('app_settings').select('value').eq('key', `last_sovereignty_level_${user.id}`).maybeSingle(),
   ])
 
   const profile = profileRes.data
@@ -98,12 +100,6 @@ export default async function AppLayout({
   }
 
   // ── Sovereignty level change detection ────────────────
-  const lastLevelRes = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', `last_sovereignty_level_${user.id}`)
-    .maybeSingle()
-
   const lastLevel = lastLevelRes.data?.value ? Number(JSON.parse(lastLevelRes.data.value)) : null
 
   if (lastLevel !== null && featureAccess.level > lastLevel) {

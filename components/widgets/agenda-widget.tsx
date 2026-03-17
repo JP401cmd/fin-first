@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -47,7 +48,7 @@ function getWeekNumber(dateStr: string): number {
   return Math.ceil((diff / (1000 * 60 * 60 * 24) + startOfYear.getDay() + 1) / 7)
 }
 
-export function AgendaWidget({ size, data, href }: Props) {
+export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Props) {
   const { upcomingEvents } = data
 
   // ── Empty state ────────────────────────────────────────────
@@ -211,4 +212,4 @@ export function AgendaWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

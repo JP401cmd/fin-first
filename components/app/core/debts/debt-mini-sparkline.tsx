@@ -1,8 +1,9 @@
 'use client'
 
+import { memo } from 'react'
 import type { Valuation } from './debt-types'
 
-export function DebtMiniSparkline({
+export const DebtMiniSparkline = memo(function DebtMiniSparkline({
   debtId,
   valuations,
   currentBalance,
@@ -84,4 +85,4 @@ export function DebtMiniSparkline({
       </svg>
     </div>
   )
-}
+})

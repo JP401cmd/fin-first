@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lightbulb, Clock } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
@@ -43,7 +43,7 @@ type Props = {
   onClose: () => void
 }
 
-export function NotificationItem({ notification, onRead, onClose }: Props) {
+export const NotificationItem = memo(function NotificationItem({ notification, onRead, onClose }: Props) {
   const router = useRouter()
   const { openWithMessage } = useChatContext()
   const [showLevelUp, setShowLevelUp] = useState(false)
@@ -212,4 +212,4 @@ export function NotificationItem({ notification, onRead, onClose }: Props) {
       </div>
     </div>
   )
-}
+})

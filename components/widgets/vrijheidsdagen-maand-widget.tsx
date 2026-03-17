@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -66,7 +67,7 @@ function BarChart({
   )
 }
 
-export function VrijheidsdagenMaandWidget({ size, data, href }: Props) {
+export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget({ size, data, href }: Props) {
   const months = data.freedomDaysMonthly ?? []
 
   // Find current month value
@@ -193,4 +194,4 @@ export function VrijheidsdagenMaandWidget({ size, data, href }: Props) {
       )}
     </WidgetShell>
   )
-}
+})

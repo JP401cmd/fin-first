@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { AlertTriangle } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -33,7 +33,7 @@ type Props = {
  * with filled area chart projecting forward. Red zone below €500.
  * Alerts shown below the chart.
  */
-export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Props) {
+export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forecast, alerts, currentBalance }: Props) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 700 })
 
@@ -386,7 +386,7 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
       </div>
     </div>
   )
-}
+})
 
 function formatEurShort(amount: number): string {
   if (Math.abs(amount) >= 1000) {

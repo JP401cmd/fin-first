@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopGoal } from './widget-renderer'
@@ -167,7 +168,7 @@ function EmptyState({ full }: { full?: boolean }) {
 
 // ── Widget ────────────────────────────────────────────────────
 
-export function DoelenWidget({ size, data, href }: Props) {
+export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Props) {
   const { topGoals, goals } = data
   const { ref: containerRef, hasEntered } = useInViewAnimation({ duration: 800 })
   const footerLabel = goals === 1 ? '1 actief doel' : `${goals} actieve doelen`
@@ -324,4 +325,4 @@ export function DoelenWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

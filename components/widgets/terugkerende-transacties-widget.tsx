@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -29,7 +30,7 @@ function getCategoryIcon(category: string | null) {
   return <RefreshCcw className="h-3.5 w-3.5 text-[var(--ink-4)]" />
 }
 
-export function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
+export const TerugkerendeTransactiesWidget = memo(function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
   const { recurringTransactions, totalRecurringAmount, topRecurringTransactions, monthlyExpenses, monthlyIncome } = data
 
   const dailyExp = monthlyExpenses / 30
@@ -150,4 +151,4 @@ export function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
       </p>
     </WidgetShell>
   )
-}
+})

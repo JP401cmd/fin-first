@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -40,7 +41,7 @@ function buildSvgPath(
   return { pathD, fillD }
 }
 
-export function InflatieImpactWidget({ size, data, href }: Props) {
+export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, data, href }: Props) {
   const inflationRate = data.inflationRate || 0.02
 
   // ── Mini: inflation percentage only ────────────────────────
@@ -235,4 +236,4 @@ export function InflatieImpactWidget({ size, data, href }: Props) {
       </p>
     </WidgetShell>
   )
-}
+})

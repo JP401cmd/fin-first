@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -18,7 +18,7 @@ interface Props {
 
 const SVG_W = 200
 
-export function NettoVermogenWidget({ size, data, href }: Props) {
+export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, data, href }: Props) {
   const { perspective, partnerName } = usePerspective()
   const isHouseholdView = perspective === 'household' && data.householdOverrides != null
   const isPartnerView = perspective === 'partner' && data.partnerOverrides != null
@@ -413,4 +413,4 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

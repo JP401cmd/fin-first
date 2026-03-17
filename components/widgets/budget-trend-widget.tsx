@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -189,7 +190,7 @@ function Sparkline({
 
 // ── Main component ───────────────────────────────────────────
 
-export function BudgetTrendWidget({ budgetType, size, data, href }: Props) {
+export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, size, data, href }: Props) {
   const config = TYPE_CONFIGS[budgetType]
   const history = data.budgetTypeHistory[budgetType]
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
@@ -387,4 +388,4 @@ export function BudgetTrendWidget({ budgetType, size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})

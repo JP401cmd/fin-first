@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
 import { formatCurrency } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
@@ -32,7 +32,7 @@ function label(spent: number, limit: number): string {
   return `${formatCurrency(spent)} / ${formatCurrency(limit)}`
 }
 
-export function BudgetSankey({
+export const BudgetSankey = memo(function BudgetSankey({
   groups,
   spending,
   getEffectiveLimit,
@@ -181,4 +181,4 @@ export function BudgetSankey({
       </div>
     </div>
   )
-}
+})

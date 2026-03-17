@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -10,7 +11,7 @@ interface Props {
   href?: string
 }
 
-export function AbonnementenWidget({ size, data, href }: Props) {
+export const AbonnementenWidget = memo(function AbonnementenWidget({ size, data, href }: Props) {
   const { recurringTransactions, totalRecurringAmount, topRecurringTransactions, monthlyExpenses, monthlyIncome } = data
 
   const dailyExp = monthlyExpenses / 30
@@ -122,4 +123,4 @@ export function AbonnementenWidget({ size, data, href }: Props) {
       </p>
     </WidgetShell>
   )
-}
+})

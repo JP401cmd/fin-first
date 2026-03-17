@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { BarChart2 } from 'lucide-react'
@@ -9,7 +10,7 @@ interface Props {
   href?: string
 }
 
-export function MonteCarloWidget({ size, data, href }: Props) {
+export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, href }: Props) {
   const successRate = data.backtestSuccessRate
   const namedPaths = data.backtestNamedPaths
 
@@ -175,4 +176,4 @@ export function MonteCarloWidget({ size, data, href }: Props) {
       </p>
     </WidgetShell>
   )
-}
+})

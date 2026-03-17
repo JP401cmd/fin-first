@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -48,7 +49,7 @@ function buildSparklinePaths(
   return { lineD, fillD }
 }
 
-export function BeleggingsrendementWidget({ size, data, href }: Props) {
+export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget({ size, data, href }: Props) {
   const investmentAssets = data.assetsByType.filter(a => INVESTMENT_TYPES.includes(a.type))
   const totalInvestmentValue = investmentAssets.reduce((s, a) => s + a.value, 0)
   const totalInvestmentCost = investmentAssets.reduce((s, a) => s + a.purchaseValue, 0)
@@ -238,4 +239,4 @@ export function BeleggingsrendementWidget({ size, data, href }: Props) {
       </div>
     </WidgetShell>
   )
-}
+})
