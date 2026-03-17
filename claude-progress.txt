@@ -14728,3 +14728,31 @@ For Feature #51 (Transaction Import):
 
 ### Current Status
 - 1 feature completed this session (#207)
+
+## Session 2026-03-17 - Features #209, #210
+
+### Feature #209: React.memo toevoegen aan widgets, charts en lijstitems - PASSING
+- Wrapped all 46 dashboard widget components with React.memo
+- Wrapped WidgetShell and LockedWidgetShell with React.memo
+- Wrapped 17 chart components (balance-history, trend, sankey, sparklines, debt charts, sim charts, etc.)
+- Wrapped KassabonShell, NotificationItem, SparklineCard with React.memo
+- 66 total components wrapped
+- Pattern: `export const X = memo(function X(props) { ... })`
+- Zero TypeScript errors, zero console errors
+- Commit: 4f14ca12
+
+### Feature #210: horizon-client.tsx opsplitsen en modals dynamic importeren - PASSING
+- Extracted 12 helper components/functions/types to new horizon-helpers.tsx (632 lines)
+  - PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel
+  - KpiTooltip, ExploreCard, getResilienceLabel
+  - ResilienceContextMessage, ResilienceTrendChart, FireAgeTrendChart
+  - computeCumulativeImpacts, SnapshotForTrend type, PensionParseSummaryResult type
+- Converted 5 modal imports to next/dynamic with ssr:false for lazy loading
+  - ScenariosModal, SimulationsModal, WithdrawalModal, BacktestingModal, SimChartModal
+- Removed 4 unused icon imports (FileText, Download, Loader2, ExternalLink)
+- horizon-client.tsx reduced from 5,744 to 5,144 lines
+- Zero TypeScript errors, zero console errors
+- Commit: 57d51904
+
+### Current Status
+- 2 features completed this session (#209, #210)
