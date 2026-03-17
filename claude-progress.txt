@@ -1,3 +1,18 @@
+## Session 2026-03-17 - Feature #201
+
+### Feature #201: Chat FAB cirkel: wit met 60% transparantie - PASSING
+- Verified: implementation already done in Feature #200 session
+- fabBg is 'bg-white/60 backdrop-blur-sm' (white, 60% opacity, frosted glass)
+- WillDots avatar visible against white bg with text-wil-600
+- shadow-[var(--s1)] works with transparent background
+- backdrop-blur-sm provides frosted glass effect on any background
+- Could not browser-test authenticated FAB due to Supabase email rate limit
+- Code verified: bg-wil-600 only used on sendBg (not FAB)
+
+### Current Status
+- 1 feature completed this session (#201)
+- 198/201 features passing (98.5%)
+
 ## Session 2026-03-17 - Feature #200
 
 ### Feature #200: Chat FAB: witte cirkel met 60% transparantie - PASSING

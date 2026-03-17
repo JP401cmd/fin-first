@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { WillDots, FinnAvatar } from '@/components/app/will-dots'
 
-const STATES = ['idle', 'talking', 'listening', 'thinking', 'streaming', 'success', 'error'] as const
+const STATES = ['idle', 'talking', 'listening', 'thinking', 'streaming', 'success', 'error', 'loading'] as const
 
 export default function TestWillDotsPage() {
   const [activeState, setActiveState] = useState<typeof STATES[number]>('idle')
