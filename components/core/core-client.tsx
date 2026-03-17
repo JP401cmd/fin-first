@@ -41,10 +41,10 @@ import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import dynamic from 'next/dynamic'
 
-const DynBudgetsPage = dynamic(() => import('@/app/(app)/core/budgets/page'), {
+const DynBudgetsPage = dynamic(() => import('@/components/app/budgets-client'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
-const DynAssetsPage = dynamic(() => import('@/app/(app)/core/assets/page'), {
+const DynAssetsPage = dynamic(() => import('@/components/core/assets-client'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
 const DynCashOverview = dynamic(
