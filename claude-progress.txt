@@ -1,3 +1,30 @@
+## Session 2026-03-17 - Features #190, #191
+
+### Feature #190: Auto-assignment na elke AI batch van 20 transacties - PASSING
+- Replaced parallel AI batch processing with sequential batching + auto-assignment
+- After each AI batch returns, builds counterparty_name/iban map from all results so far
+- Propagates AI categories to all remaining uncategorized rows matching same counterparty
+- Drastically reduces AI API calls: e.g. 100x Albert Heijn → AI does ~20, rest auto-matched
+- Added `autoMatched` counter to aiProgress state, shown in loading + ready banners
+- IBAN matching prioritized over name matching (more specific)
+- Retry flow unchanged (parallel concurrency preserved)
+- Zero TypeScript errors
+- Commit: 8fa15588
+
+### Feature #191: Eigen rekening detectie: bulk transfer marking - PASSING
+- Added `markRowsAsTransfer()` function to handle manual transfer marking
+- When user selects "Eigen overboeking", ALL rows with same counterparty_iban are marked
+- IBAN persisted to user_own_ibans table (upsert, no duplicates) for future import recognition
+- Toast shows count of affected transactions
+- Local ownIbans set updated immediately for same-session re-use
+- Automatic detection during parsing already worked per-row (no change needed)
+- Zero TypeScript errors
+- Commit: 560dd171
+
+### Current Status
+- 2 features completed this session (#190, #191)
+- Zero TypeScript errors (verified with tsc --noEmit)
+
 ## Session 2026-03-17 - Feature #189
 
 ### Feature #189: Fix: category_source 'correction' schendt database constraint - PASSING
