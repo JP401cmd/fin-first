@@ -14654,3 +14654,28 @@ For Feature #51 (Transaction Import):
 
 ### Current Status
 - 2 features completed this session (#204, #205)
+
+## Session 2026-03-17 - Feature #207
+
+### Feature #207: Budgets pagina migreren naar server+client patroon - PASSING
+- Created `lib/budgets-data-loader.ts` (202 lines) — server-side data loader
+  - Loads budgets, transactions, splits, rollovers, budget_amounts, goals in parallel via Promise.all
+  - Builds budget tree, spending map, transaction list, uncategorized stats
+  - Exports BudgetsPageData interface + BudgetTransaction, BudgetGoal, BudgetAmountRow types
+  - Wrapped in React cache() for request deduplication
+- Created `components/app/budgets-client.tsx` (4,031 lines) — client shell
+  - Moved entire existing page code here
+  - Accepts `initialData: BudgetsPageData` prop for server-provided data
+  - Initializes all state from initialData (no loading state on first render)
+  - Uses skipInitialFetch refs to avoid redundant client-side fetch on mount
+  - Keeps all re-fetch logic for month navigation, perspective changes, mutations
+- Converted `app/(app)/core/budgets/page.tsx` to 10-line server component
+  - Follows exact pattern of identity/page.tsx: createClient → loadData → ClientComponent
+- Updated `components/core/core-client.tsx` dynamic import to new client component path
+- Zero TypeScript errors in changed files
+- Zero console errors
+- Page compiles correctly (307 auth redirect confirms no build errors)
+- Commit: a33aa706
+
+### Current Status
+- 1 feature completed this session (#207)
