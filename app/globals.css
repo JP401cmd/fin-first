@@ -446,136 +446,131 @@ body {
 }
 
 /* ── WillDots avatar animations ──────────────────────────── */
+/* All dots are at center (24,24) in the 48×48 viewBox.       */
+/* CSS animations handle positioning per state.                */
+/* Reference: Will Avatar — TriFinity.html (110px → 48 scale) */
 
-/* --- IDLE --- */
-/* Blink: scaleY squeeze on the two "eye" dots (~4s interval) */
-@keyframes will-blink {
-  0%, 88%, 100% { transform: scaleY(1); }
-  91% { transform: scaleY(0.1); }
-  94% { transform: scaleY(1); }
-}
+/* --- IDLE: Triangle with JS-driven random blink + mouth --- */
+/* All idle animations (blink, mouth pulse) are driven by JS in will-dots.tsx */
+/* Positioning is handled via inline transform to allow JS animation control */
+.will-idle-1 { transform: translate(-8px, -5px); }
+.will-idle-2 { transform: translate(8px, -5px); }
+.will-idle-3 { transform: translate(0px, 8px); }
 
-/* Breathe: whole triangle drifts up/down (5s cycle, 2px) */
-@keyframes will-breathe {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(2px); }
+/* --- TALKING: Horizontal row, slow bounce (0.9s) --- */
+@keyframes will-talking-1 {
+  0%, 100% { transform: translate(-9px, 2px); }
+  50% { transform: translate(-9px, -7px); }
 }
-
-.will-blink-dot {
-  animation: will-blink 4s ease-in-out infinite;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+@keyframes will-talking-2 {
+  0%, 100% { transform: translate(0px, 2px); }
+  50% { transform: translate(0px, -9px); }
 }
-
-.will-breathe-group {
-  animation: will-breathe 5s ease-in-out infinite;
-}
-
-/* --- TALKING: individual vertical bounce with stagger --- */
-@keyframes will-talk-1 {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-@keyframes will-talk-2 {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
-}
-@keyframes will-talk-3 {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+@keyframes will-talking-3 {
+  0%, 100% { transform: translate(9px, 2px); }
+  50% { transform: translate(9px, -5px); }
 }
 
-.will-talk-1 {
-  animation: will-talk-1 300ms ease-in-out infinite;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.will-talk-2 {
-  animation: will-talk-2 300ms ease-in-out infinite;
-  animation-delay: 120ms;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.will-talk-3 {
-  animation: will-talk-3 300ms ease-in-out infinite;
-  animation-delay: 240ms;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+.will-talking-1 { animation: will-talking-1 0.9s ease-in-out infinite; }
+.will-talking-2 { animation: will-talking-2 0.9s ease-in-out infinite 0.18s; }
+.will-talking-3 { animation: will-talking-3 0.9s ease-in-out infinite 0.36s; }
+
+/* --- THINKING: Individual orbital rotation (3.2s) --- */
+@keyframes will-orbit {
+  0%   { transform: translate(0, -10px) scale(1); }
+  25%  { transform: translate(10px, 0px) scale(0.85); }
+  50%  { transform: translate(0, 10px) scale(0.7); }
+  75%  { transform: translate(-10px, 0px) scale(0.85); }
+  100% { transform: translate(0, -10px) scale(1); }
 }
 
-/* --- THINKING: rotate around center point with 120° offset per dot --- */
-@keyframes will-think-rotate {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.will-thinking-1 { animation: will-orbit 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.will-thinking-2 { animation: will-orbit 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite -1.066s; }
+.will-thinking-3 { animation: will-orbit 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite -2.133s; }
+
+/* --- LISTENING: Sway per dot + pulsing ring --- */
+@keyframes will-listen-ring-pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.12; }
+  50% { transform: scale(1.15); opacity: 0.3; }
+}
+@keyframes will-listen-sway-1 {
+  0%, 100% { transform: translate(-8px, -5px) scale(1); }
+  25% { transform: translate(-7px, -4px) scale(1.08); }
+  50% { transform: translate(-8px, -5px) scale(1); }
+  75% { transform: translate(-9px, -7px) scale(0.92); }
+}
+@keyframes will-listen-sway-2 {
+  0%, 100% { transform: translate(8px, -5px) scale(1); }
+  25% { transform: translate(7px, -4px) scale(1.08); }
+  50% { transform: translate(8px, -5px) scale(1); }
+  75% { transform: translate(9px, -7px) scale(0.92); }
+}
+@keyframes will-listen-sway-3 {
+  0%, 100% { transform: translate(0px, 8px) scale(1); }
+  25% { transform: translate(1px, 7px) scale(1.08); }
+  50% { transform: translate(0px, 8px) scale(1); }
+  75% { transform: translate(-1px, 9px) scale(0.92); }
 }
 
-.will-think-group {
-  animation: will-think-rotate 2s linear infinite;
-  transform-origin: 24px 21.33px;
+.will-listen-ring { animation: will-listen-ring-pulse 3.5s ease-in-out infinite; }
+.will-listening-1 { animation: will-listen-sway-1 3.5s ease-in-out infinite; }
+.will-listening-2 { animation: will-listen-sway-2 3.5s ease-in-out infinite 0.5s; }
+.will-listening-3 { animation: will-listen-sway-3 3.5s ease-in-out infinite 1s; }
+
+/* --- SUCCESS: Merge-then-disperse (continuous, 2.4s) --- */
+@keyframes will-success-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  30% { transform: translate(0, 0) scale(1.25); }
+  60% { transform: translate(-10px, -7px) scale(1); }
+  80% { transform: translate(-8px, -5px) scale(1); }
+}
+@keyframes will-success-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  30% { transform: translate(0, 0) scale(1.25); }
+  60% { transform: translate(10px, -7px) scale(1); }
+  80% { transform: translate(8px, -5px) scale(1); }
+}
+@keyframes will-success-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  30% { transform: translate(0, 0) scale(1.25); }
+  60% { transform: translate(0px, 11px) scale(1); }
+  80% { transform: translate(0px, 8px) scale(1); }
 }
 
-.will-think-dot-1,
-.will-think-dot-2,
-.will-think-dot-3 {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+.will-success-1 { animation: will-success-1 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+.will-success-2 { animation: will-success-2 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite 0.08s; }
+.will-success-3 { animation: will-success-3 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite 0.16s; }
+
+/* --- ERROR: Slow shake at triangle positions (1s) --- */
+@keyframes will-error-shake {
+  0%, 100% { transform: var(--will-err-pos) translateX(0); }
+  20% { transform: var(--will-err-pos) translateX(-3px); }
+  40% { transform: var(--will-err-pos) translateX(3px); }
+  60% { transform: var(--will-err-pos) translateX(-2px); }
+  80% { transform: var(--will-err-pos) translateX(2px); }
 }
 
-/* --- LISTENING: synchronous scale pulse --- */
-@keyframes will-listen {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.15); opacity: 1; }
+.will-error-1 { --will-err-pos: translate(-8px, -5px); animation: will-error-shake 1s ease-in-out infinite; }
+.will-error-2 { --will-err-pos: translate(8px, -5px); animation: will-error-shake 1s ease-in-out infinite 0.08s; }
+.will-error-3 { --will-err-pos: translate(0px, 8px); animation: will-error-shake 1s ease-in-out infinite 0.16s; }
+
+/* --- LOADING: Horizontal row, sequential pulse (1.8s) --- */
+@keyframes will-load-pulse {
+  0%, 80%, 100% { transform: var(--will-load-pos) scale(0.6); opacity: 0.35; }
+  40% { transform: var(--will-load-pos) scale(1.15); opacity: 1; }
 }
 
-.will-listen-dot {
-  animation: will-listen 1.5s ease-in-out infinite;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
+.will-loading-1 { --will-load-pos: translate(-10px, 0); animation: will-load-pulse 1.8s ease-in-out infinite; }
+.will-loading-2 { --will-load-pos: translate(0, 0); animation: will-load-pulse 1.8s ease-in-out infinite 0.35s; }
+.will-loading-3 { --will-load-pos: translate(10px, 0); animation: will-load-pulse 1.8s ease-in-out infinite 0.7s; }
 
-/* --- STREAMING: sequential wave pulse --- */
-@keyframes will-stream {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  33% { transform: scale(1.3); opacity: 1; }
-  66% { transform: scale(1); opacity: 0.6; }
-}
-
-.will-stream-1 {
-  animation: will-stream 600ms ease-in-out infinite;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.will-stream-2 {
-  animation: will-stream 600ms ease-in-out infinite;
-  animation-delay: 200ms;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.will-stream-3 {
-  animation: will-stream 600ms ease-in-out infinite;
-  animation-delay: 400ms;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* --- SUCCESS: one-shot jump + bounce landing --- */
-@keyframes will-success {
-  0%   { transform: translateY(0); }
-  30%  { transform: translateY(-10px); }
-  55%  { transform: translateY(1px); }
-  70%  { transform: translateY(-3px); }
-  85%  { transform: translateY(0.5px); }
-  100% { transform: translateY(0); }
-}
-
-.will-success-group {
-  animation: will-success 600ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-/* --- ERROR: one-shot horizontal shake --- */
-@keyframes will-error {
-  0%, 100% { transform: translateX(0); }
-  15% { transform: translateX(-2px); }
-  30% { transform: translateX(2px); }
-  45% { transform: translateX(-2px); }
-  60% { transform: translateX(2px); }
-  75% { transform: translateX(-1px); }
-  90% { transform: translateX(1px); }
-}
-
-.will-error-group {
-  animation: will-error 300ms ease-in-out forwards;
+/* --- Reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .will-dot,
+  .will-listen-ring {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 /* ── Level-up celebration animations ─────────────────────── */
