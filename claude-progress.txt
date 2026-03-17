@@ -1,3 +1,30 @@
+## Session 2026-03-17 - Features #186, #187
+
+### Feature #186: WillDots basiscomponent — 3-dots avatar met idle animatie - PASSING
+- Created components/app/will-dots.tsx: pure SVG component with 3 dots in triangle formation
+- Kern (brown, top-left), Wil (purple, top-right), Horizon (gold, bottom-center)
+- Colors via CSS vars (--color-kern-500, --color-wil-500, --color-horizon-500) — user-customizable
+- Idle: blink animation on top two "eye" dots (~4s), breathing on whole group (5s, 2px)
+- size prop (default 48), state prop (default 'idle'), FinnAvatar backward compat alias
+- Glow filter per dot via SVG feGaussianBlur
+- Added @keyframes will-blink + will-breathe to globals.css
+
+### Feature #187: WillDots animatiestaten — talking, thinking, listening, streaming, success, error - PASSING
+- Talking: 3 individual bounce keyframes with 120ms stagger (will-talk-1/2/3)
+- Thinking: whole group rotates around center (2s/revolution, will-think-rotate)
+- Listening: synchronous scale pulse 1.0→1.15→1.0 with opacity variation (1.5s)
+- Streaming: sequential wave pulse per dot with 200ms stagger (typing indicator effect)
+- Success: one-shot jump + bounce landing (~600ms), reverts to idle via useEffect timeout
+- Error: one-shot horizontal shake (±2px, ~300ms), reverts to idle
+- All states use CSS transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) for smooth state changes
+- Test page at /test-will-dots with interactive state switcher
+- Zero console errors
+
+### Current Status
+- 2 features completed this session (#186, #187)
+- Files committed as part of 8fa15588
+- 187/192 features passing (97.4%)
+
 ## Session 2026-03-17 - Features #179, #184
 
 ### Feature #179: Life events metadata toevoegen aan alle persona's - PASSING
