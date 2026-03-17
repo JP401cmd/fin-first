@@ -1,3 +1,25 @@
+## Session 2026-03-17 - Feature #183
+
+### Feature #183: Daan en Lisa extra holding toevoegen voor variatie - PASSING
+- Daan Bakker: Added Brand New Day Pensioen (~€4500, 35 units)
+  - Asset entry with purchase_value 4141, monthly_contribution 125
+  - 3 buy transactions (monthsAgo 12/8/4), total_amounts verified against units*price
+  - 3 valuations (monthsAgo 12/8/0)
+  - Classification: asset_class=equity, geography=global, currency=EUR
+- Lisa de Groot: Added NT World Custom ESG Kinderbelegging (~€8000, 220 units, ISIN NL0011225305)
+  - Asset entry with purchase_value 7140, monthly_contribution 0
+  - 4 buy transactions (monthsAgo 14/10/6/2), total_amounts verified
+  - 4 valuations (monthsAgo 14/10/6/0)
+  - Classification: asset_class=equity, geography=global, currency=EUR
+- Updated net_worth_snapshots for both personas to include new investment values
+- Corrected avg_purchase_price values to match actual transaction sums
+- Zero TypeScript errors
+- Could not browser-test seeding due to Supabase auth (consistent with prior sessions)
+
+### Current Status
+- 1 feature completed this session (#183)
+- 179/185 features passing (96.8%)
+
 ## Session 2026-03-17 - Features #181, #182
 
 ### Feature #181: Holdings classification invullen voor alle persona's - PASSING
