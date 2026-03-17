@@ -1,3 +1,30 @@
+## Session 2026-03-17 - Features #181, #182
+
+### Feature #181: Holdings classification invullen voor alle persona's - PASSING
+- PersonaHolding interface already extended (by another agent) with asset_class, sector, geography, is_favorite, currency
+- Holdings data already populated for all personas (by another agent)
+- Updated seed-persona.ts to pass new classification fields during insert
+- Fields conditionally added: asset_class, sector, geography, is_favorite, currency
+- Commit: da2d7e57
+
+### Feature #182: Willem Jansen uitbreiden met meerdere holdings - PASSING
+- Added 3 new holdings to Willem's DEGIRO portfolio:
+  - IEAG (iShares Euro Aggregate Bond ETF): 800 units, ~€80K, asset_class: 'bonds', geography: 'europe'
+  - TDIV (VanEck Dividend Leaders ETF): 180 units, ~€45K, asset_class: 'equity', sector: 'dividend', geography: 'europe'
+  - EMIM (iShares Core MSCI EM IMI ETF): 900 units, ~€25K, asset_class: 'equity', geography: 'emerging_markets'
+- Updated DEGIRO asset value from 420K to 570K
+- Updated all valuations (8 datapoints) to reflect new ~570K total
+- Updated net_worth_snapshots (+128K to +150K across 15 months)
+- Updated 'Portefeuille 500K' goal: current_value 570K, is_completed: true
+- Updated recommendation description to reference 570K instead of 420K
+- VWRL marked as is_favorite: true
+- Commit: 9df2da2a
+
+### Current Status
+- 2 features completed this session (#181, #182)
+- Zero TypeScript errors
+- 180/185 features passing (97.3%)
+
 ## Session 2026-03-17 - Feature #180
 
 ### Feature #180: Event_type waarden corrigeren naar LIFE_EVENT_CATALOG keys - PASSING
