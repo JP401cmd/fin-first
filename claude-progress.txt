@@ -1,3 +1,26 @@
+## Session 2026-03-17 - Features #176, #177
+
+### Feature #176: Na import navigeren naar rekeningdetail met juiste maand - PASSING
+- Added `importedMinMonth` computed from imported rows (earliest date YYYY-MM)
+- Import success button now navigates to `/core/assets/cash/[accountId]?month=YYYY-MM`
+- Added `initialMonth` prop to CashAccountView that initializes monthDate from URL param
+- Updated account detail page to read `?month` from searchParams
+- Added other-month transaction indicator when current month has no transactions
+- Button text changes: "Naar rekeningdetail" when account selected
+
+### Feature #177: Datumbereik en aantal tonen op import-successcherm - PASSING
+- Computed `importDateRange` with min/max dates and months from imported rows
+- Success screen now shows: "X transacties geïmporteerd van jan 2025 tot mrt 2025"
+- Single month variant: "X transacties geïmporteerd in jan 2025"
+- Dutch locale month-year formatting via toLocaleDateString('nl-NL')
+
+### Current Status
+- 2 features completed this session (#176, #177)
+- 177/178 features passing (99.4%)
+- Zero TypeScript errors
+- Could not browser-test due to Supabase auth (no working credentials)
+- Commits: 0e974721, 9997f458
+
 ## Session 2026-03-17 - Features #174, #175
 
 ### Feature #174: Levensgebeurtenis: Begrafenis / Uitvaart - PASSING
