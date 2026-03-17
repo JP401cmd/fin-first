@@ -35,7 +35,7 @@ const WILL_CONFIG: DomainConfig = {
   placeholder: 'Vraag Will iets...',
   greeting: 'Hoi, ik ben Will',
   greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
-  fabBg: 'bg-wil-600',
+  fabBg: 'bg-white/60 backdrop-blur-sm',
   fabAvatar: (size: number) => <WillDots size={size} />,
   headerColor: 'text-wil-600',
   bubbleBg: 'bg-wil-50',
@@ -343,7 +343,7 @@ export function ChatPanel() {
       <div className="fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] z-50 md:bottom-6" style={{ right: 'calc(1.5rem + var(--chat-sidebar-width, 0px))' }}>
         <button
           onClick={toggle}
-          className={`flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-white shadow-[var(--s2)] transition-all hover:scale-105 active:scale-95`}
+          className={`flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-wil-600 shadow-[var(--s1)] transition-all hover:scale-105 active:scale-95`}
           aria-label={`Open chat met ${config.name}`}
         >
           {config.fabAvatar(36)}
