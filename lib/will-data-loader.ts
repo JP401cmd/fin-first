@@ -1,8 +1,9 @@
 /**
  * Server-side data loader for the Will (De Wil) landing page.
  *
- * Extracts the data-fetching logic from the client-side will/page.tsx
- * so it can be called from a Server Component or API route.
+ * Optimized to accept shared data from loadDashboardData to avoid
+ * duplicate Supabase queries (assets, debts, auth, profile).
+ * Internal queries are consolidated: actions 2→1, recommendations 2→1, goals 3→1.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -73,35 +74,54 @@ export interface WillPageData {
 }
 
 // ---------------------------------------------------------------------------
+// Shared data from dashboard loader (avoids duplicate queries)
+// ---------------------------------------------------------------------------
+
+export interface WillSharedData {
+  /** Authenticated user ID (from dashboard's auth.getUser) */
+  userId: string | null
+  /** Active assets with id+name+current_value */
+  assets: { id: string; name: string; current_value: number }[]
+  /** Active debts with id+name+current_balance */
+  debts: { id: string; name: string; current_balance: number }[]
+  /** User's full_name from profile */
+  fullName: string | null
+}
+
+// ---------------------------------------------------------------------------
 // Loader
 // ---------------------------------------------------------------------------
 
-export async function loadWillData(supabase: SupabaseClient): Promise<WillPageData> {
+export async function loadWillData(
+  supabase: SupabaseClient,
+  shared?: WillSharedData,
+): Promise<WillPageData> {
   const today = new Date().toISOString().split('T')[0]
 
-  // 1. Get authenticated user
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
-
-  const currentUserId = authUser?.id ?? null
+  // 1. Get authenticated user (reuse from shared data if available)
+  let currentUserId: string | null
+  if (shared) {
+    currentUserId = shared.userId
+  } else {
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    currentUserId = authUser?.id ?? null
+  }
 
   // 2. Check household membership for shared goals
   let householdFilter = ''
   let partnerInfo: WillPageData['partnerInfo'] = null
 
-  if (authUser) {
-    // Single query: get household_id + all members with profile names via join
+  if (currentUserId) {
     const { data: membership } = await supabase
       .from('household_members')
       .select('household_id')
-      .eq('user_id', authUser.id)
+      .eq('user_id', currentUserId)
       .maybeSingle()
 
     if (membership?.household_id) {
       householdFilter = `,and(ownership.eq.shared,household_id.eq.${membership.household_id})`
 
-      // One query replaces two: get all members + their profile names in a single join
+      // One query: get all members + their profile names in a single join
       const { data: allMembers } = await supabase
         .from('household_members')
         .select('user_id, profile:profiles!user_id(full_name)')
@@ -109,7 +129,7 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
 
       type HouseholdMemberRow = { user_id: string; profile: { full_name: string | null }[] }
       const partner = (allMembers as HouseholdMemberRow[] ?? []).find(
-        (m) => m.user_id !== authUser.id,
+        (m) => m.user_id !== currentUserId,
       )
       if (partner) {
         partnerInfo = {
@@ -120,93 +140,105 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
     }
   }
 
-  const goalFilter = authUser
-    ? `user_id.eq.${authUser.id}${householdFilter}`
+  const goalFilter = currentUserId
+    ? `user_id.eq.${currentUserId}${householdFilter}`
     : `user_id.eq.00000000-0000-0000-0000-000000000000`
 
-  // 4. Run the 11 parallel queries (includes user profile — no sequential step 5)
-  const [
-    actionsRes,
-    pendingRecsRes,
-    _feedbackRes,
-    activeGoalsRes,
-    completedGoalCountRes,
-    totalGoalCountRes,
-    recsForListRes,
-    actionsForBoardRes,
-    assetsRes,
-    debtsRes,
-    userProfileRes,
-  ] = await Promise.all([
-    // KPI actions (lightweight select)
-    supabase
-      .from('actions')
-      .select('id, status, freedom_days_impact, source, completed_at, due_date, created_at, recommendation:recommendations(recommendation_type)')
-      .order('created_at', { ascending: false }),
-    // Pending / postponed recommendations for KPI
-    supabase
-      .from('recommendations')
-      .select('id, status, recommendation_type, freedom_days_per_year, decided_at, created_at')
-      .in('status', ['pending', 'postponed']),
-    // Feedback (fetched for completeness, matches original loadData)
-    supabase
-      .from('recommendation_feedback')
-      .select('id, feedback_type, recommendation_type, freedom_days_impact, created_at'),
-    // Active goals (max 5)
-    supabase
-      .from('goals')
-      .select('*, budgets:budget_id(id, name)')
-      .or(goalFilter)
-      .eq('is_completed', false)
-      .order('sort_order', { ascending: true })
-      .limit(5),
-    // Completed goal count
-    supabase
-      .from('goals')
-      .select('*', { count: 'exact', head: true })
-      .or(goalFilter)
-      .eq('is_completed', true),
-    // Total goal count
-    supabase
-      .from('goals')
-      .select('*', { count: 'exact', head: true })
-      .or(goalFilter),
-    // Full recommendations for RecommendationList
-    supabase
-      .from('recommendations')
-      .select('*')
-      .or(`status.eq.pending,and(status.eq.postponed,postponed_until.lte.${today})`)
-      .order('priority_score', { ascending: false })
-      .order('created_at', { ascending: false }),
-    // Full actions for ActionBoard
+  // 3. Consolidated parallel queries
+  // - Actions: 1 broad query (was 2) — derive KPI + board data from same result
+  // - Recommendations: 1 broad query (was 2) — derive KPI + list from same result
+  // - Goals: 1 query for all goals (was 3) — derive active/counts in JS
+  // - Assets/debts/profile: skip when shared data provided (was 3 queries)
+  const queries: Promise<unknown>[] = [
+    // [0] All actions with full fields + recommendation join (covers KPI + board)
     supabase
       .from('actions')
       .select('*, recommendation:recommendations(title, recommendation_type)')
       .order('status', { ascending: true })
       .order('priority_score', { ascending: false })
       .order('sort_order', { ascending: true }),
-    // Assets for GoalForm auto-link
-    supabase.from('assets').select('id, name, current_value').eq('is_active', true),
-    // Debts for GoalForm auto-link
-    supabase.from('debts').select('id, name, current_balance').eq('is_active', true),
-    // User profile (moved into batch — was sequential step 5)
-    authUser?.id
-      ? supabase.from('profiles').select('full_name').eq('id', authUser.id).single()
-      : Promise.resolve({ data: null }),
-  ])
+    // [1] All pending/postponed recommendations with full fields (covers KPI + list)
+    supabase
+      .from('recommendations')
+      .select('*')
+      .in('status', ['pending', 'postponed'])
+      .order('priority_score', { ascending: false })
+      .order('created_at', { ascending: false }),
+    // [2] All goals (derive active list + counts in JS)
+    supabase
+      .from('goals')
+      .select('*, budgets:budget_id(id, name)')
+      .or(goalFilter)
+      .order('sort_order', { ascending: true }),
+  ]
 
-  const allActions = (actionsRes.data ?? []) as AllAction[]
-  const allPendingRecs = (pendingRecsRes.data ?? []) as PendingRec[]
-  const goals = (activeGoalsRes.data ?? []) as GoalWithBudget[]
-  const loadedAssets = (assetsRes.data ?? []) as { id: string; name: string; current_value: number }[]
-  const loadedDebts = (debtsRes.data ?? []) as { id: string; name: string; current_balance: number }[]
-
-  const completedGoalCount = completedGoalCountRes.count ?? 0
-  const totalGoalCount = totalGoalCountRes.count ?? 0
-
-  const userProfile: { full_name: string | null } = {
-    full_name: (userProfileRes.data as { full_name: string | null } | null)?.full_name ?? null,
+  // Only query assets/debts/profile if not provided via shared data
+  if (!shared) {
+    queries.push(
+      // [3] Assets for GoalForm auto-link
+      supabase.from('assets').select('id, name, current_value').eq('is_active', true),
+      // [4] Debts for GoalForm auto-link
+      supabase.from('debts').select('id, name, current_balance').eq('is_active', true),
+      // [5] User profile
+      currentUserId
+        ? supabase.from('profiles').select('full_name').eq('id', currentUserId).single()
+        : Promise.resolve({ data: null }),
+    )
   }
+
+  const results = await Promise.all(queries)
+
+  // Unpack results
+  const actionsResult = results[0] as { data: unknown[] | null }
+  const recsResult = results[1] as { data: unknown[] | null }
+  const goalsResult = results[2] as { data: unknown[] | null }
+
+  // Assets, debts, profile: from shared data or query results
+  const loadedAssets: { id: string; name: string; current_value: number }[] = shared
+    ? shared.assets
+    : ((results[3] as { data: unknown[] | null })?.data ?? []) as { id: string; name: string; current_value: number }[]
+  const loadedDebts: { id: string; name: string; current_balance: number }[] = shared
+    ? shared.debts
+    : ((results[4] as { data: unknown[] | null })?.data ?? []) as { id: string; name: string; current_balance: number }[]
+  const userProfile: { full_name: string | null } = shared
+    ? { full_name: shared.fullName }
+    : { full_name: ((results[5] as { data: { full_name: string | null } | null })?.data as { full_name: string | null } | null)?.full_name ?? null }
+
+  // ── Actions: derive KPI + board data from single query ──
+  const allActionsRaw = (actionsResult.data ?? []) as (Action & { created_at: string; source: string; completed_at: string | null; recommendation: { title?: string; recommendation_type: string }[] | null })[]
+  const allActions: AllAction[] = allActionsRaw.map(a => ({
+    id: a.id,
+    status: a.status,
+    freedom_days_impact: Number(a.freedom_days_impact) || 0,
+    source: a.source ?? '',
+    completed_at: a.completed_at ?? null,
+    due_date: a.due_date ?? null,
+    created_at: a.created_at,
+    recommendation: a.recommendation as { recommendation_type: string }[] | null,
+  }))
+  const enrichedActionsRaw = allActionsRaw as Action[]
+
+  // ── Recommendations: derive KPI pending list + recommendation list ──
+  const allRecsRaw = (recsResult.data ?? []) as (Recommendation & { decided_at?: string | null; created_at: string })[]
+  const allPendingRecs: PendingRec[] = allRecsRaw.map(r => ({
+    id: r.id,
+    status: r.status,
+    recommendation_type: r.recommendation_type,
+    freedom_days_per_year: Number(r.freedom_days_per_year) || 0,
+    decided_at: r.decided_at ?? null,
+    created_at: r.created_at,
+  }))
+  // Filter for recommendation list: pending, or postponed with postponed_until <= today
+  const recsForList = allRecsRaw.filter(r =>
+    r.status === 'pending' ||
+    (r.status === 'postponed' && r.postponed_until != null && r.postponed_until <= today)
+  ) as Recommendation[]
+
+  // ── Goals: derive active list + counts from single query ──
+  const allGoals = (goalsResult.data ?? []) as GoalWithBudget[]
+  const goals = allGoals.filter(g => !g.is_completed).slice(0, 5)
+  const completedGoalCount = allGoals.filter(g => g.is_completed).length
+  const totalGoalCount = allGoals.length
 
   // 6. Auto-link goals to assets/debts — override current_value
   for (const goal of goals) {
@@ -226,11 +258,11 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
   const goalProgresses = goals.map(g => computeGoalProgress(g))
 
   // 8. Enrich actions with assigner display names
-  let enrichedActions = (actionsForBoardRes.data as Action[]) ?? []
+  let enrichedActions = enrichedActionsRaw
   const assignerIds = [
     ...new Set(
       enrichedActions
-        .filter(a => a.assigned_by && a.assigned_by !== authUser?.id)
+        .filter(a => a.assigned_by && a.assigned_by !== currentUserId)
         .map(a => a.assigned_by as string),
     ),
   ]
@@ -265,7 +297,7 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
 
   // 10. Return assembled result
   return {
-    recommendations: (recsForListRes.data as Recommendation[]) ?? [],
+    recommendations: recsForList,
     actions: enrichedActions,
     kpiData,
     goals,

@@ -7,34 +7,30 @@ import { WillLanding } from '@/components/will/will-landing'
 export default async function WillPage() {
   const supabase = await createClient()
 
-  // Load data sources in parallel
-  const [dashboardResult, willData] = await Promise.all([
-    loadDashboardData(supabase),
-    loadWillData(supabase),
-  ])
+  // Load dashboard data first (cached via React cache())
+  const dashboardResult = await loadDashboardData(supabase)
 
   const {
     dashboardData,
     activeWidgets,
     allWidgetPrefs,
+    userName,
+    aiEnabled,
+    userId,
+    sharedAssets,
+    sharedDebts,
   } = dashboardResult
+
+  // Load Will data with shared data from dashboard (avoids ~5 duplicate queries)
+  const willData = await loadWillData(supabase, {
+    userId,
+    assets: sharedAssets,
+    debts: sharedDebts,
+    fullName: userName,
+  })
 
   // Build temporal context for DAIshboard briefing
   const temporal = buildTemporalContext()
-
-  // Fetch user profile for briefing (name + AI preference)
-  const { data: { user } } = await supabase.auth.getUser()
-  let userName: string | undefined
-  let aiEnabled = true
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, ai_enabled')
-      .eq('id', user.id)
-      .single()
-    userName = profile?.full_name ?? undefined
-    if (profile?.ai_enabled === false) aiEnabled = false
-  }
 
   return (
     <WillLanding
@@ -43,7 +39,7 @@ export default async function WillPage() {
       allPrefs={allWidgetPrefs}
       willData={willData}
       temporal={temporal}
-      userName={userName}
+      userName={userName ?? undefined}
       aiEnabled={aiEnabled}
     />
   )

@@ -74,6 +74,16 @@ export interface DashboardDataResult {
   activated: boolean
   /** Next steps for check-in detection */
   nextSteps: NextStep[]
+  /** User's full name from profile (shared to avoid extra queries) */
+  userName: string | null
+  /** Whether AI/Will is enabled for the user (shared to avoid extra queries) */
+  aiEnabled: boolean
+  /** Authenticated user ID (shared to avoid extra auth calls) */
+  userId: string | null
+  /** Raw active assets with id+name+current_value (shared for will-data-loader) */
+  sharedAssets: { id: string; name: string; current_value: number }[]
+  /** Raw active debts with id+name+current_balance (shared for will-data-loader) */
+  sharedDebts: { id: string; name: string; current_balance: number }[]
 }
 
 // ── Main loader ────────────────────────────────────────────────
@@ -91,29 +101,32 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Previous 3 full months (excl. current month) for stable sovereignty calculation
   const prev3MonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1)).toISOString().split('T')[0]
 
+  // ── Auth: fetch once, reuse throughout ─────────────────────
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const currentUserId = authUser?.id ?? null
+
   const [
     txResult, assetsResult, debtsResult, profileResult,
-    essentialBudgetsResult, actionsResult, eventsResult,
-    allBudgetsResult, recsResult, childBudgetsResult,
+    allBudgetsRawResult, actionsResult, eventsResult,
+    recsResult,
     goalsResult, recurringResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
-    bankAccountsResult, favBudgetsResult, prevMonthTxResult,
+    bankAccountsResult, prevMonthTxResult,
     nextStepCompletionsResult,
     expenseTx12Result,
     favHoldingsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
-    supabase.from('debts').select('id, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active').single(),
-    supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
+    supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
+    supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
+    supabase.from('profiles').select('full_name, ai_enabled, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active').single(),
+    // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
+    supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
       .in('status', ['open', 'postponed', 'completed']),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
-    supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite').is('parent_id', null),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
-    supabase.from('budgets').select('id, name, icon, parent_id, default_limit, budget_type, is_favorite').not('parent_id', 'is', null),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('recurring_transactions').select('id, name, amount, frequency, budget_id').eq('is_active', true),
     supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age, savings_rate').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
@@ -121,15 +134,23 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
     supabase.from('transactions').select('amount, transaction_type').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
-    supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
     supabase.from('transactions').select('amount, transaction_type, budget_id').gte('date', prevMonthStart).lt('date', monthStart),
     supabase.from('next_step_completions').select('step_key, dismissed'),
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
     supabase.from('holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
   ])
 
-  // Read budgeting_active from the profile query (already fetched above)
+  // ── Derive budget subsets from single query (was 4 queries) ──
+  const allBudgetsRaw = (allBudgetsRawResult.data ?? []) as { id: string; name: string; icon: string; default_limit: number; interval: string; budget_type: string; alert_threshold: number; parent_id: string | null; is_favorite: boolean; is_essential: boolean }[]
+  const essentialBudgetsData = allBudgetsRaw.filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
+  const allParentBudgetsData = allBudgetsRaw.filter(b => b.parent_id === null)
+  const allChildrenData = allBudgetsRaw.filter(b => b.parent_id !== null)
+  const favBudgetsData = allBudgetsRaw.filter(b => b.is_favorite)
+
+  // Read profile fields from the combined profile query
   const budgetingActive = (profileResult.data as Record<string, unknown> | null)?.budgeting_active !== false
+  const profileFullName = (profileResult.data as Record<string, unknown> | null)?.full_name as string | null ?? null
+  const profileAiEnabled = (profileResult.data as Record<string, unknown> | null)?.ai_enabled !== false
 
   // Core calculations
   let monthlyIncome = 0
@@ -182,9 +203,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   const totalPurchaseValue = assetsByType.reduce((s, a) => s + a.purchaseValue, 0)
 
-  const allChildren = childBudgetsResult.data ?? []
+  const allChildren = allChildrenData
   let yearlyMustExpenses = 0
-  for (const b of essentialBudgetsResult.data ?? []) {
+  for (const b of essentialBudgetsData) {
     const children = allChildren.filter(c => c.parent_id === b.id)
     const limit = children.length > 0
       ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
@@ -195,7 +216,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // Budget totals per type — limiet en werkelijke besteding
-  const allParentBudgets = (allBudgetsResult.data ?? []) as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; is_favorite: boolean }[]
+  const allParentBudgets = allParentBudgetsData as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; is_favorite: boolean; alert_threshold: number }[]
   // Map: budget_id → budget_type (voor zowel parent als child budgetten)
   const budgetTypeMap = new Map<string, string>()
   for (const b of allParentBudgets) budgetTypeMap.set(b.id, b.budget_type)
@@ -261,7 +282,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // Favorite budgets: compute limit + spent for each
-  const favBudgetsRaw = (favBudgetsResult.data ?? []) as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; parent_id: string | null; is_favorite: boolean }[]
+  const favBudgetsRaw = favBudgetsData as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; parent_id: string | null; is_favorite: boolean }[]
   const txData = txResult.data ?? []
   const favoriteBudgets = favBudgetsRaw.map(fb => {
     // Determine effective limit
@@ -347,11 +368,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       })),
     ...allChildren
       .filter((c: { budget_type?: string }) => c.budget_type !== 'archive')
-      .map((c: { id: string; name: string; icon: string; budget_type: string; is_favorite: boolean; parent_id: string }) => ({
+      .map((c: { id: string; name: string; icon: string; budget_type: string; is_favorite: boolean; parent_id: string | null }) => ({
         id: c.id,
         name: c.name,
         icon: c.icon || '',
-        budgetType: (c.budget_type ?? budgetTypeMap.get(c.parent_id) ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt',
+        budgetType: (c.budget_type ?? budgetTypeMap.get(c.parent_id ?? '') ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt',
         isFavorite: c.is_favorite ?? false,
         parentId: c.parent_id,
       })),
@@ -968,17 +989,21 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   let householdOverrides: DashboardData['householdOverrides'] = null
   let partnerOverrides: DashboardData['partnerOverrides'] = null
   let partnerHiddenCategories: string[] = []
+  // Household membership (reused in activity feed below)
+  let cachedHouseholdId: string | null = null
+  let cachedHouseholdMemberIds: string[] = []
+  let cachedPartnerId: string | null = null
   try {
-    // Check if user has a household
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
+    // Check if user has a household (reuse authUser from above)
+    if (authUser) {
       const { data: membership } = await supabase
         .from('household_members')
         .select('household_id')
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .maybeSingle()
 
       if (membership?.household_id) {
+        cachedHouseholdId = membership.household_id
         // Get partner's personal asset/debt totals via RPC + partner's privacy settings
         const [partnerTotalsRes, partnerMemberRes] = await Promise.all([
           supabase.rpc('household_partner_totals'),
@@ -986,7 +1011,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             .from('household_members')
             .select('user_id, privacy_settings')
             .eq('household_id', membership.household_id)
-            .neq('user_id', user.id)
+            .neq('user_id', authUser!.id)
             .maybeSingle(),
         ])
         const pt = partnerTotalsRes.data?.[0] ?? null
@@ -1044,47 +1069,36 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ── Household activity feed — recent shared transactions from both partners ──
   let householdActivity: HouseholdActivityItem[] = []
   try {
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-    if (currentUser && householdOverrides) {
-      const { data: myMembership } = await supabase
+    if (authUser && householdOverrides && cachedHouseholdId) {
+      // Get all household members (reuse cached household_id)
+      const { data: allMembers } = await supabase
         .from('household_members')
-        .select('household_id')
-        .eq('user_id', currentUser.id)
-        .maybeSingle()
+        .select('user_id, privacy_settings')
+        .eq('household_id', cachedHouseholdId)
 
-      if (myMembership) {
-        // Get all household members
-        const { data: allMembers } = await supabase
-          .from('household_members')
-          .select('user_id')
-          .eq('household_id', myMembership.household_id)
+      const memberIds = (allMembers ?? []).map(m => m.user_id)
+      cachedHouseholdMemberIds = memberIds
 
-        const memberIds = (allMembers ?? []).map(m => m.user_id)
-
-        if (memberIds.length > 1) {
-          // Get partner's profile name
-          const partnerId = memberIds.find(id => id !== currentUser.id)
-          let partnerDisplayName = 'Partner'
-          if (partnerId) {
-            const { data: partnerProfile } = await supabase
-              .from('profiles')
-              .select('first_name')
-              .eq('id', partnerId)
-              .maybeSingle()
-            if (partnerProfile?.first_name) {
-              partnerDisplayName = partnerProfile.first_name
-            }
-          }
-
-          // Get current user's name
-          const { data: myProfile } = await supabase
+      if (memberIds.length > 1) {
+        // Get partner's profile name
+        const partnerId = memberIds.find(id => id !== authUser.id)
+        cachedPartnerId = partnerId ?? null
+        let partnerDisplayName = 'Partner'
+        if (partnerId) {
+          const { data: partnerProfile } = await supabase
             .from('profiles')
             .select('first_name')
-            .eq('id', currentUser.id)
+            .eq('id', partnerId)
             .maybeSingle()
-          const myDisplayName = myProfile?.first_name || 'Jij'
+          if (partnerProfile?.first_name) {
+            partnerDisplayName = partnerProfile.first_name
+          }
+        }
 
-          // Fetch recent shared transactions from all household members (last 30 days)
+        // Derive display name from full_name (use first word)
+        const myDisplayName = profileFullName?.split(' ')[0] || 'Jij'
+
+        // Fetch recent shared transactions from all household members (last 30 days)
           const thirtyDaysAgo = new Date()
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
           const cutoffStr = thirtyDaysAgo.toISOString().split('T')[0]
@@ -1123,7 +1137,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
             householdActivity = sharedTxs
               .filter(tx => {
-                const isMe = tx.user_id === currentUser.id
+                const isMe = tx.user_id === authUser!.id
                 const isShared = tx.ownership === 'shared'
                 // If partner's privacy is 'verborgen'/'hidden', don't show partner's personal transactions
                 if (!isMe && !isShared && (partnerTxPrivacy === 'verborgen' || partnerTxPrivacy === 'hidden')) {
@@ -1137,17 +1151,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
                 amount: Number(tx.amount),
                 date: tx.date,
                 category: tx.budget_id ? budgetMap[tx.budget_id] ?? null : null,
-                partnerName: tx.user_id === currentUser.id ? myDisplayName : partnerDisplayName,
-                isCurrentUser: tx.user_id === currentUser.id,
+                partnerName: tx.user_id === authUser!.id ? myDisplayName : partnerDisplayName,
+                isCurrentUser: tx.user_id === authUser!.id,
                 ownership: tx.ownership || 'personal',
               }))
               .slice(0, 15)
           }
         }
       }
-    }
-  } catch {
-    // Household activity feed not available — leave empty
+  } catch (_e) {
+    // Household activity feed not available — leave empty, reset cache
+    cachedHouseholdMemberIds = []
+    cachedPartnerId = null
   }
 
   // ── Decision Patterns: group completed actions by recommendation_type ──
@@ -1403,5 +1418,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     fireProjResult,
     activated,
     nextSteps,
+    userName: profileFullName,
+    aiEnabled: profileAiEnabled,
+    userId: currentUserId,
+    sharedAssets: (assetsResult.data ?? []).map(a => ({
+      id: (a as { id: string }).id,
+      name: (a as { name: string }).name,
+      current_value: Number((a as { current_value: number }).current_value),
+    })),
+    sharedDebts: (debtsResult.data ?? []).map(d => ({
+      id: (d as { id: string }).id,
+      name: (d as { name: string }).name,
+      current_balance: Number((d as { current_balance: number }).current_balance),
+    })),
   }
 })
