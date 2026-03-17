@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Pencil, Save, Trash2,
-  GitFork, CircleDot, AlertTriangle, CheckCircle2, Heart,
+  GitFork, CircleDot, AlertTriangle, CheckCircle2, Heart, LayoutGrid,
   TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -16,6 +16,7 @@ import { buildSegments, typeColors, childTypeColors } from '@/components/app/bud
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetDonut } from '@/components/app/budget-donut'
+import { BudgetHeatmap } from '@/components/app/budget-heatmap'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
@@ -186,10 +187,10 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const [error, setError] = useState<string | null>(null)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null)
   const [modalStep, setModalStep] = useState<'detail' | 'edit'>('detail')
-  const [viewMode, setViewMode] = useState<'tree' | 'donut'>(() => {
+  const [viewMode, setViewMode] = useState<'tree' | 'donut' | 'heatmap'>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('budgets-view-mode')
-      if (stored === 'tree' || stored === 'donut') return stored
+      if (stored === 'tree' || stored === 'donut' || stored === 'heatmap') return stored
     }
     return 'tree'
   })
@@ -617,7 +618,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
-  function toggleViewMode(mode: 'tree' | 'donut') {
+  function toggleViewMode(mode: 'tree' | 'donut' | 'heatmap') {
     setViewMode(mode)
     localStorage.setItem('budgets-view-mode', mode)
   }
@@ -1035,6 +1036,17 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
             <CircleDot className="h-3.5 w-3.5" />
             Ring
           </button>
+          <button
+            onClick={() => toggleViewMode('heatmap')}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              viewMode === 'heatmap'
+                ? 'bg-zinc-900 text-white'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+            }`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Heatmap
+          </button>
         </div>
 
         <button
@@ -1134,6 +1146,57 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                   onNavigate={(id) => openBudgetModal(id)}
                 />
               )}
+            </div>
+          )}
+        </>
+      ) : viewMode === 'heatmap' ? (
+        <>
+          {incomeBudgets.length > 0 && (
+            <div className="mt-4 sm:mt-8">
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
+              <BudgetHeatmap
+                groups={incomeBudgets}
+                spending={spending}
+                budgetType="income"
+                onNavigate={(id) => openBudgetModal(id)}
+                beschikbaarMap={beschikbaarMap}
+              />
+            </div>
+          )}
+          {expenseBudgets.length > 0 && (
+            <div className="mt-4 sm:mt-8">
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
+              <BudgetHeatmap
+                groups={expenseBudgets}
+                spending={spending}
+                budgetType="expense"
+                onNavigate={(id) => openBudgetModal(id)}
+                beschikbaarMap={beschikbaarMap}
+              />
+            </div>
+          )}
+          {savingsBudgets.length > 0 && (
+            <div className="mt-4 sm:mt-8">
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen</h3>
+              <BudgetHeatmap
+                groups={savingsBudgets}
+                spending={spending}
+                budgetType="savings"
+                onNavigate={(id) => openBudgetModal(id)}
+                beschikbaarMap={beschikbaarMap}
+              />
+            </div>
+          )}
+          {debtBudgets.length > 0 && (
+            <div className="mt-4 sm:mt-8">
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden</h3>
+              <BudgetHeatmap
+                groups={debtBudgets}
+                spending={spending}
+                budgetType="debt"
+                onNavigate={(id) => openBudgetModal(id)}
+                beschikbaarMap={beschikbaarMap}
+              />
             </div>
           )}
         </>
