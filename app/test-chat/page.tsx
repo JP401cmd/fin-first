@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
+import { FhinAvatar, FfinAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import type { AIDomain } from '@/lib/ai/dna/types'
 
 /**
@@ -55,7 +56,7 @@ const DOMAIN_CONFIGS: DomainConfig[] = [
     greeting: 'Hoi, ik ben Will',
     greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
     fabBg: 'bg-teal-600',
-    fabAvatar: (size: number) => <FinnAvatar size={size} />,
+    fabAvatar: (size: number) => <WillDots size={size} />,
     headerColor: 'text-teal-600',
     bubbleBg: 'bg-teal-50',
     accentColor: 'text-teal-600',
@@ -139,7 +140,7 @@ export default function TestChatPage() {
                 <td className="py-2 font-mono text-xs">/dashboard, other</td>
                 <td className="py-2 font-mono text-xs">wil (default)</td>
                 <td className="py-2 font-semibold">Will</td>
-                <td className="py-2"><FinnAvatar size={24} /></td>
+                <td className="py-2"><WillDots size={24} /></td>
                 <td className="py-2">
                   <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-teal-600 text-white">teal</span>
                 </td>

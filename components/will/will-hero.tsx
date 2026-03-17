@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Sparkles, Info, X, CalendarCheck } from 'lucide-react'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -253,7 +253,7 @@ export function WillHero({
         <div className="p-4 sm:p-6 md:p-8">
           {/* Avatar + label */}
           <div className="mb-3 sm:mb-6 flex items-center gap-3">
-            <FinnAvatar size={40} />
+            <WillDots size={40} />
             <p className="label-editorial text-wil-600">
               Jouw wilskracht in actie
             </p>

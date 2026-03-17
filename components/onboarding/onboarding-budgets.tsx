@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { User, Users, Briefcase, Sunset, Hand, LayoutTemplate, SlidersHorizontal, Coins, PiggyBank, Flame } from 'lucide-react'
 import type { LucideProps } from 'lucide-react'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import { BudgetAmountEditor } from './budget-amount-editor'
@@ -184,7 +184,7 @@ export function OnboardingBudgets({
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Budgettering</p>
 
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
-        <div className="shrink-0"><FinnAvatar size={48} /></div>
+        <div className="shrink-0"><WillDots size={48} /></div>
         <SpeechBubble>Een budget vertaalt je inkomen naar bewuste keuzes. Elke euro die je bespaart is opgeslagen vrijheidstijd &mdash; tijd die je later kunt besteden aan wat jij écht belangrijk vindt. Maar het is niet verplicht: jij bepaalt het tempo.</SpeechBubble>
       </div>
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 
 const SAVING_MESSAGES = [
   'Profiel wordt opgeslagen...',
@@ -64,7 +64,7 @@ export default function TestOnboardingSaving() {
       <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 text-center">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
           <div className="animate-pulse">
-            <FinnAvatar size={64} />
+            <WillDots size={64} />
           </div>
         </div>
         <p className="mb-4 text-sm font-medium text-zinc-700 transition-opacity duration-300">

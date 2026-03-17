@@ -3,7 +3,7 @@
 import { useState, useEffect, useReducer, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { BankAccountEntry } from '@/components/onboarding/mini-bank-form'
 import type { AssetEntry } from '@/components/onboarding/mini-asset-form'
@@ -439,7 +439,7 @@ export default function OnboardingPage() {
               <div className="w-full max-w-sm rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-sm p-8 text-center">
                 <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
                   <div className="animate-pulse">
-                    <FinnAvatar size={64} />
+                    <WillDots size={64} />
                   </div>
                 </div>
                 <p className="mb-4 text-sm font-medium text-[var(--ink-2)] transition-opacity duration-300">

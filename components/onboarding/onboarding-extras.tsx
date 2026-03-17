@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import { MiniBankForm, type BankAccountEntry } from './mini-bank-form'
@@ -68,7 +68,7 @@ export function OnboardingExtras({
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Je startpunt</p>
 
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
-        <div className="shrink-0"><FinnAvatar size={48} /></div>
+        <div className="shrink-0"><WillDots size={48} /></div>
         <SpeechBubble>
           Als je je rekeningen en bezittingen toevoegt, kan ik meteen je netto vermogen en vrijheidspercentage berekenen. Heb je schulden? Dan laat ik zien hoeveel vrijheid je terugkoopt als je die aflost. Dit is helemaal optioneel &mdash; je kunt het ook later toevoegen.
         </SpeechBubble>

@@ -9,7 +9,7 @@ import {
   Check,
 } from 'lucide-react'
 import type { LucideProps } from 'lucide-react'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import { WIDGET_CATALOG, type WidgetPrefs, type WidgetPref } from '@/lib/widget-catalog'
@@ -144,7 +144,7 @@ export function OnboardingPreferences({
 
       {/* Speech bubble */}
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
-        <div className="shrink-0"><FinnAvatar size={48} /></div>
+        <div className="shrink-0"><WillDots size={48} /></div>
         <SpeechBubble>
           {getSpeechText(data.focuses)}
           <span className="mt-1 block text-xs text-[var(--ink-4)]">

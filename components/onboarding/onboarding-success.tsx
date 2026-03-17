@@ -1,4 +1,4 @@
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { Shield, Zap, Telescope, type LucideIcon } from 'lucide-react'
 
 export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) {
@@ -6,7 +6,7 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
     <div className="flex flex-col items-center py-8 text-center sm:py-12">
       {/* Will's avatar — celebration emphasis with subtle pulse */}
       <div className="mb-6 animate-[pulse_3s_ease-in-out_1]">
-        <FinnAvatar size={140} />
+        <WillDots size={140} />
       </div>
 
       {/* Celebration heading — font-display */}

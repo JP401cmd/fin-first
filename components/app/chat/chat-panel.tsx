@@ -5,7 +5,7 @@ import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { useRouter } from 'next/navigation'
 import { useChatContext } from './chat-provider'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
@@ -36,7 +36,7 @@ const WILL_CONFIG: DomainConfig = {
   greeting: 'Hoi, ik ben Will',
   greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
   fabBg: 'bg-wil-600',
-  fabAvatar: (size: number) => <FinnAvatar size={size} />,
+  fabAvatar: (size: number) => <WillDots size={size} />,
   headerColor: 'text-wil-600',
   bubbleBg: 'bg-wil-50',
   accentColor: 'text-wil-600',
@@ -437,7 +437,7 @@ export function ChatPanel() {
             return (
               <div key={msg.id} className="mb-3 flex justify-start">
                 <div className="mr-2 mt-1 shrink-0">
-                  {config.fabAvatar(24)}
+                  <WillDots size={24} state={isStreaming ? 'streaming' : 'idle'} />
                 </div>
                 <div className={`max-w-[85%] rounded-[var(--r-lg)] px-3 py-2 text-sm leading-relaxed ${config.bubbleBg} text-[var(--ink-2)]`}>
                   {renderAssistantMessage(parts)}
@@ -449,7 +449,7 @@ export function ChatPanel() {
           {isStreaming && (messages.length === 0 || messages[messages.length - 1]?.role === 'user') && (
             <div className="mb-3 flex justify-start">
               <div className="mr-2 mt-1 shrink-0">
-                {config.fabAvatar(24)}
+                <WillDots size={24} state="streaming" />
               </div>
               <div className={`rounded-[var(--r-lg)] px-3 py-2 ${config.bubbleBg}`}>
                 <Loader2 className={`h-4 w-4 animate-spin ${config.accentColor}`} />

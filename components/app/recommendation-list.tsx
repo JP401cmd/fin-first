@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { RecommendationCard } from '@/components/app/recommendation-card'
 import { RecommendationModal } from '@/components/app/recommendation-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -141,7 +141,7 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
         {!hideHeader && header}
         <div className="py-6 text-center">
           <div className="mx-auto mb-3 flex justify-center">
-            <FinnAvatar size={40} />
+            <WillDots size={40} />
           </div>
           <p className="mb-4 font-serif text-sm text-[var(--ink-3)]">
             Will analyseert je profiel en ontdekt verborgen vrijheidsdagen.

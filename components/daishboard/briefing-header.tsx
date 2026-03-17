@@ -1,6 +1,6 @@
 'use client'
 
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import type { TemporalContext } from '@/lib/briefing/types'
 
@@ -34,7 +34,7 @@ export function BriefingHeader({ temporal, userName }: Props) {
       {/* Will's greeting */}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-wil-50 shrink-0">
-          <FinnAvatar size={36} />
+          <WillDots size={36} />
         </div>
         <div>
           <p className="label-editorial text-wil-600 tracking-wider flex items-center gap-1.5">WILL&apos;S BRIEFING <AiPrivacyIndicator size={13} /></p>

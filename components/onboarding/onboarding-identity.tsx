@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { User, Users, Baby } from 'lucide-react'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import { temporalLevels } from '@/lib/identity-constants'
@@ -215,7 +215,7 @@ export function OnboardingIdentity({
 
       {/* Will question */}
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
-        <div className="shrink-0"><FinnAvatar size={48} /></div>
+        <div className="shrink-0"><WillDots size={48} /></div>
         <SpeechBubble>Om je pad naar vrijheid te berekenen, moet ik je eerst leren kennen. Je inkomen bepaalt hoeveel vrijheidstijd je elke maand opbouwt &mdash; en je leeftijd helpt me inschatten hoeveel tijd er nog voor je ligt.</SpeechBubble>
       </div>
 
@@ -421,7 +421,7 @@ export function OnboardingIdentity({
       <p className="label-editorial mt-8 sm:mt-12 mb-2 text-[var(--ink-4)]">Vrijheidsberekening</p>
 
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
-        <div className="shrink-0"><FinnAvatar size={40} /></div>
+        <div className="shrink-0"><WillDots size={40} /></div>
         <SpeechBubble>
           Hoe wil je dat we je financiële toekomst berekenen? De standaardinstellingen werken voor de meeste mensen &mdash; je kunt dit later altijd finetunen in je instellingen.
         </SpeechBubble>
@@ -591,7 +591,7 @@ export function OnboardingIdentity({
       <p className="label-editorial mt-8 sm:mt-12 mb-2 text-[var(--ink-4)]">Jouw balans</p>
 
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
-        <div className="shrink-0"><FinnAvatar size={40} /></div>
+        <div className="shrink-0"><WillDots size={40} /></div>
         <SpeechBubble>
           Hoeveel van je huidige tijd wil je investeren in je toekomstige vrijheid? Dit is geen goed of fout &mdash; het is jouw persoonlijke balans.
         </SpeechBubble>

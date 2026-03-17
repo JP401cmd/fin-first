@@ -1,4 +1,4 @@
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 import { Shield, Zap, Telescope, type LucideIcon } from 'lucide-react'
 
 export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLogout?: () => void }) {
@@ -6,7 +6,7 @@ export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLo
     <div className="flex flex-col items-center py-8 sm:py-12">
       {/* Will's avatar — 140px, centered, breathing animation built-in */}
       <div className="mb-8">
-        <FinnAvatar size={140} />
+        <WillDots size={140} />
       </div>
 
       {/* Welcome heading — font-display for premium feel */}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FinnAvatar } from '@/components/app/avatars'
+import { WillDots } from '@/components/app/will-dots'
 
 const COMPOSING_MESSAGES = [
   'Je data analyseren\u2026',
@@ -24,7 +24,7 @@ export function BriefingComposingIndicator() {
     <div className="flex flex-col items-center justify-center py-16 text-center">
       {/* Will avatar */}
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[var(--r)] bg-wil-50">
-        <FinnAvatar size={44} />
+        <WillDots size={44} state="thinking" />
       </div>
 
       {/* Bouncing dots */}
