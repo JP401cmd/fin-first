@@ -1,3 +1,26 @@
+## Session 2026-03-17 - Feature #212
+
+### Feature #212: CSS animaties scopen naar componenten - PASSING
+- Analyzed all 43+ @keyframes in globals.css (1205 lines), traced each to consuming components
+- Created 5 component-scoped CSS files:
+  - components/app/will-dots.css (13 keyframes: talking, thinking, listening, success, error, loading, orbit, etc.)
+  - components/app/avatars.css (5 keyframes: blink-fhin, blink-ffin, talk-fhin, talk-ffin, breathe)
+  - components/app/budget-blob.css (5 keyframes: cell-grow-in, cell-breathe, nucleus-pulse, membrane-breathe, organelle-drift)
+  - components/app/level-up-celebration.css (4 keyframes: badge-shimmer, badge-unlock-glow, badge-scale-in, progress-fill)
+  - app/(onboarding)/onboarding/onboarding.css (2 keyframes: step-slide-from-right/left)
+- Added CSS imports to 6 component files (will-dots.tsx, avatars.tsx, budget-blob.tsx, level-up-celebration.tsx, onboarding page, test-onboarding page)
+- Removed 4 dead/unused keyframes: scroll-pulse, infinity-pulse, progIn, celebration-ring
+- Added comprehensive prefers-reduced-motion coverage for all remaining global animations (fade-up, checkPop, fadeUp, drawPath, fadeInFill, smooth scrolling)
+- All component CSS files include their own prefers-reduced-motion blocks
+- globals.css reduced from 1205 → 942 lines (22% reduction, 29 keyframes moved out)
+- Verified WillDots test page renders all 8 animation states correctly
+- Zero CSS-related console errors, zero TypeScript errors in modified files
+- Commit: 9054cc2b
+
+### Current Status
+- 1 feature completed this session (#212)
+- Feature #212 marked as passing
+
 ## Session 2026-03-17 - Features #206, #208
 
 ### Feature #206: Identity pagina migreren naar server component - PASSING
