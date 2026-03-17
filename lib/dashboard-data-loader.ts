@@ -599,7 +599,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     .map((h, i) => ({
       id: `holding_fav:${h.id}`,
       enabled: true,
-      size: 'mini' as WidgetSize,
+      size: 'quarter' as WidgetSize,
       order: lowestOrder - 200 + i,
     }))
 
