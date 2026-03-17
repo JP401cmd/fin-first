@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle, Upload } from 'lucide-react'
+import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { calculatePortfolioBox3 } from '@/lib/box3-holdings'
@@ -9,6 +9,9 @@ import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/c
 import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
 import { TIME_PERIODS, type TimePeriod, type ComparisonResult } from '@/lib/benchmark-comparison'
 import DividendTracker from '@/components/app/dividend-tracker'
+import dynamic from 'next/dynamic'
+
+const HoldingsHeatmap = dynamic(() => import('@/components/app/holdings-heatmap'), { ssr: false })
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -72,6 +75,15 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   const [benchmarkPeriod, setBenchmarkPeriod] = useState<TimePeriod>(TIME_PERIODS.find(p => p.id === '1y')!)
   const [benchmarkLoading, setBenchmarkLoading] = useState(false)
   const [overrideHolding, setOverrideHolding] = useState<Holding | null>(null)
+  // Holdings view mode: list or heatmap (persisted in localStorage)
+  const [viewMode, setViewMode] = useState<'list' | 'heatmap'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('holdings-view-mode') as 'list' | 'heatmap') || 'list'
+    }
+    return 'list'
+  })
+  // Dividend yield data for heatmap color mode
+  const [dividendData, setDividendData] = useState<Map<string, number>>(new Map())
   // Per-holding daily change data from last price refresh
   const [priceUpdates, setPriceUpdates] = useState<Map<string, HoldingPriceUpdate>>(new Map())
   // Track whether a form was recently submitted to prevent re-submission on back navigation
@@ -127,6 +139,40 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     setBenchmarkPeriod(period)
     // Data will reload via the useEffect above
   }
+
+  // Persist view mode to localStorage
+  function handleViewModeChange(mode: 'list' | 'heatmap') {
+    setViewMode(mode)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('holdings-view-mode', mode)
+    }
+  }
+
+  // Load dividend data for heatmap dividend yield color mode
+  useEffect(() => {
+    if (viewMode !== 'heatmap' || holdings.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/dividends')
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        if (cancelled) return
+        const map = new Map<string, number>()
+        if (data.holdings && Array.isArray(data.holdings)) {
+          for (const h of data.holdings) {
+            if (h.holding_id && typeof h.dividend_yield === 'number') {
+              map.set(h.holding_id, h.dividend_yield)
+            }
+          }
+        }
+        setDividendData(map)
+      } catch {
+        // Non-critical — dividend data is optional
+      }
+    })()
+    return () => { cancelled = true }
+  }, [viewMode, holdings.length])
 
   // Push a history entry when a modal opens so the back button closes the modal
   // instead of navigating away. After form submission, replace the entry to
@@ -535,8 +581,64 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         </div>
       )}
 
+      {/* View toggle: list vs heatmap */}
+      {holdings.length > 0 && (
+        <div className="mt-3 sm:mt-6 flex items-center justify-between" data-testid="holdings-view-toggle">
+          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Holdings</h2>
+          <div className="flex gap-0.5 rounded-lg bg-[var(--subtle)] p-0.5">
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('list')}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                viewMode === 'list' ? 'bg-kern-600 text-white shadow-sm' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+              }`}
+              data-testid="view-toggle-list"
+            >
+              <List className="h-3 w-3" />
+              Lijst
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('heatmap')}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                viewMode === 'heatmap' ? 'bg-kern-600 text-white shadow-sm' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+              }`}
+              data-testid="view-toggle-heatmap"
+            >
+              <LayoutGrid className="h-3 w-3" />
+              Heatmap
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Heatmap view */}
+      {viewMode === 'heatmap' && holdings.length > 0 && (
+        <section className="mt-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6" data-testid="holdings-heatmap-section">
+          <HoldingsHeatmap
+            holdings={holdings.map(h => ({
+              id: h.id,
+              name: h.name,
+              ticker: h.ticker,
+              isin: h.isin,
+              units: h.units,
+              avg_purchase_price: h.avg_purchase_price,
+              current_price: h.current_price,
+              last_price_update: h.last_price_update,
+              currency: h.currency,
+              daily_change_percent: h.daily_change_percent,
+              asset_class: h.asset_class,
+              sector: h.sector,
+              geography: h.geography,
+            }))}
+            dividendData={dividendData}
+            onHoldingClick={(id) => router.push(`/core/assets/holdings/${id}`)}
+          />
+        </section>
+      )}
+
       {/* Holdings list */}
-      <section className="mt-3 sm:mt-6 space-y-2">
+      <section className={`mt-3 sm:mt-6 space-y-2 ${viewMode === 'heatmap' && holdings.length > 0 ? 'hidden' : ''}`}>
         {holdings.length === 0 && !loading && (
           <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
             <Briefcase className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
