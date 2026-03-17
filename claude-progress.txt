@@ -1,3 +1,26 @@
+## Session 2026-03-17 - Feature #188
+
+### Feature #188: WillDots integratie — vervang FinnAvatar overal in de app - PASSING
+- Replaced FinnAvatar import/usage with WillDots in 18 files across the codebase
+- Onboarding (7 files): intro, identity, budgets, extras, preferences, success, page.tsx — all use state='idle'
+- Chat panel: WillDots with dynamic state (streaming during AI response, idle otherwise)
+- Whatif chat: WillDots with dynamic streaming state for assistant messages
+- Briefing header: WillDots size={36} (idle)
+- Briefing skeleton (composing indicator): WillDots with state='thinking' during generation
+- Will hero: WillDots size={40} (idle)
+- Recommendation list: WillDots size={40} (idle)
+- Test pages: test-chat, test-onboarding-saving, test-onboarding-error-handling updated
+- Removed entire FinnAvatar function from components/app/avatars.tsx (kept FhinAvatar + FfinAvatar)
+- Removed @keyframes blink-finn and talk-finn from globals.css
+- Zero TypeScript errors (tsc --noEmit clean)
+- Zero console errors verified via browser
+- All pages render correctly: test-will-dots, test-chat, test-onboarding-saving
+- Dots use module colors (kern-500, wil-500, horizon-500) — automatically adapt to user color settings
+- Commit: b2a56cb4
+
+### Current Status
+- 1 feature completed this session (#188)
+
 ## Session 2026-03-17 - Feature #192
 
 ### Feature #192: Popup bij handmatige budgettoekenning: toepassen op alle vergelijkbare transacties - PASSING
