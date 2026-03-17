@@ -1,3 +1,26 @@
+## Session 2026-03-17 - Features #179, #184
+
+### Feature #179: Life events metadata toevoegen aan alle persona's - PASSING
+- Added metadata field to PersonaLifeEvent interface
+- Added metadata to 10 life events across 5 personas:
+  - Roos: Schuldhulpverlening (maandelijksBedrag: 200), AOW (leefsituatie: alleenstaand)
+  - Daan: Eigen woning kopen (koopsom: 350000, hypotheek: 315000), AOW (leefsituatie: alleenstaand)
+  - Lisa: Sabbatical (nettoInkomen: 4200, doorbetalingsPct: 0, extraKosten: 5000), AOW (leefsituatie: samenwonend)
+  - Willem: Vervroegd pensioen (gewensteMaandinkomen: 3000, pensioenUitkering: 0), AOW (leefsituatie: samenwonend)
+  - Rashid: Sabbatical (nettoInkomen: 5500, doorbetalingsPct: 0, extraKosten: 8000), AOW (leefsituatie: alleenstaand)
+- Updated seed-persona.ts to spread metadata into Supabase insert
+- Zero TypeScript errors
+
+### Feature #184: Seed-logica updaten voor nieuwe database-tabellen - PASSING
+- Added holding_alerts and target_allocations to batch 0 parallel deletes in deleteAllUserData()
+- holding_prices (no user_id column) handled by CASCADE from holdings delete
+- Prevents residual data when re-seeding personas
+- Commit: 0524aa26
+
+### Current Status
+- 2 features completed this session (#179, #184)
+- Zero TypeScript errors
+
 ## Session 2026-03-17 - Feature #183
 
 ### Feature #183: Daan en Lisa extra holding toevoegen voor variatie - PASSING
