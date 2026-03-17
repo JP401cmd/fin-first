@@ -149,7 +149,7 @@ export async function loadWillData(
   // - Recommendations: 1 broad query (was 2) — derive KPI + list from same result
   // - Goals: 1 query for all goals (was 3) — derive active/counts in JS
   // - Assets/debts/profile: skip when shared data provided (was 3 queries)
-  const queries: Promise<unknown>[] = [
+  const queries: PromiseLike<unknown>[] = [
     // [0] All actions with full fields + recommendation join (covers KPI + board)
     supabase
       .from('actions')
