@@ -1,3 +1,23 @@
+## Session 2026-03-17 - Feature #192
+
+### Feature #192: Popup bij handmatige budgettoekenning: toepassen op alle vergelijkbare transacties - PASSING
+- Added BulkApplyPrompt type and state to import page
+- Modified updateRowBudget: no longer silently auto-propagates to siblings on user changes
+- Match priority: counterparty_iban (IBAN, most reliable) → counterparty_name → description
+- When siblings found (>0): shows BottomSheet dialog with count, counterparty name, budget name
+- When no siblings: saves correction rule silently (no dialog)
+- "Ja, pas toe op alle" → applies budget to all siblings + optionally saves correction rule
+- "Nee, alleen deze" → keeps only the target row change, optionally saves correction rule
+- Checkbox "Onthoud voor toekomstige imports" (default: on) → controls category_corrections persistence
+- Toast notification shows total count after bulk apply
+- Extracted saveCorrectionRule helper for reuse
+- AI-sourced changes (source='ai') remain unchanged
+- Zero TypeScript errors
+- Could not browser-test due to Supabase auth rate limit
+
+### Current Status
+- 1 feature completed this session (#192)
+
 ## Session 2026-03-17 - Features #190, #191
 
 ### Feature #190: Auto-assignment na elke AI batch van 20 transacties - PASSING
