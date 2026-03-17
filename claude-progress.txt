@@ -1,3 +1,19 @@
+## Session 2026-03-17 - Feature #200
+
+### Feature #200: Chat FAB: witte cirkel met 60% transparantie - PASSING
+- Changed fabBg from 'bg-wil-600' to 'bg-white/60 backdrop-blur-sm' in WILL_CONFIG
+- Changed FAB button text color from 'text-white' to 'text-wil-600' for WillDots visibility on white bg
+- Reduced shadow from 'shadow-[var(--s2)]' to 'shadow-[var(--s1)]' for subtler transparent style
+- WillDots use SVG fill colors internally, unaffected by parent text color
+- Zero TypeScript errors (verified with tsc --noEmit)
+- Zero console errors on test pages
+- Could not browser-test authenticated FAB due to no available test credentials
+- Commit: 0580e75b
+
+### Current Status
+- 1 feature completed this session (#200)
+- 198/200 features passing (99.0%)
+
 ## Session 2026-03-17 - Feature #198
 
 ### Feature #198: Beheerscherm: Will Avatar emotie-overzicht - PASSING
