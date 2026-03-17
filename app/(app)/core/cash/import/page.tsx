@@ -911,6 +911,62 @@ export default function ImportPage() {
     })
   }
 
+  // Feature #191: Mark all rows with same counterparty_iban as transfer + persist IBAN
+  function markRowsAsTransfer(triggerIndex: number) {
+    const triggerRow = rows[triggerIndex]
+    if (!triggerRow) return
+
+    const iban = triggerRow.counterparty_iban?.replace(/\s/g, '').toUpperCase()
+
+    // Count matching rows (including the trigger row)
+    let matchCount = 0
+    setRows((prev) => prev.map((r, i) => {
+      const rowIban = r.counterparty_iban?.replace(/\s/g, '').toUpperCase()
+      const matches = i === triggerIndex || (iban && rowIban === iban && !r.isTransfer)
+      if (matches) {
+        matchCount++
+        return { ...r, isTransfer: true, transaction_type: 'transfer', budget_id: null, budgetName: null, category_source: 'transfer' }
+      }
+      return r
+    }))
+
+    // Show toast with count
+    if (matchCount > 1) {
+      addToast({ type: 'success', title: `${matchCount} transacties gemarkeerd als eigen overboeking`, duration: 3000 })
+    } else {
+      addToast({ type: 'success', title: 'Transactie gemarkeerd als eigen overboeking', duration: 3000 })
+    }
+
+    // Persist IBAN to user_own_ibans for future imports
+    if (iban) {
+      void (async () => {
+        try {
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
+          // Upsert: only insert if not already present
+          const { data: existing } = await supabase
+            .from('user_own_ibans')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('iban', iban)
+            .maybeSingle()
+          if (!existing) {
+            await supabase.from('user_own_ibans').insert({
+              user_id: user.id,
+              iban,
+              label: triggerRow.counterparty_name || null,
+            })
+            // Also add to local ownIbans set for immediate re-use
+            setOwnIbans((prev) => new Set([...prev, iban]))
+          }
+        } catch {
+          // Silent fail — IBAN will still be marked locally
+        }
+      })()
+    }
+  }
+
   function saveCorrectionRule(matchField: CategoryCorrection['match_field'], matchValue: string, budgetId: string) {
     void (async () => {
       const supabase = createClient()
@@ -2033,7 +2089,7 @@ export default function ImportPage() {
                                 value={row.budget_id ?? ''}
                                 onChange={(e) => {
                                   if (e.target.value === '__transfer__') {
-                                    setRows((prev) => prev.map((r, i) => i === realIdx ? { ...r, isTransfer: true, transaction_type: 'transfer', budget_id: null, budgetName: null } : r))
+                                    markRowsAsTransfer(realIdx)
                                   } else {
                                     updateRowBudget(realIdx, e.target.value, 'user')
                                   }
