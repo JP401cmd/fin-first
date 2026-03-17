@@ -1,3 +1,17 @@
+## Session 2026-03-17 - Feature #180
+
+### Feature #180: Event_type waarden corrigeren naar LIFE_EVENT_CATALOG keys - PASSING
+- Fixed Rashid's 'Sabbatical (6 mnd reizen)': event_type 'career' → 'sabbatical'
+- Fixed Rashid's 'Freelance tarief omhoog': event_type 'career' → 'career_change'
+- Verified all other persona event_types match LIFE_EVENT_CATALOG keys
+- Roos's 'Scheiding afgerond' uses 'custom' — acceptable (no 'divorce' type exists, and there's a 'scheiding' type but the event is historical/inactive)
+- Zero TypeScript errors (tsc --noEmit clean)
+- Commit: 30f51418
+
+### Current Status
+- 1 feature completed this session (#180)
+- 179/185 features passing (96.8%)
+
 ## Session 2026-03-17 - Feature #178
 
 ### Feature #178: Indicator voor transacties in andere maanden op cash-pagina's - PASSING
