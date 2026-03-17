@@ -14606,3 +14606,25 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#199)
 - 197/199 features passing (99.0%)
+
+## Session 2026-03-17 - Features #204, #205
+
+### Feature #204: Will data loader: household waterfall elimineren - PASSING
+- Combined 3 sequential household queries into 2: merged partner lookup + partner name into single join query
+- Query uses `profiles!user_id(full_name)` join on household_members to get partner name in one query
+- Moved user profile query (was sequential step 5) into the main Promise.all batch (11 queries instead of 10)
+- Net result: eliminated 2 sequential queries (1 from waterfall, 1 from post-batch profile fetch)
+- Zero TypeScript errors
+- Commit: 36696d1a
+
+### Feature #205: loading.tsx skeletons toevoegen aan hoofdroutes - PASSING
+- All 4 loading.tsx files already existed (created in commit 9ec0801b perf pass)
+- core/loading.tsx: hero gradient + KPI grid + mission control + charts skeletons
+- horizon/loading.tsx: hero + inline KPIs + sim chart + life events + deep dive cards
+- will/loading.tsx: hero + action cards
+- identity/loading.tsx: profile strip + stats grid + timeline
+- All use consistent animate-pulse with var(--subtle) and module-specific colors
+- All 4 routes compile correctly (verified via 307 auth redirects)
+
+### Current Status
+- 2 features completed this session (#204, #205)
