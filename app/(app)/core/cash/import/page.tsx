@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -958,6 +958,14 @@ export default function ImportPage() {
   const toImportCount = rows.filter((r) => !r.skipImport).length
   const totalBij = rows.filter((r) => !r.skipImport && r.amount > 0).reduce((s, r) => s + r.amount, 0)
   const totalAf = rows.filter((r) => !r.skipImport && r.amount < 0).reduce((s, r) => s + r.amount, 0)
+
+  // Compute earliest month from imported rows for post-import navigation
+  const importedMinMonth = useMemo(() => {
+    const imported = rows.filter((r) => !r.skipImport && r.date)
+    if (imported.length === 0) return null
+    const minDate = imported.reduce((min, r) => r.date < min ? r.date : min, imported[0].date)
+    return minDate.slice(0, 7) // 'YYYY-MM'
+  }, [rows])
 
   // Pagination helper for step 2 and step 3 tables
   function PaginationBar({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
@@ -1961,10 +1969,14 @@ export default function ImportPage() {
               </div>
               <div className="mt-3 sm:mt-6">
                 <Link
-                  href="/core/cash"
+                  href={
+                    selectedAccountId && importedMinMonth
+                      ? `/core/assets/cash/${selectedAccountId}?month=${importedMinMonth}`
+                      : '/core/cash'
+                  }
                   className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
                 >
-                  Naar Cash overzicht
+                  {selectedAccountId ? 'Naar rekeningdetail' : 'Naar Cash overzicht'}
                 </Link>
               </div>
             </div>

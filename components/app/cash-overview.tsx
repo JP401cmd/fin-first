@@ -46,7 +46,7 @@ type BudgetExpense = {
   limit: number
 }
 
-export function CashOverview({ embedded = false }: { embedded?: boolean }) {
+export function CashOverview({ embedded = false, onNavigateToAccount }: { embedded?: boolean; onNavigateToAccount?: (accountId: string) => void }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [budgets, setBudgets] = useState<BudgetRow[]>([])
   const [transactions, setTransactions] = useState<TxAgg[]>([])
@@ -55,6 +55,10 @@ export function CashOverview({ embedded = false }: { embedded?: boolean }) {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
+
+  // Other-month transaction indicator state
+  const [hasOtherMonthTx, setHasOtherMonthTx] = useState(false)
+  const [latestTxDate, setLatestTxDate] = useState<string | null>(null)
 
   // Kassabon state
   const [showIncomeReceipt, setShowIncomeReceipt] = useState(false)
@@ -132,6 +136,41 @@ export function CashOverview({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     loadTransactions()
   }, [loadTransactions])
+
+  // Check if transactions exist in other months when current month is empty
+  useEffect(() => {
+    if (transactions.length > 0) {
+      setHasOtherMonthTx(false)
+      setLatestTxDate(null)
+      return
+    }
+    const checkOtherMonths = async () => {
+      const supabase = createClient()
+      let query = supabase
+        .from('transactions')
+        .select('date')
+        .order('date', { ascending: false })
+        .limit(1)
+      if (perspective === 'personal') {
+        query = query.eq('ownership', 'personal')
+      }
+      const { data } = await query
+      if (data && data.length > 0) {
+        setHasOtherMonthTx(true)
+        setLatestTxDate(data[0].date)
+      } else {
+        setHasOtherMonthTx(false)
+        setLatestTxDate(null)
+      }
+    }
+    checkOtherMonths()
+  }, [transactions.length, perspective])
+
+  function goToLatestTransaction() {
+    if (!latestTxDate) return
+    const d = new Date(latestTxDate + 'T00:00:00')
+    setMonthDate(new Date(d.getFullYear(), d.getMonth(), 1))
+  }
 
   // Aggregations
   const totalBalance = useMemo(() => accounts.reduce((s, a) => s + Number(a.balance), 0), [accounts])
@@ -274,10 +313,13 @@ export function CashOverview({ embedded = false }: { embedded?: boolean }) {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           {accounts.map((acc) => {
             const sharePct = totalBalance > 0 ? (Number(acc.balance) / totalBalance) * 100 : 0
-            const Wrapper = embedded ? 'button' : Link
-            const wrapperProps = embedded
-              ? { type: 'button' as const, onClick: () => setDetailAccountId(acc.id) }
-              : { href: `/core/assets/cash/${acc.id}` }
+            const useCallback = embedded && onNavigateToAccount
+            const Wrapper = (embedded ? 'button' : Link) as any
+            const wrapperProps = useCallback
+              ? { type: 'button' as const, onClick: () => onNavigateToAccount(acc.id) }
+              : embedded
+                ? { type: 'button' as const, onClick: () => setDetailAccountId(acc.id) }
+                : { href: `/core/assets/cash/${acc.id}` }
             return (
               <Wrapper
                 key={acc.id}
@@ -494,6 +536,25 @@ export function CashOverview({ embedded = false }: { embedded?: boolean }) {
             </div>
           </div>
         </div>
+
+        {/* Hint: transactions exist in other months */}
+        {transactions.length === 0 && hasOtherMonthTx && (
+          <div className="mt-3 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-4 text-center" data-testid="other-month-hint">
+            <p className="text-xs text-[var(--ink-3)]">
+              Geen transacties in {monthLabel}. Er zijn transacties in andere maanden — gebruik ◀ ▶ om te navigeren.
+            </p>
+            {latestTxDate && (
+              <button
+                onClick={goToLatestTransaction}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--paper)]"
+                data-testid="go-to-latest-tx"
+              >
+                <ChevronRight className="h-3 w-3" />
+                Ga naar recentste transactie
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {/* === 4. Snelle acties === */}

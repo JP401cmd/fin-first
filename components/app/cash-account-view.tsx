@@ -89,12 +89,14 @@ export function CashAccountView({
   backLabel = 'Assets',
   embedded = false,
   onNavigateToAccount,
+  initialMonth,
 }: {
   accountId?: string
   backHref?: string
   backLabel?: string
   embedded?: boolean
   onNavigateToAccount?: (accountId: string | undefined) => void
+  initialMonth?: string // 'YYYY-MM' format
 }) {
   const isCombined = !accountId
   const router = useRouter()
@@ -106,6 +108,10 @@ export function CashAccountView({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [monthDate, setMonthDate] = useState(() => {
+    if (initialMonth && /^\d{4}-\d{2}$/.test(initialMonth)) {
+      const [y, m] = initialMonth.split('-').map(Number)
+      return new Date(y, m - 1, 1)
+    }
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
@@ -152,6 +158,10 @@ export function CashAccountView({
   // Tab state
   const [activeTab, setActiveTab] = useState<'transacties' | 'kalender'>('transacties')
   const [showManualTransfer, setShowManualTransfer] = useState(false)
+
+  // Other-month transaction indicator state
+  const [hasOtherMonthTx, setHasOtherMonthTx] = useState(false)
+  const [latestTxDate, setLatestTxDate] = useState<string | null>(null)
 
   // Split transaction expansion state
   const [expandedSplitId, setExpandedSplitId] = useState<string | null>(null)
@@ -462,6 +472,45 @@ export function CashAccountView({
   useEffect(() => {
     if (account) loadRecurrings()
   }, [account, loadRecurrings])
+
+  // Check if transactions exist in other months when current month is empty
+  useEffect(() => {
+    if (transactions.length > 0) {
+      setHasOtherMonthTx(false)
+      setLatestTxDate(null)
+      return
+    }
+    // Only check when we have 0 transactions in the current month
+    const checkOtherMonths = async () => {
+      const supabase = createClient()
+      let query = supabase
+        .from('transactions')
+        .select('date')
+        .order('date', { ascending: false })
+        .limit(1)
+      if (!isCombined) {
+        query = query.eq('account_id', accountId!)
+      }
+      if (perspective === 'personal') {
+        query = query.eq('ownership', 'personal')
+      }
+      const { data } = await query
+      if (data && data.length > 0) {
+        setHasOtherMonthTx(true)
+        setLatestTxDate(data[0].date)
+      } else {
+        setHasOtherMonthTx(false)
+        setLatestTxDate(null)
+      }
+    }
+    checkOtherMonths()
+  }, [transactions.length, accountId, isCombined, perspective])
+
+  function goToLatestTransaction() {
+    if (!latestTxDate) return
+    const d = new Date(latestTxDate + 'T00:00:00')
+    setMonthDate(new Date(d.getFullYear(), d.getMonth(), 1))
+  }
 
   function prevMonth() {
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
@@ -1631,6 +1680,22 @@ export function CashAccountView({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Filters wissen
                 </button>
+              </>
+            ) : hasOtherMonthTx ? (
+              <>
+                <p className="mt-1 text-xs text-[var(--ink-3)]">
+                  Geen transacties in {monthLabel}. Er zijn transacties in andere maanden — gebruik ◀ ▶ om te navigeren.
+                </p>
+                {latestTxDate && (
+                  <button
+                    onClick={goToLatestTransaction}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                    data-testid="go-to-latest-tx"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                    Ga naar recentste transactie
+                  </button>
+                )}
               </>
             ) : (
               <p className="mt-1 text-xs text-[var(--ink-3)]">Er zijn geen transacties in {monthLabel}. Voeg een transactie toe of importeer je bankafschriften.</p>

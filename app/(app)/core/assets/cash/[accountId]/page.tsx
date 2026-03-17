@@ -1,6 +1,7 @@
 'use client'
 
 import { use } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { CashAccountView } from '@/components/app/cash-account-view'
 
 export default function CashAccountDetailPage({
@@ -9,5 +10,15 @@ export default function CashAccountDetailPage({
   params: Promise<{ accountId: string }>
 }) {
   const { accountId } = use(params)
-  return <CashAccountView accountId={accountId} backHref="/core/assets" backLabel="Assets" />
+  const searchParams = useSearchParams()
+  const month = searchParams.get('month') ?? undefined
+
+  return (
+    <CashAccountView
+      accountId={accountId}
+      backHref="/core/assets"
+      backLabel="Assets"
+      initialMonth={month}
+    />
+  )
 }
