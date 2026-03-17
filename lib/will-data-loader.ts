@@ -91,6 +91,7 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
   let partnerInfo: WillPageData['partnerInfo'] = null
 
   if (authUser) {
+    // Single query: get household_id + all members with profile names via join
     const { data: membership } = await supabase
       .from('household_members')
       .select('household_id')
@@ -100,22 +101,20 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
     if (membership?.household_id) {
       householdFilter = `,and(ownership.eq.shared,household_id.eq.${membership.household_id})`
 
-      // 3. Fetch partner info if household exists
+      // One query replaces two: get all members + their profile names in a single join
       const { data: allMembers } = await supabase
         .from('household_members')
-        .select('user_id')
+        .select('user_id, profile:profiles!user_id(full_name)')
         .eq('household_id', membership.household_id)
 
-      const partnerId = (allMembers ?? []).find((m: { user_id: string }) => m.user_id !== authUser.id)?.user_id
-      if (partnerId) {
-        const { data: partnerProfile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', partnerId)
-          .single()
+      type HouseholdMemberRow = { user_id: string; profile: { full_name: string | null }[] }
+      const partner = (allMembers as HouseholdMemberRow[] ?? []).find(
+        (m) => m.user_id !== authUser.id,
+      )
+      if (partner) {
         partnerInfo = {
-          partnerId,
-          partnerName: partnerProfile?.full_name ?? 'Partner',
+          partnerId: partner.user_id,
+          partnerName: partner.profile?.[0]?.full_name ?? 'Partner',
         }
       }
     }
@@ -125,7 +124,7 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
     ? `user_id.eq.${authUser.id}${householdFilter}`
     : `user_id.eq.00000000-0000-0000-0000-000000000000`
 
-  // 4. Run the 10 parallel queries
+  // 4. Run the 11 parallel queries (includes user profile — no sequential step 5)
   const [
     actionsRes,
     pendingRecsRes,
@@ -137,6 +136,7 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
     actionsForBoardRes,
     assetsRes,
     debtsRes,
+    userProfileRes,
   ] = await Promise.all([
     // KPI actions (lightweight select)
     supabase
@@ -189,6 +189,10 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
     supabase.from('assets').select('id, name, current_value').eq('is_active', true),
     // Debts for GoalForm auto-link
     supabase.from('debts').select('id, name, current_balance').eq('is_active', true),
+    // User profile (moved into batch — was sequential step 5)
+    authUser?.id
+      ? supabase.from('profiles').select('full_name').eq('id', authUser.id).single()
+      : Promise.resolve({ data: null }),
   ])
 
   const allActions = (actionsRes.data ?? []) as AllAction[]
@@ -200,15 +204,8 @@ export async function loadWillData(supabase: SupabaseClient): Promise<WillPageDa
   const completedGoalCount = completedGoalCountRes.count ?? 0
   const totalGoalCount = totalGoalCountRes.count ?? 0
 
-  // 5. Fetch user profile
-  let userProfile: { full_name: string | null } = { full_name: null }
-  if (authUser?.id) {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', authUser.id)
-      .single()
-    userProfile = { full_name: profileData?.full_name ?? null }
+  const userProfile: { full_name: string | null } = {
+    full_name: (userProfileRes.data as { full_name: string | null } | null)?.full_name ?? null,
   }
 
   // 6. Auto-link goals to assets/debts — override current_value
