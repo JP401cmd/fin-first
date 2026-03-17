@@ -14549,3 +14549,26 @@ For Feature #51 (Transaction Import):
 - Could not browser-test due to Supabase auth rate limit (all credentials rejected)
 - TypeScript compilation clean, dev server compiles pages using BottomSheet
 - This is a touch gesture feature — Playwright on desktop cannot simulate touch events anyway
+
+## Session 2026-03-17 - Feature #199
+
+### Feature #199: WillDots idle: willekeurig knipperen en mond-beweging - PASSING
+- Replaced fixed CSS `will-idle-blink-1/2` keyframe animations with JS-driven random blinking
+- Added useState for eyeScaleY and mouthScale, useRef for timer cleanup
+- Eye blink: recursive setTimeout with random 2000-6000ms delay, scaleY squeeze to 0.1 for 80ms
+- ~20% chance of double-blink (second squeeze after 200ms gap)
+- Mouth pulse: recursive setTimeout with random 3000-8000ms delay, scale to 1.12-1.18 for 150ms
+- ~30% chance of multi-pulse (2-3 quick pulses with 200ms gaps)
+- Both eye dots blink synchronously (same scaleY state), mouth pulses independently
+- Inline transforms include positioning (translate) merged with animation (scaleY/scale)
+- CSS idle classes changed to position-only (no animation), JS handles all animation
+- Transition: 80ms ease on eye dots, 100ms ease on mouth dot
+- All timers cleaned up on state change or component unmount
+- prefers-reduced-motion check: skips all random animations when reduced motion enabled
+- Tested on /test-will-dots: all 8 states work (idle, talking, listening, thinking, streaming, success, error, loading)
+- Zero console errors, triangle formation correct at all sizes (24px, 48px, 80px, 120px)
+- Commit: 19dbdc97
+
+### Current Status
+- 1 feature completed this session (#199)
+- 197/199 features passing (99.0%)
