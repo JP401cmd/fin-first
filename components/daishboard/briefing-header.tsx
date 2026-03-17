@@ -33,7 +33,7 @@ export function BriefingHeader({ temporal, userName }: Props) {
 
       {/* Will's greeting */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-wil-50 shrink-0">
+        <div className="shrink-0">
           <WillDots size={36} />
         </div>
         <div>

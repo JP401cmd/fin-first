@@ -23,7 +23,7 @@ export function BriefingComposingIndicator() {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       {/* Will avatar */}
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[var(--r)] bg-wil-50">
+      <div className="mb-4">
         <WillDots size={44} state="thinking" />
       </div>
 

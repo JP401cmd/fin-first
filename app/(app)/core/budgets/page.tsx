@@ -922,28 +922,28 @@ export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: str
         </div>
 
         {/* Totals split: Income / Expenses / Savings / Debt — budget limits as primary */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-1 sm:gap-4 text-center">
           <div>
-            <p className="text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
-            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
-            <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalIncomeActual)} ontvangen</p>
+            <p className="text-[9px] sm:text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
+            <p className="mt-0.5 sm:mt-1 text-sm sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
+            <p className="text-[10px] sm:text-xs text-[var(--ink-3)]">{formatCurrency(totalIncomeActual)} ontvangen</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-kern-600 uppercase">Uitgaven</p>
-            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalExpenseBudget)}</p>
-            <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalExpenseSpent)} besteed</p>
+            <p className="text-[9px] sm:text-xs font-medium text-kern-600 uppercase">Uitgaven</p>
+            <p className="mt-0.5 sm:mt-1 text-sm sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalExpenseBudget)}</p>
+            <p className="text-[10px] sm:text-xs text-[var(--ink-3)]">{formatCurrency(totalExpenseSpent)} besteed</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-wil-600 uppercase">Sparen</p>
-            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalSavingsBudget)}</p>
-            <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalSavingsActual)} gespaard</p>
-            <p className="text-[10px] text-wil-500/70">vrijheid opbouwen</p>
+            <p className="text-[9px] sm:text-xs font-medium text-wil-600 uppercase">Sparen</p>
+            <p className="mt-0.5 sm:mt-1 text-sm sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalSavingsBudget)}</p>
+            <p className="text-[10px] sm:text-xs text-[var(--ink-3)]">{formatCurrency(totalSavingsActual)} gespaard</p>
+            <p className="text-[10px] text-wil-500/70 hidden sm:block">vrijheid opbouwen</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-red-600 uppercase">Schulden</p>
-            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalDebtBudget)}</p>
-            <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalDebtActual)} afgelost</p>
-            <p className="text-[10px] text-red-500/70">vrijheid terugkopen</p>
+            <p className="text-[9px] sm:text-xs font-medium text-red-600 uppercase">Schulden</p>
+            <p className="mt-0.5 sm:mt-1 text-sm sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalDebtBudget)}</p>
+            <p className="text-[10px] sm:text-xs text-[var(--ink-3)]">{formatCurrency(totalDebtActual)} afgelost</p>
+            <p className="text-[10px] text-red-500/70 hidden sm:block">vrijheid terugkopen</p>
           </div>
         </div>
 
