@@ -959,13 +959,16 @@ export default function ImportPage() {
   const totalBij = rows.filter((r) => !r.skipImport && r.amount > 0).reduce((s, r) => s + r.amount, 0)
   const totalAf = rows.filter((r) => !r.skipImport && r.amount < 0).reduce((s, r) => s + r.amount, 0)
 
-  // Compute earliest month from imported rows for post-import navigation
-  const importedMinMonth = useMemo(() => {
+  // Compute date range from imported rows for post-import navigation and display
+  const importDateRange = useMemo(() => {
     const imported = rows.filter((r) => !r.skipImport && r.date)
     if (imported.length === 0) return null
     const minDate = imported.reduce((min, r) => r.date < min ? r.date : min, imported[0].date)
-    return minDate.slice(0, 7) // 'YYYY-MM'
+    const maxDate = imported.reduce((max, r) => r.date > max ? r.date : max, imported[0].date)
+    return { min: minDate, max: maxDate, minMonth: minDate.slice(0, 7), maxMonth: maxDate.slice(0, 7) }
   }, [rows])
+
+  const importedMinMonth = importDateRange?.minMonth ?? null
 
   // Pagination helper for step 2 and step 3 tables
   function PaginationBar({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
@@ -1874,7 +1877,16 @@ export default function ImportPage() {
               </div>
               <h2 className="text-xl font-bold text-[var(--ink)]">Import geslaagd!</h2>
               <p className="mt-2 text-sm text-[var(--ink-2)]">
-                <strong>{importedCount}</strong> transacties geïmporteerd.
+                <strong>{importedCount}</strong> transacties geïmporteerd
+                {importDateRange && (() => {
+                  const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
+                  const startLabel = fmt(importDateRange.min)
+                  const endLabel = fmt(importDateRange.max)
+                  return importDateRange.minMonth === importDateRange.maxMonth
+                    ? <> in <strong>{startLabel}</strong></>
+                    : <> van <strong>{startLabel}</strong> tot <strong>{endLabel}</strong></>
+                })()}
+                .
               </p>
               <div className="mt-3 flex justify-center flex-wrap gap-3 text-xs">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 font-medium">
