@@ -180,6 +180,7 @@ export interface PersonaLifeEvent {
   is_active: boolean
   sort_order: number
   is_indexed?: boolean
+  metadata?: Record<string, unknown>
 }
 
 export interface PersonaRecommendation {
@@ -227,6 +228,11 @@ export interface PersonaHolding {
   avg_purchase_price: number
   current_price: number
   purchase_date_monthsAgo: number
+  asset_class?: string
+  sector?: string | null
+  geography?: string
+  is_favorite?: boolean
+  currency?: string
   transactions: {
     type: 'buy' | 'sell' | 'dividend'
     units: number
@@ -798,6 +804,7 @@ const daanData: PersonaData = {
   ],
   assets: [
     { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 2350, purchase_value: 2100, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 100, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
+    { name: 'Brand New Day Pensioen', asset_type: 'investment', current_value: 4500, purchase_value: 4125, purchase_date: '2024-06-01', expected_return: 7, monthly_contribution: 125, institution: 'Brand New Day', subtype: 'pensioen', risk_profile: 'middel', ticker_symbol: 'BND-PENSIOEN' },
   ],
   debts: [
     { name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 14000, current_balance: 13900, interest_rate: 0.46, minimum_payment: 0, monthly_payment: 100, start_date: '2024-01-01', creditor: 'DUO', subtype: 'nieuw_stelsel', draagkrachtmeting_date: '2026-09-01' },
@@ -890,6 +897,10 @@ const daanData: PersonaData = {
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 4, value: 1700 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 2, value: 2050 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 0, value: 2350 },
+    // Brand New Day Pensioen valuations
+    { assetName: 'Brand New Day Pensioen', entity_type: 'asset', monthsAgo: 12, value: 1500 },
+    { assetName: 'Brand New Day Pensioen', entity_type: 'asset', monthsAgo: 8, value: 2600 },
+    { assetName: 'Brand New Day Pensioen', entity_type: 'asset', monthsAgo: 0, value: 4500 },
   ],
   holdings: [
     {
@@ -901,12 +912,35 @@ const daanData: PersonaData = {
       avg_purchase_price: 113.51,
       current_price: 127.03,
       purchase_date_monthsAgo: 14,
+      asset_class: 'equity',
+      sector: null,
+      geography: 'global',
+      currency: 'EUR',
       transactions: [
         { type: 'buy', units: 1.5, price_per_unit: 105, total_amount: 157.50, monthsAgo: 14, notes: 'Eerste inleg' },
         { type: 'buy', units: 3.5, price_per_unit: 108, total_amount: 378, monthsAgo: 11, notes: null },
         { type: 'buy', units: 5, price_per_unit: 112, total_amount: 560, monthsAgo: 8, notes: null },
         { type: 'buy', units: 4.5, price_per_unit: 116, total_amount: 522, monthsAgo: 5, notes: null },
         { type: 'buy', units: 4, price_per_unit: 120, total_amount: 480, monthsAgo: 2, notes: null },
+      ],
+    },
+    {
+      assetName: 'Brand New Day Pensioen',
+      ticker: 'BND-PENSIOEN',
+      isin: null,
+      name: 'Brand New Day Pensioen',
+      units: 35,
+      avg_purchase_price: 117.86,
+      current_price: 128.57,
+      purchase_date_monthsAgo: 12,
+      asset_class: 'equity',
+      sector: null,
+      geography: 'global',
+      currency: 'EUR',
+      transactions: [
+        { type: 'buy', units: 10, price_per_unit: 110, total_amount: 1375, monthsAgo: 12, notes: 'Eerste inleg pensioen' },
+        { type: 'buy', units: 12, price_per_unit: 118, total_amount: 1375, monthsAgo: 8, notes: null },
+        { type: 'buy', units: 13, price_per_unit: 125, total_amount: 1375, monthsAgo: 4, notes: null },
       ],
     },
   ],
@@ -1012,6 +1046,7 @@ const lisaData: PersonaData = {
   ],
   assets: [
     { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 42000, purchase_value: 33600, purchase_date: '2020-03-01', expected_return: 7, monthly_contribution: 400, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
+    { name: 'NT World Custom ESG Kinderbelegging', asset_type: 'investment', current_value: 8000, purchase_value: 7200, purchase_date: '2023-12-01', expected_return: 7, monthly_contribution: 0, institution: 'Northern Trust', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'NL0011225305' },
     { name: 'Woning Utrecht', asset_type: 'eigen_huis', current_value: 385000, purchase_value: 285000, purchase_date: '2015-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 385000, address_postcode: '3581 KP', address_house_number: '24' },
     { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: -12, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
   ],
@@ -1124,6 +1159,11 @@ const lisaData: PersonaData = {
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 4, value: 39800 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 2, value: 41000 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 0, value: 42000 },
+    // NT World Custom ESG valuations
+    { assetName: 'NT World Custom ESG Kinderbelegging', entity_type: 'asset', monthsAgo: 14, value: 5800 },
+    { assetName: 'NT World Custom ESG Kinderbelegging', entity_type: 'asset', monthsAgo: 10, value: 6400 },
+    { assetName: 'NT World Custom ESG Kinderbelegging', entity_type: 'asset', monthsAgo: 6, value: 7200 },
+    { assetName: 'NT World Custom ESG Kinderbelegging', entity_type: 'asset', monthsAgo: 0, value: 8000 },
     { assetName: 'Woning Utrecht', entity_type: 'asset', monthsAgo: 14, value: 360000 },
     { assetName: 'Woning Utrecht', entity_type: 'asset', monthsAgo: 12, value: 365000 },
     { assetName: 'Woning Utrecht', entity_type: 'asset', monthsAgo: 6, value: 375000 },
@@ -1139,6 +1179,11 @@ const lisaData: PersonaData = {
       avg_purchase_price: 108.31,
       current_price: 135.48,
       purchase_date_monthsAgo: 72,
+      asset_class: 'equity',
+      sector: null,
+      geography: 'global',
+      is_favorite: true,
+      currency: 'EUR',
       transactions: [
         { type: 'buy', units: 95, price_per_unit: 98.00, total_amount: 9310, monthsAgo: 72, notes: 'Initiële gezamenlijke inleg' },
         { type: 'buy', units: 60, price_per_unit: 104.00, total_amount: 6240, monthsAgo: 60, notes: null },
@@ -1148,6 +1193,26 @@ const lisaData: PersonaData = {
         { type: 'buy', units: 25, price_per_unit: 130.00, total_amount: 3250, monthsAgo: 12, notes: 'Jaarlijkse bijstorting' },
         { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 480, monthsAgo: 6, notes: 'Halfjaarlijks dividend' },
         { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 520, monthsAgo: 0, notes: 'Halfjaarlijks dividend' },
+      ],
+    },
+    {
+      assetName: 'NT World Custom ESG Kinderbelegging',
+      ticker: 'NL0011225305',
+      isin: 'NL0011225305',
+      name: 'NT World Custom ESG Kinderbelegging',
+      units: 220,
+      avg_purchase_price: 32.73,
+      current_price: 36.36,
+      purchase_date_monthsAgo: 14,
+      asset_class: 'equity',
+      sector: null,
+      geography: 'global',
+      currency: 'EUR',
+      transactions: [
+        { type: 'buy', units: 80, price_per_unit: 30.00, total_amount: 2400, monthsAgo: 14, notes: 'Kinderbelegging startkapitaal' },
+        { type: 'buy', units: 50, price_per_unit: 32.00, total_amount: 1600, monthsAgo: 10, notes: null },
+        { type: 'buy', units: 50, price_per_unit: 34.00, total_amount: 1700, monthsAgo: 6, notes: null },
+        { type: 'buy', units: 40, price_per_unit: 36.00, total_amount: 1440, monthsAgo: 2, notes: null },
       ],
     },
   ],
@@ -1356,6 +1421,11 @@ const willemData: PersonaData = {
       avg_purchase_price: 73.68,
       current_price: 110.53,
       purchase_date_monthsAgo: 48,
+      asset_class: 'equity',
+      sector: null,
+      geography: 'global',
+      is_favorite: true,
+      currency: 'EUR',
       transactions: [
         { type: 'buy', units: 1500, price_per_unit: 68.00, total_amount: 102000, monthsAgo: 48, notes: 'Initiële grote inleg' },
         { type: 'buy', units: 800, price_per_unit: 72.50, total_amount: 58000, monthsAgo: 36, notes: 'Bijkoop na dip' },
@@ -1437,8 +1507,8 @@ const rashidData: PersonaData = {
     { name: 'Sabbatical fonds', description: '6 maanden reizen — een sabbatical fonds opbouwen om de wereld te ontdekken', goal_type: 'savings', target_value: 30000, current_value: 8000, target_date: '2028-06-30', icon: 'Plane', color: 'teal', is_completed: false },
   ],
   life_events: [
-    { name: 'Sabbatical (6 mnd reizen)', event_type: 'career', target_age: 45, target_date: '2028-09-14', one_time_cost: 5000, monthly_cost_change: 2000, monthly_income_change: -5500, duration_months: 6, icon: 'Plane', is_active: true, sort_order: 0 },
-    { name: 'Freelance tarief omhoog', event_type: 'career', target_age: 47, target_date: '2030-09-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 500, duration_months: 0, icon: 'TrendingUp', is_active: true, sort_order: 1 },
+    { name: 'Sabbatical (6 mnd reizen)', event_type: 'sabbatical', target_age: 45, target_date: '2028-09-14', one_time_cost: 5000, monthly_cost_change: 2000, monthly_income_change: -5500, duration_months: 6, icon: 'Plane', is_active: true, sort_order: 0 },
+    { name: 'Freelance tarief omhoog', event_type: 'career_change', target_age: 47, target_date: '2030-09-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 500, duration_months: 0, icon: 'TrendingUp', is_active: true, sort_order: 1 },
     { name: 'AOW', event_type: 'aow', target_age: 69, target_date: '2052-06-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1350, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true },
   ],
   recommendations: [
@@ -1542,6 +1612,10 @@ const rashidData: PersonaData = {
       avg_purchase_price: 136,
       current_price: 178.95,
       purchase_date_monthsAgo: 36,
+      asset_class: 'equity',
+      sector: null,
+      geography: 'global',
+      currency: 'EUR',
       transactions: [
         { type: 'buy', units: 300, price_per_unit: 128.00, total_amount: 38400, monthsAgo: 36, notes: 'Eerste grote inleg' },
         { type: 'buy', units: 200, price_per_unit: 132.00, total_amount: 26400, monthsAgo: 30, notes: null },
