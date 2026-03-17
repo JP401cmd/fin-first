@@ -39,7 +39,7 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
   const horizonCx = 24, horizonCy = 32
 
   // Dot radius in viewBox space
-  const dotR = vb / 6 // = 8
+  const dotR = vb / 8 // = 6
 
   // Center of the triangle (for thinking rotation)
   const cx = 24, cy = 21.33
@@ -60,15 +60,15 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
     >
       <defs>
         <filter id="will-glow-kern" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.5" result="blur" />
+          <feGaussianBlur stdDeviation="1.0" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
         <filter id="will-glow-wil" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.5" result="blur" />
+          <feGaussianBlur stdDeviation="1.0" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
         <filter id="will-glow-horizon" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.5" result="blur" />
+          <feGaussianBlur stdDeviation="1.0" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
       </defs>
