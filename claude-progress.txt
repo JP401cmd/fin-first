@@ -1,3 +1,29 @@
+## Session 2026-03-17 - Features #206, #208
+
+### Feature #206: Identity pagina migreren naar server component - PASSING
+- Created lib/identity-data-loader.ts with server-side loader (profile, sovereignty, checkin data)
+- Created components/identity/identity-client.tsx for all interactive UI
+- Converted app/(app)/identity/page.tsx to async server component
+- Eliminates client-side JS→fetch waterfall for faster page load
+- All functionality preserved: profile strip, demo banner, temporal balance, chronology, checkin timeline
+- Zero TypeScript errors from changes
+- Commit: a7ce3d78
+
+### Feature #208: Assets & Holdings pagina's migreren naar server+client patroon - PASSING
+- Created lib/assets-data-loader.ts: parallel fetch of assets, mortgages, transactions, bank links, profile, valuations
+- Created lib/holdings-data-loader.ts: direct holdings table query with total calculations
+- Moved assets/page.tsx (3228 lines) to components/core/assets-client.tsx with initialData prop
+- Moved holdings/page.tsx (2184 lines) to components/core/holdings-client.tsx with initialData prop
+- Server pages pass initialData with try/catch fallback to client-side loading
+- Bank account balance syncing handled at initialization for server-provided data
+- Zero TypeScript errors from changes (pre-existing widget errors unchanged)
+- Both pages compile successfully (307 auth redirect)
+- Commit: 39de007a
+
+### Current Status
+- 2 features completed this session (#206, #208)
+- Server component migration pattern now applied to: /core, /will, /horizon, /identity, /core/assets, /core/assets/holdings
+
 ## Session 2026-03-17 - Feature #197
 
 ### Feature #197: WillDots: animaties vervangen door referentie-ontwerp - PASSING
