@@ -14319,3 +14319,29 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session
 - 173/175 features passing (98.9%)
+
+## Session 2026-03-17 - Feature #185
+
+### Feature #185: 6e persona: Gepensioneerde (Marijke, 68 jaar) - PASSING
+- Added Marijke Vermeer as 6th persona to lib/test-personas.ts (278 lines added)
+- Updated PersonaKey type, PERSONAS record, and PERSONA_KEYS array
+- Profile: born 1957-06-20, household samen, mastery sovereignty (level 5)
+- Bank accounts: Rabo betaal (€5.200), Rabo spaar (€35.000), ASN spaar (€15.000)
+- Assets: Beleggingsportefeuille Rabobank (€320K), Eigen woning Zwolle (€420K), Stacaravan Drenthe (€25K)
+- Debts: none (hypotheekvrij)
+- Holdings: 3 positions with classification — TDIV (equity/dividend, €180K), IEAG (bonds, €100K), Deposito-ladder (€40K)
+- 15 months transactions: AOW (€1.200), ABP pensioen (€1.800), dividend (~€400), low fixed costs, medical/leisure pattern
+- Life events: Pensioen (inactive, al gebeurd), Stacaravan verkoop (over 5 jaar), AOW partner Henk (active)
+- Goals: Wereldcruise met Henk, Erfenis structureren
+- FIRE: legacy strategy, fire_legacy_amount €200K
+- Widget prefs: netto_vermogen, passief_inkomen, fire_prognose (full), box3_drag, holdings, vrijheidsmijlpalen
+- Recommendations: defensievere allocatie, erfenis fiscaal plannen, zorgkosten voorbereiden
+- Net worth snapshots: 15 months €798K → €850K
+- Valuations: 8 beleggingen + 3 woning datapoints
+- Zero TypeScript errors, page compiles (307 auth redirect)
+- No changes needed to persona-card.tsx, seed-persona.ts, or testdata page (all generic)
+- Commit: 9d3dd288
+
+### Current Status
+- 1 feature completed this session (#185)
+- 185/185 features passing (100.0%) 🎉 ALL FEATURES COMPLETE!
