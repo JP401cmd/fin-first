@@ -39,6 +39,11 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
   const dragCurrentY = useRef(0)
   const isDragging = useRef(false)
   const velocityTracker = useRef<{ y: number; t: number }[]>([])
+  const contentRef = useRef<HTMLDivElement>(null)
+  // 'handle' = drag handle touch, 'content' = content area touch
+  const touchSource = useRef<'handle' | 'content'>('handle')
+  // Once we decide scroll vs drag for a content touch, lock it in
+  const gestureDecision = useRef<'undecided' | 'scroll' | 'drag'>('undecided')
 
   // Animation state machine
   const phaseRef = useRef<'idle' | 'entering' | 'open' | 'closing'>('idle')
@@ -273,20 +278,69 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
     dragCurrentY.current = 0
     isDragging.current = true
     velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
+    // Touch from drag handle: always drag immediately
+    touchSource.current = 'handle'
+    gestureDecision.current = 'drag'
     if (sheetRef.current) {
-      sheetRef.current.style.animation = 'none' // cancel entry animation if still running
+      sheetRef.current.style.animation = 'none'
       sheetRef.current.style.transition = 'none'
       sheetRef.current.style.willChange = 'transform'
     }
   }, [])
 
+  const handleContentTouchStart = useCallback((e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY
+    dragCurrentY.current = 0
+    isDragging.current = false // don't drag yet — wait for decision
+    velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
+    touchSource.current = 'content'
+    gestureDecision.current = 'undecided'
+  }, [])
+
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current || !sheetRef.current) return
+    if (!sheetRef.current) return
 
     const rawDelta = e.touches[0].clientY - dragStartY.current
 
+    // Content-area touch: decide between scroll and drag
+    if (touchSource.current === 'content') {
+      if (gestureDecision.current === 'scroll') return // let native scroll handle it
+
+      if (gestureDecision.current === 'undecided') {
+        // Need enough movement to decide (5px threshold)
+        if (Math.abs(rawDelta) < 5) return
+
+        const scrollEl = contentRef.current
+        const atTop = !scrollEl || scrollEl.scrollTop <= 0
+        const swipingDown = rawDelta > 0
+
+        if (atTop && swipingDown) {
+          // Activate drag-dismiss
+          gestureDecision.current = 'drag'
+          isDragging.current = true
+          // Reset start to current position for smooth drag start
+          dragStartY.current = e.touches[0].clientY
+          if (sheetRef.current) {
+            sheetRef.current.style.animation = 'none'
+            sheetRef.current.style.transition = 'none'
+            sheetRef.current.style.willChange = 'transform'
+          }
+          velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
+          return
+        } else {
+          // Let native scroll take over
+          gestureDecision.current = 'scroll'
+          return
+        }
+      }
+    }
+
+    // From here: active drag (handle or content-decided drag)
+    if (!isDragging.current) return
+
     // Rubber-banding for upward drag (15% resistance)
-    const deltaY = rawDelta < 0 ? rawDelta * 0.15 : rawDelta
+    const currentRawDelta = e.touches[0].clientY - dragStartY.current
+    const deltaY = currentRawDelta < 0 ? currentRawDelta * 0.15 : currentRawDelta
 
     sheetRef.current.style.transform = `translateY(${deltaY}px)`
     dragCurrentY.current = deltaY
@@ -299,17 +353,23 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
     }
 
     // Backdrop opacity follows finger
-    if (backdropRef.current && rawDelta > 0) {
+    if (backdropRef.current && currentRawDelta > 0) {
       const sheetHeight = getSheetHeight()
-      const dragPercent = Math.min(1, rawDelta / sheetHeight)
+      const dragPercent = Math.min(1, currentRawDelta / sheetHeight)
       backdropRef.current.style.backgroundColor = `rgba(0,0,0,${0.5 * (1 - dragPercent)})`
       backdropRef.current.style.transition = 'none'
     }
 
-    if (rawDelta > 0) e.preventDefault()
+    if (currentRawDelta > 0) e.preventDefault()
   }, [getSheetHeight])
 
   const handleTouchEnd = useCallback(() => {
+    // Content touch that stayed as scroll — just clean up
+    if (touchSource.current === 'content' && gestureDecision.current !== 'drag') {
+      gestureDecision.current = 'undecided'
+      touchSource.current = 'handle'
+      return
+    }
     if (!isDragging.current || !sheetRef.current) return
     isDragging.current = false
 
@@ -334,6 +394,8 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
 
     dragCurrentY.current = 0
     velocityTracker.current = []
+    gestureDecision.current = 'undecided'
+    touchSource.current = 'handle'
   }, [getSheetHeight, animateDismiss, animateSnapBack])
 
   const handleBackdrop = useCallback((e: React.MouseEvent) => {
@@ -382,7 +444,12 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
         )}
 
         {/* Scrollable content area */}
-        <div className="min-h-0 flex-1 overflow-y-auto" style={{ overscrollBehaviorY: 'contain' }}>
+        <div
+          ref={contentRef}
+          className="min-h-0 flex-1 overflow-y-auto"
+          style={{ overscrollBehaviorY: 'contain' }}
+          onTouchStart={handleContentTouchStart}
+        >
           {children}
         </div>
       </div>
