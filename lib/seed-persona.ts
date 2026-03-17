@@ -54,14 +54,18 @@ export async function deleteAllUserData(
 ): Promise<Record<string, number>> {
   const summary: Record<string, number> = {}
 
-  // Batch 0: tables with no FK to other user tables (user_feature_visits, next_step_completions)
-  // Also holding_transactions (FK to holdings) must be deleted before holdings
+  // Batch 0: tables with no FK to other user tables + holding children (FK to holdings)
+  // holding_transactions, holding_alerts must be deleted before holdings
+  // holding_prices has no user_id but CASCADE from holdings handles it
+  // target_allocations has user_id only (no FK to holdings)
   const batch0Results = await Promise.all([
     deleteTable(supabase, 'holding_transactions', userId),
+    deleteTable(supabase, 'holding_alerts', userId),
+    deleteTable(supabase, 'target_allocations', userId),
     deleteTable(supabase, 'user_feature_visits', userId),
     deleteTable(supabase, 'next_step_completions', userId),
   ])
-  const batch0Tables = ['holding_transactions', 'user_feature_visits', 'next_step_completions']
+  const batch0Tables = ['holding_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions']
   for (let i = 0; i < batch0Tables.length; i++) {
     summary[batch0Tables[i]] = batch0Results[i]
   }
