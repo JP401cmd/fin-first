@@ -1,3 +1,29 @@
+## Session 2026-03-17 - Feature #213
+
+### Feature #213: Budget Heatmap Visualisatie - PASSING
+- Created `components/app/budget-heatmap.tsx` (806 lines) — treemap-style heatmap inspired by Finviz
+- Squarified treemap algorithm (Bruls/Huizing/van Wijk 2000) for optimal aspect ratios
+- Color logic: `getHeatmapColor(budgetType, percentUsed)`
+  - Expenses: green → yellow → orange → red (spending is negative)
+  - Income/savings/debt: gray → light green → green → dark green (reaching goal is positive)
+- SVG rendering with `<foreignObject>` for HTML content (icons, text, amounts)
+- Parent group outlines with dashed borders and labels
+- Hover tooltip: budget name, icon, spent/limit, percentage bar, remaining, trend arrow
+- Click handler → `onNavigate(budgetId)` → opens existing BudgetDetailModal
+- Added 'heatmap' as 3rd viewMode option in `budgets-client.tsx` (tree | donut | heatmap)
+- LayoutGrid icon for toggle button, localStorage persistence
+- Responsive: desktop SVG treemap (16:10), mobile stacked blocks with horizontal proportional layout
+- Edge cases: MIN_WEIGHT=20 for 0-limit budgets, 200% cap, empty groups → null
+- Legend with gradient color scale + percentage labels per budget type
+- Staggered fade-in + scale animation on entry
+- Wrapped with React.memo
+- Zero TypeScript errors, zero mock data patterns
+- Commit: 43e756cc
+
+### Current Status
+- 1 feature completed this session (#213)
+- 212/212 features passing (100.0%)
+
 ## Session 2026-03-17 - Features #202, #203
 
 ### Feature #202: Will-pagina Supabase queries consolideren - PASSING
