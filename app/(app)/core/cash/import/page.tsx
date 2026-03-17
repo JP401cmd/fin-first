@@ -17,6 +17,7 @@ import { categorizeTransaction, isOwnAccountTransfer, buildFrequencyMap, type Ca
 import type { Budget } from '@/lib/budget-data'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { useToast } from '@/components/app/toast-provider'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 type Account = {
   id: string
@@ -44,7 +45,16 @@ type ImportRow = ParsedTransaction & {
   userManuallyChanged?: boolean
 }
 
-// BulkApplyPrompt removed — live correction propagation now auto-applies
+type BulkApplyPrompt = {
+  targetIndex: number
+  matchField: 'counterparty_iban' | 'counterparty_name' | 'description'
+  matchValue: string
+  budgetId: string
+  budgetName: string
+  siblingCount: number
+  siblingIndices: number[]
+  rememberRule: boolean
+}
 
 // --- Import session persistence (localStorage) ---
 const IMPORT_SESSION_KEY = 'fintwo_import_session'
@@ -146,10 +156,10 @@ export default function ImportPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiReady, setAiReady] = useState(false)
   const [aiError, setAiError] = useState(false)
-  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, skippedHighConf: 0 })
+  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, skippedHighConf: 0, autoMatched: 0 })
   const [aiFailedBatches, setAiFailedBatches] = useState<Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string | null; amount: number; reference: string | null }> }>>([])
   const [aiRetrying, setAiRetrying] = useState(false)
-  // bulkApplyPrompt removed — live correction propagation now applies automatically
+  const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
   const [checkingDups, setCheckingDups] = useState(false)
   const [pendingSession, setPendingSession] = useState<ImportSession | null>(null)
   const PAGE_SIZE = 50
@@ -285,73 +295,201 @@ export default function ImportPage() {
     setAiRetrying(!!retryPayloads)
 
     try {
-      // Build batches of 20
-      let batches: Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string | null; amount: number; reference: string | null }> }>
+      type BatchPayloadItem = { import_hash: string; description: string; counterparty_name: string | null; amount: number; reference: string | null }
+      type Batch = { index: number; payload: BatchPayloadItem[] }
 
       if (retryPayloads) {
-        batches = retryPayloads.map((b, i) => ({ index: i, payload: b.payload }))
-      } else {
-        const payload = toEnrich.map((r) => ({
-          import_hash: r.import_hash,
-          description: r.description,
-          counterparty_name: r.counterparty_name,
-          amount: r.amount,
-          reference: r.reference,
-        }))
+        // Retry flow: use parallel concurrency (no auto-assignment needed)
+        const batches: Batch[] = retryPayloads.map((b, i) => ({ index: i, payload: b.payload }))
+        const totalTxCount = batches.reduce((sum, b) => sum + b.payload.length, 0)
+        setAiProgress({ current: 0, total: totalTxCount, skippedHighConf: 0, autoMatched: 0 })
 
-        batches = []
-        for (let i = 0; i < payload.length; i += 20) {
-          batches.push({ index: batches.length, payload: payload.slice(i, i + 20) })
-        }
-      }
-
-      const totalTxCount = batches.reduce((sum, b) => sum + b.payload.length, 0)
-      setAiProgress({ current: 0, total: totalTxCount, skippedHighConf: retryPayloads ? 0 : highConfidence.length })
-
-      let completedTxCount = 0
-
-      // Feature #100: Parallel AI categorization with concurrency limiter (max 3)
-      const tasks = batches.map((batch) => async () => {
-        const res = await fetch('/api/ai/categorize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transactions: batch.payload }),
+        let completedTxCount = 0
+        const tasks = batches.map((batch) => async () => {
+          const res = await fetch('/api/ai/categorize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactions: batch.payload }),
+          })
+          if (!res.ok) throw new Error('AI niet beschikbaar')
+          return await res.json() as { results: AISuggestion[] }
         })
-        if (!res.ok) throw new Error('AI niet beschikbaar')
-        return await res.json() as { results: AISuggestion[] }
-      })
 
-      const results = await runWithConcurrency(tasks, 3, (idx) => {
-        completedTxCount += batches[idx].payload.length
-        setAiProgress((prev) => ({ ...prev, current: completedTxCount }))
-      })
+        const results = await runWithConcurrency(tasks, 3, (idx) => {
+          completedTxCount += batches[idx].payload.length
+          setAiProgress((prev) => ({ ...prev, current: completedTxCount }))
+        })
 
-      // Collect successes and failures
-      const allResults: AISuggestion[] = []
-      const failed: typeof aiFailedBatches = []
+        const allResults: AISuggestion[] = []
+        const failed: typeof aiFailedBatches = []
+        results.forEach((result, idx) => {
+          if (result.status === 'fulfilled') {
+            allResults.push(...result.value.results)
+          } else {
+            failed.push(batches[idx])
+          }
+        })
 
-      results.forEach((result, idx) => {
-        if (result.status === 'fulfilled') {
-          allResults.push(...result.value.results)
-        } else {
-          failed.push(batches[idx])
+        const map = new Map<string, AISuggestion>(aiSuggestions)
+        for (const s of allResults) {
+          if (s.budget_id && s.confidence >= 0.5) {
+            map.set(s.import_hash, s)
+          }
         }
-      })
+        setAiSuggestions(map)
+        setAiFailedBatches(failed)
+        setAiReady(true)
+        if (allResults.length === 0 && failed.length > 0) setAiError(true)
+      } else {
+        // Feature #190: Sequential batching with auto-assignment after each batch
+        // After each AI batch returns, propagate AI-determined categories to remaining
+        // uncategorized rows that share the same counterparty_name or counterparty_iban.
+        // This drastically reduces the number of transactions sent to AI.
 
-      // Merge with existing suggestions (important for retry flow)
-      const map = new Map<string, AISuggestion>(retryPayloads ? aiSuggestions : [])
-      for (const s of allResults) {
-        if (s.budget_id && s.confidence >= 0.5) {
-          map.set(s.import_hash, s)
+        // Build a lookup from import_hash → ImportRow for counterparty matching
+        const rowByHash = new Map<string, ImportRow>()
+        for (const r of importRows) rowByHash.set(r.import_hash, r)
+
+        // Track all AI results and auto-matched suggestions
+        const suggestionMap = new Map<string, AISuggestion>()
+        // Track hashes that have been categorized (AI or auto-matched) — skip in future batches
+        const categorizedHashes = new Set<string>()
+        // Track auto-matched count for progress display
+        let totalAutoMatched = 0
+
+        // All hashes that need AI categorization
+        const remainingHashes = new Set(toEnrich.map((r) => r.import_hash))
+        const originalTotal = remainingHashes.size
+        setAiProgress({ current: 0, total: originalTotal, skippedHighConf: highConfidence.length, autoMatched: 0 })
+
+        let completedCount = 0
+        const failed: typeof aiFailedBatches = []
+
+        while (remainingHashes.size > 0) {
+          // Build next batch from remaining uncategorized hashes
+          const batchHashes = Array.from(remainingHashes).slice(0, 20)
+          const batchPayload: BatchPayloadItem[] = batchHashes.map((h) => {
+            const r = rowByHash.get(h)!
+            return {
+              import_hash: r.import_hash,
+              description: r.description,
+              counterparty_name: r.counterparty_name,
+              amount: r.amount,
+              reference: r.reference,
+            }
+          })
+
+          // Send batch to AI
+          let batchResults: AISuggestion[] = []
+          try {
+            const res = await fetch('/api/ai/categorize', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ transactions: batchPayload }),
+            })
+            if (!res.ok) throw new Error('AI niet beschikbaar')
+            const data = await res.json() as { results: AISuggestion[] }
+            batchResults = data.results
+          } catch {
+            failed.push({ index: failed.length, payload: batchPayload })
+            // Remove these hashes so we don't loop forever
+            for (const h of batchHashes) remainingHashes.delete(h)
+            completedCount += batchHashes.length
+            setAiProgress((prev) => ({ ...prev, current: completedCount }))
+            continue
+          }
+
+          // Process AI results
+          for (const s of batchResults) {
+            if (s.budget_id && s.confidence >= 0.5) {
+              suggestionMap.set(s.import_hash, s)
+            }
+            categorizedHashes.add(s.import_hash)
+            remainingHashes.delete(s.import_hash)
+          }
+          // Also remove batch hashes that AI returned no result for
+          for (const h of batchHashes) remainingHashes.delete(h)
+
+          completedCount += batchHashes.length
+
+          // Feature #190: Auto-assignment pass — propagate AI categories to matching counterparties
+          // Build counterparty → {budget_id, confidence} map from ALL AI results so far
+          const counterpartyMap = new Map<string, { budget_id: string; confidence: number }>()
+          for (const [hash, s] of suggestionMap) {
+            if (!s.budget_id) continue
+            const row = rowByHash.get(hash)
+            if (!row) continue
+            // Index by counterparty_name (case-insensitive)
+            if (row.counterparty_name) {
+              const key = `name:${row.counterparty_name.toLowerCase()}`
+              if (!counterpartyMap.has(key)) {
+                counterpartyMap.set(key, { budget_id: s.budget_id, confidence: s.confidence })
+              }
+            }
+            // Index by counterparty_iban (normalized)
+            if (row.counterparty_iban) {
+              const key = `iban:${row.counterparty_iban.replace(/\s/g, '').toUpperCase()}`
+              if (!counterpartyMap.has(key)) {
+                counterpartyMap.set(key, { budget_id: s.budget_id, confidence: s.confidence })
+              }
+            }
+          }
+
+          // Match remaining uncategorized rows against counterparty map
+          let batchAutoMatched = 0
+          const autoMatchedHashes: string[] = []
+          for (const hash of remainingHashes) {
+            const row = rowByHash.get(hash)
+            if (!row) continue
+
+            let match: { budget_id: string; confidence: number } | undefined
+            // Try IBAN match first (more specific)
+            if (row.counterparty_iban) {
+              const key = `iban:${row.counterparty_iban.replace(/\s/g, '').toUpperCase()}`
+              match = counterpartyMap.get(key)
+            }
+            // Try name match
+            if (!match && row.counterparty_name) {
+              const key = `name:${row.counterparty_name.toLowerCase()}`
+              match = counterpartyMap.get(key)
+            }
+
+            if (match) {
+              suggestionMap.set(hash, {
+                import_hash: hash,
+                budget_slug: null,
+                budget_id: match.budget_id,
+                confidence: match.confidence,
+                reasoning: 'auto-matched via counterparty',
+              })
+              autoMatchedHashes.push(hash)
+              batchAutoMatched++
+            }
+          }
+
+          // Remove auto-matched hashes from remaining
+          for (const h of autoMatchedHashes) {
+            remainingHashes.delete(h)
+            categorizedHashes.add(h)
+          }
+
+          totalAutoMatched += batchAutoMatched
+          completedCount += batchAutoMatched
+
+          setAiProgress({
+            current: Math.min(completedCount, originalTotal),
+            total: originalTotal,
+            skippedHighConf: highConfidence.length,
+            autoMatched: totalAutoMatched,
+          })
+          // Update suggestions incrementally so UI shows progress
+          setAiSuggestions(new Map(suggestionMap))
         }
-      }
-      setAiSuggestions(map)
-      setAiFailedBatches(failed)
-      setAiReady(true)
 
-      // If all batches failed, show error
-      if (allResults.length === 0 && failed.length > 0) {
-        setAiError(true)
+        setAiSuggestions(suggestionMap)
+        setAiFailedBatches(failed)
+        setAiReady(true)
+        if (suggestionMap.size === 0 && failed.length > 0) setAiError(true)
       }
     } catch {
       setAiError(true)
@@ -692,80 +830,151 @@ export default function ImportPage() {
     const budget = budgets.find((b) => b.id === budgetId)
     const isUserChange = source === 'user'
 
-    // Determine counterparty match criteria
-    const matchField = row?.counterparty_name ? 'counterparty_name' as const : 'description' as const
-    const matchValue = row?.counterparty_name || row?.description || ''
+    // Always update the target row
+    setRows((prev) => prev.map((r, i) =>
+      i === index ? {
+        ...r,
+        budget_id: budgetId || null,
+        budgetName: budget?.name ?? null,
+        confidence: budgetId ? 1.0 : 0,
+        category_source: budgetId ? (isUserChange ? 'manual' : source) : null,
+        aiAccepted: source === 'ai',
+        userManuallyChanged: isUserChange,
+      } : r
+    ))
 
-    // Update the target row + auto-propagate to siblings with same counterparty
-    setRows((prev) => {
-      let siblingCount = 0
-      const updated = prev.map((r, i) => {
-        // The row being changed
-        if (i === index) {
-          return {
-            ...r,
-            budget_id: budgetId || null,
-            budgetName: budget?.name ?? null,
-            confidence: budgetId ? 1.0 : 0,
-            category_source: budgetId ? (isUserChange ? 'correction' : source) : null,
-            aiAccepted: source === 'ai',
-            userManuallyChanged: isUserChange,
-          }
-        }
-        // Auto-propagate to siblings: same counterparty, not manually changed, not transfer, not skipped
-        if (isUserChange && budgetId && matchValue && !r.userManuallyChanged && !r.isTransfer && !r.skipImport) {
-          const matches = matchField === 'counterparty_name'
-            ? r.counterparty_name?.toLowerCase() === matchValue.toLowerCase()
-            : r.description?.toLowerCase().includes(matchValue.toLowerCase())
-          if (matches) {
-            siblingCount++
-            return {
-              ...r,
-              budget_id: budgetId,
-              budgetName: budget?.name ?? null,
-              confidence: 1.0,
-              category_source: 'correction',
-              aiAccepted: false,
-            }
-          }
-        }
-        return r
-      })
+    if (!isUserChange || !budgetId || !row) return
 
-      // Show toast for auto-propagated siblings (deferred to avoid setState-in-render)
-      if (siblingCount > 0 && budget) {
-        setTimeout(() => {
-          addToast({
-            type: 'success',
-            title: `Budget toegepast op ${siblingCount} vergelijkbare transactie${siblingCount === 1 ? '' : 's'}`,
-            message: `${budget.name} → ${matchValue}`,
-            duration: 3000,
-          })
-        }, 0)
+    // Determine match criteria — prefer IBAN, then counterparty_name, then description
+    let matchField: 'counterparty_iban' | 'counterparty_name' | 'description'
+    let matchValue: string
+
+    if (row.counterparty_iban) {
+      matchField = 'counterparty_iban'
+      matchValue = row.counterparty_iban.replace(/\s/g, '').toUpperCase()
+    } else if (row.counterparty_name) {
+      matchField = 'counterparty_name'
+      matchValue = row.counterparty_name
+    } else {
+      matchField = 'description'
+      matchValue = row.description || ''
+    }
+
+    if (!matchValue) {
+      // No match value available — save correction with best available field
+      saveCorrectionRule(
+        row.counterparty_name ? 'counterparty_name' : 'description',
+        row.counterparty_name || row.description || '',
+        budgetId,
+      )
+      return
+    }
+
+    // Find matching sibling indices
+    const siblingIndices: number[] = []
+    rows.forEach((r, i) => {
+      if (i === index) return
+      if (r.userManuallyChanged || r.isTransfer || r.skipImport) return
+
+      let matches = false
+      if (matchField === 'counterparty_iban') {
+        matches = r.counterparty_iban?.replace(/\s/g, '').toUpperCase() === matchValue
+      } else if (matchField === 'counterparty_name') {
+        matches = r.counterparty_name?.toLowerCase() === matchValue.toLowerCase()
+      } else {
+        matches = !!r.description?.toLowerCase().includes(matchValue.toLowerCase())
       }
 
-      return updated
+      if (matches) siblingIndices.push(i)
     })
 
-    // Save correction to category_corrections table
-    if (budgetId && row && matchValue && isUserChange) {
-      void (async () => {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        await supabase.from('category_corrections')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('match_field', matchField)
-          .ilike('match_value', matchValue)
-        await supabase.from('category_corrections')
-          .insert({ user_id: user.id, match_field: matchField, match_value: matchValue, budget_id: budgetId })
-        setCorrections(prev => {
-          const filtered = prev.filter(c => !(c.match_field === matchField && c.match_value.toLowerCase() === matchValue.toLowerCase()))
-          return [...filtered, { match_field: matchField as 'counterparty_name' | 'description', match_value: matchValue, budget_id: budgetId }]
-        })
-      })()
+    if (siblingIndices.length === 0) {
+      // No siblings — save correction silently
+      saveCorrectionRule(
+        matchField,
+        matchField === 'counterparty_iban' ? matchValue : (row.counterparty_name || row.description || ''),
+        budgetId,
+      )
+      return
     }
+
+    // Show bulk apply dialog
+    setBulkApplyPrompt({
+      targetIndex: index,
+      matchField,
+      matchValue,
+      budgetId,
+      budgetName: budget?.name ?? '',
+      siblingCount: siblingIndices.length,
+      siblingIndices,
+      rememberRule: true,
+    })
+  }
+
+  function saveCorrectionRule(matchField: CategoryCorrection['match_field'], matchValue: string, budgetId: string) {
+    void (async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase.from('category_corrections')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('match_field', matchField)
+        .ilike('match_value', matchValue)
+      await supabase.from('category_corrections')
+        .insert({ user_id: user.id, match_field: matchField, match_value: matchValue, budget_id: budgetId })
+      setCorrections(prev => {
+        const filtered = prev.filter(c => !(c.match_field === matchField && c.match_value.toLowerCase() === matchValue.toLowerCase()))
+        return [...filtered, { match_field: matchField, match_value: matchValue, budget_id: budgetId }]
+      })
+    })()
+  }
+
+  function handleBulkApplyConfirm() {
+    if (!bulkApplyPrompt) return
+    const { siblingIndices, budgetId, budgetName, matchField, matchValue, rememberRule } = bulkApplyPrompt
+
+    // Apply budget to all matching siblings
+    setRows((prev) => prev.map((r, i) => {
+      if (!siblingIndices.includes(i)) return r
+      return {
+        ...r,
+        budget_id: budgetId,
+        budgetName: budgetName,
+        confidence: 1.0,
+        category_source: 'manual',
+        aiAccepted: false,
+      }
+    }))
+
+    // Save correction rule if checkbox is checked
+    if (rememberRule) {
+      saveCorrectionRule(matchField, matchValue, budgetId)
+    }
+
+    // Toast with result count (target + siblings)
+    setTimeout(() => {
+      addToast({
+        type: 'success',
+        title: `Budget toegekend aan ${siblingIndices.length + 1} transactie${siblingIndices.length + 1 === 1 ? '' : 's'}`,
+        message: `${budgetName} → ${matchValue}`,
+        duration: 3000,
+      })
+    }, 0)
+
+    setBulkApplyPrompt(null)
+  }
+
+  function handleBulkApplyDecline() {
+    if (!bulkApplyPrompt) return
+    const { matchField, matchValue, budgetId, rememberRule } = bulkApplyPrompt
+
+    // Still save correction if checkbox was checked (even when declining bulk)
+    if (rememberRule) {
+      saveCorrectionRule(matchField, matchValue, budgetId)
+    }
+
+    setBulkApplyPrompt(null)
   }
 
   function toggleSkip(index: number) {
@@ -1627,9 +1836,11 @@ export default function ImportPage() {
                   />
                 </div>
               )}
-              {aiProgress.skippedHighConf > 0 && (
+              {(aiProgress.skippedHighConf > 0 || aiProgress.autoMatched > 0) && (
                 <p className="text-[11px] text-[var(--ink-4)]">
-                  {aiProgress.skippedHighConf} transacties automatisch herkend (overgeslagen)
+                  {aiProgress.skippedHighConf > 0 && <>{aiProgress.skippedHighConf} transacties automatisch herkend (overgeslagen)</>}
+                  {aiProgress.skippedHighConf > 0 && aiProgress.autoMatched > 0 && ' · '}
+                  {aiProgress.autoMatched > 0 && <>{aiProgress.autoMatched} extra gematcht via counterparty</>}
                 </p>
               )}
             </div>
@@ -1643,9 +1854,10 @@ export default function ImportPage() {
                   <Sparkles className="h-4 w-4 text-kern-600 shrink-0" />
                   <p className="text-sm font-medium text-kern-700">
                     Will heeft {aiSuggestions.size} {aiSuggestions.size === 1 ? 'voorstel' : 'voorstellen'}
-                    {aiProgress.skippedHighConf > 0 && (
+                    {(aiProgress.skippedHighConf > 0 || aiProgress.autoMatched > 0) && (
                       <span className="text-[var(--ink-3)] font-normal ml-1">
-                        · {aiProgress.skippedHighConf} automatisch herkend
+                        {aiProgress.skippedHighConf > 0 && <>· {aiProgress.skippedHighConf} automatisch herkend</>}
+                        {aiProgress.autoMatched > 0 && <> · {aiProgress.autoMatched} auto-gematcht</>}
                       </span>
                     )}
                   </p>
@@ -1994,6 +2206,48 @@ export default function ImportPage() {
             </div>
           )
         })()}
+
+      {/* Bulk Apply Dialog — shown when user assigns a budget with matching siblings */}
+      {bulkApplyPrompt && (
+        <BottomSheet open onClose={() => setBulkApplyPrompt(null)} size="sm">
+          <div className="p-6 space-y-4">
+            <h3 className="text-base font-semibold text-[var(--ink)]">
+              Vergelijkbare transacties gevonden
+            </h3>
+            <p className="text-sm text-[var(--ink-2)]">
+              Er {bulkApplyPrompt.siblingCount === 1 ? 'is' : 'zijn'} nog{' '}
+              <span className="font-semibold text-[var(--ink)]">{bulkApplyPrompt.siblingCount}</span>{' '}
+              {bulkApplyPrompt.siblingCount === 1 ? 'transactie' : 'transacties'} van{' '}
+              <span className="font-semibold text-[var(--ink)]">{bulkApplyPrompt.matchValue}</span>.
+              {' '}Wil je <span className="font-semibold text-[var(--ink)]">{bulkApplyPrompt.budgetName}</span> ook
+              aan deze transacties toekennen?
+            </p>
+            <label className="flex items-center gap-2 text-sm text-[var(--ink-2)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={bulkApplyPrompt.rememberRule}
+                onChange={(e) => setBulkApplyPrompt(prev => prev ? { ...prev, rememberRule: e.target.checked } : null)}
+                className="rounded border-[var(--border-ed)] accent-kern-500"
+              />
+              Onthoud voor toekomstige imports
+            </label>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleBulkApplyConfirm}
+                className="flex-1 rounded-lg bg-kern-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-kern-600 transition-colors"
+              >
+                Ja, pas toe op alle
+              </button>
+              <button
+                onClick={handleBulkApplyDecline}
+                className="flex-1 rounded-lg border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+              >
+                Nee, alleen deze
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
     </div>
   )
 }
