@@ -1,3 +1,29 @@
+## Session 2026-03-17 - Features #202, #203
+
+### Feature #202: Will-pagina Supabase queries consolideren - PASSING
+- Added full_name + ai_enabled to dashboard-data-loader profile query (eliminates extra queries)
+- Added name to assets/debts queries in dashboard-data-loader for sharing with will-data-loader
+- Merged 4 budget queries into 1 in dashboard-data-loader (essential + allParent + children + favorites)
+- Will-data-loader now accepts optional WillSharedData (userId, assets, debts, fullName)
+- Merged actions 2→1, recommendations 2→1, goals 3→1 in will-data-loader
+- Removed unused recommendation_feedback query from will-data-loader
+- Eliminated duplicate auth.getUser() calls (3→1) and redundant household_members queries in dashboard
+- Also updated berichten/page.tsx to use dashboard's userName/aiEnabled (same pattern)
+- ~15 Supabase queries eliminated per Will page load
+- Zero TypeScript errors
+- Commit: dab443f0
+
+### Feature #203: Layout waterfall lastLevelRes naar Promise.all - PASSING
+- Moved lastLevelRes (sovereignty level) query from sequential to Promise.all batch in layout.tsx
+- Query only needs user.id which is available before the batch (from getUser on line 47)
+- Eliminates sequential waterfall latency on every page navigation
+- Fire-and-forget .upsert() calls already use .then(() => {}) pattern — no changes needed
+- Zero TypeScript errors
+- Changes included in commit 4f14ca12 (bundled by concurrent agent)
+
+### Current Status
+- 2 features completed this session (#202, #203)
+
 ## Session 2026-03-17 - Feature #212
 
 ### Feature #212: CSS animaties scopen naar componenten - PASSING
