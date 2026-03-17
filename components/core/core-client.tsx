@@ -919,12 +919,16 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         <div className="p-4 sm:p-6 md:p-8">
           {needsActivation ? (
             <>
-              <div className="mb-3 sm:mb-5">
+              <button
+                type="button"
+                onClick={() => setShowNetWorthReceipt(true)}
+                className="mb-3 sm:mb-5 cursor-pointer text-left transition-opacity hover:opacity-80"
+              >
                 <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
                   {formatCurrency(effectiveNetWorth)}
                 </span>
                 <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">netto vermogen</span>
-              </div>
+              </button>
 
               <p className="mb-3 text-sm text-[var(--ink-3)]">
                 Welkom bij De Kern — je financiele fundament. Neem de tijd om je gegevens te verkennen. Wanneer je klaar bent, activeer je routekaart om De Wil en De Horizon te ontgrendelen.
@@ -941,26 +945,20 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </>
           ) : (
             <>
-              <div className="mb-3 sm:mb-5">
+              <button
+                type="button"
+                onClick={() => setShowNetWorthReceipt(true)}
+                className="mb-3 sm:mb-5 cursor-pointer text-left transition-opacity hover:opacity-80"
+              >
                 <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
-                  {((effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+                  {formatCurrency(effectiveNetWorth)}
                 </span>
-                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheid bereikt</span>
-              </div>
-
-              <button type="button" onClick={() => setShowFireReceipt(true)} className="mb-4 sm:mb-6 w-full text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none">
-                <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300 transition-all duration-1000"
-                    style={{ width: `${Math.max(Math.min((effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100, 100), 0)}%` }}
-                  />
-                </div>
-                <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
-                  <span>0%</span>
-                  <span className="font-mono">{formatCurrency(coreSimTarget ?? data.fireTarget)} — volledige vrijheid</span>
-                  <span>100%</span>
-                </div>
+                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">netto vermogen</span>
               </button>
+
+              <p className="mb-4 sm:mb-6 font-serif italic text-sm text-[var(--ink-3)]">
+                dat is {effectiveFreedomYears > 0 ? `${effectiveFreedomYears} jaar en ` : ''}{effectiveFreedomMonths} maanden vrijheid
+              </p>
             </>
           )}
 

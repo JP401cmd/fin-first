@@ -34,10 +34,19 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
   const vb = 48
   const cx = 24,
     cy = 24
-  const dotR = 6
+  const dotR = 4
 
   // Map streaming → loading (conceptually similar sequential pulse)
   const animState = state === 'streaming' ? 'loading' : state
+
+  // Prevent entrance animation: skip CSS transitions on the initial render
+  // so dots appear instantly at their idle positions without spreading from center.
+  // Uses state (not ref) so the component re-renders with transitions enabled.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setMounted(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   // --- Idle random animation state ---
   const [eyeScaleY, setEyeScaleY] = useState(1)
@@ -180,34 +189,16 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
       aria-label="Will avatar"
     >
       <defs>
-        <filter
-          id="will-glow-kern"
-          x="-50%"
-          y="-50%"
-          width="200%"
-          height="200%"
-        >
-          <feGaussianBlur stdDeviation="1.0" result="blur" />
+        <filter id="will-glow-kern" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.5" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
-        <filter
-          id="will-glow-wil"
-          x="-50%"
-          y="-50%"
-          width="200%"
-          height="200%"
-        >
-          <feGaussianBlur stdDeviation="1.0" result="blur" />
+        <filter id="will-glow-wil" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.5" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
-        <filter
-          id="will-glow-horizon"
-          x="-50%"
-          y="-50%"
-          width="200%"
-          height="200%"
-        >
-          <feGaussianBlur stdDeviation="1.0" result="blur" />
+        <filter id="will-glow-horizon" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.5" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
       </defs>
@@ -226,6 +217,20 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
         />
       )}
 
+      {/* Kern trail (dot-1 shadow — renders behind main dot) */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={dotR + 1}
+        fill="var(--color-kern-500)"
+        opacity={0.18}
+        className={`will-dot will-trail will-${animState}-1`}
+        style={{
+          transformOrigin: `${cx}px ${cy}px`,
+          transform: eye1Transform,
+          transition: mounted && animState === 'idle' ? 'transform 120ms ease' : undefined,
+        }}
+      />
       {/* Kern dot (dot-1 / left eye) */}
       <circle
         cx={cx}
@@ -237,10 +242,24 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
         style={{
           transformOrigin: `${cx}px ${cy}px`,
           transform: eye1Transform,
-          transition: animState === 'idle' ? 'transform 80ms ease' : undefined,
+          transition: mounted && animState === 'idle' ? 'transform 80ms ease' : undefined,
         }}
       />
 
+      {/* Wil trail (dot-2 shadow — renders behind main dot) */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={dotR + 1}
+        fill="var(--color-wil-500)"
+        opacity={0.18}
+        className={`will-dot will-trail will-${animState}-2`}
+        style={{
+          transformOrigin: `${cx}px ${cy}px`,
+          transform: eye2Transform,
+          transition: mounted && animState === 'idle' ? 'transform 120ms ease' : undefined,
+        }}
+      />
       {/* Wil dot (dot-2 / right eye) */}
       <circle
         cx={cx}
@@ -252,10 +271,25 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
         style={{
           transformOrigin: `${cx}px ${cy}px`,
           transform: eye2Transform,
-          transition: animState === 'idle' ? 'transform 80ms ease' : undefined,
+          transition: mounted && animState === 'idle' ? 'transform 80ms ease' : undefined,
         }}
       />
 
+      {/* Horizon trail (dot-3 shadow — renders behind main dot) */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={dotR + 1}
+        fill="var(--color-horizon-500)"
+        opacity={0.18}
+        className={`will-dot will-trail will-${animState}-3`}
+        style={{
+          transformOrigin: `${cx}px ${cy}px`,
+          transform: mouthTransform,
+          transition:
+            mounted && animState === 'idle' ? 'transform 140ms ease' : undefined,
+        }}
+      />
       {/* Horizon dot (dot-3 / mouth) */}
       <circle
         cx={cx}
@@ -268,7 +302,7 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
           transformOrigin: `${cx}px ${cy}px`,
           transform: mouthTransform,
           transition:
-            animState === 'idle' ? 'transform 100ms ease' : undefined,
+            mounted && animState === 'idle' ? 'transform 100ms ease' : undefined,
         }}
       />
     </svg>
