@@ -1,12 +1,13 @@
 /**
  * Test persona definitions for superadmin testdata seeding.
  *
- * 5 personas at different financial life stages:
+ * 6 personas at different financial life stages:
  * 1. Roos van Dijk — "In de rode cijfers" (deep in debt)
  * 2. Daan Bakker — "De starter" (young professional starting out)
  * 3. Lisa de Groot — "De 100K milestone" (family, hit 100K net worth)
  * 4. Willem Jansen — "Bijna binnen" (near financial independence)
  * 5. Rashid Dimohammed — "De Genieter" (no budgets, no transactions, check-in based)
+ * 6. Marijke Vermeer — "De Gepensioneerde" (retired, legacy strategy)
  */
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'
@@ -30,7 +31,7 @@ function monthsAgo(months: number, day = 1): string {
 
 // ── Types ─────────────────────────────────────────────────────
 
-export type PersonaKey = 'roos' | 'daan' | 'lisa' | 'willem' | 'rashid'
+export type PersonaKey = 'roos' | 'daan' | 'lisa' | 'willem' | 'rashid' | 'marijke'
 
 export type SovereigntyPhase = 'recovery' | 'stability' | 'momentum' | 'mastery'
 
@@ -1694,6 +1695,279 @@ const rashidData: PersonaData = {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Persona 6 — Marijke Vermeer ("De Gepensioneerde")
+// Uniek: al met pensioen, uitkeringsfase, legacy strategie
+// ══════════════════════════════════════════════════════════════
+
+const marijkeTransactions: PersonaTransactionTemplate[] = [
+  ...generateMonthlyTransactions(15, [
+    // Inkomen — AOW + ABP pensioen + dividend
+    { day: 22, amount: 1200, description: 'AOW uitkering', counterparty_name: 'SVB', counterparty_iban: 'NL86INGB0002445500', budgetSlug: S.SALARIS_UITKERING, is_income: true },
+    { day: 24, amount: 1800, description: 'ABP pensioen', counterparty_name: 'ABP', counterparty_iban: 'NL91ABNA0585647300', budgetSlug: S.SALARIS_UITKERING, is_income: true },
+    { day: 5, amount: 400, description: 'Dividenduitkering', counterparty_name: 'Rabobank Beleggen', counterparty_iban: 'NL44RABO0100056789', budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true, jitterPct: 0.15 },
+    // Vaste lasten (hypotheekvrij!)
+    { day: 1, amount: -95, description: 'Energie', counterparty_name: 'Vattenfall', counterparty_iban: 'NL20INGB0001234567', budgetSlug: S.GAS_WATER_LICHT, is_income: false, jitterPct: 0.15 },
+    { day: 1, amount: -175, description: 'Zorgverzekering', counterparty_name: 'Menzis', counterparty_iban: 'NL93ABNA0585927836', budgetSlug: S.VERZEKERINGEN_WONEN, is_income: false },
+    { day: 1, amount: -65, description: 'Opstal + inboedelverzekering', counterparty_name: 'Univ\u00e9', counterparty_iban: 'NL75ABNA0500100200', budgetSlug: S.VERZEKERINGEN_WONEN, is_income: false },
+    { day: 15, amount: -55, description: 'Gemeentelijke belasting', counterparty_name: 'Gemeente Zwolle', counterparty_iban: 'NL45BNGH0285000522', budgetSlug: S.GEMEENTELIJKE_LASTEN, is_income: false },
+    // Vervoer (lager — geen woon-werkverkeer meer)
+    { day: 1, amount: -45, description: 'Autoverzekering', counterparty_name: 'ANWB Verzekeringen', counterparty_iban: 'NL02ABNA0450884700', budgetSlug: S.AUTO_VASTE_LASTEN, is_income: false },
+    { day: 10, amount: -40, description: 'Brandstof', counterparty_name: 'Shell', counterparty_iban: null, budgetSlug: S.BRANDSTOF_OV, is_income: false, jitterPct: 0.25 },
+    // Medische kosten (hoger op 68-jarige leeftijd)
+    { day: 18, amount: -85, description: 'Apotheek', counterparty_name: 'Apotheek Zwolle', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false, jitterPct: 0.30 },
+    // Leuke dingen (vrije tijd focus)
+    { day: 12, amount: -65, description: 'Restaurant met vriendinnen', counterparty_name: 'Restaurant De Librije', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.20 },
+    { day: 20, amount: -35, description: 'Bridgeclub', counterparty_name: 'Bridgeclub Zwolle', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { day: 7, amount: -15.99, description: 'NPO Start Plus', counterparty_name: 'NPO', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    // Sparen (bescheiden, focus op behoud)
+    { day: 1, amount: -200, description: 'Overboeking spaarrekening', counterparty_name: 'Rabobank Spaar', counterparty_iban: 'NL33RABO0300056790', budgetSlug: S.SPAREN_NOODBUFFER, is_income: false },
+  ]),
+  ...generateGroceryTransactions(15, 65, 15), // Lagere boodschappenkosten (1-2 personen)
+  // Irregular/seasonal transactions — gepensioneerden-patroon
+  ...generateIrregularTransactions([
+    { monthsAgo: 1, day: 20, amount: -45, description: 'Cadeaus kleinkinderen', counterparty_name: 'Intertoys', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 2, day: 10, amount: -320, description: 'Kerstdiner familie', counterparty_name: 'Restaurant De Librije', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
+    { monthsAgo: 3, day: 5, amount: -155, description: 'Tandarts + gebitsreiniging', counterparty_name: 'Tandarts Zwolle', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
+    { monthsAgo: 4, day: 15, amount: -1800, description: 'Wintervakantie Canarische Eilanden', counterparty_name: 'TUI', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 5, day: 8, amount: -210, description: 'Tuinonderhoud voorjaar', counterparty_name: 'Tuincentrum Zwolle', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false },
+    { monthsAgo: 6, day: 12, amount: -1200, description: 'Stacaravan seizoensplaats', counterparty_name: 'Camping De Ree\u00ebnwissel', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 7, day: 3, amount: -185, description: 'ANWB wegenwacht + reisverzekering', counterparty_name: 'ANWB', counterparty_iban: null, budgetSlug: S.AUTO_VASTE_LASTEN, is_income: false },
+    { monthsAgo: 8, day: 22, amount: -95, description: 'Verjaardagscadeau echtgenoot', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 9, day: 14, amount: -280, description: 'Fysiotherapie (10 behandelingen)', counterparty_name: 'Fysiotherapie Zwolle', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
+    { monthsAgo: 10, day: 25, amount: -65, description: 'Sinterklaas kleinkinderen', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 11, day: 18, amount: -420, description: 'APK + kleine beurt auto', counterparty_name: 'Garage Van Dijk', counterparty_iban: null, budgetSlug: S.AUTO_ONDERHOUD, is_income: false },
+    { monthsAgo: 12, day: 5, amount: -2200, description: 'Zomervakantie Dordogne', counterparty_name: 'Booking.com', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 13, day: 10, amount: -125, description: 'Nieuwe wandelschoenen', counterparty_name: 'Bever', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 14, day: 20, amount: -350, description: 'Oogarts + nieuwe bril', counterparty_name: 'Specsavers', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
+  ]),
+]
+
+const marijkeData: PersonaData = {
+  meta: {
+    name: 'Marijke Vermeer',
+    subtitle: 'De Gepensioneerde',
+    description: 'Al 3 jaar met pensioen, geniet van het leven met \u20ac850K netto vermogen. AOW + ABP pensioen + dividend vormen een comfortabel passief inkomen van \u20ac3.400/maand.',
+    color: 'emerald',
+    avatarColor: '#6B8E6B',
+    netWorth: 850000,
+    income: 3400,
+    expenses: 2800,
+    backgroundStory: 'Marijke was 35 jaar verpleegkundig specialist bij Isala Zwolle. Samen met haar man Henk (70) heeft ze een hypotheekvrij huis in Zwolle-Zuid. Sinds haar pensioen op 65 geniet ze van bridgen, wandelen met vriendinnen en de kleinkinderen. Hun stacaravan in Drenthe is hun zomerse uitvalsbasis. Financieel zijn ze comfortabel: AOW, ABP-pensioen en een degelijke beleggingsportefeuille met focus op dividend en obligaties. Marijke wil een deel nalaten aan de kinderen \u2014 de rest is voor genieten.',
+    challenges: ['Legacy-planning: hoeveel nalaten vs. zelf uitgeven', 'Portefeuille verschuiven naar meer obligaties/minder risico', 'Stijgende zorgkosten plannen', 'Stacaravan verkopen op het juiste moment'],
+    currentSituation: 'Comfortabel met pensioen met \u20ac600/maand surplus. Portefeuille in uitkeringsfase, focus op kapitaalbehoud en dividend-inkomsten.',
+    firstGoal: 'Wereldcruise met Henk',
+    sovereignty: 'mastery',
+  },
+  profile: {
+    full_name: 'Marijke Vermeer',
+    date_of_birth: '1957-06-20',
+    household_type: 'samen',
+    temporal_balance: 5,
+    expected_return: 0.05,
+    inflation_rate: 0.02,
+    fire_end_strategy: 'legacy',
+    fire_legacy_amount: 200000,
+    retirement_expense_method: 'custom_amount',
+    retirement_expense_custom_amount: 2800,
+    net_monthly_income: 3400,
+    estimated_monthly_expenses: 2800,
+    widget_prefs: makeWidgetPrefs([
+      'netto_vermogen', 'passief_inkomen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',
+      'holdings', 'vrijheidsmijlpalen', 'acties', 'veerkracht_score',
+    ]),
+  },
+  bank_accounts: [
+    { name: 'Betaalrekening Rabobank', iban: 'NL22RABO0300056788', bank_name: 'Rabobank', account_type: 'checking', balance: 5200, is_active: true, sort_order: 0 },
+    { name: 'Spaarrekening Rabobank', iban: 'NL33RABO0300056790', bank_name: 'Rabobank', account_type: 'savings', balance: 35000, is_active: true, sort_order: 1 },
+    { name: 'Spaarrekening ASN', iban: 'NL55ASNB0708956432', bank_name: 'ASN Bank', account_type: 'savings', balance: 15000, is_active: true, sort_order: 2 },
+  ],
+  assets: [
+    { name: 'Beleggingsportefeuille Rabobank', asset_type: 'investment', current_value: 320000, purchase_value: 260000, purchase_date: '2005-01-01', expected_return: 5, monthly_contribution: 0, institution: 'Rabobank', subtype: 'etf', risk_profile: 'laag' },
+    { name: 'Eigen woning Zwolle', asset_type: 'eigen_huis', current_value: 420000, purchase_value: 180000, purchase_date: '1992-03-01', expected_return: 3, monthly_contribution: 0, institution: '', woz_value: 440000, address_postcode: '8024 AA', address_house_number: '12' },
+    { name: 'Stacaravan Drenthe', asset_type: 'physical_possession', current_value: 25000, purchase_value: 35000, purchase_date: '2018-06-01', expected_return: -5, monthly_contribution: 0, institution: '', depreciation_rate: 5 },
+  ],
+  debts: [], // Hypotheekvrij
+  budgets: makeBudgets({
+    [S.INKOMEN]: 3400, [S.SALARIS_UITKERING]: 3000,
+    [S.TOESLAGEN_KINDERBIJSLAG]: 0, [S.TERUGGAVE_BELASTING]: 0, [S.OVERIGE_INKOMSTEN]: 400,
+    [S.VASTE_LASTEN_WONEN]: 390, [S.HUUR_HYPOTHEEK]: 0, [S.GAS_WATER_LICHT]: 95,
+    [S.VERZEKERINGEN_WONEN]: 240, [S.GEMEENTELIJKE_LASTEN]: 55,
+    [S.DAGELIJKSE_UITGAVEN]: 430, [S.BOODSCHAPPEN]: 260, [S.HUISHOUDEN_VERZORGING]: 50,
+    [S.KINDEREN_SCHOOL]: 0, [S.MEDISCHE_KOSTEN]: 120,
+    [S.VERVOER]: 130, [S.BRANDSTOF_OV]: 40, [S.AUTO_VASTE_LASTEN]: 45,
+    [S.AUTO_ONDERHOUD]: 35, [S.FIETS_DEELVERVOER]: 10,
+    [S.LEUKE_DINGEN]: 350, [S.UIT_ETEN_HORECA]: 80, [S.VRIJE_TIJD_SPORT]: 60,
+    [S.VAKANTIE]: 150, [S.KLEDING_OVERIGE]: 60,
+    [S.SPAREN_SCHULDEN]: 200, [S.SPAREN_NOODBUFFER]: 200, [S.INVESTEREN_FIRE]: 0,
+    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 0, [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
+  }),
+  transactions: marijkeTransactions,
+  goals: [
+    { name: 'Wereldcruise met Henk', description: 'Een 3-weekse cruise door de Middellandse Zee \u2014 het droomavontuur na een leven hard werken', goal_type: 'savings', target_value: 12000, current_value: 8500, target_date: monthsAgo(-12), icon: 'Ship', color: 'teal', is_completed: false },
+    { name: 'Erfenis structureren', description: 'Minimaal \u20ac200.000 nalaten aan de kinderen, fiscaal optimaal verdeeld', goal_type: 'net_worth', target_value: 200000, current_value: 850000, target_date: monthsAgo(-120), icon: 'Heart', color: 'purple', is_completed: false },
+  ],
+  life_events: [
+    { name: 'Pensioen', event_type: 'early_retirement', target_age: 65, target_date: '2022-06-20', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Sunset', is_active: false, sort_order: 0, metadata: { gewensteMaandinkomen: 3400, pensioenUitkering: 1800 } },
+    { name: 'Stacaravan verkopen', event_type: 'custom', target_age: 73, target_date: '2030-06-20', one_time_cost: 0, monthly_cost_change: -100, monthly_income_change: 0, duration_months: 0, icon: 'Home', is_active: true, sort_order: 1, metadata: { verkoopprijs: 20000, reden: 'Te oud om te onderhouden' } },
+    { name: 'AOW partner Henk', event_type: 'aow', target_age: null, target_date: '2025-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
+  ],
+  recommendations: [
+    {
+      title: 'Verschuif naar defensievere allocatie',
+      description: 'Op 68 is een defensievere portefeuille verstandig. Overweeg meer obligaties en minder aandelen om je vermogen te beschermen.',
+      recommendation_type: 'asset_reallocation',
+      euro_impact_monthly: 0,
+      euro_impact_yearly: 0,
+      freedom_days_per_year: 0,
+      related_budget_slug: null,
+      priority_score: 4,
+      status: 'pending',
+      suggested_actions: [
+        { title: 'Verhoog obligatie-positie naar 40%', freedom_days_impact: 0 },
+        { title: 'Overweeg deposito-ladder voor voorspelbaar inkomen', freedom_days_impact: 0 },
+      ],
+      actions: [
+        { source: 'ai', title: 'Analyseer huidige risicoverdeling', description: 'Bekijk de verdeling over aandelen, obligaties en deposito\'s en vergelijk met je risicoprofiel', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 4 },
+        { source: 'ai', title: 'Plan een herbalancering', description: 'Verschuif geleidelijk 10% van aandelen-ETFs naar obligatie-ETFs of een deposito-ladder', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 3 },
+      ],
+    },
+    {
+      title: 'Plan je erfenis fiscaal slim',
+      description: 'Met \u20ac850K vermogen en een legacy-doel van \u20ac200K kun je jaarlijks schenken om erfbelasting te minimaliseren. De vrijstelling is ~\u20ac6.600 per kind per jaar.',
+      recommendation_type: 'savings_boost',
+      euro_impact_monthly: 0,
+      euro_impact_yearly: 6600,
+      freedom_days_per_year: 0,
+      related_budget_slug: null,
+      priority_score: 3,
+      status: 'pending',
+      suggested_actions: [
+        { title: 'Start jaarlijkse schenking aan kinderen', freedom_days_impact: 0, euro_impact_monthly: 550 },
+      ],
+      actions: [
+        { source: 'ai', title: 'Maak een schenkingsplan', description: 'Gebruik de jaarlijkse vrijstelling van ~\u20ac6.600 per kind om erfbelasting te voorkomen. Bij 2 kinderen is dat \u20ac13.200/jaar belastingvrij.', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 3 },
+      ],
+    },
+    {
+      title: 'Stijgende zorgkosten voorbereiden',
+      description: 'Zorgkosten stijgen gemiddeld met 5% per jaar na je 65e. Reserveer een buffer voor onverwachte medische kosten en eventuele thuiszorg.',
+      recommendation_type: 'budget_optimization',
+      euro_impact_monthly: -50,
+      euro_impact_yearly: -600,
+      freedom_days_per_year: 0,
+      related_budget_slug: S.MEDISCHE_KOSTEN,
+      priority_score: 3,
+      status: 'pending',
+      suggested_actions: [
+        { title: 'Verhoog medisch budget naar \u20ac170/maand', freedom_days_impact: 0, euro_impact_monthly: -50 },
+      ],
+      actions: [
+        { source: 'ai', title: 'Verhoog je medische kostenbudget', description: 'Op basis van je leeftijd en huidige uitgaven adviseren we \u20ac170/mnd te reserveren voor medische kosten.', freedom_days_impact: 0, euro_impact_monthly: -50, status: 'open', priority_score: 3 },
+      ],
+    },
+  ],
+  net_worth_snapshots: [
+    // Stabiel vermogen, lichte groei door dividend + waardevermeerdering woning
+    // total_assets = woning (~420K) + beleggingen (~320K) + stacaravan (~25K) + spaar (~50K) + checking (~5K) = ~820K
+    // total_debts = 0 (hypotheekvrij)
+    { monthsAgo: 14, total_assets: 798000, total_debts: 0, net_worth: 798000 },
+    { monthsAgo: 13, total_assets: 802000, total_debts: 0, net_worth: 802000 },
+    { monthsAgo: 12, total_assets: 806000, total_debts: 0, net_worth: 806000 },
+    { monthsAgo: 11, total_assets: 810000, total_debts: 0, net_worth: 810000 },
+    { monthsAgo: 10, total_assets: 814000, total_debts: 0, net_worth: 814000 },
+    { monthsAgo: 9, total_assets: 818000, total_debts: 0, net_worth: 818000 },
+    { monthsAgo: 8, total_assets: 822000, total_debts: 0, net_worth: 822000 },
+    { monthsAgo: 7, total_assets: 826000, total_debts: 0, net_worth: 826000 },
+    { monthsAgo: 6, total_assets: 830000, total_debts: 0, net_worth: 830000 },
+    { monthsAgo: 5, total_assets: 834000, total_debts: 0, net_worth: 834000 },
+    { monthsAgo: 4, total_assets: 838000, total_debts: 0, net_worth: 838000 },
+    { monthsAgo: 3, total_assets: 842000, total_debts: 0, net_worth: 842000 },
+    { monthsAgo: 2, total_assets: 845000, total_debts: 0, net_worth: 845000 },
+    { monthsAgo: 1, total_assets: 848000, total_debts: 0, net_worth: 848000 },
+    { monthsAgo: 0, total_assets: 850000, total_debts: 0, net_worth: 850000 },
+  ],
+  valuations: [
+    // Beleggingsportefeuille: stabiele groei door dividend herbelegging (\u20ac295K \u2192 \u20ac320K)
+    { assetName: 'Beleggingsportefeuille Rabobank', entity_type: 'asset', monthsAgo: 14, value: 295000 },
+    { assetName: 'Beleggingsportefeuille Rabobank', entity_type: 'asset', monthsAgo: 12, value: 300000 },
+    { assetName: 'Beleggingsportefeuille Rabobank', entity_type: 'asset', monthsAgo: 10, value: 304000 },
+    { assetName: 'Beleggingsportefeuille Rabobank', entity_type: 'asset', monthsAgo: 8, value: 308000 },
+    { assetName: 'Beleggingsportefeuille Rabobank', entity_type: 'asset', monthsAgo: 6, value: 312000 },
+    { assetName: 'Beleggingsportefeuille Rabobank', entity_type: 'asset', monthsAgo: 4, value: 315000 },
+    { assetName: 'Beleggingsportefeuille Rabobank', entity_type: 'asset', monthsAgo: 2, value: 318000 },
+    { assetName: 'Beleggingsportefeuille Rabobank', entity_type: 'asset', monthsAgo: 0, value: 320000 },
+    // Woning: lichte stijging (\u20ac400K \u2192 \u20ac420K)
+    { assetName: 'Eigen woning Zwolle', entity_type: 'asset', monthsAgo: 12, value: 400000 },
+    { assetName: 'Eigen woning Zwolle', entity_type: 'asset', monthsAgo: 6, value: 410000 },
+    { assetName: 'Eigen woning Zwolle', entity_type: 'asset', monthsAgo: 0, value: 420000 },
+  ],
+  holdings: [
+    {
+      assetName: 'Beleggingsportefeuille Rabobank',
+      ticker: 'TDIV',
+      isin: 'NL0011683594',
+      name: 'VanEck Morningstar Developed Markets Dividend Leaders ETF',
+      units: 720,
+      avg_purchase_price: 195.83,
+      current_price: 250.00,
+      purchase_date_monthsAgo: 60,
+      asset_class: 'equity',
+      sector: 'dividend',
+      geography: 'europe',
+      is_favorite: true,
+      currency: 'EUR',
+      transactions: [
+        { type: 'buy', units: 300, price_per_unit: 180.00, total_amount: 54000, monthsAgo: 60, notes: 'Initi\u00eble dividendstrategie bij pensioen' },
+        { type: 'buy', units: 200, price_per_unit: 195.00, total_amount: 39000, monthsAgo: 48, notes: 'Bijkoop na herbeleggen' },
+        { type: 'buy', units: 120, price_per_unit: 210.00, total_amount: 25200, monthsAgo: 36, notes: null },
+        { type: 'buy', units: 100, price_per_unit: 225.00, total_amount: 22500, monthsAgo: 24, notes: 'Laatste bijkoop' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 3600, monthsAgo: 9, notes: 'Q2 dividend' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 3800, monthsAgo: 3, notes: 'Q4 dividend' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 3900, monthsAgo: 0, notes: 'Q1 dividend' },
+      ],
+    },
+    {
+      assetName: 'Beleggingsportefeuille Rabobank',
+      ticker: 'IEAG',
+      isin: 'IE00B3DKXQ41',
+      name: 'iShares Euro Aggregate Bond ETF',
+      units: 1000,
+      avg_purchase_price: 95.00,
+      current_price: 100.00,
+      purchase_date_monthsAgo: 48,
+      asset_class: 'bonds',
+      sector: null,
+      geography: 'europe',
+      currency: 'EUR',
+      transactions: [
+        { type: 'buy', units: 500, price_per_unit: 92.00, total_amount: 46000, monthsAgo: 48, notes: 'Opbouw obligatiepositie' },
+        { type: 'buy', units: 300, price_per_unit: 96.00, total_amount: 28800, monthsAgo: 30, notes: 'Bijkoop obligaties' },
+        { type: 'buy', units: 200, price_per_unit: 99.00, total_amount: 19800, monthsAgo: 12, notes: 'Herbalancering' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 1500, monthsAgo: 6, notes: 'Halfjaarlijkse coupon' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 1600, monthsAgo: 0, notes: 'Halfjaarlijkse coupon' },
+      ],
+    },
+    {
+      assetName: 'Beleggingsportefeuille Rabobank',
+      ticker: null,
+      isin: null,
+      name: 'Deposito-ladder (3 tranches)',
+      units: 1,
+      avg_purchase_price: 40000,
+      current_price: 40000,
+      purchase_date_monthsAgo: 24,
+      asset_class: 'bonds',
+      sector: null,
+      geography: 'europe',
+      currency: 'EUR',
+      transactions: [
+        { type: 'buy', units: 1, price_per_unit: 40000, total_amount: 40000, monthsAgo: 24, notes: '3x \u20ac13.333 deposito: 1jr, 2jr, 3jr looptijd' },
+      ],
+    },
+  ],
+}
+
+// ══════════════════════════════════════════════════════════════
 // Export
 // ══════════════════════════════════════════════════════════════
 
@@ -1703,6 +1977,7 @@ export const PERSONAS: Record<PersonaKey, PersonaData> = {
   lisa: lisaData,
   willem: willemData,
   rashid: rashidData,
+  marijke: marijkeData,
 }
 
-export const PERSONA_KEYS: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem', 'rashid']
+export const PERSONA_KEYS: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem', 'rashid', 'marijke']
