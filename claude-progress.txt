@@ -1,3 +1,18 @@
+## Session 2026-03-17 - Feature #189
+
+### Feature #189: Fix: category_source 'correction' schendt database constraint - PASSING
+- Bug: import code used 'correction' as category_source but DB CHECK constraint only allows: rule, manual, ai, import, transfer
+- Fixed 3 occurrences in app/(app)/core/cash/import/page.tsx (lines ~710, ~727, ~945): 'correction' → 'manual'
+- Fixed 3 occurrences in lib/parsers/categorize.ts: categorizeTransaction returned 'correction' → now returns 'manual'
+- Updated categorize.test.ts assertion to expect 'manual' instead of 'correction'
+- Updated SRC display label map: key changed from 'correction' to 'manual' (still displays as 'Correctieregel')
+- All 10 categorize tests pass
+- Zero console errors, page compiles (307 auth redirect)
+- Commit: 2325a426
+
+### Current Status
+- 1 feature completed this session (#189)
+
 ## Session 2026-03-17 - Features #186, #187
 
 ### Feature #186: WillDots basiscomponent — 3-dots avatar met idle animatie - PASSING
