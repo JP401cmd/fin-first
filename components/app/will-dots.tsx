@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import './will-dots.css'
 
 /**
  * WillDots — Minimalist 3-dot avatar using module colors.

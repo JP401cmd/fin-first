@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useReducer, useCallback } from 'react'
+import './onboarding.css'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { WillDots } from '@/components/app/will-dots'

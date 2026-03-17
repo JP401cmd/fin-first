@@ -1,3 +1,5 @@
+import './avatars.css'
+
 export function FhinAvatar({ size = 200 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 200 200">

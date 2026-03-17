@@ -1,0 +1,61 @@
+/* ── Level-up celebration animations ─────────────────────── */
+
+/* Shimmer effect for newly-earned badges */
+@keyframes badge-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-badge-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.4) 25%,
+    rgba(255,255,255,0.7) 50%,
+    rgba(255,255,255,0.4) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: badge-shimmer 2s ease-in-out;
+}
+
+/* Badge unlock glow pulse */
+@keyframes badge-unlock-glow {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  50% { box-shadow: 0 0 16px 4px rgba(245, 158, 11, 0.3); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+.animate-badge-unlock {
+  animation: badge-unlock-glow 1.5s ease-out;
+}
+
+/* Badge scale-in entrance */
+@keyframes badge-scale-in {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-badge-scale-in {
+  animation: badge-scale-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Progress bar filling animation */
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+.animate-progress-fill {
+  animation: progress-fill 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* --- Reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .animate-badge-shimmer,
+  .animate-badge-unlock,
+  .animate-badge-scale-in,
+  .animate-progress-fill {
+    animation: none !important;
+  }
+  .animate-badge-scale-in {
+    opacity: 1;
+    transform: none;
+  }
+}

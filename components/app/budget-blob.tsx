@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import './budget-blob.css'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 import {

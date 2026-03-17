@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import './level-up-celebration.css'
 import { X, ArrowUp, Star, Sparkles, Zap } from 'lucide-react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 

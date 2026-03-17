@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import '../(onboarding)/onboarding/onboarding.css'
 
 type Direction = 'forward' | 'back'
 
