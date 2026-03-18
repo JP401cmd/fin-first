@@ -234,6 +234,11 @@ export async function loadAllTests(): Promise<void> {
     const idNavMod = await import('@/lib/regression-tests/suites/identity-navigatie')
     idNavMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const briefingMod = await import('@/lib/regression-tests/suites/briefing-directives')
+    briefingMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
