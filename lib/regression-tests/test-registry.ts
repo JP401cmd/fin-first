@@ -175,6 +175,8 @@ export async function loadAllTests(): Promise<void> {
   await loadSuite('@/lib/regression-tests/suites/berichten-chat', 'berichten-chat')
   await loadSuite('@/lib/regression-tests/suites/horizon-strategie-pagina', 'horizon-strategie-pagina')
   await loadSuite('@/lib/regression-tests/suites/identiteit-household', 'identiteit-household')
+  await loadSuite('@/lib/regression-tests/suites/beheer-notificaties', 'beheer-notificaties')
+  await loadSuite('@/lib/regression-tests/suites/dashboard-empty-loading', 'dashboard-empty-loading')
 
   // ── Validate that all registered categories have tests ────────────────────
   // Warn about categories with 0 tests after loading — this likely indicates
