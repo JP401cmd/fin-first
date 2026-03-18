@@ -507,6 +507,21 @@ export async function loadAllTests(): Promise<void> {
     const rapportagesMod = await import('@/lib/regression-tests/suites/rapportages')
     rapportagesMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const securityAuthMod = await import('@/lib/regression-tests/suites/security-auth')
+    securityAuthMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const checkinMod = await import('@/lib/regression-tests/suites/checkin-flow')
+    checkinMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const inputValMod = await import('@/lib/regression-tests/suites/input-validatie')
+    inputValMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
