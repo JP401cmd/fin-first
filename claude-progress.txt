@@ -1,3 +1,16 @@
+## Session 2026-03-18 - Features #290, #291
+
+### Feature #290: Regressietest categorisering herschikken — dot-notatie - PASSING
+- Renamed all 64 suite files from hyphen-separated to {module}.{area} dot-notation
+- Fixed kern-api-routes collision: budget-api-routes now uses kern.budgets-api
+- Removed all 22 pre-registrations from test-registry.ts (suites self-register)
+- Zero TypeScript errors, Commit: 2d38cd74
+
+### Feature #291: Regressietest UI — module-groepering in beheer pagina - PASSING
+- Two-level collapsible tree: module > category > tests
+- Per-module summary badges, Run module button, enhanced JSON export
+- Zero TypeScript errors, Commit: d1f2ed87
+
 ## Session 2026-03-18 - Feature #292
 
 ### Feature #292: Regressietest infra fixes — typo, silent failures, isolatie - PASSING
@@ -15941,3 +15954,68 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#297, #303)
 - 42 total regression tests across both files
+
+## Session 2026-03-18 - Feature #300
+
+### Feature #300: Regressietest: AI Chat interactie - PASSING
+- Created lib/regression-tests/suites/berichten-chat.ts with 27 tests
+- Registered under category 'Berichten — AI Chat' (berichten.chat)
+- Tests cover all 10 feature steps:
+  - Berichten pagina laadt: GET /berichten returns 200 or auth redirect
+  - Chat input veld: WILL_CONFIG contract (placeholder, greeting, name, subtitle)
+  - Bericht versturen: POST /api/ai/chat auth guard (401), domain validation (kern/wil/horizon + fallback)
+  - AI response: streaming status detection (streaming/submitted = true), message deduplication
+  - Gesprekshistorie: pin persistence (localStorage key), CSS variable sync, stable chat-will ID
+  - Lege berichten: empty/whitespace blocking, streaming blocks send
+  - API timeout: 60s constant, AbortError → 504, error message mapping (5 error types)
+  - Lange berichten: textarea max-h-24, stepCountIs(5) tool limit
+  - PII pipeline: sanitizeForAI input + maskPIIInOutput output + fail-safe 503
+  - Extra: tier gating (ai), tools per domain/context, what-if scenario, UI modes, transport config, enter/shift+enter, AI provider config (4 providers)
+- Zero TypeScript errors in new file (3 pre-existing in other files)
+- API endpoint verified: 401 for unauthenticated POST
+- Berichten page redirects to login correctly
+- Commit: 13eb84c5
+
+### Current Status
+- 1 feature completed this session (#300)
+- 27 regression tests added
+
+## Session 2026-03-18 - Features #298, #299
+
+### Feature #298: Regressietest: What-if scenario builder - PASSING
+- Created lib/regression-tests/suites/horizon-whatif.ts with 27 tests
+- Registered under category 'horizon.whatif' (De Horizon — What-If Scenario Builder)
+- Tests cover all 8 feature steps:
+  - Route: page module exports default component
+  - Baseline: correct derivation of overrides from FinancialInput (income, savingsRate, workDays)
+  - Custom scenario: custom overrides produce valid simulation results
+  - Comparison: higher savings/contribution → earlier FIRE vs baseline
+  - Slider effects: income delta (1:1 to savings), workdays effect (proportional), savings rate (adjusts expenses), extra contribution, return rate
+  - Multiple scenarios: 5 diverse scenarios produce unique FIRE ages
+  - Save/load API: auth guards (GET/POST/DELETE 401), validation (name+overrides required), SavedScenario shape, max 5 limit
+  - Extreme values: 0% return, high return+low savings, 0 income, negative net worth — no crashes
+  - Events: toggle disabled, cost impact on FIRE age
+  - Presets: part-time (4 days), frugal (+15% savings capped at 80%)
+  - FIRE delta: negative delta = earlier FIRE
+  - Scenario key uniqueness per configuration
+- Zero TypeScript errors, Commit: 000127e6
+
+### Feature #299: Regressietest: Strategie pagina UI flow - PASSING
+- Created lib/regression-tests/suites/horizon-strategie-pagina.ts with 26 tests
+- Registered under category 'horizon.strategie-pagina' (De Horizon — Strategie Pagina)
+- Tests cover all 7 feature steps:
+  - Route: page exists and is accessible (200/307)
+  - Strategy picker: all 4 strategies defined, Dutch labels, resolver recognizes all, invalid fallback
+  - Parameter editing: guardrail defaults, custom params, cut effect, raise effect, floor<ceiling
+  - Comparison: all strategies produce valid output, diverse outcomes, sim with each fire strategy
+  - Back link: horizon route accessible
+  - API: auth guards (GET/PUT 401), validation, guardrail parameter ranges
+  - Strategy explanations: complete for all 4 strategies
+  - VPW: age sensitivity (older = higher withdrawal)
+  - Bucket: cash-first withdrawal, low cash handling
+  - Edge cases: zero portfolio, recurring income reduces withdrawal
+- Zero TypeScript errors, Commit: a1b33ea1
+
+### Current Status
+- 2 features completed this session (#298, #299)
+- 53 total regression tests across both files
