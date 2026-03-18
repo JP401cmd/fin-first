@@ -246,6 +246,14 @@ registerCategory({
   testCount: 0,
 })
 
+registerCategory({
+  id: 'kern-api-routes',
+  label: 'De Kern — API Routes',
+  description: 'Holdings, transactions, refresh-prices, valuations, snapshots, daily-expense-rate API routes',
+  icon: 'Activity',
+  testCount: 0,
+})
+
 // ── Dynamic test loader ─────────────────────────────────────────────────────
 // This function dynamically imports all test modules and registers their tests.
 
@@ -448,6 +456,16 @@ export async function loadAllTests(): Promise<void> {
   try {
     const horizonParamsMod = await import('@/lib/regression-tests/suites/horizon-parameters')
     horizonParamsMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const budgetApiMod = await import('@/lib/regression-tests/suites/budget-api-routes')
+    budgetApiMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const kernApiMod = await import('@/lib/regression-tests/suites/kern-api-routes')
+    kernApiMod.register()
   } catch { /* module not found yet */ }
 }
 
