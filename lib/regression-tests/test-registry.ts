@@ -522,6 +522,11 @@ export async function loadAllTests(): Promise<void> {
     const inputValMod = await import('@/lib/regression-tests/suites/input-validatie')
     inputValMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const perfApiMod = await import('@/lib/regression-tests/suites/api-response-performance')
+    perfApiMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
