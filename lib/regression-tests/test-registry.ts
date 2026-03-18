@@ -282,6 +282,11 @@ export async function loadAllTests(): Promise<void> {
     const widgetsAvatarMod = await import('@/lib/regression-tests/suites/widgets-avatar')
     widgetsAvatarMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const migratieMod = await import('@/lib/regression-tests/suites/beheer-migratie')
+    migratieMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
