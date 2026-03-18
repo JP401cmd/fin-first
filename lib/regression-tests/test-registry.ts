@@ -532,6 +532,16 @@ export async function loadAllTests(): Promise<void> {
     const securityPrivacyMod = await import('@/lib/regression-tests/suites/security-privacy')
     securityPrivacyMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const dbIntegriteitMod = await import('@/lib/regression-tests/suites/database-integriteit')
+    dbIntegriteitMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const dataTijdreeksenMod = await import('@/lib/regression-tests/suites/data-tijdreeksen')
+    dataTijdreeksenMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
