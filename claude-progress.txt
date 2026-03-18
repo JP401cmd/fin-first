@@ -1,3 +1,34 @@
+## Session 2026-03-18 - Features #258, #259
+
+### Feature #258: Test: Identiteit overzicht pagina - PASSING
+- Created lib/identity-page.test.ts with 39 regression tests
+- loadIdentityData: netWorth (assets-debts), monthsCovered, freedomPct, sovereignty level
+- Profielsamenvatting strip: initials, household label, sovereignty level label
+- Temporeel evenwicht: 5 levels with persona mapping, slider value to card
+- Chronologische schaal: 4 phases, 9 levels (-2 to 6), progress per criteria
+- Check-in timeline: 12 months, completed month links, current month handling
+- Demo-user banner: visibility gating, switch flow (POST /api/onboarding/reset → /onboarding)
+- Feature roadmap: getFeaturesPerPhase, icons, pills, phase unlock logic
+- Gids link-kaart: navigates to /identity/gids
+- computeSovereigntyLevel: all 9 levels tested comprehensively
+- Commit: 83b483cd
+
+### Feature #259: Test: Profiel pagina — persoonlijke gegevens & huishouden - PASSING
+- Created lib/identity-profiel.test.ts with 25 regression tests
+- Profile loading: all 10 fields from DB row with correct defaults
+- Upsert payload: null conversion for empty strings, number conversion for income
+- Household type: Solo/Samen/Gezin selection and labels
+- Children fields: array trim on count reduction, add/remove by index, age clamping to 0+
+- Woningtype: 3 housing types, 9 energy labels A++ through G
+- Numeric validation: income min=0, children count >= 0, ISO date format
+- HouseholdSection component presence
+- Color preferences: module/budget/phase loading with fallback to defaults
+- Commit: a3b2eaa8
+
+### Current Status
+- 2 features completed this session (#258, #259)
+- 64 total regression tests across both files, all passing
+
 ## Session 2026-03-18 - Feature #218
 
 ### Feature #218: Onttrekkingsstrategie profiel-instellingen + strategie-pagina - PASSING
