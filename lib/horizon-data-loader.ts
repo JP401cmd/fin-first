@@ -125,7 +125,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses').single(),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
@@ -157,7 +157,39 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
       profileResult.error,
     )
   }
-  const profile = profileResult.data ?? PROFILE_DEFAULTS
+  const baseProfile = profileResult.data ?? PROFILE_DEFAULTS
+
+  // Fetch withdrawal strategy columns separately — these may not exist yet
+  // (migration 20260318000001). By splitting, we prevent a missing-column error
+  // from killing the entire profile query and making the horizon chart invisible.
+  let wsData: {
+    withdrawal_strategy?: string | null
+    guardrail_floor?: number | null
+    guardrail_ceiling?: number | null
+    guardrail_cut_step?: number | null
+    guardrail_raise_step?: number | null
+  } = {}
+  const wsResult = await supabase
+    .from('profiles')
+    .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
+    .single()
+  if (wsResult.error) {
+    // Columns likely don't exist yet — use defaults silently
+    console.warn(
+      `[horizon-data-loader] Withdrawal strategy columns not available (migration pending): ${wsResult.error.code}`,
+    )
+  } else {
+    wsData = wsResult.data ?? {}
+  }
+
+  const profile = {
+    ...baseProfile,
+    withdrawal_strategy: wsData.withdrawal_strategy ?? PROFILE_DEFAULTS.withdrawal_strategy,
+    guardrail_floor: wsData.guardrail_floor ?? PROFILE_DEFAULTS.guardrail_floor,
+    guardrail_ceiling: wsData.guardrail_ceiling ?? PROFILE_DEFAULTS.guardrail_ceiling,
+    guardrail_cut_step: wsData.guardrail_cut_step ?? PROFILE_DEFAULTS.guardrail_cut_step,
+    guardrail_raise_step: wsData.guardrail_raise_step ?? PROFILE_DEFAULTS.guardrail_raise_step,
+  }
 
   // Monthly income/expenses from current month transactions
   let monthlyIncome = 0
