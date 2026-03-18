@@ -14875,3 +14875,19 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#216)
 - 215/215 features passing (100%)
+
+## Session 2026-03-18 - Feature #226
+
+### Feature #226: Life events seed crash: metadata NOT NULL violation bij bulk insert - PASSING
+- Root cause: conditional spread `...(e.metadata ? { metadata: e.metadata } : {})` in seed-persona.ts
+- PostgREST bulk inserts require ALL rows to have identical columns; omitting metadata caused NULL instead of DB default '{}'
+- Fix: replaced with `metadata: e.metadata ?? {}` - always includes metadata column with empty object fallback
+- Affected 5 of 6 personas (all except Gepensioneerd who has metadata on all events)
+- Events without metadata: Scheiding afgerond, Eerste baan gestart, Kinderen naar middelbare school, Hypotheek afgelost, Freelance tarief omhoog
+- Events with metadata preserved correctly: AOW (leefsituatie), Sabbatical (nettoInkomen), Eigen woning (koopsom/hypotheek), etc.
+- Zero TypeScript errors (full tsc --noEmit clean)
+- Commit: 41790890
+
+### Current Status
+- 1 feature completed this session (#226)
+- 217/225 features passing (96.4%)
