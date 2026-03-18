@@ -257,6 +257,11 @@ export async function loadAllTests(): Promise<void> {
     const bankConnectMod = await import('@/lib/regression-tests/suites/beheer-bank-connect')
     bankConnectMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const toegangMod = await import('@/lib/regression-tests/suites/beheer-toegang')
+    toegangMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
