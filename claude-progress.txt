@@ -1,3 +1,28 @@
+## Session 2026-03-18 - Features #249, #250
+
+### Feature #249: Test: API response tijden - PASSING
+- Created lib/regression-tests/suites/api-response-performance.ts with 13 tests
+- Category: Performance — API Response (performance-api-response)
+- Tests: guide-progress <500ms, daily-expense-rate <300ms, snapshots <500ms, budget-trends <500ms
+- Dashboard page load <1000ms, concurrent API calls <800ms
+- Baseline storage in localStorage with rolling average and regression detection (>50%)
+- Baseline version-upgrade handling for corrupt/old data
+- Commit: 634d16a3
+
+### Feature #250: Test: Berekening performance - PASSING
+- Created lib/regression-tests/suites/berekening-performance.ts with 16 tests
+- Category: Performance — Berekeningen (performance-berekeningen)
+- Tests: runSimulation 40yr <100ms (basic/cashflows/perpetual), runBacktest <200ms (30yr/50yr)
+- computeFireRange 3 scenarios <300ms, recurring detection 1000-2000tx <500ms
+- Transfer matching 1000+ tx <500ms, buildDashboardLayout <50ms (small/large/all-focuses)
+- Regression detection at 20% threshold, baseline persistence check
+- Commit: 53c7e0cf
+
+### Current Status
+- 2 features completed this session (#249, #250)
+- 29 total regression tests added
+- Zero TypeScript errors in new files
+
 ## Session 2026-03-18 - Features #246, #247
 
 ### Feature #246: Test: Authenticatie & autorisatie - PASSING
