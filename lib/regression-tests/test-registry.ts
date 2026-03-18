@@ -201,6 +201,16 @@ export async function loadAllTests(): Promise<void> {
     const navMod = await import('@/lib/regression-tests/suites/navigatie')
     navMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const beheerMod = await import('@/lib/regression-tests/suites/beheer-layout')
+    beheerMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const delenMod = await import('@/lib/regression-tests/suites/delen-jaaroverzicht')
+    delenMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
