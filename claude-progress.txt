@@ -14818,3 +14818,28 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#215)
 - 214/214 features passing
+
+## Session 2026-03-18 - Feature #216
+
+### Feature #216: Roadmap pagina bijwerken met Boldin-analyse inzichten - PASSING
+- Added 5 new features to roadmap page based on Boldin competitive analysis
+- FASE_A (2 new, Hoog priority):
+  - nr 7: Gestapelde Vermogensgrafiek (Stacked Bar Chart) — wealth composition per source
+  - nr 8: Inkomsten vs. Uitgaven Projectie Chart — FIRE crossover visualization
+- FASE_B (2 new, Middel priority):
+  - nr 12: Vermogensopbouw per Bron (Area Chart) — active-to-passive income crossover
+  - nr 13: Withdrawal Strategy Visualisatie — which sources to tap when
+- FASE_C (1 new, Laag priority):
+  - nr 16: Levensfase Inkomsten Breakdown — income sources per life phase
+- Updated Feature #1 description + werking with vertical marker annotations:
+  AOW-start, pensioen-start, FIRE-moment, onttrekkingsfase-start, active life events
+- All 5 new Feature objects include all required fields (nr, name, description, werking,
+  afhankelijkheden, technisch, waardeGebruiker, aandachtspunten, competitors, priority)
+- Competitors referenced: Boldin, ProjectionLab, Empower
+- Zero TypeScript errors
+- Page compiles correctly (307 auth redirect)
+- Commit: 555bdb5d
+
+### Current Status
+- 1 feature completed this session (#216)
+- 215/215 features passing (100%)
