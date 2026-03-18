@@ -1,3 +1,34 @@
+## Session 2026-03-18 - Features #246, #247
+
+### Feature #246: Test: Authenticatie & autorisatie - PASSING
+- Created lib/regression-tests/suites/security-auth.ts with 30 tests
+- Registered under category 'Security — Auth & Autorisatie' (security-auth)
+- Tests cover all 6 feature steps:
+  - Auth guards: 11 major API routes (holdings, valuations, snapshots, export, widgets, etc.) return 401
+  - RLS: data-isolation endpoint, user_id filtering, URL manipulation prevention
+  - Admin routes: 7 admin endpoints (seed, ai-features, news-prompt, briefing, tier-config, settings) return 401/403
+  - Session-info: unauthenticated shape, no sensitive field leaks, authenticated response contract
+  - Account deletion: auth required, cascade contract verification, signOut contract
+  - CSRF: POST/PUT/DELETE mutations all require auth before processing body
+- All endpoints verified via curl to return correct status codes
+- Zero TypeScript errors, Commit: 985e668d
+
+### Feature #247: Test: Data privacy & PII bescherming - PASSING
+- Created lib/regression-tests/suites/security-privacy.ts with 28 tests
+- Registered under category 'Security — Privacy & PII' (security-privacy)
+- Tests cover all 6 feature steps:
+  - sanitizeForAI: IBAN (NL+spaces), BSN (with currency preservation), email, phone, address, name replacement, birth date → age, financial amounts preserved, transaction sanitization
+  - maskPIIInOutput: IBAN masking, BSN masking, currency false-positive prevention, deep object filtering, empty input handling
+  - API response safety: no password hashes/tokens, boolean refresh_token_present, admin key masking
+  - Household privacy: RLS scoping, export scoped to user
+  - Export: auth required for all 6 types, invalid type rejected
+  - Error handling: no stack traces, no DB details, consistent {error} format, clean 500 errors
+- Zero TypeScript errors, Commit: d1640c10
+
+### Current Status
+- 2 features completed this session (#246, #247)
+- 58 total regression tests across both files
+
 ## Session 2026-03-18 - Feature #248
 
 ### Feature #248: Test: Input validatie & injection preventie - PASSING
@@ -15673,3 +15704,18 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#245)
 - 35 regression tests added
+
+## Session 2026-03-18 - Feature #289
+
+### Feature #289: Build error: rapportages test importeert server-only module - PASSING
+- The original rapportages.ts server-only import issue was already fixed (comment at line 494)
+- Actual build error was in box3-belasting.ts: Asset and Debt types had new fields not in test stubs
+- Added missing Asset fields: household_id, net_worth_inclusion_pct, has_budget_tracking
+- Added missing Debt fields: draagkrachtmeting_date, tax_year, has_payment_plan, has_written_agreement, partner_split_pct
+- Destructured required overrides params to avoid TypeScript "specified more than once" errors
+- Build now compiles successfully (verified with next build)
+- Commit: 56fb7444
+
+### Current Status
+- 1 feature completed this session (#289)
+- Build is green
