@@ -76,13 +76,7 @@ export function clearRegistry(): void {
 // ── Built-in test registrations ─────────────────────────────────────────────
 
 // Register categories matching the app's module structure
-registerCategory({
-  id: 'fire-simulatie',
-  label: 'FIRE Simulatie',
-  description: 'Simulatie-engine: projecties, strategieën, cashflows',
-  icon: 'TrendingUp',
-  testCount: 0,
-})
+// 'horizon-fire-simulatie' category is registered by its own suite module
 
 registerCategory({
   id: 'horizon-grafiek',
@@ -241,6 +235,14 @@ registerCategory({
   label: 'Onboarding — Persona Seeding',
   description: 'Persona seed flow: NDJSON streaming, deleteAllUserData, seedPersonaData, metadata constraints',
   icon: 'UserPlus',
+  testCount: 0,
+})
+
+registerCategory({
+  id: 'kern-belasting',
+  label: 'De Kern — Belasting',
+  description: 'Box 3 belastingberekeningen: fictief rendement, vrijstelling, partnerschap, gewogen rendement',
+  icon: 'Calculator',
   testCount: 0,
 })
 
@@ -426,6 +428,26 @@ export async function loadAllTests(): Promise<void> {
   try {
     const kernFmtMod = await import('@/lib/regression-tests/suites/kern-formatting')
     kernFmtMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const box3Mod = await import('@/lib/regression-tests/suites/box3-belasting')
+    box3Mod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const budgetBerMod = await import('@/lib/regression-tests/suites/budget-berekeningen')
+    budgetBerMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const recurTransMod = await import('@/lib/regression-tests/suites/recurring-transfers')
+    recurTransMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const horizonParamsMod = await import('@/lib/regression-tests/suites/horizon-parameters')
+    horizonParamsMod.register()
   } catch { /* module not found yet */ }
 }
 
