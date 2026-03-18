@@ -1,3 +1,21 @@
+## Session 2026-03-18 - Features #265, #266
+
+### Feature #265: Test: Beheer layout & toegangscontrole - PASSING
+- Created lib/regression-tests/suites/beheer-layout.ts with 7 tests
+- Tests: admin-only access, redirect non-admin to /will, all 18 nav tabs reachable, /beheer→/beheer/ai redirect, /beheer/features→/beheer/toegang, /beheer/tiers→/beheer/toegang, horizontal scroll nav
+- Registered under 'Beheer — Layout & Toegang' category
+- Commit: 20b9b9d9
+
+### Feature #266: Test: AI Instellingen & prompts beheer - PASSING
+- Created lib/regression-tests/suites/beheer-ai.ts with 9 tests
+- Tests: provider selection (4 providers), model name fields, API key masking (***), Ollama base URL, prompt override, default prompt endpoint, prompts list with domain badges (kern/wil/horizon/shared), dynamic flag (briefing=true, rest=false), character counts per prompt + combined total
+- Registered under 'Beheer — AI Configuratie' category
+- Commit: b08d2117
+
+### Current Status
+- 2 features completed this session (#265, #266)
+- Zero TypeScript errors in new files
+
 ## Session 2026-03-18 - Features #260, #261
 
 ### Feature #260: Test: Gids pagina — voortgang & reis-stappen - PASSING
