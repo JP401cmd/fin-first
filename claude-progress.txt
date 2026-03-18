@@ -1,3 +1,39 @@
+## Session 2026-03-18 - Features #260, #261
+
+### Feature #260: Test: Gids pagina — voortgang & reis-stappen - PASSING
+- Created lib/guide-page.test.ts with 40 regression tests
+- API response shape: counts, financial, steps, calculatedAt structure
+- Net worth calculation (assets - debts), daily expense rate, sovereignty level
+- GuideProgressBar: 4-step completion logic (OR conditions for steps 1 and 4)
+- ReisStapSection: status indicators and statusLines logic for all 4 steps
+- GuideTopicCard: howTo steps array validation, tip optionality
+- ConceptFlipCards: 5 concepts, personalDataFn output for vrijheidstijd/FIRE/soevereiniteit
+- GuideFaq: 8 FAQ items, single-open accordion logic, link validation
+- GuideProTips: 8 tips content validation
+- GuideNaslagwerk: 4 modules (Kern/Wil/Horizon/Algemeen), 32+ topics
+- FIRE age estimation, freedom days calculation, OntdekkenSection structure
+- Commit: 41c03a5d
+
+### Feature #261: Test: Instellingen pagina — Sectie A t/m G - PASSING
+- Created lib/instellingen-page.test.ts with 54 regression tests
+- Accordion UI: 6 sections with independent open/close state
+- Sectie A Notificaties: 9 types, partner modes (all_shared/threshold/categories/disabled)
+- Sectie B Widgets: size validation (full/half/quarter), dynamic IDs (budget_fav:/holding_fav:)
+- Sectie C FIRE: expected_return 1-15%, inflation 0-8%, SWR kassabon live calculation
+- Sectie C FIRE: RetirementExpenseMethod (3 variants), FireEndStrategy (3 + parseFireStrategy)
+- Sectie C FIRE: Withdrawal strategy (4 types), guardrail validation (floor < ceiling, ranges)
+- Sectie D Weergave: 3 typography themes, ColorPickerCard hex validation, module colors
+- Sectie E Gegevens: reset dialog confirmation flow
+- Sectie F Privacy & AI: ai_enabled boolean toggle
+- Sectie G Huishouden Privacy: 5 categories × 3 levels, Dutch↔English mapping
+- API edge cases: NaN rejection, boundary values, box3_method validation
+- Commit: e7752732
+
+### Current Status
+- 2 features completed this session (#260, #261)
+- 94 total regression tests across both files, all passing
+- Zero TypeScript errors
+
 ## Session 2026-03-18 - Features #258, #259
 
 ### Feature #258: Test: Identiteit overzicht pagina - PASSING
