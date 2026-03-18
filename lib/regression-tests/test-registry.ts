@@ -502,6 +502,11 @@ export async function loadAllTests(): Promise<void> {
     const featureGatingMod = await import('@/lib/regression-tests/suites/feature-gating')
     featureGatingMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const rapportagesMod = await import('@/lib/regression-tests/suites/rapportages')
+    rapportagesMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
