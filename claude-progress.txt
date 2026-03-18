@@ -1,3 +1,35 @@
+## Session 2026-03-18 - Feature #217
+
+### Feature #217: Financiële Gezondheids Score (vervangt veerkracht_score) - PASSING
+- Created `lib/financial-health.ts` (210 lines) — 6-pillar weighted health score
+  - Pillar score curves: spaarquote (25%), schuldratio (20%), noodfonds (15%), FIRE-voortgang (20%), diversificatie (10%), budgetdiscipline (10%)
+  - Each pillar: score 0-100, explanation, improvement tip, raw value
+  - Previous month estimate from history data for trend comparison
+  - Labels: Uitstekend/Sterk/Redelijk/Kwetsbaar/Kritiek
+- Created `components/widgets/gezondheids-score-widget.tsx` (340 lines)
+  - Mini: score number with color
+  - Quarter: Activity icon + score + trend badge + kassabon onClick
+  - Half: HalfGauge (SVG arc) + top 3 pillar bars + trend + kassabon onClick
+  - Full: gauge + radar/spider chart for 6 pillars + pillar bars + improvement tips + kassabon onClick
+  - RadarChart: SVG polygon with background rings, axis lines, data polygon, labels
+  - HealthKassabon BottomSheet: total score header, per-pillar drill-down (weakest first), weighting explanation
+- Updated widget-catalog.ts: `veerkracht_score` → `gezondheids_score`
+- Updated widget-renderer.tsx: dynamic import + switch case
+- Updated 20+ files across codebase:
+  - identity-constants.ts, auto-dashboard-builder.ts, feature-registry.ts
+  - locked-features-footer.tsx, discover-carousel.tsx, phase-transition-modal.tsx
+  - horizon-client.tsx (FeatureGate refs + section labels)
+  - scenarios-modal.tsx, snapshot-comparison-view.tsx, release-notes.ts
+  - test-personas.ts (2 personas), test-feature-spotlight, test-locked-features, test-phase-modal
+  - verify-resilience-history, verify-locked-default, verify-snapshot-comparison API routes
+- Kept `veerkracht_score` as legacyId in feature-registry for backward compatibility
+- Zero TypeScript errors, zero console errors
+- Commit: 024a5a08
+
+### Current Status
+- 1 feature completed this session (#217)
+- 216/217 features passing (99.5%)
+
 ## Session 2026-03-17 - Feature #213
 
 ### Feature #213: Budget Heatmap Visualisatie - PASSING
