@@ -1,3 +1,24 @@
+## Session 2026-03-18 - Features #264, #240
+
+### Feature #264: Test: Sovereignty level berekening & transitie - PASSING
+- Created lib/regression-tests/suites/sovereignty-levels.ts with 10 tests
+- 5 persona tests: Roos (level -2), Daan (level -1), Lisa (level 2), Willem (level 5), Marijke (level 6)
+- Consumer debt impact, full journey transition, feature gating, edge cases
+- Registered under Identiteit Sovereignty Levels category
+- Commit: c82e97fa + b47c3176
+
+### Feature #240: Test: Profiel & instellingen - PASSING
+- Created lib/regression-tests/suites/profiel-instellingen.ts with 14 tests
+- API tests: parameters, widgets, notifications, budgeting-active, dashboard-type
+- Guide progress: counts structure + steps consistency
+- All tests restore original values after modification
+- Registered under Identiteit Profiel & Instellingen category
+- Commit: 2ce60da4 + 86a67025
+
+### Current Status
+- 2 features completed this session (#264, #240)
+- Zero TypeScript errors in new code
+
 ## Session 2026-03-18 - Features #265, #266
 
 ### Feature #265: Test: Beheer layout & toegangscontrole - PASSING
@@ -15166,3 +15187,40 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#223)
 - Zero TypeScript errors
+
+## Session 2026-03-18 - Features #262, #263
+
+### Feature #262: Test: Delen & Jaaroverzicht - PASSING
+- Created lib/regression-tests/suites/delen-jaaroverzicht.ts with 15 tests
+- Registered under category 'Identiteit — Delen & Jaaroverzicht'
+- Tests cover all 11 feature steps:
+  - FreedomCardGenerator: API data structure validation
+  - ShareDialog: sharing content contract verification
+  - POST /api/share/track: event logging + validation (invalid share_type rejected)
+  - GET /api/share/freedom-card: privacy levels (anonymous/named/full), invalid privacy rejected
+  - GET /api/year-in-review: data structure, invalid year validation
+  - Year selector: 5 year options generation
+  - Charts data: freedom days bar, net worth sparkline, best/worst months, FIRE progress
+  - Samenvatting: totalSaved = totalIncome - totalExpenses, savingsRate consistency
+  - Canvas render: YearInReviewData contract, dimensions 840x1200
+  - ShareDialog jaaroverzicht: share content with year, freedomDays, growth percentage
+  - Route accessibility: /identity/delen and /identity/jaaroverzicht
+
+### Feature #263: Test: Identity redirects & navigatie - PASSING
+- Created lib/regression-tests/suites/identity-navigatie.ts with 9 tests
+- Registered under category 'Identiteit — Navigatie'
+- Tests cover all 7 feature steps:
+  - /identity/voortgang → /identity redirect
+  - /identity/parameters → /identity/instellingen redirect
+  - /identity/widgets → /identity/instellingen redirect
+  - 5 identity nav tabs: Overzicht, Profiel, Gids, Instellingen, Delen
+  - All tab routes accessible (200 or auth redirect)
+  - Active tab mapping: unique hrefs, correct basePath
+  - Active tab per page: exact match + longest prefix match logic
+  - Data loader cache: layout structure + identityNav config verification
+  - Redirect targets don't 404 after following
+
+### Current Status
+- 2 features completed this session (#262, #263)
+- Zero TypeScript errors
+- Commit: 0f8c8adc
