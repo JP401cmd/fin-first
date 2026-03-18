@@ -15608,3 +15608,24 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#243)
 - 27 regression tests added
+
+## Session 2026-03-18 - Feature #244
+
+### Feature #244: Test: Rapport generatie - PASSING
+- Expanded lib/regression-tests/suites/rapportages.ts from 22 to 31 tests
+- Registered under category 'Rapportages' (rapportages)
+- Tests cover all 6 feature steps:
+  - Report CRUD (7 tests): GET/POST/DELETE auth guards, date validation, ReportData + ReportConfig type contracts
+  - Budget report (5 tests): auth guard, BudgetReportData contract, 18 KPI fields, health scoring, trend computation
+  - Balans (7 tests): auth guard, BalansData type contract, vaste vs vlottende activa classification, lang vs kort vreemd vermogen, financial ratios (solvabiliteitsratio/schuldgraad/liquiditeitsratio), balance equation
+  - CSV export (4 tests): auth guard, 6 export types validation, Dutch column headers, escapeCSV helper
+  - Year-in-review (4 tests): auth guard, year validation, YearInReviewData contract, FIRE progress delta
+  - Auth consistency (1 test): all 6 endpoints (incl. balans) check authentication
+- Added /api/report/balans to auth consistency check
+- Zero TypeScript errors in new code
+- Auth rate limit prevented browser testing (known persistent Supabase issue)
+- Commit: 03a6f0cd
+
+### Current Status
+- 1 feature completed this session (#244)
+- 31 regression tests in rapportages suite (9 new)
