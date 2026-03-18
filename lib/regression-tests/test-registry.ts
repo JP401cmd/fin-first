@@ -552,6 +552,16 @@ export async function loadAllTests(): Promise<void> {
     const errorHandlingMod = await import('@/lib/regression-tests/suites/error-handling')
     errorHandlingMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const obApiFlowMod = await import('@/lib/regression-tests/suites/onboarding-api-flow')
+    obApiFlowMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const bankConnMod = await import('@/lib/regression-tests/suites/bank-connectie-flow')
+    bankConnMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
