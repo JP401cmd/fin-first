@@ -15534,3 +15534,58 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#234)
 - 22 regression tests added
+
+## Session 2026-03-18 - Features #235, #236
+
+### Feature #235: Test: FIRE simulatie engine - PASSING
+- Expanded fire-simulatie.ts from 14 to 25 tests
+- Re-categorized under De Horizon — FIRE Simulatie
+- Added: Box 3 drag, inflation, phase switch, edge cases, life events, FIRE detection
+- Zero TypeScript errors, Commit: 439b5b3e
+
+### Feature #236: Test: Horizon projectie - PASSING
+- Expanded horizon-grafiek.ts from 11 to 23 tests
+- Re-categorized under De Horizon — Projecties
+- Added: custom baseReturn, range spread, runBacktest, ageAtDate, persona scenarios
+- Zero TypeScript errors, Commit: c59a531b
+
+### Current Status
+- 2 features completed this session (#235, #236)
+- 23 new regression tests added (48 total across both files)
+
+## Session 2026-03-18 - Feature #242
+
+### Feature #242: Test: Widget systeem and builder - PASSING
+- Created lib/regression-tests/suites/dashboard-widgets.ts with 39 tests
+- Registered under category 'Widgets' (dashboard-widgets)
+- Tests cover all 7 feature steps:
+  - Widget catalog (9 tests): 44+ widgets, unique IDs, valid modules, sizes, hrefs, name/desc, getWidgetDef, defaults (7 enabled), BUDGET_WIDGETS set
+  - mergeWidgetPrefs (7 tests): null/empty input, preserves existing, adds new disabled, mini sanitize, dynamic budget_fav/holding_fav preserved, abonnementen migration
+  - Auto-builder (9 tests): small/medium/large grid cell counts, all-enabled, sequential order, focus boost, budget favorites insertion, focus choices, popularity
+  - Widget ordering (7 tests): reassignOrders sequential, empty list, moveWidget forward/backward/self/unknown, field preservation
+  - PUT /api/widgets (3 tests): auth guard (401), invalid payload, sanitization contract
+  - Widget rendering (4 tests): switch coverage, budget gating, feature gating, grid targets
+- Zero TypeScript errors in new file
+- Page compiles correctly (307 auth redirect)
+- Auth rate limit prevented browser testing (known persistent issue)
+- Commit: 0c7fec06
+
+### Current Status
+- 1 feature completed this session (#242)
+- 39 regression tests added
+
+## Session 2026-03-18 - Features #238, #239
+
+### Feature #238: Test: Aanbevelingen - PASSING
+- Created wil-aanbevelingen.ts with 15 tests under De Wil - Aanbevelingen
+- Recommendation schema, action creation, feedback, PII sanitization tests
+
+### Feature #239: Test: Financiele gezondheidsscore - PASSING
+- Created wil-gezondheid.ts with 25 tests under De Wil - Gezondheid
+- 6-pillar score curves, weighted total, labels, edge cases
+- Registered both in test-registry.ts
+- Zero TypeScript errors, Commit: b9f617d0
+
+### Current Status
+- 2 features completed (#238, #239)
+- 40 total regression tests
