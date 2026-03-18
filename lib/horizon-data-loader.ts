@@ -45,6 +45,8 @@ export interface HorizonPageData {
   snapshotResilience: number | null
   avgIncome6m: number
   avgExpenses6m: number
+  /** Error message from profile query, null if successful */
+  profileError: string | null
 }
 
 /**
@@ -74,6 +76,25 @@ function computeCumulativeImpacts(
     const idx = sorted.findIndex(s => s.id === ev.id)
     return results[idx]
   })
+}
+
+/** Default profile fallback values when profile query fails */
+const PROFILE_DEFAULTS = {
+  date_of_birth: null as string | null,
+  retirement_expense_method: null as string | null,
+  retirement_expense_custom_amount: null as number | null,
+  fire_end_strategy: 'perpetual' as string,
+  fire_end_age: 90,
+  fire_legacy_amount: 0,
+  expected_return: null as number | null,
+  inflation_rate: null as number | null,
+  net_monthly_income: 0,
+  estimated_monthly_expenses: 0,
+  withdrawal_strategy: 'static' as string,
+  guardrail_floor: 0.80,
+  guardrail_ceiling: 1.20,
+  guardrail_cut_step: 0.05,
+  guardrail_raise_step: 0.05,
 }
 
 export async function loadHorizonData(supabase: SupabaseClient): Promise<HorizonPageData> {
@@ -129,6 +150,15 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
   ])
 
+  // Check profile query for errors and use fallback if needed
+  if (profileResult.error) {
+    console.error(
+      `[horizon-data-loader] Profile query failed: code=${profileResult.error.code}, message=${profileResult.error.message}`,
+      profileResult.error,
+    )
+  }
+  const profile = profileResult.data ?? PROFILE_DEFAULTS
+
   // Monthly income/expenses from current month transactions
   let monthlyIncome = 0
   let monthlyExpenses = 0
@@ -139,8 +169,8 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   }
 
   // Fallback to profile estimates for users without transactions
-  const profileMonthlyIncome = Number(profileResult.data?.net_monthly_income ?? 0)
-  const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
+  const profileMonthlyIncome = Number(profile.net_monthly_income ?? 0)
+  const profileMonthlyExpenses = Number(profile.estimated_monthly_expenses ?? 0)
   const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
   const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
 
@@ -187,23 +217,23 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   )
 
   const yearlyRetirementExpenses = computeRetirementExpenses(
-    profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
+    profile.retirement_expense_method as RetirementExpenseMethod,
     yearlyMustExpenses,
     extrapolatedIncome,
-    profileResult.data?.retirement_expense_custom_amount,
+    profile.retirement_expense_custom_amount,
     profileMonthlyExpenses * 12,
   )
 
-  const dob = profileResult.data?.date_of_birth ?? null
+  const dob = profile.date_of_birth ?? null
 
   // FIRE strategy from profile
-  const fireStrategy = parseFireStrategy(profileResult.data ?? {})
+  const fireStrategy = parseFireStrategy(profile)
 
   // Withdrawal strategy from profile (static/guardrails/vpw/bucket)
-  const withdrawalStrategy = resolveWithdrawalStrategy(profileResult.data ?? {})
+  const withdrawalStrategy = resolveWithdrawalStrategy(profile)
 
   // Berekeningsparameters uit profiel
-  const fireParams = resolveFireParams(profileResult.data ?? {})
+  const fireParams = resolveFireParams(profile)
 
   // Build the effective FIRE input
   const effectiveInput: FinancialInput = {
@@ -244,5 +274,8 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     snapshotResilience,
     avgIncome6m,
     avgExpenses6m,
+    profileError: profileResult.error
+      ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`
+      : null,
   }
 }

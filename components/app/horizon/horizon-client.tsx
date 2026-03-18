@@ -207,9 +207,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [openCatalogGroups, setOpenCatalogGroups] = useState<Set<LifeEventGroup>>(new Set())
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
-  const { result: simResult, cashflows: simCashflows } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError } = useHorizonFireSim(
     input
-      ? { horizonInput: input, lifeEvents: events, fireStrategy, withdrawalStrategy: withdrawalStrategyConfig, grossReturn: fireParams.grossReturn, inflation: fireParams.inflationRate }
+      ? { horizonInput: input, lifeEvents: events, fireStrategy, withdrawalStrategy: withdrawalStrategyConfig, grossReturn: fireParams.grossReturn, inflation: fireParams.inflationRate, profileError: initialData.profileError }
       : null,
   )
 
@@ -269,6 +269,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         supabase.from('transactions').select('amount').gte('date', sixMonthsAgo).lt('date', monthEnd),
         supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
       ])
+
+      // Check for profile query errors
+      if (profileResult.error) {
+        console.warn(
+          `[horizon-client] Profile query failed: code=${profileResult.error.code}, message=${profileResult.error.message}`,
+          profileResult.error,
+        )
+      }
 
       let monthlyIncome = 0
       let monthlyExpenses = 0
@@ -1639,6 +1647,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
             )}
           </div>
+
+          {/* Profile error warning — shown when profile query failed but page loads with defaults */}
+          {simError && (
+            <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2.5">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <p className="font-sans text-[12px] text-amber-700">
+                Je profielgegevens konden niet worden geladen — de grafiek toont standaardwaarden. Probeer de pagina te verversen.
+              </p>
+            </div>
+          )}
 
           {/* Grafiekgedeelte — alleen zichtbaar als simResult beschikbaar is */}
           {simResult && (

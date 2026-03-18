@@ -41,10 +41,12 @@ interface HorizonFireSimInput {
   withdrawalStrategy?: WithdrawalStrategyConfig  // default: static (identical to old logic)
   grossReturn?: number   // default: DEFAULT_RETURN
   inflation?: number     // default: INFLATION
+  /** Upstream error (e.g. from server data loader profile query failure) */
+  profileError?: string | null
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
   const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
@@ -134,13 +136,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null }
   }
 
   return {
     result: simResult?.result ?? null,
     cashflows: simResult?.cashflows ?? [],
     isLoading: false,
-    error: null,
+    error: profileError ?? null,
   }
 }
