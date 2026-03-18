@@ -1,3 +1,26 @@
+## Session 2026-03-18 - Feature #301
+
+### Feature #301: Regressietest: Household/Partner functies - PASSING
+- Created lib/regression-tests/suites/identiteit-household.ts with 35 tests
+- Registered under category 'identiteit.household'
+- Tests cover all 9 feature steps:
+  - Household schema: core functions (computeSharePct, filterByPerspective, etc.), SplitMode labels/descriptions
+  - Partner uitnodiging: POST/GET/DELETE auth guards (401), email validation, self-invite prevention
+  - Partner accepteren: POST auth guard, action validation (accept/decline), token/invitation_id required, GET redirect
+  - Gecombineerd netto vermogen: personal perspective, household perspective, per-debt partner_split_pct, inactive exclusion
+  - Gecombineerde FIRE projectie: auth guard, equal/income_ratio/custom/one_carries_all split modes
+  - Privacy instellingen: DEFAULT_PRIVACY_SETTINGS (5 categories, all totals), normalise Dutch/English, applyPrivacyFilter (full/totals/hidden), auth guards
+  - Household verlaten: auth guard, 9 data tables revert, profile reset to solo
+  - Solo vs. household toggle: status/settings/data auth guards, filterByPerspective personal/household
+  - Auth consistency: all 13 household API endpoints verified 401 for unauthenticated
+- All endpoints confirmed returning 401 via curl
+- Zero TypeScript errors, build passes
+- Commit: 5faa8092
+
+### Current Status
+- 1 feature completed this session (#301)
+- 35 regression tests added
+
 ## Session 2026-03-18 - Features #290, #291
 
 ### Feature #290: Regressietest categorisering herschikken — dot-notatie - PASSING
@@ -16019,3 +16042,28 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#298, #299)
 - 53 total regression tests across both files
+
+## Session 2026-03-18 - Feature #304
+
+### Feature #304: Regressietest: Notificatie systeem - PASSING
+- Created lib/regression-tests/suites/beheer-notificaties.ts with 27 tests
+- Registered under category 'Beheer — Notificaties' (beheer.notificaties)
+- Tests cover all 8 feature steps:
+  - Preferences page loads: GET /identity/instellingen returns 200 or 307
+  - Preferences save: PUT /api/notifications auth guard (401), validation (400), valid types (8), defaults (all true)
+  - Notification creation: GET /api/notifications auth guard (401), response shape, NotificationType (10 types), Notification shape (9 required + 3 optional fields), shouldAlert budget logic, days param clamping (1-90)
+  - UI display: MODULE_MAP (10 types → DE KERN/DE WIL/DE HORIZON), MeldingenWidget TYPE_ICONS/TYPE_LABELS (4 widget types), widget sizes (mini/quarter/half/full), timestamp formatting (m/u/d geleden + absolute date)
+  - Mark as read: PATCH /api/notifications auth guard (401), markRead single ID, markAllRead array, readIds pruning (max 200)
+  - History/dismiss: 30-day storage with requested-period return, merge upsert with read-status preservation
+  - Badge counter: unreadCount calculation, badge display logic (exact count to 9, then "9+"), provider context (10 properties), 60s poll interval, optimistic update with skip-next-poll
+  - Auth consistency: all 3 endpoints (GET/PATCH/PUT) verified 401
+  - Sorting: priority-based (lower number = higher priority)
+  - Preference filtering: disabled types excluded from response
+- All 3 API endpoints confirmed returning 401 for unauthenticated requests
+- Zero TypeScript errors in new file (3 pre-existing in other files)
+- Commit: 7534101b
+
+### Current Status
+- 1 feature completed this session (#304)
+- 27 regression tests added
+- Overall progress: 301/304 (99.0%)
