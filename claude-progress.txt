@@ -1,3 +1,19 @@
+## Session 2026-03-18 - Feature #292
+
+### Feature #292: Regressietest infra fixes — typo, silent failures, isolatie - PASSING
+- All 4 feature steps verified as already implemented by concurrent agent:
+  1. AssertionError class name verified as correctly spelled (matches standard Assertion + Error)
+  2. loadSuite() helper with console.warn in catch block replaces silent `catch { }` blocks
+  3. Post-loading validation loop warns about categories with 0 tests
+  4. KNOWN LIMITATION comment block documents test isolation limitations in Dutch
+- Changes already committed in prior session by concurrent agent
+- Zero TypeScript errors in test-registry.ts
+- Feature marked as passing
+
+### Current Status
+- 1 feature verified this session (#292)
+- 288/303 features passing (95.0%)
+
 ## Session 2026-03-18 - Features #249, #250
 
 ### Feature #249: Test: API response tijden - PASSING
