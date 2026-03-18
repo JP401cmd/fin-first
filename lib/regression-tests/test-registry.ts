@@ -170,6 +170,7 @@ export async function loadAllTests(): Promise<void> {
   await loadSuite('@/lib/regression-tests/suites/kern-bank-connect-flow', 'kern-bank-connect-flow')
   await loadSuite('@/lib/regression-tests/suites/kern-import-export', 'kern-import-export')
   await loadSuite('@/lib/regression-tests/suites/kern-schulden', 'kern-schulden')
+  await loadSuite('@/lib/regression-tests/suites/kern-dividenden', 'kern-dividenden')
 
   // ── Validate that all registered categories have tests ────────────────────
   // Warn about categories with 0 tests after loading — this likely indicates
