@@ -15084,3 +15084,31 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#227, #256)
 - Zero TypeScript errors
 - Auth rate limit prevented browser testing but all routes compile correctly
+
+## Session 2026-03-18 - Feature #223
+
+### Feature #223: Onttrekkingsstrategie — Strategie-pagina & visualisaties - PASSING
+- Page already existed at `/horizon/strategie` with base charts and selectors
+- Added STRATEGY_EXPLANATIONS record with Dutch content for all 4 strategies
+  - Per strategy: howItWorks, suitableFor, pros[], cons[]
+- Added strategy explanation cards section ("Strategieën uitgelegd")
+  - Colored accent bars matching strategy colors (gray/blue/green/amber)
+  - Icon + name header with "Actief" badge for current strategy
+  - "Hoe het werkt", "Geschikt voor" subsections
+  - Side-by-side "Voordelen" (green Check icons) and "Nadelen" (red CircleDot icons) lists
+  - Active strategy highlighted with ring-2 ring-horizon-400
+- Added direct strategy activation functionality
+  - "Activeer [name]" button appears when selected differs from active
+  - PUTs to /api/withdrawal-strategy, updates withdrawalConfig state live
+  - Loading spinner (Loader2) while saving, error banner on failure
+- Updated horizon page link: ExploreCard now navigates to /horizon/strategie (was onClick modal)
+  - Secondary link changed to "Strategieën vergelijken →" pointing to /horizon/strategie
+- Bottom link changed from "Strategie wijzigen" to "Geavanceerde instellingen" (for guardrail params)
+- Zero TypeScript errors (full tsc --noEmit clean)
+- Auth rate limit prevented browser testing (persistent Supabase issue)
+- All 8 feature steps verified in code review
+- Commit: 0f11d4ea (committed by coder agent)
+
+### Current Status
+- 1 feature completed this session (#223)
+- Zero TypeScript errors
