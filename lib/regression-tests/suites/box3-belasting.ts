@@ -19,12 +19,13 @@ const CAT = 'kern-belasting'
 
 // ── Helper: minimal Asset stub ─────────────────────────────────────
 function makeAsset(overrides: Partial<Asset> & { asset_type: Asset['asset_type']; current_value: number }): Asset {
+  const { asset_type, current_value, ...rest } = overrides
   return {
     id: crypto.randomUUID(),
     user_id: 'test',
     name: 'Test Asset',
-    asset_type: overrides.asset_type,
-    current_value: overrides.current_value,
+    asset_type,
+    current_value,
     purchase_value: 0,
     purchase_date: null,
     expected_return: 0.07,
@@ -55,18 +56,22 @@ function makeAsset(overrides: Partial<Asset> & { asset_type: Asset['asset_type']
     annual_dividend: null,
     linked_asset_id: null,
     ownership: 'personal',
-    ...overrides,
+    household_id: null,
+    net_worth_inclusion_pct: 100,
+    has_budget_tracking: false,
+    ...rest,
   }
 }
 
 function makeDebt(overrides: Partial<Debt> & { current_balance: number }): Debt {
+  const { current_balance, ...rest } = overrides
   return {
     id: crypto.randomUUID(),
     user_id: 'test',
     name: 'Test Debt',
     debt_type: 'personal_loan',
-    original_amount: overrides.current_balance,
-    current_balance: overrides.current_balance,
+    original_amount: current_balance,
+    current_balance,
     interest_rate: 0.05,
     minimum_payment: 0,
     monthly_payment: 0,
@@ -85,7 +90,15 @@ function makeDebt(overrides: Partial<Debt> & { current_balance: number }): Debt 
     linked_asset_id: null,
     credit_limit: null,
     repayment_type: null,
-    ...overrides,
+    draagkrachtmeting_date: null,
+    tax_year: null,
+    has_payment_plan: false,
+    has_written_agreement: false,
+    ownership: 'personal' as const,
+    household_id: null,
+    partner_split_pct: null,
+    net_worth_inclusion_pct: 100,
+    ...rest,
   }
 }
 
