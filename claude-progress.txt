@@ -15719,3 +15719,16 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#289)
 - Build is green
+
+## Session 2026-03-18 - Feature #253
+
+### Feature #253: Test: Snapshot and tijdreeks consistentie - PASSING
+- Created lib/regression-tests/suites/data-tijdreeksen.ts with 28 tests
+- Registered under category Data Tijdreeksen (data-tijdreeksen)
+- Tests cover all 6 feature steps: chronological ordering, no duplicates, auto-snapshot, balance snapshots, valuations, historical data
+- All 5 endpoints confirmed returning 401 for unauthenticated requests
+- Zero TypeScript errors, Commit: 7734b272
+
+### Current Status
+- 1 feature completed this session (#253)
+- 28 regression tests added
