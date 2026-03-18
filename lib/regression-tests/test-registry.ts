@@ -205,6 +205,14 @@ registerCategory({
 })
 
 registerCategory({
+  id: 'onboarding-ui',
+  label: 'Onboarding — UI Componenten',
+  description: 'StepProgress, SpeechBubble, responsive layout, keyboard navigatie, terug-knop',
+  icon: 'Component',
+  testCount: 0,
+})
+
+registerCategory({
   id: 'onboarding-save',
   label: 'Onboarding — Save & Success',
   description: 'Save flow, animatie, voortgangsbalk, success scherm, fase activatie',
@@ -374,6 +382,11 @@ export async function loadAllTests(): Promise<void> {
   try {
     const obResetMod = await import('@/lib/regression-tests/suites/onboarding-reset')
     obResetMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obUiMod = await import('@/lib/regression-tests/suites/onboarding-ui')
+    obUiMod.register()
   } catch { /* module not found yet */ }
 
   try {
