@@ -19,32 +19,35 @@ type Feature = {
 const FASE_A_FEATURES: readonly Feature[] = [
   {
     nr: 1,
-    name: 'Pensioen Unified Timeline',
+    name: 'Gestapelde Inkomsten vs. Uitgaven Grafiek',
     description:
-      'AOW-leeftijd, werkgeverspensioen (UPO) en eigen vermogen op een ge\u00efntegreerde tijdlijn. De AOW-tabel en pensioen PDF upload bestaan al \u2014 maar een visuele tijdlijn die toont \u201cMet 52 FIRE, AOW bridge 52\u201367 uit eigen vermogen, dan AOW + pensioen erbij\u201d ontbreekt. Dit is de ontbrekende schakel die De Horizon compleet maakt.',
+      'De bestaande SimChart op De Horizon toont het vermogenspad als lijn met markers voor AOW-leeftijd, pensioen, FIRE-leeftijd en levensgebeurtenissen (cashflow bands). Wat ontbreekt is een gestapelde kolomweergave die per jaar laat zien WAAR het inkomen vandaan komt in de afbouwfase. Boldin\u2019s \u201cLifetime Income Projection Chart\u201d is hun vlaggenschip \u2014 dit is de ontbrekende visualisatie in TriFinity. Daarnaast moet de bestaande vermogenslijn expliciet gemarkeerd worden met verticale annotaties voor sleutelmomenten: AOW-startmoment, pensioen-startmoment, FIRE-moment, onttrekkingsfase-start, en alle andere actieve levensgebeurtenissen. Deze markers laten zien WANNEER elke bron inschakelt.',
     werking:
-      'Een interactieve tijdlijn die drie inkomstenbronnen visueel combineert: (1) eigen vermogen/beleggingen tot FIRE-datum, (2) AOW vanaf AOW-leeftijd, (3) werkgeverspensioen vanaf pensioendatum. De gebruiker ziet precies wanneer elke bron inschakelt en hoeveel \u201cbridge-vermogen\u201d nodig is om de periode tussen FIRE en AOW te overbruggen. Sliders voor FIRE-leeftijd, pensioenleeftijd en bestedingsniveau maken scenario\u2019s direct zichtbaar.',
+      'Een gestapelde kolom-grafiek (stacked bar chart) die per jaar toont: Kolommen (gestapeld): eigen vermogen/onttrekking, AOW-uitkering, werkgeverspensioen, passief inkomen, deeltijds werk, overige inkomstenbronnen. Lijn: totale uitgaven (ge\u00efndexeerd voor inflatie). Visueel: als de kolommen hoger zijn dan de lijn = surplus; lager = deficit (rode zone). Integratie met de bestaande SimChart: kan als alternatieve weergavemodus (\u201cVermogenspad\u201d vs \u201cInkomstenbronnen\u201d) of als aanvullende grafiek eronder. De bestaande AOW/pensioen/life event markers uit SimChart worden hier vertaald naar gestapelde bronnen. Aanvullend: de bestaande vermogenslijn/SimChart krijgt verticale marker-lijnen en annotaties op de tijdas voor elk sleutelmoment \u2014 AOW-start (verticale lijn + label), pensioen-start (verticale lijn + label), FIRE-moment (prominente marker), onttrekkingsfase-start, en alle actieve levensgebeurtenissen (bijv. kind, huis, sabbatical). Elke marker toont het moment waarop een inkomstenbron of uitgavenpost activeert, zodat de gebruiker in \u00e9\u00e9n oogopslag ziet WANNEER en WAAROM het vermogenspad verandert.',
     afhankelijkheden: [
-      'lib/aow-leeftijd.ts (AOW leeftijdstabel)',
-      'lib/fire-simulation.ts (runSimulation)',
-      'lib/horizon-data.ts (computeFireProjection, computeFireRange)',
+      'components/app/horizon/sim-chart.tsx (bestaande SimChart)',
+      'lib/fire-simulation.ts (SimRow: withdrawal, cashflowNet)',
+      'lib/horizon-data.ts (computeFireProjection)',
+      'lib/fire-simulation.ts (lifeEventsToCashflows)',
       'app/api/pension/parse (UPO PDF parsing)',
       'profiles.fire_end_strategy',
       'profiles.expected_return',
       'profiles.inflation_rate',
     ],
     technisch:
-      'Nieuwe component pension-timeline.tsx in De Horizon module. Combineert drie datastreams: (a) FIRE simulatie output (vermogenspad), (b) AOW bedragen uit aow-leeftijd.ts (enkel/samenwonend), (c) geparsed pensioen uit pension_documents. Berekent bridge-bedrag = jaarlijkse uitgaven \u00d7 (AOW-leeftijd \u2212 FIRE-leeftijd) \u2212 pensioeninkomen in die periode. Visualisatie als gestapeld area chart met drie kleuren. Nieuwe API route /api/pension/timeline die alles samenvoegt.',
+      'Data grotendeels beschikbaar via SimRow (withdrawal, cashflowNet, savings, growth). Wat nodig is: cashflows opsplitsen per bron (nu opgeteld in cashflowNet), stacked bar chart component (Recharts of custom SVG zoals SimChart), weergave als toggle of tab op De Horizon. De bestaande levensgebeurtenissen (AOW, pensioen, erfenis, etc.) worden automatisch als inkomstenbronnen getoond.',
     waardeGebruiker:
-      'Beantwoordt de #1 vraag van Nederlandse FIRE-planners: \u201cHeb ik genoeg om de periode tot mijn AOW te overbruggen?\u201d Maakt de abstracte FIRE-berekening concreet en actionable. Reduceert angst over \u201chet gat\u201d tussen stoppen met werken en pensioen.',
+      'Beantwoordt de #1 vraag: \u201cWaar komt mijn geld vandaan als ik stop met werken?\u201d De huidige SimChart toont WANNEER, deze grafiek toont HOEVEEL per bron.',
     aandachtspunten: [
-      'Pensioen PDF parsing is complex en foutgevoelig (wisselende UPO formats).',
+      'Cashflows moeten per bron opgesplitst worden \u2014 nu opgeteld in cashflowNet.',
       'Werkgeverspensioen kan variabele opbouw hebben.',
       'Gebruikers zonder UPO upload moeten handmatig bedrag kunnen invoeren.',
       'AOW-leeftijd kan politiek wijzigen.',
       'Partnersituatie (AOW enkel vs samenwonend) moet correct meegenomen worden.',
+      'Toggle/tab UX tussen Vermogenspad en Inkomstenbronnen weergave.',
     ],
-    competitors: 'Boldin (Social Security Explorer), ProjectionLab (pensioen modeling)',
+    competitors:
+      'Boldin (Lifetime Income Projection Chart \u2014 hun vlaggenschip), ProjectionLab (income streams)',
     priority: 'Hoog',
   },
   {
@@ -157,14 +160,105 @@ const FASE_A_FEATURES: readonly Feature[] = [
       'NIBUD-normen als basis voor wat \u201cgezond\u201d is in NL context.',
     ],
     competitors:
-      'Niemand doet dit goed \u2014 Credit Karma heeft credit score maar dat is anders',
-    priority: 'Middel',
+      'Boldin (Financial Wellness Score \u2014 gelanceerd 2025), Credit Karma (credit score \u2014 anders)',
+    priority: 'Hoog',
+  },
+  {
+    nr: 6,
+    name: 'Spending Guardrails (Dynamische Onttrekkingsstrategie)',
+    description:
+      'Hoeveel kan een pensioenado veilig uitgeven? De SWR Monitor widget bestaat al maar is statisch. Spending Guardrails geven dynamische uitgavenlimieten op basis van portefeuillewaarde, marktomstandigheden en persoonlijke situatie. Boldin biedt dit als \u201cSpending Guardrails Insight\u201d \u2014 dit ontbreekt in TriFinity.',
+    werking:
+      'Dynamische berekening van veilige uitgavenlimieten in de afbouwfase: (1) Guyton-Klinger guardrails: verhoog uitgaven als portefeuille stijgt, verlaag als portefeuille daalt. (2) Vloer en plafond: minimale en maximale jaaruitgaven. (3) CAPE-adjusted SWR: veilige onttrekking op basis van marktwaardering. (4) Variabele withdrawal rates per levensfase. (5) Dashboard: \u201cDit jaar kun je veilig \u20acX uitgeven. Je vloer is \u20acY, je plafond is \u20acZ.\u201d',
+    afhankelijkheden: [
+      'lib/fire-simulation.ts (runSimulation, SimRow)',
+      'lib/horizon-data.ts (NL_SWR, computeFireProjection)',
+      'components/widgets/widget-renderer.tsx (swr_monitor widget)',
+      'profiles.fire_end_strategy',
+      'profiles.expected_return',
+    ],
+    technisch:
+      'Nieuwe lib/spending-guardrails.ts: computeGuardrails(portfolio, age, strategy, marketConditions) \u2192 { safeSpending: number, floor: number, ceiling: number, currentSWR: number, adjustment: \u2018increase\u2019 | \u2018decrease\u2019 | \u2018hold\u2019 }. Guyton-Klinger regels: als portefeuille > 120% van startwaarde \u2192 spending +10%, als < 80% \u2192 spending -10%. CAPE-based SWR: gebruik historische CAPE ratio\u2019s voor marktwaardering. Uitbreiding van bestaande swr_monitor widget of nieuwe widget spending_guardrails. Integratie met What-If scenario\u2019s.',
+    waardeGebruiker:
+      'De grootste angst van pensioenado\u2019s is \u201cte veel uitgeven en door je geld heen raken\u201d. Guardrails geven concrete, dynamische grenzen: \u201cdit jaar mag je X besteden\u201d. Vermindert angst en voorkomt zowel te zuinig als te royaal leven in pensioen.',
+    aandachtspunten: [
+      'Guyton-Klinger is Amerikaans model \u2014 NL-context (AOW als vloer) aanpassen.',
+      'Marktwaardering (CAPE) data nodig \u2014 historische data of API.',
+      'Te conservatieve guardrails leiden tot onnodig zuinig leven.',
+      'Communicatie: \u201cdit is een richtlijn, geen garantie.\u201d',
+      'Integratie met bestaande fire_end_strategy (perpetual/legacy/deplete).',
+    ],
+    competitors:
+      'Boldin (Spending Guardrails Insight \u2014 2025), ProjectionLab (variable spending)',
+    priority: 'Hoog',
+  },
+  {
+    nr: 7,
+    name: 'Gestapelde Vermogensgrafiek (Stacked Bar Chart)',
+    description:
+      'Boldin toont vermogensopbouw als gestapelde kolommen: beleggingen, pensioen, AOW, vastgoed, spaargeld als aparte lagen. TriFinity heeft nu alleen een lijngrafiek (SimChart) die het totale vermogenspad toont. Voeg een gestapelde kolomweergave toe die laat zien HOE het vermogen is opgebouwd per bron, niet alleen het totaal. Dit geeft de gebruiker inzicht in de samenstelling van het vermogen op elk moment in de toekomst.',
+    werking:
+      'Een gestapelde kolomgrafiek (stacked bar chart) die per jaar de vermogenssamenstelling toont als aparte lagen: beleggingen (ETF/aandelen), pensioenvermogen (werkgever + eigen opbouw), AOW-rechten (gekapitaliseerd), vastgoed (WOZ-waarde minus restschuld), spaargeld, crypto, overige bezittingen. De Y-as toont het totale vermogen, elke laag toont de bijdrage per bron. Hover-tooltip met absolute bedragen en percentages per laag. Tijdas loopt van nu tot beoogde FIRE-leeftijd + 30 jaar. Weergave als tab/toggle naast bestaande SimChart ("Vermogenspad" vs "Vermogensopbouw"). Schulden als negatieve laag onder de nullijn.',
+    afhankelijkheden: [
+      'components/app/horizon/sim-chart.tsx (bestaande SimChart)',
+      'lib/fire-simulation.ts (SimRow data)',
+      'lib/horizon-data.ts (computeFireProjection, vermogenscategorieën)',
+      'assets tabel (bezittingen per type)',
+      'holdings tabel (beleggingsportefeuille)',
+      'debts tabel (schulden als negatieve laag)',
+    ],
+    technisch:
+      'Data deels beschikbaar via SimRow (savings, growth), maar vermogenscategorieën moeten uitgesplitst worden. Nieuwe helper: splitVermogenPerBron(simRows, assets, holdings) → StackedRow[]. Stacked bar chart component (Recharts StackedBarChart of custom SVG). Integratie als toggle-modus op De Horizon naast bestaande SimChart. Categorieën afleiden uit asset.type en holding.asset_class. Pensioen apart berekenen op basis van UPO-data of handmatige invoer. AOW gekapitaliseerd als contante waarde van toekomstige uitkeringen.',
+    waardeGebruiker:
+      'Beantwoordt de vraag: "Waaruit bestaat mijn vermogen straks?" De huidige lijngrafiek toont alleen het totaal — deze visualisatie laat zien dat bijv. 40% uit beleggingen komt, 30% uit pensioen, 20% uit vastgoed. Helpt bij diversificatie-beslissingen en geeft vertrouwen dat het vermogen over meerdere bronnen verspreid is.',
+    aandachtspunten: [
+      'Vermogenscategorieën moeten consistent zijn met de assets-pagina classificatie.',
+      'Pensioenwaarde is onzeker — duidelijk markeren als schatting.',
+      'AOW kapitaliseren vereist een disconteringsvoet — maak aannames expliciet.',
+      'Te veel categorieën maken de grafiek onleesbaar — max 6-7 lagen.',
+      'Vastgoedwaarde fluctueert — gebruik laatste check-in of WOZ.',
+      'Kleurcodering consistent houden met de rest van de app (module kleuren).',
+    ],
+    competitors:
+      'Boldin (Stacked Asset Allocation Charts — hun kernvisualitatie), ProjectionLab (portfolio composition over time)',
+    priority: 'Hoog',
+  },
+  {
+    nr: 8,
+    name: 'Inkomsten vs. Uitgaven Projectie Chart',
+    description:
+      'Boldin toont verwachte jaarlijkse inkomsten (salaris, pensioen, AOW, beleggingsinkomen) vs. jaarlijkse uitgaven over de gehele levenslijn. Cruciaal inzicht: "wanneer overtreffen mijn passieve inkomsten mijn uitgaven?" Dit is de visuele representatie van het FIRE-kruispunt — het moment waarop je financieel vrij bent. TriFinity berekent dit al intern maar visualiseert het niet expliciet als inkomsten vs. uitgaven over tijd.',
+    werking:
+      'Twee-lagen grafiek die per jaar toont: (1) Gestapelde inkomstenbronnen als kolommen: salaris/freelance (zolang werkend), AOW-uitkering (vanaf AOW-leeftijd), werkgeverspensioen (vanaf pensioenleeftijd), beleggingsinkomen/onttrekking, passief inkomen (huur, dividend), overig. (2) Uitgavenlijn: totale jaarlijkse uitgaven geïndexeerd voor inflatie. Het FIRE-kruispunt is waar de inkomstenkolommen de uitgavenlijn overtreffen zonder salaris-component — visueel gemarkeerd met een prominente indicator. Hover per jaar toont: totale inkomsten, totale uitgaven, surplus/tekort, en samenstelling per bron als percentage.',
+    afhankelijkheden: [
+      'lib/fire-simulation.ts (SimRow: withdrawal, cashflowNet, savings)',
+      'lib/horizon-data.ts (computeFireProjection, computeFireRange)',
+      'lib/fire-simulation.ts (lifeEventsToCashflows — inkomensbronnen)',
+      'profiles (pensioenleeftijd, AOW-leeftijd, salaris)',
+      'budgets (huidige uitgaven als basis voor projectie)',
+      'app/api/pension/parse (UPO PDF parsing voor pensioeninkomen)',
+    ],
+    technisch:
+      'Cashflows moeten per bron opgesplitst worden — nu opgeteld in cashflowNet. Nieuwe helper: splitInkomstenPerBron(simRows, lifeEvents, profile) → IncomeBreakdownRow[]. Per bron-type: salary (tot FIRE/pensioen), aow (vanaf AOW-leeftijd), pension (vanaf pensioenleeftijd), withdrawal (onttrekking uit vermogen), passive (dividend, huur), other (levensgebeurtenissen). Uitgavenlijn: baseer op huidige jaaruitgaven × (1 + inflatie)^n, aangepast voor levensgebeurtenissen (kind, hypotheekvrij). Chart als Recharts ComposedChart (StackedBar + Line) of custom SVG. FIRE-kruispunt markering: verticale lijn + label "Financieel vrij" op het jaar waar passieve inkomsten ≥ uitgaven.',
+    waardeGebruiker:
+      'De meest intuïtieve visualisatie van financiële vrijheid: "wanneer verdien ik genoeg zonder te werken?" Boldin beschouwt dit als hun vlaggenschip-grafiek. Geeft direct inzicht in de transitie van actief naar passief inkomen. Motiveert: je ziet de kruispunt-lijn dichterbij komen naarmate je spaart en belegt.',
+    aandachtspunten: [
+      'Cashflows moeten per bron opgesplitst worden — nu opgeteld in cashflowNet.',
+      'Werkgeverspensioen kan variabele opbouw hebben (middelloon vs eindloon).',
+      'Gebruikers zonder UPO upload moeten handmatig pensioenbedrag kunnen invoeren.',
+      'AOW-leeftijd kan politiek wijzigen — actueel houden.',
+      'Partnersituatie (AOW enkel vs samenwonend) correct meenemen.',
+      'Inflatie-aanpassing van uitgaven is een aanname — maak expliciet.',
+    ],
+    competitors:
+      'Boldin (Lifetime Income vs Expenses Projection — hun vlaggenschip), Empower (Cash Flow Planner)',
+    priority: 'Hoog',
   },
 ]
 
 const FASE_B_FEATURES: readonly Feature[] = [
   {
-    nr: 6,
+    nr: 7,
     name: 'Vermogensaanwasbelasting 2027 Simulator',
     description:
       'Nederland schakelt per 2027 over van forfaitair rendement naar belasting op werkelijk rendement (vermogensaanwasbelasting). Geen enkele app of tool bereidt gebruikers hierop voor. Bouw een simulator die toont: \u201cOnder het huidige systeem betaal je \u20acX, onder het nieuwe systeem \u20acY \u2014 dit is het effect op je FIRE-datum.\u201d Dit is een first-mover kans met directe PR-waarde.',
@@ -193,7 +287,7 @@ const FASE_B_FEATURES: readonly Feature[] = [
     priority: 'Hoog',
   },
   {
-    nr: 7,
+    nr: 8,
     name: 'Hypotheek: Aflossen vs Beleggen',
     description:
       'De grootste financi\u00eble vraag voor Nederlandse huishoudens: \u201cmoet ik extra aflossen op mijn hypotheek of dat geld beleggen?\u201d Bouw een vergelijkingsmodule die beide scenario\u2019s doorrekent inclusief hypotheekrenteaftrek, Box 3 impact, risico, en effect op FIRE-datum. Schulden- en beleggingsmodule bestaan al \u2014 de vergelijking ontbreekt.',
@@ -223,7 +317,7 @@ const FASE_B_FEATURES: readonly Feature[] = [
     priority: 'Hoog',
   },
   {
-    nr: 8,
+    nr: 9,
     name: 'Toeslagen Simulator',
     description:
       'Veel Nederlanders ontvangen huurtoeslag, zorgtoeslag of kindgebonden budget. Vermogensgroei kan leiden tot verlies van toeslagen \u2014 een verborgen \u201cbelasting\u201d die niemand berekent. Simuleer: \u201cBij \u20acX vermogen verlies je \u20acY aan toeslagen per jaar.\u201d Dit helpt gebruikers bij de timing van vermogensopbouw en de beslissing of snel sparen altijd slim is.',
@@ -252,7 +346,7 @@ const FASE_B_FEATURES: readonly Feature[] = [
     priority: 'Middel',
   },
   {
-    nr: 9,
+    nr: 10,
     name: 'Zorgkosten Planning',
     description:
       'NL-specifiek: eigen risico optimalisatie (\u20ac385 vs \u20ac885), aanvullende verzekering kosten-baten analyse, zorgtoeslag drempelberekening. Jaarlijks terugkerende keuze die veel Nederlanders verkeerd maken. Integreer met de budget-module (categorie zorg) en de check-in.',
@@ -281,7 +375,7 @@ const FASE_B_FEATURES: readonly Feature[] = [
     priority: 'Middel',
   },
   {
-    nr: 10,
+    nr: 11,
     name: 'Box 2 \u2194 Box 3 Optimalisatie (DGA Planning)',
     description:
       'Voor DGA\u2019s/ondernemers: wanneer dividend uitkeren uit de BV? Hoeveel in Box 2 laten vs overhevelen naar priv\u00e9 (Box 3)? Optimale timing van BV-liquidatie bij FIRE. De Box 2 module bestaat al \u2014 maar de strategische planning \u201cwanneer en hoeveel\u201d ontbreekt. Relevant voor ~400.000 DGA\u2019s in Nederland.',
@@ -305,7 +399,68 @@ const FASE_B_FEATURES: readonly Feature[] = [
       'Gebruikersaantallen DGA\u2019s klein maar waarde per gebruiker hoog \u2014 overweeg als premium feature.',
       'BV kan ook andere activiteiten hebben (vastgoed, pensioen-BV) \u2014 vereenvoudigen tot vermogenscomponent.',
     ],
-    competitors: 'Niemand \u2014 fiscalisten doen dit handmatig voor \u20ac200+/uur',
+    competitors: 'Niemand — fiscalisten doen dit handmatig voor €200+/uur',
+    priority: 'Middel',
+  },
+  {
+    nr: 12,
+    name: 'Vermogensopbouw per Bron (Area Chart)',
+    description:
+      'Gestapeld area chart dat toont hoe vermogen over tijd verschuift van arbeidsgerelateerd (spaargeld uit salaris) naar passief (beleggingsrendement, pensioen, AOW). Toont de "crossover" wanneer passief inkomen > actief inkomen. Boldin visualiseert dit als een vloeiend area chart — TriFinity mist deze "bron-transitie" visualisatie die laat zien hoe de samenstelling van vermogensgroei verandert naarmate je ouder wordt.',
+    werking:
+      'Gestapeld area chart (stacked area) met op de X-as de leeftijd/jaren en op de Y-as de cumulatieve vermogensgroei uitgesplitst per bron: (1) Arbeidsinleg: cumulatieve spaargeld uit netto-inkomen, (2) Beleggingsrendement: cumulatief rendement op portefeuille (compound growth), (3) Pensioenopbouw: geschatte pensioenwaarde over tijd, (4) Vastgoedwaardestijging: cumulatieve waardegroei van onroerend goed, (5) Overig: erfenissen, schenkingen, eenmalige inkomsten. Het crossover-punt — waar de passieve bronnen (rendement + pensioen + vastgoed) de actieve bron (arbeidsinleg) overtreffen — wordt prominent gemarkeerd. Dit laat visueel zien: "vanaf je 45e groeit je vermogen harder door rendement dan door sparen."',
+    afhankelijkheden: [
+      'lib/fire-simulation.ts (SimRow: savings, growth, cashflowNet)',
+      'lib/horizon-data.ts (computeFireProjection)',
+      'net_worth_snapshots (historische vermogensgroei)',
+      'assets tabel (per type: belegging, vastgoed, pensioen)',
+      'holdings tabel (rendement tracking)',
+      'profiles (leeftijd, pensioenleeftijd)',
+    ],
+    technisch:
+      'Nieuwe helper: computeVermogensgroeiPerBron(simRows, assets, profile) → AreaRow[]. Per jaar cumulatieve bijdrage per bron berekenen: arbeidsinleg = sum(netto savings), rendement = sum(portfolio growth), pensioen = sum(pension accrual), vastgoed = sum(property appreciation). Area chart component (Recharts AreaChart met stackId of custom SVG). Crossover-punt berekenen: het jaar waar passieve bronnen > arbeidsinleg. Hover-tooltip met absolute bedragen en percentages per bron. Integratie op De Horizon als extra tab/visualisatie.',
+    waardeGebruiker:
+      'Maakt het "sneeuwbaleffect" van compound interest visueel: je ziet hoe beleggingsrendement over tijd de dominante bron van vermogensgroei wordt. Motiveert langetermijnbeleggers — "elke euro die ik nu beleg, groeit over 20 jaar tot vier euro." Toont waarom vroeg beginnen zo belangrijk is.',
+    aandachtspunten: [
+      'Onderscheid arbeidsinleg vs rendement vereist tracking van stortingen vs groei — niet altijd beschikbaar.',
+      'Pensioenopbouw is een schatting — markeer als zodanig.',
+      'Vastgoedwaardestijging is onzeker — gebruik conservatieve aanname.',
+      'Te veel bronnen maken het area chart onoverzichtelijk — max 5 lagen.',
+      'Historische data (net_worth_snapshots) kan gaten bevatten bij nieuwe gebruikers.',
+    ],
+    competitors:
+      'Boldin (Wealth Composition Area Chart), ProjectionLab (portfolio growth attribution)',
+    priority: 'Middel',
+  },
+  {
+    nr: 13,
+    name: 'Withdrawal Strategy Visualisatie',
+    description:
+      'Boldin toont expliciet de onttrekkingsstrategie: uit welke bronnen wordt wanneer geput? Eerst eigen vermogen (bridge-periode), dan pensioen erbij, dan AOW erbij. TriFinity berekent dit al intern via fire_end_strategy en de SimChart, maar visualiseert niet expliciet welke pot je wanneer aanspreekt. Deze visualisatie geeft de gebruiker inzicht in de optimale volgorde van onttrekken.',
+    werking:
+      'Tijdlijn-visualisatie die per levensfase toont uit welke bronnen wordt geput: (1) Bridge-periode (FIRE → pensioenleeftijd): onttrekking uit eigen beleggingsportefeuille. (2) Pensioen-fase (pensioenleeftijd → AOW): beleggingen + werkgeverspensioen. (3) AOW-fase (vanaf AOW-leeftijd): beleggingen + pensioen + AOW. (4) Latere fase (80+): mogelijk uitputting, erfenis of aanpassing. Per fase: jaarlijkse onttrekking per bron als gestapelde balk, restant vermogen per pot, en uitputtingsdatum per bron. "Waterval" visualisatie: je ziet hoe elke nieuwe inkomstenbron het onttrekkingsbedrag uit beleggingen verlaagt. Waarschuwing als een pot eerder opraakt dan verwacht.',
+    afhankelijkheden: [
+      'lib/fire-simulation.ts (runSimulation, SimRow)',
+      'lib/horizon-data.ts (computeFireProjection, computeFireRange)',
+      'profiles.fire_end_strategy (perpetual/legacy/deplete)',
+      'profiles.retirement_age, profiles.aow_age',
+      'app/api/pension/parse (pensioeninkomen)',
+      'lib/fire-simulation.ts (lifeEventsToCashflows)',
+    ],
+    technisch:
+      'Nieuwe helper: computeWithdrawalStrategy(simRows, profile, pensionIncome, aowIncome) → WithdrawalPhase[]. Per fase: bronnen met bedragen, start/eindjaar, restant per pot. Visualisatie als horizontale tijdlijn met gestapelde bronnen per fase (Gantt-chart stijl). Alternatief: waterval-diagram dat toont hoe elke bron de druk op beleggingen verlaagt. Integratie op De Horizon, eventueel als onderdeel van het Onttrekkingsmodal (bestaand). SimRow bevat al withdrawal en cashflowNet — deze opsplitsen per bron voor de visualisatie.',
+    waardeGebruiker:
+      'Beantwoordt de cruciale vraag: "Hoe overleef ik de bridge-periode tussen FIRE en pensioen?" Laat zien dat FIRE niet betekent dat al het geld uit één pot komt — pensioen en AOW nemen het over. Vermindert angst: "Ik hoef niet alles zelf te hebben, want op mijn 67e komt AOW erbij." Helpt bij het bepalen van het optimale FIRE-moment.',
+    aandachtspunten: [
+      'Bridge-periode is het meest kwetsbare stuk — prominente waarschuwing als beleggingen te snel opraken.',
+      'Pensioeninkomen is onzeker (indexatie, kortingen) — scenario-analyse nodig.',
+      'AOW-leeftijd kan politiek wijzigen.',
+      'Partnersituatie: dubbel AOW, gezamenlijk pensioen.',
+      'fire_end_strategy (perpetual vs deplete) beïnvloedt de visualisatie sterk.',
+      'Niet alle gebruikers hebben pensioendata — graceful degradation naar schatting of handmatige invoer.',
+    ],
+    competitors:
+      'Boldin (Withdrawal Strategy Planner — expliciet per bron), ProjectionLab (income source timeline)',
     priority: 'Middel',
   },
 ]
@@ -455,7 +610,37 @@ const FASE_C_FEATURES: readonly Feature[] = [
       'Manipulation: gebruikers die extreme data invoeren verstoren aggregaten \u2014 outlier detection nodig.',
     ],
     competitors:
-      'Niemand doet dit goed \u2014 Boldin heeft een PeerScore maar beperkt',
+      'Niemand doet dit goed — Boldin heeft een PeerScore maar beperkt',
+    priority: 'Laag',
+  },
+  {
+    nr: 16,
+    name: 'Levensfase Inkomsten Breakdown',
+    description:
+      'Per levensfase (werkend → FIRE → AOW-leeftijd → 80+) een breakdown van inkomstenbronnen als percentage. Laat zien hoe de inkomstenmix verschuift over de tijd. In de werkfase komt 90% uit salaris, na FIRE verschuift dit naar onttrekking uit vermogen, later komt pensioen en AOW erbij. Boldin toont dit als een compact overzicht per levensfase — TriFinity mist deze samenvatting.',
+    werking:
+      'Overzichtelijke weergave per levensfase met procentuele verdeling van inkomstenbronnen: (1) Werkfase (nu → FIRE): salaris 80-90%, beleggingsinkomen 5-10%, overig 5%. (2) Bridge-fase (FIRE → pensioenleeftijd): onttrekking uit vermogen 70-90%, passief inkomen 10-30%. (3) Pensioen-fase (pensioenleeftijd → AOW): onttrekking 40-60%, werkgeverspensioen 30-40%, passief inkomen 10-20%. (4) AOW-fase (vanaf AOW-leeftijd): AOW 30-40%, pensioen 25-35%, onttrekking 20-30%, passief inkomen 10%. (5) Late fase (80+): AOW + pensioen dominant, onttrekking minimaal. Per fase: horizontale gestapelde balk met kleuren per bron, absolute bedragen per jaar, en percentage van totaal. Compact overzicht dat in één oogopslag de transitie laat zien.',
+    afhankelijkheden: [
+      'lib/fire-simulation.ts (SimRow, runSimulation)',
+      'lib/horizon-data.ts (computeFireProjection)',
+      'profiles (leeftijd, pensioenleeftijd, AOW-leeftijd, fire_end_strategy)',
+      'app/api/pension/parse (pensioeninkomen)',
+      'lib/fire-simulation.ts (lifeEventsToCashflows)',
+      'budgets (huidige uitgaven als basis)',
+    ],
+    technisch:
+      'Nieuwe helper: computeLevensfaseBreakdown(simRows, profile, pensionIncome, aowIncome) → LevensfaseRow[]. Per fase: faseLidwoord, startJaar, eindJaar, bronnen: { label, bedrag, percentage, kleur }[]. Levensfasen afleiden uit profile: werkfase (nu → FIRE), bridge (FIRE → pensioen), pensioen (pensioen → AOW), AOW (AOW → eindleeftijd), laat (80+). Visualisatie als horizontale gestapelde balken per fase, compact onder elkaar. Kan als sectie op De Horizon of als onderdeel van het rapportage-systeem. Relatief simpel te bouwen op basis van bestaande SimRow data — voornamelijk een presentatie-laag.',
+    waardeGebruiker:
+      'Geeft in één oogopslag het "grote plaatje" van je financiële levenslijn. Maakt abstract plannen concreet: "Na mijn 67e komt 35% van mijn inkomen uit AOW." Helpt bij het identificeren van kwetsbare fasen: als de bridge-periode bijna volledig afhankelijk is van onttrekking, is dat een risico. Ideaal voor rapportages en delen met partner.',
+    aandachtspunten: [
+      'Levensfasen moeten dynamisch zijn — niet iedereen heeft dezelfde FIRE/pensioen/AOW-leeftijd.',
+      'Gebruikers zonder pensioendata zien onvolledige breakdown — graceful degradation.',
+      'Percentages moeten optellen tot 100% per fase — afrondingsverschillen oplossen.',
+      'Te veel bronnen per fase maakt het onoverzichtelijk — groepeer kleine bronnen als "overig".',
+      'Partnersituatie: gezamenlijke breakdown of per persoon?',
+    ],
+    competitors:
+      'Boldin (Income by Life Phase breakdown), ProjectionLab (income source timeline per period)',
     priority: 'Laag',
   },
 ]
