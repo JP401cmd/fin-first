@@ -164,6 +164,22 @@ registerCategory({
   testCount: 0,
 })
 
+registerCategory({
+  id: 'onboarding-flow',
+  label: 'Onboarding — Flow',
+  description: 'Onboarding stap navigatie, state management, auth guards, error handling',
+  icon: 'Workflow',
+  testCount: 0,
+})
+
+registerCategory({
+  id: 'onboarding-intro',
+  label: 'Onboarding — Intro',
+  description: 'Intro scherm: WillDots avatar, filosofie, module preview, CTA',
+  icon: 'Sparkles',
+  testCount: 0,
+})
+
 // ── Dynamic test loader ─────────────────────────────────────────────────────
 // This function dynamically imports all test modules and registers their tests.
 
@@ -286,6 +302,21 @@ export async function loadAllTests(): Promise<void> {
   try {
     const migratieMod = await import('@/lib/regression-tests/suites/beheer-migratie')
     migratieMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const informatiefMod = await import('@/lib/regression-tests/suites/beheer-informatief')
+    informatiefMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obFlowMod = await import('@/lib/regression-tests/suites/onboarding-flow')
+    obFlowMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obIntroMod = await import('@/lib/regression-tests/suites/onboarding-intro')
+    obIntroMod.register()
   } catch { /* module not found yet */ }
 }
 
