@@ -4,7 +4,7 @@ import type { TestCase } from '../test-types'
 import { lookupAowAge, formatAowAge } from '@/lib/aow-leeftijd'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 
-const CAT = 'aow-leeftijd'
+const CAT = 'horizon.aow-leeftijd'
 
 // ── Helper: sample AOW rows for unit tests ──────────────────────────────────
 

@@ -11,7 +11,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'error-handling'
+const CAT = 'cross-cutting.error-handling'
 
 /**
  * Error handling & edge case regression tests.

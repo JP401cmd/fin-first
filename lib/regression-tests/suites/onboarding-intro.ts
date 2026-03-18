@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-intro'
+const CAT = 'onboarding.intro'
 
 // ── Module card data (mirrors onboarding-intro.tsx MODULE_CARDS) ────────────
 

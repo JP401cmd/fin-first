@@ -4,7 +4,7 @@ import type { TestCase } from '../test-types'
 import { reassignOrders, moveWidget } from '@/lib/widget-order'
 import type { WidgetPref } from '@/lib/widget-catalog'
 
-const CAT = 'widget-systeem'
+const CAT = 'widgets.ordering'
 
 function makePrefs(ids: string[]): WidgetPref[] {
   return ids.map((id, i) => ({ id, enabled: true, size: 'half' as const, order: i * 10 }))

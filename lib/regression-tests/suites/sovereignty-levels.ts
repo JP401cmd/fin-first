@@ -5,7 +5,7 @@ import { computeSovereigntyLevel, levelToPhaseId, PHASES } from '@/lib/feature-p
 import { computeFeatureAccess, isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FinancialInput } from '@/lib/compute-feature-access'
 
-const CAT = 'sovereignty-levels'
+const CAT = 'identiteit.sovereignty'
 
 // ── Persona financial snapshots ──────────────────────────────────────────────
 // Derived from lib/test-personas.ts — these mirror the actual persona data.

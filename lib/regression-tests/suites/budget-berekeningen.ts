@@ -23,7 +23,7 @@ import {
   type RetirementExpenseMethod,
 } from '@/lib/budget-utils'
 
-const CAT = 'kern-budgets'
+const CAT = 'kern.budgets'
 
 registerCategory({
   id: CAT,

@@ -25,7 +25,7 @@ import type { TestCase } from '../test-types'
 import { computeHealthScore } from '@/lib/financial-health'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
-const CAT = 'wil-gezondheid'
+const CAT = 'wil.gezondheid'
 
 // ── Minimal DashboardData mock helper ────────────────────────────────────
 

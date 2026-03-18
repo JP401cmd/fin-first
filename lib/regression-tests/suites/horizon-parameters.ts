@@ -13,7 +13,7 @@ import {
 import { DEFAULT_RETURN, INFLATION, BOX3_DRAG } from '@/lib/constants'
 import { runSimulation, type SimResult } from '@/lib/fire-simulation'
 
-const CAT = 'horizon-parameters'
+const CAT = 'horizon.parameters'
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

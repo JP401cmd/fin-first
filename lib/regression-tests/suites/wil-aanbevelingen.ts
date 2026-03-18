@@ -24,7 +24,7 @@ import type { TestCase } from '../test-types'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 
-const CAT = 'wil-aanbevelingen'
+const CAT = 'wil.aanbevelingen'
 
 // ── Valid recommendation_type enum values ─────────────────────────────────
 const VALID_REC_TYPES = [

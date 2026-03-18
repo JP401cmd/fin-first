@@ -8,7 +8,7 @@ import type { CheckinSnapshot } from '@/app/api/checkin/save/route'
 import type { Aandachtspunt } from '@/app/api/checkin/aandachtspunten/route'
 import type { GesprekStarterData } from '@/app/api/checkin/gespreksstarters/route'
 
-const CAT = 'checkin-flow'
+const CAT = 'checkin.flow'
 
 /**
  * Regression tests for the Financiële Check-in system.

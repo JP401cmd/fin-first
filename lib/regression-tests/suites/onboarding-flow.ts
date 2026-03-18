@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-flow'
+const CAT = 'onboarding.flow'
 
 // ── Constants derived from onboarding page.tsx ──────────────────────────────
 

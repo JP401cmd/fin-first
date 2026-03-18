@@ -2,7 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThanOrEqual, assertLessThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-identity'
+const CAT = 'onboarding.identity'
 
 // ── IdentityData interface mirror (matches components/onboarding/onboarding-identity.tsx) ──
 

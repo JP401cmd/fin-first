@@ -5,7 +5,7 @@ import { buildDashboardLayout, GRID_TARGET_CELLS, type AutoDashboardAnswers, typ
 import { WIDGET_CATALOG } from '@/lib/widget-catalog'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
 
-const CAT = 'dashboard-builder'
+const CAT = 'widgets.builder'
 
 function countCells(prefs: { size: string }[]): number {
   return prefs.reduce((sum, p) => {

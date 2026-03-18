@@ -15,7 +15,7 @@ import {
   NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, BOX3_DRAG,
 } from '@/lib/constants'
 
-const CAT = 'kern-belasting'
+const CAT = 'kern.belasting'
 
 // ── Helper: minimal Asset stub ─────────────────────────────────────
 function makeAsset(overrides: Partial<Asset> & { asset_type: Asset['asset_type']; current_value: number }): Asset {

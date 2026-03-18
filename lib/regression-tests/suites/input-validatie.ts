@@ -4,7 +4,7 @@ import type { TestCase } from '../test-types'
 import { sanitizeForAI, sanitizeTransaction } from '@/lib/ai/sanitize'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 
-const CAT = 'security-input-validatie'
+const CAT = 'security.input-validatie'
 
 // ── SQL injection test strings ──────────────────────────────────────────
 const SQL_INJECTION_PAYLOADS = [

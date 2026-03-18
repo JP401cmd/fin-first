@@ -25,7 +25,7 @@ import {
 } from '@/lib/auto-dashboard-builder'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
 
-const CAT = 'dashboard-widgets'
+const CAT = 'widgets.systeem'
 
 // ── Helpers ───────────────────────────────────────────────────────────
 

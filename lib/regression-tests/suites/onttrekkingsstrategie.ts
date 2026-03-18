@@ -6,7 +6,7 @@ import {
   type WithdrawalStrategyConfig, type WithdrawalContext,
 } from '@/lib/withdrawal-strategy'
 
-const CAT = 'onttrekkingsstrategie'
+const CAT = 'horizon.onttrekkingsstrategie'
 
 function makeConfig(o?: Partial<WithdrawalStrategyConfig>): WithdrawalStrategyConfig {
   return { ...WITHDRAWAL_DEFAULTS, ...o }

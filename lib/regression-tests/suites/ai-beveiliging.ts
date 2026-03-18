@@ -4,7 +4,7 @@ import type { TestCase } from '../test-types'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 
-const CAT = 'ai-beveiliging'
+const CAT = 'security.ai-beveiliging'
 
 const tests: TestCase[] = [
   {

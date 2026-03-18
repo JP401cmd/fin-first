@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'navigatie'
+const CAT = 'cross-cutting.navigatie'
 
 // ── Navigation items from lib/navigation.ts ─────────────────────────────────
 

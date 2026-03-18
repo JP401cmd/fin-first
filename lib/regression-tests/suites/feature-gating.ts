@@ -43,7 +43,7 @@ import {
   WIDGET_FEATURE_MAP,
 } from '@/lib/widget-catalog'
 
-const CAT = 'identity-feature-gating'
+const CAT = 'identiteit.feature-gating'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

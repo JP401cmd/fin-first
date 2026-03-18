@@ -5,7 +5,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'kern-api-routes'
+const CAT = 'kern.api-routes'
 
 /**
  * Regression tests for Cash & Assets API routes.

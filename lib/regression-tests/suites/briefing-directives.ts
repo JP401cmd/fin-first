@@ -16,7 +16,7 @@ import {
   type FunctionalDirective,
 } from '@/lib/briefing/directives'
 
-const CAT = 'beheer-briefing'
+const CAT = 'beheer.briefing'
 
 // ── Fixtures ────────────────────────────────────────────────────
 

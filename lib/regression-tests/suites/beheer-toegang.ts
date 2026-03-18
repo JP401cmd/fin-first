@@ -11,7 +11,7 @@ import { PHASES } from '@/lib/feature-phases'
 import { TIERS } from '@/lib/tier-config'
 import { computeFeatureAccess, type FinancialInput } from '@/lib/compute-feature-access'
 
-const CAT = 'beheer-toegang'
+const CAT = 'beheer.toegang'
 
 const PHASE_IDS: PhaseId[] = ['recovery', 'stability', 'momentum', 'mastery']
 const TIER_IDS: CommercialTier[] = ['gratis', 'connected', 'ai']

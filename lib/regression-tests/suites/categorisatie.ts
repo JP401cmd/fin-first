@@ -4,7 +4,7 @@ import type { TestCase } from '../test-types'
 import { frequencyMatch, categorizeTransaction, type FrequencyMatch } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
 
-const CAT = 'categorisatie'
+const CAT = 'kern.categorisatie'
 
 function mockBudget(id: string, name: string, slug: string): Budget {
   return {

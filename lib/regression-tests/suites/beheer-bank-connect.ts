@@ -2,7 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'beheer-bank-connect'
+const CAT = 'beheer.bank-connect'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

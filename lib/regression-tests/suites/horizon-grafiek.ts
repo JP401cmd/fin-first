@@ -14,7 +14,7 @@ import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams } from '@/lib/fire-params'
 import { BOX3_DRAG } from '@/lib/constants'
 
-const CAT = 'horizon-projecties'
+const CAT = 'horizon.projecties'
 
 const INPUT: FinancialInput = {
   totalAssets: 500_000, totalDebts: 0, monthlyIncome: 5_000,

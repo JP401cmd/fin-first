@@ -2,7 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-extras'
+const CAT = 'onboarding.extras'
 
 // ── Type mirrors (match mini-form interfaces) ───────────────────────────────
 

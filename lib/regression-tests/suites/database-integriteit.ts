@@ -10,7 +10,7 @@ import type { Budget, BudgetAmount } from '@/lib/budget-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 
-const CAT = 'data-database-integriteit'
+const CAT = 'data.database-integriteit'
 
 // ── Valid type enums (from database CHECK constraints) ────────────────
 

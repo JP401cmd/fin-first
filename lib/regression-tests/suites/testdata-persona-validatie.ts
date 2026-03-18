@@ -11,7 +11,7 @@ import {
 } from '@/lib/test-personas'
 import { deleteAllUserData, seedPersonaData } from '@/lib/seed-persona'
 
-const CAT = 'data-testdata'
+const CAT = 'data.testdata'
 
 // ── Valid types (from database schema) ────────────────────────────────
 

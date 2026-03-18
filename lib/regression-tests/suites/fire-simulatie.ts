@@ -16,7 +16,7 @@ import { type FireStrategyConfig } from '@/lib/fire-strategy'
 import { NL_AOW_MONTHLY, BOX3_DRAG } from '@/lib/constants'
 import { NIBUD_CHILDREN_MONTHLY_COST, type LifeEvent } from '@/lib/horizon-data'
 
-const CAT = 'horizon-fire-simulatie'
+const CAT = 'horizon.simulatie'
 
 const STANDARD: {
   currentAge: number; endAge: number; currentPortfolio: number;

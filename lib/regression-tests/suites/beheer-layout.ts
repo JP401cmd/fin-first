@@ -2,7 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'beheer-layout'
+const CAT = 'beheer.layout'
 
 // ── Beheer nav tabs (all 18 from beheer-nav.tsx) ──────────────────────────────
 

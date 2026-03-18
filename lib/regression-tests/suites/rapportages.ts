@@ -5,7 +5,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'rapportages'
+const CAT = 'rapportages.generatie'
 
 /**
  * Regression tests for the Rapportages system.

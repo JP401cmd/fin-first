@@ -10,7 +10,7 @@ import {
 } from '@/lib/test-personas'
 import { BUDGET_TEMPLATES, type BudgetTemplate, type SeedBudget } from '@/lib/budget-templates'
 
-const CAT = 'beheer-testdata'
+const CAT = 'beheer.testdata'
 
 // ── Tests ───────────────────────────────────────────────────────
 

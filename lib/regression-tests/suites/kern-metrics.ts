@@ -9,7 +9,7 @@ import {
   computeFreedomTime, computeSavingsRate,
 } from '@/lib/core-metrics'
 
-const CAT = 'kern-berekeningen'
+const CAT = 'kern.berekeningen'
 
 const tests: TestCase[] = [
   // ── computeEffectiveExpenses ──────────────────────────────────────────

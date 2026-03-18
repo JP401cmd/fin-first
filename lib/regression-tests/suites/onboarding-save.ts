@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-save'
+const CAT = 'onboarding.save'
 
 // ── Zod schema constraints from save-own-data route ────────────────────────
 

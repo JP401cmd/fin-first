@@ -5,7 +5,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'security-privacy'
+const CAT = 'security.privacy'
 
 /**
  * Security regression tests for PII protection, data sanitization, and privacy compliance.

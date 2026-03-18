@@ -2,7 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'identiteit-delen-jaaroverzicht'
+const CAT = 'identiteit.delen-jaaroverzicht'
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 

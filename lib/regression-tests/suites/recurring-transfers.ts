@@ -27,7 +27,7 @@ import {
   CATEGORY_LABELS,
 } from '@/lib/recurring-detection'
 
-const CAT = 'kern-transactie-analyse'
+const CAT = 'kern.transactie-analyse'
 
 registerCategory({
   id: CAT,

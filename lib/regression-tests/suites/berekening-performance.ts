@@ -23,7 +23,7 @@ import { detectRecurringTransactions, type TransactionForDetection } from '@/lib
 import { buildDashboardLayout, type AutoDashboardAnswers } from '@/lib/auto-dashboard-builder'
 import { WIDGET_CATALOG } from '@/lib/widget-catalog'
 
-const CAT = 'performance-berekeningen'
+const CAT = 'performance.berekeningen'
 
 /**
  * Performance regression tests for computation-heavy functions.

@@ -5,7 +5,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'security-auth'
+const CAT = 'security.auth'
 
 /**
  * Security regression tests for authentication, authorization, and data isolation.

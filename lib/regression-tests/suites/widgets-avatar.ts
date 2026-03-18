@@ -3,7 +3,7 @@ import { assert, assertEqual, assertGreaterThan, assertIncludes } from '../asser
 import type { TestCase } from '../test-types'
 import { WIDGET_CATALOG, type WidgetModule, type WidgetSize } from '@/lib/widget-catalog'
 
-const CAT = 'widgets-avatar'
+const CAT = 'widgets.avatar'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 

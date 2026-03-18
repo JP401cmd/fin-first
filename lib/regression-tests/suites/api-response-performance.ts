@@ -10,7 +10,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'performance-api-response'
+const CAT = 'performance.api-response'
 
 /**
  * Performance regression tests for API response times.

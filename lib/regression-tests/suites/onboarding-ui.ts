@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-ui'
+const CAT = 'onboarding.ui'
 
 // ── Constants from step-progress.tsx ────────────────────────────────────────
 

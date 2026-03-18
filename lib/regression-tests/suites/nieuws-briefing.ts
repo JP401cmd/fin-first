@@ -6,7 +6,7 @@ import { CARD_SPAN } from '@/lib/briefing/types'
 import { validateBriefingLayout, optimizeRowFill } from '@/lib/briefing/validate-layout'
 import { validateHref, validateCardHrefs } from '@/lib/briefing/validate-hrefs'
 
-const CAT = 'berichten-ai-content'
+const CAT = 'berichten.ai-content'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

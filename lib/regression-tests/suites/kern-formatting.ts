@@ -6,7 +6,7 @@ import {
   calculateFreedomTime, formatFreedomTimeString,
 } from '@/lib/format'
 
-const CAT = 'kern-formatting'
+const CAT = 'kern.formatting'
 
 const tests: TestCase[] = [
   // ── formatCurrency ────────────────────────────────────────────────────

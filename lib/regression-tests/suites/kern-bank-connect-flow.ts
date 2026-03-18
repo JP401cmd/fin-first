@@ -20,7 +20,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'kern-bank-connect'
+const CAT = 'kern.bank-connect'
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 

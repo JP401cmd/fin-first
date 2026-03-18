@@ -23,9 +23,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'kern-api-routes'
-
-// Category 'kern-api-routes' is already registered in test-registry.ts
+const CAT = 'kern.budgets-api'
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -837,5 +835,12 @@ const tests: TestCase[] = [
 ]
 
 export function register(): void {
+  registerCategory({
+    id: CAT,
+    label: 'De Kern — Budgets API',
+    description: 'Budget API routes: delete, favorites sync, trends, variance, cashflow forecast',
+    icon: 'Wallet',
+    testCount: 0,
+  })
   registerTests(tests)
 }

@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-reset'
+const CAT = 'onboarding.reset'
 
 // ── Constants derived from api/onboarding/reset/route.ts & seed-persona.ts ──
 

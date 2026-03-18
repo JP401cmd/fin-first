@@ -2,7 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThan } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'beheer-informatief'
+const CAT = 'beheer.informatief'
 
 /** Fetch a URL without following redirects */
 async function fetchNoRedirect(path: string): Promise<Response> {

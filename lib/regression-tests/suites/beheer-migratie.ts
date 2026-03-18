@@ -2,7 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'beheer-migratie'
+const CAT = 'beheer.migratie'
 
 // ── Expected schema elements from the migration route ────────────────────────
 

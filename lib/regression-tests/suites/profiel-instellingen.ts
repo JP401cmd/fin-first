@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'profiel-instellingen'
+const CAT = 'identiteit.profiel-instellingen'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

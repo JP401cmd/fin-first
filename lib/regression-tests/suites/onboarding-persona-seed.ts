@@ -3,7 +3,7 @@ import { assert, assertEqual, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
 
-const CAT = 'onboarding-persona-seed'
+const CAT = 'onboarding.persona-seed'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 

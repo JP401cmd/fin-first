@@ -2,7 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThan } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'beheer-ai'
+const CAT = 'beheer.ai'
 
 // ── Known providers and their settings fields ─────────────────────────────────
 

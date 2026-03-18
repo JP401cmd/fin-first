@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-preferences'
+const CAT = 'onboarding.preferences'
 
 // ── Mirror of constants from onboarding-preferences.tsx ─────────────────────
 

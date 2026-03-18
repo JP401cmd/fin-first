@@ -23,7 +23,7 @@ import type { TestCase } from '../test-types'
 import type { Budget } from '@/lib/budget-data'
 import { BUDGET_SLUGS } from '@/lib/budget-data'
 
-const CAT = 'kern-budget-crud'
+const CAT = 'kern.budget-crud'
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 

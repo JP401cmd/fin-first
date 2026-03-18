@@ -2,7 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'onboarding-budgets'
+const CAT = 'onboarding.budgets'
 
 // ── Mirror of PROFILE_TEMPLATES from onboarding-budgets.tsx ─────────────────
 

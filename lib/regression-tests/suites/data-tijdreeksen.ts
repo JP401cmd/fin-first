@@ -5,7 +5,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 
-const CAT = 'data-tijdreeksen'
+const CAT = 'data.tijdreeksen'
 
 /**
  * Regression tests for time series data consistency:
