@@ -262,6 +262,11 @@ export async function loadAllTests(): Promise<void> {
     const toegangMod = await import('@/lib/regression-tests/suites/beheer-toegang')
     toegangMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const aowMod = await import('@/lib/regression-tests/suites/aow-leeftijd')
+    aowMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
