@@ -15757,3 +15757,79 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#253)
 - 28 regression tests added
+
+## Session 2026-03-18 - Features #254, #255
+
+### Feature #254: Test: Onboarding flow - PASSING
+- Created lib/regression-tests/suites/onboarding-api-flow.ts with 12 tests
+- Registered under category 'Onboarding — API Flow' (onboarding-api-flow)
+- Tests cover all 7 feature steps:
+  - POST /api/onboarding/seed: auth guard, persona key validation, NDJSON streaming, profile flags
+  - POST /api/onboarding/save-own-data: auth guard, Zod schema validation, profile+FIRE params
+  - POST /api/onboarding/save-own-data: budget hierarchy creation, parent limit = sum children
+  - POST /api/onboarding/save-own-data: optional bank/asset/debt arrays with type-specific fields
+  - POST /api/onboarding/save-own-data: idempotency check (alreadyCompleted)
+  - POST /api/onboarding/save-own-data: default AOW life event seeding
+  - POST /api/onboarding/reset: complete wipe + profile reset to defaults
+  - POST /api/onboarding/suggest-budgets: AI budget suggestions, 24 child slugs, token usage
+  - Sovereignty level determination after onboarding
+  - Dashboard widget display based on data + sovereignty level
+  - Category registration verification
+
+### Feature #255: Test: Bank connectie flow - PASSING
+- Created lib/regression-tests/suites/bank-connectie-flow.ts with 13 tests
+- Registered under category 'Onboarding — Bank Connectie' (onboarding-bank-connectie)
+- Tests cover all 7 feature steps:
+  - POST /api/bank-connect/auth-link: auth, feature gate, provider_id, pending connection, state encoding
+  - GET /api/bank-connect/callback: OAuth code exchange, token storage, account creation, cash-as-asset
+  - GET /api/bank-connect/callback: IBAN matching, legacy backfill, re-authorization
+  - POST /api/bank-connect/sync: auth, deduplication (import_hash), batch insert (50), rate limit (10/day)
+  - POST /api/bank-connect/sync: auto-categorization, sync cursor, sync log
+  - POST /api/bank-connect/sync: token refresh (<5min buffer), expired status on failure
+  - GET /api/bank-connect/status: TrueLayer enabled check
+  - GET /api/bank-connect/providers: sandbox/production, mapped response
+  - POST /api/bank-connect/disconnect: soft disconnect (is_active=false), data preservation
+  - POST /api/bank-connect/balances: balance sync to bank_account + linked asset
+  - Auth consistency: all 7 endpoints verified 401 for unauthenticated requests
+- Zero TypeScript errors in new files (3 pre-existing in other files)
+- All endpoints confirmed returning 401 for unauthenticated requests
+- Commit: aaa706d2
+
+### Current Status
+- 2 features completed this session (#254, #255)
+- 25 total regression tests across both files
+
+## Session 2026-03-18 - Features #251, #252
+
+### Feature #251: Test: Database constraints - PASSING
+- Created database-integriteit.ts with 30 tests under Data - Database Integriteit
+- FK relations, NOT NULL, cascade deletes, data consistency, unique constraints, CHECK constraints
+- Commit: c9b33967
+
+### Feature #252: Test: Testdata persona validatie - PASSING
+- Created testdata-persona-validatie.ts with 29 tests under Data - Testdata
+- All 6 personas validated, financial consistency, metadata bug #226 regression, idempotency
+- 59 total regression tests across both files
+- Zero TypeScript errors, Commit: c9b33967
+
+## Session 2026-03-18 - Feature #257
+
+### Feature #257: Test: Error handling & edge cases - PASSING
+- Created lib/regression-tests/suites/error-handling.ts with 30 tests
+- Registered under category 'Cross-cutting - Error Handling' (error-handling)
+- Tests cover all 7 feature steps:
+  - API error responses (10 tests): 401 auth guards on holdings/widgets/parameters/checkin/daily-expense-rate, 400 invalid payloads, export type validation, error body format
+  - Graceful degradation (5 tests): dashboard/core/horizon/will no-crash (no 5xx), holdings graceful response
+  - Empty state handling (5 tests): budget-trends/cashflow-forecast/snapshots/guide-progress auth guard, FIRE sim edge cases (0 savings, negative expenses)
+  - Concurrent requests (3 tests): 5x parallel PUT parameters, 5x parallel PUT widgets, 8x parallel GET mixed endpoints
+  - Timeout handling (3 tests): API within 10s limit, AbortController cancellation, large FIRE sim range (100yr)
+  - Connection failure (4 tests): JSON-only responses, no leaked internals/SQL/credentials, unknown route handling, malformed JSON body
+  - Additional edge cases (2 tests): empty PUT body, 404 page no-crash
+- Zero TypeScript errors in new file (3 pre-existing in other files)
+- Auth rate limit prevented browser testing (known persistent Supabase issue)
+- All API endpoints verified via curl: correct 401 responses, JSON content type
+- Commit: 6dbbd9e3
+
+### Current Status
+- 1 feature completed this session (#257)
+- 30 regression tests added
