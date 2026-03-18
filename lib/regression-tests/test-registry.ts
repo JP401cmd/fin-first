@@ -140,6 +140,14 @@ registerCategory({
   testCount: 0,
 })
 
+registerCategory({
+  id: 'navigatie',
+  label: 'Cross-cutting — Navigatie',
+  description: 'Navigatie, redirects, routing, admin-beveiliging',
+  icon: 'Navigation',
+  testCount: 0,
+})
+
 // ── Dynamic test loader ─────────────────────────────────────────────────────
 // This function dynamically imports all test modules and registers their tests.
 
@@ -187,6 +195,11 @@ export async function loadAllTests(): Promise<void> {
   try {
     const dashMod = await import('@/lib/regression-tests/suites/dashboard-builder')
     dashMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const navMod = await import('@/lib/regression-tests/suites/navigatie')
+    navMod.register()
   } catch { /* module not found yet */ }
 }
 

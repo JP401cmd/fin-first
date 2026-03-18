@@ -5,7 +5,7 @@ import {
   Play, ChevronDown, ChevronRight, CheckCircle2, XCircle, AlertTriangle,
   SkipForward, Clock, Download, RotateCcw, Loader2, Activity,
   TrendingUp, LineChart, ArrowDownToLine, Calculator, LayoutGrid,
-  Tag, Shield, Wand2,
+  Tag, Shield, Wand2, Navigation,
 } from 'lucide-react'
 import type { TestReport, TestResult, TestCategory } from '@/lib/regression-tests/test-types'
 import { loadAllTests, getCategories } from '@/lib/regression-tests/test-registry'
@@ -17,7 +17,7 @@ const STORAGE_KEY = 'fintwo-regression-report'
 
 const ICON_MAP: Record<string, React.ElementType> = {
   TrendingUp, LineChart, ArrowDownToLine, Calculator, LayoutGrid,
-  Tag, Shield, Wand2, Activity,
+  Tag, Shield, Wand2, Activity, Navigation,
 }
 
 // ── Status helpers ──────────────────────────────────────────────────────────
