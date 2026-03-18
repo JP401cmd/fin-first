@@ -21,6 +21,12 @@ import {
   kinderbijslagPerMaand,
 } from '@/lib/horizon-data'
 import { type FireEndStrategy, type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
+import {
+  applyWithdrawalStrategy,
+  WITHDRAWAL_DEFAULTS,
+  type WithdrawalStrategyConfig,
+  type WithdrawalContext,
+} from '@/lib/withdrawal-strategy'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -86,6 +92,7 @@ export function runSimulation(
   inflation: number,        // decimal, e.g. 0.02
   cashflows: SimCashflow[],
   strategyConfig?: FireStrategyConfig,
+  withdrawalStrategy?: WithdrawalStrategyConfig,
 ): SimResult {
   // Resolve strategy (default = deplete@endAge for backward compat)
   const cfg = strategyConfig ?? DEFAULT_FIRE_STRATEGY
@@ -138,19 +145,32 @@ export function runSimulation(
     return cf.direction === 'income' ? nominal : -nominal
   }
 
+  // Resolve withdrawal strategy — default to static (identical to old hardcoded logic)
+  const wsConfig = withdrawalStrategy ?? WITHDRAWAL_DEFAULTS
+
   /**
    * Simulate decumulation from startPortfolio at startAge to endAge.
    * portfolio is NOT clamped to 0 (for binary search convergence).
    * generateRows=true produces SimRows with endPortfolio clamped >= 0 for display.
+   *
+   * useWithdrawalStrategy: when true, applies the configured withdrawal strategy.
+   * When false (binary search), always uses 'static' to keep FIRE-age calculation
+   * conservative and deterministic — dynamic strategies only affect the visualisation.
    */
   function simulateDecumulation(
     startPortfolio: number,
     startAge: number,
     generateRows: boolean,
     simEndAge: number = effectiveEndAge,
+    useWithdrawalStrategy: boolean = false,
   ): { rows: SimRow[]; endPortfolio: number } {
     const rows: SimRow[] = []
     let portfolio = startPortfolio
+    let previousWithdrawal = 0
+    const decumStartPortfolio = startPortfolio // Portfolio at FIRE age, for guardrails ratio
+
+    // Determine which config to use: dynamic for visualisation, static for binary search
+    const activeConfig = useWithdrawalStrategy ? wsConfig : WITHDRAWAL_DEFAULTS
 
     for (let age = startAge; age < simEndAge; age++) {
       const startPf = portfolio
@@ -172,7 +192,20 @@ export function runSimulation(
         recurringNet += recurringMonthly(cf, age) * 12
       }
 
-      const withdrawal = Math.max(0, expensesThisYear - recurringNet)
+      // Build withdrawal context and apply strategy
+      const wCtx: WithdrawalContext = {
+        baseExpenses: expensesThisYear,
+        recurringIncome: recurringNet,
+        currentPortfolio: portfolio,
+        startPortfolio: decumStartPortfolio,
+        previousWithdrawal,
+        yearReturn: portReturn,
+        yearsIntoRetirement: yearsIntoPension,
+        currentAge: age,
+        endAge: simEndAge,
+      }
+      const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
+
       const growth = portfolio * portReturn
       const rawEnd = portfolio + growth - withdrawal
 
@@ -189,6 +222,7 @@ export function runSimulation(
         })
       }
 
+      previousWithdrawal = withdrawal
       portfolio = rawEnd // unclamped for binary search convergence
     }
 
@@ -314,7 +348,9 @@ export function runSimulation(
     fractionalFireAge = (computedFireAge - 1) + Math.max(0, Math.min(1, t))
   }
 
-  const { rows: decRows } = simulateDecumulation(requiredFirePortfolioExact, computedFireAge, true, displayEndAge)
+  // Use withdrawal strategy for visualisation rows (dynamic strategies apply here)
+  // Binary search (requiredAt) always uses static — see comment in simulateDecumulation
+  const { rows: decRows } = simulateDecumulation(requiredFirePortfolioExact, computedFireAge, true, displayEndAge, true)
 
   const implicitWithdrawalRate = requiredFirePortfolio > 0
     ? yearlyExpenses / requiredFirePortfolio

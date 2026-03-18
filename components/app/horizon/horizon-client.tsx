@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
@@ -25,6 +26,7 @@ import {
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
+import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { Debt } from '@/lib/debt-data'
@@ -97,6 +99,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [householdInput, setHouseholdInput] = useState<FinancialInput | null>(null)
   const [householdOverlays, setHouseholdOverlays] = useState<HouseholdPartnerOverlay[] | null>(null)
   const [fireParams, setFireParams] = useState<FireParams>(initialData.fireParams)
+  const [wsConfig, setWsConfig] = useState<{ strategy: WithdrawalStrategyType; floor: number; ceiling: number } | null>(
+    initialData?.withdrawalStrategy
+      ? { strategy: initialData.withdrawalStrategy.strategy, floor: initialData.withdrawalStrategy.guardrailFloor, ceiling: initialData.withdrawalStrategy.guardrailCeiling }
+      : null,
+  )
+  const [withdrawalStrategyConfig, setWithdrawalStrategyConfig] = useState<WithdrawalStrategyConfig>(
+    initialData?.withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
+  )
   const fireSwr = fireParams.effectiveSwr
   const [input, setInput] = useState<FinancialInput | null>(initialData.effectiveInput)
   const [fire, setFire] = useState<FireProjection | null>(() =>
@@ -199,7 +209,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   const { result: simResult, cashflows: simCashflows } = useHorizonFireSim(
     input
-      ? { horizonInput: input, lifeEvents: events, fireStrategy, grossReturn: fireParams.grossReturn, inflation: fireParams.inflationRate }
+      ? { horizonInput: input, lifeEvents: events, fireStrategy, withdrawalStrategy: withdrawalStrategyConfig, grossReturn: fireParams.grossReturn, inflation: fireParams.inflationRate }
       : null,
   )
 
@@ -356,6 +366,26 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         // Non-critical — continue without dividend data
       }
       setMonthlyDividendIncome(dividendMonthly)
+
+      // Load withdrawal strategy config (refreshes server-side initial data)
+      try {
+        const wsRes = await fetch('/api/withdrawal-strategy')
+        if (wsRes.ok) {
+          const wsData = await wsRes.json()
+          setWsConfig({
+            strategy: wsData.withdrawal_strategy ?? 'static',
+            floor: wsData.guardrail_floor ?? 0.80,
+            ceiling: wsData.guardrail_ceiling ?? 1.20,
+          })
+          setWithdrawalStrategyConfig({
+            strategy: wsData.withdrawal_strategy ?? WITHDRAWAL_DEFAULTS.strategy,
+            guardrailFloor: wsData.guardrail_floor ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
+            guardrailCeiling: wsData.guardrail_ceiling ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
+            guardrailCutStep: wsData.guardrail_cut_step ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
+            guardrailRaiseStep: wsData.guardrail_raise_step ?? WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
+          })
+        }
+      } catch { /* defaults */ }
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
@@ -2313,9 +2343,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             onClick={() => setActiveModal('withdrawal')}
             icon={<Landmark className="h-5 w-5 text-horizon-600" />}
             title="Opnamestrategie"
-            value="4 strategieen"
+            value={wsConfig ? ({ static: 'Vast (SWR)', guardrails: 'Guardrails', vpw: 'VPW', bucket: 'Bucket' } as Record<WithdrawalStrategyType, string>)[wsConfig.strategy] + (wsConfig.strategy === 'guardrails' ? ` ${Math.round(wsConfig.floor * 100)}–${Math.round(wsConfig.ceiling * 100)}%` : '') : '4 strategieën'}
             subtitle="hoe je vermogen opneemt"
           />
+          <div className="mt-1 flex justify-end">
+            <Link href="/identity/instellingen#onttrekking" className="text-[11px] text-horizon-600 hover:text-horizon-700 underline underline-offset-2">
+              Strategie wijzigen →
+            </Link>
+          </div>
         </FeatureGate>
         <FeatureGate featureId="gezondheids_score" fallback="hidden">
           <button

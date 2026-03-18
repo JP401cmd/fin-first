@@ -17,6 +17,7 @@ import { ColorPickerCard } from '@/components/app/color-picker-card'
 import { Palette, RotateCcw, Type } from 'lucide-react'
 import { type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
+import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 
 import { formatCurrency } from '@/lib/format'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
@@ -147,6 +148,15 @@ export default function InstellingenPage() {
   const [fireLegacyAmount, setFireLegacyAmount] = useState<string>('')
   const [fireSaving, setFireSaving] = useState(false)
   const [fireMessage, setFireMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // ─ Withdrawal strategy ─
+  const [withdrawalStrategy, setWithdrawalStrategy] = useState<WithdrawalStrategyType>('static')
+  const [guardrailFloor, setGuardrailFloor] = useState<string>('80')
+  const [guardrailCeiling, setGuardrailCeiling] = useState<string>('120')
+  const [guardrailCutStep, setGuardrailCutStep] = useState<string>('10')
+  const [guardrailRaiseStep, setGuardrailRaiseStep] = useState<string>('10')
+  const [wsSaving, setWsSaving] = useState(false)
+  const [wsMessage, setWsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // ─ Section D: Weergave ─
   const { fontTheme, setFontTheme } = useFontTheme()
@@ -297,6 +307,20 @@ export default function InstellingenPage() {
       } catch {
         // No household or error — leave hidden
       }
+
+      // Withdrawal strategy
+      try {
+        const wsRes = await fetch('/api/withdrawal-strategy')
+        if (wsRes.ok) {
+          const wsData = await wsRes.json()
+          setWithdrawalStrategy(wsData.withdrawal_strategy ?? 'static')
+          setGuardrailFloor(String(Math.round((wsData.guardrail_floor ?? 0.80) * 100)))
+          setGuardrailCeiling(String(Math.round((wsData.guardrail_ceiling ?? 1.20) * 100)))
+          setGuardrailCutStep(String(Math.round((wsData.guardrail_cut_step ?? 0.10) * 100)))
+          setGuardrailRaiseStep(String(Math.round((wsData.guardrail_raise_step ?? 0.10) * 100)))
+        }
+      } catch { /* defaults are fine */ }
+
       setHouseholdPrivacyLoading(false)
     }
     load()
@@ -428,6 +452,34 @@ export default function InstellingenPage() {
     }
     setFireSaving(false)
   }, [supabase, retirementMethod, retirementCustomAmount, fireEndStrategy, fireEndAge, fireLegacyAmount])
+
+  const saveWithdrawalStrategy = useCallback(async () => {
+    setWsSaving(true)
+    setWsMessage(null)
+    try {
+      const res = await fetch('/api/withdrawal-strategy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          withdrawal_strategy: withdrawalStrategy,
+          guardrail_floor: Number(guardrailFloor) / 100,
+          guardrail_ceiling: Number(guardrailCeiling) / 100,
+          guardrail_cut_step: Number(guardrailCutStep) / 100,
+          guardrail_raise_step: Number(guardrailRaiseStep) / 100,
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setWsMessage({ type: 'error', text: d.error ?? 'Opslaan mislukt' })
+      } else {
+        setWsMessage({ type: 'success', text: 'Onttrekkingsstrategie opgeslagen' })
+        setTimeout(() => setWsMessage(null), 3000)
+      }
+    } catch {
+      setWsMessage({ type: 'error', text: 'Netwerkfout — probeer opnieuw' })
+    }
+    setWsSaving(false)
+  }, [withdrawalStrategy, guardrailFloor, guardrailCeiling, guardrailCutStep, guardrailRaiseStep])
 
   // ─ Section F: Privacy & AI handler ────────────────────────────────────────
   const toggleAiEnabled = useCallback(async (enabled: boolean) => {
@@ -1086,6 +1138,134 @@ export default function InstellingenPage() {
               {fireMessage.text}
             </span>
           )}
+        </div>
+
+        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
+
+        {/* Onttrekkingsstrategie */}
+        <div id="onttrekking" className="mb-6">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Onttrekkingsstrategie</p>
+          <p className="mb-4 font-sans text-sm text-[var(--ink-3)]">
+            Hoe neem je vermogen op na FIRE? Dit bepaalt hoe je jaarlijkse opname reageert op marktschommelingen.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {([
+              {
+                value: 'static' as WithdrawalStrategyType,
+                label: 'Vast (SWR)',
+                subtitle: 'Vaste jaarlijkse opname op basis van je SWR — de klassieke 4%-regel.',
+              },
+              {
+                value: 'guardrails' as WithdrawalStrategyType,
+                label: 'Guardrails',
+                subtitle: 'Guyton-Klinger: verlaag of verhoog je opname binnen grenzen, afhankelijk van portfolioprestatie.',
+              },
+              {
+                value: 'vpw' as WithdrawalStrategyType,
+                label: 'VPW',
+                subtitle: 'Variable Percentage Withdrawal: elk jaar herberekend op basis van levensverwachting en vermogen.',
+              },
+              {
+                value: 'bucket' as WithdrawalStrategyType,
+                label: 'Bucket',
+                subtitle: 'Drie-emmer strategie: cash (1-2 jaar), obligaties (3-5 jaar), groei (6+ jaar). Hervulling vanuit groei-emmer.',
+              },
+            ]).map(opt => {
+              const isSelected = withdrawalStrategy === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setWithdrawalStrategy(opt.value)}
+                  className={`rounded-xl border-2 p-4 text-left transition-all ${
+                    isSelected ? 'border-zinc-900 bg-zinc-50' : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
+                  }`}
+                >
+                  <span className={`text-sm font-semibold ${isSelected ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
+                    {opt.label}
+                  </span>
+                  <p className="mt-1 text-xs text-[var(--ink-3)]">{opt.subtitle}</p>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Guardrails extra velden */}
+          {withdrawalStrategy === 'guardrails' && (
+            <div className="mt-4 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4 space-y-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Guardrail parameters</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Floor (%)</label>
+                  <input
+                    type="number" min={50} max={200} step={1} value={guardrailFloor}
+                    onChange={e => setGuardrailFloor(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-white px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">Minimale opname als % van basis</p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Ceiling (%)</label>
+                  <input
+                    type="number" min={50} max={200} step={1} value={guardrailCeiling}
+                    onChange={e => setGuardrailCeiling(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-white px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">Maximale opname als % van basis</p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Verlagingsstap (%)</label>
+                  <input
+                    type="number" min={1} max={50} step={1} value={guardrailCutStep}
+                    onChange={e => setGuardrailCutStep(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-white px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">Stap omlaag bij slechte returns</p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Verhogingsstap (%)</label>
+                  <input
+                    type="number" min={1} max={50} step={1} value={guardrailRaiseStep}
+                    onChange={e => setGuardrailRaiseStep(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-white px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">Stap omhoog bij goede returns</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* VPW info */}
+          {withdrawalStrategy === 'vpw' && (
+            <div className="mt-4 rounded-xl border border-dashed border-horizon-300 bg-horizon-50/50 p-4">
+              <p className="font-sans text-sm text-horizon-700">
+                <strong>Variable Percentage Withdrawal</strong> herberekent elk jaar je opnamepercentage op basis van je resterende levensverwachting en actuele portfoliowaarde. Je neemt relatief meer op naarmate je ouder wordt, waardoor je vermogen efficiënter wordt benut.
+              </p>
+            </div>
+          )}
+
+          {/* Bucket info */}
+          {withdrawalStrategy === 'bucket' && (
+            <div className="mt-4 rounded-xl border border-dashed border-horizon-300 bg-horizon-50/50 p-4">
+              <p className="font-sans text-sm text-horizon-700">
+                <strong>Bucket-strategie</strong> verdeelt je vermogen over drie emmers: <strong>cash</strong> (1-2 jaar levenskosten), <strong>obligaties</strong> (3-5 jaar), en <strong>groei</strong> (aandelen, 6+ jaar). Je leeft van de cash-emmer en vult die periodiek aan vanuit de groei-emmer bij gunstige markten.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              type="button" onClick={saveWithdrawalStrategy} disabled={wsSaving}
+              className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {wsSaving ? 'Opslaan...' : 'Strategie opslaan'}
+            </button>
+            {wsMessage && (
+              <span className={`text-sm ${wsMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                {wsMessage.text}
+              </span>
+            )}
+          </div>
         </div>
           </div>
         )}

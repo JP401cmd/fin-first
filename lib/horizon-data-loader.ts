@@ -21,6 +21,7 @@ import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementEx
 import type { Debt } from '@/lib/debt-data'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
+import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -38,6 +39,7 @@ export interface HorizonPageData {
   actions: Action[]
   debts: Debt[]
   fireStrategy: FireStrategyConfig
+  withdrawalStrategy: WithdrawalStrategyConfig
   fireParams: FireParams
   resilienceSnapshots: SnapshotForTrend[]
   snapshotResilience: number | null
@@ -102,7 +104,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
@@ -197,6 +199,9 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   // FIRE strategy from profile
   const fireStrategy = parseFireStrategy(profileResult.data ?? {})
 
+  // Withdrawal strategy from profile (static/guardrails/vpw/bucket)
+  const withdrawalStrategy = resolveWithdrawalStrategy(profileResult.data ?? {})
+
   // Berekeningsparameters uit profiel
   const fireParams = resolveFireParams(profileResult.data ?? {})
 
@@ -233,6 +238,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     actions,
     debts,
     fireStrategy,
+    withdrawalStrategy,
     fireParams,
     resilienceSnapshots: allSnapshots,
     snapshotResilience,

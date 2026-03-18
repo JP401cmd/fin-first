@@ -25,6 +25,7 @@ import {
   type ReturnModel,
 } from '@/lib/fire-simulation'
 import { type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
+import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 
 export interface HorizonFireSimResult {
   result: SimResult | null
@@ -37,12 +38,13 @@ interface HorizonFireSimInput {
   horizonInput: FinancialInput | null
   lifeEvents: LifeEvent[]
   fireStrategy?: FireStrategyConfig
+  withdrawalStrategy?: WithdrawalStrategyConfig  // default: static (identical to old logic)
   grossReturn?: number   // default: DEFAULT_RETURN
   inflation?: number     // default: INFLATION
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, grossReturn: grossReturnParam, inflation: inflationParam } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
   const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
@@ -86,10 +88,11 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       inflationParam ?? INFLATION,
       cashflows,
       strategyForSim,
+      withdrawalStrategy,
     )
 
     return { result, cashflows }
-  }, [horizonInput, lifeEvents, fireStrategy, grossReturnParam, inflationParam])
+  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
