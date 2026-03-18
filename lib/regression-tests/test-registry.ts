@@ -419,6 +419,11 @@ export async function loadAllTests(): Promise<void> {
   } catch { /* module not found yet */ }
 
   try {
+    const obPersonaSeedMod = await import('@/lib/regression-tests/suites/onboarding-persona-seed')
+    obPersonaSeedMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
     const kernFmtMod = await import('@/lib/regression-tests/suites/kern-formatting')
     kernFmtMod.register()
   } catch { /* module not found yet */ }
