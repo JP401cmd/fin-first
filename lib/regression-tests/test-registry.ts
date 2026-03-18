@@ -204,6 +204,14 @@ registerCategory({
   testCount: 0,
 })
 
+registerCategory({
+  id: 'onboarding-save',
+  label: 'Onboarding — Save & Success',
+  description: 'Save flow, animatie, voortgangsbalk, success scherm, fase activatie',
+  icon: 'Save',
+  testCount: 0,
+})
+
 // ── Dynamic test loader ─────────────────────────────────────────────────────
 // This function dynamically imports all test modules and registers their tests.
 
@@ -366,6 +374,11 @@ export async function loadAllTests(): Promise<void> {
   try {
     const obResetMod = await import('@/lib/regression-tests/suites/onboarding-reset')
     obResetMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obSaveMod = await import('@/lib/regression-tests/suites/onboarding-save')
+    obSaveMod.register()
   } catch { /* module not found yet */ }
 }
 
