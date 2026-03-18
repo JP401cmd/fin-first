@@ -148,6 +148,14 @@ registerCategory({
   testCount: 0,
 })
 
+registerCategory({
+  id: 'sovereignty-levels',
+  label: 'Identiteit — Sovereignty Levels',
+  description: 'Sovereignty level berekening, fase transitie, feature gating',
+  icon: 'Shield',
+  testCount: 0,
+})
+
 // ── Dynamic test loader ─────────────────────────────────────────────────────
 // This function dynamically imports all test modules and registers their tests.
 
@@ -210,6 +218,21 @@ export async function loadAllTests(): Promise<void> {
   try {
     const delenMod = await import('@/lib/regression-tests/suites/delen-jaaroverzicht')
     delenMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const sovMod = await import('@/lib/regression-tests/suites/sovereignty-levels')
+    sovMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const beheerAiMod = await import('@/lib/regression-tests/suites/beheer-ai')
+    beheerAiMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const idNavMod = await import('@/lib/regression-tests/suites/identity-navigatie')
+    idNavMod.register()
   } catch { /* module not found yet */ }
 }
 
