@@ -529,6 +529,11 @@ export async function loadAllTests(): Promise<void> {
   } catch { /* module not found yet */ }
 
   try {
+    const perfCalcMod = await import('@/lib/regression-tests/suites/berekening-performance')
+    perfCalcMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
     const securityPrivacyMod = await import('@/lib/regression-tests/suites/security-privacy')
     securityPrivacyMod.register()
   } catch { /* module not found yet */ }
@@ -541,6 +546,11 @@ export async function loadAllTests(): Promise<void> {
   try {
     const dataTijdreeksenMod = await import('@/lib/regression-tests/suites/data-tijdreeksen')
     dataTijdreeksenMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const errorHandlingMod = await import('@/lib/regression-tests/suites/error-handling')
+    errorHandlingMod.register()
   } catch { /* module not found yet */ }
 }
 
