@@ -38,7 +38,7 @@ export const DISCOVER_ITEMS: DiscoverItem[] = [
   { id: 'monte_carlo',          label: 'Monte Carlo Simulaties', description: '1.000 simulaties draaien',                href: '/horizon',      teaser: 'Wist je dat je Monte Carlo simulaties kunt draaien?',         module: 'horizon', minLevel: 3 },
   { id: 'levensgebeurtenissen', label: 'Levensgebeurtenissen',   description: 'Plan life events en zie impact',          href: '/horizon',      teaser: 'Wist je dat je levensgebeurtenissen kunt plannen?',           module: 'horizon', minLevel: 1 },
   { id: 'withdrawal_strategie', label: 'Opnamestrategie',        description: 'Hoe je vermogen opneemt bij FIRE',        href: '/horizon',      teaser: 'Wist je dat je verschillende opnamestrategieen kunt vergelijken?', module: 'horizon', minLevel: 5 },
-  { id: 'veerkracht_score',     label: 'Veerkracht Analyse',     description: 'Resilience score 0-100',                  href: '/horizon',      teaser: 'Wist je dat je een veerkrachtscore hebt?',                    module: 'horizon', minLevel: 1 },
+  { id: 'gezondheids_score',    label: 'Financiële Gezondheid',  description: 'Gezondheidsscore 0-100',                  href: '/horizon',      teaser: 'Wist je dat je een financiële gezondheidsscore hebt?',        module: 'horizon', minLevel: 1 },
   { id: 'vermogensprojectie_chart', label: 'Vermogensprojectie', description: '30-jaar netto vermogensgroei grafiek',    href: '/horizon',      teaser: 'Wist je dat je je vermogensgroei 30 jaar vooruit kunt zien?', module: 'horizon', minLevel: 1 },
 ]
 

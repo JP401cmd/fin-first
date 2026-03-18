@@ -22,7 +22,7 @@ const FEATURE_PAGE_MAP: Record<string, string> = {
   monte_carlo: '/horizon',
   levensgebeurtenissen: '/horizon',
   withdrawal_strategie: '/horizon',
-  veerkracht_score: '/horizon',
+  gezondheids_score: '/horizon',
   vermogensprojectie_chart: '/horizon',
   fire_scenario_analyse: '/horizon',
   fire_geavanceerde_params: '/horizon',

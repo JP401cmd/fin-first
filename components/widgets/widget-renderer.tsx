@@ -48,8 +48,8 @@ const VasteLastenWidget = dynamic(() =>
 const JouwPadWidgetWrapper = dynamic(() =>
   import('./jouw-pad-widget-wrapper').then(m => ({ default: m.JouwPadWidgetWrapper }))
 )
-const VeerkrachtScoreWidget = dynamic(() =>
-  import('./veerkracht-score-widget').then(m => ({ default: m.VeerkrachtScoreWidget }))
+const GezondheidScoreWidget = dynamic(() =>
+  import('./gezondheids-score-widget').then(m => ({ default: m.GezondheidScoreWidget }))
 )
 const BelastingBox3Widget = dynamic(() =>
   import('./belasting-box3-widget').then(m => ({ default: m.BelastingBox3Widget }))
@@ -519,8 +519,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <VasteLastenWidget size={size} data={data} href={href} />
     case 'jouw_pad':
       return <JouwPadWidgetWrapper size={size} data={data} href={href} />
-    case 'veerkracht_score':
-      return <VeerkrachtScoreWidget size={size} data={data} href={href} />
+    case 'gezondheids_score':
+      return <GezondheidScoreWidget size={size} data={data} href={href} />
     case 'belasting_box3':
       return <BelastingBox3Widget size={size} data={data} href={href} />
     case 'nibud_benchmark':

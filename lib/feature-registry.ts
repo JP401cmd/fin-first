@@ -106,14 +106,14 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
   {
     id: 'simulaties',
     label: 'Simulaties & Analyse',
-    description: 'Monte Carlo simulaties, scenario analyse, veerkracht score, backtesting',
+    description: 'Monte Carlo simulaties, scenario analyse, financiële gezondheid, backtesting',
     module: 'horizon',
     requiredTier: 'gratis',
     defaultPhase: 'momentum',
-    widgets: ['monte_carlo', 'veerkracht_score', 'backtesting_score'],
+    widgets: ['monte_carlo', 'gezondheids_score', 'backtesting_score'],
     legacyIds: [
       'widget_monte_carlo', 'monte_carlo',
-      'fire_scenario_analyse', 'veerkracht_score',
+      'fire_scenario_analyse', 'gezondheids_score', 'veerkracht_score',
       'widget_backtesting_score',
     ],
   },

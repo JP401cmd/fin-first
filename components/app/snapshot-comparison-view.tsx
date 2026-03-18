@@ -124,7 +124,7 @@ const metrics: MetricConfig[] = [
   },
   {
     key: 'resilience_score',
-    label: 'Veerkracht-score',
+    label: 'Gezondheids-score',
     getValue: (s) => s.resilience_score ?? null,
     format: (v) => `${Math.round(v)}/100`,
     formatDelta: (d) => `${d > 0 ? '+' : ''}${Math.round(d)}`,

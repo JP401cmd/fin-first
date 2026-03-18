@@ -141,7 +141,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
           {resilience && (
             <section>
               <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                Veerkrachtscore
+                Gezondheidsscore
               </h2>
               <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
                 <div className="flex flex-col items-center gap-6 sm:flex-row">

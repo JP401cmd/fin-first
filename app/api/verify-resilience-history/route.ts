@@ -211,14 +211,14 @@ export async function GET() {
 
   // ─── Test 10: FeatureGate wraps resilience trend section ─────
   try {
-    const hasFeatureGate = horizonSource.includes("featureId=\"veerkracht_score\"") &&
+    const hasFeatureGate = horizonSource.includes("featureId=\"gezondheids_score\"") &&
       horizonSource.includes('resilience-trend-section')
 
     results.push({
-      name: 'Resilience trend section gated by veerkracht_score feature',
+      name: 'Resilience trend section gated by gezondheids_score feature',
       pass: hasFeatureGate,
       detail: hasFeatureGate
-        ? 'Resilience trend section wrapped in FeatureGate with featureId="veerkracht_score"'
+        ? 'Resilience trend section wrapped in FeatureGate with featureId="gezondheids_score"'
         : 'FeatureGate not found around resilience trend section',
     })
   } catch (e) {

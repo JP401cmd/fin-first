@@ -1300,7 +1300,7 @@ const willemData: PersonaData = {
     retirement_expense_custom_amount: 3000,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
-      'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'veerkracht_score',
+      'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'gezondheids_score',
     ]),
   },
   bank_accounts: [
@@ -1773,7 +1773,7 @@ const marijkeData: PersonaData = {
     estimated_monthly_expenses: 2800,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'passief_inkomen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',
-      'holdings', 'vrijheidsmijlpalen', 'acties', 'veerkracht_score',
+      'holdings', 'vrijheidsmijlpalen', 'acties', 'gezondheids_score',
     ]),
   },
   bank_accounts: [

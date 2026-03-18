@@ -49,7 +49,7 @@ export const FOCUS_WIDGET_BOOST: Record<FocusChoice, string[]> = {
   fire_freedom: [
     'fire_prognose', 'monte_carlo', 'vrijheidsscenarios',
     'sim_vermogenspad', 'passief_inkomen', 'vrijheidsmijlpalen',
-    'backtesting_score', 'veerkracht_score', 'vrijheidsvoortgang',
+    'backtesting_score', 'gezondheids_score', 'vrijheidsvoortgang',
     'levensgebeurtenissen',
   ],
   goals_actions: [
@@ -85,7 +85,7 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   nibud_benchmark: 4,
   berichten: 4,
   agenda: 4,
-  veerkracht_score: 4,
+  gezondheids_score: 4,
   levensgebeurtenissen: 4,
   vrijheidsscenarios: 4,
   sim_vermogenspad: 4,

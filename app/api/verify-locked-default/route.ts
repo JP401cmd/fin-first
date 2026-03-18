@@ -147,7 +147,7 @@ export async function GET() {
   })
 
   // Test 10: Only intentional exceptions use 'hidden' fallback
-  // The only allowed hidden usage is veerkracht_score in horizon (inner chart section)
+  // The only allowed hidden usage is gezondheids_score in horizon (inner chart section)
   const horizonSrc = (() => {
     try {
       return fs.readFileSync(

@@ -34,7 +34,7 @@ const MODULE_FEATURES: Record<string, string[]> = {
     'monte_carlo',
     'levensgebeurtenissen',
     'withdrawal_strategie',
-    'veerkracht_score',
+    'gezondheids_score',
     'vermogensprojectie_chart',
     'fire_geavanceerde_params',
     'widget_vrijheidsscenarios',

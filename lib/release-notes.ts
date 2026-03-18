@@ -1496,7 +1496,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
           },
           {
             title: '20 widget-componenten',
-            description: 'Netto Vermogen, Cashflow Maand, Budgetten, Vermogen, Schulden, Beleggingen, Voorstellen, Acties, Doelen, FIRE Prognose, Monte Carlo, Levensgebeurtenissen, Spaarquote, Vrijheidsvoortgang, Abonnementen, Jouw Pad, Veerkracht Score, Box 3 Belasting, Vaste Lasten en NIBUD Benchmark.',
+            description: 'Netto Vermogen, Cashflow Maand, Budgetten, Vermogen, Schulden, Beleggingen, Voorstellen, Acties, Doelen, FIRE Prognose, Monte Carlo, Levensgebeurtenissen, Spaarquote, Vrijheidsvoortgang, Abonnementen, Jouw Pad, Financiële Gezondheid, Box 3 Belasting, Vaste Lasten en NIBUD Benchmark.',
           },
           {
             title: 'Deep-link modals vanuit widgets',
@@ -1901,8 +1901,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         color: 'blue',
         items: [
           {
-            title: 'Veerkrachtscore historiegrafiek',
-            description: 'Lijndiagram dat je financiele veerkrachtscore over tijd toont met contextuele berichten over je voortgang.',
+            title: 'Financiële gezondheid historiegrafiek',
+            description: 'Lijndiagram dat je financiële gezondheidsscore over tijd toont met contextuele berichten over je voortgang.',
           },
           {
             title: 'Netto-vermogen mijlpaalmarkers',

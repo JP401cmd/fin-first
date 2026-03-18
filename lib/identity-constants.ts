@@ -175,7 +175,7 @@ export const featureIcons: Record<string, string> = {
   monte_carlo: '\uD83C\uDFB2',
   levensgebeurtenissen: '\uD83C\uDFAF',
   withdrawal_strategie: '\uD83D\uDCB8',
-  veerkracht_score: '\uD83D\uDEE1\uFE0F',
+  gezondheids_score: '\uD83D\uDCAA',
   vermogensprojectie_chart: '\uD83D\uDCC9',
   fire_scenario_analyse: '\uD83D\uDD00',
   fire_geavanceerde_params: '\u2699\uFE0F',

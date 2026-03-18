@@ -68,7 +68,7 @@ export async function GET() {
     const hasFireAge = compViewSource.includes("'fire_age'") && compViewSource.includes('FIRE-leeftijd')
     const hasSovereignty = compViewSource.includes("'sovereignty_level'") && compViewSource.includes('Soevereiniteitsniveau')
     const hasSavingsRate = compViewSource.includes("'savings_rate'") && compViewSource.includes('Spaarquote')
-    const hasResilience = compViewSource.includes("'resilience_score'") && compViewSource.includes('Veerkracht-score')
+    const hasResilience = compViewSource.includes("'resilience_score'") && compViewSource.includes('Gezondheids-score')
 
     // Check for MetricRow component that renders side-by-side
     const hasMetricRow = compViewSource.includes('MetricRow')

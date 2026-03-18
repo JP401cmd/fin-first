@@ -2227,15 +2227,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
       {/* === 5. Resilience Trend Chart (Deep Dive) === */}
       {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
-        <FeatureGate featureId="veerkracht_score" fallback="hidden">
+        <FeatureGate featureId="gezondheids_score" fallback="hidden">
         <section className="mt-5 sm:mt-8" data-testid="resilience-trend-section">
           <div className="mb-3">
             <h2 className="label-editorial text-[var(--ink-2)]">
               <Shield className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
-              Veerkracht verloop
+              Gezondheidsverloop
             </h2>
             <p className="mt-1 text-sm text-[var(--ink-3)]">
-              Je veerkrachtscore over tijd, gebaseerd op echte snapshot data
+              Je gezondheidsscore over tijd, gebaseerd op echte snapshot data
             </p>
           </div>
           <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
@@ -2317,7 +2317,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             subtitle="hoe je vermogen opneemt"
           />
         </FeatureGate>
-        <FeatureGate featureId="veerkracht_score" fallback="hidden">
+        <FeatureGate featureId="gezondheids_score" fallback="hidden">
           <button
             type="button"
             onClick={() => setShowResilienceReceipt(true)}
@@ -5050,12 +5050,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         </div>
       </BottomSheet>
 
-      <BottomSheet open={showResilienceReceipt} onClose={() => setShowResilienceReceipt(false)} title="Veerkrachtscore">
+      <BottomSheet open={showResilienceReceipt} onClose={() => setShowResilienceReceipt(false)} title="Financiële Gezondheid">
         <div className="p-5">
           <KassabonShell>
             <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">VEERKRACHTSCORE</p>
-              <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">financiële weerbaarheid</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">FINANCIËLE GEZONDHEID</p>
+              <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">gezondheidsscore op basis van 6 pilaren</p>
             </div>
 
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">

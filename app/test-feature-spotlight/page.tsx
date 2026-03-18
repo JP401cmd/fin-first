@@ -116,7 +116,7 @@ export default function TestFeatureSpotlight() {
   function resetDemo() {
     localStorage.removeItem('spotlight_seen_box3_belasting')
     localStorage.removeItem('spotlight_seen_fire_projecties')
-    localStorage.removeItem('spotlight_seen_veerkracht_score')
+    localStorage.removeItem('spotlight_seen_gezondheids_score')
     setDemoKey(prev => prev + 1) // force re-render
   }
 
@@ -203,11 +203,11 @@ export default function TestFeatureSpotlight() {
           </div>
         </NewFeatureSpotlight>
 
-        {/* Demo card 3: Veerkracht Score */}
-        <NewFeatureSpotlight featureId="veerkracht_score">
+        {/* Demo card 3: Gezondheids Score */}
+        <NewFeatureSpotlight featureId="gezondheids_score">
           <div className="rounded-xl bg-zinc-800 p-6 border border-zinc-700" data-testid="demo-card-resilience">
-            <h3 className="text-sm font-semibold text-teal-400 mb-1">Veerkracht Analyse</h3>
-            <p className="text-xs text-zinc-400">Resilience score 0-100</p>
+            <h3 className="text-sm font-semibold text-teal-400 mb-1">Financiële Gezondheid</h3>
+            <p className="text-xs text-zinc-400">Gezondheidsscore 0-100</p>
             <div className="mt-3 text-2xl font-bold text-white">87 / 100</div>
           </div>
         </NewFeatureSpotlight>

@@ -14,7 +14,7 @@ type AIDomain = 'kern' | 'wil' | 'horizon'
 const MODULE_FEATURES: Record<string, string[]> = {
   kern: ['box3_belasting', 'vermogensverloop', 'snapshot_vergelijking', 'cashflow_sankey', 'data_export', 'budget_optimalisatie', 'asset_allocatie'],
   wil: ['nibud_benchmark', 'doelen_systeem', 'beslissingspatronen', 'schulden_aflosplan'],
-  horizon: ['fire_projecties', 'fire_scenario_analyse', 'monte_carlo', 'levensgebeurtenissen', 'withdrawal_strategie', 'veerkracht_score', 'vermogensprojectie_chart', 'fire_geavanceerde_params'],
+  horizon: ['fire_projecties', 'fire_scenario_analyse', 'monte_carlo', 'levensgebeurtenissen', 'withdrawal_strategie', 'gezondheids_score', 'vermogensprojectie_chart', 'fire_geavanceerde_params'],
 }
 
 const MODULE_COLORS: Record<string, { gradient: string; text: string; border: string; bg: string }> = {
