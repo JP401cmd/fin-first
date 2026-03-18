@@ -1,3 +1,24 @@
+## Session 2026-03-18 - Feature #222
+
+### Feature #222: Onttrekkingsstrategie — Instellingen UI - PASSING
+- Added onttrekkingsstrategie section to Section C (FIRE Instellingen) in /identity/instellingen/page.tsx
+- 4 strategy cards: Vast (SWR), Guardrails, VPW, Bucket — same card selection pattern as rest of page
+- Guardrails: 4 conditional numeric inputs (floor%, ceiling%, cut-step%, raise-step%) in a 2x2 grid
+- VPW and Bucket: informative text panels explaining how each strategy works
+- API integration: loads from GET /api/withdrawal-strategy, saves via PUT with percent-to-fraction conversion
+- Success/error feedback with 3-second auto-dismiss
+- Horizon page: dynamic ExploreCard showing current strategy name (e.g., "Guardrails 80–120%")
+- Added "Strategie wijzigen →" link to /identity/instellingen#onttrekking
+- Wired withdrawal strategy into fire simulation engine (applyWithdrawalStrategy)
+- Binary search uses static for deterministic FIRE-age, dynamic strategies only for visualization
+- horizon-data-loader.ts: loads withdrawal strategy columns from profiles
+- use-horizon-fire-sim.ts: passes withdrawalStrategy to runSimulation
+- Zero new TypeScript errors, pages compile correctly (307 auth redirect)
+- Commit: 833c575f
+
+### Current Status
+- 1 feature completed this session (#222)
+
 ## Session 2026-03-18 - Features #219, #220
 
 ### Feature #219: Onttrekkingsstrategie — Database & types - PASSING
