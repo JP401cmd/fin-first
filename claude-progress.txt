@@ -1,3 +1,31 @@
+## Session 2026-03-18 - Feature #218
+
+### Feature #218: Onttrekkingsstrategie profiel-instellingen + strategie-pagina - PASSING
+- All 8 feature steps verified as complete:
+  1. Supabase migration exists (20260318000001_add_withdrawal_strategy_columns.sql) — 5 columns with NOT NULL + DEFAULT
+  2. lib/withdrawal-strategy.ts complete with types, resolver, and engine (4 strategies: static, guardrails, vpw, bucket)
+  3. API route /api/withdrawal-strategy with GET/PUT, full validation
+  4. fire-simulation.ts integration via applyWithdrawalStrategy() in simulateDecumulation — binary search uses static, display uses chosen
+  5. Instellingen page Section C has withdrawal strategy dropdown + guardrail parameters + save
+  6. NEW: /horizon/strategie page (1019 lines) with:
+     - SVG comparison chart showing all 4 strategies as colored lines
+     - Strategy selector cards with per-strategy FIRE age
+     - Spending flexibility indicator (min/max €/month)
+     - Guardrails bandwidth visualization (floor/target/ceiling corridor)
+     - Life events timeline markers
+     - Activate strategy button (writes to profile via API)
+     - Detailed strategy explanations with pros/cons in Dutch
+  7. Horizon chart integration: withdrawalStrategyConfig passed to useHorizonFireSim hook
+  8. Backwards compatibility: 'static' default preserves existing behavior
+- Updated ExploreCard on horizon page to link to /horizon/strategie (replaces modal onClick)
+- Zero TypeScript errors
+- All pages compile (307 auth redirect)
+- Commit: 0f11d4ea
+
+### Current Status
+- 1 feature completed this session (#218)
+- 222/256 features passing (86.7%)
+
 ## Session 2026-03-18 - Feature #221
 
 ### Feature #221: Onttrekkingsstrategie — Integratie in simulateDecumulation - PASSING
