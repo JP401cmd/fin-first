@@ -1,3 +1,22 @@
+## Session 2026-03-18 - Feature #237
+
+### Feature #237: Test: FIRE parameters & withdrawal strategy - PASSING
+- Created lib/regression-tests/suites/horizon-parameters.ts with 18 tests
+- Registered under category 'De Horizon — Parameters' (horizon-parameters)
+- Step 1: resolveFireParams — 4 tests (defaults, custom, null fallback, SWR floor 0.001)
+- Step 2: parseFireStrategy — 5 tests (perpetual, legacy+amount, deplete, invalid→deplete, string→number)
+- Step 3: resolveWithdrawalStrategy — 4 tests (all 4 types, defaults, custom guardrails, invalid→static)
+- Step 4: API /api/parameters contract — 1 test (validation bounds, edge ranges, box3_method)
+- Step 5: API /api/withdrawal-strategy contract — 1 test (strategy types, guardrail bounds, floor<ceiling)
+- Step 6: Parameters effect on simulation — 3 tests (higher return→lower FIRE age, higher inflation→higher FIRE age, resolved params→simulation consistency)
+- Zero TypeScript errors in new file
+- Auth rate limit prevented browser login (known recurring Supabase issue)
+- All tests are pure function tests — no UI/DB dependency
+- Commit: bee62fd9
+
+### Current Status
+- 1 feature completed this session (#237)
+
 ## Session 2026-03-18 - Features #282, #283
 
 ### Feature #282: Test: Onboarding save flow & success - PASSING
@@ -15495,3 +15514,23 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#232, #233)
 - 48 total tests across both files
+
+## Session 2026-03-18 - Feature #234
+
+### Feature #234: Test: Budget API routes - PASSING
+- Created lib/regression-tests/suites/budget-api-routes.ts with 22 tests
+- Registered under category 'De Kern — API Routes' (kern-api-routes)
+- Tests cover all 6 feature steps:
+  - DELETE /api/budgets/[id]: UUID validation, cascade structure (parent→children), child-no-cascade, transaction unlink (not delete)
+  - PUT /api/budgets/favorites: sync logic (clear all + set selected), body validation (array check), empty array clears all
+  - GET /api/budget-trends: 12-month window, parent-child aggregation, response shape, spending rounding
+  - GET /api/budget-variance: statistics (mean/stdDev/CV), confidence level mapping (high/medium/low/insufficient), insufficient data fallback, response summary aggregation
+  - GET /api/cashflow-forecast: 6-month projection structure, recurring+pattern blending (70/30), frequency normalization, low-balance alerts (€500/€0), no-data fallback, partial-month pro-rata
+  - Auth guard consistency: all 6 endpoints check authentication
+- Zero TypeScript errors in new file
+- Auth rate limit prevented browser testing (known persistent issue)
+- Commit: d2c1410a
+
+### Current Status
+- 1 feature completed this session (#234)
+- 22 regression tests added
