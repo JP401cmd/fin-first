@@ -272,6 +272,16 @@ export async function loadAllTests(): Promise<void> {
     const nieuwsAiMod = await import('@/lib/regression-tests/suites/beheer-nieuws-ai')
     nieuwsAiMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const testdataMod = await import('@/lib/regression-tests/suites/beheer-testdata')
+    testdataMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const widgetsAvatarMod = await import('@/lib/regression-tests/suites/widgets-avatar')
+    widgetsAvatarMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
