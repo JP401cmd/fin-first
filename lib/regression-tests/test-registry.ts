@@ -248,6 +248,22 @@ registerCategory({
   testCount: 0,
 })
 
+registerCategory({
+  id: 'wil-aanbevelingen',
+  label: 'De Wil — Aanbevelingen',
+  description: 'AI-aanbevelingensysteem, actie-management, PII sanitization',
+  icon: 'Sparkles',
+  testCount: 0,
+})
+
+registerCategory({
+  id: 'wil-gezondheid',
+  label: 'De Wil — Gezondheid',
+  description: 'Financiële gezondheidsscore: 6-pijler systeem, weging, edge cases',
+  icon: 'Heart',
+  testCount: 0,
+})
+
 // ── Dynamic test loader ─────────────────────────────────────────────────────
 // This function dynamically imports all test modules and registers their tests.
 
@@ -460,6 +476,26 @@ export async function loadAllTests(): Promise<void> {
   try {
     const kernApiMod = await import('@/lib/regression-tests/suites/kern-api-routes')
     kernApiMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const dashWidgetsMod = await import('@/lib/regression-tests/suites/dashboard-widgets')
+    dashWidgetsMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const nieuwsBriefingMod = await import('@/lib/regression-tests/suites/nieuws-briefing')
+    nieuwsBriefingMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const wilAanbevelingenMod = await import('@/lib/regression-tests/suites/wil-aanbevelingen')
+    wilAanbevelingenMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const wilGezondheidMod = await import('@/lib/regression-tests/suites/wil-gezondheid')
+    wilGezondheidMod.register()
   } catch { /* module not found yet */ }
 }
 
