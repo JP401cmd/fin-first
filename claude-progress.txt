@@ -15833,3 +15833,95 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#257)
 - 30 regression tests added
+
+## Session 2026-03-18 - Features #293, #294
+
+### Feature #293: Regressietest: Assets CRUD operaties - PASSING
+- Created lib/regression-tests/suites/kern-assets-crud.ts with 30 tests
+- Registered under category 'kern.assets-crud' (De Kern — Assets CRUD)
+- Tests cover all 8 feature steps:
+  - Auth guards: GET/POST/PATCH/DELETE /api/holdings + GET /api/holdings/[id] + value-history (6 endpoints, all 401)
+  - Create validation: required fields (name), numeric validation, defaults, response shape
+  - Edit: partial update rules, optimistic concurrency control (409 conflict)
+  - Delete cascade: syncAssetValueFromHoldings, response shape
+  - Duplicate ticker handling: 409 conflict, force_duplicate bypass
+  - Idempotency: X-Idempotency-Key header, 5-min TTL cache
+  - Revaluation: price/units update triggers asset sync, value-history response shape, event labels, cost basis
+  - Net worth impact: total_value/total_cost calculation, currency conversion, single holding detail
+- Zero TypeScript errors
+
+### Feature #294: Regressietest: Schulden management - PASSING
+- Created lib/regression-tests/suites/kern-schulden.ts with 28 tests
+- Registered under category 'kern.schulden' (De Kern — Schulden)
+- Tests cover all 8 feature steps:
+  - Debt types: 11 types with labels/icons, 3 repayment types, subtypes per type
+  - Type-specific fields per debt_type (DEBT_TYPE_FIELDS validation)
+  - Seed data: getDefaultDebts() returns 3 debts (hypotheek, persoonlijke lening, studielening)
+  - Amortization: annuity (vaste betaling), linear (vaste aflossing), interest-only (saldo constant)
+  - Edge cases: 0 balance, 0 payment, 0 rate, 0 term
+  - debtProjection: all 3 repayment types + unpayable + zero balance
+  - Net worth impact: net_worth_inclusion_pct (100%, 50%), inactive debts
+  - Freedom time: calculateFreedomTime with/without debts, formatFreedomTimeString
+  - Payoff strategies: snowball (smallest first), avalanche (highest rate first), current (own pace)
+  - Interest-only exclusion from payoff targeting
+  - Payoff summary: totalMonths, totalInterest, totalPaid, payoffDate
+  - Paid-off state: balance=0, is_active=false
+  - Debt ratio calculation with inclusion percentages
+- Zero TypeScript errors
+- Commit: 9889abdf
+
+### Current Status
+- 2 features completed this session (#293, #294)
+- 58 total regression tests across both files
+
+## Session 2026-03-18 - Features #295, #296
+
+### Feature #295: Regressietest: Budget CRUD flow - PASSING
+- Created lib/regression-tests/suites/kern-budget-crud.ts with 22 tests
+- Category: De Kern — Budget CRUD (kern-budget-crud)
+- Tests: form defaults, name validation, auto-parent, row construction, edit redirect, dirty state, delete cascade, UUID validation, auth guards, category linking, BUDGET_SLUGS, limit validation, intervals, budget types, rollover types, goal_type override, draft keys
+- Registered in test-registry
+
+### Feature #296: Regressietest: Bank koppeling flow (TrueLayer) - PASSING
+- Created lib/regression-tests/suites/kern-bank-connect-flow.ts with 22 tests
+- Category: De Kern — Bank Koppeling (kern-bank-connect)
+- Tests: 3-step connect flow, error mapping, OAuth auth-link, state encoding, redirect URI, callback redirect logic, missing code handling, success page, LinkedAccount shape, sync response, denied OAuth, expired code, connection lifecycle, auth consistency (5 endpoints)
+- Registered in test-registry
+
+### Current Status
+- 2 features completed this session (#295, #296)
+- 44 total regression tests across both files
+- Commit: 75a91c1e
+
+## Session 2026-03-18 - Features #297, #303
+
+### Feature #297: Regressietest: Import/Export data flows - PASSING
+- Created lib/regression-tests/suites/kern-import-export.ts with 20 tests
+- Registered under category 'kern.import-export' (De Kern — Import/Export)
+- Tests cover all 8 feature steps:
+  - Holdings import page (/core/assets/holdings/import) loads (200 or auth redirect)
+  - CSV upload validation: BROKER_PRESETS (3 brokers), detectBroker, parseBrokerCSV
+  - CSV upload: valid DEGIRO format parsed with rows, empty/garbage content → 0 rows
+  - Holdings import API: auth guard (401), empty holdings (400/401), invalid broker (400/401)
+  - Duplicate detection: ISIN/ticker normalization, weighted average price calculation
+  - Bank import: detectFormat (MT940/CSV/OFX), CSV_PRESETS (5 banks), import_hash SHA-256
+  - Data export: auth guard, 6 valid types, invalid/missing type rejected
+  - Auth consistency: all 7 import/export endpoints verified 401
+- Zero TypeScript errors, Commit: 87b46a7a
+
+### Feature #303: Regressietest: Dividend tracking - PASSING
+- Created lib/regression-tests/suites/kern-dividenden.ts with 22 tests
+- Registered under category 'kern.dividenden' (De Kern — Dividenden)
+- Tests cover all 7 feature steps:
+  - Dividend registration: auth guard, type validation (4 types), required fields, no units change
+  - Dividend accumulation: single/multiple dividends, chronological order, running totals
+  - Dividend yield: (annual income / holding value) × 100, zero value edge case, annualization
+  - Passief inkomen widget: exists in WIDGET_CATALOG, freedom days calculation, monthly income
+  - Dividend history: GET /api/dividends auth guard, response shape (13 holding + 8 aggregate fields)
+  - Multiple dividends: per-holding aggregation, weighted yield across portfolio
+  - Total return: realized + unrealized + dividends, summary fields, sorted output
+- Zero TypeScript errors, Commit: e4706468
+
+### Current Status
+- 2 features completed this session (#297, #303)
+- 42 total regression tests across both files
