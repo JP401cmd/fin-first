@@ -1,3 +1,24 @@
+## Session 2026-03-18 - Feature #248
+
+### Feature #248: Test: Input validatie & injection preventie - PASSING
+- Created lib/regression-tests/suites/input-validatie.ts with 25 tests
+- Registered under category 'Security — Input Validatie' (security-input-validatie)
+- Tests cover all 7 feature steps:
+  - SQL injection preventie (3 tests): sanitizeForAI, maskPIIInOutput, sanitizeTransaction with SQL payloads
+  - XSS preventie (3 tests): script tags, event handlers, template injection in sanitize functions
+  - Numerieke validatie (3 tests): parameter ranges (return 1-15%, inflation 0-8%), holdings numeric fields, extreme values
+  - Type coercion (4 tests): Number() from strings, Boolean() for widget enabled, Array.isArray guards, UUID regex validation
+  - Maximale lengte (4 tests): 100KB strings, repeated PII patterns (100 IBANs), long transaction fields
+  - File upload validatie (3 tests): PDF-only type check, 10MB size limit, rate limiting (5/hour)
+  - Bonus edge cases (5 tests): combined SQL+XSS, null/empty/unicode, box3 enum, holdings name required, currency normalization
+- Zero TypeScript errors in new file
+- Auth rate limit prevented browser testing (known persistent Supabase issue)
+- Commit: 5f29089a
+
+### Current Status
+- 1 feature completed this session (#248)
+- 25 regression tests added
+
 ## Session 2026-03-18 - Feature #237
 
 ### Feature #237: Test: FIRE parameters & withdrawal strategy - PASSING
@@ -15629,3 +15650,26 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#244)
 - 31 regression tests in rapportages suite (9 new)
+
+## Session 2026-03-18 - Feature #245
+
+### Feature #245: Test: Financiële check-in flow - PASSING
+- Created lib/regression-tests/suites/checkin-flow.ts with 35 tests
+- Registered under category 'Check-in' (checkin-flow)
+- Tests cover all 7 feature steps:
+  - POST /api/checkin/save: auth guard, CheckinSnapshot shape, details optional, key format, household key
+  - GET /api/checkin/save: auth guard, history mode response, month lookup response
+  - GET /api/checkin/overview: auth guard, response shape, Dutch month names, netWorth calc, FIRE age formula, netWorthChange pct
+  - GET /api/checkin/upcoming: auth guard, items shape, recurring filter (count>=2), sort/limit, life events
+  - GET /api/checkin/budgets: auth guard, budget item shape, override logic, interval normalization, child aggregation
+  - GET /api/checkin/aandachtspunten: auth guard, Aandachtspunt shape, budget over detection, unexpected expenses, goals overdue/behind, severity sort
+  - GET /api/checkin/gespreksstarters: auth guard, GesprekStarterData shape, sentiment sort, max 5, min 2 fallback, freedomLabel, data-driven IDs
+  - Auth consistency: all 6 endpoints verified 401 for unauthenticated
+- All 6 API endpoints confirmed returning 401 for unauthenticated requests
+- Zero TypeScript errors in new file
+- Zero console errors
+- Commit: fd35f110
+
+### Current Status
+- 1 feature completed this session (#245)
+- 35 regression tests added
