@@ -15477,3 +15477,21 @@ For Feature #51 (Transaction Import):
 - 46 total regression tests
 - Zero TypeScript errors
 - Commit: ba8562d6
+
+## Session 2026-03-18 - Features #232, #233
+
+### Feature #232: Test: Box 3 belasting berekeningen - PASSING
+- Created lib/regression-tests/suites/box3-belasting.ts with 18 tests
+- Category: De Kern - Belasting (kern-belasting)
+- Tests: tarieven, vrijstelling, partnerschap, gewogen rendement, classificatie, edge cases
+- Commit: 59556e92
+
+### Feature #233: Test: Cash and Holdings API routes - PASSING
+- Created lib/regression-tests/suites/kern-api-routes.ts with 30 tests
+- Category: De Kern - API Routes (kern-api-routes)
+- Tests: auth guards, validation, response shapes, idempotency, concurrency, P&L, refresh-prices
+- Commit: 59556e92
+
+### Current Status
+- 2 features completed this session (#232, #233)
+- 48 total tests across both files
