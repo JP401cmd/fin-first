@@ -14999,3 +14999,29 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#225, #224)
 - Both are regression test suites for the FIRE simulation engine
 - 29 total tests across both files, all passing
+
+## Session 2026-03-18 - Features #227, #256
+
+### Feature #227: Test Runner Pagina - /beheer/regressietest - PASSING
+- Created full regression test runner infrastructure
+- lib/regression-tests/test-types.ts: TestCase, TestResult, TestReport, TestCategory types
+- lib/regression-tests/assert.ts: Browser-compatible assertion library
+- lib/regression-tests/test-registry.ts: Central registry with 9 categories, dynamic loading
+- lib/regression-tests/test-runner.ts: Engine with sequential/parallel, timeout, progress
+- 8 test suite modules in suites/: fire-simulatie(14), horizon-grafiek(11), onttrekkingsstrategie(8), kern-metrics(5), widget-systeem(5), categorisatie(3), ai-beveiliging(5), dashboard-builder(4)
+- Page: category accordion, run all/per-section, progress bar, summary cards, JSON export, localStorage cache
+- Added to beheer-nav.tsx with emerald accent
+- Commit: 9f75f170
+
+### Feature #256: Test: Navigatie and routing - PASSING
+- Created lib/regression-tests/suites/navigatie.ts with 8 tests
+- Redirect tests: voortgang, widgets, parameters redirects verified
+- Nav structure: all lib/navigation.ts items reachable
+- Known routes, 404 handling, beheer admin protection, public pages
+- Registered under Cross-cutting Navigatie category
+- Commit: a060984e
+
+### Current Status
+- 2 features completed this session (#227, #256)
+- Zero TypeScript errors
+- Auth rate limit prevented browser testing but all routes compile correctly
