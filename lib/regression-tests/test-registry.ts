@@ -156,6 +156,14 @@ registerCategory({
   testCount: 0,
 })
 
+registerCategory({
+  id: 'profiel-instellingen',
+  label: 'Identiteit — Profiel & Instellingen',
+  description: 'Profiel CRUD, instellingen opslag, gids voortgangsberekening',
+  icon: 'Settings',
+  testCount: 0,
+})
+
 // ── Dynamic test loader ─────────────────────────────────────────────────────
 // This function dynamically imports all test modules and registers their tests.
 
@@ -238,6 +246,11 @@ export async function loadAllTests(): Promise<void> {
   try {
     const briefingMod = await import('@/lib/regression-tests/suites/briefing-directives')
     briefingMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const profielMod = await import('@/lib/regression-tests/suites/profiel-instellingen')
+    profielMod.register()
   } catch { /* module not found yet */ }
 }
 
