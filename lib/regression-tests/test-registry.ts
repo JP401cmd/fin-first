@@ -78,13 +78,7 @@ export function clearRegistry(): void {
 // Register categories matching the app's module structure
 // 'horizon-fire-simulatie' category is registered by its own suite module
 
-registerCategory({
-  id: 'horizon-grafiek',
-  label: 'Horizon Grafiek',
-  description: 'FIRE-projectie en -range berekeningen',
-  icon: 'LineChart',
-  testCount: 0,
-})
+// 'horizon-projecties' category is registered by its own suite module
 
 registerCategory({
   id: 'onttrekkingsstrategie',
