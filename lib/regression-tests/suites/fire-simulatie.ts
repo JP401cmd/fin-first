@@ -1,4 +1,4 @@
-import { registerTests } from '../test-registry'
+import { registerCategory, registerTests } from '../test-registry'
 import {
   assert, assertEqual, assertNotNull, assertGreaterThan,
   assertGreaterThanOrEqual, assertLessThan, assertLessThanOrEqual,
@@ -10,17 +10,22 @@ import {
   lifeEventsToCashflows,
   type SimCashflow,
   type SimResult,
+  type ReturnModel,
 } from '@/lib/fire-simulation'
 import { type FireStrategyConfig } from '@/lib/fire-strategy'
-import { NL_AOW_MONTHLY } from '@/lib/constants'
+import { NL_AOW_MONTHLY, BOX3_DRAG } from '@/lib/constants'
 import { NIBUD_CHILDREN_MONTHLY_COST, type LifeEvent } from '@/lib/horizon-data'
 
-const CAT = 'fire-simulatie'
+const CAT = 'horizon-fire-simulatie'
 
-const STANDARD = {
+const STANDARD: {
+  currentAge: number; endAge: number; currentPortfolio: number;
+  yearlyExpenses: number; annualSavings: number; grossReturn: number;
+  returnModel: ReturnModel; inflation: number;
+} = {
   currentAge: 35, endAge: 90, currentPortfolio: 150_000,
   yearlyExpenses: 36_000, annualSavings: 18_000, grossReturn: 0.07,
-  returnModel: 'nl_box3' as const, inflation: 0.02,
+  returnModel: 'nl_box3', inflation: 0.02,
 }
 
 function runStd(
@@ -231,8 +236,218 @@ const tests: TestCase[] = [
       assertEqual(fwd.rows.length, rev.rows.length, 'rows')
     },
   },
+  // ── Step 2: Life events — huis kopen, huurinkomsten, stopdatum ──────────
+  {
+    id: 'fire-sim-huis-kopen', name: 'Life event: huis kopen (eenmalige uitgave)', category: CAT,
+    description: 'Eenmalige uitgave verlaagt portfolio en kan FIRE uitstellen',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      const base = runStd()
+      const huisCf: SimCashflow = { id: 'huis', name: 'Huis kopen', type: 'one_time', direction: 'expense', amount: 50_000, fromAge: 40, toAge: 40, indexed: false }
+      const withHuis = runStd({}, [huisCf])
+      assert(withHuis.fireReachable, 'FIRE nog steeds bereikbaar')
+      assertGreaterThanOrEqual(withHuis.fireAge!, base.fireAge!, 'huis kopen stelt FIRE uit of gelijk')
+      // Verify the row at age 40 shows the expense
+      const row40 = withHuis.rows.find(r => r.age === 40)
+      assertNotNull(row40, 'row at age 40')
+      assertLessThan(row40.cashflowNet, 0, 'negatieve cashflow bij huis kopen')
+    },
+  },
+  {
+    id: 'fire-sim-huurinkomsten', name: 'Life event: huurinkomsten (terugkerend)', category: CAT,
+    description: 'Terugkerende huurinkomsten versnellen FIRE',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      const base = runStd()
+      const huurCf: SimCashflow = { id: 'huur', name: 'Huurinkomsten', type: 'recurring', direction: 'income', amount: 800, fromAge: 38, toAge: null, indexed: true }
+      const withHuur = runStd({}, [huurCf])
+      assert(withHuur.fireReachable, 'FIRE bereikbaar')
+      assertLessThanOrEqual(withHuur.fireAge!, base.fireAge!, 'huurinkomsten versnellen FIRE')
+    },
+  },
+  {
+    id: 'fire-sim-stopdatum', name: 'Life event: cashflow met stopdatum', category: CAT,
+    description: 'Recurring cashflow stopt correct bij toAge',
+    priority: 'medium', estimatedDurationMs: 100,
+    fn() {
+      const cf: SimCashflow = { id: 'freelance', name: 'Freelance', type: 'recurring', direction: 'income', amount: 1000, fromAge: 36, toAge: 45, indexed: true }
+      const r = runStd({}, [cf])
+      // Rows at age 36-44 should have positive cashflow from this, rows at 45+ should not
+      const activeRows = r.rows.filter(row => row.age >= 36 && row.age < 45)
+      const stoppedRows = r.rows.filter(row => row.age >= 45 && row.age < 50)
+      if (activeRows.length > 0) {
+        assertGreaterThan(activeRows[0].cashflowNet, 0, 'cashflow actief voor stopdatum')
+      }
+      // After toAge, this specific cashflow should not contribute (cashflowNet comes from all cashflows)
+      // With no other cashflows, stopped rows should have 0 cashflowNet
+      for (const row of stoppedRows) {
+        assertEqual(row.cashflowNet, 0, `geen cashflow na stopdatum (age ${row.age})`)
+      }
+    },
+  },
+  // ── Step 3: Box 3 belastingdruk ─────────────────────────────────────────
+  {
+    id: 'fire-sim-box3-drag', name: 'Box 3 belastingdruk', category: CAT,
+    description: 'nl_box3 model trekt forfaitaire belasting af van rendement',
+    priority: 'critical', estimatedDurationMs: 200,
+    fn() {
+      // Same scenario with nl_box3 vs classic — nl_box3 should have higher FIRE age due to tax drag
+      const box3 = runStd({ returnModel: 'nl_box3' })
+      const classic = runStd({ returnModel: 'classic' })
+      assert(box3.fireReachable, 'box3 bereikbaar')
+      assert(classic.fireReachable, 'classic bereikbaar')
+      assertGreaterThan(box3.fireAge!, classic.fireAge!, 'Box 3 belasting stelt FIRE uit')
+      // Box 3 drag should reduce effective return by ~2.12%
+      // Verify portfolio at same age is lower for box3
+      const age50box3 = box3.rows.find(r => r.age === 50)
+      const age50classic = classic.rows.find(r => r.age === 50)
+      if (age50box3 && age50classic && age50box3.phase === 'accumulation' && age50classic.phase === 'accumulation') {
+        assertLessThan(age50box3.endPortfolio, age50classic.endPortfolio, 'Box 3 lager portfolio bij 50')
+      }
+      // BOX3_DRAG should be approximately 2.12% (0.0588 * 0.36)
+      assertLessThan(Math.abs(BOX3_DRAG - 0.02117), 0.001, 'BOX3_DRAG ≈ 2.12%')
+    },
+  },
+  // ── Step 4: Inflatie correctie ──────────────────────────────────────────
+  {
+    id: 'fire-sim-inflation', name: 'Inflatie correctie over 30 jaar', category: CAT,
+    description: 'Uitgaven stijgen met inflatie in onttrekkingsfase, portfolio compenseert',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      // Compare 0% vs 2% inflation — higher inflation should require larger portfolio / later FIRE
+      const noInflation = runStd({ inflation: 0 })
+      const withInflation = runStd({ inflation: 0.02 })
+      assert(noInflation.fireReachable, 'no inflation bereikbaar')
+      assert(withInflation.fireReachable, 'with inflation bereikbaar')
+      // Higher inflation means you need more to sustain expenses → later FIRE or larger portfolio
+      assertGreaterThanOrEqual(withInflation.fireAge!, noInflation.fireAge!, 'inflatie stelt FIRE uit')
+      assertGreaterThan(withInflation.requiredFirePortfolio, noInflation.requiredFirePortfolio, 'inflatie verhoogt vereist portfolio')
+      // Verify retirement expenses grow: later rows should have higher withdrawal
+      const retRows = withInflation.rows.filter(r => r.phase === 'retirement')
+      if (retRows.length >= 10) {
+        assertGreaterThan(retRows[retRows.length - 1].withdrawal, retRows[0].withdrawal, 'withdrawal stijgt door inflatie')
+      }
+    },
+  },
+  // ── Step 5: Edge cases ──────────────────────────────────────────────────
+  {
+    id: 'fire-sim-zero-return', name: 'Edge case: 0% rendement', category: CAT,
+    description: 'Simulatie werkt met 0% rendement — puur sparen',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      const r = runStd({ grossReturn: 0, returnModel: 'classic', inflation: 0 })
+      // With 0% return, 0% inflation, classic model: pure savings
+      // €150K + €18K/yr savings, €36K/yr expenses → needs 36K * 55yr = €1.98M for deplete@90
+      // Should still be reachable eventually since savings > 0
+      for (const row of r.rows) {
+        assertFinite(row.startPortfolio, `row ${row.age} start`)
+        assertFinite(row.endPortfolio, `row ${row.age} end`)
+        assertEqual(row.growth, 0, `geen groei bij 0% rendement (age ${row.age})`)
+      }
+    },
+  },
+  {
+    id: 'fire-sim-negative-return', name: 'Edge case: negatief rendement', category: CAT,
+    description: 'Simulatie crasht niet bij negatief rendement',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      const r = runStd({ grossReturn: -0.02, returnModel: 'classic', inflation: 0 })
+      // Negative return = portfolio shrinks yearly, FIRE may be unreachable
+      for (const row of r.rows) {
+        assertFinite(row.startPortfolio, `row ${row.age} start finite`)
+        assertFinite(row.endPortfolio, `row ${row.age} end finite`)
+      }
+      // Growth should be negative in accumulation rows
+      const accRows = r.rows.filter(row => row.phase === 'accumulation')
+      if (accRows.length > 0) {
+        assertLessThan(accRows[0].growth, 0, 'negatieve groei')
+      }
+    },
+  },
+  {
+    id: 'fire-sim-extreme-return', name: 'Edge case: extreem hoog rendement (>20%)', category: CAT,
+    description: 'Simulatie werkt met extreem hoog rendement zonder overflow',
+    priority: 'medium', estimatedDurationMs: 100,
+    fn() {
+      const r = runStd({ grossReturn: 0.25, returnModel: 'classic' })
+      assert(r.fireReachable, 'FIRE bereikbaar bij 25% rendement')
+      assertNotNull(r.fireAge)
+      // Should reach FIRE much faster than standard
+      const base = runStd()
+      assertLessThan(r.fireAge!, base.fireAge!, 'extreem rendement versnelt FIRE')
+      // All values should remain finite (no overflow)
+      for (const row of r.rows) {
+        assertFinite(row.startPortfolio, `row ${row.age} start finite`)
+        assertFinite(row.endPortfolio, `row ${row.age} end finite`)
+        assertFinite(row.growth, `row ${row.age} growth finite`)
+      }
+    },
+  },
+  {
+    id: 'fire-sim-zero-savings', name: 'Edge case: 0 spaargeld maar hoog portfolio', category: CAT,
+    description: 'Geen spaargeld maar groot bestaand portfolio = FIRE mogelijk',
+    priority: 'medium', estimatedDurationMs: 50,
+    fn() {
+      const r = runStd({ currentPortfolio: 2_000_000, annualSavings: 0 })
+      assert(r.fireReachable, 'FIRE bereikbaar met groot portfolio')
+      assertEqual(r.fireAge, STANDARD.currentAge, 'direct FIRE met groot portfolio')
+    },
+  },
+  // ── Step 6: Onttrekkingsfase switch ─────────────────────────────────────
+  {
+    id: 'fire-sim-phase-switch', name: 'Fase switch: opbouw → afbouw', category: CAT,
+    description: 'Correcte transition van accumulation naar retirement bij FIRE leeftijd',
+    priority: 'critical', estimatedDurationMs: 100,
+    fn() {
+      const r = runStd()
+      assert(r.fireReachable, 'FIRE bereikbaar')
+      assertNotNull(r.fireAge)
+      // All rows before fireAge should be accumulation, at/after should be retirement
+      for (const row of r.rows) {
+        if (row.age < r.fireAge!) {
+          assertEqual(row.phase, 'accumulation', `age ${row.age} moet accumulation zijn`)
+          assertGreaterThanOrEqual(row.savings, 0, `savings >= 0 in opbouw (age ${row.age})`)
+        } else {
+          assertEqual(row.phase, 'retirement', `age ${row.age} moet retirement zijn`)
+          assertEqual(row.savings, 0, `geen savings in retirement (age ${row.age})`)
+          assertGreaterThanOrEqual(row.withdrawal, 0, `withdrawal >= 0 in afbouw (age ${row.age})`)
+        }
+      }
+      // Verify no gaps: ages should be consecutive from currentAge to endAge-1
+      const ages = r.rows.map(row => row.age)
+      for (let i = 1; i < ages.length; i++) {
+        assertEqual(ages[i], ages[i - 1] + 1, `opeenvolgende leeftijden (${ages[i - 1]} → ${ages[i]})`)
+      }
+    },
+  },
+  // ── Step 8: FIRE leeftijd bepaling ──────────────────────────────────────
+  {
+    id: 'fire-sim-fire-detection', name: 'FIRE leeftijd: passief inkomen ≥ uitgaven', category: CAT,
+    description: 'FIRE wordt bepaald wanneer portfolio voldoende is voor onttrekking',
+    priority: 'critical', estimatedDurationMs: 100,
+    fn() {
+      const r = runStd()
+      assert(r.fireReachable, 'FIRE bereikbaar')
+      assertNotNull(r.fireAge)
+      // At fireAge, portfolio should be >= requiredFirePortfolio
+      assertGreaterThanOrEqual(r.firePortfolioAtFire, r.requiredFirePortfolio, 'portfolio ≥ vereist bij FIRE')
+      // requiredFirePortfolio should be enough to sustain expenses
+      assertGreaterThan(r.requiredFirePortfolio, 0, 'vereist portfolio > 0')
+      // Fractional age should be close to integer age
+      assertNotNull(r.fireAgeFractional)
+      assertLessThan(Math.abs(r.fireAgeFractional! - r.fireAge!), 1, 'fractional ≈ integer')
+      assertGreaterThanOrEqual(r.fireAgeFractional!, r.fireAge! - 1, 'fractional nabij integer')
+    },
+  },
 ]
 
 export function register(): void {
+  registerCategory({
+    id: CAT,
+    label: 'De Horizon — FIRE Simulatie',
+    description: 'Kritieke tests voor runSimulation(): strategieën, life events, Box 3, inflatie, edge cases',
+    icon: 'TrendingUp',
+    testCount: 0,
+  })
   registerTests(tests)
 }
