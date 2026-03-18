@@ -562,6 +562,11 @@ export async function loadAllTests(): Promise<void> {
     const bankConnMod = await import('@/lib/regression-tests/suites/bank-connectie-flow')
     bankConnMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const testdataPersonaMod = await import('@/lib/regression-tests/suites/testdata-persona-validatie')
+    testdataPersonaMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
