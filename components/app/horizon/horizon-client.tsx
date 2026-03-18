@@ -2339,16 +2339,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
       <section className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
         <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
-          <ExploreCard
-            onClick={() => setActiveModal('withdrawal')}
-            icon={<Landmark className="h-5 w-5 text-horizon-600" />}
-            title="Opnamestrategie"
-            value={wsConfig ? ({ static: 'Vast (SWR)', guardrails: 'Guardrails', vpw: 'VPW', bucket: 'Bucket' } as Record<WithdrawalStrategyType, string>)[wsConfig.strategy] + (wsConfig.strategy === 'guardrails' ? ` ${Math.round(wsConfig.floor * 100)}–${Math.round(wsConfig.ceiling * 100)}%` : '') : '4 strategieën'}
-            subtitle="hoe je vermogen opneemt"
-          />
+          <Link href="/horizon/strategie" className="block">
+            <div className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
+                <Landmark className="h-5 w-5 text-horizon-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-[var(--ink-3)]">Opnamestrategie</p>
+                <p className="text-lg font-bold text-[var(--ink)]">{wsConfig ? ({ static: 'Vast (SWR)', guardrails: 'Guardrails', vpw: 'VPW', bucket: 'Bucket' } as Record<WithdrawalStrategyType, string>)[wsConfig.strategy] + (wsConfig.strategy === 'guardrails' ? ` ${Math.round(wsConfig.floor * 100)}–${Math.round(wsConfig.ceiling * 100)}%` : '') : '4 strategieën'}</p>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">hoe je vermogen opneemt</p>
+              </div>
+            </div>
+          </Link>
           <div className="mt-1 flex justify-end">
-            <Link href="/identity/instellingen#onttrekking" className="text-[11px] text-horizon-600 hover:text-horizon-700 underline underline-offset-2">
-              Strategie wijzigen →
+            <Link href="/horizon/strategie" className="text-[11px] text-horizon-600 hover:text-horizon-700 underline underline-offset-2">
+              Strategieën vergelijken →
             </Link>
           </div>
         </FeatureGate>
