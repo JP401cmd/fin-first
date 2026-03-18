@@ -16,7 +16,7 @@ import { buildSegments, typeColors, childTypeColors } from '@/components/app/bud
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetDonut } from '@/components/app/budget-donut'
-import { BudgetHeatmap } from '@/components/app/budget-heatmap'
+import { BudgetHeatmap, type HeatmapSection } from '@/components/app/budget-heatmap'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
@@ -1150,56 +1150,19 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           )}
         </>
       ) : viewMode === 'heatmap' ? (
-        <>
-          {incomeBudgets.length > 0 && (
-            <div className="mt-4 sm:mt-8">
-              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
-              <BudgetHeatmap
-                groups={incomeBudgets}
-                spending={spending}
-                budgetType="income"
-                onNavigate={(id) => openBudgetModal(id)}
-                beschikbaarMap={beschikbaarMap}
-              />
-            </div>
-          )}
-          {expenseBudgets.length > 0 && (
-            <div className="mt-4 sm:mt-8">
-              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
-              <BudgetHeatmap
-                groups={expenseBudgets}
-                spending={spending}
-                budgetType="expense"
-                onNavigate={(id) => openBudgetModal(id)}
-                beschikbaarMap={beschikbaarMap}
-              />
-            </div>
-          )}
-          {savingsBudgets.length > 0 && (
-            <div className="mt-4 sm:mt-8">
-              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen</h3>
-              <BudgetHeatmap
-                groups={savingsBudgets}
-                spending={spending}
-                budgetType="savings"
-                onNavigate={(id) => openBudgetModal(id)}
-                beschikbaarMap={beschikbaarMap}
-              />
-            </div>
-          )}
-          {debtBudgets.length > 0 && (
-            <div className="mt-4 sm:mt-8">
-              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden</h3>
-              <BudgetHeatmap
-                groups={debtBudgets}
-                spending={spending}
-                budgetType="debt"
-                onNavigate={(id) => openBudgetModal(id)}
-                beschikbaarMap={beschikbaarMap}
-              />
-            </div>
-          )}
-        </>
+        <div className="mt-4 sm:mt-8">
+          <BudgetHeatmap
+            sections={[
+              ...(incomeBudgets.length > 0 ? [{ label: 'Inkomen', budgetType: 'income' as const, groups: incomeBudgets }] : []),
+              ...(expenseBudgets.length > 0 ? [{ label: 'Uitgaven', budgetType: 'expense' as const, groups: expenseBudgets }] : []),
+              ...(savingsBudgets.length > 0 ? [{ label: 'Sparen', budgetType: 'savings' as const, groups: savingsBudgets }] : []),
+              ...(debtBudgets.length > 0 ? [{ label: 'Schulden', budgetType: 'debt' as const, groups: debtBudgets }] : []),
+            ] satisfies HeatmapSection[]}
+            spending={spending}
+            onNavigate={(id) => openBudgetModal(id)}
+            beschikbaarMap={beschikbaarMap}
+          />
+        </div>
       ) : (
         <BudgetDonut
           groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}

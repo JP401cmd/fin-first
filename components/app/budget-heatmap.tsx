@@ -7,10 +7,16 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 /* ── Types ────────────────────────────────────────────────────── */
 
-interface BudgetHeatmapProps {
-  groups: BudgetWithChildren[]
-  spending: Record<string, number>
+/** A section in the combined heatmap */
+export interface HeatmapSection {
+  label: string
   budgetType: BudgetType
+  groups: BudgetWithChildren[]
+}
+
+interface CombinedBudgetHeatmapProps {
+  sections: HeatmapSection[]
+  spending: Record<string, number>
   onNavigate: (budgetId: string) => void
   beschikbaarMap?: Record<string, number>
   previousSpending?: Record<string, number>
@@ -29,8 +35,19 @@ interface TreemapRect {
   spent: number
   limit: number
   parentId: string | null
+  /** Budget type this rect belongs to */
+  budgetType: BudgetType
   /** Flat index for stagger animation */
   index: number
+}
+
+/** Section header label in the SVG treemap */
+interface SectionLabel {
+  label: string
+  budgetType: BudgetType
+  x: number
+  y: number
+  w: number
 }
 
 /** Tooltip data for the hovered cell */
@@ -55,6 +72,12 @@ const CELL_GAP = 3
 /** Corner radius on cells */
 const CELL_RADIUS = 6
 
+/** Height reserved for section label headers in the SVG */
+const SECTION_LABEL_H = 18
+
+/** Gap between sections */
+const SECTION_GAP = 6
+
 /* ── Color interpolation ─────────────────────────────────────── */
 
 /** Linearly interpolate between two hex colors */
@@ -71,16 +94,19 @@ function lerpColor(a: string, b: string, t: number): string {
 /**
  * Determine the heatmap fill color based on budget type and percentage used.
  *
- * Expense budgets use a green-to-red scale (spending is "bad"),
- * while income/savings/debt use neutral-to-green (reaching the goal is "good").
+ * Expense budgets use a neutral/green scale up to 100% (spending within budget is fine),
+ * and only transition to red when exceeding the budget (>100%).
+ * Income/savings/debt use neutral-to-green (reaching the goal is "good").
  */
 function getHeatmapColor(budgetType: BudgetType, percentUsed: number): string {
   const p = Math.max(0, Math.min(percentUsed, 200)) // cap at 200%
 
   if (budgetType === 'expense') {
-    if (p <= 50) return lerpColor('#22c55e', '#a3e635', p / 50)
-    if (p <= 80) return lerpColor('#a3e635', '#facc15', (p - 50) / 30)
-    if (p <= 100) return lerpColor('#facc15', '#f97316', (p - 80) / 20)
+    // 0–100%: neutral gray → green (within budget is good)
+    if (p <= 50) return lerpColor('#d4d4d8', '#a3e635', p / 50)
+    if (p <= 80) return lerpColor('#a3e635', '#22c55e', (p - 50) / 30)
+    if (p <= 100) return lerpColor('#22c55e', '#16a34a', (p - 80) / 20)
+    // >100%: red (over budget)
     return lerpColor('#ef4444', '#991b1b', Math.min((p - 100) / 100, 1))
   }
 
@@ -107,7 +133,7 @@ const NEUTRAL_COLOR = '#e4e4e7'
  * Reference: Bruls, Huizing & van Wijk (2000) — "Squarified Treemaps"
  */
 function squarify(
-  items: { id: string; name: string; icon: string; weight: number; spent: number; limit: number; parentId: string | null }[],
+  items: { id: string; name: string; icon: string; weight: number; spent: number; limit: number; parentId: string | null; budgetType: BudgetType }[],
   x: number,
   y: number,
   w: number,
@@ -213,6 +239,7 @@ function squarify(
 function buildTreemapItems(
   groups: BudgetWithChildren[],
   spending: Record<string, number>,
+  budgetType: BudgetType,
   beschikbaarMap?: Record<string, number>,
 ) {
   const items: {
@@ -223,6 +250,7 @@ function buildTreemapItems(
     spent: number
     limit: number
     parentId: string | null
+    budgetType: BudgetType
   }[] = []
 
   for (const group of groups) {
@@ -240,6 +268,7 @@ function buildTreemapItems(
         spent,
         limit,
         parentId: null,
+        budgetType,
       })
     } else {
       // Add each child as a separate block
@@ -256,12 +285,81 @@ function buildTreemapItems(
           spent,
           limit,
           parentId: group.id,
+          budgetType,
         })
       }
     }
   }
 
   return items
+}
+
+/* ── Build combined sectioned layout ────────────────────────── */
+
+/**
+ * Build a combined treemap with sections stacked vertically.
+ * Each section gets proportional height based on total weight,
+ * with a label header above each section.
+ */
+function buildCombinedLayout(
+  sections: HeatmapSection[],
+  spending: Record<string, number>,
+  beschikbaarMap?: Record<string, number>,
+): { rects: TreemapRect[]; labels: SectionLabel[]; allGroups: BudgetWithChildren[] } {
+  // Build items per section
+  const sectionData = sections
+    .filter((s) => s.groups.length > 0)
+    .map((s) => ({
+      ...s,
+      items: buildTreemapItems(s.groups, spending, s.budgetType, beschikbaarMap),
+    }))
+    .filter((s) => s.items.length > 0)
+
+  if (sectionData.length === 0) return { rects: [], labels: [], allGroups: [] }
+
+  // Compute total weight per section for proportional height allocation
+  const sectionWeights = sectionData.map((s) => s.items.reduce((sum, it) => sum + it.weight, 0))
+  const totalWeight = sectionWeights.reduce((s, w) => s + w, 0)
+
+  // Reserve space for labels and gaps
+  const totalLabelSpace = sectionData.length * SECTION_LABEL_H
+  const totalGapSpace = Math.max(0, sectionData.length - 1) * SECTION_GAP
+  const availableH = VB_H - totalLabelSpace - totalGapSpace
+
+  const allRects: TreemapRect[] = []
+  const labels: SectionLabel[] = []
+  const allGroups: BudgetWithChildren[] = []
+  let yOffset = 0
+  let globalIndex = 0
+
+  for (let si = 0; si < sectionData.length; si++) {
+    const section = sectionData[si]
+    const sectionH = totalWeight > 0
+      ? (sectionWeights[si] / totalWeight) * availableH
+      : availableH / sectionData.length
+
+    // Add section label
+    labels.push({
+      label: section.label,
+      budgetType: section.budgetType,
+      x: 0,
+      y: yOffset,
+      w: VB_W,
+    })
+    yOffset += SECTION_LABEL_H
+
+    // Squarify within this section's area
+    const sectionRects = squarify(section.items, 0, yOffset, VB_W, sectionH, globalIndex)
+    allRects.push(...sectionRects)
+    globalIndex += sectionRects.length
+
+    // Collect groups
+    allGroups.push(...section.groups)
+
+    yOffset += sectionH + SECTION_GAP
+  }
+
+  return { rects: allRects, labels, allGroups }
 }
 
 /* ── Trend arrow helper ──────────────────────────────────────── */
@@ -287,16 +385,15 @@ function getTrendArrow(
 
 function HeatmapTooltip({
   data,
-  budgetType,
   previousSpending,
   containerRef,
 }: {
   data: TooltipData
-  budgetType: BudgetType
   previousSpending?: Record<string, number>
   containerRef: React.RefObject<HTMLDivElement | null>
 }) {
   const { rect, mouseX, mouseY } = data
+  const budgetType = rect.budgetType
   const pct = rect.limit > 0 ? Math.round((rect.spent / rect.limit) * 100) : 0
   const remaining = Math.max(0, rect.limit - rect.spent)
   const overPositive = isOverPositive(budgetType)
@@ -371,139 +468,163 @@ function HeatmapTooltip({
   )
 }
 
-/* ── Legend component ─────────────────────────────────────────── */
+/* ── Combined Legend component ────────────────────────────────── */
 
-function HeatmapLegend({ budgetType }: { budgetType: BudgetType }) {
-  const isExpense = budgetType === 'expense'
-
-  // Build gradient stops
-  const stops = isExpense
-    ? [
-        { offset: '0%', color: '#22c55e' },
-        { offset: '50%', color: '#a3e635' },
-        { offset: '80%', color: '#facc15' },
-        { offset: '100%', color: '#ef4444' },
-      ]
-    : [
-        { offset: '0%', color: '#d4d4d8' },
-        { offset: '50%', color: '#a3e635' },
-        { offset: '80%', color: '#22c55e' },
-        { offset: '100%', color: '#15803d' },
-      ]
-
-  const gradientId = `heatmap-legend-${budgetType}`
+function CombinedHeatmapLegend() {
+  // Combined legend: neutral/green for 0-100%, red for >100% (expense overspend)
+  const gradientId = 'heatmap-legend-combined'
 
   return (
     <div className="mt-4 flex flex-col items-center gap-1">
-      <svg width="240" height="14" viewBox="0 0 240 14" className="overflow-visible">
-        <defs>
-          <linearGradient id={gradientId}>
-            {stops.map((s, i) => (
-              <stop key={i} offset={s.offset} stopColor={s.color} />
-            ))}
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="240" height="10" rx="3" fill={`url(#${gradientId})`} />
-      </svg>
-      <div className="flex w-60 justify-between">
-        <span className="text-[9px] text-[var(--ink-4)]">0%</span>
-        <span className="text-[9px] text-[var(--ink-4)]">50%</span>
-        <span className="text-[9px] text-[var(--ink-4)]">80%</span>
-        <span className="text-[9px] text-[var(--ink-4)]">100%+</span>
+      <div className="flex items-center gap-6">
+        {/* Main scale: 0–100% */}
+        <div className="flex flex-col items-center gap-0.5">
+          <svg width="180" height="14" viewBox="0 0 180 14" className="overflow-visible">
+            <defs>
+              <linearGradient id={gradientId}>
+                <stop offset="0%" stopColor="#d4d4d8" />
+                <stop offset="40%" stopColor="#a3e635" />
+                <stop offset="70%" stopColor="#22c55e" />
+                <stop offset="100%" stopColor="#16a34a" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="180" height="10" rx="3" fill={`url(#${gradientId})`} />
+          </svg>
+          <div className="flex w-[180px] justify-between">
+            <span className="text-[9px] text-[var(--ink-4)]">0%</span>
+            <span className="text-[9px] text-[var(--ink-4)]">50%</span>
+            <span className="text-[9px] text-[var(--ink-4)]">100%</span>
+          </div>
+        </div>
+
+        {/* Overspend indicator */}
+        <div className="flex flex-col items-center gap-0.5">
+          <svg width="50" height="14" viewBox="0 0 50 14" className="overflow-visible">
+            <defs>
+              <linearGradient id="heatmap-legend-over">
+                <stop offset="0%" stopColor="#ef4444" />
+                <stop offset="100%" stopColor="#991b1b" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="50" height="10" rx="3" fill="url(#heatmap-legend-over)" />
+          </svg>
+          <span className="text-[9px] text-[var(--ink-4)]">&gt;100%</span>
+        </div>
       </div>
       <p className="text-[9px] text-[var(--ink-4)]">
-        {isExpense ? 'Groen = ruimte over \u00b7 Rood = over budget' : 'Grijs = begin \u00b7 Groen = doel bereikt'}
+        Grijs = begin &middot; Groen = op schema &middot; Rood = over budget (alleen uitgaven)
       </p>
     </div>
   )
 }
 
-/* ── Mobile layout: stacked groups ───────────────────────────── */
+/* ── Mobile layout: stacked sections with groups ───────────────── */
 
-function MobileHeatmap({
-  groups,
-  rects,
-  budgetType,
+function MobileCombinedHeatmap({
+  sections,
+  spending,
+  beschikbaarMap,
   onNavigate,
   hasEntered,
 }: {
-  groups: BudgetWithChildren[]
-  rects: TreemapRect[]
-  budgetType: BudgetType
+  sections: HeatmapSection[]
+  spending: Record<string, number>
+  beschikbaarMap?: Record<string, number>
   onNavigate: (budgetId: string) => void
   hasEntered: boolean
 }) {
-  const overPositive = isOverPositive(budgetType)
+  let globalIndex = 0
 
   return (
-    <div className="space-y-3">
-      {groups.map((group) => {
-        // Collect rects belonging to this group
-        const groupRects = rects.filter(
-          (r) => r.parentId === group.id || (r.parentId === null && r.id === group.id),
-        )
+    <div className="space-y-6">
+      {sections
+        .filter((s) => s.groups.length > 0)
+        .map((section) => {
+          const items = buildTreemapItems(section.groups, spending, section.budgetType, beschikbaarMap)
+          if (items.length === 0) return null
 
-        if (groupRects.length === 0) return null
+          const overPositive = isOverPositive(section.budgetType)
 
-        const groupTotalLimit = groupRects.reduce((s, r) => s + r.limit, 0)
-        const groupTotalSpent = groupRects.reduce((s, r) => s + r.spent, 0)
+          return (
+            <div key={section.budgetType}>
+              {/* Section header */}
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                {section.label}
+              </h4>
 
-        return (
-          <div
-            key={group.id}
-            className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]"
-          >
-            {/* Group header */}
-            <div className="flex items-center gap-2 border-b border-[var(--border-ed)] px-3 py-2">
-              <BudgetIcon name={group.icon} className="h-3.5 w-3.5 text-[var(--ink-2)]" />
-              <span className="flex-1 truncate text-xs font-semibold text-[var(--ink)]">{group.name}</span>
-              <span className="font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
-                {formatCurrency(groupTotalSpent)} / {formatCurrency(groupTotalLimit)}
-              </span>
+              <div className="space-y-3">
+                {section.groups.map((group) => {
+                  // Collect items belonging to this group
+                  const groupItems = items.filter(
+                    (it) => it.parentId === group.id || (it.parentId === null && it.id === group.id),
+                  )
+
+                  if (groupItems.length === 0) return null
+
+                  const groupTotalLimit = groupItems.reduce((s, it) => s + it.limit, 0)
+                  const groupTotalSpent = groupItems.reduce((s, it) => s + it.spent, 0)
+
+                  return (
+                    <div
+                      key={group.id}
+                      className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]"
+                    >
+                      {/* Group header */}
+                      <div className="flex items-center gap-2 border-b border-[var(--border-ed)] px-3 py-2">
+                        <BudgetIcon name={group.icon} className="h-3.5 w-3.5 text-[var(--ink-2)]" />
+                        <span className="flex-1 truncate text-xs font-semibold text-[var(--ink)]">{group.name}</span>
+                        <span className="font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
+                          {formatCurrency(groupTotalSpent)} / {formatCurrency(groupTotalLimit)}
+                        </span>
+                      </div>
+
+                      {/* Horizontal child blocks */}
+                      <div className="flex flex-wrap gap-1 p-2">
+                        {groupItems.map((item) => {
+                          const idx = globalIndex++
+                          const pct = item.limit > 0 ? Math.round((item.spent / item.limit) * 100) : 0
+                          const color = item.limit > 0 ? getHeatmapColor(section.budgetType, pct) : NEUTRAL_COLOR
+                          const isOver = item.spent > item.limit && item.limit > 0
+
+                          // Width proportional to weight within the group
+                          const totalGroupWeight = groupItems.reduce((s, it) => s + it.weight, 0)
+                          const widthPct = totalGroupWeight > 0 ? (item.weight / totalGroupWeight) * 100 : 100 / groupItems.length
+
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className="flex flex-col items-center justify-center rounded-md px-2 py-2 transition-opacity"
+                              style={{
+                                backgroundColor: color,
+                                width: `calc(${widthPct}% - 4px)`,
+                                minWidth: 60,
+                                minHeight: 52,
+                                opacity: hasEntered ? 1 : 0,
+                                transform: hasEntered ? 'scale(1)' : 'scale(0.92)',
+                                transition: `opacity 0.4s ease-out ${idx * 40}ms, transform 0.4s ease-out ${idx * 40}ms`,
+                              }}
+                              onClick={() => onNavigate(item.id)}
+                            >
+                              <span className="truncate text-[10px] font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
+                                {item.name}
+                              </span>
+                              <span className={`font-mono text-[10px] font-bold tabular-nums [text-shadow:0_1px_2px_rgba(0,0,0,0.3)] ${
+                                isOver ? (overPositive ? 'text-emerald-100' : 'text-red-100') : 'text-white'
+                              }`}>
+                                {pct}%
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-
-            {/* Horizontal child blocks */}
-            <div className="flex flex-wrap gap-1 p-2">
-              {groupRects.map((rect) => {
-                const pct = rect.limit > 0 ? Math.round((rect.spent / rect.limit) * 100) : 0
-                const color = rect.limit > 0 ? getHeatmapColor(budgetType, pct) : NEUTRAL_COLOR
-                const isOver = rect.spent > rect.limit && rect.limit > 0
-
-                // Width proportional to weight within the group
-                const totalGroupWeight = groupRects.reduce((s, r) => s + r.weight, 0)
-                const widthPct = totalGroupWeight > 0 ? (rect.weight / totalGroupWeight) * 100 : 100 / groupRects.length
-
-                return (
-                  <button
-                    key={rect.id}
-                    type="button"
-                    className="flex flex-col items-center justify-center rounded-md px-2 py-2 transition-opacity"
-                    style={{
-                      backgroundColor: color,
-                      width: `calc(${widthPct}% - 4px)`,
-                      minWidth: 60,
-                      minHeight: 52,
-                      opacity: hasEntered ? 1 : 0,
-                      transform: hasEntered ? 'scale(1)' : 'scale(0.92)',
-                      transition: `opacity 0.4s ease-out ${rect.index * 40}ms, transform 0.4s ease-out ${rect.index * 40}ms`,
-                    }}
-                    onClick={() => onNavigate(rect.id)}
-                  >
-                    <span className="truncate text-[10px] font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
-                      {rect.name}
-                    </span>
-                    <span className={`font-mono text-[10px] font-bold tabular-nums [text-shadow:0_1px_2px_rgba(0,0,0,0.3)] ${
-                      isOver ? (overPositive ? 'text-emerald-100' : 'text-red-100') : 'text-white'
-                    }`}>
-                      {pct}%
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
+          )
+        })}
     </div>
   )
 }
@@ -512,7 +633,6 @@ function MobileHeatmap({
 
 function TreemapCell({
   rect,
-  budgetType,
   isHovered,
   hasEntered,
   onMouseEnter,
@@ -520,13 +640,13 @@ function TreemapCell({
   onClick,
 }: {
   rect: TreemapRect
-  budgetType: BudgetType
   isHovered: boolean
   hasEntered: boolean
   onMouseEnter: (e: React.MouseEvent) => void
   onMouseLeave: () => void
   onClick: () => void
 }) {
+  const budgetType = rect.budgetType
   const pct = rect.limit > 0 ? Math.round((rect.spent / rect.limit) * 100) : 0
   const color = rect.limit > 0 ? getHeatmapColor(budgetType, pct) : NEUTRAL_COLOR
   const overPositive = isOverPositive(budgetType)
@@ -628,33 +748,33 @@ function TreemapCell({
   )
 }
 
-/* ── BudgetHeatmap (top-level) ───────────────────────────────── */
+/* ── BudgetHeatmap (top-level — combined) ────────────────────── */
 
 export const BudgetHeatmap = memo(function BudgetHeatmap({
-  groups,
+  sections,
   spending,
-  budgetType,
   onNavigate,
   beschikbaarMap,
   previousSpending,
-}: BudgetHeatmapProps) {
+}: CombinedBudgetHeatmapProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 900 })
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
-  // Build treemap data
-  const items = useMemo(
-    () => buildTreemapItems(groups, spending, beschikbaarMap),
-    [groups, spending, beschikbaarMap],
+  // Build combined sectioned layout
+  const { rects, labels, allGroups } = useMemo(
+    () => buildCombinedLayout(sections, spending, beschikbaarMap),
+    [sections, spending, beschikbaarMap],
   )
 
-  // Compute treemap layout
-  const rects = useMemo(
-    () => squarify(items, 0, 0, VB_W, VB_H, 0),
-    [items],
-  )
+  // Compute total viewbox height based on actual layout
+  const totalVbH = useMemo(() => {
+    if (rects.length === 0) return VB_H
+    const maxY = Math.max(...rects.map((r) => r.y + r.h))
+    return Math.max(maxY + 4, VB_H)
+  }, [rects])
 
   // Group parent outlines for SVG labels
   const parentOutlines = useMemo(() => {
@@ -669,7 +789,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
         existing.maxX = Math.max(existing.maxX, rect.x + rect.w)
         existing.maxY = Math.max(existing.maxY, rect.y + rect.h)
       } else {
-        const parent = groups.find((g) => g.id === pid)
+        const parent = allGroups.find((g) => g.id === pid)
         if (parent) {
           map.set(pid, {
             name: parent.name,
@@ -683,7 +803,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
       }
     }
     return Array.from(map.entries())
-  }, [rects, groups])
+  }, [rects, allGroups])
 
   const handleMouseEnter = useCallback((rect: TreemapRect, e: React.MouseEvent) => {
     setHoveredId(rect.id)
@@ -700,8 +820,9 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
     setTooltip(null)
   }, [])
 
-  // Edge case: empty groups
-  if (groups.length === 0) return null
+  // Edge case: no sections with data
+  const hasData = sections.some((s) => s.groups.length > 0)
+  if (!hasData) return null
 
   return (
     <div ref={ref}>
@@ -709,7 +830,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
         {/* Desktop: SVG treemap (hidden below md) */}
         <div className="hidden md:block">
           <svg
-            viewBox={`0 0 ${VB_W} ${VB_H}`}
+            viewBox={`0 0 ${VB_W} ${totalVbH}`}
             className="h-auto w-full"
             preserveAspectRatio="xMidYMid meet"
             onMouseMove={handleMouseMove}
@@ -718,6 +839,20 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
               opacity: hasEntered ? undefined : 0,
             }}
           >
+            {/* Section labels */}
+            {labels.map((label) => (
+              <text
+                key={`section-${label.budgetType}`}
+                x={label.x + 4}
+                y={label.y + 13}
+                className="fill-[var(--ink-2)] font-sans text-[12px] font-semibold uppercase tracking-wider"
+                opacity={hasEntered ? 1 : 0}
+                style={{ transition: 'opacity 0.4s ease-out 0.1s', letterSpacing: '0.05em' }}
+              >
+                {label.label}
+              </text>
+            ))}
+
             {/* Parent group outlines — subtle dashed borders with labels */}
             {parentOutlines.map(([pid, outline]) => (
               <g key={`outline-${pid}`}>
@@ -755,7 +890,6 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
               <TreemapCell
                 key={rect.id}
                 rect={rect}
-                budgetType={budgetType}
                 isHovered={hoveredId === rect.id}
                 hasEntered={hasEntered}
                 onMouseEnter={(e) => handleMouseEnter(rect, e)}
@@ -774,12 +908,12 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
           )}
         </div>
 
-        {/* Mobile: stacked groups (visible below md) */}
+        {/* Mobile: stacked sections with groups (visible below md) */}
         <div className="md:hidden">
-          <MobileHeatmap
-            groups={groups}
-            rects={rects}
-            budgetType={budgetType}
+          <MobileCombinedHeatmap
+            sections={sections}
+            spending={spending}
+            beschikbaarMap={beschikbaarMap}
             onNavigate={onNavigate}
             hasEntered={hasEntered}
           />
@@ -790,7 +924,6 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
           <div className="hidden md:block">
             <HeatmapTooltip
               data={tooltip}
-              budgetType={budgetType}
               previousSpending={previousSpending}
               containerRef={containerRef}
             />
@@ -798,8 +931,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
         )}
       </div>
 
-      {/* Legend */}
-      <HeatmapLegend budgetType={budgetType} />
+      {/* Combined legend */}
+      <CombinedHeatmapLegend />
     </div>
   )
 })
