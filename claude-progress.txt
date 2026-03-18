@@ -14798,3 +14798,23 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#214)
 - 212/213 features passing
+
+## Session 2026-03-18 - Feature #215
+
+### Feature #215: Budget heatmap samenvoegen + rood alleen bij >100% - PASSING
+- Merged 4 separate BudgetHeatmap instances (income, expense, savings, debt) into one combined treemap
+- New `HeatmapSection` interface: `{ label, budgetType, groups }` array replaces single budgetType prop
+- Combined SVG layout: sections stacked vertically with proportional height allocation, section label headers
+- Changed expense color scheme: 0-100% now uses neutral gray → green (same as income/savings/debt), only >100% transitions to red
+- New `CombinedHeatmapLegend`: shows 0-100% gray→green scale + separate >100% red indicator
+- New `MobileCombinedHeatmap`: stacked sections with section header labels per budget type
+- `buildCombinedLayout()`: allocates proportional vertical space per section based on total weight
+- Each TreemapRect now carries `budgetType` field for per-cell coloring
+- Tooltip updated to read budgetType from rect instead of component prop
+- budgets-client.tsx: single `<BudgetHeatmap sections={[...]} />` replaces 4 separate instances
+- Zero TypeScript errors
+- Commit: ce578185
+
+### Current Status
+- 1 feature completed this session (#215)
+- 214/214 features passing
