@@ -1,3 +1,27 @@
+## Session 2026-03-18 - Feature #221
+
+### Feature #221: Onttrekkingsstrategie — Integratie in simulateDecumulation - PASSING
+- Core integration was already implemented by feature #222 agent (commit 833c575f)
+- Changes verified in fire-simulation.ts: applyWithdrawalStrategy replaces hardcoded withdrawal logic
+- simulateDecumulation accepts useWithdrawalStrategy flag: true for visualisation, false for binary search
+- Binary search (requiredAt) always uses static strategy for conservative FIRE-age calculation
+- WithdrawalContext built from simulation variables: currentPortfolio, startPortfolio, previousWithdrawal, etc.
+- useHorizonFireSim hook accepts optional withdrawalStrategy param, passed to runSimulation
+- horizon-data-loader.ts loads withdrawal_strategy fields from profiles query
+- horizon-client.tsx initializes withdrawalStrategyConfig from server data, refreshes via API
+- Created comprehensive integration test suite (lib/fire-withdrawal-integration.test.ts):
+  - 10 tests covering static identity, dynamic strategies, and FIRE age conservation
+  - Verified byte-for-byte identical output for static vs no-strategy with all 3 FIRE strategies
+  - Verified static identity with multiple life events (AOW, pension, children, inheritance)
+  - Verified guardrails/VPW/bucket produce valid output with life events
+  - Verified FIRE age is identical across all strategies (binary search uses static)
+- All 73 related tests passing (17 fire-sim + 12 chart + 34 withdrawal + 10 integration)
+- Zero TypeScript errors (only pre-existing regression-test module errors)
+- Commit: 26155db6
+
+### Current Status
+- 1 feature completed this session (#221)
+
 ## Session 2026-03-18 - Feature #222
 
 ### Feature #222: Onttrekkingsstrategie — Instellingen UI - PASSING
