@@ -497,6 +497,11 @@ export async function loadAllTests(): Promise<void> {
     const wilGezondheidMod = await import('@/lib/regression-tests/suites/wil-gezondheid')
     wilGezondheidMod.register()
   } catch { /* module not found yet */ }
+
+  try {
+    const featureGatingMod = await import('@/lib/regression-tests/suites/feature-gating')
+    featureGatingMod.register()
+  } catch { /* module not found yet */ }
 }
 
 /** Reset loaded flag (for testing) */
