@@ -1,3 +1,37 @@
+## Session 2026-03-18 - Features #219, #220
+
+### Feature #219: Onttrekkingsstrategie — Database & types - PASSING
+- Created migration: `20260318000001_add_withdrawal_strategy_columns.sql`
+  - 5 new columns on profiles: withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step
+  - All NOT NULL with sensible defaults, idempotent with IF NOT EXISTS
+- Created `lib/withdrawal-strategy.ts` with types + resolver:
+  - WithdrawalStrategyType: 'static' | 'guardrails' | 'vpw' | 'bucket'
+  - WithdrawalStrategyConfig interface + WITHDRAWAL_DEFAULTS
+  - resolveWithdrawalStrategy(profile) with fallback to defaults
+- Created API route `app/api/withdrawal-strategy/route.ts` (GET/PUT):
+  - Full validation: strategy enum, floor < ceiling, floor ≥ 0.50, ceiling ≤ 2.00, steps 0.01-0.50
+  - Returns 401 for unauthenticated, 400 for invalid input
+- No existing files modified — purely additive
+
+### Feature #220: Onttrekkingsstrategie — applyWithdrawalStrategy engine - PASSING
+- Added `applyWithdrawalStrategy()` pure function to lib/withdrawal-strategy.ts
+- WithdrawalContext interface with all required simulation year context
+- BucketState interface for bucket strategy tracking
+- Four strategies implemented:
+  - static: Math.max(0, baseExpenses - recurringIncome) — exact match to current simulateDecumulation
+  - guardrails: Guyton-Klinger with prosperity/preservation rules, inflation-skip, floor/ceiling clamping
+  - vpw: Variable Percentage Withdrawal formula with annuity factor, minimum floor
+  - bucket: 3-bucket model (cash 2yr/bonds 5yr/stocks rest) + rebalanceBuckets() helper
+- initBucketState() and rebalanceBuckets() helper functions exported
+- 34 unit tests all passing, covering all strategies + edge cases
+- 17 existing FIRE simulation regression tests still pass — zero regressions
+- Commits: fca5effb
+
+### Current Status
+- 2 features completed this session (#219, #220)
+- Zero TypeScript errors
+- 34 new + 17 existing tests all passing
+
 ## Session 2026-03-18 - Feature #217
 
 ### Feature #217: Financiële Gezondheids Score (vervangt veerkracht_score) - PASSING
@@ -14891,3 +14925,32 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#226)
 - 217/225 features passing (96.4%)
+
+## Session 2026-03-18 - Features #225, #224
+
+### Feature #225: FIRE-simulatie regressietests — PASSING
+- Created `lib/fire-simulation.test.ts` with 17 tests covering all required steps
+- STANDARD_PROFILE fixture: age 35, €150K portfolio, €36K expenses, €18K savings, 7%/2%, nl_box3
+- Section A (strategies): deplete (endPortfolio ≈ €0), legacy (indexed €200K preserved), perpetual (survives 100yr), ordering comparison
+- Section B (FIRE age): basic case with fractional precision, unreachable scenario (0 portfolio/savings), parameter sensitivity (return/expenses/savings)
+- Section C (metrics): requiredFirePortfolio consistency, implicitWithdrawalRate + classic25xTarget formulas
+- Section D (cashflows): AOW reduces withdrawal post-67, pension lowers FIRE age, children NIBUD phases (baby 1.2×/basisschool 1.0×/tiener 1.3×), inheritance boosts portfolio, combination (no NaN/Infinity), empty cashflows = baseline, order independence
+- All 17 tests pass
+- Commit: 1c6af098
+
+### Feature #224: Horizon grafiek regressietest — PASSING
+- Created `lib/horizon-fire-chart.test.ts` with 12 tests covering all required steps
+- Tests computeFireProjection (fireAge, fireTarget ≥ 25× expenses)
+- Tests computeFireRange (optimistic < expected < pessimistic ordering)
+- Tests 3 end-of-life strategies via runSimulation (deplete/perpetual/legacy)
+- Tests life events: AOW+pension lower FIRE age, one-time expense raises it with portfolio dip
+- Tests FIRE portfolio consistency (firePortfolioAtFire ≥ requiredFirePortfolio)
+- Tests resolveFireParams with custom parameters + effect on fireAge
+- Edge cases: unreachable FIRE (negative savings), already FIRE-achieved (€2M portfolio)
+- All 12 tests pass
+- Commit: 0d457a7d
+
+### Current Status
+- 2 features completed this session (#225, #224)
+- Both are regression test suites for the FIRE simulation engine
+- 29 total tests across both files, all passing
