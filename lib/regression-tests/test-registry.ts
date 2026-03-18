@@ -180,6 +180,30 @@ registerCategory({
   testCount: 0,
 })
 
+registerCategory({
+  id: 'onboarding-budgets',
+  label: 'Onboarding — Budgetten',
+  description: 'Budget template selectie, AI suggesties, handmatige bewerking',
+  icon: 'Wallet',
+  testCount: 0,
+})
+
+registerCategory({
+  id: 'onboarding-preferences',
+  label: 'Onboarding — Voorkeuren',
+  description: 'Dashboard focus selectie en widget voorkeur generatie',
+  icon: 'SlidersHorizontal',
+  testCount: 0,
+})
+
+registerCategory({
+  id: 'onboarding-reset',
+  label: 'Onboarding — Reset',
+  description: 'Onboarding reset flow: data wipe, profiel reset, herstart',
+  icon: 'RotateCcw',
+  testCount: 0,
+})
+
 // ── Dynamic test loader ─────────────────────────────────────────────────────
 // This function dynamically imports all test modules and registers their tests.
 
@@ -317,6 +341,31 @@ export async function loadAllTests(): Promise<void> {
   try {
     const obIntroMod = await import('@/lib/regression-tests/suites/onboarding-intro')
     obIntroMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obIdentityMod = await import('@/lib/regression-tests/suites/onboarding-identity')
+    obIdentityMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obExtrasMod = await import('@/lib/regression-tests/suites/onboarding-extras')
+    obExtrasMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obBudgetsMod = await import('@/lib/regression-tests/suites/onboarding-budgets')
+    obBudgetsMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obPrefsMod = await import('@/lib/regression-tests/suites/onboarding-preferences')
+    obPrefsMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const obResetMod = await import('@/lib/regression-tests/suites/onboarding-reset')
+    obResetMod.register()
   } catch { /* module not found yet */ }
 }
 
