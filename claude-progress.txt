@@ -15240,3 +15240,41 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#271, #272)
 - 21 total regression tests added
+
+## Session 2026-03-18 - Features #267, #268
+
+### Feature #267: Test: Briefing directives beheer - PASSING
+- Created lib/regression-tests/suites/briefing-directives.ts with 20 tests
+- Category: Beheer - Briefing (beheer-briefing)
+- Temporal directives: months filter, day ranges, priority sorting, enabled/disabled toggle
+- Functional directives: DIRECTIVE_METRICS completeness, evaluateFunctionalDirective
+- Prompt preview: formatting with priority prefixes, ACTIEF/INACTIEF tags
+- Zero TypeScript errors, Commit: e6f49d0b
+
+### Feature #268: Test: Testdata seeding and admin beheer - PASSING
+- Created lib/regression-tests/suites/beheer-testdata.ts with 20 tests
+- Category: Beheer - Testdata (beheer-testdata)
+- Persona validation: all 6 personas, profiles, meta, bank accounts
+- Budget templates: 4 templates with parent-child structure
+- Sovereignty phases, FIRE params, life events, holdings, widget prefs
+- Zero TypeScript errors, Commit: 8b65ba77
+
+### Current Status
+- 2 features completed this session (#267, #268)
+- 40 total regression tests across both files
+
+## Session 2026-03-18 - Features #276, #277
+
+### Feature #276: Test: Onboarding flow - stap navigatie & state management - PASSING
+- Created onboarding-flow.ts with 12 tests covering step order, state preservation, transitions, auth, errors
+- Registered under Onboarding - Flow category
+
+### Feature #277: Test: Onboarding Stap 1 - Intro - PASSING
+- Created onboarding-intro.ts with 8 tests covering WillDots, tagline, module cards, CTA, logout
+- Registered under Onboarding - Intro category
+
+### Current Status
+- 2 features completed this session (#276, #277)
+- 20 total regression tests added
+- Zero TypeScript errors
+- Commit: 7a909a8c
