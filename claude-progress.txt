@@ -1,3 +1,42 @@
+## Session 2026-03-18 - Features #282, #283
+
+### Feature #282: Test: Onboarding save flow & success - PASSING
+- Created lib/regression-tests/suites/onboarding-save.ts with 11 tests
+- Category: Onboarding — Save & Success (onboarding-save)
+- Tests cover all 11 feature steps:
+  - handleSaveOwnData request body construction (identity, budgetAmounts, widgetPrefs, bankAccounts, assets, debts)
+  - Numeric conversion: string inputs → Number() for API
+  - Filtering: items without required fields (name, balance) skipped
+  - 10-second timeout via AbortController with specific error messages
+  - Saving animation: WillDots 64px pulse, 5 rotating messages at 800ms intervals
+  - Progress bar: ramp 0%→90% over ~3s (+3% every 100ms), jump to 100% on success
+  - Zod schema validation: empty body, invalid household_type, negative income, out-of-range return
+  - onboarding_completed flag, is_demo_user, budgeting_active, FIRE field mapping
+  - Success screen: WillDots 140px, module cards (Kern/Wil/Horizon), "Bekijk De Kern" CTA → /core
+  - POST /api/activate: phase computation via computeFeatureAccess, double-activation guard
+  - Category registration verification
+
+### Feature #283: Test: Onboarding persona seeding flow - PASSING
+- Created lib/regression-tests/suites/onboarding-persona-seed.ts with 9 tests
+- Category: Onboarding — Persona Seeding (onboarding-persona-seed)
+- Tests cover all 9 feature steps:
+  - POST /api/onboarding/seed: auth, persona key validation, onboarding_completed guard (403)
+  - NDJSON streaming: Content-Type, progress object format, 7 total steps, done/error lines
+  - deleteAllUserData: 4 FK-compatible batches, 26+ tables, bank connection chain order
+  - seedPersonaData: all 6 personas validated for required data arrays and structures
+  - 4-phase insert order: cash→basis→dependent→transactions→valuations/holdings, batch size 50
+  - is_demo_user=true after persona seed (vs false for own data)
+  - onboarding_completed flag: one-way gate, guard sequence
+  - Metadata constraint (bug #225 regression): all life_events have non-null metadata via ?? {}
+  - Category registration with ob-seed- prefix convention
+- Registered both suites + categories in test-registry.ts
+- Zero TypeScript errors
+- Commit: b2519f4b
+
+### Current Status
+- 2 features completed this session (#282, #283)
+- 20 total regression tests across both files
+
 ## Session 2026-03-18 - Features #288, #287
 
 ### Feature #288: Horizon grafiek — database migratie withdrawal strategy kolommen - PASSING
@@ -15418,3 +15457,23 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#278, #279)
 - 25 total tests across both files
+
+## Session 2026-03-18 - Features #230, #231
+
+### Feature #230: Test: Budget berekeningen - PASSING
+- Created budget-berekeningen.ts with 24 tests under kern-budgets category
+- computeYearlyMustExpenses: essential children, fallback, orphans, excluded types
+- computeRetirementExpenses: all 3 methods plus fallback chains
+- Forecast, rollover, alerts logic tests
+
+### Feature #231: Test: Recurring detection and matching - PASSING
+- Created recurring-transfers.ts with 22 tests under kern-transactie-analyse
+- Salary, subscription, fixed cost detection plus edge cases
+- detectFrequency, detectCategory, normalizeCounterparty
+- IBAN cross-match, false positive prevention, sorting
+
+### Current Status
+- 2 features completed (#230, #231)
+- 46 total regression tests
+- Zero TypeScript errors
+- Commit: ba8562d6
