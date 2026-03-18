@@ -15224,3 +15224,19 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#262, #263)
 - Zero TypeScript errors
 - Commit: 0f8c8adc
+
+## Session 2026-03-18 - Features #271, #272
+
+### Feature #271: Test: Bank connectie admin - PASSING
+- Created beheer-bank-connect.ts with 10 tests
+- TrueLayer toggle, credentials masking, environment selection, test-connection, admin guards
+- Commit: 726f8f3b
+
+### Feature #272: Test: Nieuws & AI features beheer - PASSING
+- Created beheer-nieuws-ai.ts with 11 tests
+- News prompt CRUD, AI feature flags, validation, admin guard consistency
+- Commit: 5397b5f9
+
+### Current Status
+- 2 features completed this session (#271, #272)
+- 21 total regression tests added
