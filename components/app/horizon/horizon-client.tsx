@@ -37,7 +37,7 @@ import {
   Hourglass, TrendingUp, Percent, Shield, Info,
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
-  DollarSign, TableProperties,
+  DollarSign, TableProperties, RefreshCw,
   ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -1658,8 +1658,28 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </div>
           )}
 
-          {/* Grafiekgedeelte — alleen zichtbaar als simResult beschikbaar is */}
-          {simResult && (
+          {/* Grafiekgedeelte — fallback UI als simResult niet beschikbaar is */}
+          {!simResult && !loading ? (
+            <div className="flex flex-col items-center justify-center rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] px-6 py-16 text-center" style={{ minHeight: 320 }}>
+              <AlertTriangle className="mb-3 h-8 w-8 text-[var(--ink-4)]" />
+              <p className="font-sans text-sm font-medium text-[var(--ink-2)]">
+                Grafiek kan niet worden geladen
+              </p>
+              <p className="mt-1.5 max-w-xs font-sans text-xs text-[var(--ink-3)]">
+                {simError
+                  ? 'Er is een fout opgetreden bij het berekenen van je FIRE-projectie. Controleer je profielgegevens of probeer opnieuw.'
+                  : 'Profieldata ontbreekt of is onvolledig. Vul je profiel aan om je FIRE-projectie te zien.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => loadData()}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-[var(--r-sm)] border border-horizon-200 bg-horizon-50 px-3 py-1.5 font-sans text-xs font-medium text-horizon-600 transition-colors hover:bg-horizon-100"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Opnieuw laden
+              </button>
+            </div>
+          ) : simResult ? (
             <>
               <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
 
@@ -1818,7 +1838,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 Wat als...? Speel met je toekomst &rarr;
               </button>
             </>
-          )}
+          ) : null}
         </div>
       </section>
 
