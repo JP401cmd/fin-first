@@ -109,6 +109,22 @@ registerCategory({
 })
 
 registerCategory({
+  id: 'kern-berekeningen',
+  label: 'De Kern — Berekeningen',
+  description: 'Regressietests voor core-metrics: effectieve uitgaven, FIRE target, vrijheidspercentage, vrijheidstijd, spaarquote',
+  icon: 'Calculator',
+  testCount: 0,
+})
+
+registerCategory({
+  id: 'kern-formatting',
+  label: 'De Kern — Formatting',
+  description: 'Format utilities: valuta, vrijheidstijd strings, percentages',
+  icon: 'Type',
+  testCount: 0,
+})
+
+registerCategory({
   id: 'widget-systeem',
   label: 'Widget Systeem',
   description: 'Widget ordering, preferences, catalog',
@@ -217,6 +233,14 @@ registerCategory({
   label: 'Onboarding — Save & Success',
   description: 'Save flow, animatie, voortgangsbalk, success scherm, fase activatie',
   icon: 'Save',
+  testCount: 0,
+})
+
+registerCategory({
+  id: 'onboarding-persona-seed',
+  label: 'Onboarding — Persona Seeding',
+  description: 'Persona seed flow: NDJSON streaming, deleteAllUserData, seedPersonaData, metadata constraints',
+  icon: 'UserPlus',
   testCount: 0,
 })
 
@@ -392,6 +416,11 @@ export async function loadAllTests(): Promise<void> {
   try {
     const obSaveMod = await import('@/lib/regression-tests/suites/onboarding-save')
     obSaveMod.register()
+  } catch { /* module not found yet */ }
+
+  try {
+    const kernFmtMod = await import('@/lib/regression-tests/suites/kern-formatting')
+    kernFmtMod.register()
   } catch { /* module not found yet */ }
 }
 
