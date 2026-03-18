@@ -15589,3 +15589,22 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed (#238, #239)
 - 40 total regression tests
+
+## Session 2026-03-18 - Feature #243
+
+### Feature #243: Test: Nieuws and AI content systeem - PASSING
+- Created lib/regression-tests/suites/nieuws-content.ts with 27 tests
+- Registered under category Berichten AI Content (berichten-ai-content)
+- Tests cover all 6 feature steps:
+  - News generation: schema validation (6 categories, required fields), impact type sorting, auth guard, cache TTL
+  - Tool-to-card mapping (19 tools), CARD_SPAN completeness, compose auth and validation
+  - Progressive loading: GenerationState and CompositionState structures, timeout/TTL values
+  - Polling endpoints: idle/composing/done/error response shapes, partial items, rate limit 429
+  - validateLayout: milestone position, last card ending, adjacent same-type, row fill, card count preservation
+  - validateCardHrefs: valid routes, aliases, prefix match, invalid removal, checklist nesting
+- Zero TypeScript errors
+- Commits: d32d13e6, c8a9b47a
+
+### Current Status
+- 1 feature completed this session (#243)
+- 27 regression tests added
