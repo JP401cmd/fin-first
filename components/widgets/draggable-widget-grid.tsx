@@ -235,13 +235,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     }),
   )
 
-  const scheduleSave = useCallback((widgets: WidgetPref[]) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      performSave(widgets)
-    }, 800)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   const performSave = useCallback(async (widgets: WidgetPref[]) => {
     setSaveState('saving')
     setSaveError(null)
@@ -271,6 +264,13 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     }
   }, [allPrefs])
 
+  const scheduleSave = useCallback((widgets: WidgetPref[]) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      performSave(widgets)
+    }, 800)
+  }, [performSave])
+
   const handleResize = useCallback((widgetId: string, size: WidgetSize) => {
     setActiveWidgets(prev => {
       const updated = prev.map(w =>
@@ -292,10 +292,11 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const handleAdd = useCallback((widgetId: string) => {
     setActiveWidgets(prev => {
       const maxOrder = prev.reduce((max, w) => Math.max(max, w.order), 0)
+      const def = getWidgetDef(widgetId)
       const newWidget: WidgetPref = {
         id: widgetId,
         enabled: true,
-        size: 'quarter' as WidgetSize,
+        size: def?.defaultSize ?? 'quarter' as WidgetSize,
         order: maxOrder + 1,
       }
       const updated = [...prev, newWidget]
@@ -364,9 +365,9 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     }
   }, [activeWidgets, allPrefs])
 
-  const toggleEditMode = useCallback(() => {
+  const toggleEditMode = useCallback(async () => {
     if (isEditMode) {
-      handleGereed()
+      await handleGereed()
     } else {
       setIsEditMode(true)
       setSaveError(null)

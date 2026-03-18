@@ -1,3 +1,19 @@
+## Session 2026-03-18 - Feature #305
+
+### Feature #305: Widget opslag Wil pagina — save niet persistent na refresh - PASSING
+- Bug: Widget changes on Wil page were not persisting after refresh due to 4 related issues
+- Fix 1 (main cause): Made toggleEditMode async and await handleGereed() so save completes before UI state changes
+- Fix 2: Added .select('id') to API update query and verify data.length > 0 to detect failed updates
+- Fix 3: handleAdd now uses def?.defaultSize instead of hardcoded 'quarter', so widgets with restricted sizes get correct default
+- Fix 4: Moved performSave before scheduleSave and added performSave to scheduleSave's dependency array, fixing stale closure
+- Zero TypeScript errors in modified files
+- Auth rate limit prevented full browser testing (Supabase email rate limit)
+- API endpoint verified working (401 for unauth, correct response structure)
+
+### Current Status
+- 1 feature completed this session (#305)
+- 4 bug fixes applied across 2 files
+
 ## Session 2026-03-18 - Feature #301
 
 ### Feature #301: Regressietest: Household/Partner functies - PASSING

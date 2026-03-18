@@ -25,12 +25,14 @@ export async function PUT(request: Request) {
         order: Number(w.order) || 0,
       }))
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .update({ widget_prefs: { widgets: sanitized } })
       .eq('id', user.id)
+      .select('id')
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('No profile updated')
 
     return NextResponse.json({ success: true })
   } catch (err) {
