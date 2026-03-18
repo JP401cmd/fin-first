@@ -21,6 +21,7 @@ const tabs = [
   { label: 'AOW-leeftijd', href: '/beheer/aow-leeftijd' },
   { label: 'Will Avatar', href: '/beheer/will-avatar' },
   { label: 'Roadmap', href: '/beheer/roadmap', activeClass: 'border-[var(--horizon-500)] text-[var(--horizon-500)]' },
+  { label: 'Regressietest', href: '/beheer/regressietest', activeClass: 'border-emerald-500 text-emerald-700' },
 ] as const
 
 export function BeheerNav() {

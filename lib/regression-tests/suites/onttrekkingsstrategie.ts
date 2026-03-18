@@ -84,11 +84,11 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'withdrawal-abw', name: 'ABW strategie', category: CAT,
-    description: 'ABW combineert amortisatie met vloer/plafond',
+    id: 'withdrawal-bucket', name: 'Bucket strategie', category: CAT,
+    description: 'Bucket combineert korte/lange termijn allocaties',
     priority: 'medium', estimatedDurationMs: 10,
     fn() {
-      const w = applyWithdrawalStrategy(makeConfig({ strategy: 'abw' }), makeCtx())
+      const w = applyWithdrawalStrategy(makeConfig({ strategy: 'bucket' }), makeCtx())
       assertGreaterThan(w, 0, 'positief')
     },
   },
