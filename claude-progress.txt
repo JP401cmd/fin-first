@@ -1,3 +1,25 @@
+## Session 2026-03-18 - Features #280, #281
+
+### Feature #280: Test: Onboarding Stap 4 — Budgetten - PASSING
+- Created lib/regression-tests/suites/onboarding-budgets.ts with 8 tests
+- Registered under category 'Onboarding — Budgetten'
+- Tests: profile templates (zuinig/gebalanceerd/fire), template switching, AI suggest API, fallback, BudgetAmountEditor, budget slugs completeness, numeric validation, route accessibility
+- All templates verified: percentages sum to 100%, correct ordering of vaste/sparen ratios
+- buildProfileAmounts tested with multiple incomes (0, 1500, 2500, 3000, 5000, 10000)
+
+### Feature #281: Test: Onboarding Stap 5 — Voorkeuren & dashboard focus - PASSING
+- Created lib/regression-tests/suites/onboarding-preferences.ts with 6 tests
+- Registered under category 'Onboarding — Voorkeuren'
+- Tests: 5 focus options, buildWidgetPrefsFromPreferences widget boost mapping, INITIAL_PREFERENCES/DEFAULT_PREFERENCES defaults, buildDashboardLayout integration, focus → dashboard effects, route accessibility
+- Verified FOCUS_WIDGET_BOOST mapping for all 5 focuses
+- Verified combo focus (2 selections) produces union of widget boosts
+
+### Current Status
+- 2 features completed this session (#280, #281)
+- Zero TypeScript errors in new files
+- Auth rate limit prevented browser testing (known Supabase issue)
+- Commit: 9fa43eed
+
 ## Session 2026-03-18 - Feature #275
 
 ### Feature #275: Test: Propositie, releases & roadmap (read-only pagina's) - PASSING
@@ -15297,3 +15319,52 @@ For Feature #51 (Transaction Import):
 - 20 total regression tests added
 - Zero TypeScript errors
 - Commit: 7a909a8c
+
+## Session 2026-03-18 - Feature #286
+
+### Feature #286: Horizon grafiek - error handling bij falende profile query - PASSING
+- Added PROFILE_DEFAULTS fallback, console.error/warn logging, profileError propagation to UI
+- Amber warning banner shown when profile query fails
+- Zero TypeScript errors, commit: 92e58b22
+
+## Session 2026-03-18 - Features #278, #279
+
+### Feature #278: Test: Onboarding Stap 2 — Identity gegevens - PASSING
+- Created lib/regression-tests/suites/onboarding-identity.ts with 13 tests
+- Category: Onboarding — Identity (onboarding-identity)
+- Tests cover all 11 feature steps:
+  - Required fields: full_name (min 2 tekens), date_of_birth (18-100 jaar), net_monthly_income (>0, ≤1M)
+  - Household type: solo/samen/gezin selection, conditional number_of_children (1-20 for gezin)
+  - Estimated monthly expenses: optional field shown when budgettering_mode === 'none'
+  - Budgettering mode: 'yes'/'none' toggle
+  - FIRE parameters: expected_return (7%), inflation_rate (2%), 3 retirement methods, 3 strategies
+  - Conditional fields: legacy_amount only for 'legacy', fire_end_age (60-120) only for 'deplete'
+  - Temporal balance: slider 1-5 with 5 named levels
+  - SpeechBubble: 3 guidance sections with WillDots avatar
+  - Validation error display: red border class + error text on touch/submit
+  - Step progression: blocks on invalid, allows on valid
+  - Full integration: all conditional paths combined
+
+### Feature #279: Test: Onboarding Stap 3 — Extras (optionele data) - PASSING
+- Created lib/regression-tests/suites/onboarding-extras.ts with 12 tests
+- Category: Onboarding — Extras (onboarding-extras)
+- Tests cover all 12 feature steps:
+  - Collapsible sections: 3 sections (bank/assets/debts), all optional, toggle state
+  - MiniBankForm: name, bank_name, balance, account_type (checking/savings/joint), add/update
+  - MiniBankForm validation: fields checked for completeness
+  - MiniAssetForm basic: 12 asset types, save gate (name + current_value)
+  - MiniAssetForm extended: institution, subtype, risk_profile, tax_benefit, is_liquid, ticker_symbol
+  - MiniAssetForm vastgoed: rental_income, woz_value, address_postcode, address_house_number, depreciation_rate
+  - MiniAssetForm pensioen: retirement_provider_type
+  - MiniDebtForm basic: 8 debt types, save gate (name + current_balance), all 7 base fields
+  - MiniDebtForm extended: creditor, subtype, repayment_type, is_tax_deductible, nhg, fixed_rate_end_date, credit_limit
+  - Multiple items: 3+ of each type simultaneously
+  - Item deletion: filter-by-index pattern for all form types
+  - Route accessibility check
+- Both suites registered in test-registry.ts
+- Zero TypeScript errors in new files (3 pre-existing in other files)
+- Commit: ba73999d
+
+### Current Status
+- 2 features completed this session (#278, #279)
+- 25 total tests across both files
