@@ -17894,3 +17894,14 @@ Current status: 369/371 features passing (99.5%)
 
 ### Current Status
 - 2 features completed this session (#392, #393)
+
+## Session 2026-03-19 - Feature #396
+
+### Feature #396: Gids uitbreiding: Hypotheek vs Beleggen uitleg - PASSING
+- Added GuideTopicCard to gids page (identity/gids/page.tsx) in De Kern section
+- Content covers: HRA, Box 3 effect, breakeven rendement, risicoverschil
+- Includes 6-step 'Hoe werkt het?' with practical tip
+- Added to naslagwerk index (guide-naslagwerk.tsx) under De Kern
+- Verified: card renders, collapsible expands, naslagwerk entry scrolls to card
+- No new console errors introduced
+- Stats: 393/397 passing (99.0%)
