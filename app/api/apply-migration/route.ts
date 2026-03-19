@@ -451,6 +451,30 @@ $$`,
   // ── 20260319000003: Invulfase active flag ───────────────────────────
   `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS invulfase_active boolean NOT NULL DEFAULT false`,
 
+  // ── 20260319000004: Roadmap features table ─────────────────────────
+  `CREATE TABLE IF NOT EXISTS roadmap_features (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    feature_nr int NOT NULL,
+    fase text NOT NULL CHECK (fase IN ('a', 'b', 'c', 'd')),
+    status text NOT NULL DEFAULT 'backlog' CHECK (status IN ('backlog', 'in_ontwikkeling', 'testen', 'afgerond')),
+    opmerkingen text,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (feature_nr, fase)
+  )`,
+  `ALTER TABLE roadmap_features ENABLE ROW LEVEL SECURITY`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roadmap_features' AND policyname='Authenticated can read roadmap features') THEN CREATE POLICY "Authenticated can read roadmap features" ON roadmap_features FOR SELECT TO authenticated USING (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roadmap_features' AND policyname='Authenticated can insert roadmap features') THEN CREATE POLICY "Authenticated can insert roadmap features" ON roadmap_features FOR INSERT TO authenticated WITH CHECK (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roadmap_features' AND policyname='Authenticated can update roadmap features') THEN CREATE POLICY "Authenticated can update roadmap features" ON roadmap_features FOR UPDATE TO authenticated USING (true) WITH CHECK (true); END IF; END $$`,
+  `CREATE OR REPLACE FUNCTION update_roadmap_features_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql`,
+  `DROP TRIGGER IF EXISTS roadmap_features_updated_at ON roadmap_features`,
+  `CREATE TRIGGER roadmap_features_updated_at BEFORE UPDATE ON roadmap_features FOR EACH ROW EXECUTE FUNCTION update_roadmap_features_updated_at()`,
+
   // ── PostgREST schema cache reload ───────────────────────────────────
   `NOTIFY pgrst, 'reload schema'`,
 ]
@@ -589,7 +613,7 @@ export async function GET() {
   // Check all required tables
   const requiredTables = [
     'user_feature_visits', 'holdings', 'holding_transactions', 'next_step_completions',
-    'target_allocations', 'holding_prices', 'holding_alerts',
+    'target_allocations', 'holding_prices', 'holding_alerts', 'roadmap_features',
   ]
 
   const tableStatus: Record<string, boolean> = {}

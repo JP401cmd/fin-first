@@ -1,7 +1,11 @@
-/* ─────────────────────────────────────────────────────────────
+'use client'
+
+/* -----------------------------------------------------------------
    Roadmap & Feature Gap Analyse
    Vergelijking met 30+ budgeting & wealth management apps
-   ───────────────────────────────────────────────────────────── */
+   ----------------------------------------------------------------- */
+
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 type Feature = {
   readonly nr: number
@@ -14,6 +18,16 @@ type Feature = {
   readonly aandachtspunten: readonly string[]
   readonly competitors: string
   readonly priority: string
+}
+
+type RoadmapStatus = 'backlog' | 'in_ontwikkeling' | 'testen' | 'afgerond'
+
+type RoadmapOverlay = {
+  feature_nr: number
+  fase: string
+  status: RoadmapStatus
+  opmerkingen: string | null
+  updated_at: string
 }
 
 const FASE_A_FEATURES: readonly Feature[] = [
@@ -202,56 +216,56 @@ const FASE_A_FEATURES: readonly Feature[] = [
     afhankelijkheden: [
       'components/app/horizon/sim-chart.tsx (bestaande SimChart)',
       'lib/fire-simulation.ts (SimRow data)',
-      'lib/horizon-data.ts (computeFireProjection, vermogenscategorieën)',
+      'lib/horizon-data.ts (computeFireProjection, vermogenscategorie\u00ebn)',
       'assets tabel (bezittingen per type)',
       'holdings tabel (beleggingsportefeuille)',
       'debts tabel (schulden als negatieve laag)',
     ],
     technisch:
-      'Data deels beschikbaar via SimRow (savings, growth), maar vermogenscategorieën moeten uitgesplitst worden. Nieuwe helper: splitVermogenPerBron(simRows, assets, holdings) → StackedRow[]. Stacked bar chart component (Recharts StackedBarChart of custom SVG). Integratie als toggle-modus op De Horizon naast bestaande SimChart. Categorieën afleiden uit asset.type en holding.asset_class. Pensioen apart berekenen op basis van UPO-data of handmatige invoer. AOW gekapitaliseerd als contante waarde van toekomstige uitkeringen.',
+      'Data deels beschikbaar via SimRow (savings, growth), maar vermogenscategorie\u00ebn moeten uitgesplitst worden. Nieuwe helper: splitVermogenPerBron(simRows, assets, holdings) \u2192 StackedRow[]. Stacked bar chart component (Recharts StackedBarChart of custom SVG). Integratie als toggle-modus op De Horizon naast bestaande SimChart. Categorie\u00ebn afleiden uit asset.type en holding.asset_class. Pensioen apart berekenen op basis van UPO-data of handmatige invoer. AOW gekapitaliseerd als contante waarde van toekomstige uitkeringen.',
     waardeGebruiker:
-      'Beantwoordt de vraag: "Waaruit bestaat mijn vermogen straks?" De huidige lijngrafiek toont alleen het totaal — deze visualisatie laat zien dat bijv. 40% uit beleggingen komt, 30% uit pensioen, 20% uit vastgoed. Helpt bij diversificatie-beslissingen en geeft vertrouwen dat het vermogen over meerdere bronnen verspreid is.',
+      'Beantwoordt de vraag: "Waaruit bestaat mijn vermogen straks?" De huidige lijngrafiek toont alleen het totaal \u2014 deze visualisatie laat zien dat bijv. 40% uit beleggingen komt, 30% uit pensioen, 20% uit vastgoed. Helpt bij diversificatie-beslissingen en geeft vertrouwen dat het vermogen over meerdere bronnen verspreid is.',
     aandachtspunten: [
-      'Vermogenscategorieën moeten consistent zijn met de assets-pagina classificatie.',
-      'Pensioenwaarde is onzeker — duidelijk markeren als schatting.',
-      'AOW kapitaliseren vereist een disconteringsvoet — maak aannames expliciet.',
-      'Te veel categorieën maken de grafiek onleesbaar — max 6-7 lagen.',
-      'Vastgoedwaarde fluctueert — gebruik laatste check-in of WOZ.',
+      'Vermogenscategorie\u00ebn moeten consistent zijn met de assets-pagina classificatie.',
+      'Pensioenwaarde is onzeker \u2014 duidelijk markeren als schatting.',
+      'AOW kapitaliseren vereist een disconteringsvoet \u2014 maak aannames expliciet.',
+      'Te veel categorie\u00ebn maken de grafiek onleesbaar \u2014 max 6-7 lagen.',
+      'Vastgoedwaarde fluctueert \u2014 gebruik laatste check-in of WOZ.',
       'Kleurcodering consistent houden met de rest van de app (module kleuren).',
     ],
     competitors:
-      'Boldin (Stacked Asset Allocation Charts — hun kernvisualitatie), ProjectionLab (portfolio composition over time)',
+      'Boldin (Stacked Asset Allocation Charts \u2014 hun kernvisualitatie), ProjectionLab (portfolio composition over time)',
     priority: 'Hoog',
   },
   {
     nr: 8,
     name: 'Inkomsten vs. Uitgaven Projectie Chart',
     description:
-      'Boldin toont verwachte jaarlijkse inkomsten (salaris, pensioen, AOW, beleggingsinkomen) vs. jaarlijkse uitgaven over de gehele levenslijn. Cruciaal inzicht: "wanneer overtreffen mijn passieve inkomsten mijn uitgaven?" Dit is de visuele representatie van het FIRE-kruispunt — het moment waarop je financieel vrij bent. TriFinity berekent dit al intern maar visualiseert het niet expliciet als inkomsten vs. uitgaven over tijd.',
+      'Boldin toont verwachte jaarlijkse inkomsten (salaris, pensioen, AOW, beleggingsinkomen) vs. jaarlijkse uitgaven over de gehele levenslijn. Cruciaal inzicht: "wanneer overtreffen mijn passieve inkomsten mijn uitgaven?" Dit is de visuele representatie van het FIRE-kruispunt \u2014 het moment waarop je financieel vrij bent. TriFinity berekent dit al intern maar visualiseert het niet expliciet als inkomsten vs. uitgaven over tijd.',
     werking:
-      'Twee-lagen grafiek die per jaar toont: (1) Gestapelde inkomstenbronnen als kolommen: salaris/freelance (zolang werkend), AOW-uitkering (vanaf AOW-leeftijd), werkgeverspensioen (vanaf pensioenleeftijd), beleggingsinkomen/onttrekking, passief inkomen (huur, dividend), overig. (2) Uitgavenlijn: totale jaarlijkse uitgaven geïndexeerd voor inflatie. Het FIRE-kruispunt is waar de inkomstenkolommen de uitgavenlijn overtreffen zonder salaris-component — visueel gemarkeerd met een prominente indicator. Hover per jaar toont: totale inkomsten, totale uitgaven, surplus/tekort, en samenstelling per bron als percentage.',
+      'Twee-lagen grafiek die per jaar toont: (1) Gestapelde inkomstenbronnen als kolommen: salaris/freelance (zolang werkend), AOW-uitkering (vanaf AOW-leeftijd), werkgeverspensioen (vanaf pensioenleeftijd), beleggingsinkomen/onttrekking, passief inkomen (huur, dividend), overig. (2) Uitgavenlijn: totale jaarlijkse uitgaven ge\u00efndexeerd voor inflatie. Het FIRE-kruispunt is waar de inkomstenkolommen de uitgavenlijn overtreffen zonder salaris-component \u2014 visueel gemarkeerd met een prominente indicator. Hover per jaar toont: totale inkomsten, totale uitgaven, surplus/tekort, en samenstelling per bron als percentage.',
     afhankelijkheden: [
       'lib/fire-simulation.ts (SimRow: withdrawal, cashflowNet, savings)',
       'lib/horizon-data.ts (computeFireProjection, computeFireRange)',
-      'lib/fire-simulation.ts (lifeEventsToCashflows — inkomensbronnen)',
+      'lib/fire-simulation.ts (lifeEventsToCashflows \u2014 inkomensbronnen)',
       'profiles (pensioenleeftijd, AOW-leeftijd, salaris)',
       'budgets (huidige uitgaven als basis voor projectie)',
       'app/api/pension/parse (UPO PDF parsing voor pensioeninkomen)',
     ],
     technisch:
-      'Cashflows moeten per bron opgesplitst worden — nu opgeteld in cashflowNet. Nieuwe helper: splitInkomstenPerBron(simRows, lifeEvents, profile) → IncomeBreakdownRow[]. Per bron-type: salary (tot FIRE/pensioen), aow (vanaf AOW-leeftijd), pension (vanaf pensioenleeftijd), withdrawal (onttrekking uit vermogen), passive (dividend, huur), other (levensgebeurtenissen). Uitgavenlijn: baseer op huidige jaaruitgaven × (1 + inflatie)^n, aangepast voor levensgebeurtenissen (kind, hypotheekvrij). Chart als Recharts ComposedChart (StackedBar + Line) of custom SVG. FIRE-kruispunt markering: verticale lijn + label "Financieel vrij" op het jaar waar passieve inkomsten ≥ uitgaven.',
+      'Cashflows moeten per bron opgesplitst worden \u2014 nu opgeteld in cashflowNet. Nieuwe helper: splitInkomstenPerBron(simRows, lifeEvents, profile) \u2192 IncomeBreakdownRow[]. Per bron-type: salary (tot FIRE/pensioen), aow (vanaf AOW-leeftijd), pension (vanaf pensioenleeftijd), withdrawal (onttrekking uit vermogen), passive (dividend, huur), other (levensgebeurtenissen). Uitgavenlijn: baseer op huidige jaaruitgaven \u00d7 (1 + inflatie)^n, aangepast voor levensgebeurtenissen (kind, hypotheekvrij). Chart als Recharts ComposedChart (StackedBar + Line) of custom SVG. FIRE-kruispunt markering: verticale lijn + label "Financieel vrij" op het jaar waar passieve inkomsten \u2265 uitgaven.',
     waardeGebruiker:
-      'De meest intuïtieve visualisatie van financiële vrijheid: "wanneer verdien ik genoeg zonder te werken?" Boldin beschouwt dit als hun vlaggenschip-grafiek. Geeft direct inzicht in de transitie van actief naar passief inkomen. Motiveert: je ziet de kruispunt-lijn dichterbij komen naarmate je spaart en belegt.',
+      'De meest intu\u00eftieve visualisatie van financi\u00eble vrijheid: "wanneer verdien ik genoeg zonder te werken?" Boldin beschouwt dit als hun vlaggenschip-grafiek. Geeft direct inzicht in de transitie van actief naar passief inkomen. Motiveert: je ziet de kruispunt-lijn dichterbij komen naarmate je spaart en belegt.',
     aandachtspunten: [
-      'Cashflows moeten per bron opgesplitst worden — nu opgeteld in cashflowNet.',
+      'Cashflows moeten per bron opgesplitst worden \u2014 nu opgeteld in cashflowNet.',
       'Werkgeverspensioen kan variabele opbouw hebben (middelloon vs eindloon).',
       'Gebruikers zonder UPO upload moeten handmatig pensioenbedrag kunnen invoeren.',
-      'AOW-leeftijd kan politiek wijzigen — actueel houden.',
+      'AOW-leeftijd kan politiek wijzigen \u2014 actueel houden.',
       'Partnersituatie (AOW enkel vs samenwonend) correct meenemen.',
-      'Inflatie-aanpassing van uitgaven is een aanname — maak expliciet.',
+      'Inflatie-aanpassing van uitgaven is een aanname \u2014 maak expliciet.',
     ],
     competitors:
-      'Boldin (Lifetime Income vs Expenses Projection — hun vlaggenschip), Empower (Cash Flow Planner)',
+      'Boldin (Lifetime Income vs Expenses Projection \u2014 hun vlaggenschip), Empower (Cash Flow Planner)',
     priority: 'Hoog',
   },
 ]
@@ -399,16 +413,16 @@ const FASE_B_FEATURES: readonly Feature[] = [
       'Gebruikersaantallen DGA\u2019s klein maar waarde per gebruiker hoog \u2014 overweeg als premium feature.',
       'BV kan ook andere activiteiten hebben (vastgoed, pensioen-BV) \u2014 vereenvoudigen tot vermogenscomponent.',
     ],
-    competitors: 'Niemand — fiscalisten doen dit handmatig voor €200+/uur',
+    competitors: 'Niemand \u2014 fiscalisten doen dit handmatig voor \u20ac200+/uur',
     priority: 'Middel',
   },
   {
     nr: 12,
     name: 'Vermogensopbouw per Bron (Area Chart)',
     description:
-      'Gestapeld area chart dat toont hoe vermogen over tijd verschuift van arbeidsgerelateerd (spaargeld uit salaris) naar passief (beleggingsrendement, pensioen, AOW). Toont de "crossover" wanneer passief inkomen > actief inkomen. Boldin visualiseert dit als een vloeiend area chart — TriFinity mist deze "bron-transitie" visualisatie die laat zien hoe de samenstelling van vermogensgroei verandert naarmate je ouder wordt.',
+      'Gestapeld area chart dat toont hoe vermogen over tijd verschuift van arbeidsgerelateerd (spaargeld uit salaris) naar passief (beleggingsrendement, pensioen, AOW). Toont de "crossover" wanneer passief inkomen > actief inkomen. Boldin visualiseert dit als een vloeiend area chart \u2014 TriFinity mist deze "bron-transitie" visualisatie die laat zien hoe de samenstelling van vermogensgroei verandert naarmate je ouder wordt.',
     werking:
-      'Gestapeld area chart (stacked area) met op de X-as de leeftijd/jaren en op de Y-as de cumulatieve vermogensgroei uitgesplitst per bron: (1) Arbeidsinleg: cumulatieve spaargeld uit netto-inkomen, (2) Beleggingsrendement: cumulatief rendement op portefeuille (compound growth), (3) Pensioenopbouw: geschatte pensioenwaarde over tijd, (4) Vastgoedwaardestijging: cumulatieve waardegroei van onroerend goed, (5) Overig: erfenissen, schenkingen, eenmalige inkomsten. Het crossover-punt — waar de passieve bronnen (rendement + pensioen + vastgoed) de actieve bron (arbeidsinleg) overtreffen — wordt prominent gemarkeerd. Dit laat visueel zien: "vanaf je 45e groeit je vermogen harder door rendement dan door sparen."',
+      'Gestapeld area chart (stacked area) met op de X-as de leeftijd/jaren en op de Y-as de cumulatieve vermogensgroei uitgesplitst per bron: (1) Arbeidsinleg: cumulatieve spaargeld uit netto-inkomen, (2) Beleggingsrendement: cumulatief rendement op portefeuille (compound growth), (3) Pensioenopbouw: geschatte pensioenwaarde over tijd, (4) Vastgoedwaardestijging: cumulatieve waardegroei van onroerend goed, (5) Overig: erfenissen, schenkingen, eenmalige inkomsten. Het crossover-punt \u2014 waar de passieve bronnen (rendement + pensioen + vastgoed) de actieve bron (arbeidsinleg) overtreffen \u2014 wordt prominent gemarkeerd. Dit laat visueel zien: "vanaf je 45e groeit je vermogen harder door rendement dan door sparen."',
     afhankelijkheden: [
       'lib/fire-simulation.ts (SimRow: savings, growth, cashflowNet)',
       'lib/horizon-data.ts (computeFireProjection)',
@@ -418,14 +432,14 @@ const FASE_B_FEATURES: readonly Feature[] = [
       'profiles (leeftijd, pensioenleeftijd)',
     ],
     technisch:
-      'Nieuwe helper: computeVermogensgroeiPerBron(simRows, assets, profile) → AreaRow[]. Per jaar cumulatieve bijdrage per bron berekenen: arbeidsinleg = sum(netto savings), rendement = sum(portfolio growth), pensioen = sum(pension accrual), vastgoed = sum(property appreciation). Area chart component (Recharts AreaChart met stackId of custom SVG). Crossover-punt berekenen: het jaar waar passieve bronnen > arbeidsinleg. Hover-tooltip met absolute bedragen en percentages per bron. Integratie op De Horizon als extra tab/visualisatie.',
+      'Nieuwe helper: computeVermogensgroeiPerBron(simRows, assets, profile) \u2192 AreaRow[]. Per jaar cumulatieve bijdrage per bron berekenen: arbeidsinleg = sum(netto savings), rendement = sum(portfolio growth), pensioen = sum(pension accrual), vastgoed = sum(property appreciation). Area chart component (Recharts AreaChart met stackId of custom SVG). Crossover-punt berekenen: het jaar waar passieve bronnen > arbeidsinleg. Hover-tooltip met absolute bedragen en percentages per bron. Integratie op De Horizon als extra tab/visualisatie.',
     waardeGebruiker:
-      'Maakt het "sneeuwbaleffect" van compound interest visueel: je ziet hoe beleggingsrendement over tijd de dominante bron van vermogensgroei wordt. Motiveert langetermijnbeleggers — "elke euro die ik nu beleg, groeit over 20 jaar tot vier euro." Toont waarom vroeg beginnen zo belangrijk is.',
+      'Maakt het "sneeuwbaleffect" van compound interest visueel: je ziet hoe beleggingsrendement over tijd de dominante bron van vermogensgroei wordt. Motiveert langetermijnbeleggers \u2014 "elke euro die ik nu beleg, groeit over 20 jaar tot vier euro." Toont waarom vroeg beginnen zo belangrijk is.',
     aandachtspunten: [
-      'Onderscheid arbeidsinleg vs rendement vereist tracking van stortingen vs groei — niet altijd beschikbaar.',
-      'Pensioenopbouw is een schatting — markeer als zodanig.',
-      'Vastgoedwaardestijging is onzeker — gebruik conservatieve aanname.',
-      'Te veel bronnen maken het area chart onoverzichtelijk — max 5 lagen.',
+      'Onderscheid arbeidsinleg vs rendement vereist tracking van stortingen vs groei \u2014 niet altijd beschikbaar.',
+      'Pensioenopbouw is een schatting \u2014 markeer als zodanig.',
+      'Vastgoedwaardestijging is onzeker \u2014 gebruik conservatieve aanname.',
+      'Te veel bronnen maken het area chart onoverzichtelijk \u2014 max 5 lagen.',
       'Historische data (net_worth_snapshots) kan gaten bevatten bij nieuwe gebruikers.',
     ],
     competitors:
@@ -438,7 +452,7 @@ const FASE_B_FEATURES: readonly Feature[] = [
     description:
       'Boldin toont expliciet de onttrekkingsstrategie: uit welke bronnen wordt wanneer geput? Eerst eigen vermogen (bridge-periode), dan pensioen erbij, dan AOW erbij. TriFinity berekent dit al intern via fire_end_strategy en de SimChart, maar visualiseert niet expliciet welke pot je wanneer aanspreekt. Deze visualisatie geeft de gebruiker inzicht in de optimale volgorde van onttrekken.',
     werking:
-      'Tijdlijn-visualisatie die per levensfase toont uit welke bronnen wordt geput: (1) Bridge-periode (FIRE → pensioenleeftijd): onttrekking uit eigen beleggingsportefeuille. (2) Pensioen-fase (pensioenleeftijd → AOW): beleggingen + werkgeverspensioen. (3) AOW-fase (vanaf AOW-leeftijd): beleggingen + pensioen + AOW. (4) Latere fase (80+): mogelijk uitputting, erfenis of aanpassing. Per fase: jaarlijkse onttrekking per bron als gestapelde balk, restant vermogen per pot, en uitputtingsdatum per bron. "Waterval" visualisatie: je ziet hoe elke nieuwe inkomstenbron het onttrekkingsbedrag uit beleggingen verlaagt. Waarschuwing als een pot eerder opraakt dan verwacht.',
+      'Tijdlijn-visualisatie die per levensfase toont uit welke bronnen wordt geput: (1) Bridge-periode (FIRE \u2192 pensioenleeftijd): onttrekking uit eigen beleggingsportefeuille. (2) Pensioen-fase (pensioenleeftijd \u2192 AOW): beleggingen + werkgeverspensioen. (3) AOW-fase (vanaf AOW-leeftijd): beleggingen + pensioen + AOW. (4) Latere fase (80+): mogelijk uitputting, erfenis of aanpassing. Per fase: jaarlijkse onttrekking per bron als gestapelde balk, restant vermogen per pot, en uitputtingsdatum per bron. "Waterval" visualisatie: je ziet hoe elke nieuwe inkomstenbron het onttrekkingsbedrag uit beleggingen verlaagt. Waarschuwing als een pot eerder opraakt dan verwacht.',
     afhankelijkheden: [
       'lib/fire-simulation.ts (runSimulation, SimRow)',
       'lib/horizon-data.ts (computeFireProjection, computeFireRange)',
@@ -448,19 +462,19 @@ const FASE_B_FEATURES: readonly Feature[] = [
       'lib/fire-simulation.ts (lifeEventsToCashflows)',
     ],
     technisch:
-      'Nieuwe helper: computeWithdrawalStrategy(simRows, profile, pensionIncome, aowIncome) → WithdrawalPhase[]. Per fase: bronnen met bedragen, start/eindjaar, restant per pot. Visualisatie als horizontale tijdlijn met gestapelde bronnen per fase (Gantt-chart stijl). Alternatief: waterval-diagram dat toont hoe elke bron de druk op beleggingen verlaagt. Integratie op De Horizon, eventueel als onderdeel van het Onttrekkingsmodal (bestaand). SimRow bevat al withdrawal en cashflowNet — deze opsplitsen per bron voor de visualisatie.',
+      'Nieuwe helper: computeWithdrawalStrategy(simRows, profile, pensionIncome, aowIncome) \u2192 WithdrawalPhase[]. Per fase: bronnen met bedragen, start/eindjaar, restant per pot. Visualisatie als horizontale tijdlijn met gestapelde bronnen per fase (Gantt-chart stijl). Alternatief: waterval-diagram dat toont hoe elke bron de druk op beleggingen verlaagt. Integratie op De Horizon, eventueel als onderdeel van het Onttrekkingsmodal (bestaand). SimRow bevat al withdrawal en cashflowNet \u2014 deze opsplitsen per bron voor de visualisatie.',
     waardeGebruiker:
-      'Beantwoordt de cruciale vraag: "Hoe overleef ik de bridge-periode tussen FIRE en pensioen?" Laat zien dat FIRE niet betekent dat al het geld uit één pot komt — pensioen en AOW nemen het over. Vermindert angst: "Ik hoef niet alles zelf te hebben, want op mijn 67e komt AOW erbij." Helpt bij het bepalen van het optimale FIRE-moment.',
+      'Beantwoordt de cruciale vraag: "Hoe overleef ik de bridge-periode tussen FIRE en pensioen?" Laat zien dat FIRE niet betekent dat al het geld uit \u00e9\u00e9n pot komt \u2014 pensioen en AOW nemen het over. Vermindert angst: "Ik hoef niet alles zelf te hebben, want op mijn 67e komt AOW erbij." Helpt bij het bepalen van het optimale FIRE-moment.',
     aandachtspunten: [
-      'Bridge-periode is het meest kwetsbare stuk — prominente waarschuwing als beleggingen te snel opraken.',
-      'Pensioeninkomen is onzeker (indexatie, kortingen) — scenario-analyse nodig.',
+      'Bridge-periode is het meest kwetsbare stuk \u2014 prominente waarschuwing als beleggingen te snel opraken.',
+      'Pensioeninkomen is onzeker (indexatie, kortingen) \u2014 scenario-analyse nodig.',
       'AOW-leeftijd kan politiek wijzigen.',
       'Partnersituatie: dubbel AOW, gezamenlijk pensioen.',
-      'fire_end_strategy (perpetual vs deplete) beïnvloedt de visualisatie sterk.',
-      'Niet alle gebruikers hebben pensioendata — graceful degradation naar schatting of handmatige invoer.',
+      'fire_end_strategy (perpetual vs deplete) be\u00efnvloedt de visualisatie sterk.',
+      'Niet alle gebruikers hebben pensioendata \u2014 graceful degradation naar schatting of handmatige invoer.',
     ],
     competitors:
-      'Boldin (Withdrawal Strategy Planner — expliciet per bron), ProjectionLab (income source timeline)',
+      'Boldin (Withdrawal Strategy Planner \u2014 expliciet per bron), ProjectionLab (income source timeline)',
     priority: 'Middel',
   },
 ]
@@ -610,16 +624,16 @@ const FASE_C_FEATURES: readonly Feature[] = [
       'Manipulation: gebruikers die extreme data invoeren verstoren aggregaten \u2014 outlier detection nodig.',
     ],
     competitors:
-      'Niemand doet dit goed — Boldin heeft een PeerScore maar beperkt',
+      'Niemand doet dit goed \u2014 Boldin heeft een PeerScore maar beperkt',
     priority: 'Laag',
   },
   {
     nr: 16,
     name: 'Levensfase Inkomsten Breakdown',
     description:
-      'Per levensfase (werkend → FIRE → AOW-leeftijd → 80+) een breakdown van inkomstenbronnen als percentage. Laat zien hoe de inkomstenmix verschuift over de tijd. In de werkfase komt 90% uit salaris, na FIRE verschuift dit naar onttrekking uit vermogen, later komt pensioen en AOW erbij. Boldin toont dit als een compact overzicht per levensfase — TriFinity mist deze samenvatting.',
+      'Per levensfase (werkend \u2192 FIRE \u2192 AOW-leeftijd \u2192 80+) een breakdown van inkomstenbronnen als percentage. Laat zien hoe de inkomstenmix verschuift over de tijd. In de werkfase komt 90% uit salaris, na FIRE verschuift dit naar onttrekking uit vermogen, later komt pensioen en AOW erbij. Boldin toont dit als een compact overzicht per levensfase \u2014 TriFinity mist deze samenvatting.',
     werking:
-      'Overzichtelijke weergave per levensfase met procentuele verdeling van inkomstenbronnen: (1) Werkfase (nu → FIRE): salaris 80-90%, beleggingsinkomen 5-10%, overig 5%. (2) Bridge-fase (FIRE → pensioenleeftijd): onttrekking uit vermogen 70-90%, passief inkomen 10-30%. (3) Pensioen-fase (pensioenleeftijd → AOW): onttrekking 40-60%, werkgeverspensioen 30-40%, passief inkomen 10-20%. (4) AOW-fase (vanaf AOW-leeftijd): AOW 30-40%, pensioen 25-35%, onttrekking 20-30%, passief inkomen 10%. (5) Late fase (80+): AOW + pensioen dominant, onttrekking minimaal. Per fase: horizontale gestapelde balk met kleuren per bron, absolute bedragen per jaar, en percentage van totaal. Compact overzicht dat in één oogopslag de transitie laat zien.',
+      'Overzichtelijke weergave per levensfase met procentuele verdeling van inkomstenbronnen: (1) Werkfase (nu \u2192 FIRE): salaris 80-90%, beleggingsinkomen 5-10%, overig 5%. (2) Bridge-fase (FIRE \u2192 pensioenleeftijd): onttrekking uit vermogen 70-90%, passief inkomen 10-30%. (3) Pensioen-fase (pensioenleeftijd \u2192 AOW): onttrekking 40-60%, werkgeverspensioen 30-40%, passief inkomen 10-20%. (4) AOW-fase (vanaf AOW-leeftijd): AOW 30-40%, pensioen 25-35%, onttrekking 20-30%, passief inkomen 10%. (5) Late fase (80+): AOW + pensioen dominant, onttrekking minimaal. Per fase: horizontale gestapelde balk met kleuren per bron, absolute bedragen per jaar, en percentage van totaal. Compact overzicht dat in \u00e9\u00e9n oogopslag de transitie laat zien.',
     afhankelijkheden: [
       'lib/fire-simulation.ts (SimRow, runSimulation)',
       'lib/horizon-data.ts (computeFireProjection)',
@@ -629,14 +643,14 @@ const FASE_C_FEATURES: readonly Feature[] = [
       'budgets (huidige uitgaven als basis)',
     ],
     technisch:
-      'Nieuwe helper: computeLevensfaseBreakdown(simRows, profile, pensionIncome, aowIncome) → LevensfaseRow[]. Per fase: faseLidwoord, startJaar, eindJaar, bronnen: { label, bedrag, percentage, kleur }[]. Levensfasen afleiden uit profile: werkfase (nu → FIRE), bridge (FIRE → pensioen), pensioen (pensioen → AOW), AOW (AOW → eindleeftijd), laat (80+). Visualisatie als horizontale gestapelde balken per fase, compact onder elkaar. Kan als sectie op De Horizon of als onderdeel van het rapportage-systeem. Relatief simpel te bouwen op basis van bestaande SimRow data — voornamelijk een presentatie-laag.',
+      'Nieuwe helper: computeLevensfaseBreakdown(simRows, profile, pensionIncome, aowIncome) \u2192 LevensfaseRow[]. Per fase: faseLidwoord, startJaar, eindJaar, bronnen: { label, bedrag, percentage, kleur }[]. Levensfasen afleiden uit profile: werkfase (nu \u2192 FIRE), bridge (FIRE \u2192 pensioen), pensioen (pensioen \u2192 AOW), AOW (AOW \u2192 eindleeftijd), laat (80+). Visualisatie als horizontale gestapelde balken per fase, compact onder elkaar. Kan als sectie op De Horizon of als onderdeel van het rapportage-systeem. Relatief simpel te bouwen op basis van bestaande SimRow data \u2014 voornamelijk een presentatie-laag.',
     waardeGebruiker:
-      'Geeft in één oogopslag het "grote plaatje" van je financiële levenslijn. Maakt abstract plannen concreet: "Na mijn 67e komt 35% van mijn inkomen uit AOW." Helpt bij het identificeren van kwetsbare fasen: als de bridge-periode bijna volledig afhankelijk is van onttrekking, is dat een risico. Ideaal voor rapportages en delen met partner.',
+      'Geeft in \u00e9\u00e9n oogopslag het "grote plaatje" van je financi\u00eble levenslijn. Maakt abstract plannen concreet: "Na mijn 67e komt 35% van mijn inkomen uit AOW." Helpt bij het identificeren van kwetsbare fasen: als de bridge-periode bijna volledig afhankelijk is van onttrekking, is dat een risico. Ideaal voor rapportages en delen met partner.',
     aandachtspunten: [
-      'Levensfasen moeten dynamisch zijn — niet iedereen heeft dezelfde FIRE/pensioen/AOW-leeftijd.',
-      'Gebruikers zonder pensioendata zien onvolledige breakdown — graceful degradation.',
-      'Percentages moeten optellen tot 100% per fase — afrondingsverschillen oplossen.',
-      'Te veel bronnen per fase maakt het onoverzichtelijk — groepeer kleine bronnen als "overig".',
+      'Levensfasen moeten dynamisch zijn \u2014 niet iedereen heeft dezelfde FIRE/pensioen/AOW-leeftijd.',
+      'Gebruikers zonder pensioendata zien onvolledige breakdown \u2014 graceful degradation.',
+      'Percentages moeten optellen tot 100% per fase \u2014 afrondingsverschillen oplossen.',
+      'Te veel bronnen per fase maakt het onoverzichtelijk \u2014 groepeer kleine bronnen als "overig".',
       'Partnersituatie: gezamenlijke breakdown of per persoon?',
     ],
     competitors:
@@ -795,7 +809,20 @@ const FASE_D_FEATURES: readonly Feature[] = [
   },
 ]
 
-/* ── Priority badge colors ────────────────────────────────── */
+/* -- Helper: composite key for overlay map ---------------------- */
+function statusKey(fase: string, nr: number): string {
+  return `${fase}:${nr}`
+}
+
+/* -- Status configuration --------------------------------------- */
+const STATUS_CONFIG: Record<RoadmapStatus, { label: string; color: string; bg: string; border: string }> = {
+  backlog: { label: 'Backlog', color: 'text-zinc-500', bg: 'bg-zinc-100', border: 'border-zinc-200' },
+  in_ontwikkeling: { label: 'In ontwikkeling', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+  testen: { label: 'Testen', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+  afgerond: { label: 'Afgerond', color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+}
+
+/* -- Priority badge colors -------------------------------------- */
 function PriorityBadge({ priority }: { priority: string }) {
   const styles: Record<string, string> = {
     Hoog: 'bg-red-50 text-red-700 border-red-200',
@@ -811,7 +838,7 @@ function PriorityBadge({ priority }: { priority: string }) {
   )
 }
 
-/* ── Feature card (collapsible details) ───────────────────── */
+/* -- Feature card (collapsible details) ------------------------- */
 function FeatureCard({
   nr,
   name,
@@ -823,10 +850,21 @@ function FeatureCard({
   aandachtspunten,
   competitors,
   priority,
-}: Feature) {
+  fase,
+  status,
+  opmerkingen,
+  onStatusChange,
+  onOpmerkingenChange,
+}: Feature & {
+  fase: string
+  status: RoadmapStatus
+  opmerkingen: string | null
+  onStatusChange: (status: RoadmapStatus) => void
+  onOpmerkingenChange: (opmerkingen: string) => void
+}) {
   return (
     <details className="group rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:bg-[var(--subtle)]">
-      {/* Collapsed summary: number, name, priority */}
+      {/* Collapsed summary: number, name, priority, status */}
       <summary className="flex cursor-pointer select-none items-center gap-4 p-4">
         <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--subtle)] font-mono text-sm font-bold tabular-nums text-[var(--ink-2)]">
           {nr}
@@ -834,6 +872,9 @@ function FeatureCard({
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <p className="font-display text-sm font-bold text-[var(--ink)]">{name}</p>
           <PriorityBadge priority={priority} />
+          <span className={`inline-block rounded-full border px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-[0.06em] ${STATUS_CONFIG[status].bg} ${STATUS_CONFIG[status].color} ${STATUS_CONFIG[status].border}`}>
+            {STATUS_CONFIG[status].label}
+          </span>
         </div>
         <span className="flex-shrink-0 text-[var(--ink-4)] transition-transform group-open:rotate-90">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -844,6 +885,41 @@ function FeatureCard({
 
       {/* Expanded detail sections */}
       <div className="space-y-5 border-t border-[var(--border-ed)] px-4 pb-5 pt-4">
+        {/* Status selector + Opmerkingen */}
+        <div className="mb-4 space-y-3">
+          <div>
+            <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Status</p>
+            <div className="flex gap-1">
+              {(['backlog', 'in_ontwikkeling', 'testen', 'afgerond'] as const).map((s) => {
+                const cfg = STATUS_CONFIG[s]
+                const isActive = status === s
+                return (
+                  <button
+                    key={s}
+                    onClick={(e) => { e.stopPropagation(); onStatusChange(s); }}
+                    className={`rounded-full border px-2.5 py-1 font-sans text-[11px] font-medium transition-colors ${
+                      isActive ? `${cfg.bg} ${cfg.color} ${cfg.border}` : 'border-transparent text-[var(--ink-4)] hover:bg-[var(--subtle)]'
+                    }`}
+                  >
+                    {cfg.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Opmerkingen</p>
+            <textarea
+              value={opmerkingen ?? ''}
+              onChange={(e) => onOpmerkingenChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="Notities over deze feature..."
+              rows={2}
+              className="w-full resize-y rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-serif text-[13px] text-[var(--ink-2)] placeholder:text-[var(--ink-4)] focus:border-[var(--ink-3)] focus:outline-none"
+            />
+          </div>
+        </div>
+
         {/* Description */}
         <p className="font-serif text-[13px] leading-relaxed text-[var(--ink-2)]">
           {description}
@@ -927,7 +1003,7 @@ function FeatureCard({
   )
 }
 
-/* ── Phase section ────────────────────────────────────────── */
+/* -- Phase section ---------------------------------------------- */
 function PhaseSection({
   id,
   title,
@@ -935,6 +1011,10 @@ function PhaseSection({
   accentColor,
   accentBg,
   features,
+  fase,
+  overlayMap,
+  onStatusChange,
+  onOpmerkingenChange,
 }: {
   id: string
   title: string
@@ -942,7 +1022,15 @@ function PhaseSection({
   accentColor: string
   accentBg: string
   features: readonly Feature[]
+  fase: string
+  overlayMap: Map<string, RoadmapOverlay>
+  onStatusChange: (fase: string, nr: number, status: RoadmapStatus) => void
+  onOpmerkingenChange: (fase: string, nr: number, opmerkingen: string) => void
 }) {
+  const total = features.length
+  const afgerond = features.filter(f => (overlayMap.get(statusKey(fase, f.nr))?.status ?? 'backlog') === 'afgerond').length
+  const percentage = total > 0 ? Math.round((afgerond / total) * 100) : 0
+
   return (
     <section
       className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6"
@@ -959,18 +1047,41 @@ function PhaseSection({
           <p className="font-display text-lg font-bold text-[var(--ink)]">{title}</p>
         </div>
         <p className="font-serif text-sm italic text-[var(--ink-3)]">{subtitle}</p>
+
+        {/* Progress bar */}
+        <div className="mt-3 mb-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-mono text-[11px] tabular-nums text-[var(--ink-4)]">{afgerond}/{total} afgerond</span>
+            <span className="font-mono text-[11px] tabular-nums text-[var(--ink-4)]">{percentage}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-[var(--subtle)]">
+            <div className="h-1.5 rounded-full bg-green-500 transition-all duration-300" style={{ width: `${percentage}%` }} />
+          </div>
+        </div>
       </div>
 
       <div className="space-y-3">
-        {features.map((f) => (
-          <FeatureCard key={f.nr} {...f} />
-        ))}
+        {features.map((f) => {
+          const key = statusKey(fase, f.nr)
+          const overlay = overlayMap.get(key)
+          return (
+            <FeatureCard
+              key={f.nr}
+              {...f}
+              fase={fase}
+              status={overlay?.status ?? 'backlog'}
+              opmerkingen={overlay?.opmerkingen ?? null}
+              onStatusChange={(s) => onStatusChange(fase, f.nr, s)}
+              onOpmerkingenChange={(o) => onOpmerkingenChange(fase, f.nr, o)}
+            />
+          )
+        })}
       </div>
     </section>
   )
 }
 
-/* ── Competitor group ─────────────────────────────────────── */
+/* -- Competitor group ------------------------------------------- */
 function CompetitorGroup({ title, apps }: { title: string; apps: string[] }) {
   return (
     <div>
@@ -991,8 +1102,92 @@ function CompetitorGroup({ title, apps }: { title: string; apps: string[] }) {
   )
 }
 
-/* ── Page ─────────────────────────────────────────────────── */
+/* -- Phase config for rendering --------------------------------- */
+const PHASE_CONFIG = [
+  { id: 'Fase A', fase: 'a', title: 'De Brug', subtitle: 'Bouw voort op wat er al is \u2014 maximaliseer waarde van bestaande data', accentColor: 'var(--kern-500)', accentBg: 'var(--kern-l, #fef3c7)', features: FASE_A_FEATURES },
+  { id: 'Fase B', fase: 'b', title: 'Nederland-proof', subtitle: 'Onverslaanbare NL-positie \u2014 geen concurrent raakt hier aan', accentColor: 'var(--horizon-500)', accentBg: 'var(--horizon-l, #f3e8ff)', features: FASE_B_FEATURES },
+  { id: 'Fase C', fase: 'c', title: 'Groei', subtitle: 'Features die nieuwe gebruikers aantrekken', accentColor: 'var(--wil-500)', accentBg: 'var(--wil-l, #ccfbf1)', features: FASE_C_FEATURES },
+  { id: 'Fase D', fase: 'd', title: 'Premium', subtitle: 'Waarde waarvoor gebruikers willen betalen', accentColor: 'var(--ink-3)', accentBg: 'var(--subtle)', features: FASE_D_FEATURES },
+] as const
+
+/* -- Page ------------------------------------------------------- */
 export default function RoadmapPage() {
+  const [overlayMap, setOverlayMap] = useState<Map<string, RoadmapOverlay>>(new Map())
+  const [statusFilter, setStatusFilter] = useState<RoadmapStatus | 'alle'>('alle')
+  const [loading, setLoading] = useState(true)
+  const debounceTimers = useRef<Map<string, NodeJS.Timeout>>(new Map())
+
+  // Load overlay data on mount
+  useEffect(() => {
+    fetch('/api/roadmap')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: RoadmapOverlay[]) => {
+        const map = new Map<string, RoadmapOverlay>()
+        for (const d of data) map.set(statusKey(d.fase, d.feature_nr), d)
+        setOverlayMap(map)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  // Optimistic status change + PUT
+  const handleStatusChange = useCallback((fase: string, nr: number, status: RoadmapStatus) => {
+    const key = statusKey(fase, nr)
+    setOverlayMap(prev => {
+      const next = new Map(prev)
+      next.set(key, {
+        ...prev.get(key),
+        feature_nr: nr,
+        fase,
+        status,
+        opmerkingen: prev.get(key)?.opmerkingen ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      return next
+    })
+    fetch('/api/roadmap', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature_nr: nr, fase, status }),
+    }).catch(() => {})
+  }, [])
+
+  // Debounced opmerkingen change (optimistic + PUT after 1s)
+  const handleOpmerkingenChange = useCallback((fase: string, nr: number, opmerkingen: string) => {
+    const key = statusKey(fase, nr)
+    setOverlayMap(prev => {
+      const next = new Map(prev)
+      next.set(key, {
+        ...prev.get(key),
+        feature_nr: nr,
+        fase,
+        opmerkingen: opmerkingen || null,
+        status: prev.get(key)?.status ?? 'backlog',
+        updated_at: new Date().toISOString(),
+      })
+      return next
+    })
+    // Debounce the API call
+    const existing = debounceTimers.current.get(key)
+    if (existing) clearTimeout(existing)
+    debounceTimers.current.set(key, setTimeout(() => {
+      fetch('/api/roadmap', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feature_nr: nr, fase, opmerkingen: opmerkingen || null }),
+      }).catch(() => {})
+    }, 1000))
+  }, [])
+
+  // Filter features per phase based on statusFilter
+  function getFilteredFeatures(fase: string, features: readonly Feature[]): readonly Feature[] {
+    if (statusFilter === 'alle') return features
+    return features.filter(f => {
+      const s = overlayMap.get(statusKey(fase, f.nr))?.status ?? 'backlog'
+      return s === statusFilter
+    })
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -1008,7 +1203,7 @@ export default function RoadmapPage() {
         </p>
       </header>
 
-      {/* ─── Section 1: Concurrentiepositionering ─────────── */}
+      {/* --- Section 1: Concurrentiepositionering --- */}
       <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <p className="label-editorial mb-3 text-[var(--ink-4)]">Concurrentiepositionering</p>
         <p className="font-serif text-sm leading-relaxed text-[var(--ink-2)]">
@@ -1019,7 +1214,7 @@ export default function RoadmapPage() {
         </p>
       </section>
 
-      {/* ─── Section 2: Onderzochte concurrenten ──────────── */}
+      {/* --- Section 2: Onderzochte concurrenten --- */}
       <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <p className="label-editorial mb-4 text-[var(--ink-4)]">Onderzochte concurrenten</p>
         <div className="grid gap-6 sm:grid-cols-2">
@@ -1060,52 +1255,102 @@ export default function RoadmapPage() {
         </div>
       </section>
 
-      {/* ─── Section 3: Feature Gaps ──────────────────────── */}
+      {/* --- Section 3: Feature Gaps --- */}
       <div>
         <p className="label-editorial mb-4 text-[var(--ink-4)]">
           Feature Gaps &mdash; Geprioriteerd
         </p>
 
+        {/* Filter + Progress */}
+        <div className="space-y-4 mb-6">
+          {/* Overall progress */}
+          {(() => {
+            const allFeatures = [
+              ...FASE_A_FEATURES.map(f => ({ ...f, fase: 'a' })),
+              ...FASE_B_FEATURES.map(f => ({ ...f, fase: 'b' })),
+              ...FASE_C_FEATURES.map(f => ({ ...f, fase: 'c' })),
+              ...FASE_D_FEATURES.map(f => ({ ...f, fase: 'd' })),
+            ]
+            const total = allFeatures.length
+            const counts = { backlog: 0, in_ontwikkeling: 0, testen: 0, afgerond: 0 }
+            for (const f of allFeatures) {
+              const s = overlayMap.get(statusKey(f.fase, f.nr))?.status ?? 'backlog'
+              counts[s]++
+            }
+            return (
+              <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+                <p className="label-editorial mb-3 text-[var(--ink-4)]">Voortgang</p>
+                <div className="flex gap-4 mb-3">
+                  {(Object.entries(counts) as [RoadmapStatus, number][]).map(([s, c]) => (
+                    <div key={s} className="text-center">
+                      <p className={`font-mono text-lg font-bold tabular-nums ${STATUS_CONFIG[s].color}`}>{c}</p>
+                      <p className="font-sans text-[10px] uppercase tracking-[0.06em] text-[var(--ink-4)]">{STATUS_CONFIG[s].label}</p>
+                    </div>
+                  ))}
+                  <div className="text-center">
+                    <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{total}</p>
+                    <p className="font-sans text-[10px] uppercase tracking-[0.06em] text-[var(--ink-4)]">Totaal</p>
+                  </div>
+                </div>
+                <div className="h-2 w-full rounded-full bg-[var(--subtle)] overflow-hidden flex">
+                  <div className="h-2 bg-green-500 transition-all" style={{ width: `${(counts.afgerond / total) * 100}%` }} />
+                  <div className="h-2 bg-amber-400 transition-all" style={{ width: `${(counts.testen / total) * 100}%` }} />
+                  <div className="h-2 bg-blue-400 transition-all" style={{ width: `${(counts.in_ontwikkeling / total) * 100}%` }} />
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Status filter */}
+          <div className="flex items-center gap-2">
+            <span className="font-sans text-[11px] font-medium text-[var(--ink-3)]">Filter:</span>
+            {(['alle', 'backlog', 'in_ontwikkeling', 'testen', 'afgerond'] as const).map((f) => {
+              const isActive = statusFilter === f
+              const cfg = f === 'alle' ? null : STATUS_CONFIG[f]
+              return (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={`rounded-full border px-2.5 py-1 font-sans text-[11px] font-medium transition-colors ${
+                    isActive
+                      ? f === 'alle'
+                        ? 'border-[var(--ink-3)] bg-[var(--ink)] text-[var(--paper)]'
+                        : `${cfg!.bg} ${cfg!.color} ${cfg!.border}`
+                      : 'border-transparent text-[var(--ink-4)] hover:bg-[var(--subtle)]'
+                  }`}
+                >
+                  {f === 'alle' ? 'Alle' : STATUS_CONFIG[f].label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         <div className="space-y-6">
-          <PhaseSection
-            id="Fase A"
-            title="De Brug"
-            subtitle="Bouw voort op wat er al is &mdash; maximaliseer waarde van bestaande data"
-            accentColor="var(--kern-500)"
-            accentBg="var(--kern-l, #fef3c7)"
-            features={FASE_A_FEATURES}
-          />
-
-          <PhaseSection
-            id="Fase B"
-            title="Nederland-proof"
-            subtitle="Onverslaanbare NL-positie &mdash; geen concurrent raakt hier aan"
-            accentColor="var(--horizon-500)"
-            accentBg="var(--horizon-l, #f3e8ff)"
-            features={FASE_B_FEATURES}
-          />
-
-          <PhaseSection
-            id="Fase C"
-            title="Groei"
-            subtitle="Features die nieuwe gebruikers aantrekken"
-            accentColor="var(--wil-500)"
-            accentBg="var(--wil-l, #ccfbf1)"
-            features={FASE_C_FEATURES}
-          />
-
-          <PhaseSection
-            id="Fase D"
-            title="Premium"
-            subtitle="Waarde waarvoor gebruikers willen betalen"
-            accentColor="var(--ink-3)"
-            accentBg="var(--subtle)"
-            features={FASE_D_FEATURES}
-          />
+          {PHASE_CONFIG.map((phase) => {
+            const filtered = getFilteredFeatures(phase.fase, phase.features)
+            // Hide empty sections when filtering
+            if (statusFilter !== 'alle' && filtered.length === 0) return null
+            return (
+              <PhaseSection
+                key={phase.fase}
+                id={phase.id}
+                title={phase.title}
+                subtitle={phase.subtitle}
+                accentColor={phase.accentColor}
+                accentBg={phase.accentBg}
+                features={filtered}
+                fase={phase.fase}
+                overlayMap={overlayMap}
+                onStatusChange={handleStatusChange}
+                onOpmerkingenChange={handleOpmerkingenChange}
+              />
+            )
+          })}
         </div>
       </div>
 
-      {/* ─── Section 4: Bronnen & Methodologie ────────────── */}
+      {/* --- Section 4: Bronnen & Methodologie --- */}
       <details className="group rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
         <summary className="cursor-pointer select-none px-6 py-4 font-display text-sm font-bold text-[var(--ink)] transition-colors hover:bg-[var(--subtle)]">
           Bronnen &amp; Methodologie
