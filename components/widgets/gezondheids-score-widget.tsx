@@ -1,14 +1,14 @@
 'use client'
 
 import { memo, useState } from 'react'
+import Link from 'next/link'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { Activity, TrendingUp, TrendingDown, Minus, ChevronRight, Lightbulb } from 'lucide-react'
+import { Activity, TrendingUp, TrendingDown, Minus, ChevronRight, Lightbulb, ExternalLink } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 import { computeHealthScore, type HealthPillar } from '@/lib/financial-health'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
-import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 
 interface Props {
   size: WidgetSize
@@ -242,12 +242,14 @@ function TrendBadge({ trend }: { trend: number }) {
   )
 }
 
-// ── Kassabon BottomSheet content ──────────────────────────────
+// ── Simplified Kassabon for widget (summary + link to Horizon) ──
 
-function HealthKassabon({ health }: { health: ReturnType<typeof computeHealthScore> }) {
-  // Sort pillars: weakest first for improvement focus
-  const sorted = [...health.pillars].sort((a, b) => a.score - b.score)
-
+/**
+ * Widget kassabon shows a summary of the health score with pillar overview bars
+ * and links to the Horizon page for the full detail view.
+ * Both widget and Horizon use the same computeHealthScore function (single source of truth).
+ */
+function HealthKassabonSummary({ health }: { health: ReturnType<typeof computeHealthScore> }) {
   return (
     <div className="space-y-4">
       {/* Total score header */}
@@ -275,57 +277,32 @@ function HealthKassabon({ health }: { health: ReturnType<typeof computeHealthSco
           </div>
         )}
         <div className="border-t border-dashed border-[var(--border-md)] mt-2 pt-2 text-[10px] text-[var(--ink-3)]">
-          Score = gewogen gemiddelde van 6 pilaren
+          Score = gewogen gemiddelde van {health.activePillarCount ?? 6} pilaren
         </div>
       </KassabonShell>
 
-      {/* Per-pillar breakdown */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-[var(--ink-2)]">Pilaren (zwakste eerst)</h3>
-        {sorted.map(pillar => (
-          <div
-            key={pillar.id}
-            className="rounded-[var(--r-sm)] border border-[var(--border-ed)] p-3"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-[var(--ink)]">{pillar.name}</span>
-              <span className={`font-mono text-sm font-semibold tabular-nums ${scoreColorClass(pillar.score)}`}>
-                {pillar.score}/100
-              </span>
+      {/* Compact pillar overview (bars only, no detailed breakdown) */}
+      <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] p-3 space-y-1.5">
+        <h3 className="text-xs font-semibold text-[var(--ink-2)] mb-2">Pilaren</h3>
+        {health.pillars.map(pillar => (
+          <div key={pillar.id} className="flex items-center gap-2">
+            <span className="w-[72px] shrink-0 text-[10px] text-[var(--ink-3)] truncate">{pillar.name}</span>
+            <div className="flex-1 h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden">
+              <div className={`h-full rounded-full ${barColorClass(pillar.score)}`} style={{ width: `${pillar.score}%` }} />
             </div>
-            <p className="mt-1 text-[11px] text-[var(--ink-3)]">{pillar.explanation}</p>
-            <div className="mt-1.5 flex items-center justify-between text-[10px]">
-              <span className="text-[var(--ink-3)]">Waarde</span>
-              <span className="font-mono tabular-nums text-[var(--ink-2)]">{pillar.rawValue}</span>
-            </div>
-            {/* Progress bar */}
-            <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--subtle)] overflow-hidden">
-              <div
-                className={`h-full rounded-full ${barColorClass(pillar.score)}`}
-                style={{ width: `${pillar.score}%` }}
-              />
-            </div>
-            {/* Improvement tip */}
-            <div className="mt-2 flex items-start gap-1.5">
-              <Lightbulb className="h-3 w-3 text-horizon-500 mt-0.5 shrink-0" />
-              <p className="text-[10px] text-[var(--ink-2)] leading-snug">{pillar.improvementTip}</p>
-            </div>
+            <span className="w-[32px] shrink-0 text-right font-mono text-[10px] tabular-nums text-[var(--ink-2)]">{pillar.score}</span>
           </div>
         ))}
       </div>
 
-      {/* Weighting explanation */}
-      <div className="rounded-[var(--r-sm)] bg-[var(--subtle)] p-3">
-        <h4 className="text-[10px] font-semibold text-[var(--ink-2)] mb-1.5">Weging</h4>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-          {health.pillars.map(p => (
-            <div key={p.id} className="flex items-center justify-between text-[10px]">
-              <span className="text-[var(--ink-3)]">{p.name}</span>
-              <span className="font-mono tabular-nums text-[var(--ink-2)]">{Math.round(p.weight * 100)}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* CTA: link to Horizon for full detail view */}
+      <Link
+        href="/horizon"
+        className="flex items-center justify-center gap-2 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 px-4 py-2.5 text-xs font-medium text-horizon-700 transition-colors hover:bg-horizon-100 hover:border-horizon-300"
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+        Bekijk volledige analyse op De Horizon
+      </Link>
     </div>
   )
 }
@@ -365,7 +342,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
           </div>
         )}
         <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-          <div className="p-5"><HealthScoreReceipt health={health} /></div>
+          <div className="p-5"><HealthKassabonSummary health={health} /></div>
         </BottomSheet>
       </WidgetShell>
     )
@@ -390,7 +367,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
           </div>
         </div>
         <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-          <div className="p-5"><HealthScoreReceipt health={health} /></div>
+          <div className="p-5"><HealthKassabonSummary health={health} /></div>
         </BottomSheet>
       </WidgetShell>
     )
@@ -448,13 +425,16 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
         </div>
       )}
 
-      {/* CTA */}
-      <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)] flex items-center gap-1">
-        Bekijk alle pilaren <ChevronRight className="h-3 w-3" />
-      </p>
+      {/* CTA: link to Horizon for full detail view */}
+      <Link
+        href="/horizon"
+        className="mt-1.5 font-serif italic text-[11px] text-horizon-600 hover:text-horizon-800 flex items-center gap-1"
+      >
+        Bekijk details op De Horizon <ChevronRight className="h-3 w-3" />
+      </Link>
 
       <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-        <div className="p-5"><HealthScoreReceipt health={health} /></div>
+        <div className="p-5"><HealthKassabonSummary health={health} /></div>
       </BottomSheet>
     </WidgetShell>
   )
