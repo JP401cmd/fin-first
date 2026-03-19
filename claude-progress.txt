@@ -1,3 +1,26 @@
+## Session 2026-03-19 - Feature #308
+
+### Feature #308: Regressietest suite laadt geen tests — dynamische imports fixen - PASSING
+- The fix was partially applied by a previous session but not committed
+- Changes verified and committed:
+  - Removed `loadSuite()` helper that used variable path parameter (Turbopack can't statically analyze)
+  - Replaced with 71 static `import()` strings + `Promise.allSettled()` for parallel loading
+  - Each import has individual `.catch()` so one failing suite never blocks the rest
+  - Moved checkin-flow types from API route imports to `lib/checkin-types.ts` (avoids server-only deps)
+  - Minor fixes in horizon-strategie-pagina.ts and horizon-whatif.ts
+- Verification (browser): Created temporary standalone test page (no auth required)
+  - Categories: 71 (all suites loaded)
+  - Tests: 1333 (all tests registered)
+  - Registry Warnings: 0 (no failed imports)
+  - Console errors: 0
+  - "ALL SUITES LOADED SUCCESSFULLY" confirmed
+- Server-side API verification also confirmed: 71 categories, 1333 tests
+- Commit: b2992042
+
+### Current Status
+- 1 feature completed this session (#308)
+- Overall progress: 307/307 (100%)
+
 ## Session 2026-03-19 - Features #306, #307
 
 ### Feature #306: Default mismatch fixen — guardrail_cut_step en guardrail_raise_step - PASSING
