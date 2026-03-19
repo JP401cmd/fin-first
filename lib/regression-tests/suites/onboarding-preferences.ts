@@ -220,7 +220,46 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 6: Route accessible ──────────────────────────────────
+  // ── Step 6: Conditional hiding of budget_cashflow when budgeting is none ──
+  {
+    id: 'ob-pref-budget-cashflow-hidden',
+    name: 'budget_cashflow focus optie verborgen wanneer budgettering_mode === none',
+    category: CAT,
+    description: 'Wanneer gebruiker geen budgettering heeft gekozen, wordt budget_cashflow focus optie niet getoond',
+    priority: 'high',
+    estimatedDurationMs: 100,
+    fn() {
+      // When budgettering_mode is 'none', the budget_cashflow option should be hidden
+      // because there are no budgets to track
+      type BudgetteringMode = 'none' | 'yes' | 'template' | 'manual'
+
+      function getVisibleFocusOptions(budgetteringMode: BudgetteringMode): FocusChoice[] {
+        const all = ALL_FOCUS_OPTIONS.map((o) => o.id)
+        if (budgetteringMode === 'none') {
+          return all.filter((id) => id !== 'budget_cashflow')
+        }
+        return all
+      }
+
+      // Mode none: budget_cashflow hidden, 4 options visible
+      const noneOptions = getVisibleFocusOptions('none')
+      assertEqual(noneOptions.length, 4, 'Mode none: 4 focus opties zichtbaar')
+      assert(!noneOptions.includes('budget_cashflow'), 'Mode none: budget_cashflow niet zichtbaar')
+      assert(noneOptions.includes('assets_investments'), 'Mode none: assets_investments wel zichtbaar')
+      assert(noneOptions.includes('fire_freedom'), 'Mode none: fire_freedom wel zichtbaar')
+      assert(noneOptions.includes('goals_actions'), 'Mode none: goals_actions wel zichtbaar')
+      assert(noneOptions.includes('overview'), 'Mode none: overview wel zichtbaar')
+
+      // Mode yes/template/manual: all 5 options visible
+      for (const mode of ['yes', 'template', 'manual'] as BudgetteringMode[]) {
+        const options = getVisibleFocusOptions(mode)
+        assertEqual(options.length, 5, `Mode ${mode}: 5 focus opties zichtbaar`)
+        assert(options.includes('budget_cashflow'), `Mode ${mode}: budget_cashflow zichtbaar`)
+      }
+    },
+  },
+
+  // ── Step 7: Route accessible ──────────────────────────────────
   {
     id: 'ob-pref-route-accessible',
     name: '/onboarding route bereikbaar (voorkeuren stap is onderdeel van onboarding)',

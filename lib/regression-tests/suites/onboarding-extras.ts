@@ -11,6 +11,7 @@ interface BankAccountEntry {
   bank_name: string
   account_type: string
   balance: string
+  has_budget_tracking: boolean
 }
 
 interface AssetEntry {
@@ -60,7 +61,7 @@ interface DebtEntry {
 
 // ── Default empty entries (match EMPTY consts in mini-forms) ────────────────
 
-const EMPTY_BANK: BankAccountEntry = { name: '', bank_name: '', account_type: 'checking', balance: '' }
+const EMPTY_BANK: BankAccountEntry = { name: '', bank_name: '', account_type: 'checking', balance: '', has_budget_tracking: true }
 
 const EMPTY_ASSET: AssetEntry = {
   name: '', asset_type: 'savings', current_value: '', purchase_value: '',
@@ -105,11 +106,10 @@ function debtCanSave(draft: DebtEntry): boolean {
 
 // ── Sections config (matches onboarding-extras.tsx) ─────────────────────────
 
-type Section = 'bank' | 'assets' | 'debts'
+type Section = 'assets' | 'debts'
 
 const SECTIONS: { key: Section; label: string; description: string }[] = [
-  { key: 'bank', label: 'Bankrekeningen', description: 'Betaal- en spaarrekeningen' },
-  { key: 'assets', label: 'Bezittingen', description: 'Spaargeld, beleggingen, woning, etc.' },
+  { key: 'assets', label: 'Bezittingen', description: 'Bankrekeningen, spaargeld, beleggingen, woning, etc.' },
   { key: 'debts', label: 'Schulden', description: 'Hypotheek, leningen, creditcard, etc.' },
 ]
 
@@ -127,17 +127,16 @@ const tests: TestCase[] = [
   // ── Step 1: Collapsible secties ──────────────────────────────────────────
   {
     id: 'ob-ext-collapsible-sections',
-    name: 'Collapsible secties: alle drie inklapbaar, optioneel',
+    name: 'Collapsible secties: beide inklapbaar, optioneel',
     category: CAT,
-    description: '3 secties (bank, assets, debts) zijn inklapbaar en mogen allemaal leeg blijven',
+    description: '2 secties (assets incl. bankrekeningen, debts) zijn inklapbaar en mogen leeg blijven',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // 3 sections exist
-      assertEqual(SECTIONS.length, 3, '3 secties verwacht')
-      assertEqual(SECTIONS[0].key, 'bank', 'Sectie 1: bank')
-      assertEqual(SECTIONS[1].key, 'assets', 'Sectie 2: assets')
-      assertEqual(SECTIONS[2].key, 'debts', 'Sectie 3: debts')
+      // 2 sections exist (bank accounts are now inside assets)
+      assertEqual(SECTIONS.length, 2, '2 secties verwacht')
+      assertEqual(SECTIONS[0].key, 'assets', 'Sectie 1: assets (incl. bankrekeningen)')
+      assertEqual(SECTIONS[1].key, 'debts', 'Sectie 2: debts')
 
       // All sections are optional: empty arrays are valid
       const bankAccounts: BankAccountEntry[] = []
@@ -147,16 +146,15 @@ const tests: TestCase[] = [
       assert(!hasData, 'Lege secties: geen data is geldig')
 
       // Default openSections state: all closed
-      const openSections: Record<Section, boolean> = { bank: false, assets: false, debts: false }
-      assert(!openSections.bank, 'Bank sectie standaard dicht')
+      const openSections: Record<Section, boolean> = { assets: false, debts: false }
       assert(!openSections.assets, 'Assets sectie standaard dicht')
       assert(!openSections.debts, 'Debts sectie standaard dicht')
 
       // Toggle works
-      openSections.bank = !openSections.bank
-      assert(openSections.bank, 'Bank sectie na toggle: open')
-      openSections.bank = !openSections.bank
-      assert(!openSections.bank, 'Bank sectie na 2e toggle: dicht')
+      openSections.assets = !openSections.assets
+      assert(openSections.assets, 'Assets sectie na toggle: open')
+      openSections.assets = !openSections.assets
+      assert(!openSections.assets, 'Assets sectie na 2e toggle: dicht')
 
       // Button text changes based on data presence
       // hasData = false → "Overslaan", hasData = true → "Volgende"
@@ -180,6 +178,7 @@ const tests: TestCase[] = [
       assertEqual(entry.bank_name, '', 'Default bank_name leeg')
       assertEqual(entry.balance, '', 'Default balance leeg')
       assertEqual(entry.account_type, 'checking', 'Default type checking')
+      assertEqual(entry.has_budget_tracking, true, 'Default has_budget_tracking true')
 
       // Account types available: checking, savings, joint
       const accountTypes = ['checking', 'savings', 'joint']
@@ -219,7 +218,7 @@ const tests: TestCase[] = [
       // empty fields produce useless data that won't be saved to DB
 
       // Verify the entry interface has all expected fields
-      const entry: BankAccountEntry = { name: 'Test', bank_name: 'ING', account_type: 'checking', balance: '1000' }
+      const entry: BankAccountEntry = { name: 'Test', bank_name: 'ING', account_type: 'checking', balance: '1000', has_budget_tracking: true }
       assert(!!entry.name, 'name is gevuld')
       assert(!!entry.bank_name, 'bank_name is gevuld')
       assert(!!entry.balance, 'balance is gevuld')
@@ -596,6 +595,76 @@ const tests: TestCase[] = [
     },
   },
 
+  // ── Step 12: Budget tracking validation ─────────────────────────────────────
+  {
+    id: 'ob-ext-budget-tracking-validation',
+    name: 'Budget tracking validatie: minstens 1 bank met has_budget_tracking bij actief budgetteren',
+    category: CAT,
+    description: 'Wanneer budgettering actief is, moet minstens 1 bankrekening has_budget_tracking=true hebben',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      // Validation function: when budgeting is active, at least one bank must track budgets
+      function validateBudgetTracking(banks: BankAccountEntry[], budgetteringActive: boolean): boolean {
+        if (!budgetteringActive) return true // No validation needed when budgeting is off
+        if (banks.length === 0) return true // No banks added yet is fine
+        return banks.some((b) => b.has_budget_tracking)
+      }
+
+      // Budgeting active, one bank with tracking: valid
+      const banksWithTracking: BankAccountEntry[] = [
+        { ...EMPTY_BANK, name: 'ING', bank_name: 'ING', balance: '2500', has_budget_tracking: true },
+      ]
+      assert(validateBudgetTracking(banksWithTracking, true), 'Budgettering actief + bank met tracking: geldig')
+
+      // Budgeting active, all banks without tracking: invalid
+      const banksNoTracking: BankAccountEntry[] = [
+        { ...EMPTY_BANK, name: 'ING', bank_name: 'ING', balance: '2500', has_budget_tracking: false },
+        { ...EMPTY_BANK, name: 'Rabo', bank_name: 'Rabo', balance: '1000', has_budget_tracking: false },
+      ]
+      assert(!validateBudgetTracking(banksNoTracking, true), 'Budgettering actief + geen tracking: ongeldig')
+
+      // Budgeting inactive: always valid regardless of tracking state
+      assert(validateBudgetTracking(banksNoTracking, false), 'Budgettering inactief: altijd geldig')
+      assert(validateBudgetTracking([], false), 'Budgettering inactief + geen banken: geldig')
+
+      // Budgeting active, no banks: valid (banks are optional)
+      assert(validateBudgetTracking([], true), 'Budgettering actief + geen banken: geldig')
+    },
+  },
+
+  // ── Step 13: Auto-create checking account ──────────────────────────────────
+  {
+    id: 'ob-ext-auto-create-checking',
+    name: 'Auto-create betaalrekening: handleAutoCreate maakt Lopende rekening met budget tracking',
+    category: CAT,
+    description: 'handleAutoCreate voegt standaard betaalrekening toe met has_budget_tracking=true',
+    priority: 'high',
+    estimatedDurationMs: 100,
+    fn() {
+      // Simulate handleAutoCreate behavior
+      function handleAutoCreate(): BankAccountEntry {
+        return {
+          name: 'Lopende rekening',
+          bank_name: '',
+          account_type: 'checking',
+          balance: '',
+          has_budget_tracking: true,
+        }
+      }
+
+      const autoCreated = handleAutoCreate()
+      assertEqual(autoCreated.name, 'Lopende rekening', 'Auto-created naam is Lopende rekening')
+      assertEqual(autoCreated.account_type, 'checking', 'Auto-created type is checking')
+      assertEqual(autoCreated.has_budget_tracking, true, 'Auto-created heeft budget tracking aan')
+
+      // When added to empty list, validation should pass
+      const banks = [autoCreated]
+      const hasTracking = banks.some((b) => b.has_budget_tracking)
+      assert(hasTracking, 'Auto-created rekening passeert budget tracking validatie')
+    },
+  },
+
   // ── Bonus: Onboarding route check ────────────────────────────────────────
   {
     id: 'ob-ext-route-accessible',
@@ -616,7 +685,7 @@ export function register(): void {
   registerCategory({
     id: CAT,
     label: 'Onboarding — Extras',
-    description: 'Onboarding stap 3: optionele data — bankrekeningen, bezittingen, schulden',
+    description: 'Onboarding stap 3: optionele data — bezittingen (incl. bankrekeningen), schulden',
     icon: 'PlusCircle',
     testCount: 0,
   })

@@ -7,9 +7,21 @@ const CAT = 'onboarding.flow'
 
 // ── Constants derived from onboarding page.tsx ──────────────────────────────
 
-const STEP_ORDER = ['intro', 'identity', 'extras', 'budgets', 'preferences', 'saving', 'success'] as const
-type Step = (typeof STEP_ORDER)[number]
+const FULL_STEP_ORDER = ['intro', 'identity', 'extras', 'budgets', 'preferences', 'saving', 'success'] as const
+type Step = (typeof FULL_STEP_ORDER)[number]
 type Direction = 'forward' | 'back'
+type BudgetteringMode = 'none' | 'yes' | 'template' | 'manual'
+
+/** Dynamic step order: when budgettering_mode is 'none', budgets step is skipped */
+function getStepOrder(mode: BudgetteringMode): Step[] {
+  if (mode === 'none') {
+    return FULL_STEP_ORDER.filter((s) => s !== 'budgets') as Step[]
+  }
+  return [...FULL_STEP_ORDER]
+}
+
+/** localStorage key for onboarding draft persistence */
+const LOCALSTORAGE_DRAFT_KEY = 'trifinity_onboarding_draft'
 
 /** Minimal reducer replica for state management verification */
 interface State {
@@ -23,7 +35,7 @@ interface State {
 }
 
 function getDirection(from: Step, to: Step): Direction {
-  return STEP_ORDER.indexOf(to) >= STEP_ORDER.indexOf(from) ? 'forward' : 'back'
+  return FULL_STEP_ORDER.indexOf(to) >= FULL_STEP_ORDER.indexOf(from) ? 'forward' : 'back'
 }
 
 const SAVING_MESSAGES = [
@@ -46,14 +58,14 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      assertEqual(STEP_ORDER.length, 7, 'Totaal aantal stappen')
-      assertEqual(STEP_ORDER[0], 'intro', 'Eerste stap')
-      assertEqual(STEP_ORDER[1], 'identity', 'Tweede stap')
-      assertEqual(STEP_ORDER[2], 'extras', 'Derde stap')
-      assertEqual(STEP_ORDER[3], 'budgets', 'Vierde stap')
-      assertEqual(STEP_ORDER[4], 'preferences', 'Vijfde stap')
-      assertEqual(STEP_ORDER[5], 'saving', 'Zesde stap')
-      assertEqual(STEP_ORDER[6], 'success', 'Zevende stap')
+      assertEqual(FULL_STEP_ORDER.length, 7, 'Totaal aantal stappen')
+      assertEqual(FULL_STEP_ORDER[0], 'intro', 'Eerste stap')
+      assertEqual(FULL_STEP_ORDER[1], 'identity', 'Tweede stap')
+      assertEqual(FULL_STEP_ORDER[2], 'extras', 'Derde stap')
+      assertEqual(FULL_STEP_ORDER[3], 'budgets', 'Vierde stap')
+      assertEqual(FULL_STEP_ORDER[4], 'preferences', 'Vijfde stap')
+      assertEqual(FULL_STEP_ORDER[5], 'saving', 'Zesde stap')
+      assertEqual(FULL_STEP_ORDER[6], 'success', 'Zevende stap')
     },
   },
 
@@ -247,7 +259,7 @@ const tests: TestCase[] = [
 
       // After error, step goes back to preferences (line 312)
       const errorRecoveryStep: Step = 'preferences'
-      assertIncludes([...STEP_ORDER], errorRecoveryStep, 'Error recovery stap is een geldige stap')
+      assertIncludes([...FULL_STEP_ORDER], errorRecoveryStep, 'Error recovery stap is een geldige stap')
 
       // saving state is reset in finally block (line 314)
       // This ensures retry is possible
@@ -313,7 +325,7 @@ const tests: TestCase[] = [
       // 2. Header: when showHeader is true (!['intro', 'success', 'saving'].includes(step))
       //    "Uitloggen" button in top-right (line 380-385)
 
-      const headerVisibleSteps = STEP_ORDER.filter(
+      const headerVisibleSteps = FULL_STEP_ORDER.filter(
         (s) => !['intro', 'success', 'saving'].includes(s),
       )
       assertEqual(headerVisibleSteps.length, 4, 'Header met logout zichtbaar op 4 stappen')
@@ -392,6 +404,84 @@ const tests: TestCase[] = [
       // Verify saving step removes interactive elements
       const savingStepHasButtons = false // In saving step, no buttons are rendered
       assertEqual(savingStepHasButtons, false, 'Saving stap heeft geen knoppen')
+    },
+  },
+
+  // ── Step 13: Dynamic step order based on budgettering_mode ──────
+  {
+    id: 'ob-flow-dynamic-step-order',
+    name: 'Dynamic step order: budgettering_mode bepaalt of budgets stap getoond wordt',
+    category: CAT,
+    description: 'getStepOrder("none") retourneert 6 stappen (budgets overgeslagen), andere modes 7 stappen',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      // Mode 'none': budgets step is skipped, 6 steps remain
+      const noneSteps = getStepOrder('none')
+      assertEqual(noneSteps.length, 6, 'Mode none: 6 stappen (budgets overgeslagen)')
+      assert(!noneSteps.includes('budgets'), 'Mode none: budgets stap niet aanwezig')
+      assertEqual(noneSteps[0], 'intro', 'Mode none: intro eerste')
+      assertEqual(noneSteps[1], 'identity', 'Mode none: identity tweede')
+      assertEqual(noneSteps[2], 'extras', 'Mode none: extras derde')
+      assertEqual(noneSteps[3], 'preferences', 'Mode none: preferences vierde (budgets overgeslagen)')
+      assertEqual(noneSteps[4], 'saving', 'Mode none: saving vijfde')
+      assertEqual(noneSteps[5], 'success', 'Mode none: success zesde')
+
+      // Mode 'yes': all 7 steps
+      const yesSteps = getStepOrder('yes')
+      assertEqual(yesSteps.length, 7, 'Mode yes: 7 stappen')
+      assert(yesSteps.includes('budgets'), 'Mode yes: budgets stap aanwezig')
+
+      // Mode 'template': all 7 steps
+      const templateSteps = getStepOrder('template')
+      assertEqual(templateSteps.length, 7, 'Mode template: 7 stappen')
+      assert(templateSteps.includes('budgets'), 'Mode template: budgets stap aanwezig')
+
+      // Mode 'manual': all 7 steps
+      const manualSteps = getStepOrder('manual')
+      assertEqual(manualSteps.length, 7, 'Mode manual: 7 stappen')
+      assert(manualSteps.includes('budgets'), 'Mode manual: budgets stap aanwezig')
+
+      // Verify step order is preserved in all modes
+      for (const mode of ['yes', 'template', 'manual'] as BudgetteringMode[]) {
+        const steps = getStepOrder(mode)
+        assertEqual(steps.indexOf('extras') < steps.indexOf('budgets'), true, `Mode ${mode}: extras voor budgets`)
+        assertEqual(steps.indexOf('budgets') < steps.indexOf('preferences'), true, `Mode ${mode}: budgets voor preferences`)
+      }
+    },
+  },
+
+  // ── Step 14: localStorage draft persistence ─────────────────────
+  {
+    id: 'ob-flow-localstorage-persistence',
+    name: 'localStorage draft persistence: key trifinity_onboarding_draft',
+    category: CAT,
+    description: 'Onboarding data wordt opgeslagen in localStorage onder trifinity_onboarding_draft voor draft recovery',
+    priority: 'high',
+    estimatedDurationMs: 100,
+    fn() {
+      // The onboarding persists its reducer state to localStorage for crash/tab-close recovery
+      assertEqual(LOCALSTORAGE_DRAFT_KEY, 'trifinity_onboarding_draft', 'localStorage key correct')
+
+      // Draft data structure mirrors the reducer State interface
+      const draftFields = ['step', 'direction', 'identity', 'budgetAmounts', 'bankAccounts', 'assets', 'debts']
+      assertEqual(draftFields.length, 7, 'Draft bevat 7 velden (volledige reducer state)')
+
+      // Simulate serialization/deserialization roundtrip
+      const mockState: State = {
+        step: 'extras',
+        direction: 'forward',
+        identity: { full_name: 'Draft Test', net_monthly_income: '3000' },
+        budgetAmounts: { 'huur-hypotheek': 840 },
+        bankAccounts: [{ name: 'ING', balance: '2500' }],
+        assets: [],
+        debts: [],
+      }
+      const serialized = JSON.stringify(mockState)
+      const deserialized = JSON.parse(serialized)
+      assertEqual(deserialized.step, 'extras', 'Draft step hersteld na serialize/deserialize')
+      assertEqual(deserialized.identity.full_name, 'Draft Test', 'Draft identity hersteld')
+      assertEqual(deserialized.bankAccounts.length, 1, 'Draft bankAccounts hersteld')
     },
   },
 ]
