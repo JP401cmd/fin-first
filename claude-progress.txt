@@ -16609,3 +16609,23 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#334, #335)
 - Progress: 329/336 passing (97.9%)
+
+## Session 2026-03-19 - Feature #331 (Attempt 6)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 6)
+- **Blocker**: Cannot access hosted Supabase database to apply DDL migrations
+- **Root cause**: Supabase MCP server (https://mcp.supabase.com/mcp) requires OAuth authentication that has not been established in this environment
+- **All approaches exhausted**:
+  1. Supabase MCP tools (list_migrations, apply_migration, execute_sql, list_tables) — all return "permission not granted" despite being in settings.local.json allow list
+  2. Supabase CLI (`npx supabase`) — "Access token not provided"
+  3. REST API with anon key — read-only, cannot execute DDL
+  4. No service role key, DB password, or Management API PAT available in any env file
+- **Confirmed still pending** (verified via REST API):
+  - holdings.asset_class column does NOT exist
+  - target_allocations table does NOT exist
+  - save_onboarding_data RPC does NOT exist
+- **Resolution needed**: One of:
+  1. Complete Supabase MCP OAuth flow (run `supabase login` or authenticate MCP in browser)
+  2. Add SUPABASE_ACCESS_TOKEN to environment
+  3. Add service role key to .env.local
+  4. Apply migrations manually via Supabase Dashboard SQL Editor
