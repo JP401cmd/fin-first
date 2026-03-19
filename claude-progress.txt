@@ -16780,3 +16780,27 @@ For Feature #51 (Transaction Import):
 ### Next Steps
 - Continue with next features in the backlog
 - Migration blocker (feature 331) still unresolved — needs Supabase MCP permissions
+
+## Session 2026-03-19 - Feature #347
+
+### Feature #347: Eindstrategie selectie toevoegen aan strategie-modal - PASSING
+- Extended the strategy modal (BottomSheet) with a leading end strategy selection section
+- Three end strategy cards: Portfolio opteren (deplete), Erfenis (legacy), Behouden van vermogen (perpetual)
+- Conditional inputs: Eindleeftijd for deplete/legacy, Na te laten bedrag for legacy
+- Direct save to profiles via Supabase on card click (fire_end_strategy, fire_end_age, fire_legacy_amount)
+- Incompatibility warning banner when active withdrawal strategy clashes with chosen end strategy
+- Incompatible withdrawal strategy cards marked as disabled with red "INCOMPATIBEL" badge
+- Warning suggestions shown on compatible-with-caveats withdrawal cards
+- Simulations recalculate immediately when end strategy changes
+- Bidirectional sync verified: modal ↔ Settings page both read from and write to same profiles columns
+- Fixed Settings page profile query: removed non-existent ai_enabled column, added fire_end_age/fire_legacy_amount
+- Mobile-first grid layout: grid-cols-1 sm:grid-cols-3 for end strategy cards
+- Zero TypeScript errors, zero mock data patterns
+- Commit: 5594fec6
+
+### Files Modified
+- components/app/horizon/strategie-modal.tsx — main feature implementation (+231 lines)
+- app/(app)/identity/instellingen/page.tsx — fixed profile query columns
+
+### Current Status
+- Feature #347 completed and marked passing
