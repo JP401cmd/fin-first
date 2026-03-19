@@ -1,6 +1,6 @@
 'use client'
 
-import { Receipt, Clock, SlidersHorizontal, Unlock, MessageSquare, CalendarCheck, GitBranch, Users, Scale, Lightbulb, type LucideIcon } from 'lucide-react'
+import { Receipt, Clock, SlidersHorizontal, Unlock, MessageSquare, CalendarCheck, GitBranch, Users, Scale, TrendingDown, Lightbulb, type LucideIcon } from 'lucide-react'
 
 /* ── Tip definitions ──────────────────────── */
 
@@ -45,6 +45,10 @@ const PRO_TIPS: ProTip[] = [
   {
     icon: Scale,
     text: 'Herbalanceer je portfolio jaarlijks rond de Box 3 peildatum (1 jan) — zo houd je risico in lijn én optimaliseer je belasting.',
+  },
+  {
+    icon: TrendingDown,
+    text: 'Elke 0,1% TER-verlaging bespaart ~€2.000 over 20 jaar per €100.000 belegd. Dat is weken eerder financiële vrijheid.',
   },
 ]
 

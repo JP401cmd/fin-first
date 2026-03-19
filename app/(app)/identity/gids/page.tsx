@@ -488,6 +488,57 @@ export default function GidsPage() {
           />
 
           <GuideTopicCard
+            icon={BarChart3}
+            title="Beleggingskosten & TER"
+            color="var(--color-kern-400)"
+            description={
+              <>
+                <strong>Kosten zijn de stille vijand van vermogensopbouw.</strong> Elke euro die je aan fondskosten betaalt, is een euro die niet voor je werkt. En door het compound effect groeien die kosten mee — over 20, 30 of 40 jaar maakt een klein verschil in kosten een enorm verschil in eindvermogen.
+                <br /><br />
+                <strong>Wat is TER?</strong> De Total Expense Ratio is het jaarlijkse kostenpercentage dat een fonds in rekening brengt. Een TER van 0,22% betekent dat je per €100.000 belegd vermogen €220 per jaar aan fondskosten betaalt. Een actief beheerd fonds met 1,50% TER kost je €1.500 — bijna 7× zoveel.
+                <br /><br />
+                <strong>Het compound effect van kosten:</strong> Stel je hebt €100.000 en behaalt 7% bruto rendement over 20 jaar.
+                <br />
+                • Met <strong>0,22% TER</strong> (indexfonds): je eindvermogen is ca. <strong>€356.000</strong>
+                <br />
+                • Met <strong>1,50% TER</strong> (actief fonds): je eindvermogen is ca. <strong>€291.000</strong>
+                <br />
+                Dat verschil van 1,28% per jaar kost je <strong>~€65.000</strong> over 20 jaar. Bij een FIRE-portfolio kan dat het verschil zijn tussen 2–3 jaar eerder of later financiële vrijheid bereiken.
+                <br /><br />
+                <strong>TER vs tracking difference vs transactiekosten:</strong>
+                <br />
+                • <strong>TER</strong> — de lopende kosten van het fonds (beheer, administratie, bewaarkosten). Dit is de meest geciteerde kostenmaat.
+                <br />
+                • <strong>Tracking difference</strong> — het verschil tussen het fondsrendement en de index die het volgt. Kan afwijken van TER doordat fondsen inkomsten uit securities lending of belastingefficiëntie terugverdienen. Een fonds met 0,20% TER kan een tracking difference van 0,05% hebben.
+                <br />
+                • <strong>Transactiekosten</strong> — de aan- en verkoopkosten die je broker rekent. Deze zitten niet in de TER.
+                <br /><br />
+                <strong>Hoe vind je de TER van een fonds?</strong>
+                <br />
+                • <strong>Factsheet</strong> — elk fonds publiceert een Key Information Document (KID) met de TER
+                <br />
+                • <strong>Morningstar.nl</strong> — zoek je fonds op en kijk bij &lsquo;Kosten&rsquo;
+                <br />
+                • <strong>Fondsaanbieder</strong> — Vanguard, iShares, Northern Trust publiceren TER op hun website
+                <br /><br />
+                <strong>TriFinity &amp; kosten:</strong> Voer de TER per holding in bij <strong>De Kern → Portfolio → Holdings</strong>. De <strong>fee analyzer-widget</strong> op je dashboard berekent vervolgens je gewogen totale kosten, de impact op je FIRE-datum en hoeveel vrijheidsdagen de kosten je over tijd kosten.
+                <br /><br />
+                <em>Disclaimer: TER is niet de enige kostenmaat. Tracking difference kan positief of negatief afwijken van de TER. Bekijk altijd het totaalplaatje inclusief transactiekosten van je broker.</em>
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Kern → Portfolio → Holdings en voer de TER in bij elk fonds (te vinden in het KID/factsheet of op Morningstar.nl)",
+                "Bekijk de fee analyzer-widget op je dashboard — deze toont je gewogen portfoliokosten en de impact op je FIRE-datum",
+                "Vergelijk fondsen: een indexfonds (TER ~0,20%) vs een actief fonds (TER ~1,50%) kan tienduizenden euro's verschil maken over 20 jaar",
+                "Check ook de tracking difference naast de TER — sommige fondsen presteren beter dan hun TER suggereert door securities lending of belastingefficiëntie",
+                "Minimaliseer transactiekosten door minder frequent te handelen en grotere orders te plaatsen",
+              ],
+              tip: "Focus op gewogen portfoliokosten, niet op individuele TER-percentages. Een fonds met 0,40% TER dat maar 5% van je portfolio uitmaakt kost je effectief maar 0,02% — terwijl je kernpositie met 0,22% TER die 80% van je portfolio uitmaakt je 0,18% kost. De fee analyzer doet deze berekening automatisch.",
+            }}
+          />
+
+          <GuideTopicCard
             icon={RefreshCw}
             title="Check-in"
             color="var(--color-kern-400)"

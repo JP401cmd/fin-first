@@ -101,6 +101,13 @@ const MODULES: NaslagwerkModule[] = [
         anchor: 'guide-reis-2',
       },
       {
+        icon: BarChart3,
+        title: 'Beleggingskosten & TER',
+        summary:
+          'Begrijp Total Expense Ratio, het compound effect van kosten en hoe je TER per fonds invoert.',
+        anchor: 'guide-reis-2',
+      },
+      {
         icon: RefreshCw,
         title: 'Check-in',
         summary: 'Maandelijkse routine om je saldi bij te werken en voortgang te meten.',
