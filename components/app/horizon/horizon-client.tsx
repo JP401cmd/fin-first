@@ -80,7 +80,7 @@ import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
-import { projectWealthComposition, type StackedRow } from '@/lib/wealth-composition'
+import { deriveWealthCompositionFromSim, type StackedRow } from '@/lib/wealth-composition'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
@@ -617,21 +617,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     ? { ...mcData.percentiles, startAge: currentAge }
     : undefined
 
-  // Wealth composition projection for vermogensopbouw chart
+  // Wealth composition projection for vermogensopbouw chart (SimRow as source of truth)
   const wealthCompositionRows: StackedRow[] = useMemo(() => {
     if (chartMode !== 'vermogensopbouw') return []
-    const ca = currentAge ?? 30
-    const ea = simResult?.displayEndAge ?? 90
-    return projectWealthComposition({
-      assets: initialData.assets ?? [],
+    if (!simResult?.rows?.length) return []
+    return deriveWealthCompositionFromSim(
+      simResult.rows,
+      initialData.assets ?? [],
       debts,
-      currentAge: ca,
-      endAge: ea,
-      inflation: fireParams.inflationRate,
-      fireAge: simResult?.fireAge ?? undefined,
-      annualExpenses: effectiveInput?.yearlyMustExpenses,
-    })
-  }, [chartMode, currentAge, simResult?.displayEndAge, simResult?.fireAge, initialData.assets, debts, fireParams.inflationRate, effectiveInput?.yearlyMustExpenses])
+      simResult.fireAge ?? undefined,
+      effectiveInput?.yearlyMustExpenses,
+    )
+  }, [chartMode, simResult?.rows, simResult?.fireAge, initialData.assets, debts, effectiveInput?.yearlyMustExpenses])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
