@@ -17158,3 +17158,21 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 0 features completed this session (external blocker)
 - Total: 346/347 features passing (99.7%)
+
+## Session 2026-03-19 - Feature #331 (Attempt 25)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 25)
+- **Root cause unchanged**: All Supabase MCP tools (list_migrations, execute_sql, apply_migration) return "Claude requested permissions but you haven't granted it yet"
+- **feature_request_human_input** also blocked by same MCP permissions issue
+- **No credentials available**: No SERVICE_ROLE_KEY, DB_PASSWORD, or SUPABASE_ACCESS_TOKEN in .env or .env.local
+- **Supabase CLI**: `supabase projects list` returns "Access token not provided"
+- **Resolution needed**: User must either:
+  1. Grant Supabase MCP OAuth permissions in an interactive Claude Code session (click "Allow" when prompted)
+  2. Add SUPABASE_ACCESS_TOKEN to .env.local
+  3. Apply the 11 pending migrations manually via Supabase Dashboard SQL Editor
+- **11 migration files pending** (20260316100001 through 20260319000003, excluding 20260318000001 which is already applied)
+- This is a TRUE external blocker - no code changes can resolve it
+
+### Current Status
+- 0 features completed this session (external blocker)
+- Total: 346/348 features passing (99.4%)
