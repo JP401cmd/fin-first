@@ -1,3 +1,28 @@
+## Session 2026-03-19 - Features #322, #323
+
+### Feature #322: Gids bijwerken voor onboarding wijzigingen - PASSING
+- Updated guide page (/identity/gids) to reflect onboarding changes
+- Budget section: added opt-in budgeting choice + 3 templates (Minimalistisch/Nibud/Uitgebreid) descriptions
+- Cash accounts: updated descriptions to reflect bank accounts integrated into assets section
+- Added new Invulfase GuideTopicCard explaining post-onboarding guided phase
+- Updated howTo steps to reference new onboarding flow
+- Zero console errors, verified via browser automation
+- Commit: 7a30f5b7
+
+### Feature #323: Regressietesten bijwerken voor onboarding wijzigingen - PASSING
+- Updated 5 regression test suites with 10 new test cases:
+  - onboarding-budgets.ts: complete rewrite (zuinig/gebalanceerd/fire → minimalistisch/nibud/uitgebreid templates with distributeIncome + rounding fix)
+  - onboarding-extras.ts: 2 sections (not 3), has_budget_tracking field, budget tracking validation, auto-create checking account
+  - onboarding-flow.ts: dynamic STEP_ORDER (budgets skipped when mode='none'), localStorage persistence
+  - onboarding-preferences.ts: conditional budget_cashflow hiding
+  - onboarding-save.ts: invulfase activation, localStorage resilience
+- Zero TypeScript errors (only pre-existing 3 in unrelated test files)
+- Commit: b2352ca5
+
+### Current Status
+- 2 features completed this session (#322, #323)
+- 327/336 tests passing (97.0%)
+
 ## Session 2026-03-19 (attempt 3) - Feature #331
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED AGAIN (External Blocker)
