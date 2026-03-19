@@ -26,7 +26,8 @@ import {
   type RetirementExpenseMethod,
 } from '@/lib/budget-utils'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { ArrowLeft, Shield, TrendingUp, Landmark, Settings, Info, Check, CircleDot, Loader2 } from 'lucide-react'
+import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { ArrowLeft, Shield, TrendingUp, Landmark, Settings, Info, Check, CircleDot, Loader2, AlertTriangle } from 'lucide-react'
 
 // ── Strategy metadata (Dutch) ──────────────────────────────────────────────
 
@@ -119,6 +120,261 @@ const STRATEGY_EXPLANATIONS: Record<WithdrawalStrategyType, StrategyExplanation>
     pros: ['Beschermt tegen sequence-of-returns risk', 'Emotioneel rustgevend', 'Duidelijke structuur'],
     cons: ['Lagere totale rendementen door cash-allocatie', 'Hervulling vereist aandacht', 'Cash verliest waarde door inflatie'],
   },
+}
+
+// ── Compatibility matrix data ─────────────────────────────────────────────
+
+type CompatibilityStatus = 'compatible' | 'warning' | 'incompatible'
+
+interface CompatibilityEntry {
+  status: CompatibilityStatus
+  explanation: string
+  suggestion?: string
+}
+
+const END_STRATEGIES: FireEndStrategy[] = ['deplete', 'legacy', 'perpetual']
+
+const END_STRATEGY_SHORT: Record<FireEndStrategy, string> = {
+  deplete: 'Opteren',
+  legacy: 'Erfenis',
+  perpetual: 'Behouden',
+}
+
+/**
+ * Compatibility matrix: withdrawal strategy × end strategy
+ * Rows = withdrawal strategies (static, guardrails, vpw, bucket)
+ * Cols = end strategies (deplete, legacy, perpetual)
+ */
+const COMPATIBILITY_MATRIX: Record<WithdrawalStrategyType, Record<FireEndStrategy, CompatibilityEntry>> = {
+  static: {
+    deplete: {
+      status: 'compatible',
+      explanation: 'Klassieke 4%-regel is ontworpen voor portfolio-optering over 30 jaar.',
+    },
+    legacy: {
+      status: 'warning',
+      explanation: 'Vaste onttrekking houdt geen rekening met erfenisdoelbedrag — je kunt te veel of te weinig onttrekken.',
+      suggestion: 'Overweeg Guardrails voor betere afstemming op je erfenisdoel.',
+    },
+    perpetual: {
+      status: 'warning',
+      explanation: 'Bij een vast onttrekkingspercentage boven het reëel rendement daalt de koopkracht geleidelijk.',
+      suggestion: 'Stel het percentage lager in dan je verwachte reëel rendement.',
+    },
+  },
+  guardrails: {
+    deplete: {
+      status: 'compatible',
+      explanation: 'Guardrails passen onttrekking dynamisch aan, ideaal bij een einddoel van €0.',
+    },
+    legacy: {
+      status: 'compatible',
+      explanation: 'Door de dynamische aanpassing kun je sturen richting je erfenisdoelbedrag.',
+    },
+    perpetual: {
+      status: 'warning',
+      explanation: 'Guardrails kunnen soms boven het duurzame niveau onttrekken in goede jaren.',
+      suggestion: 'Stel een conservatief plafond in om vermogensbehoud te waarborgen.',
+    },
+  },
+  vpw: {
+    deplete: {
+      status: 'compatible',
+      explanation: 'VPW is wiskundig geoptimaliseerd voor volledige benutting van je vermogen.',
+    },
+    legacy: {
+      status: 'warning',
+      explanation: 'VPW streeft naar volledige optering — een erfenisdoel vereist extra reservering.',
+      suggestion: 'Houd je erfenisdoel apart als "niet-opneembaar" vermogen.',
+    },
+    perpetual: {
+      status: 'incompatible',
+      explanation: 'VPW is ontworpen om vermogen op te maken. Vermogensbehoud is tegenstrijdig met VPW.',
+      suggestion: 'Kies Guardrails of Vast (SWR) met een laag percentage voor vermogensbehoud.',
+    },
+  },
+  bucket: {
+    deplete: {
+      status: 'compatible',
+      explanation: 'De emmer-strategie beschermt je onttrekking met een cash-buffer tot de einddatum.',
+    },
+    legacy: {
+      status: 'compatible',
+      explanation: 'De groei-emmer kan strategisch worden ingezet om een erfenisdoel te beschermen.',
+    },
+    perpetual: {
+      status: 'warning',
+      explanation: 'Cash-emmer verliest waarde door inflatie, wat op lange termijn je koopkracht aantast.',
+      suggestion: 'Minimaliseer de cash-allocatie en hervul vaker vanuit de groei-emmer.',
+    },
+  },
+}
+
+const STATUS_ICONS: Record<CompatibilityStatus, string> = {
+  compatible: '✅',
+  warning: '⚠️',
+  incompatible: '❌',
+}
+
+const STATUS_COLORS: Record<CompatibilityStatus, { bg: string; border: string; text: string }> = {
+  compatible: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
+  warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+  incompatible: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
+}
+
+// ── Compatibility Matrix Component ──────────────────────────────────────────
+
+interface CompatibilityMatrixProps {
+  selectedWithdrawal: WithdrawalStrategyType
+  activeWithdrawal: WithdrawalStrategyType
+  activeEnd: FireEndStrategy
+}
+
+function CompatibilityMatrix({ selectedWithdrawal, activeWithdrawal, activeEnd }: CompatibilityMatrixProps) {
+  return (
+    <div className="card-editorial overflow-hidden">
+      <div className="h-[3px] bg-horizon-500" />
+      <div className="px-4 py-3">
+        <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+          Compatibiliteit
+        </p>
+
+        {/* Desktop table: hidden on mobile, shown md+ */}
+        <div className="hidden md:block">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="pb-2 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-4)]">
+                  Onttrekking
+                </th>
+                {END_STRATEGIES.map(end => (
+                  <th
+                    key={end}
+                    className="pb-2 text-center font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-4)]"
+                  >
+                    {END_STRATEGY_SHORT[end]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ALL_STRATEGIES.map(ws => {
+                const info = STRATEGY_INFO[ws]
+                return (
+                  <tr key={ws} className="border-t border-[var(--border-ed)]">
+                    <td className="py-2 pr-3">
+                      <div className="flex items-center gap-1.5">
+                        <span style={{ color: info.color }}>{STRATEGY_ICONS[ws]}</span>
+                        <span className="font-sans text-xs font-medium text-[var(--ink)]">
+                          {info.label}
+                        </span>
+                      </div>
+                    </td>
+                    {END_STRATEGIES.map(end => {
+                      const entry = COMPATIBILITY_MATRIX[ws][end]
+                      const isActive = ws === activeWithdrawal && end === activeEnd
+                      const isSelected = ws === selectedWithdrawal && end === activeEnd
+                      const colors = STATUS_COLORS[entry.status]
+
+                      return (
+                        <td key={end} className="py-2 text-center">
+                          <div className="group relative inline-block">
+                            <span
+                              className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-sm transition-all ${
+                                isActive
+                                  ? 'ring-2 ring-horizon-400 ring-offset-1'
+                                  : isSelected
+                                    ? 'ring-2 ring-horizon-300 ring-offset-1 ring-opacity-60'
+                                    : ''
+                              } ${colors.bg} ${colors.border} border`}
+                            >
+                              {STATUS_ICONS[entry.status]}
+                            </span>
+                            {/* Hover tooltip */}
+                            <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-52 -translate-x-1/2 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] p-2.5 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                              <p className={`mb-1 font-sans text-[10px] font-bold uppercase tracking-wider ${colors.text}`}>
+                                {entry.status === 'compatible' ? 'Goed' : entry.status === 'warning' ? 'Let op' : 'Onverenigbaar'}
+                              </p>
+                              <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
+                                {entry.explanation}
+                              </p>
+                              {entry.suggestion && (
+                                <p className="mt-1 font-sans text-[11px] leading-snug font-medium text-[var(--ink-3)]">
+                                  💡 {entry.suggestion}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile: cards per withdrawal strategy with mini badges */}
+        <div className="space-y-3 md:hidden">
+          {ALL_STRATEGIES.map(ws => {
+            const info = STRATEGY_INFO[ws]
+            const isSelectedRow = ws === selectedWithdrawal
+
+            return (
+              <div
+                key={ws}
+                className={`rounded-[var(--r)] border p-3 transition-all ${
+                  isSelectedRow
+                    ? `${info.cardBorder} ${info.cardBg}`
+                    : 'border-[var(--border-ed)] bg-[var(--paper)]'
+                }`}
+              >
+                <div className="mb-2 flex items-center gap-1.5">
+                  <span style={{ color: info.color }}>{STRATEGY_ICONS[ws]}</span>
+                  <span className="font-sans text-xs font-semibold text-[var(--ink)]">
+                    {info.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {END_STRATEGIES.map(end => {
+                    const entry = COMPATIBILITY_MATRIX[ws][end]
+                    const isActive = ws === activeWithdrawal && end === activeEnd
+                    const colors = STATUS_COLORS[entry.status]
+
+                    return (
+                      <div
+                        key={end}
+                        className={`flex flex-1 flex-col items-center gap-1 rounded-md border px-2 py-1.5 ${colors.bg} ${colors.border} ${
+                          isActive ? 'ring-2 ring-horizon-400 ring-offset-1' : ''
+                        }`}
+                      >
+                        <span className="text-xs">{STATUS_ICONS[entry.status]}</span>
+                        <span className="font-sans text-[9px] font-medium text-[var(--ink-3)]">
+                          {END_STRATEGY_SHORT[end]}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Show explanation for the active end strategy combination */}
+                {(() => {
+                  const entry = COMPATIBILITY_MATRIX[ws][activeEnd]
+                  if (entry.status === 'compatible') return null
+                  const colors = STATUS_COLORS[entry.status]
+                  return (
+                    <p className={`mt-2 font-sans text-[10px] leading-snug ${colors.text}`}>
+                      {entry.explanation}
+                    </p>
+                  )
+                })()}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ── Modal component ────────────────────────────────────────────────────────
@@ -597,6 +853,22 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
           </div>
         )}
 
+        {/* ── Inline incompatibility warning under activate button ─── */}
+        {selectedStrategy !== withdrawalConfig.strategy && (() => {
+          const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[fireStrategy?.strategy ?? 'deplete']
+          if (!entry || entry.status === 'compatible') return null
+          const colors = STATUS_COLORS[entry.status]
+          return (
+            <div className={`mb-4 -mt-3 flex items-start gap-2 rounded-[var(--r)] border ${colors.border} ${colors.bg} px-3 py-2`}>
+              <span className="mt-0.5 text-sm">{STATUS_ICONS[entry.status]}</span>
+              <p className={`font-sans text-xs ${colors.text}`}>
+                {entry.explanation}
+                {entry.suggestion && <> — {entry.suggestion}</>}
+              </p>
+            </div>
+          )
+        })()}
+
         {/* ── Activation error message ───────────────────────────── */}
         {activateError && (
           <div className="mb-6 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2">
@@ -773,6 +1045,39 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
             </div>
           </section>
         )}
+
+        {/* ── Compatibility matrix ─────────────────────────────── */}
+        <section className="mb-6">
+          <CompatibilityMatrix
+            selectedWithdrawal={selectedStrategy}
+            activeWithdrawal={withdrawalConfig.strategy}
+            activeEnd={fireStrategy?.strategy ?? 'deplete'}
+          />
+        </section>
+
+        {/* ── Incompatibility warning (when selected combo is incompatible) ── */}
+        {(() => {
+          const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[fireStrategy?.strategy ?? 'deplete']
+          if (!entry || entry.status !== 'incompatible') return null
+          return (
+            <div className="mb-6 flex items-start gap-2.5 rounded-[var(--r)] border-2 border-red-300 bg-red-50 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+              <div>
+                <p className="font-sans text-sm font-semibold text-red-700">
+                  Onverenigbare combinatie
+                </p>
+                <p className="mt-0.5 font-sans text-xs text-red-600">
+                  {entry.explanation}
+                </p>
+                {entry.suggestion && (
+                  <p className="mt-1 font-sans text-xs font-medium text-red-700">
+                    💡 {entry.suggestion}
+                  </p>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ── Strategy explanation cards ──────────────────────── */}
         <section className="mb-6">
@@ -1128,6 +1433,8 @@ interface GuardrailsBandwidthChartProps {
 }
 
 const GR_CHART_H = 160
+
+// ── Guardrails Bandwidth Chart ────────────────────────────────────────────
 
 function GuardrailsBandwidthChart({ corridor, chartBounds }: GuardrailsBandwidthChartProps) {
   const { minAge, maxAge } = chartBounds
