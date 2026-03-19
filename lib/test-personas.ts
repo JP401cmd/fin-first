@@ -245,6 +245,8 @@ export interface PersonaHolding {
   geography?: string
   is_favorite?: boolean
   currency?: string
+  ter?: number | null        // Total Expense Ratio as decimal (e.g. 0.0050 = 0.50%)
+  ter_source?: string | null // 'manual' | 'lookup' | null
   transactions: {
     type: 'buy' | 'sell' | 'dividend'
     units: number
@@ -933,6 +935,8 @@ const daanData: PersonaData = {
       sector: null,
       geography: 'global',
       currency: 'EUR',
+      ter: 0.0050,           // Meesman Wereldwijd Totaal TER 0.50%
+      ter_source: 'manual',
       transactions: [
         { type: 'buy', units: 1.5, price_per_unit: 105, total_amount: 157.50, monthsAgo: 14, notes: 'Eerste inleg' },
         { type: 'buy', units: 3.5, price_per_unit: 108, total_amount: 378, monthsAgo: 11, notes: null },
@@ -954,6 +958,8 @@ const daanData: PersonaData = {
       sector: null,
       geography: 'global',
       currency: 'EUR',
+      ter: 0.0059,           // Brand New Day TER 0.59%
+      ter_source: 'manual',
       transactions: [
         { type: 'buy', units: 10, price_per_unit: 110, total_amount: 1100, monthsAgo: 12, notes: 'Eerste inleg pensioen' },
         { type: 'buy', units: 12, price_per_unit: 118, total_amount: 1416, monthsAgo: 8, notes: null },
@@ -1203,6 +1209,8 @@ const lisaData: PersonaData = {
       geography: 'global',
       is_favorite: true,
       currency: 'EUR',
+      ter: 0.0050,           // Meesman Wereldwijd Totaal TER 0.50%
+      ter_source: 'manual',
       transactions: [
         { type: 'buy', units: 95, price_per_unit: 98.00, total_amount: 9310, monthsAgo: 72, notes: 'Initiële gezamenlijke inleg' },
         { type: 'buy', units: 60, price_per_unit: 104.00, total_amount: 6240, monthsAgo: 60, notes: null },
@@ -1227,6 +1235,8 @@ const lisaData: PersonaData = {
       sector: null,
       geography: 'global',
       currency: 'EUR',
+      ter: 0.0018,           // Northern Trust World Custom ESG TER 0.18%
+      ter_source: 'manual',
       transactions: [
         { type: 'buy', units: 80, price_per_unit: 30.00, total_amount: 2400, monthsAgo: 14, notes: 'Kinderbelegging startkapitaal' },
         { type: 'buy', units: 50, price_per_unit: 32.00, total_amount: 1600, monthsAgo: 10, notes: null },
@@ -1448,6 +1458,8 @@ const willemData: PersonaData = {
       geography: 'global',
       is_favorite: true,
       currency: 'EUR',
+      ter: 0.0022,           // Vanguard FTSE All-World TER 0.22%
+      ter_source: 'manual',
       transactions: [
         { type: 'buy', units: 1500, price_per_unit: 68.00, total_amount: 102000, monthsAgo: 48, notes: 'Initiële grote inleg' },
         { type: 'buy', units: 800, price_per_unit: 72.50, total_amount: 58000, monthsAgo: 36, notes: 'Bijkoop na dip' },
@@ -1471,6 +1483,8 @@ const willemData: PersonaData = {
       sector: null,
       geography: 'europe',
       currency: 'EUR',
+      ter: 0.0009,           // iShares Euro Aggregate Bond TER 0.09%
+      ter_source: 'manual',
       transactions: [
         { type: 'buy', units: 300, price_per_unit: 90.00, total_amount: 27000, monthsAgo: 36, notes: 'Initiële obligatiepositie' },
         { type: 'buy', units: 250, price_per_unit: 94.00, total_amount: 23500, monthsAgo: 24, notes: 'Bijkoop obligaties' },
@@ -1492,6 +1506,8 @@ const willemData: PersonaData = {
       sector: 'dividend',
       geography: 'europe',
       currency: 'EUR',
+      ter: 0.0120,           // Actief beheerd dividendfonds TER 1.20% — demonstreert kostenverschil
+      ter_source: 'manual',
       transactions: [
         { type: 'buy', units: 50, price_per_unit: 215.00, total_amount: 10750, monthsAgo: 30, notes: 'Start dividendstrategie' },
         { type: 'buy', units: 40, price_per_unit: 225.00, total_amount: 9000, monthsAgo: 24, notes: null },
@@ -1703,6 +1719,8 @@ const rashidData: PersonaData = {
       sector: null,
       geography: 'global',
       currency: 'EUR',
+      ter: 0.0030,           // NT World Custom ESG gemiddelde TER 0.30%
+      ter_source: 'manual',
       transactions: [
         { type: 'buy', units: 300, price_per_unit: 128.00, total_amount: 38400, monthsAgo: 36, notes: 'Eerste grote inleg' },
         { type: 'buy', units: 200, price_per_unit: 132.00, total_amount: 26400, monthsAgo: 30, notes: null },

@@ -609,6 +609,8 @@ export async function seedPersonaData(
       if (h.geography) holdingRow.geography = h.geography
       if (h.is_favorite != null) holdingRow.is_favorite = h.is_favorite
       if (h.currency) holdingRow.currency = h.currency
+      if (h.ter != null) holdingRow.ter = h.ter
+      if (h.ter_source) holdingRow.ter_source = h.ter_source
 
       let holdingData: { id: string } | null = null
       const { data: d1, error: holdingErr } = await supabase
@@ -621,8 +623,8 @@ export async function seedPersonaData(
         // If the error indicates missing columns (from migration 20260316100001),
         // retry without the newer optional columns.
         const msg = holdingErr.message ?? ''
-        if (msg.includes('column') || msg.includes('asset_class') || msg.includes('sector') || msg.includes('geography') || msg.includes('previous_close') || msg.includes('daily_change_percent') || msg.includes('currency')) {
-          console.warn(`[seed-persona] Holdings insert failed, retrying without optional columns (asset_class, sector, geography, previous_close, daily_change_percent, currency): ${msg}`)
+        if (msg.includes('column') || msg.includes('asset_class') || msg.includes('sector') || msg.includes('geography') || msg.includes('previous_close') || msg.includes('daily_change_percent') || msg.includes('currency') || msg.includes('ter')) {
+          console.warn(`[seed-persona] Holdings insert failed, retrying without optional columns (asset_class, sector, geography, previous_close, daily_change_percent, currency, ter, ter_source): ${msg}`)
           const fallbackRow = { ...holdingRow }
           delete fallbackRow.asset_class
           delete fallbackRow.sector
@@ -630,6 +632,8 @@ export async function seedPersonaData(
           delete fallbackRow.previous_close
           delete fallbackRow.daily_change_percent
           delete fallbackRow.currency
+          delete fallbackRow.ter
+          delete fallbackRow.ter_source
           const { data: d2, error: fallbackErr } = await supabase
             .from('holdings')
             .insert(fallbackRow)
