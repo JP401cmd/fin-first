@@ -512,7 +512,7 @@ export default function OnboardingPage() {
             </p>
             <button
               onClick={() => setRestoredNotice(false)}
-              className="rounded-lg p-1 text-green-400 hover:bg-green-100 hover:text-green-600"
+              className="-mr-1 flex h-[44px] w-[44px] items-center justify-center rounded-lg text-green-400 hover:bg-green-100 hover:text-green-600 sm:mr-0 sm:h-auto sm:w-auto sm:p-1"
               aria-label="Sluiten"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
