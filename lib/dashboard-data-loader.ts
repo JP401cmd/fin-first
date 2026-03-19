@@ -45,6 +45,12 @@ import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
+import {
+  computeDrift,
+  isBox3Window as isRebalanceBox3Window,
+  generateRebalanceNotifications,
+} from '@/lib/rebalancing'
+import type { HoldingForAllocation, TargetAllocation } from '@/lib/portfolio-allocation'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -838,7 +844,53 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     }
   }
 
+  // ── Rebalance notifications: drift alerts + Box 3 peildatum ──
+  try {
+    const [rebalHoldingsRes, rebalTargetsRes] = await Promise.all([
+      supabase
+        .from('holdings')
+        .select('id, name, ticker, units, avg_purchase_price, current_price, asset_class, sector, geography')
+        .eq('is_active', true),
+      supabase
+        .from('target_allocations')
+        .select('category, target_pct')
+        .eq('view_mode', 'asset_class'),
+    ])
 
+    const rebalHoldings: HoldingForAllocation[] = (rebalHoldingsRes.data ?? [])
+      .map((h: Record<string, unknown>) => {
+        const price = Number(h.current_price ?? h.avg_purchase_price ?? 0)
+        const value = price * Math.max(0, Number(h.units ?? 0))
+        return {
+          id: h.id as string,
+          name: h.name as string,
+          ticker: (h.ticker ?? null) as string | null,
+          value,
+          asset_class: (h.asset_class ?? null) as string | null,
+          sector: (h.sector ?? null) as string | null,
+          geography: (h.geography ?? null) as string | null,
+        }
+      })
+      .filter((h: HoldingForAllocation) => h.value > 0)
+
+    const rebalTargets: TargetAllocation[] = (rebalTargetsRes.data ?? []).map(
+      (t: Record<string, unknown>) => ({
+        category: t.category as string,
+        target_pct: Number(t.target_pct),
+      }),
+    )
+
+    if (rebalTargets.length > 0 && rebalHoldings.length > 0) {
+      const drifts = computeDrift(rebalHoldings, rebalTargets, 'asset_class')
+      const box3Window = isRebalanceBox3Window()
+      const rebalNotifs = generateRebalanceNotifications(drifts, 5, box3Window)
+      for (const n of rebalNotifs) {
+        notifications.push(n)
+      }
+    }
+  } catch {
+    // Rebalancing data not available — gracefully degrade, no notifications
+  }
 
   // ── AI Insights: derived from financial data (no DB table) ──
   const aiInsights: AiInsight[] = []

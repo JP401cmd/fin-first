@@ -16,6 +16,7 @@ const TYPE_ICONS: Record<Notification['type'], string> = {
   milestone: '\ud83d\udcca',
   positive: '\u2705',
   anomaly: '\ud83d\udea8',
+  rebalance: '\u2696\ufe0f',
 }
 
 const TYPE_LABELS: Record<Notification['type'], string> = {
@@ -23,6 +24,7 @@ const TYPE_LABELS: Record<Notification['type'], string> = {
   milestone: 'Mijlpaal',
   positive: 'Positief',
   anomaly: 'Ongebruikelijk',
+  rebalance: 'Rebalancing',
 }
 
 function formatTimestamp(dateStr: string): string {

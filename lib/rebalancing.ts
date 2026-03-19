@@ -320,3 +320,72 @@ export function generateRebalancingReport(
     generatedAt: new Date().toISOString(),
   }
 }
+
+// ── Notification generation ──────────────────────────────────
+
+/**
+ * Notification shape matching the DashboardData Notification interface.
+ * Defined here to avoid circular import with widget-renderer.
+ */
+export interface RebalanceNotification {
+  id: string
+  type: 'rebalance'
+  message: string
+  severity: 'info' | 'warning' | 'critical'
+  createdAt: string
+  actionHref: string
+}
+
+/**
+ * Generate rebalance notifications from drift results.
+ *
+ * Severity mapping:
+ * - drift > threshold: warning
+ * - drift > 2× threshold: critical
+ * - Box 3 peildatum window (Nov/Dec): info
+ *
+ * @param drifts      Output of computeDrift()
+ * @param threshold   Drift threshold percentage (default: 5)
+ * @param box3Window  Whether currently in Nov-Dec Box 3 window
+ * @returns           Array of Notification objects for the meldingen system
+ */
+export function generateRebalanceNotifications(
+  drifts: DriftResult[],
+  threshold = 5,
+  box3Window = false,
+): RebalanceNotification[] {
+  const notifications: RebalanceNotification[] = []
+  const now = new Date().toISOString()
+
+  for (const drift of drifts) {
+    const absDrift = Math.abs(drift.drift_pct)
+    if (absDrift < threshold) continue
+
+    const severity: 'warning' | 'critical' = absDrift >= threshold * 2 ? 'critical' : 'warning'
+    const action = drift.drift_pct > 0 ? 'Overweeg te verkopen' : 'Overweeg bij te kopen'
+    const sign = drift.drift_pct > 0 ? '+' : ''
+
+    notifications.push({
+      id: `rebalance-drift-${drift.category}`,
+      type: 'rebalance',
+      message: `${drift.label}-allocatie wijkt ${sign}${drift.drift_pct.toFixed(1)}% af (${drift.current_pct.toFixed(1)}% vs ${drift.target_pct.toFixed(1)}%). ${action} €${drift.drift_amount.toLocaleString('nl-NL')}.`,
+      severity,
+      createdAt: now,
+      actionHref: '/core/assets',
+    })
+  }
+
+  // Box 3 peildatum notification (info severity, only Nov-Dec)
+  if (box3Window) {
+    notifications.push({
+      id: 'rebalance-box3-peildatum',
+      type: 'rebalance',
+      message: 'Peildatum 1 januari nadert. Overweeg rebalancing vóór jaareinde voor belastingoptimalisatie.',
+      severity: 'info',
+      createdAt: now,
+      actionHref: '/core/assets',
+    })
+  }
+
+  return notifications
+}
