@@ -1,3 +1,32 @@
+## Session 2026-03-19 - Features #351, #352
+
+### Feature #351: SimRow uitbreiden met grossIncome en grossExpenses - PASSING
+- Added `grossIncome` and `grossExpenses` fields to SimRow interface
+- Accumulation: grossIncome = annualSavings + yearlyExpenses + positive cashflows + growth
+- Accumulation: grossExpenses = yearlyExpenses + negative cashflows
+- Decumulation: grossIncome = portfolio growth + positive cashflows
+- Decumulation: grossExpenses = withdrawal + negative cashflows
+- Split cashflowNet into positive/negative components for accurate calculation
+- All 29 existing tests pass, zero new type errors
+- Commit: 8f339a62
+
+### Feature #352: IncomeExpenseChart component — dual-line area chart - PASSING
+- Created `components/app/horizon/income-expense-chart.tsx`
+- Props: rows, currentAge, endAge, visibleMinAge, visibleMaxAge
+- Matching SimChart layout: identical PAD constants (60/16/16/28), grid style, font-mono Y-axis
+- Income line: var(--horizon-500), Expense line: var(--kern-500)
+- Gap-fill: green where income > expenses, orange where expenses > income
+- Hover tooltip showing income, expenses, and difference per year
+- Responsive: 150px desktop, 120px mobile
+- Entry animation via useInViewAnimation
+- Legend with line indicators
+- Zero TypeScript errors, zero console errors
+- Commit: f9208d6a
+
+### Current Status
+- 2 features completed this session (#351, #352)
+- Overall progress: 349/356 (98.0%)
+
 ## Session 2026-03-19 - Feature #350 - PENDING MIGRATION
 
 ### Feature #350: Roadmap pagina — feature statussen en opmerkingen - PENDING
