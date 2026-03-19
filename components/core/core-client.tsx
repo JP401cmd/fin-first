@@ -39,6 +39,7 @@ import { buildSegments, typeColors, childTypeColors } from '@/components/app/bud
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { InvulfaseWelcomeCard } from '@/components/app/invulfase-banner'
 import dynamic from 'next/dynamic'
 
 const DynBudgetsPage = dynamic(() => import('@/components/app/budgets-client'), {
@@ -912,6 +913,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-8">
+      {/* === 0. Invulfase Welcome Card === */}
+      <InvulfaseWelcomeCard />
+
       {/* === 1. Hero (Gradient) === */}
       <section data-testid="kern-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-kern-500" />

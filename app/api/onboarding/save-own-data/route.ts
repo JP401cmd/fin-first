@@ -579,12 +579,17 @@ export async function POST(req: Request) {
     if (completeErr) throw new Error(`Onboarding afronden mislukt: ${completeErr.message}`)
 
     // 8. Activate invulfase — guides user to fill in remaining data after onboarding
+    // Store in feature_preferences JSONB under '_invulfase_active' key
+    const { data: fpProfile } = await supabase
+      .from('profiles')
+      .select('feature_preferences')
+      .eq('id', user.id)
+      .single()
+    const fpPrefs = (fpProfile?.feature_preferences as Record<string, unknown>) ?? {}
     await supabase
-      .from('app_settings')
-      .upsert(
-        { key: `invulfase_active_${user.id}`, value: JSON.stringify(true) },
-        { onConflict: 'key' }
-      )
+      .from('profiles')
+      .update({ feature_preferences: { ...fpPrefs, _invulfase_active: true } })
+      .eq('id', user.id)
 
     return Response.json({ success: true })
   } catch (err) {

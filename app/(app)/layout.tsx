@@ -15,6 +15,7 @@ import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { PerspectiveProvider } from '@/components/app/perspective-provider'
 import { NotificationProvider } from '@/components/app/notifications/notification-provider'
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
+import { InvulfaseBanner } from '@/components/app/invulfase-banner'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
@@ -120,6 +121,10 @@ export default async function AppLayout({
     value: JSON.stringify(featureAccess.level),
   }, { onConflict: 'key' }).then(() => {})
 
+  // ── Invulfase detection ───────────────────────────────
+  const featurePrefs = (profile?.feature_preferences as Record<string, unknown>) ?? {}
+  const invulfaseActive = featurePrefs._invulfase_active === true
+
   // ── Module colors (SSR) ────────────────────────────────
   const mc = profile?.module_colors as Record<string, string> | null
   const moduleColors: ModuleColorConfig = {
@@ -164,6 +169,7 @@ export default async function AppLayout({
                       <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
                         <ChatLayoutWrapper>
                           <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
+                          {invulfaseActive && <InvulfaseBanner initialActive={invulfaseActive} />}
                           <DailyExpenseProvider>
                             <main className="pb-20 md:pb-0">{children}</main>
                           </DailyExpenseProvider>
