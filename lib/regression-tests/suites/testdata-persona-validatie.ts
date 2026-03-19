@@ -751,6 +751,162 @@ const tests: TestCase[] = [
       }
     },
   },
+
+  // ── Step 7: Gezondheids score persona validatie ────────────────────────
+
+  {
+    id: 'tp-health-score-personas-identified',
+    name: 'Gezondheids score: 2 personas hebben widget enabled',
+    category: CAT,
+    description: 'Willem and Marijke have gezondheids_score in their widget_prefs',
+    priority: 'critical',
+    estimatedDurationMs: 200,
+    fn() {
+      const personasWithHealth: string[] = []
+      for (const key of PERSONA_KEYS) {
+        const prefs = PERSONAS[key].profile.widget_prefs
+        if (prefs?.widgets?.some((w: { id: string; enabled: boolean }) => w.id === 'gezondheids_score' && w.enabled)) {
+          personasWithHealth.push(key)
+        }
+      }
+      assertGreaterThanOrEqual(personasWithHealth.length, 2, `At least 2 personas with gezondheids_score: ${personasWithHealth.join(', ')}`)
+      assertIncludes(personasWithHealth, 'willem', 'Willem has gezondheids_score')
+      assertIncludes(personasWithHealth, 'marijke', 'Marijke has gezondheids_score')
+    },
+  },
+
+  {
+    id: 'tp-health-score-willem-data-fields',
+    name: 'Willem: alle data-velden voor computeHealthScore aanwezig',
+    category: CAT,
+    description: 'Willem has savings rate, assets, debts, emergency fund, FIRE, diversification, and budget data',
+    priority: 'critical',
+    estimatedDurationMs: 200,
+    fn() {
+      const w = p('willem')
+      // Assets for savingsRate, totalAssets, assetsByType (diversification)
+      assertGreaterThan(w.assets.length, 0, 'Willem: has assets')
+      // Multiple asset types for diversification pillar
+      const assetTypes = new Set(w.assets.map(a => a.asset_type))
+      assertGreaterThanOrEqual(assetTypes.size, 3, `Willem: ${assetTypes.size} distinct asset types for diversification`)
+      // Bank accounts for emergency fund calculation
+      assertGreaterThan(w.bank_accounts.length, 0, 'Willem: has bank accounts')
+      const savingsAccounts = w.bank_accounts.filter(a => a.account_type === 'savings')
+      assertGreaterThan(savingsAccounts.length, 0, 'Willem: has savings account for emergency fund')
+      // Income and expenses for savings rate
+      assertGreaterThan(w.meta.income, 0, 'Willem: income > 0')
+      assertGreaterThan(w.meta.expenses, 0, 'Willem: expenses > 0')
+      assertGreaterThan(w.meta.income, w.meta.expenses, 'Willem: income > expenses (positive savings rate)')
+      // Budgets for budget discipline pillar
+      assertGreaterThan(w.budgets.length, 0, 'Willem: has budgets (6-pillar mode)')
+      // Expense budgets for discipline check
+      const expBudgets = w.budgets.filter(b => b.budget_type === 'expense')
+      assertGreaterThan(expBudgets.length, 0, 'Willem: has expense budgets')
+      // FIRE params for fire_progress
+      assertDefined(w.profile.expected_return, 'Willem: expected_return for FIRE')
+      assertDefined(w.profile.fire_end_strategy, 'Willem: fire_end_strategy')
+    },
+  },
+
+  {
+    id: 'tp-health-score-marijke-data-fields',
+    name: 'Marijke: alle data-velden voor computeHealthScore aanwezig',
+    category: CAT,
+    description: 'Marijke has savings rate, assets, emergency fund, FIRE, diversification, and budget data',
+    priority: 'critical',
+    estimatedDurationMs: 200,
+    fn() {
+      const m = p('marijke')
+      // Assets
+      assertGreaterThan(m.assets.length, 0, 'Marijke: has assets')
+      const assetTypes = new Set(m.assets.map(a => a.asset_type))
+      assertGreaterThanOrEqual(assetTypes.size, 2, `Marijke: ${assetTypes.size} distinct asset types`)
+      // Bank accounts
+      assertGreaterThan(m.bank_accounts.length, 0, 'Marijke: has bank accounts')
+      // Savings for emergency fund
+      const savingsAccounts = m.bank_accounts.filter(a => a.account_type === 'savings')
+      assertGreaterThan(savingsAccounts.length, 0, 'Marijke: has savings account')
+      // Income > expenses
+      assertGreaterThan(m.meta.income, 0, 'Marijke: income > 0')
+      assertGreaterThan(m.meta.expenses, 0, 'Marijke: expenses > 0')
+      assertGreaterThanOrEqual(m.meta.income, m.meta.expenses, 'Marijke: income >= expenses')
+      // Budgets for 6-pillar
+      assertGreaterThan(m.budgets.length, 0, 'Marijke: has budgets (6-pillar mode)')
+      // FIRE params
+      assertDefined(m.profile.expected_return, 'Marijke: expected_return')
+      assertDefined(m.profile.fire_end_strategy, 'Marijke: fire_end_strategy')
+    },
+  },
+
+  {
+    id: 'tp-health-score-budgeting-active-persona',
+    name: 'Gezondheids score: minstens 1 persona met budgetten (6-pilaren)',
+    category: CAT,
+    description: 'At least one gezondheids_score persona has active budgets for 6-pillar testing',
+    priority: 'critical',
+    estimatedDurationMs: 200,
+    fn() {
+      const healthPersonas = ['willem', 'marijke'] as const
+      let hasBudgetingActive = false
+      for (const key of healthPersonas) {
+        const persona = PERSONAS[key]
+        if (persona.budgets.length > 0) {
+          hasBudgetingActive = true
+        }
+      }
+      assert(hasBudgetingActive, 'At least one health-score persona has budgets (6-pillar mode)')
+      // Both Willem and Marijke have budgets
+      assertGreaterThan(p('willem').budgets.length, 0, 'Willem has budgets')
+      assertGreaterThan(p('marijke').budgets.length, 0, 'Marijke has budgets')
+    },
+  },
+
+  {
+    id: 'tp-health-score-5pillar-candidate',
+    name: 'Gezondheids score: 5-pilaren modus kandidaat (zonder budgetten)',
+    category: CAT,
+    description: 'Rashid has no budgets — natural 5-pillar candidate. Note: gezondheids_score not in his widget_prefs (recommendation for future)',
+    priority: 'medium',
+    estimatedDurationMs: 200,
+    fn() {
+      const rashid = p('rashid')
+      assertEqual(rashid.budgets.length, 0, 'Rashid: no budgets (5-pillar candidate)')
+      // Rashid has the financial data needed for 5 pillars (everything except budget discipline)
+      assertGreaterThan(rashid.assets.length, 0, 'Rashid: has assets')
+      assertGreaterThan(rashid.meta.income, 0, 'Rashid: has income')
+      assertGreaterThan(rashid.bank_accounts.length, 0, 'Rashid: has bank accounts')
+      // Note: gezondheids_score not in Rashid's widget_prefs — 5-pillar persona coverage is recommended
+      const prefs = rashid.profile.widget_prefs
+      const hasHealthWidget = prefs?.widgets?.some((w: { id: string; enabled: boolean }) => w.id === 'gezondheids_score' && w.enabled) ?? false
+      // This is informational — not a failure, just documentation
+      assert(true, `Rashid gezondheids_score widget: ${hasHealthWidget ? 'enabled' : 'not enabled (recommendation: add for 5-pillar coverage)'}`)
+    },
+  },
+
+  {
+    id: 'tp-health-score-widget-prefs-consistent',
+    name: 'Gezondheids score: widget_prefs consistent met widget catalog',
+    category: CAT,
+    description: 'Personas with gezondheids_score widget reference valid widget ID from catalog',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    async fn() {
+      const catalog = await import('@/lib/widget-catalog')
+      const validWidgetIds = new Set(catalog.WIDGET_CATALOG.map((w: { id: string }) => w.id))
+
+      for (const key of PERSONA_KEYS) {
+        const prefs = PERSONAS[key].profile.widget_prefs
+        if (!prefs?.widgets) continue
+        for (const w of prefs.widgets) {
+          if (w.id === 'gezondheids_score') {
+            assert(validWidgetIds.has('gezondheids_score'), `${key}: gezondheids_score is valid widget ID in catalog`)
+          }
+          // Also verify all widget IDs in persona prefs are valid catalog entries
+          assert(validWidgetIds.has(w.id), `${key}: widget "${w.id}" exists in WIDGET_CATALOG`)
+        }
+      }
+    },
+  },
 ]
 
 // ── Registration ──────────────────────────────────────────────────────
@@ -759,7 +915,7 @@ export function register() {
   registerCategory({
     id: CAT,
     label: 'Data — Testdata',
-    description: 'Persona seed validatie: 6 personas, financiële consistentie, metadata constraints, idempotentie',
+    description: 'Persona seed validatie: 6 personas, financiële consistentie, metadata constraints, idempotentie, gezondheids score',
     icon: 'Users',
     testCount: 0,
   })
