@@ -29,6 +29,7 @@ import {
   Scale,
   Settings,
   Smartphone,
+  Home,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -105,6 +106,13 @@ const MODULES: NaslagwerkModule[] = [
         title: 'Beleggingskosten & TER',
         summary:
           'Begrijp Total Expense Ratio, het compound effect van kosten en hoe je TER per fonds invoert.',
+        anchor: 'guide-reis-2',
+      },
+      {
+        icon: Home,
+        title: 'Hypotheek vs Beleggen',
+        summary:
+          'Wanneer is extra aflossen beter dan beleggen? Leer over hypotheekrenteaftrek, Box 3 effect en breakeven rendement.',
         anchor: 'guide-reis-2',
       },
       {

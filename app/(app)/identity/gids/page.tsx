@@ -31,6 +31,7 @@ import {
   Scale,
   Shield,
   Activity,
+  Home,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -535,6 +536,38 @@ export default function GidsPage() {
                 "Minimaliseer transactiekosten door minder frequent te handelen en grotere orders te plaatsen",
               ],
               tip: "Focus op gewogen portfoliokosten, niet op individuele TER-percentages. Een fonds met 0,40% TER dat maar 5% van je portfolio uitmaakt kost je effectief maar 0,02% — terwijl je kernpositie met 0,22% TER die 80% van je portfolio uitmaakt je 0,18% kost. De fee analyzer doet deze berekening automatisch.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Home}
+            title="Hypotheek vs Beleggen"
+            color="var(--color-kern-400)"
+            description={
+              <>
+                <strong>Extra aflossen of beleggen? Dé financiële afweging voor huiseigenaren.</strong> Als je maandelijks geld overhoudt, kun je kiezen: extra aflossen op je hypotheek of dat geld beleggen. Beide opties bouwen vermogen op, maar op een fundamenteel andere manier — en de beste keuze hangt af van je persoonlijke situatie.
+                <br /><br />
+                <strong>Hypotheekrenteaftrek (HRA):</strong> In Nederland mag je de rente op je hypotheek aftrekken van je belastbaar inkomen. Hoe hoger je marginaal tarief (36,97% of 49,50%), hoe meer belastingvoordeel je krijgt. Door de HRA is je <em>effectieve</em> hypotheekrente lager dan de nominale rente. Voorbeeld: bij 4,0% rente en 49,50% marginaal tarief is je effectieve rente slechts ~2,02%.
+                <br /><br />
+                <strong>Box 3 effect:</strong> Beleggen in Box 3 wordt belast op basis van een fictief rendement (~6,04% voor beleggingen in 2025). Over het deel boven je heffingsvrij vermogen betaal je ~36% belasting. Dit verlaagt je netto beleggingsrendement. Extra aflossen vermindert daarentegen je schuld, wat je Box 3 grondslag kan verlagen — een dubbel voordeel.
+                <br /><br />
+                <strong>Breakeven rendement:</strong> Dit is het beleggingsrendement waarbij aflossen en beleggen precies gelijk uitkomen. Als je verwacht rendement boven de breakeven ligt, is beleggen voordeliger. Ligt het eronder, dan wint aflossen. De breakeven hangt af van je hypotheekrente, marginaal tarief, en Box 3 belastingdruk. TriFinity berekent dit automatisch in de vergelijkingsmodal op de schuldenpagina.
+                <br /><br />
+                <strong>Risicoverschil:</strong> Extra aflossen is risicovrij — je bespaart gegarandeerd rente. Beleggen biedt een <em>verwacht</em> hoger rendement, maar met onzekerheid. In slechte beursjaren kun je geld verliezen terwijl je hypotheekkosten doorlopen. Aflossen is daarom de &lsquo;zekere&rsquo; keuze, beleggen de &lsquo;rationele&rsquo; keuze bij een lange horizon.
+                <br /><br />
+                <strong>Bekijk de vergelijking:</strong> Ga naar <strong>De Kern → Schulden</strong> en klik op &lsquo;Aflossen vs Beleggen&rsquo; bij je hypotheek om een gepersonaliseerde berekening te zien met jouw rente, tarief en verwacht rendement.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Kern → Schulden en zoek je hypotheek in de lijst",
+                "Klik op 'Aflossen vs Beleggen' om de vergelijkingsmodal te openen",
+                "Bekijk het breakeven rendement — dit is het minimale beleggingsrendement waarbij beleggen voordeliger is dan aflossen",
+                "Vergelijk de 10-jaars en 20-jaars scenario's — bij een langere horizon wordt beleggen statistisch voordeliger door het compound effect",
+                "Controleer je marginaal belastingtarief in je profiel (Instellingen → FIRE-parameters) — dit beïnvloedt de hypotheekrenteaftrek en daarmee de breakeven",
+                "Houd rekening met je risicotolerantie: aflossen is gegarandeerd, beleggen biedt een hoger verwacht maar onzeker rendement",
+              ],
+              tip: "De meeste financieel planners adviseren een combinatie: los extra af tot je hypotheek onder de 50% loan-to-value zit (lagere rente bij oversluiten), en beleg daarna het surplus. Zo profiteer je van beide werelden — lagere woonlasten én vermogensgroei.",
             }}
           />
 
