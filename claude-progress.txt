@@ -1,3 +1,22 @@
+## Session 2026-03-19 - Feature #395
+
+### Feature #395: Briefing integratie: hypotheek vs beleggen context en card - PASSING
+- Extended DashboardData with hvbSummary: HvbSummary | null interface
+- Extended debts query in dashboard-data-loader to include interest_rate, repayment_type, remaining_term_months
+- Extended profiles query to include marginaal_tarief
+- Computed hvbSummary server-side using compareMortgageVsInvest (200/mnd extra, 10yr horizon)
+- Added HYPOTHEEK VS BELEGGEN section to condensed data summary (condense.ts)
+- Added hypotheek metric to functional directives with 4 conditions: has_mortgage, high_rate, beleggen_wint, aflossen_wint
+- Added metric extraction and evaluation for hypotheek in directives.ts
+- Added comparison fallback card for mortgage users with href /core/debts
+- Updated all test mocks (draggable-widget-grid.test, mock-dashboard-data, test-kern-widgets, dashboard-empty-loading)
+- All changes compile cleanly, no new TypeScript errors
+- Commit: c7f68ca5
+
+### Current Status
+- 1 feature completed this session (#395)
+- Progress: 390/397 passing (98.2%)
+
 ## Session 2026-03-19 - Features #378, #387
 
 ### Feature #378: Gids bijwerken — Rebalancing uitleg en portfolio drift - PASSING
