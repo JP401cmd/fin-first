@@ -1,3 +1,20 @@
+## Session 2026-03-19 - Feature #331 (Attempt 19)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 19)
+- **Root cause unchanged**: Cannot access hosted Supabase database to apply DDL migrations
+- **All approaches still blocked**:
+  1. Supabase MCP tools (apply_migration, execute_sql, list_migrations) — "Claude requested permissions but you haven't granted it yet" (OAuth not authenticated)
+  2. Supabase CLI (`npx supabase`) — "Access token not provided"
+  3. REST API with anon key — read-only, cannot execute DDL
+  4. No service role key, DB password, or Management API PAT in any env file
+- **Verified still missing via REST API**: holdings.asset_class, profiles.invulfase_active, target_allocations table
+- **Resolution needed**: User must grant Supabase MCP OAuth permissions, OR run `supabase login`, OR add SUPABASE_ACCESS_TOKEN, OR apply migrations manually via Supabase Dashboard SQL Editor
+- **11 migration files pending** (20260316100001 through 20260319000003, excluding 20260318000001)
+
+### Current Status
+- 0 features completed this session (external blocker)
+- Total: 345/347 features passing (99.4%)
+
 ## Session 2026-03-19 - Feature #348
 
 ### Feature #348: Gids content: Hoe de Horizon-grafiek werkt — volledige uitleg - PASSING
