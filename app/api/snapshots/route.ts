@@ -226,6 +226,9 @@ export async function POST() {
     fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
     sovereignty_level: sovereigntyLevel,
     savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
+    // Note: resilience_score column is retained for historical data continuity.
+    // It now stores the 6-pillar health score (from computeHealthScore) instead of
+    // the old 4-pillar resilience score (from the deprecated computeResilienceScore).
     resilience_score: healthScore.total,
   }
 

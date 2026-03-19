@@ -40,7 +40,7 @@ export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }
 
   return (
     <>
-      <BottomSheet open={true} onClose={onClose} title={perspectiveLabel ? `Historische veerkracht — ${perspectiveLabel}` : 'Historische veerkracht'}>
+      <BottomSheet open={true} onClose={onClose} title={perspectiveLabel ? `Historische robuustheid — ${perspectiveLabel}` : 'Historische robuustheid'}>
         <div className="space-y-6 px-6 py-6">
 
           {/* Kicker */}
@@ -147,11 +147,11 @@ export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }
           {/* Success framing */}
           <section className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
             <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">VEERKRACHTCONCLUSIE</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">ROBUUSTHEIDSCONCLUSIE</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">1970–2024 · {result.allPaths.length} historische periodes</p>
             </div>
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              Historische veerkracht toont hoe {perspectiveLabel ? 'jullie gezamenlijke' : 'jouw'} strategie standhield in {result.allPaths.length} verschillende startpunten —
+              Historische robuustheid toont hoe {perspectiveLabel ? 'jullie gezamenlijke' : 'jouw'} strategie standhield in {result.allPaths.length} verschillende startpunten —
               inclusief echte crashes die een normaalverdeling onderschat.
               {perspectiveLabel && (
                 <> Op basis van gecombineerd vermogen, inkomen en uitgaven van het huishouden.</>
@@ -170,7 +170,7 @@ export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }
               <span className="tabular-nums text-[var(--ink)]">{result.bestCase.startYear}</span>
             </div>
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-              <span className="text-[var(--ink)]">Veerkracht</span>
+              <span className="text-[var(--ink)]">Robuustheid</span>
               <span className="tabular-nums text-[var(--ink)]">{successPct}% robuust</span>
             </div>
             <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">

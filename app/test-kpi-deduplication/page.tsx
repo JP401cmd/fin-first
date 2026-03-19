@@ -107,7 +107,7 @@ export default function TestKpiDeduplicationPage() {
               <li>- FIRE age (hero)</li>
               <li>- Countdown</li>
               <li>- FIRE Doelbedrag</li>
-              <li>- Veerkracht</li>
+              <li>- Financiële Gezondheid</li>
             </ul>
           </div>
         </div>

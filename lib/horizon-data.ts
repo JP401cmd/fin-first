@@ -1858,6 +1858,13 @@ export function computeLifeEventImpact(
 
 /**
  * Compute resilience score (0-100).
+ *
+ * @deprecated This function uses the old 4-pillar resilience model.
+ * Use `computeHealthScore()` from `lib/financial-health.ts` instead, which provides
+ * a broader 6-pillar financial health assessment. This function is retained only for
+ * backward compatibility with historical snapshots that store `resilience_score` values.
+ *
+ * @see computeHealthScore — the replacement function in lib/financial-health.ts
  */
 export function computeResilienceScore(input: FinancialInput): ResilienceScore {
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses } = input

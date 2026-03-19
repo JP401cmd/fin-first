@@ -99,15 +99,15 @@ export async function GET() {
       : 'Missing freedom percentage KPI card'
   })
 
-  // Test 8: Horizon has resilience KPI
+  // Test 8: Horizon has health/resilience KPI
   const hasResilienceKpi = horizonSource.includes('data-testid="resilience-kpi"') &&
-    horizonSource.includes('Veerkracht')
+    (horizonSource.includes('Financiële Gezondheid') || horizonSource.includes('Gezondheid'))
   results.push({
-    name: 'Horizon has resilience KPI card',
+    name: 'Horizon has financiële gezondheid KPI card',
     pass: hasResilienceKpi,
     details: hasResilienceKpi
-      ? 'KPI card with data-testid="resilience-kpi" showing resilience score'
-      : 'Missing resilience KPI card'
+      ? 'KPI card with data-testid="resilience-kpi" showing health score'
+      : 'Missing financiële gezondheid KPI card'
   })
 
   // Test 9: Purple color theme in hero

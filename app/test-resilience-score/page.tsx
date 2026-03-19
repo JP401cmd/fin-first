@@ -213,9 +213,9 @@ export default function TestResilienceScorePage() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50">
                 <Shield className="h-5 w-5 text-purple-600" />
               </div>
-              <span className="text-xs text-zinc-400">Veerkrachtscore 0-100</span>
+              <span className="text-xs text-zinc-400">Gezondheidsscore 0-100</span>
             </div>
-            <p className="text-sm font-medium text-zinc-500">Veerkracht</p>
+            <p className="text-sm font-medium text-zinc-500">Financiële Gezondheid</p>
             <p className="mt-1 text-3xl font-bold text-zinc-900" data-testid="demo-resilience-value">
               {demoScore}
             </p>

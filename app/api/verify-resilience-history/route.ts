@@ -32,8 +32,8 @@ export async function GET() {
 
   // ─── Test 1: Store resilience score in monthly snapshots via resilience_score column ─────
   try {
-    const autoStores = autoSnapshotSource.includes('resilience_score') && autoSnapshotSource.includes('computeResilienceScore')
-    const manualStores = manualSnapshotSource.includes('resilience_score') && manualSnapshotSource.includes('computeResilienceScore')
+    const autoStores = autoSnapshotSource.includes('resilience_score') && (autoSnapshotSource.includes('healthScore') || autoSnapshotSource.includes('computeResilienceScore'))
+    const manualStores = manualSnapshotSource.includes('resilience_score') && (manualSnapshotSource.includes('healthScore') || manualSnapshotSource.includes('computeResilienceScore'))
     const cronStores = cronSnapshotSource.includes('resilience_score')
 
     const pass = autoStores && manualStores

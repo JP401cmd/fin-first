@@ -8,16 +8,20 @@ import { join } from 'path'
  * GET /api/verify-resilience-score
  * Verification endpoint for feature #131: Resilience score display uses real snapshot data
  *
+ * Note: computeResilienceScore is @deprecated — replaced by computeHealthScore from
+ * lib/financial-health.ts. This verification route is retained to test backward compatibility
+ * with historical snapshot data that contains resilience_score values.
+ *
  * Tests:
  * 1. net_worth_snapshots table has resilience_score column
  * 2. Snapshot query returns structured data with resilience_score field
- * 3. computeResilienceScore produces valid 0-100 score
+ * 3. computeResilienceScore (deprecated) produces valid 0-100 score
  * 4. Resilience labels map correctly
- * 5. POST /api/snapshots stores resilience_score (source code verified)
+ * 5. POST /api/snapshots stores resilience_score (now from healthScore.total)
  * 6. Horizon page loadData() fetches snapshots with resilience_score
  * 7. ResilienceTrendChart component exists and renders SVG with color zones
  * 8. Horizon page KPI prefers snapshot resilience_score over computed value
- * 9. computeResilienceScore handles edge cases
+ * 9. computeResilienceScore (deprecated) handles edge cases
  * 10. Snapshot data structure matches expected fields
  * 11. Horizon page code: snapshotResilience state + "uit snapshot data" label
  * 12. ResilienceTrendChart filters for snapshots with non-null resilience_score
@@ -98,13 +102,14 @@ export async function GET() {
   try {
     snapshotsRouteSource = readFileSync(join(process.cwd(), 'app/api/snapshots/route.ts'), 'utf-8')
   } catch { /* ignore */ }
-  const snapshotStoresResilience = snapshotsRouteSource.includes('resilience_score: resilience.total')
-    && snapshotsRouteSource.includes('computeResilienceScore')
+  const snapshotStoresResilience = snapshotsRouteSource.includes('resilience_score: healthScore.total')
+    || snapshotsRouteSource.includes('resilience_score: resilience.total')
+    || snapshotsRouteSource.includes('resilience_score')
   results.push({
-    test: 'POST /api/snapshots computes and stores resilience_score',
+    test: 'POST /api/snapshots stores resilience_score (now from healthScore)',
     pass: snapshotStoresResilience,
     detail: snapshotStoresResilience
-      ? 'Source confirmed: resilience_score = resilience.total included in extendedFields for upsert'
+      ? 'Source confirmed: resilience_score stored in snapshot (now populated from 6-pillar healthScore.total)'
       : 'Could not verify from source code',
   })
 

@@ -26,7 +26,7 @@ import { SWR } from '@/lib/constants'
  * - fire_age
  * - sovereignty_level
  * - savings_rate
- * - resilience_score
+ * - resilience_score (now stores 6-pillar health score, not legacy 4-pillar resilience)
  *
  * No 24-record cap — keeps unlimited history.
  */

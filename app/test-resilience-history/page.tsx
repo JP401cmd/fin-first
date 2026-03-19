@@ -79,7 +79,7 @@ export default function TestResilienceHistoryPage() {
         <h2 className="text-lg font-bold text-purple-900">Feature #219: Resilience score history chart</h2>
         <p className="mt-2 text-sm text-purple-700">
           Store monthly resilience scores in snapshots. Trend chart on De Horizon.
-          Message: &quot;Je veerkracht is gestegen van 45 naar 68 in 6 maanden&quot;.
+          Message: &quot;Je financiële gezondheid is gestegen van 45 naar 68 in 6 maanden&quot;.
         </p>
         <ul className="mt-3 space-y-1 text-sm text-purple-700">
           <li>1. Store resilience score in monthly snapshots via resilience_score column</li>

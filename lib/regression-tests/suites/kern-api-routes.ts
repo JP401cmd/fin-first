@@ -473,7 +473,7 @@ const tests: TestCase[] = [
       ]
       assertEqual(calculationFields.length, 12, '12 berekening velden')
       assertIncludes(calculationFields, 'sovereignty_level', 'sovereignty level metriek')
-      assertIncludes(calculationFields, 'resilience_score', 'veerkrachtsscore')
+      assertIncludes(calculationFields, 'resilience_score', 'gezondheidsscore (legacy kolom)')
 
       // Upsert strategy: on conflict user_id + snapshot_date
       const conflictKey = 'user_id,snapshot_date'

@@ -197,7 +197,7 @@ export async function GET() {
     })
   }
 
-  // TEST 10: Veerkracht (resilience) KPI ONLY on Horizon
+  // TEST 10: Financiële Gezondheid (health) KPI ONLY on Horizon
   {
     const pages = { Dashboard: dashboardSrc, Kern: coreSrc, Wil: willSrc, Horizon: horizonSrc }
     const found: string[] = []
@@ -207,10 +207,10 @@ export async function GET() {
     const passed = found.length === 1 && found[0] === 'Horizon'
     results.push({
       id: 'resilience-only-horizon',
-      name: 'Veerkracht KPI appears ONLY on Horizon page',
+      name: 'Financiële Gezondheid KPI appears ONLY on Horizon page',
       passed,
       details: passed
-        ? 'resilience-kpi found only on De Horizon.'
+        ? 'health-kpi found only on De Horizon.'
         : `Found on: ${found.join(', ') || 'none'}`,
     })
   }
