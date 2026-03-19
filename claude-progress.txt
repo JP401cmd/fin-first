@@ -17564,3 +17564,15 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#366, #367)
 - Overall progress: 366/371 (98.7%)
+
+## Session 2026-03-19 - Features #371, #372
+
+### Feature #371: Regressietests - vermogensopbouw ratio-engine - PASSING
+Added 15 new regression tests for deriveWealthCompositionFromSim().
+Covers: ratio sums, endPortfolio matching, FIRE contributions, waterfall order, deplete strategy, debt projection, zero-value groups, depreciating assets.
+Total tests in derive-wealth-composition.test.ts: 33 (was 18)
+
+### Feature #372: Persona seed data controleren voor vermogensopbouw - PASSING
+Seed fixes: Daan Brand New Day investment->retirement, added pension for Roos, added repayment_type to all debts.
+Added 19 validation tests covering 3+ wealth groups, realistic returns, contributions, repayment_types, chart representativeness.
+Total tests in persona-wealth-composition-compat.test.ts: 57 (was 38)
