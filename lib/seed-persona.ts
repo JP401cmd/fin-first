@@ -393,7 +393,7 @@ export async function seedPersonaData(
     for (const parent of persona.budgets) {
       const { data: parentData, error: parentErr } = await supabase
         .from('budgets')
-        .insert({
+        .upsert({
           user_id: userId,
           parent_id: null,
           name: parent.name,
@@ -411,10 +411,10 @@ export async function seedPersonaData(
           priority_score: parent.priority_score,
           is_inflation_indexed: false,
           sort_order: parent.sort_order,
-        })
+        }, { onConflict: 'user_id, slug' })
         .select('id')
         .single()
-      if (parentErr) throw new Error(`Budget "${parent.name}" insert mislukt: ${parentErr.message}`)
+      if (parentErr) throw new Error(`Budget "${parent.name}" upsert mislukt: ${parentErr.message}`)
       budgetSlugToId[parent.slug] = parentData.id
       budgetCount++
 
@@ -423,7 +423,7 @@ export async function seedPersonaData(
           const child = parent.children[i]
           const { data: childData, error: childErr } = await supabase
             .from('budgets')
-            .insert({
+            .upsert({
               user_id: userId,
               parent_id: parentData.id,
               name: child.name,
@@ -441,10 +441,10 @@ export async function seedPersonaData(
               priority_score: parent.priority_score,
               is_inflation_indexed: false,
               sort_order: i,
-            })
+            }, { onConflict: 'user_id, slug' })
             .select('id')
             .single()
-          if (childErr) throw new Error(`Budget "${child.name}" insert mislukt: ${childErr.message}`)
+          if (childErr) throw new Error(`Budget "${child.name}" upsert mislukt: ${childErr.message}`)
           budgetSlugToId[child.slug] = childData.id
           budgetCount++
         }

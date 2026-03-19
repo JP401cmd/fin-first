@@ -239,7 +239,7 @@ export async function seedTestData(
     // Parent: Vaste Lasten
     const { data: parentBudget } = await supabase
       .from('budgets')
-      .insert({
+      .upsert({
         user_id: userId,
         parent_id: null,
         name: `Vaste Lasten ${SEED_TAG}`,
@@ -251,12 +251,12 @@ export async function seedTestData(
         rollover_type: 'reset',
         is_essential: true,
         sort_order: 0,
-      })
+      }, { onConflict: 'user_id, slug' })
       .select('id')
       .single()
 
     if (parentBudget) {
-      await supabase.from('budgets').insert([
+      await supabase.from('budgets').upsert([
         {
           user_id: userId,
           parent_id: parentBudget.id,
@@ -302,7 +302,7 @@ export async function seedTestData(
     // Parent: Dagelijkse Uitgaven
     const { data: dailyBudget } = await supabase
       .from('budgets')
-      .insert({
+      .upsert({
         user_id: userId,
         parent_id: null,
         name: `Dagelijkse Uitgaven ${SEED_TAG}`,
@@ -314,12 +314,12 @@ export async function seedTestData(
         rollover_type: 'reset',
         is_essential: false,
         sort_order: 1,
-      })
+      }, { onConflict: 'user_id, slug' })
       .select('id')
       .single()
 
     if (dailyBudget) {
-      await supabase.from('budgets').insert([
+      await supabase.from('budgets').upsert([
         {
           user_id: userId,
           parent_id: dailyBudget.id,

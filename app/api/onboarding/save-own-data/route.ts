@@ -110,7 +110,8 @@ export async function POST(req: Request) {
       return Response.json({ success: true, alreadyCompleted: true })
     }
 
-    // 1. Update profile
+    // 1. Update profile (onboarding_completed is set to false first; will be set to true at the end
+    // after all data is saved successfully — this ensures retries work correctly)
     const profileData: Record<string, unknown> = {
       id: user.id,
       full_name: identity.full_name,
@@ -118,7 +119,7 @@ export async function POST(req: Request) {
       household_type: identity.household_type,
       number_of_children: identity.number_of_children,
       net_monthly_income: identity.net_monthly_income,
-      onboarding_completed: true,
+      onboarding_completed: false,
       is_demo_user: false,
       budgeting_active: budgetteringMode !== 'none',
       updated_at: new Date().toISOString(),
@@ -141,72 +142,135 @@ export async function POST(req: Request) {
       .upsert(profileData)
     if (profileErr) throw new Error(`Profiel opslaan mislukt: ${profileErr.message}`)
 
-    // 2. Create budget hierarchy with user amounts
+    // 2. Create budget hierarchy with user amounts — BATCHED for performance
+    // Uses upsert with ON CONFLICT on (user_id, slug) so retries and
+    // double-submits are handled gracefully without deleting existing data.
+    // The idx_budgets_user_slug_parent unique index (migration 20260319000001)
+    // ensures proper deduplication while allowing same slug under different parents.
+    // Delete existing budgets first as a safety net for the transition period
+    // (before the new composite index replaces the old simple index).
+    //
+    // Batched: all parents in 1 insert, all children in 1 insert (2-3 DB calls instead of 34)
+
+    await supabase.from('budgets').delete().eq('user_id', user.id)
+
     const defaults = getDefaultBudgets()
-    for (const parent of defaults) {
-      // Calculate parent limit from children
+
+    // Step 2a: Build all parent rows in one array
+    const parentRows = defaults.map((parent) => {
       const childAmounts = (parent.children ?? []).map(
         (c) => budgetAmounts[c.slug] ?? c.default_limit,
       )
       const parentLimit = childAmounts.reduce((a, b) => a + b, 0)
+      return {
+        user_id: user.id,
+        parent_id: null as string | null,
+        name: parent.name,
+        slug: parent.slug,
+        icon: parent.icon,
+        description: parent.description,
+        default_limit: parentLimit,
+        budget_type: parent.budget_type,
+        interval: 'monthly' as const,
+        rollover_type: 'reset' as const,
+        limit_type: 'soft' as const,
+        alert_threshold: 80,
+        max_single_transaction_amount: parentLimit,
+        is_essential: parent.is_essential,
+        priority_score: parent.priority_score,
+        is_inflation_indexed: false,
+        sort_order: parent.sort_order,
+      }
+    })
 
-      const { data: parentData, error: parentErr } = await supabase
-        .from('budgets')
-        .insert({
+    // Step 2b: Bulk insert all parents in one call and get their IDs
+    const { data: insertedParents, error: parentBulkErr } = await supabase
+      .from('budgets')
+      .upsert(parentRows, { onConflict: 'user_id, slug' })
+      .select('id, slug')
+    if (parentBulkErr) throw new Error(`Budget parents bulk upsert mislukt: ${parentBulkErr.message}`)
+
+    // Step 2c: Map parent slugs to their generated IDs for child assignment
+    const parentSlugToId = new Map<string, string>()
+    for (const p of insertedParents ?? []) {
+      parentSlugToId.set(p.slug, p.id)
+    }
+
+    // Step 2d: Build all child rows in one array with correct parent_id references
+    const childRows: typeof parentRows = []
+    for (const parent of defaults) {
+      if (!parent.children) continue
+      const parentId = parentSlugToId.get(parent.slug)
+      if (!parentId) continue
+
+      for (let i = 0; i < parent.children.length; i++) {
+        const child = parent.children[i]
+        const amount = budgetAmounts[child.slug] ?? child.default_limit
+        childRows.push({
           user_id: user.id,
-          parent_id: null,
-          name: parent.name,
-          slug: parent.slug,
-          icon: parent.icon,
-          description: parent.description,
-          default_limit: parentLimit,
+          parent_id: parentId,
+          name: child.name,
+          slug: child.slug,
+          icon: child.icon,
+          description: child.description,
+          default_limit: amount,
           budget_type: parent.budget_type,
           interval: 'monthly',
           rollover_type: 'reset',
           limit_type: 'soft',
           alert_threshold: 80,
-          max_single_transaction_amount: parentLimit,
+          max_single_transaction_amount: amount * 2,
           is_essential: parent.is_essential,
           priority_score: parent.priority_score,
           is_inflation_indexed: false,
-          sort_order: parent.sort_order,
+          sort_order: i,
         })
-        .select('id')
-        .single()
-      if (parentErr) throw new Error(`Budget "${parent.name}" insert mislukt: ${parentErr.message}`)
-
-      if (parent.children) {
-        for (let i = 0; i < parent.children.length; i++) {
-          const child = parent.children[i]
-          const amount = budgetAmounts[child.slug] ?? child.default_limit
-          const { error: childErr } = await supabase
-            .from('budgets')
-            .insert({
-              user_id: user.id,
-              parent_id: parentData.id,
-              name: child.name,
-              slug: child.slug,
-              icon: child.icon,
-              description: child.description,
-              default_limit: amount,
-              budget_type: parent.budget_type,
-              interval: 'monthly',
-              rollover_type: 'reset',
-              limit_type: 'soft',
-              alert_threshold: 80,
-              max_single_transaction_amount: amount * 2,
-              is_essential: parent.is_essential,
-              priority_score: parent.priority_score,
-              is_inflation_indexed: false,
-              sort_order: i,
-            })
-          if (childErr) throw new Error(`Budget "${child.name}" insert mislukt: ${childErr.message}`)
-        }
       }
     }
 
-    // 3. Insert optional bank accounts
+    // Step 2e: Bulk insert all children in one call
+    if (childRows.length > 0) {
+      const { error: childBulkErr } = await supabase
+        .from('budgets')
+        .upsert(childRows, { onConflict: 'user_id, slug' })
+      if (childBulkErr) throw new Error(`Budget children bulk upsert mislukt: ${childBulkErr.message}`)
+    }
+
+    // 3. Insert optional bank accounts + companion cash assets
+    // Delete existing onboarding-created bank accounts (without IBAN) to avoid wiping bank-connected ones
+    await supabase.from('bank_accounts').delete().eq('user_id', user.id).eq('iban', '')
+    // Also delete existing onboarding-created cash assets (companion assets from previous attempt)
+    await supabase.from('assets').delete().eq('user_id', user.id).eq('asset_type', 'cash')
+
+    let companionCashAssetIds: string[] = []
     if (bankAccounts && bankAccounts.length > 0) {
+      // 3a. Create companion cash assets first (same pattern as seed-persona.ts)
+      const cashAssetRows = bankAccounts.map((a, i) => ({
+        user_id: user.id,
+        name: a.name,
+        asset_type: 'cash' as const,
+        current_value: a.balance,
+        purchase_value: a.balance,
+        expected_return: 0,
+        monthly_contribution: 0,
+        institution: a.bank_name,
+        is_active: true,
+        sort_order: i,
+        ownership: 'personal',
+        net_worth_inclusion_pct: 100,
+        is_liquid: true,
+        subtype: a.account_type,
+        has_budget_tracking: budgetteringMode !== 'none',
+      }))
+
+      const { data: cashAssets, error: cashErr } = await supabase
+        .from('assets')
+        .insert(cashAssetRows)
+        .select('id')
+      if (cashErr) throw new Error(`Cash assets opslaan mislukt: ${cashErr.message}`)
+      companionCashAssetIds = (cashAssets ?? []).map((a) => a.id)
+
+      // 3b. Create bank accounts with linked_asset_id pointing to companion cash assets
       const rows = bankAccounts.map((a, i) => ({
         user_id: user.id,
         name: a.name,
@@ -216,13 +280,18 @@ export async function POST(req: Request) {
         iban: '',
         is_active: true,
         sort_order: i,
+        linked_asset_id: companionCashAssetIds[i] ?? null,
       }))
       const { error: bankErr } = await supabase.from('bank_accounts').insert(rows)
       if (bankErr) throw new Error(`Bankrekeningen opslaan mislukt: ${bankErr.message}`)
     }
 
-    // 4. Insert optional assets (with type-specific fields)
+    // 4. Insert optional assets (delete existing non-cash ones on retry to prevent duplicates)
+    // Cash assets were already handled above for bank accounts
     if (assets && assets.length > 0) {
+      await supabase.from('assets').delete().eq('user_id', user.id).neq('asset_type', 'cash')
+      // Offset sort_order by number of companion cash assets to avoid conflicts
+      const assetSortOffset = companionCashAssetIds.length
       const rows = assets.map((a, i) => ({
         user_id: user.id,
         name: a.name,
@@ -234,7 +303,7 @@ export async function POST(req: Request) {
         monthly_contribution: a.monthly_contribution ?? 0,
         institution: a.institution || null,
         is_active: true,
-        sort_order: i,
+        sort_order: assetSortOffset + i,
         // Type-specific
         subtype: a.subtype || null,
         risk_profile: a.risk_profile || null,
@@ -253,8 +322,9 @@ export async function POST(req: Request) {
       if (assetErr) throw new Error(`Bezittingen opslaan mislukt: ${assetErr.message}`)
     }
 
-    // 5. Insert optional debts (with type-specific fields)
+    // 5. Insert optional debts (delete existing ones on retry to prevent duplicates)
     if (debts && debts.length > 0) {
+      await supabase.from('debts').delete().eq('user_id', user.id)
       const rows = debts.map((d, i) => ({
         user_id: user.id,
         name: d.name,
@@ -282,6 +352,9 @@ export async function POST(req: Request) {
     }
 
     // 6. Seed default AOW life event (leeftijd uit aow_leeftijd tabel)
+    // Delete existing AOW event first to prevent duplicates on retry
+    await supabase.from('life_events').delete().eq('user_id', user.id).eq('event_type', 'aow')
+
     let aowTargetAge = NL_AOW_AGE
     try {
       const { data: aowRows } = await supabase
@@ -310,6 +383,14 @@ export async function POST(req: Request) {
       sort_order: 0,
       metadata: { leefsituatie: 'alleenstaand', jarenBuitenNL: 0 },
     })
+
+    // 7. Mark onboarding as completed LAST — only after all data is saved successfully
+    // This ensures the idempotency guard doesn't block retries after partial failures
+    const { error: completeErr } = await supabase
+      .from('profiles')
+      .update({ onboarding_completed: true, updated_at: new Date().toISOString() })
+      .eq('id', user.id)
+    if (completeErr) throw new Error(`Onboarding afronden mislukt: ${completeErr.message}`)
 
     return Response.json({ success: true })
   } catch (err) {

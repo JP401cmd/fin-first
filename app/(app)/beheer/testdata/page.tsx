@@ -126,7 +126,7 @@ export default function BeheerTestdataPage() {
       for (const parent of budgets) {
         const { data: parentRow, error: parentError } = await supabase
           .from('budgets')
-          .insert({
+          .upsert({
             user_id: user.id,
             name: parent.name,
             slug: parent.slug,
@@ -137,7 +137,7 @@ export default function BeheerTestdataPage() {
             is_essential: parent.is_essential,
             priority_score: parent.priority_score,
             sort_order: parent.sort_order,
-          })
+          }, { onConflict: 'user_id, slug' })
           .select('id')
           .single()
 
@@ -156,7 +156,7 @@ export default function BeheerTestdataPage() {
             budget_type: parent.budget_type,
             sort_order: idx,
           }))
-          const { data: inserted } = await supabase.from('budgets').insert(childRows).select('id')
+          const { data: inserted } = await supabase.from('budgets').upsert(childRows, { onConflict: 'user_id, slug' }).select('id')
           insertedCount += inserted?.length ?? 0
         }
       }
