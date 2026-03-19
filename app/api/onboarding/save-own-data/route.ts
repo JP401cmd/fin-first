@@ -20,6 +20,116 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
   throw lastError
 }
 
+/**
+ * Build the RPC payload for the atomic save_onboarding_data function.
+ * Structures all onboarding data into the format expected by the plpgsql function.
+ */
+function buildRpcPayload(
+  identity: z.infer<typeof bodySchema>['identity'],
+  budgetAmounts: Record<string, number>,
+  budgetteringMode: string | undefined,
+  bankAccounts: z.infer<typeof bodySchema>['bankAccounts'],
+  assets: z.infer<typeof bodySchema>['assets'],
+  debts: z.infer<typeof bodySchema>['debts'],
+  widgetPrefs: z.infer<typeof bodySchema>['widgetPrefs'],
+  aowTargetAge: number,
+  idempotencyKey: string | undefined,
+) {
+  const defaults = getDefaultBudgets()
+
+  // Build parent budget rows
+  const parentBudgets = defaults.map((parent) => {
+    const childAmounts = (parent.children ?? []).map(
+      (c) => budgetAmounts[c.slug] ?? c.default_limit,
+    )
+    const parentLimit = childAmounts.reduce((a, b) => a + b, 0)
+    return {
+      name: parent.name,
+      slug: parent.slug,
+      icon: parent.icon,
+      description: parent.description,
+      default_limit: parentLimit,
+      budget_type: parent.budget_type,
+      interval: 'monthly',
+      rollover_type: 'reset',
+      limit_type: 'soft',
+      alert_threshold: 80,
+      max_single_transaction_amount: parentLimit,
+      is_essential: parent.is_essential,
+      priority_score: parent.priority_score,
+      sort_order: parent.sort_order,
+    }
+  })
+
+  // Build child budget rows with parent_slug reference
+  const childBudgets: Record<string, unknown>[] = []
+  for (const parent of defaults) {
+    if (!parent.children) continue
+    for (let i = 0; i < parent.children.length; i++) {
+      const child = parent.children[i]
+      const amount = budgetAmounts[child.slug] ?? child.default_limit
+      childBudgets.push({
+        parent_slug: parent.slug,
+        name: child.name,
+        slug: child.slug,
+        icon: child.icon,
+        description: child.description,
+        default_limit: amount,
+        budget_type: parent.budget_type,
+        interval: 'monthly',
+        rollover_type: 'reset',
+        limit_type: 'soft',
+        alert_threshold: 80,
+        max_single_transaction_amount: amount * 2,
+        is_essential: parent.is_essential,
+        priority_score: parent.priority_score,
+        sort_order: i,
+      })
+    }
+  }
+
+  return {
+    idempotency_key: idempotencyKey ?? null,
+    profile: {
+      full_name: identity.full_name,
+      date_of_birth: identity.date_of_birth,
+      household_type: identity.household_type,
+      number_of_children: identity.number_of_children,
+      net_monthly_income: identity.net_monthly_income,
+      estimated_monthly_expenses: identity.estimated_monthly_expenses ?? null,
+      expected_return: identity.expected_return ?? null,
+      inflation_rate: identity.inflation_rate ?? null,
+      retirement_expense_method: identity.retirement_expense_method ?? null,
+      retirement_expense_custom_amount: identity.retirement_custom_amount ?? null,
+      fire_end_strategy: identity.fire_end_strategy ?? null,
+      fire_legacy_amount: identity.fire_legacy_amount ?? null,
+      fire_end_age: identity.fire_end_age ?? null,
+      temporal_balance: identity.temporal_balance ?? null,
+    },
+    budget_amounts: budgetAmounts,
+    budgettering_mode: budgetteringMode ?? 'manual',
+    parent_budgets: parentBudgets,
+    child_budgets: childBudgets,
+    bank_accounts: (bankAccounts ?? []).map((a, i) => ({ ...a, sort_order: i })),
+    assets: (assets ?? []).map((a, i) => ({
+      ...a,
+      sort_order: i,
+      purchase_value: a.purchase_value ?? a.current_value,
+      expected_return: a.expected_return ?? 0,
+      monthly_contribution: a.monthly_contribution ?? 0,
+    })),
+    debts: (debts ?? []).map((d, i) => ({
+      ...d,
+      sort_order: i,
+      original_amount: d.original_amount ?? d.current_balance,
+      minimum_payment: d.minimum_payment ?? d.monthly_payment,
+    })),
+    widget_prefs: widgetPrefs ?? null,
+    aow_target_age: aowTargetAge,
+    aow_monthly: NL_AOW_MONTHLY,
+  }
+}
+
 const bodySchema = z.object({
   identity: z.object({
     full_name: z.string().min(1),
@@ -94,6 +204,7 @@ const bodySchema = z.object({
     })),
   }).optional(),
   budgetteringMode: z.enum(['none', 'template', 'manual']).optional(),
+  idempotencyKey: z.string().uuid().optional(),
 })
 
 export async function POST(req: Request) {
