@@ -1,3 +1,23 @@
+## Session 2026-03-19 - Features #378, #387
+
+### Feature #378: Gids bijwerken — Rebalancing uitleg en portfolio drift - PASSING
+- Added 'Rebalancing & Allocatie' topic to De Kern in guide-naslagwerk.tsx (Scale icon)
+- Added GuideTopicCard with: drift explanation, color codes (green/orange/red), Box 3 peildatum tip, Vanguard research reference
+- Added howTo steps for setting targets and interpreting drift
+- Added pro tip in guide-pro-tips.tsx about annual rebalancing around Box 3 peildatum
+
+### Feature #387: Gids bijwerken — Beleggingskosten en TER uitleg - PASSING
+- Added 'Beleggingskosten & TER' topic to De Kern in guide-naslagwerk.tsx
+- Added GuideTopicCard with: TER explanation, compound cost example (€100k, 0.22% vs 1.50% TER over 20 years = ~€65k difference)
+- Explained TER vs tracking difference vs transaction costs
+- How to find TER: factsheet/KID, Morningstar.nl, fund provider
+- References fee analyzer widget and per-holding TER input
+- Added disclaimer about tracking difference
+- Added pro tip: 0.1% TER reduction = ~€2,000 over 20 years per €100k
+
+### Note
+- Gids page (/identity/gids) has pre-existing 500 error from another agent's regression test module compilation errors (clearRoleSwitcher import issue in server-runner.ts) — not caused by these changes
+
 ## Session 2026-03-19 - Features #398, #397
 
 ### Feature #398: Seed persona's uitbreiden met marginaal_tarief - PASSING
