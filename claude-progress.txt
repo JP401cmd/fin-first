@@ -1,3 +1,27 @@
+## Session 2026-03-19 - Feature #365
+
+### Feature #365: UI/UX review Vermogensopbouw stacked chart met ux-review-expert - PASSING
+- Ran comprehensive UX review via ux-review-expert agent on BucketProjectionChart
+- Fixed 18 issues across P0/P1/P2 priorities:
+  - P0: FIRE line color corrected from purple (#8B5CB8) to Horizon token (var(--hor-t))
+  - P0: FIRE label repositioned inside SVG clip area (textAnchor="end")
+  - P0: Alt comparison lines (altNwLinePath, altLinePath) now have pathLength + animation
+  - P0: SVG accessibility: added role="img" and aria-label
+  - P1: All SVG text colors migrated from fill-zinc-* to design tokens (--ink-3, --ink-4)
+  - P1: Imported and used DEBT_LAYER_COLOR constant instead of inline #ef4444
+  - P1: Tooltip opbouw view anchor moved from PAD_TOP to yPos(netWorth)
+  - P1: Added aria-label to select, aria-pressed to toggle button
+  - P1: Zero line strokeWidth increased from 0.5 to 1 for mobile legibility
+  - P1: Toggle button now shows visual active state (kern colors when pressed)
+  - P2: Controls bar now flex-wrap for narrow viewports
+  - P2: Tooltip uses design tokens for bg/border/shadow
+- Zero TypeScript errors, zero console errors
+- Commit: fb2ccc2d
+
+### Current Status
+- 1 feature completed this session (#365)
+- Overall progress: 356/364 (97.8%)
+
 ## Session 2026-03-19 - Feature #350 (continued attempt)
 
 ### Feature #350: Roadmap pagina — feature statussen en opmerkingen - BLOCKED BY MIGRATION
