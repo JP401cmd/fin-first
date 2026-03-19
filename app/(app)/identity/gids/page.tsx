@@ -28,6 +28,7 @@ import {
   Sun,
   Rss,
   SlidersHorizontal,
+  Shield,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -1027,6 +1028,14 @@ export default function GidsPage() {
                 vermogenspad, Monte Carlo simulatie — passen zich direct aan.
                 <br />
                 <br />
+                <em>
+                  Tip: de eindstrategie bepaalt <strong>wat</strong> je doel is
+                  (vermogen opbranden, nalaten of behouden). Hoe je daadwerkelijk
+                  onttrekt — welke methode — stel je apart in via de
+                  onttrekkingsmethoden (zie het volgende kaart).
+                </em>
+                <br />
+                <br />
                 <strong>SWR-monitor:</strong> de SWR-widget op je dashboard toont
                 je huidige vs. benodigde onttrekkingspercentage, gecorrigeerd
                 voor Box 3 belasting en inflatie. In Nederland is de effectieve
@@ -1046,6 +1055,65 @@ export default function GidsPage() {
                 "Bekijk de SWR-monitor widget op je dashboard — deze toont je veilige onttrekking gecorrigeerd voor Box 3 belasting en inflatie",
               ],
               tip: "Begin met perpetueel als veilige basis. Als je FIRE-datum te ver weg lijkt, experimenteer met deplete — je ziet direct hoeveel jaar eerder je vrij bent. Legacy is de gulden middenweg als je ook aan erfgenamen denkt.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Shield}
+            title="Onttrekkingsmethoden"
+            color="var(--color-horizon-400)"
+            valueText="Je eindstrategie bepaalt het doel — je onttrekkingsmethode bepaalt hoe je elk jaar je geld opneemt. De juiste methode beschermt je tegen marktonzekerheid."
+            description={
+              <>
+                TriFinity biedt vier onttrekkingsmethoden die je kunt combineren
+                met elke eindstrategie:
+                <br />
+                <br />
+                <strong>Vast (SWR / 4%-regel)</strong> — de klassieke methode.
+                Je onttrekt een vast percentage van je startportfolio (bijv. 4%),
+                jaarlijks gecorrigeerd voor inflatie. Voorspelbaar en eenvoudig,
+                maar geen aanpassing bij slechte markten. Ideaal voor wie
+                zekerheid en eenvoud waardeert.
+                <br />
+                <br />
+                <strong>Guardrails (Guyton-Klinger)</strong> — dynamische
+                onttrekking met een vloer en plafond. Bij goede beursjaren
+                verhoog je je onttrekking, bij slechte jaren verlaag je. Biedt
+                bescherming én profiteert van groei. Geschikt voor flexibele
+                pensioengangers.
+                <br />
+                <br />
+                <strong>VPW (Variable Percentage Withdrawal)</strong> — elk jaar
+                bereken je een nieuw percentage op basis van je resterende
+                levensverwachting en actuele portfoliowaarde. Wiskundig optimaal,
+                maar je inkomen kan sterk variëren. Niet combineerbaar met de
+                perpetuele eindstrategie (zie compatibiliteitsmatrix).
+                <br />
+                <br />
+                <strong>Bucket (drie-emmer methode)</strong> — verdeel je
+                vermogen in drie emmers: cash (2 jaar), obligaties (5 jaar) en
+                aandelen (rest). Je leeft van de cash-emmer en vult jaarlijks
+                aan vanuit de groei-emmer. Emotioneel rustgevend bij
+                marktvolatiliteit.
+                <br />
+                <br />
+                <strong>Compatibiliteit:</strong> niet elke methode werkt even
+                goed bij elke eindstrategie. In de strategie-modal op De Horizon
+                vind je een <strong>compatibiliteitsmatrix</strong> die per
+                combinatie toont of deze goed (✅), met aandacht (⚠️) of
+                onverenigbaar (❌) is. Zo kies je altijd de beste combinatie
+                voor jouw situatie.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Horizon → tik op de strategie-widget of navigeer naar Onttrekkingsstrategieën",
+                "Vergelijk de 4 methoden: bekijk de portefeuille-grafiek en bestedingsruimte per methode",
+                "Bekijk de compatibiliteitsmatrix: welke methode past bij jouw eindstrategie?",
+                "Kies je methode en tik op 'Activeer' — de simulatie past zich direct aan",
+                "Pas guardrail-parameters aan via Identiteit → Instellingen → Geavanceerde instellingen",
+              ],
+              tip: "Start met Vast (SWR) als je eenvoud wilt. Guardrails is de populairste keuze voor flexibiliteit. VPW is wiskundig optimaal maar vereist mentale flexibiliteit. Bucket geeft rust bij marktdalingen.",
             }}
           />
         </ReisStapSection>
