@@ -16446,3 +16446,45 @@ For Feature #51 (Transaction Import):
   - 20260319000002: save_onboarding_data RPC function
 - **Already applied**: 20260318000001 (profiles.withdrawal_strategy columns exist)
 - **Resolution needed**: Grant Supabase MCP tool permissions in runtime environment, OR provide Supabase access token / service role key
+
+## Session 2026-03-19 - Feature #332
+
+### Feature #332: Strategie-pagina → BottomSheet modal - PASSING
+- Created `components/app/horizon/strategie-modal.tsx` — full strategie page content wrapped in BottomSheet (size='full', title='Onttrekkingsstrategieën')
+- Converted `/horizon/strategie/page.tsx` from standalone page to server-side redirect → `/horizon?strategie=open`
+- Updated `horizon-client.tsx`:
+  - Added dynamic import for StrategieModal
+  - Extended ActiveModal type to include 'strategie'
+  - Converted Link to button for opening modal
+  - Fixed deep-link handler to support both `?modal=strategie` and `?strategie=open` params
+  - Added StrategieModal to modal rendering section
+- Verified: modal opens/closes (ESC, X button), all 4 strategy cards work, activate button appears, comparison chart renders, no JS errors
+- Commit: 9fc47c35
+
+## Session 2026-03-19 - Features #333, #336
+
+### Feature #333: FIRE-leeftijd berekening strategie-afhankelijk maken - PASSING
+- Changed requiredAt() binary search to use withdrawal strategy (useWithdrawalStrategy: true)
+- Each strategy now yields its own FIRE age: static=53, guardrails=51, vpw=53, bucket=53
+- Guardrails requires less portfolio (699K vs 803K) allowing earlier FIRE
+- VPW+perpetual detected as incompatible (VPW depletes fully by design)
+- VPW+legacy also incompatible (same reason)
+- Bucket strategy fixed: uses full expenses in deterministic model (not capped at cash)
+- Binary search iterations increased 60->80 for convergence safety
+- Added 7 regression tests in fire-simulatie.ts
+- Performance: 4 strategies in <5ms
+- Commit: 7a9f127e
+
+### Feature #336: Regressietests updaten voor strategie-afhankelijke FIRE-berekening - PASSING
+- Updated 3 integration tests in fire-withdrawal-integration.test.ts (FIRE age same -> differs)
+- Added VPW+perpetual and VPW+legacy incompatibility tests
+- Added 4x3 binary search convergence matrix in fire-simulation.test.ts (12 combinations)
+- Added 3 regression tests in onttrekkingsstrategie.ts (FIRE-leeftijd verschil)
+- Added 3 regression tests in horizon-strategie-pagina.ts (compatibiliteitsmatrix)
+- Updated VPW+perpetual test in fire-simulatie.ts to include legacy
+- All 42 vitest tests pass, all 17 test files green
+- Commit: 6037a22e
+
+### Current Status
+- 2 features completed this session (#333, #336)
+- Overall progress: 324/336 (96.4%)
