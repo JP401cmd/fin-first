@@ -395,11 +395,13 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 20,
     async fn() {
-      // Verify the route module exports expected handlers
-      const mod = await import('@/app/api/scenarios/route')
-      assertType(mod.GET, 'function', 'GET handler')
-      assertType(mod.POST, 'function', 'POST handler')
-      assertType(mod.DELETE, 'function', 'DELETE handler')
+      // Verify the API route responds (can't import server-only route directly)
+      const getRes = await fetch('/api/scenarios')
+      assert(getRes.status === 401 || getRes.status === 200, 'GET handler exists')
+      const postRes = await fetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      assert(postRes.status === 401 || postRes.status === 400, 'POST handler exists')
+      const delRes = await fetch('/api/scenarios?id=nonexistent', { method: 'DELETE' })
+      assert(delRes.status === 401 || delRes.status === 400 || delRes.status === 404, 'DELETE handler exists')
 
       // Validate the shape by constructing a mock scenario
       const mockScenario = {
@@ -435,9 +437,9 @@ const tests: TestCase[] = [
     estimatedDurationMs: 20,
     async fn() {
       // The route defines MAX_SCENARIOS = 5
-      // Verify the limit is enforced in the response body message
-      const mod = await import('@/app/api/scenarios/route')
-      assertNotNull(mod.POST, 'POST handler exists')
+      // Verify the POST endpoint exists (can't import server-only route directly)
+      const postRes = await fetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      assert(postRes.status === 401 || postRes.status === 400, 'POST handler exists')
 
       // The max limit of 5 is hardcoded in the route
       // We verify the concept: scenarios.length < 5 is the guard in the UI component

@@ -4,9 +4,9 @@ import {
   assert, assertNotNull, assertDefined, assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import type { CheckinSnapshot } from '@/app/api/checkin/save/route'
-import type { Aandachtspunt } from '@/app/api/checkin/aandachtspunten/route'
-import type { GesprekStarterData } from '@/app/api/checkin/gespreksstarters/route'
+import type { CheckinSnapshot } from '@/lib/checkin-types'
+import type { Aandachtspunt } from '@/lib/checkin-types'
+import type { GesprekStarterData } from '@/lib/checkin-types'
 
 const CAT = 'checkin.flow'
 

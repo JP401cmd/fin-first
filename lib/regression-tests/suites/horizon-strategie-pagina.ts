@@ -371,14 +371,18 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 200,
     async fn() {
-      // All validations return 401 when unauthenticated (auth check comes first)
-      // So we verify the route module exports correct handlers
-      const mod = await import('@/app/api/withdrawal-strategy/route')
-      assertType(mod.GET, 'function', 'GET handler')
-      assertType(mod.PUT, 'function', 'PUT handler')
+      // Verify the API route responds (auth check returns 401 for unauthenticated)
+      const getRes = await fetch('/api/withdrawal-strategy')
+      assert(getRes.status === 401 || getRes.status === 200, 'GET handler exists')
+
+      const putRes = await fetch('/api/withdrawal-strategy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ withdrawal_strategy: 'invalid_strategy_xyz' }),
+      })
+      assert(putRes.status === 401 || putRes.status === 400, 'PUT handler validates')
 
       // Verify VALID_STRATEGIES list matches our known strategies
-      // (The route module uses VALID_STRATEGIES for validation)
       const validStrategies: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
       for (const s of validStrategies) {
         const config = resolveWithdrawalStrategy({ withdrawal_strategy: s })
