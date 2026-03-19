@@ -1115,13 +1115,22 @@ export default function RoadmapPage() {
   const [overlayMap, setOverlayMap] = useState<Map<string, RoadmapOverlay>>(new Map())
   const [statusFilter, setStatusFilter] = useState<RoadmapStatus | 'alle'>('alle')
   const [loading, setLoading] = useState(true)
+  const [tableMissing, setTableMissing] = useState(false)
   const debounceTimers = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   // Load overlay data on mount
   useEffect(() => {
     fetch('/api/roadmap')
-      .then(r => r.ok ? r.json() : [])
+      .then(r => {
+        if (r.ok) return r.json()
+        // API returns empty array gracefully when table is missing
+        return []
+      })
       .then((data: RoadmapOverlay[]) => {
+        if (Array.isArray(data) && data.length === 0) {
+          // Could be empty table OR missing table — check via a test PUT
+          // Just show the page with default statuses
+        }
         const map = new Map<string, RoadmapOverlay>()
         for (const d of data) map.set(statusKey(d.fase, d.feature_nr), d)
         setOverlayMap(map)
@@ -1149,6 +1158,8 @@ export default function RoadmapPage() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ feature_nr: nr, fase, status }),
+    }).then(r => {
+      if (r.status === 503) setTableMissing(true)
     }).catch(() => {})
   }, [])
 
@@ -1175,6 +1186,8 @@ export default function RoadmapPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ feature_nr: nr, fase, opmerkingen: opmerkingen || null }),
+      }).then(r => {
+        if (r.status === 503) setTableMissing(true)
       }).catch(() => {})
     }, 1000))
   }, [])
@@ -1190,6 +1203,19 @@ export default function RoadmapPage() {
 
   return (
     <div className="space-y-8">
+      {/* Migration banner */}
+      {tableMissing && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <p className="font-sans text-sm font-medium text-amber-800">
+            De <code className="rounded bg-amber-100 px-1 font-mono text-xs">roadmap_features</code> tabel bestaat nog niet in de database.
+            Statussen worden lokaal bijgehouden maar niet opgeslagen.
+          </p>
+          <p className="mt-1 font-sans text-xs text-amber-700">
+            Voer de migratie uit via Supabase Dashboard &gt; SQL Editor om persistentie in te schakelen.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <header>
         <p className="mb-2 font-mono text-[11px] tabular-nums text-[var(--ink-4)]">

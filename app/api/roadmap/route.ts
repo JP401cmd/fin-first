@@ -20,6 +20,10 @@ export async function GET() {
     .order('feature_nr')
 
   if (error) {
+    // If table doesn't exist yet, return empty array gracefully
+    if (error.message?.includes('Could not find') || error.code === 'PGRST205') {
+      return NextResponse.json([])
+    }
     return NextResponse.json(
       { error: 'Fout bij laden roadmap data', detail: error.message },
       { status: 500 },
@@ -95,6 +99,13 @@ export async function PUT(request: NextRequest) {
     .single()
 
   if (error) {
+    // If table doesn't exist yet, return informative error
+    if (error.message?.includes('Could not find') || error.code === 'PGRST205') {
+      return NextResponse.json(
+        { error: 'Tabel roadmap_features bestaat nog niet. Voer de migratie uit via Supabase Dashboard.', table_missing: true },
+        { status: 503 },
+      )
+    }
     return NextResponse.json(
       { error: 'Fout bij opslaan', detail: error.message },
       { status: 500 },
