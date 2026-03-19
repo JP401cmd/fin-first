@@ -1,3 +1,17 @@
+## Session 2026-03-19 - Feature #338
+
+### Feature #338: Widget dashboard persistentie fixen - PASSING
+- Root cause discovered: `ai_enabled` column missing from remote DB caused the entire profiles SELECT to fail, so `widget_prefs` was always null → defaults were always shown
+- Removed `ai_enabled` from the profiles SELECT query in `dashboard-data-loader.ts`
+- Added `router.refresh()` after `performSave()` and `handleGereed()` in `draggable-widget-grid.tsx`
+- Added `revalidatePath('/will')` and `revalidatePath('/')` in `app/api/widgets/route.ts`
+- Added `export const dynamic = 'force-dynamic'` to `app/(app)/will/page.tsx`
+- Added `cache: 'no-store'` to Supabase server client for defense-in-depth
+- Verified: widget size change persists after page refresh ✓
+- Verified: hidden widget stays hidden after page refresh ✓
+- Verified: zero JS console errors ✓
+- Commit: 0931498a
+
 ## Session 2026-03-19 - Feature #337
 
 ### Feature #337: Seed personas uitbreiden met onttrekkingsstrategieën - PASSING
