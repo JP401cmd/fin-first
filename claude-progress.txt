@@ -1,3 +1,22 @@
+## Session 2026-03-19 - Feature #331
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (external blocker)
+- External blocker: No database credentials available (DB password, service role key, or access token)
+- Supabase MCP tools consistently fail with "permissions not granted" - OAuth not connected
+- No SUPABASE_DB_PASSWORD, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_ACCESS_TOKEN in .env.local
+- IMPROVEMENTS MADE to migration infrastructure:
+  - Added withdrawal_strategy migration SQL (5 columns) to MIGRATION_STATEMENTS
+  - Added env var fallback support (SUPABASE_DB_PASSWORD, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ACCESS_TOKEN)
+  - Extended GET status check with all withdrawal_strategy profile columns
+  - Created missing migration file: 20260319000003_add_invulfase_active_to_profiles.sql
+  - Added service_role_key to where_to_find help text in error response
+  - Withdrawal_strategy columns confirmed already applied (true in GET status)
+- Current missing items: target_allocations table, holding_prices table, holding_alerts table,
+  7 holdings columns, onboarding_idempotency_key, invulfase_active, save_onboarding_data RPC
+- Resolution: User needs to either connect Supabase MCP OAuth OR add SUPABASE_DB_PASSWORD to .env.local,
+  then run: curl -X POST http://localhost:3000/api/apply-migration -H "Content-Type: application/json" -d '{}'
+- Commit: 1d6ca9fe
+
 ## Session 2026-03-19 - Feature #321
 
 ### Feature #321: Post-onboarding invulfase automatisch starten - PASSING
