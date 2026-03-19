@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { TestReport, TestSuiteConfig, TestResult } from './test-types'
 import { loadAllTests } from './test-registry'
 import { runTestSuite, type TestProgressCallback } from './test-runner'
+import { seedTestData, cleanupTestData } from './test-seed'
 
 // ── Server-side Regression Test Runner ──────────────────────────────────────
 //
@@ -66,6 +67,11 @@ class MemoryStorage implements Storage {
 
 let _originalFetch: typeof globalThis.fetch | null = null
 let _baseUrl: string = ''
+let _supabaseUrl: string = ''
+let _supabaseAnonKey: string = ''
+let _accessToken: string = ''
+let _testUserId: string = ''
+let _currentRole: 'superadmin' | 'user' = 'superadmin'
 
 /**
  * Make an HTTP request WITHOUT authentication headers.
@@ -92,6 +98,95 @@ export function unauthenticatedFetch(
   }
 
   return fetchFn(url, init)
+}
+
+// ── Role switching for admin vs normal-user tests ────────────────────────────
+//
+// Some tests verify that normal users (role='user') cannot access admin pages
+// or API endpoints. Since the test account is 'superadmin' by default, we
+// provide a mechanism to temporarily switch the profile role via the Supabase
+// REST API, run the test, and restore the original role.
+
+/**
+ * Switch the test account's profile.role in the database.
+ * Uses the Supabase REST API directly with the authenticated session.
+ *
+ * @param role - The role to set ('user' or 'superadmin')
+ * @returns true if the switch succeeded, false otherwise
+ */
+async function switchTestAccountRole(role: 'superadmin' | 'user'): Promise<boolean> {
+  if (!_supabaseUrl || !_supabaseAnonKey || !_accessToken || !_testUserId) {
+    console.warn('[server-runner] Role switch unavailable: missing credentials')
+    return false
+  }
+
+  try {
+    const fetchFn = _originalFetch ?? globalThis.fetch
+    const res = await fetchFn(
+      `${_supabaseUrl}/rest/v1/profiles?id=eq.${_testUserId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${_accessToken}`,
+          'apikey': _supabaseAnonKey,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ role }),
+      },
+    )
+    if (res.ok || res.status === 204) {
+      _currentRole = role
+      return true
+    }
+    console.warn(`[server-runner] Role switch to '${role}' failed: ${res.status} ${res.statusText}`)
+    return false
+  } catch (err) {
+    console.warn(`[server-runner] Role switch to '${role}' error:`, err)
+    return false
+  }
+}
+
+/**
+ * Run a callback with the test account temporarily set to role='user'.
+ * After the callback completes (or throws), the role is restored to 'superadmin'.
+ *
+ * Usage in tests:
+ * ```ts
+ * import { withUserRole } from '../server-runner'
+ *
+ * async fn() {
+ *   await withUserRole(async () => {
+ *     const res = await fetch('/beheer/ai')
+ *     assert(isRedirect(res.status), 'Normal user should be redirected from beheer')
+ *   })
+ * }
+ * ```
+ */
+export async function withUserRole(fn: () => void | Promise<void>): Promise<void> {
+  const switched = await switchTestAccountRole('user')
+  if (!switched) {
+    throw new Error(
+      'Kon de testaccount-rol niet wisselen naar "user". ' +
+      'Controleer of het RLS-beleid op profiles self-update toestaat voor de role kolom.',
+    )
+  }
+  try {
+    await fn()
+  } finally {
+    // Always restore superadmin role, even if the test throws
+    const restored = await switchTestAccountRole('superadmin')
+    if (!restored) {
+      console.error('[server-runner] CRITICAL: Failed to restore superadmin role! Subsequent admin tests may fail.')
+    }
+  }
+}
+
+/**
+ * Get the current role of the test account (as tracked by the server-runner).
+ */
+export function getCurrentTestRole(): 'superadmin' | 'user' {
+  return _currentRole
 }
 
 // ── Core runner ──────────────────────────────────────────────────────────────
@@ -166,9 +261,13 @@ export async function runServerTestSuite(
   const originalFetch = globalThis.fetch
   const baseUrl = `http://localhost:${process.env.PORT || 3000}`
 
-  // Expose the original fetch for unauthenticatedFetch() helper
+  // Expose credentials for unauthenticatedFetch() and role-switching helpers
   _originalFetch = originalFetch
   _baseUrl = baseUrl
+  _supabaseUrl = supabaseUrl
+  _supabaseAnonKey = supabaseAnonKey
+  _accessToken = accessToken
+  _testUserId = authData.user.id
 
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     let url: string
@@ -209,7 +308,15 @@ export async function runServerTestSuite(
     return originalFetch(url, patchedInit)
   }
 
-  // ── 5. Load tests and run ──────────────────────────────────────────────
+  // ── 5. Seed test data ─────────────────────────────────────────────────
+  try {
+    await seedTestData(supabase, _testUserId)
+  } catch (seedErr) {
+    // Log but don't fail — tests should still run even if seeding partially fails
+    console.warn('[server-runner] Test data seeding warning:', seedErr)
+  }
+
+  // ── 6. Load tests and run ──────────────────────────────────────────────
   try {
     await loadAllTests()
 
@@ -225,10 +332,29 @@ export async function runServerTestSuite(
     const report = await runTestSuite(suiteConfig, progressCallback)
     return report
   } finally {
-    // ── 6. Restore original globals ────────────────────────────────────
+    // ── 7. Cleanup test data ──────────────────────────────────────────
+    try {
+      await cleanupTestData(supabase, _testUserId)
+    } catch (cleanupErr) {
+      console.warn('[server-runner] Test data cleanup warning:', cleanupErr)
+    }
+
+    // ── 8. Restore original globals ────────────────────────────────────
+    // Ensure role is restored to superadmin before cleanup
+    if (_currentRole !== 'superadmin') {
+      await switchTestAccountRole('superadmin').catch(() => {
+        console.error('[server-runner] Failed to restore superadmin role during cleanup')
+      })
+    }
+
     globalThis.fetch = originalFetch
     _originalFetch = null
     _baseUrl = ''
+    _supabaseUrl = ''
+    _supabaseAnonKey = ''
+    _accessToken = ''
+    _testUserId = ''
+    _currentRole = 'superadmin'
 
     if (originalLocalStorage !== undefined) {
       Object.defineProperty(globalThis, 'localStorage', {
