@@ -1,3 +1,19 @@
+## Session 2026-03-19 - Feature #337
+
+### Feature #337: Seed personas uitbreiden met onttrekkingsstrategieën - PASSING
+- Added `withdrawal_strategy` field (type `WithdrawalStrategyType`) to `PersonaProfile` interface
+- Added 4 guardrail parameter fields (`guardrail_floor`, `guardrail_ceiling`, `guardrail_cut_step`, `guardrail_raise_step`)
+- Assigned strategies to all 6 personas: Roos=static, Daan=static, Lisa=bucket, Willem=vpw, Rashid=static, Marijke=guardrails
+- Marijke gets custom guardrail params (floor=0.80, ceiling=1.20, cut=0.10, raise=0.10)
+- Updated `seed-persona.ts` to persist withdrawal_strategy and guardrail params when seeding profiles
+- All 4 strategies (static, guardrails, vpw, bucket) are covered across personas
+- TypeScript compiles cleanly (no new errors), app loads correctly
+- Commit: 5dd1dcbd
+
+### Current Status
+- 1 feature completed this session (#337)
+- Overall: 335/345 features passing (97.1%)
+
 ## Session 2026-03-19 (attempt 5) - Feature #331
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker)
