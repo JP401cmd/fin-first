@@ -1,3 +1,11 @@
+## Session 2026-03-19 - Feature #331 (Attempt 9)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 9)
+- **Blocker**: Cannot access hosted Supabase database to apply DDL migrations
+- **All 4 Supabase MCP tools denied at runtime**: list_migrations, apply_migration, execute_sql, list_tables
+- **Confirmed still pending** (REST API): holdings.asset_class → error 42703, save_onboarding_data → PGRST202
+- **Resolution**: User must grant Supabase MCP tool permissions when prompted, or apply via Dashboard SQL Editor
+
 ## Session 2026-03-19 - Feature #331 (Attempt 8)
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 8)
