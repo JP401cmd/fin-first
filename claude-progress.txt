@@ -1,3 +1,20 @@
+## Session 2026-03-19 - Features #398, #397
+
+### Feature #398: Seed persona's uitbreiden met marginaal_tarief - PASSING
+- Added marginaal_tarief to PersonaProfile interface in lib/test-personas.ts
+- Lisa de Groot: 0.3697 (modaal inkomen), Marijke Vermeer: 0.4950 (hoog inkomen)
+- seed-persona.ts processes marginaal_tarief with graceful fallback for missing DB column
+- Commit: a002c0c6
+
+### Feature #397: Regressietests: hypotheek vs beleggen berekeningen - PASSING
+- Created lib/regression-tests/suites/kern-hypotheek-vs-beleggen.ts (10 tests)
+- All 10 tests verified passing via browser automation on /beheer/regressietest
+- Commit: a002c0c6
+
+### Current Status
+- 2 features completed this session (#398, #397)
+- Progress: 385/397 passing (97.0%)
+
 ## Session 2026-03-19 - Features #384, #385
 
 ### Feature #384: Fee Analyzer widget — dashboard widget met kostenimpact - PASSING
@@ -17830,3 +17847,30 @@ Current status: 369/371 features passing (99.5%)
 - DB migration 20260319100001_add_holdings_ter.sql exists but not yet applied; fallback handles gracefully
 - Commit: cba4c6aa
 - Stats: 372/397 passing (93.7%)
+
+## Session 2026-03-19 - Features #392, #393
+
+### Feature #392: HypotheekVsBeleggenModal — BottomSheet vergelijkingsmodal - PASSING
+- Created components/app/core/debts/hypotheek-vs-beleggen-modal.tsx
+- BottomSheet (size xl) with 3 sliders: extra bedrag (€100-€2000), verwacht rendement (3-10%), horizon (5-30 jaar)
+- Two scenario cards: Extra aflossen vs Extra beleggen with winner badge
+- Breakeven rendement display, FIRE-impact in months
+- Collapsible disclaimer (default open), risk warning
+- Collapsible yearly comparison table with year-by-year data
+- Uses compareMortgageVsInvest() from lib/hypotheek-vs-beleggen.ts via useMemo
+- Responsive: md:grid-cols-2 for cards, Editorial Finance design tokens
+- Integrated into DebtDetailModal for mortgage debts (debt_type === 'mortgage')
+- Commit: d5295eef
+
+### Feature #393: Knop 'Aflossen vs Beleggen' op hypotheek-kaart - PASSING
+- Added compact "Aflossen vs Beleggen" button on mortgage debt cards in debts/page.tsx
+- Button only visible for debt_type === 'mortgage' with interest_rate > 0
+- e.stopPropagation() prevents opening debt detail modal when clicking button
+- Fetches marginaal_tarief and inflatie from user profile via resolveFireParams()
+- Pre-fills modal with mortgage data (balance, rate, repaymentType, isTaxDeductible, restLooptijd)
+- Maps Dutch repayment types (annuiteit/lineair/aflossingsvrij) to HvB engine types
+- Verified: button only shows on Hypotheek card, not Persoonlijke lening or Studielening
+- Commit: 6cd00e25
+
+### Current Status
+- 2 features completed this session (#392, #393)
