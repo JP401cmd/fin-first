@@ -201,13 +201,29 @@ export async function seedPersonaData(
     _invulfase_active: invulfaseActive,
   }
 
+  // Rebalancing threshold (optional, per-persona)
+  if (persona.profile.rebalance_threshold != null) profileData.rebalance_threshold = persona.profile.rebalance_threshold
+
   // Widget dashboard preferences (optional, per-persona)
   if (persona.profile.widget_prefs) profileData.widget_prefs = persona.profile.widget_prefs
 
   const { error: profileError } = await supabase
     .from('profiles')
     .upsert(profileData)
-  if (profileError) throw new Error(`Profiel update mislukt: ${profileError.message}`)
+  if (profileError) {
+    // If the error is about a missing column (e.g. rebalance_threshold not yet migrated),
+    // retry without the newer optional columns
+    const msg = profileError.message ?? ''
+    if (msg.includes('rebalance_threshold')) {
+      console.warn(`[seed-persona] Profile upsert failed with rebalance_threshold, retrying without: ${msg}`)
+      const fallbackProfile = { ...profileData }
+      delete fallbackProfile.rebalance_threshold
+      const { error: fallbackErr } = await supabase.from('profiles').upsert(fallbackProfile)
+      if (fallbackErr) throw new Error(`Profiel update mislukt (fallback): ${fallbackErr.message}`)
+    } else {
+      throw new Error(`Profiel update mislukt: ${profileError.message}`)
+    }
+  }
   summary.profiles = 1
 
   // ── Phase 1a: Cash assets first (bank_accounts need their IDs) ──
@@ -670,8 +686,32 @@ export async function seedPersonaData(
     summary.holding_transactions = holdingTxCount
   }
 
+  // Target Allocations (for rebalancing)
+  if (persona.target_allocations && persona.target_allocations.length > 0) {
+    try {
+      const taRows = persona.target_allocations.map((ta) => ({
+        user_id: userId,
+        view_mode: ta.view_mode,
+        category: ta.category,
+        target_pct: ta.target_pct,
+      }))
+      // Upsert to avoid failure if target_allocations already exist for this user
+      const { error: taErr } = await supabase
+        .from('target_allocations')
+        .upsert(taRows, { onConflict: 'user_id,view_mode,category' })
+      if (taErr) {
+        console.warn(`[seed-persona] Target allocations insert failed (table may not exist): ${taErr.message}`)
+      } else {
+        summary.target_allocations = taRows.length
+      }
+    } catch {
+      // Table may not exist yet — non-fatal
+      console.warn('[seed-persona] target_allocations table not available, skipping')
+    }
+  }
+
   onProgress('Waarderingen & holdings toevoegen...', 'phase4', 'insert',
-    (summary.valuations ?? 0) + (summary.holdings ?? 0) + (summary.holding_transactions ?? 0))
+    (summary.valuations ?? 0) + (summary.holdings ?? 0) + (summary.holding_transactions ?? 0) + (summary.target_allocations ?? 0))
 
   return summary
 }

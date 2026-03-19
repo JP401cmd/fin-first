@@ -78,6 +78,8 @@ export interface PersonaProfile {
   invulfase_active?: boolean
   // Arbitrary feature preferences (JSONB)
   feature_preferences?: Record<string, unknown>
+  // Rebalancing
+  rebalance_threshold?: number // drift threshold 1-20%, default 5
   // Widget dashboard
   widget_prefs?: { widgets: { id: string; enabled: boolean; size: 'quarter' | 'half' | 'full'; order: number }[] }
 }
@@ -257,6 +259,12 @@ export interface PersonaHolding {
   }[]
 }
 
+export interface PersonaTargetAllocation {
+  view_mode: 'asset_class' | 'sector' | 'geography'
+  category: string
+  target_pct: number
+}
+
 export interface PersonaData {
   meta: PersonaMeta
   profile: PersonaProfile
@@ -271,6 +279,7 @@ export interface PersonaData {
   net_worth_snapshots: PersonaNetWorthSnapshot[]
   valuations?: PersonaValuation[]
   holdings?: PersonaHolding[]
+  target_allocations?: PersonaTargetAllocation[]
 }
 
 // ── Shared budget structures ──────────────────────────────────
@@ -811,6 +820,7 @@ const daanData: PersonaData = {
     fire_end_age: 90,
     retirement_expense_method: 'essential_budgets',
     withdrawal_strategy: 'static',
+    rebalance_threshold: 3, // conservatief — lage drempel, snel signaal
     invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', 'spaarquote', 'doelen',
@@ -966,6 +976,13 @@ const daanData: PersonaData = {
         { type: 'buy', units: 13, price_per_unit: 125, total_amount: 1625, monthsAgo: 4, notes: null },
       ],
     },
+  ],
+  // Conservatief target: 40% aandelen, 40% obligaties, 20% cash
+  // Bewuste drift: Daan is 100% equity — ver boven zijn target
+  target_allocations: [
+    { view_mode: 'asset_class', category: 'equity', target_pct: 40 },
+    { view_mode: 'asset_class', category: 'bonds', target_pct: 40 },
+    { view_mode: 'asset_class', category: 'cash', target_pct: 20 },
   ],
 }
 
@@ -1327,6 +1344,7 @@ const willemData: PersonaData = {
     retirement_expense_method: 'custom_amount',
     retirement_expense_custom_amount: 3000,
     withdrawal_strategy: 'vpw',
+    rebalance_threshold: 10, // agressief — hoge tolerantie, minder herbalanceren
     invulfase_active: false,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
@@ -1537,6 +1555,15 @@ const willemData: PersonaData = {
       ],
     },
   ],
+  // Agressief target: 80% aandelen, 10% obligaties, 5% vastgoed, 5% crypto
+  // Bewuste drift: Willem is 86% equity (6% boven target) en 14% bonds (4% boven target),
+  // maar heeft 0% vastgoed en 0% crypto — drift op die categorieën is 5% (triggert bij threshold 10% NIET)
+  target_allocations: [
+    { view_mode: 'asset_class', category: 'equity', target_pct: 80 },
+    { view_mode: 'asset_class', category: 'bonds', target_pct: 10 },
+    { view_mode: 'asset_class', category: 'real_estate', target_pct: 5 },
+    { view_mode: 'asset_class', category: 'crypto', target_pct: 5 },
+  ],
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1571,6 +1598,7 @@ const rashidData: PersonaData = {
     fire_end_age: 90,
     retirement_expense_method: 'current_income',
     withdrawal_strategy: 'static',
+    rebalance_threshold: 5, // gebalanceerd — standaard drempel
     net_monthly_income: 5500,
     estimated_monthly_expenses: 4200,
     invulfase_active: true,
@@ -1732,6 +1760,14 @@ const rashidData: PersonaData = {
         { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 1350, monthsAgo: 3, notes: 'Halfjaarlijks dividend' },
       ],
     },
+  ],
+  // Gebalanceerd target: 60% aandelen, 20% obligaties, 10% vastgoed, 10% cash
+  // Bewuste drift: Rashid is 100% equity — 40% boven target, grote afwijking
+  target_allocations: [
+    { view_mode: 'asset_class', category: 'equity', target_pct: 60 },
+    { view_mode: 'asset_class', category: 'bonds', target_pct: 20 },
+    { view_mode: 'asset_class', category: 'real_estate', target_pct: 10 },
+    { view_mode: 'asset_class', category: 'cash', target_pct: 10 },
   ],
 }
 
