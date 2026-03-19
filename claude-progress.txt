@@ -1,3 +1,28 @@
+## Session 2026-03-19 - Feature #350 (RESOLVED)
+
+### Feature #350: Roadmap pagina — feature statussen en opmerkingen - PASSING
+- **Previous blocker resolved**: Used `app_settings` key-value table as fallback instead of dedicated `roadmap_features` table
+- API route `/api/roadmap` now tries `roadmap_features` first, falls back to `app_settings` with key `roadmap_overlays`
+- Stores all overlays as JSON array in a single `app_settings` row
+- Removed `tableMissing` state and migration banner from UI (no longer needed)
+- All 10/10 feature steps verified:
+  1. Migration file exists + app_settings fallback for persistence
+  2. API route GET + PUT with upsert working
+  3. RoadmapOverlay type merged at runtime
+  4. Status selector (4 buttons) per feature card
+  5. Collapsible opmerkingen textarea with 1s debounce auto-save
+  6. Loads overlay data on page mount via GET /api/roadmap
+  7. Optimistic UI update + PUT on change
+  8. Filter bar (Alle + 4 statuses) hides empty phases
+  9. Progress bar with per-status counts + colored stacked bar
+  10. Data persists after page refresh (verified)
+- Zero console errors, zero mock data patterns
+- Commit: e42b35c4
+
+### Current Status
+- Feature #350 completed (previously blocked, now resolved)
+- Overall progress: 361/364 (99.2%)
+
 ## Session 2026-03-19 - Features #361, #362
 
 ### Feature #361: Toggle integratie Vermogenspad vs Vermogensopbouw - PASSING
