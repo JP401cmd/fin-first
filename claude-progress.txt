@@ -1,3 +1,16 @@
+## Session 2026-03-19 - Feature #331 (Attempt 22)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 22)
+- **Root cause unchanged**: Supabase MCP tools require OAuth authentication not yet granted
+- All MCP tools (list_migrations, execute_sql, apply_migration) return "Claude requested permissions but you haven't granted it yet"
+- No SERVICE_ROLE_KEY, DB_PASSWORD, or SUPABASE_ACCESS_TOKEN available
+- Verified via REST API: asset_class column still missing, target_allocations table still missing
+- **Resolution**: User must grant Supabase MCP OAuth permissions, OR provide database credentials, OR apply migrations manually via Supabase Dashboard SQL Editor
+
+### Current Status
+- 0 features completed this session (external blocker)
+- Total: 346/347 features passing (99.7%)
+
 ## Session 2026-03-19 - Feature #331 (Attempt 21)
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 21)
