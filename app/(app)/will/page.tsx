@@ -4,6 +4,9 @@ import { loadWillData } from '@/lib/will-data-loader'
 import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { WillLanding } from '@/components/will/will-landing'
 
+// Defense-in-depth: ensure this page is never statically cached by Next.js
+export const dynamic = 'force-dynamic'
+
 export default async function WillPage() {
   const supabase = await createClient()
 

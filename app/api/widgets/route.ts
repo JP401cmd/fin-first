@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG } from '@/lib/widget-catalog'
@@ -33,6 +34,10 @@ export async function PUT(request: Request) {
 
     if (error) throw error
     if (!data || data.length === 0) throw new Error('No profile updated')
+
+    // Invalidate server-side cache for pages that render widget preferences
+    revalidatePath('/will')
+    revalidatePath('/')
 
     return NextResponse.json({ success: true })
   } catch (err) {

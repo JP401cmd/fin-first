@@ -256,13 +256,15 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       previousWidgets.current = widgets
       setSaveState('saved')
       setTimeout(() => setSaveState('idle'), 1500)
+      // Invalidate server component cache so changes are visible after navigation/refresh
+      router.refresh()
     } catch {
       // Rollback to previous state
       setActiveWidgets(previousWidgets.current)
       setSaveState('error')
       setSaveError('Opslaan mislukt. Volgorde teruggezet.')
     }
-  }, [allPrefs])
+  }, [allPrefs, router])
 
   const scheduleSave = useCallback((widgets: WidgetPref[]) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -358,12 +360,14 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       previousWidgets.current = activeWidgets
       setSaveState('saved')
       setTimeout(() => setSaveState('idle'), 1500)
+      // Invalidate server component cache so changes are visible after navigation/refresh
+      router.refresh()
     } catch {
       setActiveWidgets(previousWidgets.current)
       setSaveState('error')
       setSaveError('Opslaan mislukt. Volgorde teruggezet.')
     }
-  }, [activeWidgets, allPrefs])
+  }, [activeWidgets, allPrefs, router])
 
   const toggleEditMode = useCallback(async () => {
     if (isEditMode) {

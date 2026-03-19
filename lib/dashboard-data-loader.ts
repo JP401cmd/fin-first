@@ -119,7 +119,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
     supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
-    supabase.from('profiles').select('full_name, ai_enabled, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active').single(),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -150,6 +150,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Read profile fields from the combined profile query
   const budgetingActive = (profileResult.data as Record<string, unknown> | null)?.budgeting_active !== false
   const profileFullName = (profileResult.data as Record<string, unknown> | null)?.full_name as string | null ?? null
+  // ai_enabled column may not exist yet (migration pending) — default to true
   const profileAiEnabled = (profileResult.data as Record<string, unknown> | null)?.ai_enabled !== false
 
   // Core calculations
