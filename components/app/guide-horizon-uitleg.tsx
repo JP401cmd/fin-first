@@ -582,9 +582,51 @@ export default function GuideHorizonUitleg() {
             aflossingsschema (annuïteit, lineair of aflossingsvrij).
           </p>
           <p>
-            Na je <strong>FIRE-leeftijd</strong> worden onttrekkingen voor levensonderhoud eerst
-            afgetrokken van beleggingen, daarna van spaargeld. Zo zie je hoe je vermogensmix
-            verschuift naarmate je ouder wordt.
+            <strong>Hoe evolueert de verdeling?</strong> Elke bezitting groeit met het{' '}
+            <strong>individuele verwachte rendement</strong> dat je per bezitting hebt ingesteld. Spaargeld
+            groeit met de spaarrente, beleggingen met het beursrendement, vastgoed met de verwachte
+            waardestijging. Hierdoor verschuift de verdeling over tijd: als beleggingen sneller groeien
+            dan spaargeld, wordt het beleggingsblok relatief groter. Zo zie je hoe je vermogensmix
+            evolueert naarmate de tijd verstrijkt.
+          </p>
+          <p>
+            <strong>De onttrekkingswaterval na FIRE</strong> — na je FIRE-leeftijd heb je elk jaar
+            geld nodig voor levensonderhoud. TriFinity onttrekt dit in een vaste{' '}
+            <strong>watervalgorde</strong>, van meest liquide naar minst liquide:
+          </p>
+          <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 space-y-1 mt-1">
+            <p>
+              <strong>1.</strong> <strong>Beleggingen</strong> — eerst wordt het meest liquide
+              beleggingsvermogen aangesproken
+            </p>
+            <p>
+              <strong>2.</strong> <strong>Spaargeld</strong> — als beleggingen onvoldoende zijn,
+              volgt spaargeld
+            </p>
+            <p>
+              <strong>3.</strong> <strong>Overig</strong> — crypto, voertuigen en andere activa
+            </p>
+            <p>
+              <strong>4.</strong> <strong>Pensioen</strong> — pensioenaanspraken worden pas later
+              aangesproken
+            </p>
+            <p>
+              <strong>5.</strong> <strong>Vastgoed</strong> — als laatste wordt vastgoed aangesproken
+              (illiquide)
+            </p>
+          </div>
+          <p>
+            Merk op dat pensioen en vastgoed als <strong>illiquide middelen</strong> bewust achteraan
+            staan. In de praktijk verkoop je niet direct je huis om boodschappen te betalen. De
+            waterval weerspiegelt dit: je liquide middelen (beleggingen, spaargeld) worden eerst
+            opgemaakt. Pas als die leeg zijn, worden minder liquide bezittingen aangesproken.
+          </p>
+          <p>
+            <strong>Totaal = Vermogenspad (single source of truth)</strong> — het totaal van alle
+            groepen in de Vermogensopbouw komt <strong>altijd exact overeen</strong> met de waarde
+            op de Vermogenspad-lijngrafiek. Dit is geen toeval: de Vermogensopbouw berekent eerst
+            onderlinge verhoudingen en vermenigvuldigt die met het portfoliototaal uit de simulatie.
+            Beide weergaven zijn dus twee kanten van dezelfde berekening.
           </p>
           <p>
             <strong>Verschil met Vermogenspad:</strong> het Vermogenspad toont het{' '}
