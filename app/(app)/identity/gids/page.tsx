@@ -41,6 +41,7 @@ import GuideProTips from "@/components/app/guide-pro-tips";
 import ReisStapSection from "@/components/app/reis-stap-section";
 import GuideTopicCard from "@/components/app/guide-topic-card";
 import GuideNaslagwerk from "@/components/app/guide-naslagwerk";
+import GuideHorizonUitleg from "@/components/app/guide-horizon-uitleg";
 
 /* ── Types ─────────────────────── */
 
@@ -919,6 +920,8 @@ export default function GidsPage() {
               tip: "Je FIRE-leeftijd is geen lot \u2014 het is een kompas. Elke verhoging van je spaarquote met 1% verschuift de datum.",
             }}
           />
+
+          <GuideHorizonUitleg />
 
           <GuideTopicCard
             icon={Sparkles}

@@ -173,6 +173,12 @@ const MODULES: NaslagwerkModule[] = [
         anchor: 'guide-reis-4',
       },
       {
+        icon: LineChart,
+        title: 'Hoe de Horizon-grafiek werkt',
+        summary: 'Volledige uitleg: fases, FIRE-leeftijd, belasting, eindstrategie en alle instelbare parameters.',
+        anchor: 'guide-horizon-grafiek',
+      },
+      {
         icon: Compass,
         title: 'Levensgebeurtenissen',
         summary: 'Modelleer de financiële impact van kinderen, verhuizing, carrièreswitch.',
