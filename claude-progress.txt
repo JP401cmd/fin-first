@@ -1,3 +1,41 @@
+## Session 2026-03-19 - Features #328, #329
+
+### Feature #328: Unique constraint idx_budgets_user_slug toevoegen als migratie - PASSING
+- Created migration 20260319000001_add_budgets_user_slug_parent_unique.sql
+  - Drops old idx_budgets_user_slug (simple user_id+slug)
+  - Creates composite idx_budgets_user_slug_parent on (user_id, slug, COALESCE(parent_id, sentinel UUID))
+  - Allows same slug under different parents while preventing true duplicates
+- Updated ALL budget insert locations to use .upsert() with { onConflict: 'user_id, slug' }:
+  - save-own-data/route.ts: batched upserts (2 DB calls instead of 34)
+  - seed-persona.ts: upsert for parent and child budgets
+  - budgets-client.tsx: upsert in seedBudgets
+  - beheer/testdata/page.tsx: upsert in template application
+  - test-seed.ts: upsert for regression test budgets
+- Zero TypeScript errors
+- Commit: 97dd07d9
+
+### Feature #329: Atomaire onboarding save met rollback bij fouten - PASSING
+- Created migration 20260319000002_create_save_onboarding_rpc.sql
+  - plpgsql function save_onboarding_data(JSONB) wraps all inserts in 1 transaction
+  - Automatic ROLLBACK on any error — no partial data possible
+  - Handles: profile, budgets (parent/child), bank accounts (+ companion cash assets), assets, debts, AOW life event
+  - Idempotency check via onboarding_idempotency_key column on profiles
+- Updated save-own-data API route:
+  - Tries atomic RPC first, falls back to multi-step if RPC not deployed
+  - Accepts idempotencyKey in request body (validated as UUID)
+  - Checks both onboarding_completed and idempotency_key for dedup
+  - AOW lookup moved before RPC call to share between both paths
+- Updated onboarding client:
+  - Generates crypto.randomUUID() per save attempt
+  - Sends idempotencyKey with request body
+  - (Already had: error banner, retry button, back-to-preferences, disabled save button, timeout)
+- Zero TypeScript errors, zero console errors
+- Commits: cdb5d12a, 42d42298
+
+### Current Status
+- 2 features completed this session (#328, #329)
+- Progress: 314/328 (95.7%)
+
 ## Session 2026-03-19 - Features #311, #312
 
 ### Feature #311: UnauthenticatedFetch voor auth-guard tests - PASSING
