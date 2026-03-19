@@ -138,6 +138,9 @@ export default function StrategiePage() {
   // Selected strategy for detail view
   const [selectedStrategy, setSelectedStrategy] = useState<WithdrawalStrategyType>('static')
 
+  // Warning when withdrawal columns couldn't be loaded
+  const [strategyWarning, setStrategyWarning] = useState<string | null>(null)
+
   // Activation state for switching strategies
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState<string | null>(null)
@@ -156,13 +159,41 @@ export default function StrategiePage() {
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
         supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
         supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
       ])
+
+      // Fetch withdrawal strategy columns separately — these may not exist yet
+      // (migration 20260318000001). By splitting, we prevent a missing-column error
+      // from killing the entire profile query and crashing the page.
+      let wsData: {
+        withdrawal_strategy?: string | null
+        guardrail_floor?: number | null
+        guardrail_ceiling?: number | null
+        guardrail_cut_step?: number | null
+        guardrail_raise_step?: number | null
+      } = {}
+      try {
+        const wsResult = await supabase
+          .from('profiles')
+          .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
+          .single()
+        if (wsResult.error) {
+          console.warn(
+            `[strategie] Withdrawal strategy columns not available (migration pending): ${wsResult.error.code}`,
+          )
+          setStrategyWarning('Strategie-instellingen konden niet geladen worden. Standaardwaarden worden gebruikt.')
+        } else {
+          wsData = wsResult.data ?? {}
+        }
+      } catch (wsErr) {
+        console.warn('[strategie] Failed to load withdrawal strategy columns:', wsErr)
+        setStrategyWarning('Strategie-instellingen konden niet geladen worden. Standaardwaarden worden gebruikt.')
+      }
 
       let monthlyIncome = 0
       let monthlyExpenses = 0
@@ -214,8 +245,8 @@ export default function StrategiePage() {
       setUserGrossReturn(fireParams.grossReturn)
       setUserInflation(fireParams.inflationRate)
 
-      // Resolve withdrawal strategy from profile data
-      const wsConfig = resolveWithdrawalStrategy(profileResult.data ?? {})
+      // Resolve withdrawal strategy from separate wsData (defensive)
+      const wsConfig = resolveWithdrawalStrategy(wsData)
       setWithdrawalConfig(wsConfig)
       setSelectedStrategy(wsConfig.strategy)
 
@@ -505,6 +536,13 @@ export default function StrategiePage() {
           </span>
         </div>
       </header>
+
+      {/* ── Strategy warning (columns not loaded) ────────────────────── */}
+      {strategyWarning && (
+        <div className="mb-4 rounded-[var(--r)] border border-amber-200 bg-amber-50 px-4 py-2">
+          <p className="font-sans text-sm text-amber-700">{strategyWarning}</p>
+        </div>
+      )}
 
       {/* ── Strategy selector cards ─────────────────────────────────── */}
       <div className="mb-6 grid grid-cols-2 gap-3">

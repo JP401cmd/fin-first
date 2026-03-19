@@ -18,6 +18,7 @@ import {
 } from '@/lib/horizon-data'
 import type { Action } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Debt } from '@/lib/debt-data'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
@@ -93,8 +94,8 @@ const PROFILE_DEFAULTS = {
   withdrawal_strategy: 'static' as string,
   guardrail_floor: 0.80,
   guardrail_ceiling: 1.20,
-  guardrail_cut_step: 0.05,
-  guardrail_raise_step: 0.05,
+  guardrail_cut_step: WITHDRAWAL_DEFAULTS.guardrailCutStep,
+  guardrail_raise_step: WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
 }
 
 export async function loadHorizonData(supabase: SupabaseClient): Promise<HorizonPageData> {
