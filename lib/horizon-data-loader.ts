@@ -19,6 +19,7 @@ import {
 import type { Action } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
@@ -53,6 +54,8 @@ export interface HorizonPageData {
   healthScoreInput: HealthScoreInput
   /** Whether the user has active budgeting (cash accounts with budgets) */
   budgetingActive: boolean
+  /** Full assets array for vermogensopbouw stacked chart */
+  assets: Asset[]
   /** Error message from profile query, null if successful */
   profileError: string | null
 }
@@ -129,6 +132,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     earliestIncomeResult,
     tx6mResult,
     bankAccountsResult,
+    fullAssetsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct, asset_type').eq('is_active', true),
@@ -156,6 +160,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     // 6-month transactions for stable resilience calculation
     supabase.from('transactions').select('amount').gte('date', sixMonthsAgo).lt('date', monthEnd),
     supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
+    supabase.from('assets').select('*').eq('is_active', true).limit(500),
   ])
 
   // Check profile query for errors and use fallback if needed
@@ -328,10 +333,11 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   }
   const healthScore = computeHealthScoreFromInputs(healthScoreInput, budgetingActive)
 
-  // Events, actions, debts
+  // Events, actions, debts, assets
   const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
   const actions = (actionsResult.data ?? []) as Action[]
   const debts = (fullDebtsResult.data ?? []) as Debt[]
+  const assets = (fullAssetsResult.data ?? []) as Asset[]
 
   // Cumulative impacts
   const impacts = computeCumulativeImpacts(effectiveInput, loadedEvents)
@@ -352,6 +358,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     healthScore,
     healthScoreInput,
     budgetingActive,
+    assets,
     profileError: profileResult.error
       ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`
       : null,
