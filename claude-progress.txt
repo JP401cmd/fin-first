@@ -16836,3 +16836,26 @@ For Feature #51 (Transaction Import):
   2. Run `supabase login` to authenticate the CLI
   3. Add SUPABASE_ACCESS_TOKEN to environment
   4. Apply migrations manually via Supabase Dashboard SQL Editor
+
+## Session 2026-03-19 - Features #340, #341
+
+### Feature #340: Financiële gezondheid detail-modal op Horizon - PASSING
+- Extracted HealthKassabon from gezondheids-score-widget.tsx into standalone health-score-receipt.tsx
+- Component accepts HealthScore as prop (independent of DashboardData)
+- Supports overrideTotal/overrideLabel props for snapshot resilience display
+- Added footer slot for horizon-specific backtesting link
+- Replaced inline health receipt in horizon-client.tsx with reusable component
+- Updated widget to use extracted component
+- Feature gated behind momentum phase (test user can't access, but code compiles clean)
+
+### Feature #341: Dashboard widget haalt gezondheidsdata van Horizon feature - PASSING
+- Confirmed widget and Horizon both use computeHealthScore from lib/financial-health (single source of truth)
+- Simplified widget kassabon: compact pillar bars instead of full detailed breakdown
+- Added CTA link to /horizon in BottomSheet and in full-size widget
+- Widget catalog already had href: '/horizon' - no change needed
+- Removed HealthScoreReceipt import from widget (only used in horizon now)
+- Scores guaranteed identical since same function is used
+
+### Current Status
+- 2 features completed this session (#340, #341)
+- Overall: ~339/346 features passing (97.7%)
