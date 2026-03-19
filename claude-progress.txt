@@ -1,3 +1,28 @@
+## Session 2026-03-19 - Features #359, #360
+
+### Feature #359: wealth-composition.ts — helper, types en generieke projectielogica - PASSING
+- Created lib/wealth-composition.ts with full projection engine
+- WEALTH_GROUPS maps 13 asset_types into 5 layers: spaargeld, beleggingen, pensioen, vastgoed, overig
+- StackedRow interface: age + per-group values + schulden (negative)
+- projectWealthComposition() with per-asset compound growth, debt amortization (annuiteit/lineair/aflossingsvrij)
+- Post-FIRE withdrawal distribution: beleggingen first, then spaargeld, then overig
+- WEALTH_GROUP_LABELS/COLORS derived from ASSET_TYPE_COLORS
+- All TypeScript types verified, zero compilation errors
+
+### Feature #360: WealthCompositionChart — stacked bar SVG component - PASSING
+- Created components/app/horizon/wealth-composition-chart.tsx
+- Custom SVG stacked bar chart matching SimChart design patterns exactly
+- PAD constants identical to SimChart (left:60, right:16, top:16, bottom:28)
+- ResizeObserver responsive sizing (260px desktop, 180px mobile)
+- Stacked bars: positive layers above zero, debt below (red)
+- Hover tooltip with per-group breakdown (€-amount + percentage + net worth)
+- FIRE age as vertical dashed line, useInViewAnimation entry animation
+- Zoom sync via visibleMinAge/visibleMaxAge, legend with color squares
+
+### Current Status
+- 2 features completed this session (#359, #360)
+- Overall progress: ~355/364 (97.5%)
+
 ## Session 2026-03-19 - Feature #358
 
 ### Feature #358: HorizonPageData uitbreiden met volledige assets array - PASSING
