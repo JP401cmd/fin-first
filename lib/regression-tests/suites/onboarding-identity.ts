@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThanOrEqual, assertLessThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.identity'
 
@@ -522,7 +523,7 @@ const tests: TestCase[] = [
       // 3. "Hoeveel van je huidige tijd wil je investeren..." (temporal balance)
 
       // Verify by fetching the onboarding page and checking for the speech bubble content
-      const res = await fetch('/onboarding', { redirect: 'follow' })
+      const res = await authenticatedFetch('/onboarding', { redirect: 'follow' })
       if (res.status === 200) {
         const html = await res.text()
         // Check for SpeechBubble markers or Will guidance text
@@ -652,7 +653,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/onboarding', { redirect: 'manual' })
+      const res = await authenticatedFetch('/onboarding', { redirect: 'manual' })
       const valid = res.status === 200 || (res.status >= 300 && res.status < 400)
       assert(valid, `Onboarding route verwacht 200/3xx, kreeg ${res.status}`)
     },

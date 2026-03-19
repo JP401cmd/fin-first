@@ -3,6 +3,7 @@ import {
   assertEqual, assert, assertNotNull, assertGreaterThan, assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { getBaseUrl } from '../server-runner'
 import { unauthenticatedFetch } from '../server-runner'
 import {
   computeSharePct,
@@ -218,7 +219,7 @@ const tests: TestCase[] = [
     fn() {
       // GET handler checks for token and redirects to /identity?invite_token=...
       // Token is required, missing token → 400
-      const baseUrl = 'http://localhost:3000'
+      const baseUrl = getBaseUrl()
       const token = 'test-token-123'
       const expectedRedirect = `${baseUrl}/identity?invite_token=${token}`
       assert(expectedRedirect.includes('/identity?invite_token='), 'Redirect URL bevat invite_token')

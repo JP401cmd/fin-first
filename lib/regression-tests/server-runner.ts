@@ -67,11 +67,71 @@ class MemoryStorage implements Storage {
 
 let _originalFetch: typeof globalThis.fetch | null = null
 let _baseUrl: string = ''
+
+/**
+ * Get the base URL used for resolving relative paths in tests.
+ *
+ * Returns the URL set during test suite initialization, or a sensible default
+ * using NEXT_PUBLIC_SITE_URL / PORT env vars. Test suites should use this
+ * instead of hardcoding 'http://localhost:3000'.
+ */
+export function getBaseUrl(): string {
+  if (_baseUrl) return _baseUrl
+  return process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
+}
 let _supabaseUrl: string = ''
 let _supabaseAnonKey: string = ''
 let _accessToken: string = ''
 let _testUserId: string = ''
 let _currentRole: 'superadmin' | 'user' = 'user'
+
+// ── Cookie credentials (set during test suite init) ─────────────────────────
+let _cookieName: string = ''
+let _cookieValue: string = ''
+
+/**
+ * Make an HTTP request WITH the test account's authentication headers.
+ *
+ * Use this instead of bare `fetch()` in test suites. It explicitly resolves
+ * relative URLs and adds auth headers, so it works reliably even if
+ * Next.js re-patches globalThis.fetch during HMR / hot reload.
+ *
+ * Relative paths (starting with `/`) are resolved against the local dev server.
+ * Authorization (Bearer token) and Cookie headers are added automatically.
+ */
+export function authenticatedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const fetchFn = _originalFetch ?? globalThis.fetch
+
+  let url: string
+  if (typeof input === 'string') {
+    url = input.startsWith('/') ? `${getBaseUrl()}${input}` : input
+  } else if (input instanceof URL) {
+    url = input.toString()
+  } else {
+    // Request object
+    url = input.url
+    if (url.startsWith('/')) url = `${getBaseUrl()}${url}`
+  }
+
+  // Merge auth headers
+  const headers = new Headers(init?.headers)
+  if (!headers.has('Authorization') && _accessToken) {
+    headers.set('Authorization', `Bearer ${_accessToken}`)
+  }
+  if (!headers.has('Cookie') && _cookieName && _cookieValue) {
+    headers.set('Cookie', `${_cookieName}=${encodeURIComponent(_cookieValue)}`)
+  }
+
+  const patchedInit: RequestInit = {
+    ...init,
+    headers,
+  }
+
+  return fetchFn(url, patchedInit)
+}
 
 /**
  * Make an HTTP request WITHOUT authentication headers.
@@ -287,15 +347,17 @@ export async function runServerTestSuite(
 
   // ── 4. Patch globalThis.fetch ──────────────────────────────────────────
   const originalFetch = globalThis.fetch
-  const baseUrl = `http://localhost:${process.env.PORT || 3000}`
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
 
-  // Expose credentials for unauthenticatedFetch() and role-switching helpers
+  // Expose credentials for authenticatedFetch(), unauthenticatedFetch() and role-switching helpers
   _originalFetch = originalFetch
   _baseUrl = baseUrl
   _supabaseUrl = supabaseUrl
   _supabaseAnonKey = supabaseAnonKey
   _accessToken = accessToken
   _testUserId = authData.user.id
+  _cookieName = cookieName
+  _cookieValue = cookieValue
 
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     let url: string
@@ -394,6 +456,8 @@ export async function runServerTestSuite(
     _supabaseAnonKey = ''
     _accessToken = ''
     _testUserId = ''
+    _cookieName = ''
+    _cookieValue = ''
     _currentRole = 'user'
 
     if (originalLocalStorage !== undefined) {

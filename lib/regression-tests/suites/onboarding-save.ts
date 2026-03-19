@@ -1,6 +1,7 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.save'
 
@@ -363,7 +364,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1000,
     async fn() {
       // Test 1: Empty body → 400 (identity required fields missing)
-      const emptyRes = await fetch('/api/onboarding/save-own-data', {
+      const emptyRes = await authenticatedFetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -378,7 +379,7 @@ const tests: TestCase[] = [
         ...buildMinimalBody(),
         identity: { ...buildMinimalBody().identity, household_type: 'invalid' },
       }
-      const householdRes = await fetch('/api/onboarding/save-own-data', {
+      const householdRes = await authenticatedFetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invalidHousehold),
@@ -393,7 +394,7 @@ const tests: TestCase[] = [
         ...buildMinimalBody(),
         identity: { ...buildMinimalBody().identity, net_monthly_income: -100 },
       }
-      const negRes = await fetch('/api/onboarding/save-own-data', {
+      const negRes = await authenticatedFetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(negIncomeBody),
@@ -408,7 +409,7 @@ const tests: TestCase[] = [
         ...buildMinimalBody(),
         identity: { ...buildMinimalBody().identity, expected_return: 0.50 },
       }
-      const returnRes = await fetch('/api/onboarding/save-own-data', {
+      const returnRes = await authenticatedFetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(outOfRangeReturn),
@@ -533,7 +534,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1000,
     async fn() {
       // Activate endpoint requires auth
-      const res = await fetch('/api/activate', {
+      const res = await authenticatedFetch('/api/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })

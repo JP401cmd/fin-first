@@ -3,7 +3,7 @@ import {
   assertEqual, assertGreaterThan, assertGreaterThanOrEqual,
   assert, assertNotNull, assertDefined, assertFinite,
 } from '../assert'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 
 const CAT = 'data.tijdreeksen'
@@ -25,7 +25,7 @@ async function fetchAPI(
   options?: RequestInit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   try {
-    const res = await fetch(path, {
+    const res = await authenticatedFetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

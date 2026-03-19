@@ -1,6 +1,6 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, getBaseUrl } from '../server-runner'
 import type { TestCase } from '../test-types'
 
 const CAT = 'onboarding.bank-connectie'
@@ -72,7 +72,7 @@ const tests: TestCase[] = [
       assert(state.includes(':'), 'State bevat : separator')
 
       // Test 6: Redirect URI format
-      const appUrl = 'http://localhost:3000'
+      const appUrl = getBaseUrl()
       const redirectUri = `${appUrl}/api/bank-connect/callback`
       assert(redirectUri.endsWith('/api/bank-connect/callback'), 'Redirect naar callback endpoint')
 

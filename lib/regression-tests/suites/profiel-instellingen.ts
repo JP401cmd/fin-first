@@ -1,13 +1,14 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'identiteit.profiel-instellingen'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function fetchJson(url: string, init?: RequestInit): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await fetch(url, {
+  const res = await authenticatedFetch(url, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   })

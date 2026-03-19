@@ -1,6 +1,7 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.preferences'
 
@@ -268,7 +269,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/onboarding', { redirect: 'manual' })
+      const res = await authenticatedFetch('/onboarding', { redirect: 'manual' })
       assert(
         res.status === 200 || (res.status >= 300 && res.status < 400),
         `Expected 200 or redirect for /onboarding, got ${res.status}`,

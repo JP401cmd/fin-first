@@ -9,7 +9,7 @@ import {
   assertDefined,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 
 const CAT = 'performance.api-response'
 
@@ -311,7 +311,7 @@ const tests: TestCase[] = [
       const endpoint = '/dashboard'
       const start = performance.now()
       try {
-        const res = await fetch(endpoint, { redirect: 'manual' })
+        const res = await authenticatedFetch(endpoint, { redirect: 'manual' })
         const durationMs = performance.now() - start
         // Dashboard may redirect to login (307/302) or return 200
         assert(

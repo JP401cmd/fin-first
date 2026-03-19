@@ -5,6 +5,7 @@ import type { BriefingCardSpec } from '@/lib/briefing/types'
 import { CARD_SPAN } from '@/lib/briefing/types'
 import { validateBriefingLayout, optimizeRowFill } from '@/lib/briefing/validate-layout'
 import { validateHref, validateCardHrefs } from '@/lib/briefing/validate-hrefs'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'berichten.ai-content'
 
@@ -57,7 +58,7 @@ async function fetchJson(
   path: string,
   init?: RequestInit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await fetch(path, init)
+  const res = await authenticatedFetch(path, init)
   let body: Record<string, unknown> = {}
   try {
     body = await res.json()
@@ -182,7 +183,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1500,
     async fn() {
-      const res = await fetch('/api/news')
+      const res = await authenticatedFetch('/api/news')
       const body = await res.json()
 
       // Should require auth (401) or tier gate (403) or return news data
@@ -308,7 +309,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1500,
     async fn() {
-      const res = await fetch('/api/briefing/compose', {
+      const res = await authenticatedFetch('/api/briefing/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataSummary: 'test', temporal: { date: '2026-03-18', dayOfMonth: 18 } }),
@@ -334,7 +335,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 1500,
     async fn() {
-      const res = await fetch('/api/briefing/compose', {
+      const res = await authenticatedFetch('/api/briefing/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -361,7 +362,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 1500,
     async fn() {
-      const res = await fetch('/api/briefing/compose')
+      const res = await authenticatedFetch('/api/briefing/compose')
       const body = await res.json()
 
       // 200 with idle, or 401/403 for auth

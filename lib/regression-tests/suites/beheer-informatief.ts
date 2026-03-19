@@ -1,12 +1,13 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThan } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'beheer.informatief'
 
 /** Fetch a URL without following redirects */
 async function fetchNoRedirect(path: string): Promise<Response> {
-  return fetch(path, { redirect: 'manual' })
+  return authenticatedFetch(path, { redirect: 'manual' })
 }
 
 /** Check if a response is a redirect */
@@ -611,6 +612,7 @@ export function register(): void {
       'Propositie, release notes en roadmap: read-only beheer pagina\u2019s',
     icon: 'BookOpen',
     testCount: 0,
+    defaultRole: 'superadmin' as const,
   })
   registerTests(tests)
 }

@@ -4,7 +4,7 @@ import {
   assertGreaterThanOrEqual, assertLessThan, assertLessThanOrEqual, assertType, assertFinite,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 import {
   type WithdrawalStrategyType,
   type WithdrawalStrategyConfig,
@@ -81,7 +81,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/horizon/strategie', { redirect: 'manual' })
+      const res = await authenticatedFetch('/horizon/strategie', { redirect: 'manual' })
       // Should be 200 (if logged in) or 307 (auth redirect)
       assert(
         res.status === 200 || res.status === 307,
@@ -339,7 +339,7 @@ const tests: TestCase[] = [
       assertNotNull(mod.default, 'page exports component')
       // The page uses <Link href="/horizon"> with ArrowLeft — verified by code review
       // We can also check the horizon page is accessible
-      const res = await fetch('/horizon', { redirect: 'manual' })
+      const res = await authenticatedFetch('/horizon', { redirect: 'manual' })
       assert(res.status === 200 || res.status === 307, 'horizon route bestaat')
     },
   },

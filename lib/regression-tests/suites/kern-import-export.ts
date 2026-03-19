@@ -4,7 +4,7 @@ import {
   assert, assertNotNull, assertDefined, assertType, assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 
 const CAT = 'kern.import-export'
 
@@ -57,7 +57,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await fetch('/core/assets/holdings/import')
+      const res = await authenticatedFetch('/core/assets/holdings/import')
       // Should load (200) or redirect to auth (307/302)
       assert(
         res.status === 200 || res.status === 307 || res.status === 302,
@@ -317,7 +317,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await fetch('/core/cash/import')
+      const res = await authenticatedFetch('/core/cash/import')
       assert(
         res.status === 200 || res.status === 307 || res.status === 302,
         `Cash import page status=${res.status}, expected 200 or auth redirect`,

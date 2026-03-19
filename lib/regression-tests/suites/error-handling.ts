@@ -10,7 +10,7 @@ import {
   assertType,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 
 const CAT = 'cross-cutting.error-handling'
 
@@ -60,7 +60,7 @@ async function fetchWithTimeout(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const res = await fetch(path, {
+    const res = await authenticatedFetch(path, {
       ...options,
       signal: controller.signal,
       headers: {
@@ -258,7 +258,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       // Dashboard redirects to login when unauthenticated (307) — not a crash (500)
-      const res = await fetch('/dashboard', { redirect: 'manual' })
+      const res = await authenticatedFetch('/dashboard', { redirect: 'manual' })
       const status = res.status
       assert(
         status !== 500 && status !== 502 && status !== 503,
@@ -299,7 +299,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await fetch('/core', { redirect: 'manual' })
+      const res = await authenticatedFetch('/core', { redirect: 'manual' })
       assert(
         res.status !== 500 && res.status !== 502,
         `/core should not return 5xx, got ${res.status}`,
@@ -315,7 +315,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await fetch('/horizon', { redirect: 'manual' })
+      const res = await authenticatedFetch('/horizon', { redirect: 'manual' })
       assert(
         res.status !== 500 && res.status !== 502,
         `/horizon should not return 5xx, got ${res.status}`,
@@ -331,7 +331,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await fetch('/will', { redirect: 'manual' })
+      const res = await authenticatedFetch('/will', { redirect: 'manual' })
       assert(
         res.status !== 500 && res.status !== 502,
         `/will should not return 5xx, got ${res.status}`,
@@ -597,7 +597,7 @@ const tests: TestCase[] = [
       // Abort immediately
       controller.abort()
       try {
-        await fetch('/api/holdings', { signal: controller.signal })
+        await authenticatedFetch('/api/holdings', { signal: controller.signal })
         // Should not reach here
         assert(false, 'Fetch should have been aborted')
       } catch (err: unknown) {
@@ -787,7 +787,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/this-page-does-not-exist-12345')
+      const res = await authenticatedFetch('/this-page-does-not-exist-12345')
       assert(
         res.status === 404,
         `Unknown page should return 404, got ${res.status}`,

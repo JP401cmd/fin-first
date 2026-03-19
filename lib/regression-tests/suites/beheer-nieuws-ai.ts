@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'beheer.nieuws-ai'
 
@@ -10,7 +11,7 @@ async function fetchJson(
   path: string,
   init?: RequestInit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await fetch(path, init)
+  const res = await authenticatedFetch(path, init)
   let body: Record<string, unknown> = {}
   try {
     body = await res.json()
@@ -21,7 +22,7 @@ async function fetchJson(
 }
 
 async function fetchNoRedirect(path: string): Promise<Response> {
-  return fetch(path, { redirect: 'manual' })
+  return authenticatedFetch(path, { redirect: 'manual' })
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -337,6 +338,7 @@ export function register(): void {
     description: 'News prompt editor en AI feature flags beheer',
     icon: 'Newspaper',
     testCount: 0,
+    defaultRole: 'superadmin' as const,
   })
   registerTests(tests)
 }

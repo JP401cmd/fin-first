@@ -1,7 +1,7 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan } from '../assert'
 import type { TestCase } from '../test-types'
-import { withUserRole } from '../server-runner'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'cross-cutting.navigatie'
 
@@ -51,7 +51,7 @@ const BEHEER_ROUTES = [
 
 /** Fetch a URL without following redirects (manual redirect mode) */
 async function fetchNoRedirect(path: string): Promise<Response> {
-  return fetch(path, { redirect: 'manual' })
+  return authenticatedFetch(path, { redirect: 'manual' })
 }
 
 /** Check if a response is a redirect */
@@ -187,16 +187,14 @@ const tests: TestCase[] = [
     priority: 'critical', estimatedDurationMs: 4000,
     requiredRole: 'user',
     async fn() {
-      // Temporarily switch test account to role='user', then verify beheer redirects
-      await withUserRole(async () => {
-        for (const route of BEHEER_ROUTES) {
-          const res = await fetchNoRedirect(route)
-          assert(
-            isRedirect(res.status),
-            `Expected redirect for ${route} when role=user, got ${res.status}`,
-          )
-        }
-      })
+      // Test runner auto-switches to role='user' — verify beheer redirects
+      for (const route of BEHEER_ROUTES) {
+        const res = await fetchNoRedirect(route)
+        assert(
+          isRedirect(res.status),
+          `Expected redirect for ${route} when role=user, got ${res.status}`,
+        )
+      }
     },
   },
   // ── Step 5b: Beheer accessible for superadmin ─────────────────────
@@ -251,7 +249,7 @@ const tests: TestCase[] = [
     description: '/api/health retourneert 200',
     priority: 'medium', estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/health')
+      const res = await authenticatedFetch('/api/health')
       assertEqual(res.status, 200, 'health endpoint')
     },
   },

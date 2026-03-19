@@ -1,7 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
-import { withUserRole } from '../server-runner'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'beheer.layout'
 
@@ -30,7 +30,7 @@ const BEHEER_TABS = [
 
 /** Fetch a URL without following redirects */
 async function fetchNoRedirect(path: string): Promise<Response> {
-  return fetch(path, { redirect: 'manual' })
+  return authenticatedFetch(path, { redirect: 'manual' })
 }
 
 /** Check if a response is a redirect */
@@ -66,13 +66,12 @@ const tests: TestCase[] = [
     estimatedDurationMs: 3000,
     requiredRole: 'user',
     async fn() {
-      await withUserRole(async () => {
-        const res = await fetchNoRedirect('/beheer/ai')
-        assert(
-          isRedirect(res.status),
-          `Expected redirect for /beheer/ai when role=user, got ${res.status}`,
-        )
-      })
+      // Test runner auto-switches to role='user'
+      const res = await fetchNoRedirect('/beheer/ai')
+      assert(
+        isRedirect(res.status),
+        `Expected redirect for /beheer/ai when role=user, got ${res.status}`,
+      )
     },
   },
 
@@ -86,18 +85,17 @@ const tests: TestCase[] = [
     estimatedDurationMs: 3000,
     requiredRole: 'user',
     async fn() {
-      await withUserRole(async () => {
-        const res = await fetchNoRedirect('/beheer/testdata')
-        assert(
-          isRedirect(res.status),
-          `Expected redirect for non-admin access to /beheer/testdata, got ${res.status}`,
-        )
-        const location = res.headers.get('location') ?? ''
-        assert(
-          location.includes('/will') || location.includes('/login'),
-          `Expected redirect to /will or /login, got ${location}`,
-        )
-      })
+      // Test runner auto-switches to role='user'
+      const res = await fetchNoRedirect('/beheer/testdata')
+      assert(
+        isRedirect(res.status),
+        `Expected redirect for non-admin access to /beheer/testdata, got ${res.status}`,
+      )
+      const location = res.headers.get('location') ?? ''
+      assert(
+        location.includes('/will') || location.includes('/login'),
+        `Expected redirect to /will or /login, got ${location}`,
+      )
     },
   },
 

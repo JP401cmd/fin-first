@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.extras'
 
@@ -674,7 +675,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/onboarding', { redirect: 'manual' })
+      const res = await authenticatedFetch('/onboarding', { redirect: 'manual' })
       const valid = res.status === 200 || (res.status >= 300 && res.status < 400)
       assert(valid, `Onboarding route verwacht 200/3xx, kreeg ${res.status}`)
     },

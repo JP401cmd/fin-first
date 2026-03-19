@@ -1,6 +1,6 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan } from '../assert'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 import { lookupAowAge, formatAowAge } from '@/lib/aow-leeftijd'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -50,7 +50,7 @@ const SAMPLE_ROWS: AowLeeftijdRow[] = [
 
 /** Fetch helper without following redirects */
 async function fetchNoRedirect(path: string): Promise<Response> {
-  return fetch(path, { redirect: 'manual' })
+  return authenticatedFetch(path, { redirect: 'manual' })
 }
 
 function isRedirectOrAuth(status: number): boolean {
@@ -390,6 +390,7 @@ export function register(): void {
     description: 'CRUD AOW pensioenleeftijd referentiedata, lookup-logica en formattering',
     icon: 'Calendar',
     testCount: 0,
+    defaultRole: 'superadmin' as const,
   })
   registerTests(tests)
 }

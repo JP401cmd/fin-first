@@ -19,7 +19,7 @@ import {
   assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch, getBaseUrl } from '../server-runner'
 
 const CAT = 'kern.bank-connect'
 
@@ -94,7 +94,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/core/cash/connect', { redirect: 'manual' })
+      const res = await authenticatedFetch('/core/cash/connect', { redirect: 'manual' })
       // Should be 200 (if authed) or 307 (auth redirect)
       assert(
         res.status === 200 || res.status === 307,
@@ -171,10 +171,10 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 20,
     fn() {
-      const appUrl = 'http://localhost:3000'
+      const appUrl = getBaseUrl()
       const redirectUri = `${appUrl}/api/bank-connect/callback`
 
-      assertEqual(redirectUri, 'http://localhost:3000/api/bank-connect/callback', 'correct redirect URI')
+      assertEqual(redirectUri, `${appUrl}/api/bank-connect/callback`, 'correct redirect URI')
       assert(redirectUri.endsWith('/api/bank-connect/callback'), 'ends with callback path')
     },
   },
@@ -243,7 +243,7 @@ const tests: TestCase[] = [
       // Simulate callback route logic
       const code: string | null = null
       const state: string | null = null
-      const appUrl = 'http://localhost:3000'
+      const appUrl = getBaseUrl()
 
       if (!code || !state) {
         const redirectUrl = `${appUrl}/core/cash/connect?error=missing_code`
@@ -275,7 +275,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/core/cash/connect/success', { redirect: 'manual' })
+      const res = await authenticatedFetch('/core/cash/connect/success', { redirect: 'manual' })
       assert(
         res.status === 200 || res.status === 307,
         `expected 200 or 307, got ${res.status}`

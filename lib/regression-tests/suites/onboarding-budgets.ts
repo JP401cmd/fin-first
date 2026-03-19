@@ -1,6 +1,7 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.budgets'
 
@@ -251,7 +252,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 3000,
     async fn() {
       // Test that the endpoint exists and validates input
-      const res = await fetch('/api/onboarding/suggest-budgets', {
+      const res = await authenticatedFetch('/api/onboarding/suggest-budgets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -492,7 +493,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/onboarding', { redirect: 'manual' })
+      const res = await authenticatedFetch('/onboarding', { redirect: 'manual' })
       assert(
         res.status === 200 || (res.status >= 300 && res.status < 400),
         `Expected 200 or redirect for /onboarding, got ${res.status}`,

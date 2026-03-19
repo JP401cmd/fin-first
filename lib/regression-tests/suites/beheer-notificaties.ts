@@ -1,7 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 
 const CAT = 'beheer.notificaties'
 
@@ -33,7 +33,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await fetch('/identity/instellingen', { redirect: 'manual' })
+      const res = await authenticatedFetch('/identity/instellingen', { redirect: 'manual' })
       // 200 (logged in) or 307 redirect (not logged in)
       assert(
         res.status === 200 || res.status === 307,
@@ -702,6 +702,7 @@ export function register() {
     label: 'Beheer — Notificaties',
     description: 'Notificatie systeem: voorkeuren, bezorging, weergave en badge teller',
     testCount: 0,
+    defaultRole: 'superadmin' as const,
   })
   registerTests(tests)
 }

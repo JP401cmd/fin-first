@@ -1,7 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 
 const CAT = 'identiteit.delen-jaaroverzicht'
 
@@ -9,7 +9,7 @@ const CAT = 'identiteit.delen-jaaroverzicht'
 
 /** Fetch without following redirects */
 async function fetchNoRedirect(path: string): Promise<Response> {
-  return fetch(path, { redirect: 'manual' })
+  return authenticatedFetch(path, { redirect: 'manual' })
 }
 
 function isRedirect(status: number): boolean {

@@ -1,16 +1,14 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch, getBaseUrl } from '../server-runner'
 
 const CAT = 'berichten.chat'
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */
 
-const BASE = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
-
 async function fetchChat(body: Record<string, unknown>, opts?: RequestInit) {
-  return unauthenticatedFetch(`${BASE}/api/ai/chat`, {
+  return unauthenticatedFetch(`${getBaseUrl()}/api/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     ...opts,
@@ -30,7 +28,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch(`${BASE}/berichten`, { redirect: 'manual' })
+      const res = await authenticatedFetch(`${getBaseUrl()}/berichten`, { redirect: 'manual' })
       assert(
         res.status === 200 || res.status === 307 || res.status === 308,
         `Expected 200/307/308, got ${res.status}`,

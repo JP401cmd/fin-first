@@ -10,7 +10,7 @@ import {
 import { PHASES } from '@/lib/feature-phases'
 import { TIERS } from '@/lib/tier-config'
 import { computeFeatureAccess, type FinancialInput } from '@/lib/compute-feature-access'
-import { withUserRole } from '../server-runner'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'beheer.toegang'
 
@@ -49,7 +49,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     requiredRole: 'superadmin',
     async fn() {
-      const res = await fetch('/api/admin/feature-access')
+      const res = await authenticatedFetch('/api/admin/feature-access')
       assert(res.ok, `Expected 200 for superadmin, got ${res.status}`)
       const data = await res.json()
       assert(
@@ -78,13 +78,12 @@ const tests: TestCase[] = [
     estimatedDurationMs: 3000,
     requiredRole: 'user',
     async fn() {
-      await withUserRole(async () => {
-        const res = await fetch('/api/admin/feature-access')
-        assert(
-          res.status === 403 || res.status === 401 || res.status === 307 || res.status === 302,
-          `Expected 403/401/redirect for normal user, got ${res.status}`,
-        )
-      })
+      // Test runner auto-switches to role='user'
+      const res = await authenticatedFetch('/api/admin/feature-access')
+      assert(
+        res.status === 403 || res.status === 401 || res.status === 307 || res.status === 302,
+        `Expected 403/401/redirect for normal user, got ${res.status}`,
+      )
     },
   },
 
@@ -240,7 +239,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     requiredRole: 'superadmin',
     async fn() {
-      const res = await fetch('/api/admin/tier-assign', {
+      const res = await authenticatedFetch('/api/admin/tier-assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -279,20 +278,19 @@ const tests: TestCase[] = [
     estimatedDurationMs: 3000,
     requiredRole: 'user',
     async fn() {
-      await withUserRole(async () => {
-        const res = await fetch('/api/admin/tier-assign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: 'nonexistent@test.nl',
-            subscriptions: ['connected'],
-          }),
-        })
-        assert(
-          [302, 307, 401, 403].includes(res.status),
-          `Expected 403/401/redirect for normal user tier-assign, got ${res.status}`,
-        )
+      // Test runner auto-switches to role='user'
+      const res = await authenticatedFetch('/api/admin/tier-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'nonexistent@test.nl',
+          subscriptions: ['connected'],
+        }),
       })
+      assert(
+        [302, 307, 401, 403].includes(res.status),
+        `Expected 403/401/redirect for normal user tier-assign, got ${res.status}`,
+      )
     },
   },
 
@@ -395,7 +393,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     requiredRole: 'superadmin',
     async fn() {
-      const res = await fetch('/api/admin/feature-access', {
+      const res = await authenticatedFetch('/api/admin/feature-access', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ overrides: {} }),
@@ -416,17 +414,16 @@ const tests: TestCase[] = [
     estimatedDurationMs: 3000,
     requiredRole: 'user',
     async fn() {
-      await withUserRole(async () => {
-        const res = await fetch('/api/admin/feature-access', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ overrides: {} }),
-        })
-        assert(
-          [302, 307, 401, 403].includes(res.status),
-          `Expected 403/401/redirect for normal user PUT, got ${res.status}`,
-        )
+      // Test runner auto-switches to role='user'
+      const res = await authenticatedFetch('/api/admin/feature-access', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overrides: {} }),
       })
+      assert(
+        [302, 307, 401, 403].includes(res.status),
+        `Expected 403/401/redirect for normal user PUT, got ${res.status}`,
+      )
     },
   },
 

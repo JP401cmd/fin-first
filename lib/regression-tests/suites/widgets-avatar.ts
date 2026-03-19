@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThan, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 import { WIDGET_CATALOG, type WidgetModule, type WidgetSize } from '@/lib/widget-catalog'
 
 const CAT = 'widgets.avatar'
@@ -14,7 +15,7 @@ const WILL_SIZES = [24, 48, 80, 120] as const
 
 /** Fetch helper without following redirects */
 async function fetchNoRedirect(path: string): Promise<Response> {
-  return fetch(path, { redirect: 'manual' })
+  return authenticatedFetch(path, { redirect: 'manual' })
 }
 
 function isRedirectOrAuth(status: number): boolean {

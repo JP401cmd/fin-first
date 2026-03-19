@@ -438,6 +438,7 @@ registerCategory({
   description: 'Persona seeding, budget templates, check-in beheer, fase transitie',
   icon: 'Database',
   testCount: 0,
+  defaultRole: 'superadmin' as const,
 })
 
 export function register(): void {

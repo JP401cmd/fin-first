@@ -4,6 +4,7 @@ import type { TestCase } from '../test-types'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG, getWidgetDef, BUDGET_WIDGETS } from '@/lib/widget-catalog'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'dashboard.empty-loading'
 
@@ -828,7 +829,7 @@ const tests: TestCase[] = [
     fn: async () => {
       // The dashboard page checks useSession() and shows lock/login for unauthenticated
       try {
-        const res = await fetch('/dashboard', { redirect: 'manual' })
+        const res = await authenticatedFetch('/dashboard', { redirect: 'manual' })
         // Should either show the page (200) with login prompt, or redirect (307/302)
         assert(
           res.status === 200 || res.status === 307 || res.status === 302,

@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'identiteit.navigatie'
 
@@ -25,7 +26,7 @@ const IDENTITY_REDIRECTS = [
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 async function fetchNoRedirect(path: string): Promise<Response> {
-  return fetch(path, { redirect: 'manual' })
+  return authenticatedFetch(path, { redirect: 'manual' })
 }
 
 function isRedirect(status: number): boolean {
@@ -276,7 +277,7 @@ const tests: TestCase[] = [
     async fn() {
       // Follow each redirect and verify the target doesn't 404
       for (const redir of IDENTITY_REDIRECTS) {
-        const res = await fetch(redir.from, { redirect: 'follow' })
+        const res = await authenticatedFetch(redir.from, { redirect: 'follow' })
         // After following redirect, should get 200 (rendered) or another redirect (auth)
         assert(
           res.status === 200 || isRedirect(res.status),

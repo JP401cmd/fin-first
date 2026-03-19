@@ -4,7 +4,7 @@ import {
   assertGreaterThan,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import { unauthenticatedFetch } from '../server-runner'
+import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
 
 const CAT = 'security.privacy'
 
@@ -294,7 +294,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 500,
     async fn() {
       // Test session-info response (accessible without auth)
-      const res = await fetch('/api/session-info')
+      const res = await authenticatedFetch('/api/session-info')
       const body = await res.json()
       const sensitiveFields = [
         'password', 'password_hash', 'secret', 'api_key',
@@ -325,7 +325,7 @@ const tests: TestCase[] = [
       //   refresh_token_present: !!session.refresh_token (boolean)
       //   NOT: refresh_token: session.refresh_token (string)
       // When unauthenticated, the field is absent entirely
-      const res = await fetch('/api/session-info')
+      const res = await authenticatedFetch('/api/session-info')
       const body = await res.json()
       if (body.refresh_token_present !== undefined) {
         assertEqual(
@@ -478,7 +478,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 500,
     async fn() {
       // The test-500 endpoint intentionally returns a 500 error
-      const res = await fetch('/api/test-500')
+      const res = await authenticatedFetch('/api/test-500')
       if (res.status === 500) {
         const body = await res.json()
         // If there's an error field, it should not contain connection strings or file paths

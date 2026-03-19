@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'beheer.migratie'
 
@@ -33,7 +34,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 3000,
     async fn() {
-      const res = await fetch('/api/apply-migration')
+      const res = await authenticatedFetch('/api/apply-migration')
       // GET is available without admin check (uses user's supabase client)
       // Should return JSON with status/tables/columns
       assert(res.ok || res.status === 307, `Expected 200 or 307, got ${res.status}`)
@@ -118,7 +119,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await fetch('/api/apply-migration')
+      const res = await authenticatedFetch('/api/apply-migration')
       if (!res.ok) {
         // If auth redirect, skip gracefully
         assert(res.status === 307, `Unexpected status ${res.status}`)
@@ -157,7 +158,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       // POST without any credentials should return 400
-      const res = await fetch('/api/apply-migration', {
+      const res = await authenticatedFetch('/api/apply-migration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -250,8 +251,8 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 4000,
     async fn() {
-      const res1 = await fetch('/api/apply-migration')
-      const res2 = await fetch('/api/apply-migration')
+      const res1 = await authenticatedFetch('/api/apply-migration')
+      const res2 = await authenticatedFetch('/api/apply-migration')
 
       if (!res1.ok || !res2.ok) {
         // Auth redirect — both should redirect
@@ -296,7 +297,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 5000,
     async fn() {
-      const res = await fetch('/api/apply-migration', {
+      const res = await authenticatedFetch('/api/apply-migration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ db_password: 'totally_wrong_password_12345' }),
@@ -327,7 +328,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 3000,
     async fn() {
-      const res = await fetch('/api/apply-migration')
+      const res = await authenticatedFetch('/api/apply-migration')
       if (!res.ok) return // auth redirect, skip
 
       const data = await res.json()
@@ -371,7 +372,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1000,
     async fn() {
       // Verify the 400 response documents all 3 options
-      const res = await fetch('/api/apply-migration', {
+      const res = await authenticatedFetch('/api/apply-migration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -412,6 +413,7 @@ export function register(): void {
     description: 'Database migratie tool: schema check, auto-migratie, handmatige SQL',
     icon: 'Database',
     testCount: 0,
+    defaultRole: 'superadmin' as const,
   })
   registerTests(tests)
 }

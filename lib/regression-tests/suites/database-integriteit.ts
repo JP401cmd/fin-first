@@ -9,6 +9,7 @@ import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Budget, BudgetAmount } from '@/lib/budget-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
+import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'data.database-integriteit'
 
@@ -176,7 +177,7 @@ function makeLifeEvent(overrides?: Partial<LifeEvent>): LifeEvent {
 // ── Helper: simulate fetch ────────────────────────────────────────────
 async function fetchAPI(path: string, options?: RequestInit): Promise<{ status: number; body: Record<string, unknown> }> {
   try {
-    const res = await fetch(path, {
+    const res = await authenticatedFetch(path, {
       ...options,
       headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
     })
