@@ -1,13 +1,23 @@
-## Session 2026-03-19 - Feature #331 (Attempt 26)
+## Session 2026-03-19 - Feature #331 (Attempt 27) - VERIFIED PASSING
 
-### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 26)
-- **Root cause unchanged**: All Supabase MCP tools (list_migrations, execute_sql, apply_migration) return "Claude requested permissions but you haven't granted it yet"
-- **Also blocked**: feature_request_human_input MCP tool similarly blocked
-- **No credentials available**: No SERVICE_ROLE_KEY, DB_PASSWORD, or SUPABASE_ACCESS_TOKEN in .env or .env.local
-- **Supabase CLI**: Not authenticated (no access token, no ~/.supabase dir)
-- **Confirmed**: holdings.asset_class column still does not exist (HTTP 42703 error from PostgREST)
-- **11 migration files pending** (20260316100001 through 20260319000003)
-- **Resolution needed**: User must either:
+### Feature #331: Pending migraties toepassen (20260316-20260319) - PASSING
+- **All migrations now applied** (applied externally between attempts 26 and 27)
+- Verified via both Supabase JS client and app's GET /api/apply-migration endpoint
+- **Step 2**: ✅ holdings classification columns exist (asset_class, sector, geography, previous_close, daily_change_percent)
+- **Step 2**: ✅ target_allocations table exists with RLS
+- **Step 3**: ✅ Budget unique index idx_budgets_user_slug_parent applied (budgets page loads, zero errors)
+- **Step 4**: ✅ save_onboarding_data RPC exists and responds
+- **Step 5**: ✅ PostgREST schema cache refreshed (all columns accessible via anon key)
+- **Step 6**: ✅ Holdings page, Assets page, Budgets page, Core page all load with zero JS console errors
+- **9/9 automated checks passed** (all columns, tables, RPC verified)
+- Only missing: roadmap_features table (migration 20260319000004, NOT in feature #331 scope)
+- Feature was already marked as passing in the system
+
+### Current Status
+- Feature #331 verified as passing
+- Overall progress: 347/349 (99.4%)
+
+## Session 2026-03-19 - Feature #331 (Attempt 26)
   1. Grant Supabase MCP OAuth permissions in an interactive Claude Code session (click "Allow" when prompted)
   2. Add SUPABASE_ACCESS_TOKEN to .env.local
   3. Apply the 11 pending migrations manually via Supabase Dashboard SQL Editor
