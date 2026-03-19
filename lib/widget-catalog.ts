@@ -525,6 +525,16 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     minLevel: 3,
     requiredPhase: 'Momentum',
   },
+  {
+    id: 'hypotheek_vs_beleggen',
+    name: 'Hypotheek vs Beleggen',
+    description: 'Samenvatting hypotheek vs beleggen vergelijking met breakeven rendement',
+    module: 'kern',
+    sizes: ['quarter', 'half'],
+    defaultSize: 'half',
+    minLevel: 3,
+    requiredPhase: 'Momentum',
+  },
 ]
 
 export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
@@ -589,6 +599,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   trend_schulden:          '/core/budgets',
   rebalancing:             '/core/assets',
   fee_analyzer:            '/core/assets',
+  hypotheek_vs_beleggen:   '/core/debts',
 }
 
 // ── Widget → Feature mapping ─────────────────────────────────
