@@ -1,3 +1,28 @@
+## Session 2026-03-19 - Feature #355
+
+### Feature #355: Regressietests bijwerken voor SimRow uitbreiding en IncomeExpenseChart - PASSING
+- Added Section F (6 tests) to fire-simulation.test.ts for grossIncome/grossExpenses:
+  - F1: All rows have finite non-negative integer grossIncome/grossExpenses
+  - F2: Accumulation grossIncome >= annualSavings + yearlyExpenses
+  - F3: Accumulation grossExpenses = yearlyExpenses (no cashflows)
+  - F4: grossIncome - grossExpenses ≈ endPortfolio - startPortfolio (rounding tolerance)
+  - F5: Cashflows appear correctly in grossIncome/grossExpenses
+  - F6: One-time inheritance shows in grossIncome at target age only
+- Added grossIncome/grossExpenses property checks in Setup section
+- Created income-expense-chart.test.tsx with 7 component tests:
+  - SVG rendering, income/expense lines, area segments
+  - Zoom synchronization (visibleMinAge/visibleMaxAge filtering)
+  - Responsive height (mobile 120px when containerW < 768)
+  - Legend labels (Inkomen/Uitgaven), empty rows handling
+- Verified dropdown toggle via browser automation: default collapsed, click expands
+- draggable-widget-grid.test.tsx already correct (simRows: null, no changes needed)
+- All 76 relevant tests passing, no new regression failures
+- Commit: cd5d0589
+
+### Current Status
+- 1 feature completed this session (#355)
+- Overall progress: 353/356 (99.2%)
+
 ## Session 2026-03-19 - Features #353, #354
 
 ### Feature #353: Inklapbare dropdown integratie in horizon-client.tsx - PASSING
