@@ -1,3 +1,33 @@
+## Session 2026-03-19 - Features #375, #376
+
+### Feature #375: Rebalancing widget — half-size dashboard widget met drift visualisatie - PASSING
+- Created components/widgets/rebalancing-widget.tsx with mini/quarter/half size support
+- Mini: status indicator circle (green/orange/red) or "Stel targets in →" CTA
+- Quarter: status + biggest drift category + amount
+- Half: horizontal bars per category with current vs target %, color coding per drift severity
+- Progressive disclosure CTA when no targets set (Scale icon + "Configureer →")
+- Unclassified holdings warning with AlertTriangle icon
+- useInViewAnimation() for entrance animation on bars
+- Font-mono tabular-nums for percentages, mobile-responsive
+- Registered in widget-catalog.ts (id: 'rebalancing', module: 'kern', sizes: ['mini','quarter','half'], defaultSize: 'half', minLevel: 3)
+- Added to widget-renderer.tsx with dynamic import and switch case
+- Client-side fetch from /api/rebalancing/check endpoint
+- Commit: f61c6c65
+
+### Feature #376: Notification integratie — rebalance alerts in meldingen systeem - PASSING
+- Extended Notification type with 'rebalance' in widget-renderer.tsx
+- Added ⚖️ icon and 'Rebalancing' label to meldingen-widget.tsx TYPE_ICONS/TYPE_LABELS
+- Created generateRebalanceNotifications() in lib/rebalancing.ts
+  - Severity: drift > threshold = warning, drift > 2× threshold = critical
+  - Message format: '{label}-allocatie wijkt {drift}% af ({current}% vs {target}%). {actie} €{bedrag}.'
+  - Box 3 peildatum info notification in Nov/Dec
+- Integrated into dashboard-data-loader.ts: fetches holdings + target_allocations, computes drift, generates notifications
+- Uses try/catch for graceful degradation if rebalancing data unavailable
+- Commit: 1f4bc9e2
+
+### Current Status
+- 2 features completed this session (#375, #376)
+
 ## Session 2026-03-19 - Features #377, #380
 
 ### Feature #377: Instelbare drift drempel — gebruikersvoorkeur voor rebalancing gevoeligheid - PASSING
