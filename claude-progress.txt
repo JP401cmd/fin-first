@@ -1,3 +1,17 @@
+## Session 2026-03-19 - Feature #386
+
+### Feature #386: Goedkopere alternatieven database — fund-alternatives.ts - PASSING
+- Created `lib/fund-alternatives.ts` with full TypeScript types (FundMapping, Alternative, FundCategory)
+- 26 Dutch fund mappings across 8 categories (wereld-aandelen, europa, NL, obligaties, vastgoed, EM, duurzaam, mixed)
+- Covers ABN AMRO, ING, Rabobank, Meesman → Vanguard, iShares, Northern Trust alternatives
+- findAlternatives() with ISIN (exact), ticker (exact), name (fuzzy) search
+- findByCategory(), berekenJaarlijkseBesparing() helper functions
+- LAATST_BIJGEWERKT date constant + FUND_ALTERNATIVES_DISCLAIMER
+- Source notes per alternative (broker availability)
+- 18 unit tests passing (vitest)
+- Commit: c3703627
+- Progress: 372/397 passing (93.7%)
+
 ## Session 2026-03-19 - Feature #350 (RESOLVED)
 
 ### Feature #350: Roadmap pagina — feature statussen en opmerkingen - PASSING
@@ -17576,3 +17590,30 @@ Total tests in derive-wealth-composition.test.ts: 33 (was 18)
 Seed fixes: Daan Brand New Day investment->retirement, added pension for Roos, added repayment_type to all debts.
 Added 19 validation tests covering 3+ wealth groups, realistic returns, contributions, repayment_types, chart representativeness.
 Total tests in persona-wealth-composition-compat.test.ts: 57 (was 38)
+
+## Session 2026-03-19 - Features #368, #369
+
+### Feature #368: Toggle UI verkleinen en rechts bovenin positioneren - PASSING
+- Merged Vermogenspad/Vermogensopbouw toggle into same row as Scenario/Monte Carlo buttons
+- Matched compact pill styling (text-[11px], px-2.5 py-1, no minHeight:44)
+- Right-aligned toggle with ml-auto, shortened labels to 'Pad'/'Opbouw'
+- Selected state uses bg-horizon-50 (matching scenario button pattern)
+- Responsive via flex-wrap on container
+
+### Feature #369: Kolombreedte stacked bars verbreden - PASSING
+- Reduced barGap fraction from 2% to 0.5% (desktop) / 0.8% (mobile)
+- Bars now fill ~85% of available space, composition colors clearly visible
+- No JS console errors, tooltip hover functionality preserved
+
+Current status: 369/371 features passing (99.5%)
+
+## Session 2026-03-19 - Feature #370
+
+### Feature #370: Gids bijwerken — vermogensopbouw grafiek uitleg - PASSING
+- Enhanced section 11 (Vermogensopbouw weergave) in guide-horizon-uitleg.tsx
+- Added 'Hoe evolueert de verdeling?' paragraph about individual returns per group
+- Added full onttrekkingswaterval (beleggingen > spaargeld > overig > pensioen > vastgoed)
+- Explained illiquid assets placement at end of waterfall
+- Added 'Totaal = Vermogenspad (single source of truth)' clarification
+- Verified in browser: all content renders, 0 console errors
+- Stats: 368/371 passing (99.2%)
