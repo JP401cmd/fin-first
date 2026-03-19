@@ -1,3 +1,21 @@
+## Session 2026-03-19 - Feature #388
+
+### Feature #388: Regressietests — TER, kostenanalyse, en fee impact - PASSING
+- Created lib/regression-tests/suites/kostenanalyse-ter.ts with 23 tests
+- Tests cover: TER field CRUD (POST/PATCH/GET), TER validation (0-10% range)
+- Tests cover: computePortfolioFees weighted average, breakdown sorting, percentOfTotalFees
+- Tests cover: computeFeeImpactOnFire (positive months, zero TER), computeFeeOverHorizon
+- Tests cover: findAlternatives by ISIN (known/unknown, case-insensitive)
+- Edge cases: all holdings without TER, extreme high TER, zero-value holdings, empty portfolio, mixed TER/no-TER, fallback price
+- Auth guard tests: 401 for unauthenticated POST/PATCH with TER
+- Fund database integrity check (26+ funds, all alternatives cheaper)
+- Registered suite in test-registry.ts
+- All 23 tests passing in 99ms, 0 failures, 0 errors
+- Commit: a2a304de
+
+### Current Status
+- Progress: 382/397 passing (96.2%)
+
 ## Session 2026-03-19 - Features #375, #376
 
 ### Feature #375: Rebalancing widget — half-size dashboard widget met drift visualisatie - PASSING
