@@ -29,6 +29,7 @@ import {
   Rss,
   SlidersHorizontal,
   Shield,
+  Activity,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -564,7 +565,7 @@ export default function GidsPage() {
                 <strong>doelen</strong> en financi&euml;le situatie en genereert
                 persoonlijke aanbevelingen in vijf categorie&euml;n:
                 belegging-optimalisatie, schuld-aflossing, doel-activering,
-                budget-setup en veerkracht-verbetering. Elk voorstel toont{" "}
+                budget-setup en gezondheid-verbetering. Elk voorstel toont{" "}
                 <strong>wat je kunt doen</strong>, <strong>waarom het helpt</strong>,
                 en <strong>hoeveel vrijheidstijd het oplevert</strong> &mdash;
                 gebaseerd op je werkelijke cijfers, niet op aannames.
@@ -1114,6 +1115,67 @@ export default function GidsPage() {
                 "Pas guardrail-parameters aan via Identiteit → Instellingen → Geavanceerde instellingen",
               ],
               tip: "Start met Vast (SWR) als je eenvoud wilt. Guardrails is de populairste keuze voor flexibiliteit. VPW is wiskundig optimaal maar vereist mentale flexibiliteit. Bucket geeft rust bij marktdalingen.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Activity}
+            title="Financi&euml;le gezondheid score"
+            color="var(--color-horizon-400)"
+            valueText="E&eacute;n getal (0&ndash;100) dat je complete financi&euml;le gezondheid weergeeft. Geen vaag gevoel, maar een gewogen score op basis van 6 pilaren."
+            description={
+              <>
+                De financi&euml;le gezondheid score vervangt de oude
+                veerkracht-score en kijkt breder: niet alleen naar je buffer,
+                maar naar je volledige financi&euml;le plaatje. De score wordt
+                opgebouwd uit <strong>6 pilaren</strong>, elk met een eigen
+                gewicht:
+                <br />
+                <br />
+                <strong>1. Spaarquote (25%)</strong> &mdash; hoeveel procent van
+                je inkomen spaar je? Gemeten over de laatste 6 maanden. Hoe
+                hoger, hoe sneller je vermogen groeit.
+                <br />
+                <strong>2. Schuldratio (20%)</strong> &mdash; de verhouding
+                tussen je schulden en je totale vermogen. Minder schuld = hoger
+                score.
+                <br />
+                <strong>3. Noodfonds-dekking (15%)</strong> &mdash; hoeveel
+                maanden kun je rondkomen van je noodfonds? 6+ maanden is
+                optimaal.
+                <br />
+                <strong>4. FIRE-voortgang (20%)</strong> &mdash; hoever ben je
+                op weg naar financi&euml;le vrijheid? Gebaseerd op je
+                vrijheidspercentage.
+                <br />
+                <strong>5. Portefeuille-diversificatie (10%)</strong> &mdash;
+                spreiding over verschillende vermogenstypes (cash, aandelen,
+                vastgoed, etc.).
+                <br />
+                <strong>6. Budgetdiscipline (10%)</strong> &mdash; hoeveel van
+                je budgetten blijven binnen de limiet? <em>Deze pilaar is
+                optioneel</em>: als je geen budgetten hebt ingesteld, wordt het
+                gewicht herverdeeld over de andere 5 pilaren.
+                <br />
+                <br />
+                De score kent vijf niveaus: <strong>Uitstekend</strong> (80+),{" "}
+                <strong>Sterk</strong> (60&ndash;79),{" "}
+                <strong>Redelijk</strong> (40&ndash;59),{" "}
+                <strong>Kwetsbaar</strong> (20&ndash;39) en{" "}
+                <strong>Kritiek</strong> (0&ndash;19). Je ziet ook de{" "}
+                <strong>trend</strong> ten opzichte van vorige maand, zodat je
+                weet of je de goede kant opgaat.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Bekijk je gezondheid score op het dashboard \u2014 de widget toont je totaalscore en de trend",
+                "Tik op de widget om per pilaar je score, uitleg en verbeter-tip te zien",
+                "Focus op de pilaar met de laagste score \u2014 daar haal je het meeste rendement",
+                "Stel budgetten in om de 6e pilaar (budgetdiscipline) te activeren \u2014 anders wordt het gewicht herverdeeld over 5 pilaren",
+                "Volg je voortgang maandelijks: de trend laat zien of je financi\u00eble gezondheid verbetert",
+              ],
+              tip: "De score is geen doel op zich, maar een kompas. Focus niet op 100 punten, maar op de pilaar waar je het snelst kunt verbeteren.",
             }}
           />
         </ReisStapSection>
