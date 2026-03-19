@@ -1,3 +1,19 @@
+## Session 2026-03-19 - Feature #331
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker)
+- BLOCKER: Supabase MCP OAuth connection not authenticated — all MCP tools (apply_migration, execute_sql, list_migrations, search_docs, get_project_url) fail with "permissions not granted"
+- No alternative DDL access available (no db_password, no service_role_key, no access_token stored)
+- Verified MCP tools are in settings.local.json allow list — issue is MCP server OAuth, not Claude Code permissions
+- Checked database status: 10+ migration items missing (holdings cols, target_allocations, holding_prices, holding_alerts, budgets index, save_onboarding_data RPC, profiles cols)
+- INFRASTRUCTURE IMPROVEMENTS:
+  - Updated /api/apply-migration route with ALL pending migration SQL (20260316-20260319)
+  - Made all CREATE POLICY statements idempotent using DO $$ blocks
+  - Added comprehensive GET status check: tables, holdings columns, snapshot columns, profile columns, RPC functions
+  - Updated beheer/migration page to display full schema status with per-category breakdown
+  - Added NOTIFY pgrst reload schema as final migration step
+- To resolve: Re-authenticate Supabase MCP OAuth, then run `apply_migration` for each pending migration file
+- Alternative: Use beheer/migration page with db_password, or paste SQL files into Supabase Dashboard SQL Editor
+
 ## Session 2026-03-19 - Features #317, #330
 
 ### Feature #317: Cash rekeningen integreren in Assets op pagina 2 - PASSING

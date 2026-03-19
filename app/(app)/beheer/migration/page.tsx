@@ -6,15 +6,20 @@ import { Database, CheckCircle, XCircle, AlertCircle, Loader2, Copy, Play } from
 interface SchemaStatus {
   status: 'complete' | 'incomplete' | 'error'
   tables: Record<string, boolean>
-  columns: Record<string, boolean>
+  holdings_columns: Record<string, boolean>
+  snapshot_columns: Record<string, boolean>
+  profile_columns: Record<string, boolean>
+  rpc: Record<string, boolean>
   all_tables_exist: boolean
-  all_columns_exist: boolean
+  all_holdings_columns_exist: boolean
+  all_snapshot_columns_exist: boolean
+  all_profile_columns_exist: boolean
+  rpc_exists: boolean
 }
 
 interface MigrationResult {
   status: 'success' | 'error'
   error?: string
-  connection?: Record<string, string>
   summary?: {
     total: number
     success: number
@@ -22,7 +27,6 @@ interface MigrationResult {
     errors: number
   }
   results?: Array<{ statement: string; status: 'ok' | 'skip' | 'error'; message?: string }>
-  tables?: string[]
 }
 
 export default function MigrationPage() {
@@ -70,89 +74,68 @@ export default function MigrationPage() {
     setMigrating(false)
   }
 
-  const migrationSQL = `-- Run this in Supabase Dashboard > SQL Editor
--- File: supabase/migrations/20260215000001_create_new_tables.sql
-
--- NOTE: badges, user_badges, user_streaks tables have been dropped
--- (gamification system removed — see migration 20260316600001)
-
-CREATE TABLE IF NOT EXISTS user_feature_visits (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  feature_slug TEXT NOT NULL,
-  first_visited_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  visit_count INT NOT NULL DEFAULT 1,
-  UNIQUE(user_id, feature_slug)
-);
-ALTER TABLE user_feature_visits ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own feature visits" ON user_feature_visits FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own feature visits" ON user_feature_visits FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own feature visits" ON user_feature_visits FOR UPDATE TO authenticated USING (auth.uid() = user_id);
-
-CREATE TABLE IF NOT EXISTS holdings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
-  ticker TEXT, isin TEXT,
-  name TEXT NOT NULL,
-  units NUMERIC NOT NULL DEFAULT 0,
-  avg_purchase_price NUMERIC NOT NULL DEFAULT 0,
-  current_price NUMERIC,
-  last_price_update TIMESTAMPTZ,
-  purchase_date DATE,
-  notes TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-ALTER TABLE holdings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own holdings" ON holdings FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own holdings" ON holdings FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own holdings" ON holdings FOR UPDATE TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own holdings" ON holdings FOR DELETE TO authenticated USING (auth.uid() = user_id);
-
-CREATE TABLE IF NOT EXISTS holding_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  holding_id UUID NOT NULL REFERENCES holdings(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('buy','sell','dividend')),
-  units NUMERIC NOT NULL,
-  price_per_unit NUMERIC NOT NULL,
-  total_amount NUMERIC NOT NULL,
-  date DATE NOT NULL,
-  notes TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-ALTER TABLE holding_transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own holding transactions" ON holding_transactions FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own holding transactions" ON holding_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own holding transactions" ON holding_transactions FOR UPDATE TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own holding transactions" ON holding_transactions FOR DELETE TO authenticated USING (auth.uid() = user_id);
-
-CREATE TABLE IF NOT EXISTS next_step_completions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  step_key TEXT NOT NULL,
-  completed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  dismissed BOOLEAN NOT NULL DEFAULT false,
-  UNIQUE(user_id, step_key)
-);
-ALTER TABLE next_step_completions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own next step completions" ON next_step_completions FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own next step completions" ON next_step_completions FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own next step completions" ON next_step_completions FOR UPDATE TO authenticated USING (auth.uid() = user_id);
-
-ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS freedom_percentage NUMERIC;
-ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS fire_age NUMERIC;
-ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS sovereignty_level INT;
-ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS savings_rate NUMERIC;
-ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
-
   async function copySQL() {
-    await navigator.clipboard.writeText(migrationSQL)
+    const res = await fetch('/api/apply-migration')
+    const status = await res.json()
+    const missing: string[] = []
+
+    // Build summary of what's missing
+    if (status.tables) {
+      for (const [t, exists] of Object.entries(status.tables)) {
+        if (!exists) missing.push(`-- Missing table: ${t}`)
+      }
+    }
+    if (status.holdings_columns) {
+      for (const [c, exists] of Object.entries(status.holdings_columns)) {
+        if (!exists) missing.push(`-- Missing holdings column: ${c}`)
+      }
+    }
+
+    const hint = missing.length > 0
+      ? `-- ${missing.length} schema items missing.\n-- Run all migration files from supabase/migrations/ in the SQL Editor.\n${missing.join('\n')}`
+      : '-- All schema items present!'
+
+    await navigator.clipboard.writeText(hint)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  function StatusSection({ title, items }: { title: string; items: Record<string, boolean> | undefined }) {
+    if (!items) return null
+    return (
+      <div>
+        <h4 className="text-sm font-medium text-[var(--ink-2)] mb-2">{title}</h4>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(items).map(([name, exists]) => (
+            <div key={name} className="flex items-center gap-2 text-sm">
+              {exists ? (
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+              ) : (
+                <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+              )}
+              <code className="text-[var(--ink-2)] truncate">{name}</code>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const isComplete = schemaStatus?.status === 'complete'
+  const totalItems = schemaStatus ? (
+    Object.keys(schemaStatus.tables || {}).length +
+    Object.keys(schemaStatus.holdings_columns || {}).length +
+    Object.keys(schemaStatus.snapshot_columns || {}).length +
+    Object.keys(schemaStatus.profile_columns || {}).length +
+    Object.keys(schemaStatus.rpc || {}).length
+  ) : 0
+  const passingItems = schemaStatus ? (
+    Object.values(schemaStatus.tables || {}).filter(Boolean).length +
+    Object.values(schemaStatus.holdings_columns || {}).filter(Boolean).length +
+    Object.values(schemaStatus.snapshot_columns || {}).filter(Boolean).length +
+    Object.values(schemaStatus.profile_columns || {}).filter(Boolean).length +
+    Object.values(schemaStatus.rpc || {}).filter(Boolean).length
+  ) : 0
 
   return (
     <div className="space-y-8">
@@ -162,7 +145,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
           Database Migratie
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Status van de database schema en migratietools
+          Volledige status van database schema ({passingItems}/{totalItems} items aanwezig)
         </p>
       </div>
 
@@ -185,48 +168,22 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
             Schema controleren...
           </div>
         ) : schemaStatus ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className={`flex items-center gap-2 text-sm font-medium ${
-              schemaStatus.status === 'complete' ? 'text-green-600' : 'text-kern-600'
+              isComplete ? 'text-green-600' : 'text-kern-600'
             }`}>
-              {schemaStatus.status === 'complete' ? (
-                <><CheckCircle className="h-4 w-4" /> Schema is compleet</>
+              {isComplete ? (
+                <><CheckCircle className="h-4 w-4" /> Schema is compleet ({passingItems}/{totalItems})</>
               ) : (
-                <><AlertCircle className="h-4 w-4" /> Schema is incompleet</>
+                <><AlertCircle className="h-4 w-4" /> Schema incompleet ({passingItems}/{totalItems})</>
               )}
             </div>
 
-            <div>
-              <h4 className="text-sm font-medium text-[var(--ink-2)] mb-2">Tabellen</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(schemaStatus.tables).map(([name, exists]) => (
-                  <div key={name} className="flex items-center gap-2 text-sm">
-                    {exists ? (
-                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-3.5 w-3.5 text-red-500" />
-                    )}
-                    <code className="text-[var(--ink-2)]">{name}</code>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-[var(--ink-2)] mb-2">Kolommen op net_worth_snapshots</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(schemaStatus.columns).map(([name, exists]) => (
-                  <div key={name} className="flex items-center gap-2 text-sm">
-                    {exists ? (
-                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-3.5 w-3.5 text-red-500" />
-                    )}
-                    <code className="text-[var(--ink-2)]">{name}</code>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <StatusSection title="Tabellen" items={schemaStatus.tables} />
+            <StatusSection title="Holdings kolommen" items={schemaStatus.holdings_columns} />
+            <StatusSection title="Net Worth Snapshots kolommen" items={schemaStatus.snapshot_columns} />
+            <StatusSection title="Profiles kolommen" items={schemaStatus.profile_columns} />
+            <StatusSection title="RPC Functies" items={schemaStatus.rpc} />
           </div>
         ) : (
           <p className="text-sm text-red-500">Schema check mislukt</p>
@@ -234,11 +191,11 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
       </div>
 
       {/* Auto-apply Migration */}
-      {schemaStatus && schemaStatus.status !== 'complete' && (
+      {schemaStatus && !isComplete && (
         <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-6">
           <h3 className="font-medium text-[var(--ink)] mb-2">Migratie Uitvoeren</h3>
           <p className="text-sm text-[var(--ink-3)] mb-4">
-            Voer je database wachtwoord in om de migratie automatisch uit te voeren.
+            Voer je database wachtwoord in om alle pending migraties automatisch uit te voeren.
             Vind je wachtwoord in Supabase Dashboard &gt; Settings &gt; Database.
           </p>
 
@@ -283,8 +240,8 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
         </div>
       )}
 
-      {/* Manual SQL */}
-      {schemaStatus && schemaStatus.status !== 'complete' && (
+      {/* Manual SQL instructions */}
+      {schemaStatus && !isComplete && (
         <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-medium text-[var(--ink)]">Handmatig via SQL Editor</h3>
@@ -293,11 +250,11 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
               className="flex items-center gap-1 text-sm text-kern-600 hover:text-kern-700"
             >
               <Copy className="h-3.5 w-3.5" />
-              {copied ? 'Gekopieerd!' : 'Kopieer SQL'}
+              {copied ? 'Gekopieerd!' : 'Kopieer status'}
             </button>
           </div>
           <p className="text-sm text-[var(--ink-3)] mb-4">
-            Als alternatief kun je de SQL handmatig uitvoeren in de{' '}
+            Run de SQL bestanden uit <code className="text-xs bg-zinc-100 px-1 py-0.5 rounded">supabase/migrations/</code> in de{' '}
             <a
               href="https://supabase.com/dashboard/project/pnnuqwdcgoympgddrvze/sql/new"
               target="_blank"
@@ -306,10 +263,21 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
             >
               Supabase SQL Editor
             </a>
-            .
+            . Of gebruik de Supabase MCP tools: <code className="text-xs bg-zinc-100 px-1 py-0.5 rounded">apply_migration</code> / <code className="text-xs bg-zinc-100 px-1 py-0.5 rounded">execute_sql</code>.
           </p>
-          <div className="max-h-64 overflow-auto rounded-md bg-zinc-900 p-4">
-            <pre className="text-xs text-[var(--ink-4)] whitespace-pre-wrap">{migrationSQL.substring(0, 2000)}...</pre>
+          <div className="rounded-md bg-zinc-900 p-4 text-xs text-zinc-300 font-mono space-y-1">
+            <p>-- Pending migratie bestanden (chronologisch):</p>
+            {!schemaStatus.all_holdings_columns_exist && <p>-- supabase/migrations/20260316100001_add_holdings_classification_and_target_allocations.sql</p>}
+            {!schemaStatus.holdings_columns?.is_favorite && <p>-- supabase/migrations/20260316100002_add_holdings_is_favorite.sql</p>}
+            {!schemaStatus.holdings_columns?.currency && <p>-- supabase/migrations/20260316200001_add_holdings_currency.sql</p>}
+            {!schemaStatus.tables?.holding_prices && <p>-- supabase/migrations/20260316300001_create_holding_prices.sql</p>}
+            <p>-- supabase/migrations/20260316400001_add_holding_transaction_split_type.sql</p>
+            {!schemaStatus.tables?.holding_alerts && <p>-- supabase/migrations/20260316400002_create_holding_alerts.sql</p>}
+            <p>-- supabase/migrations/20260316500001_create_pension_documents_bucket.sql</p>
+            <p>-- supabase/migrations/20260316600001_drop_badges_streaks_tables.sql</p>
+            {!schemaStatus.profile_columns?.onboarding_idempotency_key && <p>-- supabase/migrations/20260319000001_add_budgets_user_slug_parent_unique.sql</p>}
+            {!schemaStatus.rpc?.save_onboarding_data && <p>-- supabase/migrations/20260319000002_create_save_onboarding_rpc.sql</p>}
+            {!schemaStatus.profile_columns?.invulfase_active && <p>-- supabase/migrations/20260319000003_add_invulfase_active_to_profiles.sql</p>}
           </div>
         </div>
       )}
