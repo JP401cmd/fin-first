@@ -475,6 +475,12 @@ $$ LANGUAGE plpgsql`,
   `DROP TRIGGER IF EXISTS roadmap_features_updated_at ON roadmap_features`,
   `CREATE TRIGGER roadmap_features_updated_at BEFORE UPDATE ON roadmap_features FOR EACH ROW EXECUTE FUNCTION update_roadmap_features_updated_at()`,
 
+  // ── 20260319100001: Marginaal tarief column ────────────────────────
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS marginaal_tarief numeric DEFAULT NULL`,
+
+  // ── 20260319100001: Holdings TER column ───────────────────────────
+  `ALTER TABLE holdings ADD COLUMN IF NOT EXISTS ter numeric`,
+
   // ── PostgREST schema cache reload ───────────────────────────────────
   `NOTIFY pgrst, 'reload schema'`,
 ]
@@ -639,7 +645,7 @@ export async function GET() {
   }
 
   // Check profiles columns
-  const profileColumns = ['onboarding_idempotency_key', 'invulfase_active', 'withdrawal_strategy', 'guardrail_floor', 'guardrail_ceiling', 'guardrail_cut_step', 'guardrail_raise_step']
+  const profileColumns = ['onboarding_idempotency_key', 'invulfase_active', 'withdrawal_strategy', 'guardrail_floor', 'guardrail_ceiling', 'guardrail_cut_step', 'guardrail_raise_step', 'marginaal_tarief']
   const profileColumnStatus: Record<string, boolean> = {}
   for (const col of profileColumns) {
     const { error } = await supabase.from('profiles').select(col).limit(0)

@@ -11,20 +11,35 @@ export async function GET() {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  const { data, error } = await supabase
+  // Try with marginaal_tarief column; fall back to base columns if column doesn't exist yet
+  let data: Record<string, unknown> | null = null
+  const { data: d1, error: e1 } = await supabase
     .from('profiles')
-    .select('expected_return, inflation_rate, box3_method')
+    .select('expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income')
     .eq('id', user.id)
     .single()
 
-  if (error) {
-    return NextResponse.json({ error: 'Fout bij laden parameters' }, { status: 500 })
+  if (!e1) {
+    data = d1 as Record<string, unknown>
+  } else {
+    // Fallback: column may not exist yet (migration not applied)
+    const { data: d2, error: e2 } = await supabase
+      .from('profiles')
+      .select('expected_return, inflation_rate, box3_method, net_monthly_income')
+      .eq('id', user.id)
+      .single()
+    if (e2) {
+      return NextResponse.json({ error: 'Fout bij laden parameters' }, { status: 500 })
+    }
+    data = d2 as Record<string, unknown>
   }
 
   return NextResponse.json({
     expected_return: data?.expected_return ?? 0.07,
     inflation_rate: data?.inflation_rate ?? 0.02,
     box3_method: data?.box3_method ?? 'forfaitair',
+    marginaal_tarief: data?.marginaal_tarief ?? null,
+    net_monthly_income: data?.net_monthly_income ?? null,
   })
 }
 
@@ -38,7 +53,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  let body: { expected_return?: unknown; inflation_rate?: unknown; box3_method?: unknown }
+  let body: { expected_return?: unknown; inflation_rate?: unknown; box3_method?: unknown; marginaal_tarief?: unknown }
   try {
     body = await request.json()
   } catch {
@@ -61,6 +76,19 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Box 3 methode moet "forfaitair" of "werkelijk" zijn' }, { status: 400 })
   }
 
+  // Validate marginaal_tarief if provided — null means "automatic"
+  const rawMT = body.marginaal_tarief
+  let marginaalTarief: number | null | undefined
+  if (rawMT === null) {
+    marginaalTarief = null // explicitly set to automatic
+  } else if (rawMT !== undefined) {
+    const mt = Number(rawMT)
+    if (mt !== 0.3697 && mt !== 0.4950) {
+      return NextResponse.json({ error: 'Marginaal tarief moet 36,97% of 49,50% zijn' }, { status: 400 })
+    }
+    marginaalTarief = mt
+  }
+
   const updateData: Record<string, unknown> = {
     id: user.id,
     expected_return: expectedReturn,
@@ -70,10 +98,20 @@ export async function PUT(request: NextRequest) {
   if (box3Method !== undefined) {
     updateData.box3_method = box3Method
   }
+  if (marginaalTarief !== undefined) {
+    updateData.marginaal_tarief = marginaalTarief
+  }
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from('profiles')
     .upsert(updateData)
+
+  // If upsert fails (e.g. marginaal_tarief column doesn't exist yet), retry without it
+  if (error && marginaalTarief !== undefined) {
+    delete updateData.marginaal_tarief
+    const retry = await supabase.from('profiles').upsert(updateData)
+    error = retry.error
+  }
 
   if (error) {
     return NextResponse.json({ error: 'Fout bij opslaan parameters' }, { status: 500 })
@@ -84,5 +122,6 @@ export async function PUT(request: NextRequest) {
     expected_return: expectedReturn,
     inflation_rate: inflationRate,
     box3_method: box3Method ?? 'forfaitair',
+    marginaal_tarief: marginaalTarief !== undefined ? marginaalTarief : null,
   })
 }

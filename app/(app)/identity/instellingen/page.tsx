@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote } from 'lucide-react'
+import { ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Scale } from 'lucide-react'
 import Link from 'next/link'
 import { BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -83,6 +83,14 @@ export default function InstellingenPage() {
   const [gegevensOpen, setGegevensOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [functiesOpen, setFunctiesOpen] = useState(false)
+  const [rebalancingOpen, setRebalancingOpen] = useState(false)
+
+  // ─ Section: Rebalancing ─
+  const [rebalanceThreshold, setRebalanceThreshold] = useState(5)
+  const [rebalanceThresholdSaved, setRebalanceThresholdSaved] = useState(5)
+  const [rebalanceSaving, setRebalanceSaving] = useState(false)
+  const [rebalanceMessage, setRebalanceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [hasTargetAllocations, setHasTargetAllocations] = useState(false)
 
   // ─ Feature toggle hook ─
   const { features, subscriptions, phase } = useFeatureAccess()
@@ -139,6 +147,7 @@ export default function InstellingenPage() {
   const [expectedReturn, setExpectedReturn] = useState(7)
   const [inflationRate, setInflationRate] = useState(2)
   const [box3Method, setBox3Method] = useState<'forfaitair' | 'werkelijk'>('forfaitair')
+  const [marginaalTarief, setMarginaalTarief] = useState<'auto' | '0.3697' | '0.4950'>('auto')
   const [paramSaving, setParamSaving] = useState(false)
   const [paramMessage, setParamMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
@@ -211,6 +220,17 @@ export default function InstellingenPage() {
         }
       } catch { /* ignore */ }
 
+      // Load marginaal_tarief from parameters API (resilient to missing DB column)
+      try {
+        const paramRes = await fetch('/api/parameters')
+        if (paramRes.ok) {
+          const paramData = await paramRes.json()
+          if (paramData.marginaal_tarief === 0.3697) setMarginaalTarief('0.3697')
+          else if (paramData.marginaal_tarief === 0.4950) setMarginaalTarief('0.4950')
+          else setMarginaalTarief('auto')
+        }
+      } catch { /* ignore */ }
+
       // FIRE parameters
       const d = profileData.data
       if (d) {
@@ -267,7 +287,22 @@ export default function InstellingenPage() {
           setAiEnabled(d.ai_enabled as boolean)
         }
 
+        // Rebalancing threshold
+        if (d.rebalance_threshold != null) {
+          const th = Number(d.rebalance_threshold)
+          setRebalanceThreshold(th)
+          setRebalanceThresholdSaved(th)
+        }
       }
+
+      // Check if user has target allocations (progressive disclosure)
+      try {
+        const { count } = await supabase
+          .from('target_allocations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+        setHasTargetAllocations((count ?? 0) > 0)
+      } catch { /* table may not exist */ }
 
       // Household privacy settings + partner notification prefs
       try {
@@ -415,6 +450,7 @@ export default function InstellingenPage() {
           expected_return: expectedReturn / 100,
           inflation_rate: inflationRate / 100,
           box3_method: box3Method,
+          marginaal_tarief: marginaalTarief === 'auto' ? null : Number(marginaalTarief),
         }),
       })
       if (!res.ok) {
@@ -428,7 +464,7 @@ export default function InstellingenPage() {
       setParamMessage({ type: 'error', text: 'Netwerkfout — probeer opnieuw' })
     }
     setParamSaving(false)
-  }, [expectedReturn, inflationRate, box3Method])
+  }, [expectedReturn, inflationRate, box3Method, marginaalTarief])
 
   const saveFireSettings = useCallback(async () => {
     setFireSaving(true)
@@ -480,6 +516,24 @@ export default function InstellingenPage() {
     }
     setWsSaving(false)
   }, [withdrawalStrategy, guardrailFloor, guardrailCeiling, guardrailCutStep, guardrailRaiseStep])
+
+  // ─ Section: Rebalancing handler ──────────────────────────────────────────
+  const saveRebalanceThreshold = useCallback(async () => {
+    setRebalanceSaving(true)
+    setRebalanceMessage(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+      const { error } = await supabase.from('profiles').update({ rebalance_threshold: rebalanceThreshold }).eq('id', user.id)
+      if (error) throw error
+      setRebalanceThresholdSaved(rebalanceThreshold)
+      setRebalanceMessage({ type: 'success', text: 'Drempel opgeslagen!' })
+      setTimeout(() => setRebalanceMessage(null), 3000)
+    } catch {
+      setRebalanceMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+    }
+    setRebalanceSaving(false)
+  }, [supabase, rebalanceThreshold])
 
   // ─ Section F: Privacy & AI handler ────────────────────────────────────────
   const toggleAiEnabled = useCallback(async (enabled: boolean) => {
@@ -1007,6 +1061,59 @@ export default function InstellingenPage() {
 
         <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
 
+        {/* Marginaal IB-tarief */}
+        <div className="mb-6">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Marginaal belastingtarief</p>
+          <p className="mb-4 font-sans text-sm text-[var(--ink-3)]">
+            Je marginale IB-tarief bepaalt het voordeel van hypotheekrenteaftrek en andere Box 1-aftrekposten.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {([
+              {
+                value: 'auto' as const,
+                label: 'Automatisch',
+                subtitle: 'Afgeleid uit je netto maandinkomen',
+              },
+              {
+                value: '0.3697' as const,
+                label: '36,97%',
+                subtitle: 'Schijf 1 — t/m €75.518 bruto',
+              },
+              {
+                value: '0.4950' as const,
+                label: '49,50%',
+                subtitle: 'Schijf 2 — boven €75.518 bruto',
+              },
+            ]).map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setMarginaalTarief(opt.value)}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors text-left ${
+                  marginaalTarief === opt.value
+                    ? 'border-zinc-900 bg-zinc-900 text-white'
+                    : 'border-[var(--border-md)] text-[var(--ink-2)] hover:border-zinc-400'
+                }`}
+              >
+                <div className="font-semibold">{opt.label}</div>
+                <div className={`text-xs mt-0.5 ${marginaalTarief === opt.value ? 'text-zinc-300' : 'text-[var(--ink-3)]'}`}>
+                  {opt.subtitle}
+                </div>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 font-sans text-[11px] text-[var(--ink-3)]">
+            {marginaalTarief === 'auto'
+              ? 'Het tarief wordt automatisch bepaald op basis van je netto maandinkomen. Netto > €4.200/mnd = 49,50%, anders 36,97%.'
+              : marginaalTarief === '0.3697'
+                ? 'Schijf 1-tarief (36,97%) geldt voor belastbaar inkomen tot €75.518 per jaar (2025).'
+                : 'Schijf 2-tarief (49,50%) geldt voor belastbaar inkomen boven €75.518 per jaar (2025).'
+            }
+          </p>
+        </div>
+
+        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
+
         {/* Retirement expense method */}
         <div className="mb-6">
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Jaarlijkse uitgave na retirement</p>
@@ -1466,6 +1573,82 @@ export default function InstellingenPage() {
           </div>
         )}
       </section>
+
+      {/* ── Rebalancing ─────────────────────────────────────────────── */}
+      {hasTargetAllocations && (
+      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setRebalancingOpen(o => !o)}
+          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+        >
+          <div>
+            <h2 className="label-editorial text-[var(--ink-2)]">Rebalancing</h2>
+            {!rebalancingOpen && (
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Drift drempel en herbalanceerinstellingen</p>
+            )}
+          </div>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${rebalancingOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {rebalancingOpen && (
+          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-5">
+            <p className="text-sm text-[var(--ink-2)]">
+              Stel in hoe gevoelig de rebalancing-meldingen zijn. Een lagere drempel geeft eerder een signaal, een hogere drempel filtert kleine afwijkingen weg.
+            </p>
+
+            {/* Threshold label + value */}
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Drift Drempel</p>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={rebalanceThreshold}
+                  onChange={e => setRebalanceThreshold(Number(e.target.value))}
+                  className="flex-1 h-2 rounded-full appearance-none bg-[var(--border-ed)] accent-horizon-500 cursor-pointer"
+                  style={{ minHeight: '44px' }}
+                />
+                <span className="font-mono tabular-nums text-lg font-semibold text-[var(--ink)] min-w-[3.5rem] text-right">
+                  {rebalanceThreshold}%
+                </span>
+              </div>
+              <div className="flex justify-between text-[10px] text-[var(--ink-4)] mt-1 px-0.5">
+                <span>1% — gevoelig</span>
+                <span>20% — tolerant</span>
+              </div>
+            </div>
+
+            {/* Explanation */}
+            <p className="text-xs text-[var(--ink-3)] leading-relaxed">
+              Je ontvangt een melding wanneer je allocatie meer dan {rebalanceThreshold}% afwijkt van je target.
+              Bij een drempel van {rebalanceThreshold}% en een target van 60% aandelen, krijg je pas een signaal wanneer het aandeel onder {Math.max(0, 60 - rebalanceThreshold)}% of boven {Math.min(100, 60 + rebalanceThreshold)}% komt.
+            </p>
+
+            {/* Save button */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={saveRebalanceThreshold}
+                disabled={rebalanceSaving || rebalanceThreshold === rebalanceThresholdSaved}
+                className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {rebalanceSaving ? 'Opslaan...' : 'Drempel opslaan'}
+              </button>
+              {rebalanceMessage && (
+                <span className={`text-sm ${rebalanceMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {rebalanceMessage.text}
+                </span>
+              )}
+              {rebalanceThreshold !== rebalanceThresholdSaved && !rebalanceMessage && (
+                <span className="text-xs text-amber-600">Niet opgeslagen</span>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+      )}
 
       {/* ── F: Functies ──────────────────────────────────────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
