@@ -1,3 +1,18 @@
+## Session 2026-03-19 - Feature #358
+
+### Feature #358: HorizonPageData uitbreiden met volledige assets array - PASSING
+- Added `Asset` type import from `lib/asset-data.ts`
+- Added `assets: Asset[]` field to `HorizonPageData` interface
+- Added `select('*')` full assets query in parallel Promise.all batch (no extra DB roundtrip)
+- Cast result as `Asset[]` and included in return object
+- horizon/page.tsx already passes full `HorizonPageData` to client — no change needed
+- Zero new TypeScript errors, horizon page verified via browser (all KPIs + chart render correctly)
+- Commit: 66ab5b15
+
+### Current Status
+- 1 feature completed this session (#358)
+- Overall progress: 354/364 (97.3%)
+
 ## Session 2026-03-19 - Feature #355
 
 ### Feature #355: Regressietests bijwerken voor SimRow uitbreiding en IncomeExpenseChart - PASSING
@@ -17336,3 +17351,17 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 0 features completed this session (external blocker)
 - Total: 346/348 features passing (99.4%)
+
+## Session 2026-03-19 - Feature #357
+
+### Feature #357: UI/UX review Inkomen en Uitgaven grafiek - PASSING
+- Performed thorough UI/UX review of IncomeExpenseChart component
+- Fixes applied:
+  1. Tooltip color mismatch: green/red colors replaced with purple/amber to match line colors
+  2. English text: surplus changed to overschot (Dutch)
+  3. Accessibility: SVG aria-hidden replaced with role=img + aria-label, toggle gets aria-controls + descriptive aria-label, legend gets role=list
+  4. Toggle visual hierarchy: added border-top separator
+  5. Legend decorative SVGs: added aria-hidden=true
+- No issues found with: responsive behavior, typography, animation, whitespace, touch targets
+- Commit: d6213709
+- Overall progress: 353/356 (99.2%)
