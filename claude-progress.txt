@@ -16217,3 +16217,28 @@ For Feature #51 (Transaction Import):
 - Zero TypeScript errors in new file
 - Auth rate limit prevented browser testing (known persistent Supabase issue)
 - Commit: e03a15e8
+
+## Session 2026-03-19 - Features #327, #326
+
+### Feature #327: Budget inserts batchen voor performance en timeout preventie - PASSING
+- Refactored save-own-data API: 34 sequential budget inserts → 3 batched DB calls
+- Step 2a: Build all parent rows in one array with calculated limits
+- Step 2b: Bulk upsert all parents in one call, get IDs back
+- Step 2c: Map parent slugs to IDs via Map
+- Step 2d: Build all child rows with correct parent_id references
+- Step 2e: Bulk upsert all children in one call
+- Added `withRetry()` utility with exponential backoff (max 2 retries, 500ms/1000ms delays)
+- Increased client-side timeout from 15s to 30s
+- Delete-first pattern ensures idempotent retries (no partial state)
+- Zero TypeScript errors
+- Commit: 49e91ef2, 32f090f0
+
+### Feature #326: Companion cash assets aanmaken bij onboarding save - PASSING
+- Feature was already implemented in previous session
+- save-own-data route already creates companion cash assets matching seed-persona.ts pattern
+- Verified: asset_type='cash', linked_asset_id linkage, name/balance copy, cleanup on retry
+- All 9 steps already satisfied
+
+### Current Status
+- 2 features completed this session (#327, #326)
+- Overall progress: 315/329 (95.7%)
