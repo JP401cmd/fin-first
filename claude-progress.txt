@@ -1,3 +1,12 @@
+## Session 2026-03-19 (attempt 3) - Feature #331
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED AGAIN (External Blocker)
+- Third attempt, same blocker: Supabase MCP tools fail with "permissions not granted"
+- Confirmed via REST API: holdings.asset_class missing, target_allocations missing, save_onboarding_data RPC missing
+- No SUPABASE_ACCESS_TOKEN, no service role key, no direct DB connection available
+- Feature skipped (priority moved to 380)
+- Resolution: User must connect Supabase MCP OAuth OR provide SUPABASE_ACCESS_TOKEN/DB credentials
+
 ## Session 2026-03-19 - Feature #331
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (external blocker)
