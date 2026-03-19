@@ -64,6 +64,10 @@ const BacktestingModal = dynamic(() =>
   import('@/components/app/horizon/backtesting-modal').then(m => ({ default: m.BacktestingModal })),
   { ssr: false }
 )
+const StrategieModal = dynamic(() =>
+  import('@/components/app/horizon/strategie-modal').then(m => ({ default: m.StrategieModal })),
+  { ssr: false }
+)
 const SimChartModal = dynamic(() =>
   import('@/components/app/horizon/sim-chart-widget').then(m => ({ default: m.SimChartModal })),
   { ssr: false }
@@ -74,7 +78,7 @@ import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
-type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting'
+type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
 // Household FIRE data shape (from /api/household/fire-projections)
 interface HouseholdHeroData {
@@ -160,13 +164,25 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const router = useRouter()
   useEffect(() => {
     const modal = searchParams.get('modal')
-    if (!modal) return
-    if (modal === 'scenarios' || modal === 'simulations' || modal === 'withdrawal' || modal === 'backtesting') {
-      setActiveModal(modal)
-    } else if (modal === 'life_events') {
-      setShowForm(true)
+    const strategieParam = searchParams.get('strategie')
+    let shouldReplace = false
+
+    if (modal) {
+      if (modal === 'scenarios' || modal === 'simulations' || modal === 'withdrawal' || modal === 'backtesting' || modal === 'strategie') {
+        setActiveModal(modal)
+      } else if (modal === 'life_events') {
+        setShowForm(true)
+      }
+      shouldReplace = true
     }
-    router.replace('/horizon', { scroll: false })
+
+    // Support ?strategie=open query param (redirect from /horizon/strategie)
+    if (strategieParam === 'open') {
+      setActiveModal('strategie')
+      shouldReplace = true
+    }
+
+    if (shouldReplace) router.replace('/horizon', { scroll: false })
   }, [searchParams, router])
 
   // Event form state
@@ -2377,7 +2393,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
       <section className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
         <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
-          <Link href="/horizon/strategie" className="block">
+          <button
+            type="button"
+            onClick={() => setActiveModal('strategie')}
+            className="block w-full"
+          >
             <div className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
                 <Landmark className="h-5 w-5 text-horizon-600" />
@@ -2388,11 +2408,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <p className="mt-0.5 text-xs text-[var(--ink-3)]">hoe je vermogen opneemt</p>
               </div>
             </div>
-          </Link>
+          </button>
           <div className="mt-1 flex justify-end">
-            <Link href="/horizon/strategie" className="text-[11px] text-horizon-600 hover:text-horizon-700 underline underline-offset-2">
+            <button
+              type="button"
+              onClick={() => setActiveModal('strategie')}
+              className="text-[11px] text-horizon-600 hover:text-horizon-700 underline underline-offset-2"
+            >
               Strategieën vergelijken →
-            </Link>
+            </button>
           </div>
         </FeatureGate>
         <FeatureGate featureId="gezondheids_score" fallback="hidden">
@@ -5216,6 +5240,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           />
         </>
       )}
+      <StrategieModal open={activeModal === 'strategie'} onClose={() => setActiveModal(null)} />
     </div>
   )
 }
