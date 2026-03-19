@@ -11,6 +11,7 @@
  */
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'
+import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
 
 const S = BUDGET_SLUGS
 
@@ -64,6 +65,12 @@ export interface PersonaProfile {
   fire_legacy_amount?: number     // alleen bij 'legacy'
   retirement_expense_method?: 'essential_budgets' | 'custom_amount' | 'current_income'
   retirement_expense_custom_amount?: number
+  // Withdrawal strategy
+  withdrawal_strategy?: WithdrawalStrategyType
+  guardrail_floor?: number
+  guardrail_ceiling?: number
+  guardrail_cut_step?: number
+  guardrail_raise_step?: number
   // Profile income/expense estimates (for users without budgets/transactions)
   net_monthly_income?: number
   estimated_monthly_expenses?: number
@@ -575,6 +582,7 @@ const roosData: PersonaData = {
     fire_end_strategy: 'deplete',
     fire_end_age: 85,
     retirement_expense_method: 'current_income',
+    withdrawal_strategy: 'static',
     invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'schulden', size: 'full' }, 'cash_flow',
@@ -799,6 +807,7 @@ const daanData: PersonaData = {
     fire_end_strategy: 'perpetual',
     fire_end_age: 90,
     retirement_expense_method: 'essential_budgets',
+    withdrawal_strategy: 'static',
     invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', 'spaarquote', 'doelen',
@@ -1041,6 +1050,7 @@ const lisaData: PersonaData = {
     fire_end_age: 90,
     fire_legacy_amount: 100000,
     retirement_expense_method: 'essential_budgets',
+    withdrawal_strategy: 'bucket',
     invulfase_active: false,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
@@ -1305,6 +1315,7 @@ const willemData: PersonaData = {
     fire_end_age: 95,
     retirement_expense_method: 'custom_amount',
     retirement_expense_custom_amount: 3000,
+    withdrawal_strategy: 'vpw',
     invulfase_active: false,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
@@ -1542,6 +1553,7 @@ const rashidData: PersonaData = {
     fire_end_strategy: 'deplete',
     fire_end_age: 90,
     retirement_expense_method: 'current_income',
+    withdrawal_strategy: 'static',
     net_monthly_income: 5500,
     estimated_monthly_expenses: 4200,
     invulfase_active: true,
@@ -1778,6 +1790,11 @@ const marijkeData: PersonaData = {
     fire_legacy_amount: 200000,
     retirement_expense_method: 'custom_amount',
     retirement_expense_custom_amount: 2800,
+    withdrawal_strategy: 'guardrails',
+    guardrail_floor: 0.80,
+    guardrail_ceiling: 1.20,
+    guardrail_cut_step: 0.10,
+    guardrail_raise_step: 0.10,
     net_monthly_income: 3400,
     estimated_monthly_expenses: 2800,
     invulfase_active: false,

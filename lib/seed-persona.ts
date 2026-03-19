@@ -175,6 +175,13 @@ export async function seedPersonaData(
   if (persona.profile.retirement_expense_method) profileData.retirement_expense_method = persona.profile.retirement_expense_method
   if (persona.profile.retirement_expense_custom_amount != null) profileData.retirement_expense_custom_amount = persona.profile.retirement_expense_custom_amount
 
+  // Withdrawal strategy
+  if (persona.profile.withdrawal_strategy) profileData.withdrawal_strategy = persona.profile.withdrawal_strategy
+  if (persona.profile.guardrail_floor != null) profileData.guardrail_floor = persona.profile.guardrail_floor
+  if (persona.profile.guardrail_ceiling != null) profileData.guardrail_ceiling = persona.profile.guardrail_ceiling
+  if (persona.profile.guardrail_cut_step != null) profileData.guardrail_cut_step = persona.profile.guardrail_cut_step
+  if (persona.profile.guardrail_raise_step != null) profileData.guardrail_raise_step = persona.profile.guardrail_raise_step
+
   // Profile income/expense estimates
   if (persona.profile.net_monthly_income != null) profileData.net_monthly_income = persona.profile.net_monthly_income
   if (persona.profile.estimated_monthly_expenses != null) profileData.estimated_monthly_expenses = persona.profile.estimated_monthly_expenses
