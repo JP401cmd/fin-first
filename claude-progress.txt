@@ -1,3 +1,24 @@
+## Session 2026-03-19 - Feature #331 (Attempt 8)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 8)
+- **Blocker**: Cannot access hosted Supabase database to apply DDL migrations
+- **Schema status via GET /api/apply-migration**:
+  - Missing tables: target_allocations, holding_prices, holding_alerts
+  - Missing holdings columns: asset_class, sector, geography, previous_close, daily_change_percent, is_favorite, currency
+  - Missing profile columns: onboarding_idempotency_key, invulfase_active
+  - Missing RPC: save_onboarding_data
+  - Present: all snapshot columns, withdrawal_strategy columns, base tables
+- **All approaches blocked**:
+  1. Supabase MCP tools (execute_sql, apply_migration, list_tables, list_migrations) — user has not granted permission
+  2. Supabase CLI (`npx supabase`) — "Access token not provided"
+  3. `/api/apply-migration` POST — requires db_password, service_role_key, or access_token (none available)
+  4. No SUPABASE_DB_PASSWORD, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_ACCESS_TOKEN in .env/.env.local
+- **Resolution needed**: User must either:
+  1. Grant Supabase MCP tool permissions when prompted, OR
+  2. Provide DB password (Supabase Dashboard > Settings > Database), OR
+  3. Run `npx supabase login` to authenticate CLI, OR
+  4. Use the beheer/migration page at /beheer/migration to enter DB password manually
+
 ## Session 2026-03-19 - Feature #338
 
 ### Feature #338: Widget dashboard persistentie fixen - PASSING
