@@ -16880,3 +16880,51 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#340, #341)
 - Overall: ~339/346 features passing (97.7%)
+
+## Session 2026-03-19 - Features #344, #345
+
+### Feature #344: Regressietests uitbreiden voor gezondheid score refactor - PASSING
+- Extended wil-gezondheid.ts from 25 to 34 test cases
+- Added 9 new tests for budgetingActive parameter:
+  - health-5pillar-count: verifies 5 pillars returned when budgetingActive=false
+  - health-5pillar-no-budget-discipline: budget_discipline absent from 5-pillar results
+  - health-5pillar-weights-sum: redistributed weights sum to 1.0
+  - health-6pillar-weights-sum: base weights sum to 1.0
+  - health-5pillar-redistributed-weights: each weight = base / 0.90
+  - health-5pillar-weighted-total: correct weighted total with 5-pillar math
+  - health-6pillar-explicit: explicit true produces 6 pillars with base weights
+  - health-5pillar-vs-6pillar-differ: scores differ when budget impact matters
+  - health-veerkracht-widget-not-in-catalog: old widget not in WIDGET_CATALOG
+- Deprecated veerkracht-score-widget.tsx with @deprecated JSDoc
+- Verified no UI rendering imports of computeResilienceScore (only in deprecated widget comments and test/verify pages)
+- Commit: c058a5bc
+
+### Feature #345: Seed personas valideren voor gezondheid score - PASSING
+- Added 6 health-score-specific validation tests to testdata-persona-validatie.ts:
+  - tp-health-score-personas-identified: Willem and Marijke have gezondheids_score widget
+  - tp-health-score-willem-data-fields: all computeHealthScore data fields present
+  - tp-health-score-marijke-data-fields: all computeHealthScore data fields present
+  - tp-health-score-budgeting-active-persona: both have budgets (6-pillar mode)
+  - tp-health-score-5pillar-candidate: Rashid has no budgets (5-pillar candidate)
+  - tp-health-score-widget-prefs-consistent: all widget IDs valid in WIDGET_CATALOG
+- Recommendation: Add gezondheids_score to Rashid's widget_prefs for 5-pillar coverage
+- Commit: 666a419f
+
+### Current Status
+- 2 features completed this session (#344, #345)
+- Total: 340/346 features passing (98.0%)
+
+## Session 2026-03-19 - Feature #331 (Attempt 13)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 13)
+- **Root cause confirmed**: Supabase MCP server at https://mcp.supabase.com/mcp returns HTTP 401 (Unauthorized)
+- **Permissions ARE configured** in .claude/settings.local.json (all mcp__supabase__* tools listed)
+- **But MCP server needs OAuth**: The server requires browser-based OAuth authentication before tools work
+- **Verified migrations NOT applied**: REST API confirms asset_class column missing, target_allocations/holding_prices/holding_alerts tables don't exist, save_onboarding_data RPC missing
+- **All 11 migration files identified** (20260316100001 through 20260319000003)
+- **Resolution needed**: User must authenticate Supabase MCP via interactive Claude session, OR provide database password/access token
+- Attempted: Supabase CLI (no access token), direct PostgreSQL (wrong password), REST API (anon key can't DDL)
+
+### Current Status
+- 0 features completed this session
+- Total: 343/346 features passing (99.1%)
