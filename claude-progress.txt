@@ -1,3 +1,31 @@
+## Session 2026-03-19 - Features #316, #318
+
+### Feature #316: Budgetteren keuze conditioneel doorwerken - PASSING
+- Made STEP_ORDER dynamic based on budgettering_mode in reducer state
+- OnboardingIdentity: hides 'essential_budgets' retirement method when budgettering_mode === 'none'
+- Auto-resets retirement_expense_method to 'current_income' when switching off budgeting
+- OnboardingPreferences: filters out 'budget_cashflow' FocusChoice when no budgeting
+- Budget step skipped in STEP_ORDER when budgettering_mode === 'none'
+- StepProgress shows dynamic step count via hideBudgets prop on all step components
+- Reducer cleans up budget_cashflow from preferences when switching to no-budgets
+- All 10 feature steps verified via browser automation
+- Commit: b6e785b5
+
+### Feature #318: Budget templates herstructureren - PASSING
+- Replaced Zuinig/Gebalanceerd/Vrijheidsgericht templates with 3 new category-based templates:
+  - Minimalistisch (5 categorieën): Wonen, Boodschappen, Vervoer, Vrije besteding, Sparen
+  - Nibud-standaard (9 categorieën): Based on Dutch Nibud household budget categories
+  - Uitgebreid (16 categorieën): All detailed subcategories for maximum control
+- Templates show category overview with emoji badges (NO amounts) before selection
+- distributeIncome() utility ensures amounts sum to exactly net income (rounding remainder to largest slug)
+- All three templates' percentages verified to add up to 1.00
+- After selection, pre-filled amounts shown in BudgetAmountEditor for review/adjustment
+- Commit: c75f1510
+
+### Current Status
+- 2 features completed this session (#316, #318)
+- Both verified via browser automation with zero console errors
+
 ## Session 2026-03-19 - Feature #315
 
 ### Feature #315: Testaccount downgraden naar user-rol - PASSING
