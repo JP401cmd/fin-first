@@ -1,3 +1,29 @@
+## Session 2026-03-19 - Features #377, #380
+
+### Feature #377: Instelbare drift drempel — gebruikersvoorkeur voor rebalancing gevoeligheid - PASSING
+- Migration already existed: rebalance_threshold NUMERIC DEFAULT 5 with CHECK 1-20
+- API /api/rebalancing/check already reads threshold from profile (fallback 5%)
+- UI section in instellingen already implemented: collapsible Rebalancing section with slider (1-20%, step 1)
+- Progressive disclosure: section only shows when user has target_allocations
+- Save handler updates profiles table directly
+- Touch-friendly slider with minHeight 44px
+- All verified via browser — no JS errors
+
+### Feature #380: Seed data — Target allocations voor persona's - PASSING
+- Added PersonaTargetAllocation interface and target_allocations to PersonaData type
+- Added rebalance_threshold to PersonaProfile type
+- Persona 2 (Daan): conservatief targets (40% equity, 40% bonds, 20% cash), threshold 3%
+- Persona 4 (Willem): agressief targets (80% equity, 10% bonds, 5% real_estate, 5% crypto), threshold 10%
+- Persona 5 (Rashid): gebalanceerd targets (60% equity, 20% bonds, 10% real_estate, 10% cash), threshold 5%
+- Personas 1 (Roos) and 3 (Lisa): no targets — test progressive disclosure
+- Updated seed-persona.ts: upsert target_allocations in Phase 4 with graceful fallback
+- Profile upsert retries without rebalance_threshold if column missing (migration not yet applied)
+- Verified seeding works end-to-end via browser (Willem persona loads successfully)
+
+### Current Status
+- 2 features completed this session (#377, #380)
+- Progress: 378/397 passing (95.2%)
+
 ## Session 2026-03-19 - Feature #383
 
 ### Feature #383: TER invoer op holdings — detail pagina en create/edit flows - PASSING
