@@ -17018,3 +17018,22 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 0 features completed this session (external blocker)
 - Total: 344/346 features passing (99.4%)
+
+## Session 2026-03-19 - Feature #331 (Attempt 17)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 17)
+- **Root cause unchanged**: Supabase MCP server requires OAuth authentication that can only be completed interactively by the user
+- **All Supabase MCP tools blocked**: list_migrations, apply_migration, execute_sql, list_tables all return "Claude requested permissions but you haven't granted it yet"
+- **No alternative credentials available**:
+  - No SUPABASE_ACCESS_TOKEN in environment
+  - No SERVICE_ROLE_KEY in any env file
+  - No database password available
+  - Supabase CLI requires `supabase login` (access token)
+  - Docker not available for local Supabase
+  - Anon key is read-only (cannot execute DDL)
+- **Resolution**: User must authenticate Supabase MCP via interactive Claude Code session (OAuth flow), OR provide SUPABASE_ACCESS_TOKEN, OR apply migrations manually via Supabase Dashboard SQL Editor
+- **Migrations pending**: 11 files (20260316100001 through 20260319000003, excluding 20260318000001 which is already applied)
+
+### Current Status
+- 0 features completed this session (external blocker)
+- Total: 345/347 features passing (99.4%)
