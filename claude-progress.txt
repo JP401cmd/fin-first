@@ -17484,3 +17484,31 @@ For Feature #51 (Transaction Import):
 - Minor finding: -0 vs 0 from `-Math.round(0)` when no debts — cosmetic, not a bug
 - No seed data changes needed (as expected)
 - Commit: 92bbb764
+
+## Session 2026-03-19 - Feature #363
+
+### Feature #363: Regressietests voor wealth composition helper, chart en toggle - PASSING
+- **Unit tests (26)** for `projectWealthComposition()` in `lib/wealth-composition.test.ts`:
+  - Asset type grouping: all 13 types correctly mapped to 5 wealth groups
+  - Projection growth: compound interest, monthly contributions, combined
+  - Debt repayment: annuiteit, lineair, aflossingsvrij schedules
+  - Edge cases: empty data, single category, all categories, boundary ages
+  - Post-FIRE withdrawals: draw order (beleggingen→spaargeld→overig), inflation-adjusted
+- **Component tests (13)** for `WealthCompositionChart` in `components/app/horizon/wealth-composition-chart.test.tsx`:
+  - SVG rendering, stacked bars, legend visibility
+  - FIRE age vertical line rendering
+  - Zoom sync with visibleMinAge/visibleMaxAge
+  - Responsive height (mobile vs desktop)
+  - Debt layer rendering (red bars below zero)
+- **Integration test** for toggle verified via browser automation:
+  - Default: Vermogenspad selected (pressed)
+  - Click Vermogensopbouw → chart switches to stacked bar view
+  - Click back to Vermogenspad → restores portfolio trajectory
+- **Regression verification**: All 96 horizon-related tests passing across 5 test files
+  - horizon-fire-chart.test.ts (12), persona-wealth-composition-compat.test.ts (38), income-expense-chart.test.tsx (7), wealth-composition.test.ts (26), wealth-composition-chart.test.tsx (13)
+- Zero JS console errors (only pre-existing Supabase net_worth_snapshots 400)
+- Commit: 51ad12e3
+
+### Current Status
+- 1 feature completed this session (#363)
+- Overall progress: 362/364 (99.5%)
