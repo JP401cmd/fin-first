@@ -115,6 +115,25 @@ export function composeBriefingFallback(
     })
   }
 
+  // 8b. Hypotheek vs Beleggen comparison card (for mortgage users)
+  if (data.hvbSummary) {
+    const hvb = data.hvbSummary
+    const breakevenPct = (hvb.breakevenRendement * 100).toFixed(1)
+    const aanbevelingNl = hvb.aanbeveling === 'beleggen' ? 'Extra beleggen'
+      : hvb.aanbeveling === 'aflossen' ? 'Extra aflossen'
+      : 'Nagenoeg gelijk'
+    cards.push({
+      type: 'comparison',
+      label: 'Hypotheek vs Beleggen',
+      leftLabel: 'Hypotheekrente',
+      leftValue: `${hvb.rente}%`,
+      rightLabel: 'Breakeven rendement',
+      rightValue: `${breakevenPct}%`,
+      delta: aanbevelingNl,
+      href: '/core/debts',
+    })
+  }
+
   // 9. Countdown — salary or tax deadline
   if (temporal.month === 3 || temporal.month === 4) {
     const taxDeadlineDay = temporal.month === 3 ? 31 + 30 : 30 // days until May 1

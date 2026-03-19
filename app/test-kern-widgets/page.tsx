@@ -214,6 +214,7 @@ const MOCK_DATA: DashboardData = {
     holdingsWithoutTER: 0,
   },
   feeImpactMonths: 8,
+  hvbSummary: null,
 }
 
 const KERN_WIDGETS = [

@@ -153,6 +153,7 @@ function makeEmptyDashboardData(): DashboardData {
     },
     feeAnalysis: null,
     feeImpactMonths: 0,
+    hvbSummary: null,
   }
 }
 

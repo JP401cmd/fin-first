@@ -51,6 +51,7 @@ import {
   generateRebalanceNotifications,
 } from '@/lib/rebalancing'
 import type { HoldingForAllocation, TargetAllocation } from '@/lib/portfolio-allocation'
+import { compareMortgageVsInvest, type RepaymentType } from '@/lib/hypotheek-vs-beleggen'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -126,8 +127,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
-    supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active').single(),
+    supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id, interest_rate, repayment_type, remaining_term_months, monthly_payment').eq('is_active', true),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -1395,6 +1396,51 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     }
   }
 
+  // ── Hypotheek vs Beleggen summary ────────────────────────────
+  let hvbSummary: DashboardData['hvbSummary'] = null
+  try {
+    const mortgageDebt = (debtsResult.data ?? []).find(d => {
+      const dt = (d as { debt_type?: string }).debt_type
+      return dt === 'mortgage' && Number(d.current_balance) > 0
+    })
+    if (mortgageDebt) {
+      const balance = Number(mortgageDebt.current_balance)
+      const rente = Number((mortgageDebt as { interest_rate?: number | null }).interest_rate ?? 0)
+      const isTaxDeductible = (mortgageDebt as { is_tax_deductible?: boolean }).is_tax_deductible ?? false
+      const marginaalTarief = Number((profileResult.data as Record<string, unknown> | null)?.marginaal_tarief ?? 0.3697)
+      const rawRepType = (mortgageDebt as { repayment_type?: string | null }).repayment_type
+      const repaymentType: RepaymentType = rawRepType === 'lineair' ? 'linear'
+        : rawRepType === 'aflossingsvrij' ? 'interest_only'
+        : 'annuity'
+      const remainingTermMonths = Number((mortgageDebt as { remaining_term_months?: number | null }).remaining_term_months ?? 360)
+
+      if (rente > 0) {
+        const hvbResult = compareMortgageVsInvest({
+          extraBedrag: 200, // standaard €200/maand extra
+          hypotheekBalance: balance,
+          rente,
+          repaymentType,
+          restLooptijd: remainingTermMonths,
+          isTaxDeductible,
+          marginaalTarief,
+          verwachtRendement: fireParams.grossReturn,
+          inflatie: fireParams.inflationRate,
+          hasPartner: false,
+          horizonJaren: 10,
+        })
+        hvbSummary = {
+          restschuld: balance,
+          rente,
+          breakevenRendement: hvbResult.breakevenRendement,
+          aanbeveling: hvbResult.aanbeveling,
+          isTaxDeductible,
+        }
+      }
+    }
+  } catch {
+    // HvB computation may fail — keep null
+  }
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -1491,6 +1537,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     weekOverview,
     feeAnalysis,
     feeImpactMonths,
+    hvbSummary,
   }
 
   return {

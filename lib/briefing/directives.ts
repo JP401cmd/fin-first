@@ -163,6 +163,16 @@ export const DIRECTIVE_METRICS: DirectiveMetric[] = [
     ],
   },
   {
+    id: 'hypotheek',
+    label: 'Hypotheek',
+    conditions: [
+      { id: 'has_mortgage', label: 'Heeft hypotheek' },
+      { id: 'high_rate', label: 'Hoge rente (>4%)' },
+      { id: 'beleggen_wint', label: 'Beleggen voordeliger' },
+      { id: 'aflossen_wint', label: 'Aflossen voordeliger' },
+    ],
+  },
+  {
     id: 'next_steps',
     label: 'Volgende stappen',
     conditions: [
@@ -274,6 +284,13 @@ export function extractMetricsFromSummary(dataSummary: string): Record<string, s
     metrics.totalDiscoverFeatures = parseInt(discoverMatch[2])
   }
 
+  // Hypotheek vs Beleggen
+  metrics.hasMortgage = dataSummary.includes('HYPOTHEEK VS BELEGGEN:')
+  const hvbRenteMatch = dataSummary.match(/Hypotheekrente: ([\d.,]+)%/)
+  metrics.hypotheekRente = hvbRenteMatch ? parseFloat(hvbRenteMatch[1].replace(',', '.')) : null
+  const hvbAanbevelingMatch = dataSummary.match(/Aanbeveling.*?: (aflossen|beleggen|gelijk)/)
+  metrics.hvbAanbeveling = hvbAanbevelingMatch ? hvbAanbevelingMatch[1] : null
+
   return metrics
 }
 
@@ -354,6 +371,16 @@ export function evaluateFunctionalDirective(
       if (condition === 'stable') return income > 0
       if (condition === 'variable') return false // Would need history
       if (condition === 'increased') return false // Would need history
+      return false
+    }
+    case 'hypotheek': {
+      const hasMortgage = metrics.hasMortgage as boolean
+      const rente = metrics.hypotheekRente as number | null
+      const aanbeveling = metrics.hvbAanbeveling as string | null
+      if (condition === 'has_mortgage') return hasMortgage
+      if (condition === 'high_rate') return hasMortgage && rente != null && rente > 4
+      if (condition === 'beleggen_wint') return hasMortgage && aanbeveling === 'beleggen'
+      if (condition === 'aflossen_wint') return hasMortgage && aanbeveling === 'aflossen'
       return false
     }
     case 'next_steps': {

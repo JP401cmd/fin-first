@@ -431,6 +431,20 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   lines.push(`- Budget discipline: ${trends.budgetDisciplineScore}%`)
   lines.push('')
 
+  // Hypotheek vs Beleggen context
+  if (data.hvbSummary) {
+    const hvb = data.hvbSummary
+    const breakevenPct = (hvb.breakevenRendement * 100).toFixed(2)
+    lines.push('HYPOTHEEK VS BELEGGEN:')
+    lines.push(`- Restschuld: ${formatCurrency(hvb.restschuld)}`)
+    lines.push(`- Hypotheekrente: ${hvb.rente}%`)
+    lines.push(`- Fiscaal aftrekbaar: ${hvb.isTaxDeductible ? 'ja' : 'nee'}`)
+    lines.push(`- Breakeven rendement: ${breakevenPct}%`)
+    lines.push(`- Aanbeveling (€200/mnd extra): ${hvb.aanbeveling}`)
+    lines.push(`- Vergelijkingsmodal: /core/debts`)
+    lines.push('')
+  }
+
   // Pattern alerts
   const patterns = detectPatterns(data)
   if (patterns.length > 0) {

@@ -141,6 +141,9 @@ const RebalancingWidget = dynamic(() =>
 const FeeAnalyzerWidget = dynamic(() =>
   import('./fee-analyzer-widget').then(m => ({ default: m.FeeAnalyzerWidget }))
 )
+const HypotheekVsBeleggenWidget = dynamic(() =>
+  import('./hypotheek-vs-beleggen-widget').then(m => ({ default: m.HypotheekVsBeleggenWidget }))
+)
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
@@ -436,6 +439,22 @@ export interface DashboardData {
   // Fee analyzer widget data
   feeAnalysis: FeeAnalysis | null
   feeImpactMonths: number
+  // Hypotheek vs Beleggen summary (null if no mortgage)
+  hvbSummary: HvbSummary | null
+}
+
+/** Compact mortgage-vs-invest summary for briefing context */
+export interface HvbSummary {
+  /** Restschuld (€) */
+  restschuld: number
+  /** Jaarlijkse hypotheekrente (%) bijv. 3.5 */
+  rente: number
+  /** Breakeven bruto rendement (decimaal) bijv. 0.032 */
+  breakevenRendement: number
+  /** Aanbeveling */
+  aanbeveling: 'aflossen' | 'beleggen' | 'gelijk'
+  /** Is de rente fiscaal aftrekbaar */
+  isTaxDeductible: boolean
 }
 
 export interface WeekOverviewData {
@@ -593,6 +612,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <RebalancingWidget size={size} data={data} href={href} />
     case 'fee_analyzer':
       return <FeeAnalyzerWidget size={size} data={data} href={href} />
+    case 'hypotheek_vs_beleggen':
+      return <HypotheekVsBeleggenWidget size={size} data={data} href={href} />
     default:
       return null
   }
