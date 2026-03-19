@@ -42,6 +42,9 @@ type Holding = {
   asset_class?: string | null
   sector?: string | null
   geography?: string | null
+  // TER (Total Expense Ratio) as decimal, e.g. 0.0022 for 0.22%
+  ter?: number | null
+  ter_source?: 'manual' | 'lookup' | null
   // Extra fields from assets fallback
   asset_type?: string
   institution?: string

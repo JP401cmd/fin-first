@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Request body moet een JSON-object zijn' }, { status: 400 })
     }
 
-    const { name, ticker, isin, units, avg_purchase_price, current_price, purchase_date, notes, asset_type, currency } = body
+    const { name, ticker, isin, units, avg_purchase_price, current_price, purchase_date, notes, asset_type, currency, ter, ter_source } = body
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json({ error: 'Naam is verplicht en moet een niet-lege string zijn' }, { status: 400 })
@@ -167,6 +167,21 @@ export async function POST(request: NextRequest) {
 
     if (asset_type !== undefined && asset_type !== null && typeof asset_type !== 'string') {
       return NextResponse.json({ error: 'Asset type moet een string zijn' }, { status: 400 })
+    }
+
+    // Validate TER field when provided
+    if (ter !== undefined && ter !== null) {
+      const n = Number(ter)
+      if (isNaN(n) || n < 0 || n > 0.10) {
+        return NextResponse.json({ error: 'TER moet een getal zijn tussen 0 en 0.10 (0% - 10%)' }, { status: 400 })
+      }
+    }
+
+    // Validate ter_source field when provided
+    if (ter_source !== undefined && ter_source !== null) {
+      if (typeof ter_source !== 'string' || !['manual', 'lookup'].includes(ter_source)) {
+        return NextResponse.json({ error: 'TER bron moet "manual" of "lookup" zijn' }, { status: 400 })
+      }
     }
 
     // Check if user wants to force-create despite duplicate warning
@@ -232,6 +247,8 @@ export async function POST(request: NextRequest) {
         purchase_date: purchase_date || null,
         notes: notes || null,
         is_active: true,
+        ...(ter != null ? { ter: Number(ter), ter_source: (ter_source as string) || 'manual' } : {}),
+        ...(ter_source != null && ter == null ? { ter_source: ter_source as string } : {}),
       })
       .select()
       .single()
@@ -303,6 +320,17 @@ export async function PATCH(request: NextRequest) {
     if (body.units !== undefined && body.units !== null && isNaN(Number(body.units))) {
       return NextResponse.json({ error: 'Units moet een getal zijn' }, { status: 400 })
     }
+    if (body.ter !== undefined && body.ter !== null) {
+      const n = Number(body.ter)
+      if (isNaN(n) || n < 0 || n > 0.10) {
+        return NextResponse.json({ error: 'TER moet een getal zijn tussen 0 en 0.10 (0% - 10%)' }, { status: 400 })
+      }
+    }
+    if (body.ter_source !== undefined && body.ter_source !== null) {
+      if (typeof body.ter_source !== 'string' || !['manual', 'lookup'].includes(body.ter_source)) {
+        return NextResponse.json({ error: 'TER bron moet "manual" of "lookup" zijn' }, { status: 400 })
+      }
+    }
 
     // --- Optimistic concurrency check ---
     // If the client sent expected_updated_at, verify the row hasn't changed since
@@ -346,6 +374,8 @@ export async function PATCH(request: NextRequest) {
     if (body.ticker !== undefined) updates.ticker = body.ticker || null
     if (body.notes !== undefined) updates.notes = body.notes || null
     if (body.currency !== undefined && typeof body.currency === 'string') updates.currency = body.currency.trim().toUpperCase() || 'EUR'
+    if (body.ter !== undefined) updates.ter = body.ter != null ? Number(body.ter) : null
+    if (body.ter_source !== undefined) updates.ter_source = body.ter_source || null
     if (body.current_price !== undefined) updates.last_price_update = new Date().toISOString()
     // Always bump updated_at on write so future conflict checks work
     updates.updated_at = new Date().toISOString()
