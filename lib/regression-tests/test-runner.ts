@@ -3,11 +3,59 @@ import type {
   TestResult,
   TestReport,
   TestSuiteConfig,
+  TestRole,
 } from './test-types'
 import { DEFAULT_SUITE_CONFIG } from './test-types'
-import { getCategories, getTestsByCategory, getAllTests } from './test-registry'
+import { getCategories, getTestsByCategory, getAllTests, getCategoryById } from './test-registry'
 
 // ── Test Runner Engine ──────────────────────────────────────────────────────
+
+// ── Role-switching hook ─────────────────────────────────────────────────────
+// The server-runner registers a callback so the test runner can switch roles
+// per test without a circular dependency.
+
+type RoleSwitchFn = (role: 'superadmin' | 'user') => Promise<boolean>
+let _roleSwitchFn: RoleSwitchFn | null = null
+let _currentRunnerRole: 'superadmin' | 'user' = 'user'
+
+/**
+ * Register the role-switching function (called by server-runner during setup).
+ */
+export function setRoleSwitcher(fn: RoleSwitchFn): void {
+  _roleSwitchFn = fn
+}
+
+/**
+ * Clear the role-switching function (called by server-runner during cleanup).
+ */
+export function clearRoleSwitcher(): void {
+  _roleSwitchFn = null
+  _currentRunnerRole = 'user'
+}
+
+/**
+ * Resolve the effective role for a test, considering test.requiredRole and
+ * the category's defaultRole. Falls back to 'user' if neither is set.
+ */
+function resolveTestRole(test: TestCase): TestRole {
+  if (test.requiredRole) return test.requiredRole
+  const category = getCategoryById(test.category)
+  if (category?.defaultRole) return category.defaultRole
+  return 'user' // default: tests run as normal user
+}
+
+/**
+ * Switch the test account role if needed before running a test.
+ * Returns the role that was set (or the current role if no switch was needed).
+ */
+async function ensureRole(targetRole: TestRole): Promise<void> {
+  if (targetRole === 'any' || !_roleSwitchFn) return
+  if (targetRole === _currentRunnerRole) return
+  const switched = await _roleSwitchFn(targetRole)
+  if (switched) {
+    _currentRunnerRole = targetRole
+  }
+}
 
 /** Generate a short unique run ID */
 function generateRunId(): string {
@@ -16,13 +64,17 @@ function generateRunId(): string {
   return `run-${ts}-${rand}`
 }
 
-/** Run a single test case with timeout */
+/** Run a single test case with timeout and automatic role switching */
 async function runSingleTest(
   test: TestCase,
   timeoutMs: number,
 ): Promise<TestResult> {
   const start = performance.now()
   try {
+    // Switch role before running the test
+    const targetRole = resolveTestRole(test)
+    await ensureRole(targetRole)
+
     const result = test.fn()
     if (result instanceof Promise) {
       await Promise.race([

@@ -7,10 +7,10 @@ export type TestStatus = 'pass' | 'fail' | 'skip' | 'error'
 export type TestPriority = 'critical' | 'high' | 'medium' | 'low'
 
 /**
- * Role required by a test case.
- * - 'superadmin' (default): test runs as the superadmin test account
- * - 'user': test runs after temporarily switching the test account role to 'user'
- * - 'any': test doesn't depend on role (pure logic tests)
+ * Role required by a test case or category.
+ * - 'user': test runs with the test account's profile.role set to 'user' (DEFAULT)
+ * - 'superadmin': test runs with profile.role set to 'superadmin' (for admin-only features)
+ * - 'any': test doesn't depend on role (pure logic tests, no role switch needed)
  */
 export type TestRole = 'superadmin' | 'user' | 'any'
 
@@ -30,9 +30,8 @@ export interface TestCase {
   estimatedDurationMs: number
   /**
    * Role the test account should have when running this test.
-   * Defaults to 'superadmin' if not specified.
-   * Tests with requiredRole: 'user' will have the test account's profile.role
-   * temporarily switched to 'user' before execution, then restored to 'superadmin'.
+   * If not specified, inherits from the category's defaultRole (which defaults to 'user').
+   * The test runner automatically switches the profile.role before running each test.
    */
   requiredRole?: TestRole
   /** The actual test function — returns void on success, throws on failure */
@@ -69,6 +68,12 @@ export interface TestCategory {
   icon?: string
   /** Number of tests in this category */
   testCount: number
+  /**
+   * Default role for tests in this category.
+   * Individual tests can override this with their own requiredRole.
+   * Defaults to 'user' if not specified.
+   */
+  defaultRole?: TestRole
 }
 
 /** Configuration for a test suite run */

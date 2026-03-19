@@ -8,7 +8,6 @@ import {
   Tag, Shield, Wand2, Navigation,
 } from 'lucide-react'
 import type { TestReport, TestResult, TestCategory } from '@/lib/regression-tests/test-types'
-import { loadAllTests, getCategories } from '@/lib/regression-tests/test-registry'
 import { getTestSessionStatus, REGRESSION_TEST_EMAIL } from '@/lib/regression-tests/test-session'
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -198,13 +197,22 @@ export default function RegressietestPage() {
   const [serverError, setServerError] = useState<string | null>(null)
   const mountedRef = useRef(true)
 
-  // Load test registry (client-side, for category listing only)
+  // Load test categories from server-side API (suites use server-only imports)
   useEffect(() => {
     mountedRef.current = true
     async function init() {
-      await loadAllTests()
+      try {
+        const res = await fetch('/api/regression/categories')
+        if (res.ok) {
+          const data = await res.json()
+          if (mountedRef.current && Array.isArray(data.categories)) {
+            setCategories(data.categories)
+          }
+        }
+      } catch {
+        // Categories endpoint failed — page still works, just shows 0 tests
+      }
       if (mountedRef.current) {
-        setCategories(getCategories())
         setLoading(false)
       }
       // Try to load cached report
