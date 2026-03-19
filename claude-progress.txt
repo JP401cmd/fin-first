@@ -1,3 +1,18 @@
+## Session 2026-03-19 - Feature #348
+
+### Feature #348: Gids content: Hoe de Horizon-grafiek werkt — volledige uitleg - PASSING
+- Created `components/app/guide-horizon-uitleg.tsx` — new expandable 9-section component
+- All 9 sections: twee fases, FIRE-leeftijd, opbouwfase, levensgebeurtenissen, pensioenuitgaven, eindstrategie, opnamestrategie, Box 3 belasting, instelbare parameters
+- Integrated in gids page step 4 after existing FIRE-projectie card
+- Added naslagwerk entry with anchor `#guide-horizon-grafiek` for cross-linking
+- All links to /identity/instellingen, /identity/profiel, /horizon verified
+- Expand/collapse all functionality, mobile-friendly (44px touch targets)
+- Zero console errors
+- Commit: dd374442
+
+### Current Status
+- 346/347 features passing (99.7%)
+
 ## Session 2026-03-19 - Feature #331 (Attempt 16)
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 16)
