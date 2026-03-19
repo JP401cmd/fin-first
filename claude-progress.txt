@@ -1,3 +1,25 @@
+## Session 2026-03-19 - Features #324, #325
+
+### Feature #324: Persona seeds bijwerken voor onboarding wijzigingen - PASSING
+- Verified: test-seed.ts already updated with BUDGET_SLUGS import, new template categories, feature_preferences._invulfase_active
+- Verified: seed-persona.ts already sets onboarding_completed, feature_preferences._invulfase_active per persona
+- Verified: test-personas.ts PersonaProfile already has invulfase_active field, set per persona (true for recovery/starter, false for established)
+- All changes were already in HEAD from a previous session — confirmed consistency
+- Zero TypeScript errors from changes
+
+### Feature #325: Mobile optimalisatie onboarding controleren - PASSING
+- Fixed invulfase banner touch targets: next-step link and dismiss button now min 44px on mobile
+- Added responsive padding to invulfase banner (px-4 mobile, px-6 desktop)
+- Fixed welcome card dismiss button: 44px touch target on mobile
+- Fixed localStorage restore notification dismiss: 44px touch target on mobile
+- Verified existing components already had: text-base inputs, min-h-[44px] buttons, safe-area-inset-bottom, flex-wrap grids
+- Tested at 320px (iPhone SE) and 375px (iPhone standard) viewports — all elements fit
+- Zero console errors, zero warnings
+- Commit: ecdf4787
+
+### Current Status
+- 2 features completed this session (#324, #325)
+
 ## Session 2026-03-19 - Features #322, #323
 
 ### Feature #322: Gids bijwerken voor onboarding wijzigingen - PASSING
