@@ -13,6 +13,7 @@ import {
   Receipt,
   Settings,
   Lightbulb,
+  BarChart3,
 } from 'lucide-react'
 
 /* ── Section data ─────────────────────── */
@@ -461,6 +462,62 @@ export default function GuideHorizonUitleg() {
               altijd terug naar de standaardwaarden via Instellingen.
             </p>
           </div>
+        </>
+      ),
+    },
+    {
+      id: 'horizon-uitleg-inkomen-uitgaven',
+      number: 10,
+      title: 'Inkomen & Uitgaven weergave',
+      icon: BarChart3,
+      content: (
+        <>
+          <p>
+            Onder de vermogensgrafiek vind je een inklapbare <strong>Inkomen &amp; Uitgaven</strong>{' '}
+            grafiek. Klik op de toggle-balk om hem te openen. Deze grafiek toont twee lijnen — je
+            bruto inkomen (paars) en je bruto uitgaven (oranje) — per levensjaar.
+          </p>
+          <p>
+            <strong>Wat telt als inkomen?</strong> Dat hangt af van de fase:
+          </p>
+          <p>
+            <strong>Opbouwfase</strong> — je netto jaarinkomen (salaris), positieve
+            levensgebeurtenissen (erfenis, bonus, huurinkomsten) en het beleggingsrendement op je
+            portfolio. Samen vormen deze drie bronnen je totale bruto inkomen.
+          </p>
+          <p>
+            <strong>Onttrekkingsfase</strong> — je hebt geen salaris meer, dus inkomen bestaat uit
+            beleggingsrendement op je portfolio en eventuele positieve levensgebeurtenissen (AOW,
+            pensioenuitkering, huurinkomsten).
+          </p>
+          <p>
+            <strong>Wat telt als uitgaven?</strong>
+          </p>
+          <p>
+            <strong>Opbouwfase</strong> — je jaarlijkse levenskosten plus negatieve
+            levensgebeurtenissen (huis kopen, auto, bruiloft, kinderopvang).
+          </p>
+          <p>
+            <strong>Onttrekkingsfase</strong> — je jaarlijkse onttrekking uit je portfolio plus
+            negatieve levensgebeurtenissen. De onttrekking is het bedrag dat je opneemt om je
+            levenskosten te dekken.
+          </p>
+          <p>
+            <strong>De gap tussen de lijnen</strong> is je netto vermogensmutatie per jaar. Waar
+            inkomen boven uitgaven ligt (paars vlak) groeit je vermogen — dit zie je terug als
+            stijging in de portfoliografiek erboven. Waar uitgaven boven inkomen liggen (oranje vlak)
+            daalt je vermogen.
+          </p>
+          <p>
+            <strong>Levensgebeurtenissen</strong> zijn direct zichtbaar: een erfenis verhoogt de
+            inkomenlijn in dat jaar, een huis kopen verhoogt de uitgavenlijn. Terugkerende events
+            (AOW, pensioen) verschuiven het niveau structureel.
+          </p>
+          <p>
+            De grafiek deelt dezelfde <strong>leeftijdsas</strong> als de portfolio-grafiek erboven.
+            Zoom en pan werken automatisch mee — als je inzoomt op de portfoliografiek, schaalt de
+            inkomen/uitgaven-grafiek mee naar hetzelfde leeftijdsbereik.
+          </p>
         </>
       ),
     },
