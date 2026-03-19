@@ -222,20 +222,69 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Ongeldige invoer', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { identity, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode } = parsed.data
+  const { identity, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey } = parsed.data
 
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
     // This prevents duplicate data from rapid double-clicks or retries
     const { data: existingProfile } = await supabase
       .from('profiles')
-      .select('onboarding_completed')
+      .select('onboarding_completed, onboarding_idempotency_key')
       .eq('id', user.id)
       .single()
 
     if (existingProfile?.onboarding_completed) {
       return Response.json({ success: true, alreadyCompleted: true })
     }
+
+    // Check idempotency key: if same key was already processed, return success
+    if (idempotencyKey && existingProfile?.onboarding_idempotency_key === idempotencyKey) {
+      return Response.json({ success: true, alreadyCompleted: true })
+    }
+
+    // Resolve AOW age for the user's date of birth
+    let aowTargetAge = NL_AOW_AGE
+    try {
+      const { data: aowRows } = await supabase
+        .from('aow_leeftijd')
+        .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+        .order('birth_date_from', { ascending: true })
+      if (aowRows && aowRows.length > 0) {
+        const aow = lookupAowAge(aowRows as AowLeeftijdRow[], identity.date_of_birth)
+        aowTargetAge = Math.ceil(aow.fractional)
+      }
+    } catch {
+      // Fallback to NL_AOW_AGE
+    }
+
+    // ── Strategy: Try atomic RPC first, fall back to multi-step approach ──
+    // The RPC wraps everything in a single PostgreSQL transaction — if ANY
+    // step fails, the entire save is rolled back. No partial data possible.
+    const rpcPayload = buildRpcPayload(
+      identity, budgetAmounts, budgetteringMode,
+      bankAccounts, assets, debts, widgetPrefs,
+      aowTargetAge, idempotencyKey,
+    )
+
+    const { data: rpcResult, error: rpcError } = await supabase
+      .rpc('save_onboarding_data', { payload: rpcPayload })
+
+    if (!rpcError && rpcResult) {
+      // RPC succeeded — check for application-level errors in the response
+      const result = typeof rpcResult === 'string' ? JSON.parse(rpcResult) : rpcResult
+      if (result.error) {
+        throw new Error(result.error)
+      }
+      return Response.json({ success: true, alreadyCompleted: result.already_completed ?? false })
+    }
+
+    // RPC not available (function doesn't exist yet) — fall back to multi-step approach
+    // This happens when the migration hasn't been applied yet
+    if (rpcError) {
+      console.warn('save_onboarding_data RPC not available, falling back to multi-step:', rpcError.message)
+    }
+
+    // ── Fallback: Multi-step approach (non-atomic) ──────────────────────
 
     // 1. Update profile (onboarding_completed is set to false first; will be set to true at the end
     // after all data is saved successfully — this ensures retries work correctly)
@@ -249,6 +298,7 @@ export async function POST(req: Request) {
       onboarding_completed: false,
       is_demo_user: false,
       budgeting_active: budgetteringMode !== 'none',
+      onboarding_idempotency_key: idempotencyKey ?? null,
       updated_at: new Date().toISOString(),
     }
     // Add estimated monthly expenses if provided
@@ -482,23 +532,10 @@ export async function POST(req: Request) {
       if (debtErr) throw new Error(`Schulden opslaan mislukt: ${debtErr.message}`)
     }
 
-    // 6. Seed default AOW life event (leeftijd uit aow_leeftijd tabel)
+    // 6. Seed default AOW life event (uses aowTargetAge resolved above)
     // Delete existing AOW event first to prevent duplicates on retry
     await supabase.from('life_events').delete().eq('user_id', user.id).eq('event_type', 'aow')
 
-    let aowTargetAge = NL_AOW_AGE
-    try {
-      const { data: aowRows } = await supabase
-        .from('aow_leeftijd')
-        .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
-        .order('birth_date_from', { ascending: true })
-      if (aowRows && aowRows.length > 0) {
-        const aow = lookupAowAge(aowRows as AowLeeftijdRow[], identity.date_of_birth)
-        aowTargetAge = Math.ceil(aow.fractional)
-      }
-    } catch {
-      // Fallback to NL_AOW_AGE
-    }
     await supabase.from('life_events').insert({
       user_id: user.id,
       name: 'AOW',

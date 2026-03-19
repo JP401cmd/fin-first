@@ -228,6 +228,9 @@ export default function OnboardingPage() {
       // Determine budgettering mode from user's explicit choice in identity step
       const budgetteringMode = state.identity.budgettering_mode === 'none' ? 'none' : 'manual'
 
+      // Generate idempotency key to prevent duplicate saves on retry
+      const idempotencyKey = crypto.randomUUID()
+
       const body: Record<string, unknown> = {
         identity: {
           ...identity,
@@ -241,6 +244,7 @@ export default function OnboardingPage() {
         budgetAmounts,
         widgetPrefs,
         budgetteringMode,
+        idempotencyKey,
       }
 
       // Only send non-empty optional arrays
