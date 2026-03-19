@@ -960,9 +960,29 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">netto vermogen</span>
               </button>
 
-              <p className="mb-4 sm:mb-6 font-serif italic text-sm text-[var(--ink-3)]">
+              <p className="mb-3 font-serif italic text-sm text-[var(--ink-3)]">
                 dat is {effectiveFreedomYears > 0 ? `${effectiveFreedomYears} jaar en ` : ''}{effectiveFreedomMonths} maanden vrijheid
               </p>
+
+              {/* FIRE progress bar */}
+              {(coreSimTarget ?? data.fireTarget) > 0 && (
+                <div className="mb-4 sm:mb-6" data-testid="fire-progress-bar">
+                  <div className="mb-1 flex items-baseline justify-between">
+                    <span className="font-mono text-xs text-[var(--ink-3)]">
+                      {Math.min(100, (effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+                    </span>
+                    <span className="font-mono text-xs text-[var(--ink-3)]">
+                      {formatCurrency(coreSimTarget ?? data.fireTarget)}
+                    </span>
+                  </div>
+                  <div className="h-[8px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-kern-400 to-kern-600 transition-all duration-700"
+                      style={{ width: `${Math.min(100, Math.max(0, (effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -1007,13 +1027,19 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   onClick={() => setShowNetWorthReceipt(true)}
                   className="w-full cursor-pointer text-left rounded-[var(--r)] transition-all hover:shadow-[var(--s1)]"
                 >
-                  <p className="label-editorial text-[var(--ink-3)]">
-                    {isHouseholdView ? 'Netto vermogen — Huishouden' : isPartnerView ? `Netto vermogen — ${partnerName ?? 'Partner'}` : 'Netto vermogen'}
-                  </p>
-                  <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(effectiveNetWorth)}</p>
-                  <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">
-                    dat is {effectiveFreedomYears > 0 ? `${effectiveFreedomYears} jaar en ` : ''}{effectiveFreedomMonths} maanden vrijheid
-                  </p>
+                  <p className="label-editorial text-[var(--ink-3)]">Voortgang FIRE</p>
+                  {(coreSimTarget ?? data.fireTarget) > 0 ? (
+                    <>
+                      <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]" data-testid="fire-progress-pct-mobile">
+                        {((effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+                      </p>
+                      <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="fire-progress-subtitle-mobile">
+                        {formatCurrency(effectiveNetWorth)} van {formatCurrency(coreSimTarget ?? data.fireTarget)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">Stel je FIRE-doel in</p>
+                  )}
                 </button>
                 <button type="button" onClick={() => setShowProjectionModal(true)} className="w-full cursor-pointer text-left">
                   <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
@@ -1057,13 +1083,19 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 onClick={() => setShowNetWorthReceipt(true)}
                 className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
               >
-                <p className="label-editorial text-[var(--ink-3)]">
-                  {isHouseholdView ? 'Netto vermogen — Huishouden' : isPartnerView ? `Netto vermogen — ${partnerName ?? 'Partner'}` : 'Netto vermogen'}
-                </p>
-                <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(effectiveNetWorth)}</p>
-                <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="net-worth-freedom-subtitle">
-                  dat is {effectiveFreedomYears > 0 ? `${effectiveFreedomYears} jaar en ` : ''}{effectiveFreedomMonths} maanden vrijheid
-                </p>
+                <p className="label-editorial text-[var(--ink-3)]">Voortgang FIRE</p>
+                {(coreSimTarget ?? data.fireTarget) > 0 ? (
+                  <>
+                    <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]" data-testid="fire-progress-pct">
+                      {((effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+                    </p>
+                    <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="fire-progress-subtitle">
+                      {formatCurrency(effectiveNetWorth)} van {formatCurrency(coreSimTarget ?? data.fireTarget)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">Stel je FIRE-doel in</p>
+                )}
                 {isHouseholdView && (
                   <p className="mt-1 text-[10px] text-[var(--ink-4)]">
                     Persoonlijk: {formatCurrency(data.netWorth)} · Partner: {formatCurrency(effectiveNetWorth - data.netWorth)}
