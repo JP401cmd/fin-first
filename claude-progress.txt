@@ -1,3 +1,17 @@
+## Session 2026-03-19 - Feature #313
+
+### Feature #313: Fix category ID mismatches in test-suites - PASSING
+- Fixed assertEqual expectations in 6 onboarding test suite files
+- All used dash format (e.g., 'onboarding-api-flow') but CAT constants use dot format ('onboarding.api-flow')
+- Files fixed: onboarding-api-flow.ts, onboarding-save.ts, bank-connectie-flow.ts, onboarding-ui.ts, onboarding-reset.ts, onboarding-persona-seed.ts
+- Verified no remaining mismatches across all 67 suite files
+- Zero new TypeScript errors introduced
+- Commit: 231f2277
+
+### Current Status
+- 1 feature completed this session (#313)
+- Overall progress: 310/314 (98.7%)
+
 ## Session 2026-03-19 - Features #309, #310
 
 ### Feature #309: Dedicated testaccount voor regressietests - PASSING
