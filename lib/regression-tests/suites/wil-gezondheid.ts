@@ -6,7 +6,10 @@
  * - Weighted total score calculation
  * - Score label mapping (Uitstekend/Sterk/Redelijk/Kwetsbaar/Kritiek)
  * - Edge cases: new user, perfect finances, heavy debt
- * - Pillar count consistency
+ * - Pillar count consistency (6 pillars with budgetingActive=true)
+ * - 5-pillar mode: budgetingActive=false excludes budget_discipline
+ * - Weight redistribution: 5-pillar weights proportionally scaled to sum to 1.0
+ * - Old veerkracht_score widget replaced by gezondheids_score in widget catalog
  */
 
 import { registerTests } from '../test-registry'
@@ -640,8 +643,8 @@ const tests: TestCase[] = [
   // ── Pillar count ──────────────────────────────────────────────────────
   {
     id: 'health-pillar-count',
-    name: 'Altijd 6 pijlers in resultaat',
-    description: 'computeHealthScore always returns exactly 6 pillars regardless of input',
+    name: 'Altijd 6 pijlers in resultaat (budgetingActive=true)',
+    description: 'computeHealthScore always returns exactly 6 pillars when budgetingActive=true',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 10,
@@ -678,6 +681,216 @@ const tests: TestCase[] = [
         assertLessThanOrEqual(pillar.score, 100, `${pillar.id} score ≤ 100`)
         assertGreaterThan(pillar.weight, 0, `${pillar.id} weight > 0`)
       }
+    },
+  },
+
+  // ── 5-pillar mode (budgetingActive=false) ───────────────────────────
+  {
+    id: 'health-5pillar-count',
+    name: '5-pilaren modus: budgetingActive=false geeft 5 pijlers',
+    description: 'When budgetingActive=false, computeHealthScore returns exactly 5 pillars (no budget_discipline)',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const data = makeDashboardData()
+      const result = computeHealthScore(data, false)
+      assertEqual(result.pillars.length, 5, '5 pillars when budgetingActive=false')
+      assertEqual(result.activePillarCount, 5, 'activePillarCount = 5')
+      assertEqual(result.budgetingActive, false, 'budgetingActive flag = false')
+    },
+  },
+  {
+    id: 'health-5pillar-no-budget-discipline',
+    name: '5-pilaren modus: budget_discipline ontbreekt in pillars',
+    description: 'budget_discipline pillar is absent from result.pillars when budgetingActive=false',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const data = makeDashboardData({
+        budgetTotals: {
+          expense: { spent: 800, limit: 1_000 },
+          savings: { spent: 200, limit: 300 },
+          debt: { spent: 100, limit: 200 },
+          income: { spent: 0, limit: 0 },
+        },
+      })
+      const result = computeHealthScore(data, false)
+      const budgetPillar = result.pillars.find(p => p.id === 'budget_discipline')
+      assertEqual(budgetPillar, undefined, 'budget_discipline pillar absent')
+
+      // The remaining 5 pillar IDs should be present
+      const ids = result.pillars.map(p => p.id)
+      assertIncludes(ids, 'savings_rate', 'savings_rate present')
+      assertIncludes(ids, 'debt_ratio', 'debt_ratio present')
+      assertIncludes(ids, 'emergency_fund', 'emergency_fund present')
+      assertIncludes(ids, 'fire_progress', 'fire_progress present')
+      assertIncludes(ids, 'diversification', 'diversification present')
+    },
+  },
+  {
+    id: 'health-5pillar-weights-sum',
+    name: '5-pilaren modus: gewichten sommeren tot 1.0',
+    description: 'Redistributed weights for 5 pillars sum to exactly 1.0',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const data = makeDashboardData()
+      const result = computeHealthScore(data, false)
+      const weightSum = result.pillars.reduce((sum, p) => sum + p.weight, 0)
+      assert(Math.abs(weightSum - 1.0) < 0.001, `5-pillar weights sum to 1.0: ${weightSum}`)
+    },
+  },
+  {
+    id: 'health-6pillar-weights-sum',
+    name: '6-pilaren modus: gewichten sommeren tot 1.0',
+    description: 'Base weights for 6 pillars sum to exactly 1.0',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const data = makeDashboardData()
+      const result = computeHealthScore(data, true)
+      const weightSum = result.pillars.reduce((sum, p) => sum + p.weight, 0)
+      assert(Math.abs(weightSum - 1.0) < 0.001, `6-pillar weights sum to 1.0: ${weightSum}`)
+    },
+  },
+  {
+    id: 'health-5pillar-redistributed-weights',
+    name: '5-pilaren modus: gewichten correct herverdeeld',
+    description: 'Each 5-pillar weight equals base_weight / 0.90 (proportional redistribution)',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const data = makeDashboardData()
+      const result = computeHealthScore(data, false)
+
+      // Expected redistributed weights: base / 0.90
+      const expected: Record<string, number> = {
+        savings_rate: 0.25 / 0.90,
+        debt_ratio: 0.20 / 0.90,
+        emergency_fund: 0.15 / 0.90,
+        fire_progress: 0.20 / 0.90,
+        diversification: 0.10 / 0.90,
+      }
+
+      for (const pillar of result.pillars) {
+        const exp = expected[pillar.id]!
+        assert(
+          Math.abs(pillar.weight - exp) < 0.001,
+          `${pillar.id} weight: ${pillar.weight.toFixed(4)} ~ ${exp.toFixed(4)}`,
+        )
+      }
+    },
+  },
+  {
+    id: 'health-5pillar-weighted-total',
+    name: '5-pilaren modus: correcte gewogen totaal',
+    description: 'Total score with budgetingActive=false uses redistributed 5-pillar weights',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const data = makeDashboardData({
+        savingsRate6m: 20,        // -> 80
+        totalAssets: 100_000,
+        totalDebts: 50_000,       // -> 50
+        emergencyFund: { monthsCovered: 3, currentAmount: 9_000, targetAmount: 18_000, targetMonths: 6, isComplete: false },  // -> 60
+        freedomPct: 50,           // -> 50
+        assetsByType: [
+          { type: 'cash', value: 25_000, purchaseValue: 25_000, expectedReturn: 0 },
+          { type: 'stocks', value: 25_000, purchaseValue: 20_000, expectedReturn: 0.07 },
+        ],                        // 2 types -> 40
+        budgetTotals: {
+          expense: { spent: 800, limit: 1_000 },
+          savings: { spent: 400, limit: 300 },
+          debt: { spent: 0, limit: 0 },
+          income: { spent: 0, limit: 0 },
+        },
+      })
+
+      const result = computeHealthScore(data, false)
+
+      // 5-pillar: each weight = base / 0.90
+      // Expected: (80*0.25 + 50*0.20 + 60*0.15 + 50*0.20 + 40*0.10) / 0.90
+      // = (20 + 10 + 9 + 10 + 4) / 0.90 = 53 / 0.90 = 58.89 -> 59
+      const expectedTotal = Math.round((80 * 0.25 + 50 * 0.20 + 60 * 0.15 + 50 * 0.20 + 40 * 0.10) / 0.90)
+      assertEqual(result.total, expectedTotal, `5-pillar weighted total: ${result.total} = ${expectedTotal}`)
+    },
+  },
+  {
+    id: 'health-6pillar-explicit',
+    name: '6-pilaren modus: expliciete budgetingActive=true',
+    description: 'Explicitly passing budgetingActive=true produces 6 pillars with base weights',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const data = makeDashboardData()
+      const result = computeHealthScore(data, true)
+      assertEqual(result.pillars.length, 6, '6 pillars with explicit true')
+      assertEqual(result.activePillarCount, 6, 'activePillarCount = 6')
+      assertEqual(result.budgetingActive, true, 'budgetingActive flag = true')
+
+      // Budget discipline should have base weight 0.10
+      const budgetPillar = result.pillars.find(p => p.id === 'budget_discipline')!
+      assertEqual(budgetPillar.weight, 0.10, 'budget_discipline weight = 0.10')
+    },
+  },
+  {
+    id: 'health-5pillar-vs-6pillar-differ',
+    name: '5 vs 6 pilaren: totaal verschilt wanneer budget impact heeft',
+    description: 'Total score differs between 5 and 6 pillar modes when budget discipline score is low',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      // With budgets all over limit (score 0), 5-pillar should be higher
+      const data = makeDashboardData({
+        savingsRate6m: 20,
+        totalAssets: 100_000,
+        totalDebts: 0,
+        emergencyFund: { monthsCovered: 6, currentAmount: 18_000, targetAmount: 18_000, targetMonths: 6, isComplete: true },
+        freedomPct: 50,
+        assetsByType: [
+          { type: 'cash', value: 50_000, purchaseValue: 50_000, expectedReturn: 0 },
+          { type: 'stocks', value: 50_000, purchaseValue: 40_000, expectedReturn: 0.07 },
+        ],
+        budgetTotals: {
+          expense: { spent: 1_500, limit: 1_000 },
+          savings: { spent: 400, limit: 300 },
+          debt: { spent: 300, limit: 200 },
+          income: { spent: 0, limit: 0 },
+        },
+      })
+
+      const result6 = computeHealthScore(data, true)
+      const result5 = computeHealthScore(data, false)
+
+      // 6-pillar includes budget_discipline=0, dragging score down
+      // 5-pillar excludes it, so score should be higher
+      assertGreaterThan(result5.total, result6.total, `5-pillar (${result5.total}) > 6-pillar (${result6.total}) when budget=0`)
+    },
+  },
+  {
+    id: 'health-veerkracht-widget-not-in-catalog',
+    name: 'veerkracht-score-widget niet meer in widget catalog',
+    description: 'The old veerkracht_score widget is not registered in widget-catalog.ts (replaced by gezondheids_score)',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 100,
+    async fn() {
+      // Dynamic import to check the widget catalog
+      const catalog = await import('@/lib/widget-catalog')
+      const allWidgets = catalog.WIDGET_CATALOG
+      assert(Array.isArray(allWidgets), 'WIDGET_CATALOG is an array')
+      const hasVeerkracht = allWidgets.some((w: { id: string }) => w.id === 'veerkracht_score')
+      assertEqual(hasVeerkracht, false, 'veerkracht_score NOT in widget catalog')
+      const hasGezondheid = allWidgets.some((w: { id: string }) => w.id === 'gezondheids_score')
+      assertEqual(hasGezondheid, true, 'gezondheids_score IS in widget catalog')
     },
   },
 ]

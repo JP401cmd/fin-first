@@ -1,5 +1,17 @@
 'use client'
 
+/**
+ * @deprecated This widget is deprecated and has been replaced by gezondheids-score-widget.tsx
+ * which uses the new 6-pillar computeHealthScore() from lib/financial-health.ts.
+ *
+ * The old 4-pillar resilience score (computeResilienceScore from horizon-data.ts) is no longer
+ * rendered in any UI. This file is kept only for backward compatibility with existing snapshots
+ * that store resilience_score values. Do NOT use this widget in new code.
+ *
+ * @see gezondheids-score-widget.tsx — the replacement widget
+ * @see lib/financial-health.ts — the new computeHealthScore function
+ */
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
