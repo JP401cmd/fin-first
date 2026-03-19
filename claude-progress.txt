@@ -1,3 +1,22 @@
+## Session 2026-03-19 - Feature #379
+
+### Feature #379: Regressietests — Rebalancing drift, trades, en meldingen - PASSING
+- Created lib/regression-tests/suites/rebalancing-drift.ts with 17 tests
+- Tests cover the full rebalancing chain:
+  - computeDrift: basic drift calculation, no targets, no holdings, all unclassified, sector view mode
+  - suggestTrades: buy/sell generation, min trade amount, configurable threshold, exact threshold boundary, holding suggestions
+  - isBox3Window: Nov/Dec detection vs other months
+  - generateRebalanceNotifications: severity mapping (warning/critical), Box 3 peildatum notification, message format
+  - Auth guard: 401 on unauthenticated /api/rebalancing/check
+  - generateRebalancingReport: full report structure
+- Registered suite in test-registry.ts
+- All 17 tests verified passing via browser automation
+- Commit: e461e48d
+
+### Current Status
+- 1 feature completed this session (#379)
+- Progress: 388/397 passing (97.7%)
+
 ## Session 2026-03-19 - Feature #395
 
 ### Feature #395: Briefing integratie: hypotheek vs beleggen context en card - PASSING
@@ -17924,3 +17943,19 @@ Current status: 369/371 features passing (99.5%)
 - Verified: card renders, collapsible expands, naslagwerk entry scrolls to card
 - No new console errors introduced
 - Stats: 393/397 passing (99.0%)
+
+## Session 2026-03-19 - Feature #394
+
+### Feature #394: Widget: hypotheek_vs_beleggen voor dashboard - PASSING
+- Added widget definition to `lib/widget-catalog.ts`: id 'hypotheek_vs_beleggen', module 'kern', sizes ['quarter','half'], defaultSize 'half', minLevel 3
+- Added href '/core/debts' to WIDGET_HREFS
+- Created `components/widgets/hypotheek-vs-beleggen-widget.tsx`:
+  - Quarter size: compact recommendation + breakeven rendement
+  - Half size: full summary with restschuld, hypotheekrente, breakeven box, HRA note, CTA
+  - Null-state with Home icon when no mortgage present
+  - Uses useInViewAnimation for staggered reveal
+- Added dynamic import + switch case in widget-renderer.tsx
+- hvbSummary was already computed in dashboard-data-loader.ts and in DashboardData interface
+- Verified via browser: widget renders correctly, null-state shows for users without mortgage, href navigates to /core/debts
+- Zero console errors on dashboard
+- Marked feature #394 as passing
