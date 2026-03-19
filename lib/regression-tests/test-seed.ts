@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { BUDGET_SLUGS } from '@/lib/budget-data'
 
 // ── Test Data Seed for Regression Test Account ──────────────────────────────
 //
@@ -35,6 +36,8 @@ export async function seedTestData(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<void> {
+  const S = BUDGET_SLUGS
+
   // ── 1. Profile ──────────────────────────────────────────────────────────
   await supabase.from('profiles').upsert({
     id: userId,
@@ -55,6 +58,7 @@ export async function seedTestData(
     withdrawal_strategy: 'static',
     guardrail_floor: 0.80,
     guardrail_ceiling: 1.20,
+    feature_preferences: { _invulfase_active: false },
     updated_at: new Date().toISOString(),
   })
 
@@ -229,6 +233,7 @@ export async function seedTestData(
   }
 
   // ── 6. Budgets (parent + children) ──────────────────────────────────────
+  // Uses standard BUDGET_SLUGS consistent with new template structure
   const { data: existingBudgets } = await supabase
     .from('budgets')
     .select('id')
@@ -236,33 +241,34 @@ export async function seedTestData(
     .like('name', `%${SEED_TAG}%`)
 
   if (!existingBudgets || existingBudgets.length === 0) {
-    // Parent: Vaste Lasten
-    const { data: parentBudget } = await supabase
+    // Parent: Vaste lasten wonen & energie (matches template category)
+    const { data: vasteLasten } = await supabase
       .from('budgets')
-      .upsert({
+      .insert({
         user_id: userId,
         parent_id: null,
-        name: `Vaste Lasten ${SEED_TAG}`,
-        slug: `regression-vaste-lasten`,
+        name: `Vaste lasten wonen & energie ${SEED_TAG}`,
+        slug: S.VASTE_LASTEN_WONEN,
         icon: 'Home',
         default_limit: 1550,
         budget_type: 'expense',
         interval: 'monthly',
         rollover_type: 'reset',
         is_essential: true,
+        priority_score: 5,
         sort_order: 0,
-      }, { onConflict: 'user_id, slug' })
+      })
       .select('id')
       .single()
 
-    if (parentBudget) {
-      await supabase.from('budgets').upsert([
+    if (vasteLasten) {
+      await supabase.from('budgets').insert([
         {
           user_id: userId,
-          parent_id: parentBudget.id,
-          name: `Huur/Hypotheek ${SEED_TAG}`,
-          slug: 'regression-huur-hypotheek',
-          icon: 'Home',
+          parent_id: vasteLasten.id,
+          name: `Huur / hypotheek ${SEED_TAG}`,
+          slug: S.HUUR_HYPOTHEEK,
+          icon: 'Building2',
           default_limit: 1200,
           budget_type: 'expense',
           interval: 'monthly',
@@ -272,9 +278,9 @@ export async function seedTestData(
         },
         {
           user_id: userId,
-          parent_id: parentBudget.id,
-          name: `Energie ${SEED_TAG}`,
-          slug: 'regression-energie',
+          parent_id: vasteLasten.id,
+          name: `Gas, water, licht ${SEED_TAG}`,
+          slug: S.GAS_WATER_LICHT,
           icon: 'Zap',
           default_limit: 200,
           budget_type: 'expense',
@@ -285,10 +291,10 @@ export async function seedTestData(
         },
         {
           user_id: userId,
-          parent_id: parentBudget.id,
-          name: `Verzekeringen ${SEED_TAG}`,
-          slug: 'regression-verzekeringen',
-          icon: 'Shield',
+          parent_id: vasteLasten.id,
+          name: `Verzekeringen wonen & gezondheid ${SEED_TAG}`,
+          slug: S.VERZEKERINGEN_WONEN,
+          icon: 'ShieldCheck',
           default_limit: 150,
           budget_type: 'expense',
           interval: 'monthly',
@@ -299,64 +305,65 @@ export async function seedTestData(
       ])
     }
 
-    // Parent: Dagelijkse Uitgaven
-    const { data: dailyBudget } = await supabase
+    // Parent: Dagelijkse uitgaven (matches template category)
+    const { data: dagelijks } = await supabase
       .from('budgets')
-      .upsert({
+      .insert({
         user_id: userId,
         parent_id: null,
-        name: `Dagelijkse Uitgaven ${SEED_TAG}`,
-        slug: 'regression-dagelijkse-uitgaven',
+        name: `Dagelijkse uitgaven ${SEED_TAG}`,
+        slug: S.DAGELIJKSE_UITGAVEN,
         icon: 'ShoppingCart',
         default_limit: 650,
         budget_type: 'expense',
         interval: 'monthly',
         rollover_type: 'reset',
-        is_essential: false,
+        is_essential: true,
+        priority_score: 5,
         sort_order: 1,
-      }, { onConflict: 'user_id, slug' })
+      })
       .select('id')
       .single()
 
-    if (dailyBudget) {
-      await supabase.from('budgets').upsert([
+    if (dagelijks) {
+      await supabase.from('budgets').insert([
         {
           user_id: userId,
-          parent_id: dailyBudget.id,
+          parent_id: dagelijks.id,
           name: `Boodschappen ${SEED_TAG}`,
-          slug: 'regression-boodschappen',
-          icon: 'ShoppingCart',
+          slug: S.BOODSCHAPPEN,
+          icon: 'Store',
           default_limit: 400,
           budget_type: 'expense',
           interval: 'monthly',
           rollover_type: 'reset',
-          is_essential: false,
+          is_essential: true,
           sort_order: 0,
         },
         {
           user_id: userId,
-          parent_id: dailyBudget.id,
-          name: `Uit eten ${SEED_TAG}`,
-          slug: 'regression-uit-eten',
-          icon: 'Utensils',
+          parent_id: dagelijks.id,
+          name: `Huishouden & verzorging ${SEED_TAG}`,
+          slug: S.HUISHOUDEN_VERZORGING,
+          icon: 'SprayCan',
           default_limit: 150,
           budget_type: 'expense',
           interval: 'monthly',
           rollover_type: 'reset',
-          is_essential: false,
+          is_essential: true,
           sort_order: 1,
         },
         {
           user_id: userId,
-          parent_id: dailyBudget.id,
-          name: `Overig ${SEED_TAG}`,
-          slug: 'regression-overig',
-          icon: 'MoreHorizontal',
+          parent_id: dagelijks.id,
+          name: `Medische kosten ${SEED_TAG}`,
+          slug: S.MEDISCHE_KOSTEN,
+          icon: 'HeartPulse',
           default_limit: 100,
           budget_type: 'expense',
           interval: 'monthly',
           rollover_type: 'reset',
-          is_essential: false,
+          is_essential: true,
           sort_order: 2,
         },
       ])
@@ -385,7 +392,7 @@ export async function seedTestData(
       {
         user_id: userId,
         account_id: bankAccountId,
-        budget_id: budgetMap.get('regression-boodschappen') ?? null,
+        budget_id: budgetMap.get(S.BOODSCHAPPEN) ?? null,
         date: daysAgo(2),
         amount: 67.30,
         description: `Albert Heijn ${SEED_TAG}`,
@@ -396,7 +403,7 @@ export async function seedTestData(
       {
         user_id: userId,
         account_id: bankAccountId,
-        budget_id: budgetMap.get('regression-uit-eten') ?? null,
+        budget_id: budgetMap.get(S.HUISHOUDEN_VERZORGING) ?? null,
         date: daysAgo(5),
         amount: 42.50,
         description: `Restaurant De Kas ${SEED_TAG}`,
@@ -407,7 +414,7 @@ export async function seedTestData(
       {
         user_id: userId,
         account_id: bankAccountId,
-        budget_id: budgetMap.get('regression-huur-hypotheek') ?? null,
+        budget_id: budgetMap.get(S.HUUR_HYPOTHEEK) ?? null,
         date: daysAgo(10),
         amount: 1200,
         description: `Hypotheek ABN AMRO ${SEED_TAG}`,

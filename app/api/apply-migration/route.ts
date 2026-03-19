@@ -441,6 +441,13 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$`,
 
+  // ── 20260318000001: Withdrawal strategy columns ────────────────────
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS withdrawal_strategy TEXT NOT NULL DEFAULT 'static'`,
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS guardrail_floor NUMERIC NOT NULL DEFAULT 0.80`,
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS guardrail_ceiling NUMERIC NOT NULL DEFAULT 1.20`,
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS guardrail_cut_step NUMERIC NOT NULL DEFAULT 0.10`,
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS guardrail_raise_step NUMERIC NOT NULL DEFAULT 0.10`,
+
   // ── 20260319000003: Invulfase active flag ───────────────────────────
   `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS invulfase_active boolean NOT NULL DEFAULT false`,
 
@@ -451,7 +458,11 @@ $$`,
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { db_password, service_role_key, access_token } = body
+    const { db_password: bodyPw, service_role_key: bodySrk, access_token: bodyToken } = body
+    // Allow credentials from env vars as fallback
+    const db_password = bodyPw || process.env.SUPABASE_DB_PASSWORD
+    const service_role_key = bodySrk || process.env.SUPABASE_SERVICE_ROLE_KEY
+    const access_token = bodyToken || process.env.SUPABASE_ACCESS_TOKEN
 
     if (!db_password && !service_role_key && !access_token) {
       return NextResponse.json({
@@ -459,8 +470,10 @@ export async function POST(request: NextRequest) {
         usage: {
           option1: 'curl -X POST http://localhost:3000/api/apply-migration -H "Content-Type: application/json" -d \'{"db_password":"YOUR_DB_PASSWORD"}\'',
           option2: 'curl -X POST http://localhost:3000/api/apply-migration -H "Content-Type: application/json" -d \'{"access_token":"YOUR_SUPABASE_ACCESS_TOKEN"}\'',
+          option3: 'Set SUPABASE_DB_PASSWORD, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_ACCESS_TOKEN in .env.local, then POST with empty body: curl -X POST http://localhost:3000/api/apply-migration -H "Content-Type: application/json" -d \'{}\'',
           where_to_find: {
             db_password: 'Supabase Dashboard > Settings > Database > Connection string',
+            service_role_key: 'Supabase Dashboard > Settings > API > service_role key',
             access_token: 'https://supabase.com/dashboard/account/tokens',
           }
         }
@@ -602,7 +615,7 @@ export async function GET() {
   }
 
   // Check profiles columns
-  const profileColumns = ['onboarding_idempotency_key', 'invulfase_active']
+  const profileColumns = ['onboarding_idempotency_key', 'invulfase_active', 'withdrawal_strategy', 'guardrail_floor', 'guardrail_ceiling', 'guardrail_cut_step', 'guardrail_raise_step']
   const profileColumnStatus: Record<string, boolean> = {}
   for (const col of profileColumns) {
     const { error } = await supabase.from('profiles').select(col).limit(0)

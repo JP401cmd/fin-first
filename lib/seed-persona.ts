@@ -182,6 +182,18 @@ export async function seedPersonaData(
   // Budgeting active — derived from whether persona has budgets
   profileData.budgeting_active = persona.budgets.length > 0
 
+  // Onboarding completed — personas represent post-onboarding state
+  profileData.onboarding_completed = true
+
+  // Invulfase active — set per persona (post-onboarding fill-in phase)
+  // Stored in feature_preferences JSONB under '_invulfase_active' key,
+  // consistent with save-own-data API route
+  const invulfaseActive = persona.profile.invulfase_active ?? true
+  profileData.feature_preferences = {
+    ...(typeof persona.profile.feature_preferences === 'object' ? persona.profile.feature_preferences : {}),
+    _invulfase_active: invulfaseActive,
+  }
+
   // Widget dashboard preferences (optional, per-persona)
   if (persona.profile.widget_prefs) profileData.widget_prefs = persona.profile.widget_prefs
 
@@ -389,11 +401,16 @@ export async function seedPersonaData(
   // Budgets: parent→child is sequential internally, but independent of other phase 2 inserts
   const budgetSlugToId: Record<string, string> = {}
   async function insertBudgets() {
+    // Delete all existing budgets for this user first, then plain insert.
+    // This avoids ON CONFLICT mismatches with the composite unique index
+    // (user_id, slug, COALESCE(parent_id, ...)) from migration 20260319000001.
+    await supabase.from('budgets').delete().eq('user_id', userId)
+
     let budgetCount = 0
     for (const parent of persona.budgets) {
       const { data: parentData, error: parentErr } = await supabase
         .from('budgets')
-        .upsert({
+        .insert({
           user_id: userId,
           parent_id: null,
           name: parent.name,
@@ -411,10 +428,10 @@ export async function seedPersonaData(
           priority_score: parent.priority_score,
           is_inflation_indexed: false,
           sort_order: parent.sort_order,
-        }, { onConflict: 'user_id, slug' })
+        })
         .select('id')
         .single()
-      if (parentErr) throw new Error(`Budget "${parent.name}" upsert mislukt: ${parentErr.message}`)
+      if (parentErr) throw new Error(`Budget "${parent.name}" insert mislukt: ${parentErr.message}`)
       budgetSlugToId[parent.slug] = parentData.id
       budgetCount++
 
@@ -423,7 +440,7 @@ export async function seedPersonaData(
           const child = parent.children[i]
           const { data: childData, error: childErr } = await supabase
             .from('budgets')
-            .upsert({
+            .insert({
               user_id: userId,
               parent_id: parentData.id,
               name: child.name,
@@ -441,10 +458,10 @@ export async function seedPersonaData(
               priority_score: parent.priority_score,
               is_inflation_indexed: false,
               sort_order: i,
-            }, { onConflict: 'user_id, slug' })
+            })
             .select('id')
             .single()
-          if (childErr) throw new Error(`Budget "${child.name}" upsert mislukt: ${childErr.message}`)
+          if (childErr) throw new Error(`Budget "${child.name}" insert mislukt: ${childErr.message}`)
           budgetSlugToId[child.slug] = childData.id
           budgetCount++
         }
@@ -586,12 +603,40 @@ export async function seedPersonaData(
       if (h.is_favorite != null) holdingRow.is_favorite = h.is_favorite
       if (h.currency) holdingRow.currency = h.currency
 
-      const { data: holdingData, error: holdingErr } = await supabase
+      let holdingData: { id: string } | null = null
+      const { data: d1, error: holdingErr } = await supabase
         .from('holdings')
         .insert(holdingRow)
         .select('id')
         .single()
-      if (holdingErr) throw new Error(`Holding "${h.name}" insert mislukt: ${holdingErr.message}`)
+
+      if (holdingErr) {
+        // If the error indicates missing columns (from migration 20260316100001),
+        // retry without the newer optional columns.
+        const msg = holdingErr.message ?? ''
+        if (msg.includes('column') || msg.includes('asset_class') || msg.includes('sector') || msg.includes('geography') || msg.includes('previous_close') || msg.includes('daily_change_percent') || msg.includes('currency')) {
+          console.warn(`[seed-persona] Holdings insert failed, retrying without optional columns (asset_class, sector, geography, previous_close, daily_change_percent, currency): ${msg}`)
+          const fallbackRow = { ...holdingRow }
+          delete fallbackRow.asset_class
+          delete fallbackRow.sector
+          delete fallbackRow.geography
+          delete fallbackRow.previous_close
+          delete fallbackRow.daily_change_percent
+          delete fallbackRow.currency
+          const { data: d2, error: fallbackErr } = await supabase
+            .from('holdings')
+            .insert(fallbackRow)
+            .select('id')
+            .single()
+          if (fallbackErr) throw new Error(`Holding "${h.name}" insert mislukt (fallback): ${fallbackErr.message}`)
+          holdingData = d2
+        } else {
+          throw new Error(`Holding "${h.name}" insert mislukt: ${holdingErr.message}`)
+        }
+      } else {
+        holdingData = d1
+      }
+      if (!holdingData) throw new Error(`Holding "${h.name}" insert returned no data`)
       holdingCount++
 
       if (h.transactions.length > 0) {

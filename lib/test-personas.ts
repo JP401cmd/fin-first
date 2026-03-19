@@ -67,6 +67,10 @@ export interface PersonaProfile {
   // Profile income/expense estimates (for users without budgets/transactions)
   net_monthly_income?: number
   estimated_monthly_expenses?: number
+  // Invulfase (post-onboarding fill-in phase) — defaults to true
+  invulfase_active?: boolean
+  // Arbitrary feature preferences (JSONB)
+  feature_preferences?: Record<string, unknown>
   // Widget dashboard
   widget_prefs?: { widgets: { id: string; enabled: boolean; size: 'quarter' | 'half' | 'full'; order: number }[] }
 }
@@ -571,6 +575,7 @@ const roosData: PersonaData = {
     fire_end_strategy: 'deplete',
     fire_end_age: 85,
     retirement_expense_method: 'current_income',
+    invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'schulden', size: 'full' }, 'cash_flow',
       'budgetten', 'acties', 'spaarquote', 'vrijheidsdagen_maand',
@@ -794,6 +799,7 @@ const daanData: PersonaData = {
     fire_end_strategy: 'perpetual',
     fire_end_age: 90,
     retirement_expense_method: 'essential_budgets',
+    invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', 'spaarquote', 'doelen',
       { id: 'fire_prognose', size: 'full' }, 'acties', 'trend_sparen', 'jouw_pad',
@@ -1035,6 +1041,7 @@ const lisaData: PersonaData = {
     fire_end_age: 90,
     fire_legacy_amount: 100000,
     retirement_expense_method: 'essential_budgets',
+    invulfase_active: false,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
       'assets', 'holdings', 'budgetten', 'monte_carlo', 'trend_sparen', 'acties',
@@ -1298,6 +1305,7 @@ const willemData: PersonaData = {
     fire_end_age: 95,
     retirement_expense_method: 'custom_amount',
     retirement_expense_custom_amount: 3000,
+    invulfase_active: false,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
       'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'gezondheids_score',
@@ -1536,6 +1544,7 @@ const rashidData: PersonaData = {
     retirement_expense_method: 'current_income',
     net_monthly_income: 5500,
     estimated_monthly_expenses: 4200,
+    invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'fire_prognose', 'vrijheidsscenarios', 'acties', 'doelen',
     ]),
@@ -1771,6 +1780,7 @@ const marijkeData: PersonaData = {
     retirement_expense_custom_amount: 2800,
     net_monthly_income: 3400,
     estimated_monthly_expenses: 2800,
+    invulfase_active: false,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'passief_inkomen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',
       'holdings', 'vrijheidsmijlpalen', 'acties', 'gezondheids_score',
@@ -1784,7 +1794,7 @@ const marijkeData: PersonaData = {
   assets: [
     { name: 'Beleggingsportefeuille Rabobank', asset_type: 'investment', current_value: 320000, purchase_value: 260000, purchase_date: '2005-01-01', expected_return: 5, monthly_contribution: 0, institution: 'Rabobank', subtype: 'etf', risk_profile: 'laag' },
     { name: 'Eigen woning Zwolle', asset_type: 'eigen_huis', current_value: 420000, purchase_value: 180000, purchase_date: '1992-03-01', expected_return: 3, monthly_contribution: 0, institution: '', woz_value: 440000, address_postcode: '8024 AA', address_house_number: '12' },
-    { name: 'Stacaravan Drenthe', asset_type: 'physical_possession', current_value: 25000, purchase_value: 35000, purchase_date: '2018-06-01', expected_return: -5, monthly_contribution: 0, institution: '', depreciation_rate: 5 },
+    { name: 'Stacaravan Drenthe', asset_type: 'physical', current_value: 25000, purchase_value: 35000, purchase_date: '2018-06-01', expected_return: -5, monthly_contribution: 0, institution: '', depreciation_rate: 5 },
   ],
   debts: [], // Hypotheekvrij
   budgets: makeBudgets({
