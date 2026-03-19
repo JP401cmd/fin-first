@@ -18,6 +18,9 @@ import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
 import { OnboardingPreferences, INITIAL_PREFERENCES, buildWidgetPrefsFromPreferences } from '@/components/onboarding/onboarding-preferences'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
 
+// ── localStorage key for persisting onboarding data ──────────
+const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
+
 // ── Saving progress messages ─────────────────────────────────
 const SAVING_MESSAGES = [
   'Profiel wordt opgeslagen...',
@@ -60,6 +63,18 @@ interface State {
   preferences: PreferencesData
 }
 
+/** Data portion of state that gets persisted to localStorage (excludes step/direction) */
+interface PersistedData {
+  identity: IdentityData
+  budgetAmounts: Record<string, number>
+  bankAccounts: BankAccountEntry[]
+  assets: AssetEntry[]
+  debts: DebtEntry[]
+  preferences: PreferencesData
+  /** Last step the user was on (to restore position) */
+  lastStep?: Step
+}
+
 type Action =
   | { type: 'SET_STEP'; step: Step }
   | { type: 'SET_IDENTITY'; data: IdentityData }
@@ -68,6 +83,7 @@ type Action =
   | { type: 'SET_ASSETS'; items: AssetEntry[] }
   | { type: 'SET_DEBTS'; items: DebtEntry[] }
   | { type: 'SET_PREFERENCES'; data: PreferencesData }
+  | { type: 'RESTORE_STATE'; data: PersistedData }
 
 const initialState: State = {
   step: 'intro',
