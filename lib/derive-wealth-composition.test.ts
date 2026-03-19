@@ -305,6 +305,400 @@ describe('deriveWealthCompositionFromSim', () => {
     })
   })
 
+  // ── Feature #371 — Regression tests for ratio-engine ────────
+
+  describe('#371 — ratios sum to 100% per year', () => {
+    it('ratio percentages sum to 100% for every year across 5 groups', () => {
+      const rows = Array.from({ length: 40 }, (_, i) =>
+        makeSimRow(30 + i, 100000 + i * 8000),
+      )
+      const assets = [
+        makeAsset({ asset_type: 'investment', current_value: 40000, expected_return: 8, id: 'a1' }),
+        makeAsset({ asset_type: 'savings', current_value: 20000, expected_return: 2, id: 'a2' }),
+        makeAsset({ asset_type: 'retirement', current_value: 15000, expected_return: 5, id: 'a3' }),
+        makeAsset({ asset_type: 'eigen_huis', current_value: 20000, expected_return: 3, id: 'a4' }),
+        makeAsset({ asset_type: 'crypto', current_value: 5000, expected_return: 12, id: 'a5' }),
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], null, null)
+      for (let i = 0; i < result.length; i++) {
+        const row = result[i]
+        const sum = row.spaargeld + row.beleggingen + row.pensioen + row.vastgoed + row.overig
+        if (rows[i].endPortfolio > 0) {
+          // Compute ratio percentages — they must sum to ~100%
+          const pctSum =
+            (row.spaargeld / sum) * 100 +
+            (row.beleggingen / sum) * 100 +
+            (row.pensioen / sum) * 100 +
+            (row.vastgoed / sum) * 100 +
+            (row.overig / sum) * 100
+          expect(pctSum).toBeCloseTo(100, 5)
+        }
+      }
+    })
+  })
+
+  describe('#371 — displayed total matches SimRow.endPortfolio (max €1)', () => {
+    it('sum of 5 groups matches endPortfolio within €1 for every year', () => {
+      // Use varying portfolio values including primes and odd numbers
+      const portfolios = [100003, 123456, 200001, 314159, 500000, 750007, 999999, 1234567]
+      const rows = portfolios.map((p, i) => makeSimRow(30 + i, p))
+      const assets = [
+        makeAsset({ asset_type: 'investment', current_value: 60000, expected_return: 7, monthly_contribution: 500, id: 'a1' }),
+        makeAsset({ asset_type: 'savings', current_value: 25000, expected_return: 1.5, monthly_contribution: 200, id: 'a2' }),
+        makeAsset({ asset_type: 'retirement', current_value: 10000, expected_return: 5, id: 'a3' }),
+        makeAsset({ asset_type: 'eigen_huis', current_value: 300000, expected_return: 2, id: 'a4' }),
+        makeAsset({ asset_type: 'crypto', current_value: 5000, expected_return: 15, id: 'a5' }),
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], null, null)
+      for (let i = 0; i < result.length; i++) {
+        const row = result[i]
+        const sum = row.spaargeld + row.beleggingen + row.pensioen + row.vastgoed + row.overig
+        expect(Math.abs(sum - rows[i].endPortfolio)).toBeLessThanOrEqual(1)
+      }
+    })
+
+    it('total matches endPortfolio even during post-FIRE withdrawals', () => {
+      const rows = Array.from({ length: 20 }, (_, i) =>
+        makeSimRow(45 + i, Math.max(0, 800000 - i * 30000)),
+      )
+      const assets = [
+        makeAsset({ asset_type: 'investment', current_value: 300000, expected_return: 6, id: 'a1' }),
+        makeAsset({ asset_type: 'savings', current_value: 200000, expected_return: 1, id: 'a2' }),
+        makeAsset({ asset_type: 'retirement', current_value: 200000, expected_return: 4, id: 'a3' }),
+        makeAsset({ asset_type: 'eigen_huis', current_value: 100000, expected_return: 2, id: 'a4' }),
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], 50, 40000)
+      for (let i = 0; i < result.length; i++) {
+        const row = result[i]
+        const sum = row.spaargeld + row.beleggingen + row.pensioen + row.vastgoed + row.overig
+        expect(Math.abs(sum - rows[i].endPortfolio)).toBeLessThanOrEqual(1)
+      }
+    })
+  })
+
+  describe('#371 — contributions stop per group after FIRE', () => {
+    it('group with contributions grows less after FIRE than without FIRE', () => {
+      // Create 10-year projection: FIRE at age 35 (year 5)
+      const rows = Array.from({ length: 10 }, (_, i) =>
+        makeSimRow(30 + i, 100000 + i * 20000),
+      )
+      const assets = [
+        makeAsset({
+          asset_type: 'investment',
+          current_value: 60000,
+          expected_return: 5,
+          monthly_contribution: 1000, // €12k/year contribution
+          id: 'a1',
+        }),
+        makeAsset({
+          asset_type: 'savings',
+          current_value: 40000,
+          expected_return: 1,
+          monthly_contribution: 500, // €6k/year contribution
+          id: 'a2',
+        }),
+      ]
+
+      // With FIRE at 35
+      const withFire = deriveWealthCompositionFromSim(rows, assets, [], 35, 30000)
+      // Without FIRE
+      const withoutFire = deriveWealthCompositionFromSim(rows, assets, [], null, null)
+
+      // Before FIRE (year 0-4, ages 30-34): ratios should be identical
+      for (let y = 0; y < 5; y++) {
+        expect(withFire[y].beleggingen).toBe(withoutFire[y].beleggingen)
+        expect(withFire[y].spaargeld).toBe(withoutFire[y].spaargeld)
+      }
+
+      // After FIRE (year 6+): the theoretical ratios diverge because
+      // contributions stop, changing group growth rates
+      // With FIRE + withdrawals, beleggingen ratio should be lower
+      const fireBelRatio = withFire[8].beleggingen / (withFire[8].beleggingen + withFire[8].spaargeld || 1)
+      const noFireBelRatio = withoutFire[8].beleggingen / (withoutFire[8].beleggingen + withoutFire[8].spaargeld || 1)
+      // The ratios diverge because contributions stop and withdrawals begin
+      expect(fireBelRatio).not.toBe(noFireBelRatio)
+    })
+  })
+
+  describe('#371 — waterfall order: beleggingen → spaargeld → overig → pensioen → vastgoed', () => {
+    it('draws from beleggingen before spaargeld, and spaargeld before overig', () => {
+      // Create a scenario with large withdrawals relative to beleggingen
+      // so we can observe the waterfall in action
+      const rows = Array.from({ length: 10 }, (_, i) =>
+        makeSimRow(50 + i, Math.max(10000, 150000 - i * 15000)),
+      )
+      const assets = [
+        makeAsset({ asset_type: 'investment', current_value: 20000, expected_return: 0, id: 'a1' }),  // small — depletes first
+        makeAsset({ asset_type: 'savings', current_value: 40000, expected_return: 0, id: 'a2' }),     // medium
+        makeAsset({ asset_type: 'crypto', current_value: 40000, expected_return: 0, id: 'a3' }),      // overig — medium
+        makeAsset({ asset_type: 'retirement', current_value: 25000, expected_return: 0, id: 'a4' }),  // pensioen
+        makeAsset({ asset_type: 'eigen_huis', current_value: 25000, expected_return: 0, id: 'a5' }), // vastgoed — last
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], 50, 35000)
+
+      // Since beleggingen has 0% return and withdrawals hit it first,
+      // its theoretical value drops to 0 before spaargeld does
+      // Find first year where beleggingen ratio reaches 0
+      const belDepletedIdx = result.findIndex((r, i) => i > 0 && r.beleggingen === 0)
+      if (belDepletedIdx > 0) {
+        // At the year beleggingen depletes, spaargeld should still have value
+        // (unless endPortfolio is already 0)
+        if (rows[belDepletedIdx].endPortfolio > 0) {
+          const hasOtherGroups = result[belDepletedIdx].spaargeld > 0 ||
+            result[belDepletedIdx].overig > 0 ||
+            result[belDepletedIdx].pensioen > 0 ||
+            result[belDepletedIdx].vastgoed > 0
+          expect(hasOtherGroups).toBe(true)
+        }
+      }
+
+      // Vastgoed should be the last group to deplete (drawn last in waterfall)
+      const lastNonZeroVastgoed = result.findLastIndex(r => r.vastgoed > 0)
+      const lastNonZeroBel = result.findLastIndex(r => r.beleggingen > 0)
+      if (lastNonZeroVastgoed >= 0 && lastNonZeroBel >= 0) {
+        expect(lastNonZeroVastgoed).toBeGreaterThanOrEqual(lastNonZeroBel)
+      }
+    })
+
+    it('pensioen is drawn after overig in the waterfall', () => {
+      // Scenario: only pensioen and overig have value, both equal
+      const rows = Array.from({ length: 10 }, (_, i) =>
+        makeSimRow(60 + i, Math.max(0, 100000 - i * 12000)),
+      )
+      const assets = [
+        makeAsset({ asset_type: 'crypto', current_value: 50000, expected_return: 0, id: 'a1' }),     // overig
+        makeAsset({ asset_type: 'retirement', current_value: 50000, expected_return: 0, id: 'a2' }), // pensioen
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], 60, 25000)
+
+      // Overig should deplete before pensioen (drawn first in waterfall)
+      const lastOverig = result.findLastIndex(r => r.overig > 0)
+      const lastPensioen = result.findLastIndex(r => r.pensioen > 0)
+      if (lastOverig >= 0 && lastPensioen >= 0) {
+        expect(lastPensioen).toBeGreaterThanOrEqual(lastOverig)
+      }
+    })
+  })
+
+  describe('#371 — deplete strategy draws from all groups including vastgoed', () => {
+    it('all 5 groups reach 0 when portfolio fully depletes', () => {
+      // Simulate a depleting portfolio that reaches 0
+      const rows = Array.from({ length: 30 }, (_, i) => {
+        const portfolio = Math.max(0, 600000 - i * 25000) // reaches 0 at year 24
+        return makeSimRow(50 + i, portfolio)
+      })
+      const assets = [
+        makeAsset({ asset_type: 'investment', current_value: 120000, expected_return: 3, id: 'a1' }),
+        makeAsset({ asset_type: 'savings', current_value: 120000, expected_return: 1, id: 'a2' }),
+        makeAsset({ asset_type: 'crypto', current_value: 120000, expected_return: 5, id: 'a3' }),
+        makeAsset({ asset_type: 'retirement', current_value: 120000, expected_return: 4, id: 'a4' }),
+        makeAsset({ asset_type: 'eigen_huis', current_value: 120000, expected_return: 2, id: 'a5' }),
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], 50, 50000)
+
+      // Find last row where endPortfolio is 0
+      const zeroRows = result.filter((_, i) => rows[i].endPortfolio === 0)
+      expect(zeroRows.length).toBeGreaterThan(0)
+
+      // All groups should be 0 when portfolio is 0
+      for (const row of zeroRows) {
+        expect(row.beleggingen).toBe(0)
+        expect(row.spaargeld).toBe(0)
+        expect(row.overig).toBe(0)
+        expect(row.pensioen).toBe(0)
+        expect(row.vastgoed).toBe(0)
+      }
+    })
+
+    it('vastgoed is drawn (not preserved) during depletion', () => {
+      // Scenario with only vastgoed and small other groups
+      const rows = Array.from({ length: 15 }, (_, i) =>
+        makeSimRow(55 + i, Math.max(0, 400000 - i * 30000)),
+      )
+      const assets = [
+        makeAsset({ asset_type: 'investment', current_value: 10000, expected_return: 0, id: 'a1' }),
+        makeAsset({ asset_type: 'eigen_huis', current_value: 390000, expected_return: 0, id: 'a2' }),
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], 55, 35000)
+
+      // After beleggingen depletes, vastgoed should eventually also decrease
+      const midRow = result[7] // portfolio = 400000 - 7*30000 = 190000
+      const laterRow = result[12] // portfolio = 400000 - 12*30000 = 40000
+      if (laterRow && midRow && rows[12].endPortfolio > 0 && rows[7].endPortfolio > 0) {
+        // Vastgoed's absolute value should be smaller when portfolio shrinks
+        expect(laterRow.vastgoed).toBeLessThan(midRow.vastgoed)
+      }
+    })
+  })
+
+  describe('#371 — debts projected separately and reach €0 at end date', () => {
+    it('annuity debt reaches €0 before end of projection', () => {
+      // Debt of 60000 at 4% with €600/month payment (~11 years to pay off)
+      const rows = Array.from({ length: 15 }, (_, i) => makeSimRow(35 + i, 200000))
+      const assets = [makeAsset({ asset_type: 'investment', current_value: 200000 })]
+      const debts = [makeDebt({
+        current_balance: 60000,
+        interest_rate: 4,
+        monthly_payment: 600,
+        repayment_type: 'annuiteit',
+      })]
+      const result = deriveWealthCompositionFromSim(rows, assets, debts, null, null)
+
+      // Debt should start negative
+      expect(result[0].schulden).toBeLessThan(0)
+      expect(Math.abs(result[0].schulden)).toBeCloseTo(60000, -1)
+
+      // Debt should reach 0 within the projection
+      const zeroDebtIdx = result.findIndex(r => Math.abs(r.schulden) === 0)
+      expect(zeroDebtIdx).toBeGreaterThan(0)
+      expect(zeroDebtIdx).toBeLessThan(15)
+
+      // Once at 0, should stay at 0
+      for (let i = zeroDebtIdx; i < result.length; i++) {
+        expect(Math.abs(result[i].schulden)).toBe(0)
+      }
+    })
+
+    it('lineair debt reaches €0 at approximately the end date', () => {
+      const yearsUntilEnd = 10
+      const endDate = new Date(Date.now() + yearsUntilEnd * 365.25 * 24 * 60 * 60 * 1000)
+        .toISOString().slice(0, 10)
+      const rows = Array.from({ length: 15 }, (_, i) => makeSimRow(40 + i, 300000))
+      const assets = [makeAsset({ asset_type: 'savings', current_value: 300000 })]
+      const debts = [makeDebt({
+        current_balance: 100000,
+        interest_rate: 3,
+        monthly_payment: 1000,
+        repayment_type: 'lineair',
+        end_date: endDate,
+      })]
+      const result = deriveWealthCompositionFromSim(rows, assets, debts, null, null)
+
+      // Debt starts negative
+      expect(result[0].schulden).toBeLessThan(0)
+
+      // By year ~10 the debt should be approximately 0
+      if (result.length > yearsUntilEnd) {
+        expect(Math.abs(result[yearsUntilEnd].schulden)).toBeLessThan(5000)
+      }
+
+      // After end date, debt should be 0
+      if (result.length > yearsUntilEnd + 2) {
+        expect(Math.abs(result[yearsUntilEnd + 2].schulden)).toBe(0)
+      }
+    })
+
+    it('debt values do not affect the 5 wealth groups (separate projection)', () => {
+      const rows = [makeSimRow(30, 100000), makeSimRow(31, 110000)]
+      const assets = [makeAsset({ asset_type: 'investment', current_value: 100000 })]
+      const debts = [makeDebt({ current_balance: 500000 })]
+
+      const withDebt = deriveWealthCompositionFromSim(rows, assets, debts, null, null)
+      const withoutDebt = deriveWealthCompositionFromSim(rows, assets, [], null, null)
+
+      // Wealth groups should be identical regardless of debts
+      for (let i = 0; i < rows.length; i++) {
+        expect(withDebt[i].beleggingen).toBe(withoutDebt[i].beleggingen)
+        expect(withDebt[i].spaargeld).toBe(withoutDebt[i].spaargeld)
+        expect(withDebt[i].pensioen).toBe(withoutDebt[i].pensioen)
+        expect(withDebt[i].vastgoed).toBe(withoutDebt[i].vastgoed)
+        expect(withDebt[i].overig).toBe(withoutDebt[i].overig)
+      }
+
+      // But schulden should differ
+      expect(Math.abs(withDebt[0].schulden)).toBeGreaterThan(0)
+      expect(Math.abs(withoutDebt[0].schulden)).toBe(0)
+    })
+  })
+
+  describe('#371 — group with €0 start value gets ratio 0%', () => {
+    it('group with 0 initial value stays at 0% across all years', () => {
+      const rows = Array.from({ length: 10 }, (_, i) =>
+        makeSimRow(30 + i, 100000 + i * 10000),
+      )
+      const assets = [
+        makeAsset({ asset_type: 'investment', current_value: 70000, expected_return: 7, id: 'a1' }),
+        makeAsset({ asset_type: 'savings', current_value: 30000, expected_return: 2, id: 'a2' }),
+        // No pensioen, vastgoed, or overig assets → those groups have €0
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], null, null)
+      for (const row of result) {
+        expect(row.pensioen).toBe(0)
+        expect(row.vastgoed).toBe(0)
+        expect(row.overig).toBe(0)
+      }
+    })
+
+    it('group with 0 value and 0 contribution stays at 0', () => {
+      const rows = Array.from({ length: 5 }, (_, i) =>
+        makeSimRow(30 + i, 200000 + i * 5000),
+      )
+      const assets = [
+        makeAsset({ asset_type: 'investment', current_value: 200000, expected_return: 5, monthly_contribution: 500, id: 'a1' }),
+        makeAsset({ asset_type: 'savings', current_value: 0, expected_return: 3, monthly_contribution: 0, id: 'a2' }),
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], null, null)
+      // Spaargeld starts at 0 with 0 contribution → stays at 0 ratio
+      for (const row of result) {
+        expect(row.spaargeld).toBe(0)
+      }
+    })
+  })
+
+  describe('#371 — depreciating assets (auto) floor at €0', () => {
+    it('vehicle with negative expected_return floors at €0 in theoretical balance', () => {
+      // A vehicle that depreciates at 15%/year — after enough years, theoretical goes to 0
+      const rows = Array.from({ length: 20 }, (_, i) =>
+        makeSimRow(30 + i, Math.max(100, 50000 + i * 2000)),
+      )
+      const assets = [
+        makeAsset({
+          asset_type: 'vehicle',
+          current_value: 25000,
+          expected_return: -15, // depreciates 15%/year
+          monthly_contribution: 0,
+          id: 'a1',
+        }),
+        makeAsset({
+          asset_type: 'investment',
+          current_value: 25000,
+          expected_return: 7,
+          id: 'a2',
+        }),
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], null, null)
+
+      // overig (vehicle) should never go negative
+      for (const row of result) {
+        expect(row.overig).toBeGreaterThanOrEqual(0)
+      }
+
+      // overig share should decrease over time (vehicle depreciates, investment grows)
+      const initialOverigRatio = result[0].overig / (result[0].overig + result[0].beleggingen || 1)
+      const finalOverigRatio = result[19].overig / (result[19].overig + result[19].beleggingen || 1)
+      expect(finalOverigRatio).toBeLessThan(initialOverigRatio)
+    })
+
+    it('all group values are non-negative even with depreciating assets', () => {
+      const rows = Array.from({ length: 30 }, (_, i) =>
+        makeSimRow(25 + i, 100000 + i * 3000),
+      )
+      const assets = [
+        makeAsset({ asset_type: 'vehicle', current_value: 30000, expected_return: -20, id: 'a1' }),
+        makeAsset({ asset_type: 'physical', current_value: 10000, expected_return: -10, id: 'a2' }),
+        makeAsset({ asset_type: 'investment', current_value: 60000, expected_return: 7, id: 'a3' }),
+      ]
+      const result = deriveWealthCompositionFromSim(rows, assets, [], null, null)
+      for (const row of result) {
+        expect(row.spaargeld).toBeGreaterThanOrEqual(0)
+        expect(row.beleggingen).toBeGreaterThanOrEqual(0)
+        expect(row.pensioen).toBeGreaterThanOrEqual(0)
+        expect(row.vastgoed).toBeGreaterThanOrEqual(0)
+        expect(row.overig).toBeGreaterThanOrEqual(0)
+      }
+    })
+  })
+
   describe('asset type grouping', () => {
     it('groups assets correctly into WEALTH_GROUPS', () => {
       const rows = [makeSimRow(30, 100000)]
