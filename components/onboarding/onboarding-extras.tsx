@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import { WillDots } from '@/components/app/will-dots'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import { MiniBankForm, type BankAccountEntry } from './mini-bank-form'
 import { MiniAssetForm, type AssetEntry } from './mini-asset-form'
 import { MiniDebtForm, type DebtEntry } from './mini-debt-form'
 
-type Section = 'bank' | 'assets' | 'debts'
+type Section = 'assets' | 'debts'
 
 export function OnboardingExtras({
   bankAccounts,
@@ -21,6 +22,7 @@ export function OnboardingExtras({
   onBack,
   saving = false,
   hideBudgets = false,
+  budgetteringMode = 'none',
 }: {
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -32,24 +34,59 @@ export function OnboardingExtras({
   onBack: () => void
   saving?: boolean
   hideBudgets?: boolean
+  budgetteringMode?: string
 }) {
   const [openSections, setOpenSections] = useState<Record<Section, boolean>>({
-    bank: false,
     assets: false,
     debts: false,
   })
+  const [showBudgetModal, setShowBudgetModal] = useState(false)
 
   const toggle = (section: Section) => {
     setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }))
   }
 
+  // Combined count for assets section includes bank accounts
+  const assetsCount = bankAccounts.length + assets.length
+
   const sections: { key: Section; label: string; description: string; count: number }[] = [
-    { key: 'bank', label: 'Bankrekeningen', description: 'Betaal- en spaarrekeningen', count: bankAccounts.length },
-    { key: 'assets', label: 'Bezittingen', description: 'Spaargeld, beleggingen, woning, etc.', count: assets.length },
+    { key: 'assets', label: 'Bezittingen', description: 'Bankrekeningen, spaargeld, beleggingen, woning, etc.', count: assetsCount },
     { key: 'debts', label: 'Schulden', description: 'Hypotheek, leningen, creditcard, etc.', count: debts.length },
   ]
 
   const hasData = bankAccounts.length > 0 || assets.length > 0 || debts.length > 0
+
+  /**
+   * Validate budget tracking requirement before proceeding.
+   * When budgettering is active, at least one bank account must have
+   * has_budget_tracking enabled — otherwise we prompt the user.
+   */
+  const handleNext = () => {
+    if (budgetteringMode !== 'none') {
+      const hasBudgetAccount = bankAccounts.some((a) => a.has_budget_tracking)
+      if (!hasBudgetAccount) {
+        setShowBudgetModal(true)
+        return
+      }
+    }
+    onNext()
+  }
+
+  /** Auto-create a default checking account with budget tracking enabled */
+  const handleAutoCreate = () => {
+    onBankChange([
+      ...bankAccounts,
+      {
+        name: 'Lopende rekening',
+        bank_name: '',
+        account_type: 'checking',
+        balance: '0',
+        has_budget_tracking: true,
+      },
+    ])
+    setShowBudgetModal(false)
+    onNext()
+  }
 
   return (
     <div className="pb-20 sm:pb-0">
@@ -107,8 +144,26 @@ export function OnboardingExtras({
 
             {openSections[key] && (
               <div className="border-t border-[var(--border-ed)] px-4 py-3">
-                {key === 'bank' && <MiniBankForm items={bankAccounts} onChange={onBankChange} />}
-                {key === 'assets' && <MiniAssetForm items={assets} onChange={onAssetChange} />}
+                {key === 'assets' && (
+                  <div className="space-y-4">
+                    {/* Cash & Bankrekeningen subsection */}
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+                        Cash &amp; Bankrekeningen
+                      </p>
+                      <MiniBankForm items={bankAccounts} onChange={onBankChange} />
+                    </div>
+
+                    {/* Visual divider between bank accounts and other assets */}
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-[var(--border-ed)]" />
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-4)]">Overige bezittingen</span>
+                      <div className="h-px flex-1 bg-[var(--border-ed)]" />
+                    </div>
+
+                    <MiniAssetForm items={assets} onChange={onAssetChange} />
+                  </div>
+                )}
                 {key === 'debts' && <MiniDebtForm items={debts} onChange={onDebtChange} />}
               </div>
             )}
@@ -119,7 +174,7 @@ export function OnboardingExtras({
       {/* Sticky nav on mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-8 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={saving}
           data-testid="onboarding-save-next"
           className="w-full min-h-[44px] rounded-xl bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
@@ -127,6 +182,33 @@ export function OnboardingExtras({
           {hasData ? 'Volgende' : 'Overslaan'}
         </button>
       </div>
+
+      {/* Budget tracking validation modal */}
+      <BottomSheet open={showBudgetModal} onClose={() => setShowBudgetModal(false)} title="Budgetteren" size="sm">
+        <div className="space-y-4 px-1 pb-2">
+          <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+            Je hebt budgetteren ingeschakeld, maar geen enkele bankrekening is gekoppeld aan je budget.
+            Om transacties bij te houden heb je minstens &eacute;&eacute;n rekening nodig met budgetteren aan.
+          </p>
+          <p className="text-sm text-[var(--ink-3)]">
+            Wil je dat we automatisch een standaard lopende rekening aanmaken?
+          </p>
+          <div className="flex flex-col gap-2 pt-1">
+            <button
+              onClick={handleAutoCreate}
+              className="w-full min-h-[44px] rounded-xl bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800"
+            >
+              Lopende rekening aanmaken
+            </button>
+            <button
+              onClick={() => setShowBudgetModal(false)}
+              className="w-full min-h-[44px] rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+            >
+              Terug naar bezittingen
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
     </div>
   )
 }

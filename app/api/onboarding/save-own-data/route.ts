@@ -154,6 +154,7 @@ const bodySchema = z.object({
     bank_name: z.string().min(1),
     account_type: z.string(),
     balance: z.number(),
+    has_budget_tracking: z.boolean().optional(),
   })).optional(),
   assets: z.array(z.object({
     name: z.string().min(1),
@@ -227,11 +228,25 @@ export async function POST(req: Request) {
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
     // This prevents duplicate data from rapid double-clicks or retries
-    const { data: existingProfile } = await supabase
+    // First try with idempotency key column; fall back to without if column doesn't exist yet
+    let existingProfile: { onboarding_completed: boolean; onboarding_idempotency_key?: string } | null = null
+    const { data: profileWithKey, error: profileError } = await supabase
       .from('profiles')
       .select('onboarding_completed, onboarding_idempotency_key')
       .eq('id', user.id)
       .single()
+
+    if (profileError && profileError.message?.includes('onboarding_idempotency_key')) {
+      // Column doesn't exist yet — query without it
+      const { data: profileWithoutKey } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', user.id)
+        .single()
+      existingProfile = profileWithoutKey ? { ...profileWithoutKey, onboarding_idempotency_key: undefined } : null
+    } else {
+      existingProfile = profileWithKey
+    }
 
     if (existingProfile?.onboarding_completed) {
       return Response.json({ success: true, alreadyCompleted: true })
@@ -298,8 +313,11 @@ export async function POST(req: Request) {
       onboarding_completed: false,
       is_demo_user: false,
       budgeting_active: budgetteringMode !== 'none',
-      onboarding_idempotency_key: idempotencyKey ?? null,
       updated_at: new Date().toISOString(),
+    }
+    // Only include idempotency key if the column exists (migration may not be applied yet)
+    if (!profileError || !profileError.message?.includes('onboarding_idempotency_key')) {
+      profileData.onboarding_idempotency_key = idempotencyKey ?? null
     }
     // Add estimated monthly expenses if provided
     if (identity.estimated_monthly_expenses != null) profileData.estimated_monthly_expenses = identity.estimated_monthly_expenses
@@ -330,7 +348,7 @@ export async function POST(req: Request) {
     // Batched: all parents in 1 insert, all children in 1 insert (2-3 DB calls instead of 34)
 
     // Wrapped in retry logic (max 2 retries with exponential backoff)
-    // Delete-first + upsert makes this safely idempotent on retry
+    // Delete-first + insert makes this safely idempotent on retry
     await withRetry(async () => {
       await supabase.from('budgets').delete().eq('user_id', user.id)
 
@@ -366,9 +384,9 @@ export async function POST(req: Request) {
       // Step 2b: Bulk insert all parents in one call and get their IDs
       const { data: insertedParents, error: parentBulkErr } = await supabase
         .from('budgets')
-        .upsert(parentRows, { onConflict: 'user_id, slug' })
+        .insert(parentRows)
         .select('id, slug')
-      if (parentBulkErr) throw new Error(`Budget parents bulk upsert mislukt: ${parentBulkErr.message}`)
+      if (parentBulkErr) throw new Error(`Budget parents bulk insert mislukt: ${parentBulkErr.message}`)
 
       // Step 2c: Map parent slugs to their generated IDs for child assignment
       const parentSlugToId = new Map<string, string>()
@@ -412,8 +430,8 @@ export async function POST(req: Request) {
       if (childRows.length > 0) {
         const { error: childBulkErr } = await supabase
           .from('budgets')
-          .upsert(childRows, { onConflict: 'user_id, slug' })
-        if (childBulkErr) throw new Error(`Budget children bulk upsert mislukt: ${childBulkErr.message}`)
+          .insert(childRows)
+        if (childBulkErr) throw new Error(`Budget children bulk insert mislukt: ${childBulkErr.message}`)
       }
     })
 
@@ -441,7 +459,7 @@ export async function POST(req: Request) {
         net_worth_inclusion_pct: 100,
         is_liquid: true,
         subtype: a.account_type,
-        has_budget_tracking: budgetteringMode !== 'none',
+        has_budget_tracking: a.has_budget_tracking ?? (budgetteringMode !== 'none'),
       }))
 
       const { data: cashAssets, error: cashErr } = await supabase
@@ -559,6 +577,14 @@ export async function POST(req: Request) {
       .update({ onboarding_completed: true, updated_at: new Date().toISOString() })
       .eq('id', user.id)
     if (completeErr) throw new Error(`Onboarding afronden mislukt: ${completeErr.message}`)
+
+    // 8. Activate invulfase — guides user to fill in remaining data after onboarding
+    await supabase
+      .from('app_settings')
+      .upsert(
+        { key: `invulfase_active_${user.id}`, value: JSON.stringify(true) },
+        { onConflict: 'key' }
+      )
 
     return Response.json({ success: true })
   } catch (err) {

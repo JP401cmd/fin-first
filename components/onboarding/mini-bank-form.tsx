@@ -5,9 +5,10 @@ export interface BankAccountEntry {
   bank_name: string
   account_type: string
   balance: string
+  has_budget_tracking: boolean
 }
 
-const EMPTY: BankAccountEntry = { name: '', bank_name: '', account_type: 'checking', balance: '' }
+const EMPTY: BankAccountEntry = { name: '', bank_name: '', account_type: 'checking', balance: '', has_budget_tracking: true }
 
 export function MiniBankForm({
   items,
@@ -66,6 +67,15 @@ export function MiniBankForm({
               />
             </div>
           </div>
+          <label className="flex items-center gap-2 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={item.has_budget_tracking}
+              onChange={(e) => update(i, { has_budget_tracking: e.target.checked })}
+              className="h-4 w-4 rounded border-[var(--border-ed)] text-wil-600 focus:ring-wil-500"
+            />
+            <span className="text-sm text-[var(--ink-2)]">Gebruik voor budgetteren</span>
+          </label>
         </div>
       ))}
       <button
