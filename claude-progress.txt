@@ -1,3 +1,47 @@
+## Session 2026-03-19 - Feature #383
+
+### Feature #383: TER invoer op holdings — detail pagina en create/edit flows - PASSING
+- Added TER input field to HoldingForm (create) with percentage input, annual cost calculation
+- Added TER input field to HoldingEditForm (edit) with same features
+- Added TER display section to holding detail page with annual cost
+- Progressive disclosure: hint shown when ticker/ISIN present but no TER (create, edit, detail)
+- Input transformation: user enters 0.22 (%), API receives 0.0022 (decimal)
+- Realtime calculation: "= €X/jaar" shown next to field based on holding value
+- Mobile-friendly: inputMode='decimal' for touch keyboards
+- Validation: TER 0-10%, warning shown when exceeded
+- API resilience: POST/PATCH retry without TER fields if column not yet in schema
+- Note: ter column not yet applied to production DB (migration blocker from #381)
+- Commit: 246d2180
+- Progress: 377/397 passing (94.9%)
+
+## Session 2026-03-19 - Features #390, #391
+
+### Feature #390: Migratie: marginaal_tarief veld toevoegen aan profiles - PASSING
+- Migration: `20260319100001_add_marginaal_tarief_to_profiles.sql` (ALTER TABLE profiles ADD COLUMN marginaal_tarief numeric)
+- Updated `resolveFireParams()` in lib/fire-params.ts to return marginaalTarief (auto-derived from net_monthly_income)
+- Added IB_SCHIJFGRENS constant (€75,518) and deriveMarginaalTarief() helper
+- Instellingen page: 3-option radio (Automatisch / 36,97% / 49,50%) in FIRE section C
+- API route: GET/PUT with graceful fallback when column doesn't exist
+- Apply-migration route: added marginaal_tarief migration statement
+- Fixed pre-existing bug: removed rebalance_threshold from profile select (column not yet in DB)
+- Verified end-to-end with browser automation
+- Commit: 731fcc22
+
+### Feature #391: Rekenengine: lib/hypotheek-vs-beleggen.ts - PASSING
+- New file: `lib/hypotheek-vs-beleggen.ts` with `compareMortgageVsInvest()` export
+- HvBParams interface: extraBedrag, hypotheekBalance, rente, repaymentType, restLooptijd, etc.
+- HvBResult interface: aflossing/beleggen scenarios, verschil, breakevenRendement, jaarlijkseVergelijking[], fireImpactMaanden
+- Aflossingsscenario: two amortization schedules (with/without extra), interest savings minus HRA loss
+- Beleggingsscenario: compound growth with Box 3 drag per year
+- Breakeven binary search (tolerance 0.001%)
+- FIRE impact via two runSimulation() calls
+- All 7 validation tests passed: 0% rente → beleggen, hoog rendement → beleggen, 0 extra → gelijk, FIRE impact = 31 months, linear/interest_only types work
+- Commit: de7c3b2f
+
+### Current Status
+- 2 features completed this session (#390, #391)
+- Progress: 374/397 passing (94.2%)
+
 ## Session 2026-03-19 - Features #381, #382
 
 ### Feature #381: Migratie: TER veld toevoegen aan holdings tabel - PASSING
