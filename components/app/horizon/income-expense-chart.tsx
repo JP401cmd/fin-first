@@ -182,7 +182,8 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         overflow="hidden"
-        aria-hidden="true"
+        role="img"
+        aria-label="Grafiek met inkomen en uitgaven over tijd"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoveredAge(null)}
       >
@@ -289,23 +290,23 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
                 Leeftijd {hoveredAge}
               </text>
 
-              {/* Tooltip: income */}
+              {/* Tooltip: income — color matches income line */}
               <text x={tx + 6} y={ty + 26} fontSize={7.5}
-                fill="#6ee7b7" fontFamily="var(--font-dm-mono, monospace)">
+                fill="#c4b5fd" fontFamily="var(--font-dm-mono, monospace)">
                 Inkomen: {fmtY(inc)}
               </text>
 
-              {/* Tooltip: expenses */}
+              {/* Tooltip: expenses — color matches expense line */}
               <text x={tx + 6} y={ty + 37} fontSize={7.5}
-                fill="#fca5a5" fontFamily="var(--font-dm-mono, monospace)">
+                fill="#fcd34d" fontFamily="var(--font-dm-mono, monospace)">
                 Uitgaven: {fmtY(exp)}
               </text>
 
               {/* Tooltip: difference */}
               <text x={tx + 6} y={ty + 48} fontSize={7.5}
-                fill={diff >= 0 ? '#6ee7b7' : '#fca5a5'}
+                fill={diff >= 0 ? '#c4b5fd' : '#fcd34d'}
                 fontFamily="var(--font-dm-mono, monospace)" fontWeight={600}>
-                {diff >= 0 ? '+' : ''}{fmtY(Math.abs(diff))} {diff >= 0 ? 'surplus' : 'tekort'}
+                {diff >= 0 ? '+' : ''}{fmtY(Math.abs(diff))} {diff >= 0 ? 'overschot' : 'tekort'}
               </text>
             </g>
           )
@@ -313,16 +314,16 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
       </svg>
 
       {/* Legend */}
-      <div className="mt-1 flex items-center justify-center gap-x-4 px-4">
-        <div className="flex items-center gap-1.5">
-          <svg width="16" height="4" className="shrink-0">
+      <div className="mt-1 flex items-center justify-center gap-x-4 px-4" role="list" aria-label="Legenda inkomen en uitgaven">
+        <div className="flex items-center gap-1.5" role="listitem">
+          <svg width="16" height="4" className="shrink-0" aria-hidden="true">
             <line x1="0" y1="2" x2="16" y2="2"
               stroke={COLOR_INCOME} strokeWidth={2} strokeLinecap="round" />
           </svg>
           <span className="text-[10px] font-medium text-[var(--ink-3)]">Inkomen</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <svg width="16" height="4" className="shrink-0">
+        <div className="flex items-center gap-1.5" role="listitem">
+          <svg width="16" height="4" className="shrink-0" aria-hidden="true">
             <line x1="0" y1="2" x2="16" y2="2"
               stroke={COLOR_EXPENSE} strokeWidth={2} strokeLinecap="round" />
           </svg>

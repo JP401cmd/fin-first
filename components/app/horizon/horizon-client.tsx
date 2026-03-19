@@ -1787,9 +1787,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         type="button"
                         onClick={() => setIncomeExpenseExpanded(prev => !prev)}
                         onPointerDown={(e) => e.stopPropagation()}
-                        className="flex w-full items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none"
+                        className="flex w-full items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none border-t border-[var(--border-ed)]"
                         style={{ minHeight: 44 }}
                         aria-expanded={incomeExpenseExpanded}
+                        aria-controls="income-expense-panel"
+                        aria-label={incomeExpenseExpanded ? 'Inkomen & Uitgaven grafiek verbergen' : 'Inkomen & Uitgaven grafiek tonen'}
                       >
                         <span>Inkomen &amp; Uitgaven</span>
                         {incomeExpenseExpanded
@@ -1798,6 +1800,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         }
                       </button>
                       <div
+                        id="income-expense-panel"
                         className="overflow-hidden transition-all duration-300 ease-in-out"
                         style={{
                           maxHeight: incomeExpenseExpanded ? 250 : 0,
