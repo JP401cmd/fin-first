@@ -148,14 +148,33 @@ export function runSimulation(
   // Resolve withdrawal strategy — default to static (identical to old hardcoded logic)
   const wsConfig = withdrawalStrategy ?? WITHDRAWAL_DEFAULTS
 
+  // VPW + perpetual is onverenigbaar: VPW onttrekt per definitie volledig
+  // binnen de resterende horizon, wat conflicteert met eeuwigdurend vermogensbehoud.
+  if (strategy === 'perpetual' && wsConfig.strategy === 'vpw') {
+    return {
+      rows: [],
+      fireAge: null,
+      fireAgeFractional: null,
+      firePortfolioAtFire: Math.round(currentPortfolio),
+      requiredFirePortfolio: 0,
+      fireReachable: false,
+      implicitWithdrawalRate: 0,
+      classic25xTarget,
+      strategy,
+      targetEndPortfolio: 0,
+      displayEndAge,
+    }
+  }
+
   /**
    * Simulate decumulation from startPortfolio at startAge to endAge.
    * portfolio is NOT clamped to 0 (for binary search convergence).
    * generateRows=true produces SimRows with endPortfolio clamped >= 0 for display.
    *
-   * useWithdrawalStrategy: when true, applies the configured withdrawal strategy.
-   * When false (binary search), always uses 'static' to keep FIRE-age calculation
-   * conservative and deterministic — dynamic strategies only affect the visualisation.
+   * useWithdrawalStrategy: when true, applies the configured withdrawal strategy
+   * (static/guardrails/vpw/bucket). Both binary search and visualisation now use
+   * the chosen strategy, so each strategy yields its own FIRE-leeftijd.
+   * When false, uses WITHDRAWAL_DEFAULTS (static) as conservative fallback.
    */
   function simulateDecumulation(
     startPortfolio: number,
@@ -232,6 +251,16 @@ export function runSimulation(
   /**
    * Binary search: minimum portfolio at candidateFireAge such that the
    * decumulation meets the strategy target at the verification horizon.
+   *
+   * Gebruikt de gekozen onttrekkingsstrategie (static/guardrails/vpw/bucket)
+   * zodat elke strategie een eigen FIRE-leeftijd oplevert.
+   *
+   * Convergentie-notities:
+   * - Static: monotoon, altijd convergent
+   * - Guardrails: guardrail-drempels schalen mee met startPortfolio → monotoon
+   * - VPW: annuity-based percentage × portfolio → monotoon (hoger start → hoger eind)
+   * - Bucket: BucketState wordt elke iteratie opnieuw geïnitialiseerd vanuit mid-waarde;
+   *   geen state-carry-over tussen iteraties (bekende beperking, acceptabel voor FIRE-schatting)
    */
   function requiredAt(candidateFireAge: number): number {
     // Verification horizon: perpetual simulates 100 years post-FIRE
@@ -251,9 +280,10 @@ export function runSimulation(
       ? legacyAmount * Math.pow(1 + inflation, effectiveEndAge - currentAge)
       : 0
 
-    for (let iter = 0; iter < 60; iter++) {
+    // Use withdrawal strategy in binary search — each strategy yields its own FIRE age
+    for (let iter = 0; iter < 80; iter++) {
       const mid = (lo + hi) / 2
-      const { endPortfolio: ep } = simulateDecumulation(mid, candidateFireAge, false, verifyEndAge)
+      const { endPortfolio: ep } = simulateDecumulation(mid, candidateFireAge, false, verifyEndAge, true)
 
       if (strategy === 'legacy') {
         if (ep >= indexedLegacy) hi = mid; else lo = mid
@@ -348,8 +378,8 @@ export function runSimulation(
     fractionalFireAge = (computedFireAge - 1) + Math.max(0, Math.min(1, t))
   }
 
-  // Use withdrawal strategy for visualisation rows (dynamic strategies apply here)
-  // Binary search (requiredAt) always uses static — see comment in simulateDecumulation
+  // Use withdrawal strategy for visualisation rows — consistent with binary search
+  // which now also uses the chosen strategy (since FIRE-leeftijd is strategie-afhankelijk)
   const { rows: decRows } = simulateDecumulation(requiredFirePortfolioExact, computedFireAge, true, displayEndAge, true)
 
   const implicitWithdrawalRate = requiredFirePortfolio > 0

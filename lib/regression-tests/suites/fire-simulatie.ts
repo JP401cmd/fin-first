@@ -13,6 +13,7 @@ import {
   type ReturnModel,
 } from '@/lib/fire-simulation'
 import { type FireStrategyConfig } from '@/lib/fire-strategy'
+import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { NL_AOW_MONTHLY, BOX3_DRAG } from '@/lib/constants'
 import { NIBUD_CHILDREN_MONTHLY_COST, type LifeEvent } from '@/lib/horizon-data'
 
@@ -32,9 +33,10 @@ function runStd(
   overrides: Partial<typeof STANDARD> = {},
   cashflows: SimCashflow[] = [],
   strategy?: FireStrategyConfig,
+  withdrawalStrategy?: WithdrawalStrategyConfig,
 ): SimResult {
   const s = { ...STANDARD, ...overrides }
-  return runSimulation(s.currentAge, s.endAge, s.currentPortfolio, s.yearlyExpenses, s.annualSavings, s.grossReturn, s.returnModel, s.inflation, cashflows, strategy)
+  return runSimulation(s.currentAge, s.endAge, s.currentPortfolio, s.yearlyExpenses, s.annualSavings, s.grossReturn, s.returnModel, s.inflation, cashflows, strategy, withdrawalStrategy)
 }
 
 function makeEvent(partial: Partial<LifeEvent>): LifeEvent {
@@ -437,6 +439,157 @@ const tests: TestCase[] = [
       assertNotNull(r.fireAgeFractional)
       assertLessThan(Math.abs(r.fireAgeFractional! - r.fireAge!), 1, 'fractional ≈ integer')
       assertGreaterThanOrEqual(r.fireAgeFractional!, r.fireAge! - 1, 'fractional nabij integer')
+    },
+  },
+  // ── Step 9: Onttrekkingsstrategie-afhankelijke FIRE leeftijd ──────────────
+  {
+    id: 'fire-sim-ws-differs', name: 'FIRE-leeftijd verschilt per onttrekkingsstrategie', category: CAT,
+    description: 'static vs guardrails vs vpw vs bucket levert (potentieel) andere FIRE-leeftijd op',
+    priority: 'critical', estimatedDurationMs: 400,
+    fn() {
+      const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+      const wsStatic: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'static' }
+      const wsGuardrails: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' }
+      const wsVpw: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }
+      const wsBucket: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' }
+
+      const rStatic = runStd({}, [], deplete, wsStatic)
+      const rGuardrails = runStd({}, [], deplete, wsGuardrails)
+      const rVpw = runStd({}, [], deplete, wsVpw)
+      const rBucket = runStd({}, [], deplete, wsBucket)
+
+      // All should be reachable
+      assert(rStatic.fireReachable, 'static bereikbaar')
+      assert(rGuardrails.fireReachable, 'guardrails bereikbaar')
+      assert(rVpw.fireReachable, 'vpw bereikbaar')
+      assert(rBucket.fireReachable, 'bucket bereikbaar')
+
+      // Each should have a valid fireAge
+      assertNotNull(rStatic.fireAge, 'static fireAge')
+      assertNotNull(rGuardrails.fireAge, 'guardrails fireAge')
+      assertNotNull(rVpw.fireAge, 'vpw fireAge')
+      assertNotNull(rBucket.fireAge, 'bucket fireAge')
+
+      // At least one strategy should differ from static (guardrails/vpw/bucket
+      // use different withdrawal patterns, so requiredPortfolio differs)
+      const ages = [rStatic.fireAge!, rGuardrails.fireAge!, rVpw.fireAge!, rBucket.fireAge!]
+      const portfolios = [rStatic.requiredFirePortfolio, rGuardrails.requiredFirePortfolio, rVpw.requiredFirePortfolio, rBucket.requiredFirePortfolio]
+      // Check that required portfolios are not all identical — strategies diverge
+      const uniquePortfolios = new Set(portfolios)
+      assertGreaterThan(uniquePortfolios.size, 1, 'strategieën leveren verschillende vereiste portfolios')
+    },
+  },
+  {
+    id: 'fire-sim-ws-end-strategy', name: 'Eindstrategie werkt met elke onttrekkingsstrategie', category: CAT,
+    description: 'deplete/legacy/perpetual combineert correct met static/guardrails/bucket',
+    priority: 'high', estimatedDurationMs: 600,
+    fn() {
+      const strategies: Array<{ ws: WithdrawalStrategyConfig; label: string }> = [
+        { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'static' }, label: 'static' },
+        { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' }, label: 'guardrails' },
+        { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' }, label: 'bucket' },
+      ]
+      for (const { ws, label } of strategies) {
+        const dep = runStd({}, [], { strategy: 'deplete', endAge: 90, legacyAmount: 0 }, ws)
+        const leg = runStd({}, [], { strategy: 'legacy', endAge: 90, legacyAmount: 200_000 }, ws)
+        const perp = runStd({}, [], { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, ws)
+
+        assert(dep.fireReachable, `${label}+deplete bereikbaar`)
+        assert(leg.fireReachable, `${label}+legacy bereikbaar`)
+        assert(perp.fireReachable, `${label}+perpetual bereikbaar`)
+
+        // Ordering should still hold: deplete < legacy < perpetual required portfolio
+        assertLessThan(dep.requiredFirePortfolio, leg.requiredFirePortfolio, `${label}: dep < leg portfolio`)
+        assertLessThan(leg.requiredFirePortfolio, perp.requiredFirePortfolio, `${label}: leg < perp portfolio`)
+      }
+    },
+  },
+  {
+    id: 'fire-sim-vpw-perpetual-incompatible', name: 'VPW + perpetual onverenigbaar', category: CAT,
+    description: 'VPW onttrekt per definitie volledig — perpetual moet als onbereikbaar gemeld worden',
+    priority: 'high', estimatedDurationMs: 50,
+    fn() {
+      const vpw: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }
+      const r = runStd({}, [], { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, vpw)
+      assert(!r.fireReachable, 'VPW+perpetual onbereikbaar')
+      assertEqual(r.fireAge, null, 'geen fireAge')
+      assertEqual(r.rows.length, 0, 'geen rows')
+    },
+  },
+  {
+    id: 'fire-sim-ws-convergence-edge', name: 'Binary search convergentie edge cases', category: CAT,
+    description: 'Convergentie met hoog/laag rendement en korte horizon per strategie',
+    priority: 'high', estimatedDurationMs: 800,
+    fn() {
+      const configs: Array<{ ws: WithdrawalStrategyConfig; label: string }> = [
+        { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'static' }, label: 'static' },
+        { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' }, label: 'guardrails' },
+        { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }, label: 'vpw' },
+        { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' }, label: 'bucket' },
+      ]
+      const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+
+      for (const { ws, label } of configs) {
+        // High return
+        const rHigh = runStd({ grossReturn: 0.12, returnModel: 'classic' }, [], deplete, ws)
+        for (const row of rHigh.rows) {
+          assertFinite(row.startPortfolio, `${label} hoog rendement row ${row.age} start`)
+          assertFinite(row.endPortfolio, `${label} hoog rendement row ${row.age} end`)
+        }
+
+        // Low return
+        const rLow = runStd({ grossReturn: 0.03, returnModel: 'classic' }, [], deplete, ws)
+        for (const row of rLow.rows) {
+          assertFinite(row.startPortfolio, `${label} laag rendement row ${row.age} start`)
+          assertFinite(row.endPortfolio, `${label} laag rendement row ${row.age} end`)
+        }
+
+        // Short horizon
+        const rShort = runStd({ currentAge: 55, endAge: 70 }, [], { strategy: 'deplete', endAge: 70, legacyAmount: 0 }, ws)
+        for (const row of rShort.rows) {
+          assertFinite(row.startPortfolio, `${label} korte horizon row ${row.age} start`)
+          assertFinite(row.endPortfolio, `${label} korte horizon row ${row.age} end`)
+        }
+      }
+    },
+  },
+  {
+    id: 'fire-sim-ws-performance', name: 'Performance: 4 strategieën < 200ms', category: CAT,
+    description: '4 simulaties (1 per strategie) op dezelfde parameters blijven snel',
+    priority: 'medium', estimatedDurationMs: 200,
+    fn() {
+      const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+      const start = performance.now()
+      runStd({}, [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'static' })
+      runStd({}, [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' })
+      runStd({}, [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' })
+      runStd({}, [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' })
+      const elapsed = performance.now() - start
+      assertLessThan(elapsed, 200, `4 simulaties in ${elapsed.toFixed(0)}ms`)
+    },
+  },
+  {
+    id: 'fire-sim-vpw-stable', name: 'VPW annuity formule stabiel bij variërende portfolio', category: CAT,
+    description: 'VPW binary search convergeert: geen NaN/Infinity in resultaat',
+    priority: 'high', estimatedDurationMs: 200,
+    fn() {
+      const vpw: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }
+      // Test met deplete (VPW+deplete is compatible)
+      const r = runStd({}, [], { strategy: 'deplete', endAge: 90, legacyAmount: 0 }, vpw)
+      assert(r.fireReachable, 'VPW+deplete bereikbaar')
+      assertNotNull(r.fireAge)
+      for (const row of r.rows) {
+        assertFinite(row.startPortfolio, `VPW row ${row.age} start`)
+        assertFinite(row.endPortfolio, `VPW row ${row.age} end`)
+        assertFinite(row.withdrawal, `VPW row ${row.age} withdrawal`)
+      }
+      // VPW withdrawal should vary (not constant like static)
+      const retRows = r.rows.filter(row => row.phase === 'retirement')
+      if (retRows.length >= 5) {
+        const withdrawals = retRows.map(row => row.withdrawal)
+        const allSame = withdrawals.every(w => w === withdrawals[0])
+        assert(!allSame, 'VPW onttrekkingen variëren')
+      }
     },
   },
 ]

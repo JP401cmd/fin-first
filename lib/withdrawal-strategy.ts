@@ -281,12 +281,17 @@ function applyBucket(
   // Initialize buckets if not provided
   const state = bucketState ?? initBucketState(ctx.currentPortfolio, ctx.baseExpenses)
 
-  // Withdraw from cash bucket
-  const withdrawal = Math.min(netBaseExpenses, state.cash)
-
-  // If cash is insufficient, the withdrawal is capped at what's available
-  // (simulation caller can handle the deficit by adjusting portfolio)
-  return Math.max(0, withdrawal)
+  // Bucket strategy determines *which assets* to sell (cash → bonds → stocks),
+  // but the total withdrawal amount equals full net expenses.
+  // In a deterministic simulation (single expected return), the bucket allocation
+  // affects risk/volatility but not expected withdrawal amounts.
+  // For binary search convergence, the portfolio must be allowed to go negative
+  // (same as static), so we do NOT cap at available bucket balance.
+  // The bucket structure matters for stochastic (Monte Carlo) simulations,
+  // where the cash/bonds buffer absorbs volatility — this is a known limitation
+  // of the deterministic model.
+  void state // used in stochastic extensions
+  return Math.max(0, netBaseExpenses)
 }
 
 /**
