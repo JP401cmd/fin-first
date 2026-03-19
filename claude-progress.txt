@@ -1,3 +1,33 @@
+## Session 2026-03-19 - Features #309, #310
+
+### Feature #309: Dedicated testaccount voor regressietests - PASSING
+- Created lib/regression-tests/test-session.ts helper module with:
+  - isTestSession() — checks if current user is the test account
+  - isTestEnvironment() — NODE_ENV === 'development' guard
+  - getTestSessionStatus() — computes banner variant/message for UI
+  - REGRESSION_TEST_EMAIL constant
+- Updated regressietest page with always-visible info banner (sky blue when idle, emerald green when running)
+- Verified test account exists in Supabase Auth (id: 3f466d69-af93-4ce1-a1a9-0df10129d32e)
+- Set test account profile: role=superadmin, onboarding_completed=true
+- Env vars already configured: REGRESSION_TEST_EMAIL + REGRESSION_TEST_PASSWORD (server-side only)
+- Zero console errors, verified via browser automation
+- Commit: 39824a6b
+
+### Feature #310: Server-side regressietest runner met testaccount - PASSING
+- All infrastructure already existed from previous sessions:
+  - lib/regression-tests/server-runner.ts: signs in as test account, patches fetch, localStorage polyfill
+  - app/api/regression/run/route.ts: NDJSON streaming, NODE_ENV guard, admin check
+  - Client page already uses server streaming via executeServerTests()
+- Committed previously untracked server runner files
+- Verified end-to-end: ran Rapportages module (31 tests), results streamed correctly (22 pass, 9 fail)
+- User session remains intact after test run
+- Zero console errors
+- Commit: 86004404
+
+### Current Status
+- 2 features completed this session (#309, #310)
+- Overall progress: 309/309 (100%)
+
 ## Session 2026-03-19 - Feature #308
 
 ### Feature #308: Regressietest suite laadt geen tests — dynamische imports fixen - PASSING
