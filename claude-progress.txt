@@ -16959,3 +16959,33 @@ For Feature #51 (Transaction Import):
 - No new TypeScript errors introduced
 - Verified via browser: Horizon page shows 'Financiële Gezondheid' (not 'Veerkracht')
 - Commit: cb9e3547
+
+## Session 2026-03-19 - Feature #331 (Attempt 15)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 15)
+- **Root cause unchanged**: Cannot access hosted Supabase database to apply DDL migrations
+- **All approaches still blocked**:
+  1. Supabase MCP tools (apply_migration, execute_sql, list_migrations) — "Claude requested permissions but you haven't granted it yet" (OAuth not authenticated)
+  2. Supabase CLI (`npx supabase link/db push`) — "Access token not provided"
+  3. REST API with anon key — read-only, cannot execute DDL
+  4. No service role key, DB password, or Management API PAT in any env file
+- **Verified current state via REST API**:
+  - holdings.asset_class — MISSING (migration 20260316100001)
+  - holdings.is_favorite — MISSING (migration 20260316100002)
+  - holdings.currency — MISSING (migration 20260316200001)
+  - holding_prices table — MISSING (migration 20260316300001)
+  - holding_alerts table — MISSING (migration 20260316400002)
+  - target_allocations table — MISSING (migration 20260316100001)
+  - save_onboarding_data RPC — MISSING (migration 20260319000002)
+  - profiles.invulfase_active — MISSING (migration 20260319000003)
+  - profiles.withdrawal_strategy — ALREADY APPLIED (migration 20260318000001)
+- **Resolution needed**: User must either:
+  1. Grant Supabase MCP tool permissions when prompted at runtime (click "Allow" on OAuth)
+  2. Run `supabase login` to authenticate the CLI
+  3. Add SUPABASE_ACCESS_TOKEN to environment
+  4. Apply migrations manually via Supabase Dashboard SQL Editor
+- **11 migration files pending** (20260316100001 through 20260319000003, excluding 20260318000001 which is already applied)
+
+### Current Status
+- 0 features completed this session (external blocker)
+- Total: 344/346 features passing (99.4%)
