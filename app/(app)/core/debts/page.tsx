@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, CheckCircle2, TrendingDown, Wallet, Target,
+  Plus, CheckCircle2, TrendingDown, Wallet, Target, Scale,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -16,6 +16,7 @@ import {
   getDefaultDebts,
   simulatePayoff,
   payoffSummary,
+  debtProjection,
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -38,6 +39,8 @@ import { ValuationModal } from '@/components/app/core/debts/debt-valuation-modal
 import { PayoffChart } from '@/components/app/core/debts/debt-payoff-chart'
 import { DebtPayoffTrajectoryChart, StrategyComparisonMessage } from '@/components/app/core/debts/debt-comparison-chart'
 import { BelastingSection } from '@/components/app/core/debts/belasting-section'
+import HypotheekVsBeleggenModal from '@/components/app/core/debts/hypotheek-vs-beleggen-modal'
+import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 
 export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } = {}) {
   const [debts, setDebts] = useState<Debt[]>([])
@@ -93,6 +96,28 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
     }
     loadSplit()
   }, [hasHousehold, householdId])
+
+  // HvB modal state
+  const [hvbDebt, setHvbDebt] = useState<Debt | null>(null)
+  const [fireParams, setFireParams] = useState<FireParams | null>(null)
+
+  // Load fire params for HvB modal
+  useEffect(() => {
+    async function loadFireParams() {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income')
+          .eq('id', user.id)
+          .single()
+        if (profile) setFireParams(resolveFireParams(profile))
+      } catch { /* non-critical */ }
+    }
+    loadFireParams()
+  }, [])
 
   // Kassabon modal state
   const [showTotalKassabon, setShowTotalKassabon] = useState(false)
@@ -705,6 +730,17 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
                     </p>
                   )
                 })()}
+                {/* HvB button for mortgage debts */}
+                {debt.debt_type === 'mortgage' && Number(debt.interest_rate) > 0 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setHvbDebt(debt) }}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-200 bg-kern-50/50 px-2.5 py-1 text-[11px] font-medium text-kern-600 transition-colors hover:bg-kern-100"
+                    data-testid="hvb-card-button"
+                  >
+                    <Scale className="h-3 w-3" />
+                    Aflossen vs Beleggen
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -795,6 +831,28 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
           }}
         />
       )}
+
+      {/* ═══ HVB MODAL ═══ */}
+      {hvbDebt && (() => {
+        const hvbRepaymentType = hvbDebt.repayment_type === 'lineair' ? 'linear' as const
+          : hvbDebt.repayment_type === 'aflossingsvrij' ? 'interest_only' as const
+          : 'annuity' as const
+        const proj = debtProjection(hvbDebt)
+        return (
+          <HypotheekVsBeleggenModal
+            open={true}
+            onClose={() => setHvbDebt(null)}
+            hypotheekBalance={Number(hvbDebt.current_balance)}
+            rente={Number(hvbDebt.interest_rate)}
+            repaymentType={hvbRepaymentType}
+            restLooptijd={proj.monthsToPayoff > 0 ? proj.monthsToPayoff : 360}
+            isTaxDeductible={hvbDebt.is_tax_deductible ?? false}
+            marginaalTarief={fireParams?.marginaalTarief ?? 0.3697}
+            inflatie={fireParams?.inflationRate ?? 0.02}
+            hasPartner={!!householdSplit}
+          />
+        )
+      })()}
 
       {/* ═══ KASSABON MODALS ═══ */}
 
