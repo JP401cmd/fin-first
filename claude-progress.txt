@@ -1,3 +1,30 @@
+## Session 2026-03-19 - Feature #315
+
+### Feature #315: Testaccount downgraden naar user-rol - PASSING
+- Changed regression-test@fintwo.nl profile.role from 'superadmin' to 'user' in Supabase DB
+- Updated server-runner.ts:
+  - Default _currentRole is now 'user' (matches DB)
+  - Removed unnecessary switchTestAccountRole('user') at startup
+  - Cleanup now restores to 'user' instead of 'superadmin'
+  - Updated comments to reflect new architecture
+- Verified all beheer tests still pass via requiredRole/defaultRole auto-switching:
+  - beheer.toegang: 13/13 pass (superadmin + user role tests)
+  - beheer.layout: 8/8 pass (role-related), 4 pre-existing URL parse failures
+  - beheer.ai: 9/9 pass
+  - beheer.testdata: 17/17 pass
+  - beheer.bank-connect: 10/10 pass
+  - beheer.informatief: 11/11 pass
+  - beheer.migratie: 8/8 pass
+  - beheer.nieuws-ai: 10/10 pass, 1 pre-existing failure
+  - beheer.notificaties: 28/28 pass, 1 pre-existing failure
+  - horizon.aow-leeftijd: 17/17 pass
+- Server-runner sends no superadmin-specific headers (only standard Auth + Cookie)
+- Commit: d410e0a5
+
+### Current Status
+- 1 feature completed this session (#315)
+- Overall progress: 318/329 (96.7%)
+
 ## Session 2026-03-19 - Features #328, #329
 
 ### Feature #328: Unique constraint idx_budgets_user_slug toevoegen als migratie - PASSING
@@ -16280,3 +16307,30 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#327, #326)
 - Overall progress: 315/329 (95.7%)
+
+## Session 2026-03-19 - Features #319, #320
+
+### Feature #319: Fix duplicate key budget error en error resilience - PASSING
+- **Root cause**: Budget inserts used `.insert()` without handling existing data on retry
+- **Fix**: Added `delete().eq('user_id')` before budget inserts to prevent idx_budgets_user_slug constraint violations
+- **Idempotency fix**: `onboarding_completed` is now set to `false` during save (step 1) and only set to `true` after ALL steps succeed (step 7), preventing the idempotency guard from blocking retries after partial failures
+- **Retry safety**: All data tables (budgets, bank_accounts, assets, debts, life_events) are cleaned up before reinsertion
+- **Client-side**: Timeout increased to 30s, Terug button disabled during save
+- **Additional**: withRetry utility with exponential backoff, RPC-first strategy with multi-step fallback, idempotency key support
+- Commit: 15c94ba3
+
+### Feature #320: Tussentijds opslaan en navigatie verbeteren - PASSING
+- **localStorage persistence**: All onboarding form data saved to `trifinity_onboarding_draft` key
+- **Auto-save**: State persisted on every step change (except saving/success)
+- **Restore on mount**: When user revisits onboarding without completing, data is restored
+- **Restored notice**: Green notification banner "Je eerder ingevulde gegevens zijn hersteld" with 4s auto-dismiss
+- **Cleanup**: localStorage cleared after successful save and when onboarding is already completed
+- **RESTORE_STATE action**: Added to reducer for clean state restoration with validation
+- **Data validation**: Ensures arrays are arrays, objects are objects, skips saving/success steps on restore
+- Zero TypeScript errors (3 pre-existing in test files)
+- Zero console errors
+- Commit: 4258c776
+
+### Current Status
+- 2 features completed this session (#319, #320)
+- Overall progress: 314/324 (96.9%)
