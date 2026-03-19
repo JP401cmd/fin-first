@@ -76,13 +76,6 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
 
   // Filter rows to visible range
   const visibleRows = stackedRows.filter(r => r.age >= minAge && r.age <= maxAge)
-  if (visibleRows.length === 0) {
-    return (
-      <div ref={ref} className="flex items-center justify-center py-8 text-sm text-[var(--ink-4)]">
-        Geen gegevens beschikbaar
-      </div>
-    )
-  }
 
   // Compute Y range (positive max + negative min for debt layer)
   let yMax = 0
@@ -99,7 +92,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   const yRange = yMax - yMin
 
   // Scales
-  const numBars = maxAge - minAge + 1
+  const numBars = Math.max(maxAge - minAge + 1, 1)
   const barGap = Math.max(1, innerW * 0.02)
   const barWidth = Math.max(2, (innerW - barGap * (numBars - 1)) / numBars)
 
@@ -125,7 +118,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
     xTickAges.push(a)
   }
 
-  // Hover handler
+  // Hover handler (hooks must be called unconditionally)
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget
     const rect = svg.getBoundingClientRect()
@@ -137,6 +130,15 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   }, [W, innerW, barWidth, minAge, maxAge])
 
   const handleMouseLeave = useCallback(() => setHoveredAge(null), [])
+
+  // Early return AFTER all hooks
+  if (visibleRows.length === 0) {
+    return (
+      <div ref={ref} className="flex items-center justify-center py-8 text-sm text-[var(--ink-4)]">
+        Geen gegevens beschikbaar
+      </div>
+    )
+  }
 
   // FIRE vertical line X position
   const xFire = fireAge != null && fireAge >= minAge && fireAge <= maxAge

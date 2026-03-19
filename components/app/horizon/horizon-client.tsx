@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
@@ -79,6 +79,8 @@ import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverla
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
+import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
+import { projectWealthComposition, type StackedRow } from '@/lib/wealth-composition'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
@@ -149,6 +151,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [mcExpanded, setMcExpanded] = useState(false)
   const [mcData, setMcData] = useState<MonteCarloResult | null>(null)
   const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
+  const [chartMode, setChartMode] = useState<'vermogenspad' | 'vermogensopbouw'>('vermogenspad')
 
   // Kassabon modal state
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
@@ -613,6 +616,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const monteCarloOverlay: MonteCarloOverlay | undefined = mcExpanded && mcData && currentAge != null
     ? { ...mcData.percentiles, startAge: currentAge }
     : undefined
+
+  // Wealth composition projection for vermogensopbouw chart
+  const wealthCompositionRows: StackedRow[] = useMemo(() => {
+    if (chartMode !== 'vermogensopbouw') return []
+    const ca = currentAge ?? 30
+    const ea = simResult?.displayEndAge ?? 90
+    return projectWealthComposition({
+      assets: initialData.assets ?? [],
+      debts,
+      currentAge: ca,
+      endAge: ea,
+      inflation: fireParams.inflationRate,
+      fireAge: simResult?.fireAge ?? undefined,
+      annualExpenses: effectiveInput?.yearlyMustExpenses,
+    })
+  }, [chartMode, currentAge, simResult?.displayEndAge, simResult?.fireAge, initialData.assets, debts, fireParams.inflationRate, effectiveInput?.yearlyMustExpenses])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -1760,28 +1779,87 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 </button>
               </div>
 
+              {/* ── Chart mode pill-tabs ── */}
+              <div className="flex items-center gap-1 mb-2">
+                {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setChartMode(mode)}
+                    className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors select-none ${
+                      chartMode === mode
+                        ? 'bg-horizon-100 text-horizon-700 border border-horizon-300'
+                        : 'bg-[var(--paper)] text-[var(--ink-3)] border border-[var(--border-ed)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                    }`}
+                    style={{ minHeight: 44 }}
+                    aria-pressed={chartMode === mode}
+                  >
+                    {mode === 'vermogenspad' ? 'Vermogenspad' : 'Vermogensopbouw'}
+                  </button>
+                ))}
+              </div>
+
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
                   {(visibleMin, visibleMax) => (
                     <>
-                      <SimChart
-                        rows={simResult.rows}
-                        fireAge={simResult.fireAge}
-                        fireAgeFractional={simResult.fireAgeFractional}
-                        currentAge={currentAge ?? 30}
-                        endAge={simResult.displayEndAge}
-                        cashflows={simCashflows}
-                        fireTarget={simResult.requiredFirePortfolio}
-                        strategy={simResult.strategy}
-                        targetEndPortfolio={simResult.targetEndPortfolio}
-                        scenarioOverlays={scenarioOverlays}
-                        monteCarloOverlay={monteCarloOverlay}
-                        dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
-                        householdOverlays={isHouseholdView ? householdOverlays ?? undefined : undefined}
-                        visibleMinAge={visibleMin}
-                        visibleMaxAge={visibleMax}
-                        aowAgeFractional={userAowAge.fractional}
-                      />
+                      <div className="relative">
+                        {/* Vermogenspad (SimChart) */}
+                        <div
+                          className="transition-opacity duration-300 ease-in-out"
+                          style={{
+                            opacity: chartMode === 'vermogenspad' ? 1 : 0,
+                            pointerEvents: chartMode === 'vermogenspad' ? 'auto' : 'none',
+                            position: chartMode === 'vermogenspad' ? 'relative' : 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                          }}
+                          aria-hidden={chartMode !== 'vermogenspad'}
+                        >
+                          <SimChart
+                            rows={simResult.rows}
+                            fireAge={simResult.fireAge}
+                            fireAgeFractional={simResult.fireAgeFractional}
+                            currentAge={currentAge ?? 30}
+                            endAge={simResult.displayEndAge}
+                            cashflows={simCashflows}
+                            fireTarget={simResult.requiredFirePortfolio}
+                            strategy={simResult.strategy}
+                            targetEndPortfolio={simResult.targetEndPortfolio}
+                            scenarioOverlays={scenarioOverlays}
+                            monteCarloOverlay={monteCarloOverlay}
+                            dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
+                            householdOverlays={isHouseholdView ? householdOverlays ?? undefined : undefined}
+                            visibleMinAge={visibleMin}
+                            visibleMaxAge={visibleMax}
+                            aowAgeFractional={userAowAge.fractional}
+                          />
+                        </div>
+
+                        {/* Vermogensopbouw (WealthCompositionChart) */}
+                        <div
+                          className="transition-opacity duration-300 ease-in-out"
+                          style={{
+                            opacity: chartMode === 'vermogensopbouw' ? 1 : 0,
+                            pointerEvents: chartMode === 'vermogensopbouw' ? 'auto' : 'none',
+                            position: chartMode === 'vermogensopbouw' ? 'relative' : 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                          }}
+                          aria-hidden={chartMode !== 'vermogensopbouw'}
+                        >
+                          <WealthCompositionChart
+                            stackedRows={wealthCompositionRows}
+                            currentAge={currentAge ?? 30}
+                            endAge={simResult.displayEndAge}
+                            visibleMinAge={visibleMin}
+                            visibleMaxAge={visibleMax}
+                            fireAge={simResult.fireAge}
+                          />
+                        </div>
+                      </div>
                       {/* ── Inkomen & Uitgaven toggle + collapsible chart ── */}
                       <button
                         type="button"
