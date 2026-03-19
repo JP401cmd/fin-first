@@ -252,6 +252,7 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-freedom-subtitles',
     '/test-kern-hero',
     '/api/verify-kern-hero',
+    '/api/verify-kern-hero-fire-progress',
     '/test-cash-freedom-time',
     '/api/verify-cash-freedom-time',
     '/test-belasting-freedom-time',
