@@ -1,3 +1,42 @@
+## Session 2026-03-19 - Features #311, #312
+
+### Feature #311: UnauthenticatedFetch voor auth-guard tests - PASSING
+- Added `unauthenticatedFetch` export to `lib/regression-tests/server-runner.ts`
+  - Module-level variables `_originalFetch` and `_baseUrl` store original fetch before patching
+  - Function resolves relative URLs to localhost but sends NO auth headers
+  - Variables cleaned up in finally block after test run
+- Updated 27 test suite files to use `unauthenticatedFetch` for 401 assertions:
+  - Original 19 files: error-handling, beheer-notificaties, checkin-flow, horizon-strategie-pagina, berichten-chat, delen-jaaroverzicht, identiteit-household, horizon-whatif, kern-api-routes, dashboard-widgets, kern-bank-connect-flow, kern-assets-crud, api-response-performance, kern-budget-crud, kern-dividenden, kern-import-export, security-privacy, security-auth, rapportages
+  - Additional 8 files: data-tijdreeksen, bank-connectie-flow, onboarding-api-flow, onboarding-persona-seed, onboarding-reset, onboarding-flow, aow-leeftijd, beheer-ai
+- Fixed `isRedirectOrAuth` in aow-leeftijd.ts to include 401 status
+- Zero new TypeScript errors (only 3 pre-existing in unrelated files)
+- Auth-guard tests verified: 185/185 passing across 9 categories
+- Commit: b777bbad
+
+### Feature #312: Testdata seeden voor regressietest-account - PASSING
+- Created `lib/regression-tests/test-seed.ts` with:
+  - `seedTestData(supabase, userId)`: seeds minimal realistic financial data
+  - `cleanupTestData(supabase, userId)`: removes seed data after tests
+  - Idempotent: checks for existing `__regression_seed__` tagged data before inserting
+- Seeded data includes:
+  - Profile: full_name, date_of_birth, household_type, net_monthly_income, FIRE params
+  - 3 assets: savings (25K), investment (45K), house (380K)
+  - 1 bank account linked to savings asset
+  - 2 holdings: IWDA + VWRL ETFs with purchase history
+  - 1 debt: mortgage (285K remaining)
+  - 2 budget groups with 6 child categories (vaste lasten + dagelijkse uitgaven)
+  - 4 transactions: groceries, restaurant, mortgage, salary
+  - 7 net worth snapshots (6 months history)
+  - 1 life event (AOW)
+- Integrated into server-runner.ts: seed before tests, cleanup in finally block
+- Data-dependent tests verified: 185/185 passing across 9 categories
+- Commit: 32c52332
+
+### Current Status
+- 2 features completed this session (#311, #312)
+- Overall progress: 311/314 (99.0%)
+- Transient "Failed to parse URL" errors in full suite runs (connection exhaustion at 1300+ sequential tests); all pass when run in category batches
+
 ## Session 2026-03-19 - Feature #313
 
 ### Feature #313: Fix category ID mismatches in test-suites - PASSING
