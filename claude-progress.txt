@@ -1,3 +1,47 @@
+## Session 2026-03-19 - Feature #402
+
+### Feature #402: Regressietests kern hero FIRE progress — PASSING
+- Created regression test suite `kern-hero-fire-progress.ts` with 20 tests
+- Tests cover all 5 feature steps:
+  1. Existing hero section data-testid checks (kern-hero, fire-progress-bar)
+  2. FIRE progress bar width percentage calculations (50%, 100% cap, 0%, negative, partials)
+  3. FIRE progress bar hidden when fireTarget = 0 (conditional rendering + computeFireTarget guard)
+  4. Desktop column 1 shows percentage instead of amount (data-testid, format, subtitle)
+  5. Mobile expanded shows percentage instead of amount (data-testid, subtitle, fallback)
+  6. No duplicate net worth in column 1, 3-col grid intact, progress gradient
+- Source verification tests use `/api/verify-kern-hero-fire-progress` API endpoint
+  (avoids fs module client bundle issues)
+- Added endpoint to public routes in proxy.ts for unauthenticatedFetch access
+- Registered suite in test-registry.ts
+- All 20/20 tests verified passing via browser automation on /beheer/regressietest
+
+### Files Modified
+- lib/regression-tests/suites/kern-hero-fire-progress.ts — 20 regression tests
+- lib/regression-tests/test-registry.ts — registered new suite
+- app/api/verify-kern-hero-fire-progress/route.ts — source verification API
+- lib/supabase/proxy.ts — added public route for verification endpoint
+
+---
+
+## Session 2026-03-19 - Feature #227
+
+### Feature #227: Test Runner Pagina — /beheer/regressietest — ALREADY PASSING
+- Feature was already fully implemented and committed in a previous session
+- Verified all 10 feature steps are satisfied:
+  1. Route app/(app)/beheer/regressietest/page.tsx exists and works
+  2. TestSuite runner with expandable module/category sections, run all/per-section/per-module buttons, progress bar
+  3. lib/regression-tests/test-registry.ts — central registry with 75 categories, 1444 tests
+  4. lib/regression-tests/test-runner.ts — engine with sequential/parallel execution, timing, error catching
+  5. lib/regression-tests/test-types.ts — all TypeScript types (TestCase, TestResult, TestReport, etc.)
+  6. Report view with summary cards, per-category breakdown, error messages with stack traces
+  7. JSON export functionality via Download button
+  8. Page added to beheer navigation in beheer-nav.tsx
+  9. Responsive design with flex-col/flex-row, responsive grid, hidden sm:inline
+  10. localStorage caching of last test results (STORAGE_KEY: 'fintwo-regression-report')
+- Server-side categories API at /api/regression/categories (suites use server-only imports)
+- Server-side test execution via NDJSON streaming at POST /api/regression/run
+- Verified with browser automation: page loads, shows 1444 tests in 17 modules, categories expand correctly, zero console errors
+
 ## Session 2026-03-19 - Feature #401
 
 ### Feature #401: Mobiel expanded: netto vermogen vervangen door FIRE percentage — PASSING
