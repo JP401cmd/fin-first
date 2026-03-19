@@ -1,3 +1,26 @@
+## Session 2026-03-19 - Features #353, #354
+
+### Feature #353: Inklapbare dropdown integratie in horizon-client.tsx - PASSING
+- Integrated IncomeExpenseChart as collapsible section within ZoomableChartContainer
+- Toggle bar between SimChart and EventsTimeline with chevron icon
+- Fixed pointer capture conflict: added onPointerDown stopPropagation to prevent useChartZoom from stealing click events
+- CSS transition for smooth expand/collapse (maxHeight + opacity)
+- 44px min tap target for mobile accessibility
+- Zoom state automatically synced via render prop
+- Commit: 18f1ab4b
+
+### Feature #354: Gids bijwerken met Inkomen & Uitgaven grafiek uitleg - PASSING
+- Added section 10 "Inkomen & Uitgaven weergave" to GuideHorizonUitleg component
+- Explains income composition per phase (accumulation: salary + cashflows + returns; retirement: returns + cashflows)
+- Explains expense composition per phase (accumulation: living costs + neg cashflows; retirement: withdrawal + neg cashflows)
+- Documents gap/area meaning (net wealth change), life events impact, zoom synchronization
+- Added BarChart3 icon import
+- Commit: 8e3c148a
+
+### Current Status
+- 2 features completed this session (#353, #354)
+- Overall progress: 351/356 (98.6%)
+
 ## Session 2026-03-19 - Feature #349
 
 ### Feature #349: Server-side test runner — base URL fixen voor fetch calls - PASSING
