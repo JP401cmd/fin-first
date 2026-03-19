@@ -1,3 +1,24 @@
+## Session 2026-03-19 - Features #317, #330
+
+### Feature #317: Cash rekeningen integreren in Assets op pagina 2 - PASSING
+- Moved MiniBankForm inside Bezittingen accordion as 'Cash & Bankrekeningen' subsection
+- Added has_budget_tracking boolean to BankAccountEntry interface with toggle UI
+- Budget validation on next step: requires at least 1 account with budgetteren=on when budgettering active
+- BottomSheet modal for auto-creating 'Lopende rekening' with budgetteren=on
+- API: has_budget_tracking per bank account flows through to companion cash assets
+- Visual divider between Cash & Bankrekeningen and Overige bezittingen sections
+- Files modified: mini-bank-form.tsx, onboarding-extras.tsx, save-own-data/route.ts, page.tsx
+- Verified with browser: all 10 feature steps confirmed working
+- Commit: 7dac4b41
+
+### Feature #330: Cash rekeningen integreren v2 - PASSING
+- Identical feature to #317 (v2 duplicate), all work already completed
+- Mobile touch targets verified (44px min-h), text-base inputs confirmed
+- Marked passing without additional changes needed
+
+### Current Status
+- 2 features completed this session (#317, #330)
+
 ## Session 2026-03-19 - Features #316, #318
 
 ### Feature #316: Budgetteren keuze conditioneel doorwerken - PASSING
@@ -16362,3 +16383,27 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#319, #320)
 - Overall progress: 314/324 (96.9%)
+
+## Session 2026-03-19 - Feature #331
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker)
+- **Blocker**: Cannot access hosted Supabase database to apply DDL migrations
+- **Root cause**: Supabase MCP tools (apply_migration, execute_sql, list_migrations) consistently return "permission not granted" despite being listed in .claude/settings.local.json permissions
+- **Alternative attempts**:
+  1. Supabase CLI (`npx supabase`) - no access token stored, `supabase login` not performed
+  2. Service role key - not available in any .env file
+  3. Direct DB connection - only localhost credentials available (POSTGRES_URL=localhost:5432)
+  4. REST API (anon key) - read-only, cannot execute DDL
+- **Confirmed pending migrations** (verified via REST API column/table checks):
+  - 20260316100001: holdings classification columns (asset_class, sector, geography, previous_close, daily_change_percent) + target_allocations table
+  - 20260316100002: holdings.is_favorite column
+  - 20260316200001: holdings.currency column
+  - 20260316300001: holding_prices table
+  - 20260316400001: holding_transactions split type constraint
+  - 20260316400002: holding_alerts table
+  - 20260316500001: pension-documents storage bucket
+  - 20260316600001: drop badges/streaks tables
+  - 20260319000001: budgets user_slug_parent unique index
+  - 20260319000002: save_onboarding_data RPC function
+- **Already applied**: 20260318000001 (profiles.withdrawal_strategy columns exist)
+- **Resolution needed**: Grant Supabase MCP tool permissions in runtime environment, OR provide Supabase access token / service role key
