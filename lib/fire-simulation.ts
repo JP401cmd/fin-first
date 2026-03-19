@@ -52,6 +52,8 @@ export interface SimRow {
   withdrawal: number
   cashflowNet: number
   endPortfolio: number
+  grossIncome: number
+  grossExpenses: number
 }
 
 export interface SimResult {
@@ -207,10 +209,23 @@ export function runSimulation(
       const yearsIntoPension = age - startAge
       const expensesThisYear = yearlyExpenses * Math.pow(1 + inflation, yearsIntoPension)
 
-      // Recurring cashflows net this year
+      // Recurring cashflows net this year — split into positive (income) and negative (expense)
       let recurringNet = 0
+      let recurringIncome = 0
+      let recurringExpense = 0
       for (const cf of cashflows) {
-        recurringNet += recurringMonthly(cf, age) * 12
+        const val = recurringMonthly(cf, age) * 12
+        recurringNet += val
+        if (val > 0) recurringIncome += val; else recurringExpense += Math.abs(val)
+      }
+
+      // Split one-time cashflows into income/expense
+      let oneTimeIncome = 0
+      let oneTimeExpense = 0
+      for (const cf of cashflows) {
+        const amt = oneTimeAmount(cf, age)
+        // Note: oneTimeNet already accumulated above; here we just classify
+        if (amt > 0) oneTimeIncome += amt; else if (amt < 0) oneTimeExpense += Math.abs(amt)
       }
 
       // Build withdrawal context and apply strategy
@@ -231,6 +246,11 @@ export function runSimulation(
       const rawEnd = portfolio + growth - withdrawal
 
       if (generateRows) {
+        // grossIncome: portfolio growth + positive cashflows
+        const rowGrossIncome = Math.max(0, growth) + recurringIncome + oneTimeIncome
+        // grossExpenses: withdrawal (onttrekking) + negative cashflows
+        const rowGrossExpenses = withdrawal + recurringExpense + oneTimeExpense
+
         rows.push({
           age,
           phase: 'retirement',
@@ -240,6 +260,8 @@ export function runSimulation(
           withdrawal: Math.round(withdrawal),
           cashflowNet: Math.round(oneTimeNet + recurringNet),
           endPortfolio: Math.round(Math.max(rawEnd, 0)),
+          grossIncome: Math.round(rowGrossIncome),
+          grossExpenses: Math.round(rowGrossExpenses),
         })
       }
 
@@ -323,13 +345,30 @@ export function runSimulation(
     }
 
     let cashflowNet = 0
+    let cfIncome = 0
+    let cfExpense = 0
     for (const cf of cashflows) {
-      cashflowNet += recurringMonthly(cf, age) * 12
+      const val = recurringMonthly(cf, age) * 12
+      cashflowNet += val
+      if (val > 0) cfIncome += val; else cfExpense += Math.abs(val)
+    }
+
+    // Split one-time cashflows into income/expense for gross calculations
+    let otIncome = 0
+    let otExpense = 0
+    for (const cf of cashflows) {
+      const amt = oneTimeAmount(cf, age)
+      if (amt > 0) otIncome += amt; else if (amt < 0) otExpense += Math.abs(amt)
     }
 
     const effectiveSavings = annualSavings + cashflowNet
     const growth = portfolio * portReturn
     const endPortfolio = portfolio + growth + effectiveSavings
+
+    // grossIncome: netto maandinkomen×12 (= annualSavings + yearlyExpenses) + positive cashflows + portfolio growth
+    const accGrossIncome = annualSavings + yearlyExpenses + cfIncome + otIncome + Math.max(0, growth)
+    // grossExpenses: jaarlijkse uitgaven + negative cashflows
+    const accGrossExpenses = yearlyExpenses + cfExpense + otExpense
 
     accRows.push({
       age,
@@ -340,6 +379,8 @@ export function runSimulation(
       withdrawal: 0,
       cashflowNet: Math.round(cashflowNet + oneTimeNet),
       endPortfolio: Math.round(Math.max(endPortfolio, 0)),
+      grossIncome: Math.round(accGrossIncome),
+      grossExpenses: Math.round(accGrossExpenses),
     })
 
     portfolio = endPortfolio
