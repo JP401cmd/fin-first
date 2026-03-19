@@ -4,6 +4,22 @@ import { getDefaultBudgets } from '@/lib/budget-data'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 
+/** Retry a function up to maxRetries times with exponential backoff */
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)))
+      }
+    }
+  }
+  throw lastError
+}
+
 const bodySchema = z.object({
   identity: z.object({
     full_name: z.string().min(1),
@@ -152,89 +168,93 @@ export async function POST(req: Request) {
     //
     // Batched: all parents in 1 insert, all children in 1 insert (2-3 DB calls instead of 34)
 
-    await supabase.from('budgets').delete().eq('user_id', user.id)
+    // Wrapped in retry logic (max 2 retries with exponential backoff)
+    // Delete-first + upsert makes this safely idempotent on retry
+    await withRetry(async () => {
+      await supabase.from('budgets').delete().eq('user_id', user.id)
 
-    const defaults = getDefaultBudgets()
+      const defaults = getDefaultBudgets()
 
-    // Step 2a: Build all parent rows in one array
-    const parentRows = defaults.map((parent) => {
-      const childAmounts = (parent.children ?? []).map(
-        (c) => budgetAmounts[c.slug] ?? c.default_limit,
-      )
-      const parentLimit = childAmounts.reduce((a, b) => a + b, 0)
-      return {
-        user_id: user.id,
-        parent_id: null as string | null,
-        name: parent.name,
-        slug: parent.slug,
-        icon: parent.icon,
-        description: parent.description,
-        default_limit: parentLimit,
-        budget_type: parent.budget_type,
-        interval: 'monthly' as const,
-        rollover_type: 'reset' as const,
-        limit_type: 'soft' as const,
-        alert_threshold: 80,
-        max_single_transaction_amount: parentLimit,
-        is_essential: parent.is_essential,
-        priority_score: parent.priority_score,
-        is_inflation_indexed: false,
-        sort_order: parent.sort_order,
-      }
-    })
-
-    // Step 2b: Bulk insert all parents in one call and get their IDs
-    const { data: insertedParents, error: parentBulkErr } = await supabase
-      .from('budgets')
-      .upsert(parentRows, { onConflict: 'user_id, slug' })
-      .select('id, slug')
-    if (parentBulkErr) throw new Error(`Budget parents bulk upsert mislukt: ${parentBulkErr.message}`)
-
-    // Step 2c: Map parent slugs to their generated IDs for child assignment
-    const parentSlugToId = new Map<string, string>()
-    for (const p of insertedParents ?? []) {
-      parentSlugToId.set(p.slug, p.id)
-    }
-
-    // Step 2d: Build all child rows in one array with correct parent_id references
-    const childRows: typeof parentRows = []
-    for (const parent of defaults) {
-      if (!parent.children) continue
-      const parentId = parentSlugToId.get(parent.slug)
-      if (!parentId) continue
-
-      for (let i = 0; i < parent.children.length; i++) {
-        const child = parent.children[i]
-        const amount = budgetAmounts[child.slug] ?? child.default_limit
-        childRows.push({
+      // Step 2a: Build all parent rows in one array
+      const parentRows = defaults.map((parent) => {
+        const childAmounts = (parent.children ?? []).map(
+          (c) => budgetAmounts[c.slug] ?? c.default_limit,
+        )
+        const parentLimit = childAmounts.reduce((a, b) => a + b, 0)
+        return {
           user_id: user.id,
-          parent_id: parentId,
-          name: child.name,
-          slug: child.slug,
-          icon: child.icon,
-          description: child.description,
-          default_limit: amount,
+          parent_id: null as string | null,
+          name: parent.name,
+          slug: parent.slug,
+          icon: parent.icon,
+          description: parent.description,
+          default_limit: parentLimit,
           budget_type: parent.budget_type,
-          interval: 'monthly',
-          rollover_type: 'reset',
-          limit_type: 'soft',
+          interval: 'monthly' as const,
+          rollover_type: 'reset' as const,
+          limit_type: 'soft' as const,
           alert_threshold: 80,
-          max_single_transaction_amount: amount * 2,
+          max_single_transaction_amount: parentLimit,
           is_essential: parent.is_essential,
           priority_score: parent.priority_score,
           is_inflation_indexed: false,
-          sort_order: i,
-        })
-      }
-    }
+          sort_order: parent.sort_order,
+        }
+      })
 
-    // Step 2e: Bulk insert all children in one call
-    if (childRows.length > 0) {
-      const { error: childBulkErr } = await supabase
+      // Step 2b: Bulk insert all parents in one call and get their IDs
+      const { data: insertedParents, error: parentBulkErr } = await supabase
         .from('budgets')
-        .upsert(childRows, { onConflict: 'user_id, slug' })
-      if (childBulkErr) throw new Error(`Budget children bulk upsert mislukt: ${childBulkErr.message}`)
-    }
+        .upsert(parentRows, { onConflict: 'user_id, slug' })
+        .select('id, slug')
+      if (parentBulkErr) throw new Error(`Budget parents bulk upsert mislukt: ${parentBulkErr.message}`)
+
+      // Step 2c: Map parent slugs to their generated IDs for child assignment
+      const parentSlugToId = new Map<string, string>()
+      for (const p of insertedParents ?? []) {
+        parentSlugToId.set(p.slug, p.id)
+      }
+
+      // Step 2d: Build all child rows in one array with correct parent_id references
+      const childRows: typeof parentRows = []
+      for (const parent of defaults) {
+        if (!parent.children) continue
+        const parentId = parentSlugToId.get(parent.slug)
+        if (!parentId) continue
+
+        for (let i = 0; i < parent.children.length; i++) {
+          const child = parent.children[i]
+          const amount = budgetAmounts[child.slug] ?? child.default_limit
+          childRows.push({
+            user_id: user.id,
+            parent_id: parentId,
+            name: child.name,
+            slug: child.slug,
+            icon: child.icon,
+            description: child.description,
+            default_limit: amount,
+            budget_type: parent.budget_type,
+            interval: 'monthly',
+            rollover_type: 'reset',
+            limit_type: 'soft',
+            alert_threshold: 80,
+            max_single_transaction_amount: amount * 2,
+            is_essential: parent.is_essential,
+            priority_score: parent.priority_score,
+            is_inflation_indexed: false,
+            sort_order: i,
+          })
+        }
+      }
+
+      // Step 2e: Bulk insert all children in one call
+      if (childRows.length > 0) {
+        const { error: childBulkErr } = await supabase
+          .from('budgets')
+          .upsert(childRows, { onConflict: 'user_id, slug' })
+        if (childBulkErr) throw new Error(`Budget children bulk upsert mislukt: ${childBulkErr.message}`)
+      }
+    })
 
     // 3. Insert optional bank accounts + companion cash assets
     // Delete existing onboarding-created bank accounts (without IBAN) to avoid wiping bank-connected ones
