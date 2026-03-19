@@ -16696,3 +16696,23 @@ For Feature #51 (Transaction Import):
   - target_allocations table does NOT exist (PGRST205)
   - save_onboarding_data RPC does NOT exist (PGRST202)
 - **Resolution needed**: User must grant Supabase MCP tool permissions when prompted, OR provide SUPABASE_ACCESS_TOKEN, OR apply migrations manually via Supabase Dashboard SQL Editor
+
+## Session 2026-03-19 - Feature #331 (Attempt 8)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 8)
+- **Blocker**: Cannot access hosted Supabase database to apply DDL migrations
+- **Root cause**: Supabase MCP tools (list_migrations, apply_migration, execute_sql) all blocked at runtime with "permissions not granted" despite being listed in settings
+- **All approaches exhausted** (same as attempts 1-7):
+  1. Supabase MCP tools — permission not granted by user at runtime
+  2. Supabase CLI (`npx supabase`) — "Access token not provided"
+  3. REST API with anon key — read-only, cannot execute DDL
+  4. No service role key, DB password, or Management API PAT in any env file
+- **Confirmed still pending** (verified via REST API):
+  - holdings.asset_class column does NOT exist (error 42703)
+  - target_allocations table does NOT exist (PGRST205)
+  - save_onboarding_data RPC does NOT exist (PGRST202)
+- **Resolution needed**: User must either:
+  1. Grant Supabase MCP tool permissions when prompted at runtime
+  2. Run `supabase login` to authenticate the CLI
+  3. Add SUPABASE_ACCESS_TOKEN to environment
+  4. Apply migrations manually via Supabase Dashboard SQL Editor
