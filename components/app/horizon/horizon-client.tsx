@@ -1774,26 +1774,25 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     </span>
                   )}
                 </button>
-              </div>
 
-              {/* ── Chart mode pill-tabs ── */}
-              <div className="flex items-center gap-1 mb-2">
-                {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setChartMode(mode)}
-                    className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors select-none ${
-                      chartMode === mode
-                        ? 'bg-horizon-100 text-horizon-700 border border-horizon-300'
-                        : 'bg-[var(--paper)] text-[var(--ink-3)] border border-[var(--border-ed)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                    }`}
-                    style={{ minHeight: 44 }}
-                    aria-pressed={chartMode === mode}
-                  >
-                    {mode === 'vermogenspad' ? 'Vermogenspad' : 'Vermogensopbouw'}
-                  </button>
-                ))}
+                {/* ── Chart mode toggle (compact pill, right-aligned) ── */}
+                <div className="ml-auto flex items-center gap-1">
+                  {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setChartMode(mode)}
+                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
+                        chartMode === mode
+                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                      }`}
+                      aria-pressed={chartMode === mode}
+                    >
+                      {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
