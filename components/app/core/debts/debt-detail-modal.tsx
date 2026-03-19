@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Edit3, RefreshCw, Trash2, AlertTriangle, Users } from 'lucide-react'
+import { Edit3, RefreshCw, Trash2, AlertTriangle, Users, Scale } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/client'
 import { usePerspective } from '@/components/app/perspective-provider'
 import type { Valuation } from './debt-types'
 import { DebtTrajectoryChart } from './debt-trajectory-chart'
+import HypotheekVsBeleggenModal from './hypotheek-vs-beleggen-modal'
 
 export function DebtDetailModal({
   debt,
@@ -40,6 +41,7 @@ export function DebtDetailModal({
   onDelete: () => void
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showHvB, setShowHvB] = useState(false)
   const { perspective } = usePerspective()
   const [partnerSplit, setPartnerSplit] = useState<{
     splitMode: SplitMode; mySharePct: number; myName: string; partnerName: string
@@ -97,6 +99,7 @@ export function DebtDetailModal({
   const linkedAsset = debt.linked_asset_id ? userAssets.find((a) => a.id === debt.linked_asset_id) : null
 
   return (
+    <>
     <BottomSheet open={true} onClose={onClose} title={debt.name} size="xl">
         {/* Subheader with icon and type info */}
         <div className="flex items-center gap-3 border-b border-[var(--border-ed)] px-6 py-3">
@@ -316,6 +319,20 @@ export function DebtDetailModal({
           )}
         </div>
 
+        {/* Hypotheek vs Beleggen button for mortgage debts */}
+        {debt.debt_type === 'mortgage' && Number(debt.interest_rate) > 0 && (
+          <div className="border-t border-[var(--border-ed)] px-6 py-3">
+            <button
+              onClick={() => setShowHvB(true)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--r)] border border-kern-200 bg-kern-50/50 px-4 py-2.5 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100"
+              data-testid="hvb-compare-button"
+            >
+              <Scale className="h-4 w-4" />
+              Vergelijk: Extra aflossen vs. Beleggen
+            </button>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
           <button
@@ -349,5 +366,28 @@ export function DebtDetailModal({
           )}
         </div>
     </BottomSheet>
+
+      {/* Hypotheek vs Beleggen comparison modal */}
+      {showHvB && debt.debt_type === 'mortgage' && (() => {
+        // Map Dutch repayment types to HvB engine types
+        const hvbRepaymentType = debt.repayment_type === 'lineair' ? 'linear'
+          : debt.repayment_type === 'aflossingsvrij' ? 'interest_only'
+          : 'annuity' as const
+        return (
+          <HypotheekVsBeleggenModal
+            open={showHvB}
+            onClose={() => setShowHvB(false)}
+            hypotheekBalance={balance}
+            rente={Number(debt.interest_rate)}
+            repaymentType={hvbRepaymentType}
+            restLooptijd={proj.monthsToPayoff > 0 ? proj.monthsToPayoff : 360}
+            isTaxDeductible={debt.is_tax_deductible ?? false}
+            marginaalTarief={0.3697}
+            inflatie={0.02}
+            hasPartner={!!partnerSplit}
+          />
+        )
+      })()}
+    </>
   )
 }
