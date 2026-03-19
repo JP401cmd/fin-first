@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { computeFireProjection, computeResilienceScore, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
+import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
@@ -191,8 +192,21 @@ export async function POST() {
   const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debtType) && Number(d.currentBalance) > 0)
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPercentage, hasConsumerDebt)
 
-  // Compute resilience score
-  const resilience = computeResilienceScore(horizonInput)
+  // Compute 6-pillar health score (replaces old 4-pillar resilience)
+  const savingsRate6m = monthlyIncome > 0
+    ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
+    : 0
+  const emergencyFundMonths = monthlyExpenses > 0 ? totalAssets * 0.3 / monthlyExpenses : 0
+  const assetTypes = new Set((assets as { assetType?: string }[]).map(a => a.assetType).filter(Boolean))
+  const healthScore = computeHealthScoreFromInputs({
+    savingsRate6m,
+    totalAssets,
+    totalDebts,
+    emergencyFundMonths,
+    freedomPct: freedomPercentage,
+    assetTypeCount: assetTypes.size,
+    budgetCategories: [], // budget spending not available in snapshot context
+  })
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -212,7 +226,7 @@ export async function POST() {
     fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
     sovereignty_level: sovereigntyLevel,
     savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
-    resilience_score: resilience.total,
+    resilience_score: healthScore.total,
   }
 
   // Try upsert with extended fields first
@@ -253,7 +267,7 @@ export async function POST() {
       fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
-      resilience_score: resilience.total,
+      resilience_score: healthScore.total,
       fire_target: fireTarget,
       yearly_must_expenses: yearlyMustExpenses,
       net_worth_verified: netWorth === totalAssets - totalDebts,
@@ -269,8 +283,8 @@ export async function POST() {
       fire_age: fireProjection.fireAge,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
-      resilience_score: resilience.total,
-      resilience_breakdown: resilience.breakdown,
+      resilience_score: healthScore.total,
+      health_pillars: healthScore.pillars.map(p => ({ id: p.id, name: p.name, score: p.score, weight: p.weight })),
     },
     ...(upsertError ? { warning: upsertError } : {}),
   })

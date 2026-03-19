@@ -302,27 +302,27 @@ export function ResilienceContextMessage({ snapshots }: { snapshots: SnapshotFor
   const monthLabel = monthSpan === 1 ? '1 maand' : `${monthSpan} maanden`
 
   return (
-    <div className="mb-4 rounded-[var(--r)] border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="resilience-context-message">
+    <div className="mb-4 rounded-[var(--r)] border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="health-context-message">
       <p className="text-sm text-horizon-800">
         {diff > 0 ? (
           <>
             <span className="font-semibold text-emerald-700">
-              Je veerkracht is gestegen van {firstScore} naar {lastScore} in {monthLabel}
+              Je gezondheidsscore is gestegen van {firstScore} naar {lastScore} in {monthLabel}
             </span>
             {' — '}
-            goed bezig! Je financiële buffer wordt sterker.
+            goed bezig! Je financiële gezondheid wordt sterker.
           </>
         ) : diff < 0 ? (
           <>
             <span className="font-semibold text-amber-700">
-              Je veerkracht is gedaald van {firstScore} naar {lastScore} in {monthLabel}
+              Je gezondheidsscore is gedaald van {firstScore} naar {lastScore} in {monthLabel}
             </span>
             {' — '}
-            bekijk je uitgaven en buffer om je veerkracht te herstellen.
+            bekijk je uitgaven en buffer om je score te herstellen.
           </>
         ) : (
           <>
-            Je veerkracht is stabiel gebleven op{' '}
+            Je gezondheidsscore is stabiel gebleven op{' '}
             <span className="font-bold">{lastScore}</span>
             {monthSpan > 0 && <> over {monthLabel}</>}
             {' — '}

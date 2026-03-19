@@ -16,6 +16,20 @@
 
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
+// ── Lightweight input for server-side / snapshot usage ───────
+// Allows computing the health score without a full DashboardData bundle.
+
+export interface HealthScoreInput {
+  savingsRate6m: number
+  totalAssets: number
+  totalDebts: number
+  emergencyFundMonths: number
+  freedomPct: number
+  assetTypeCount: number
+  /** Budget categories with limit/spent; empty array if no budgets */
+  budgetCategories: { limit: number; spent: number }[]
+}
+
 // ── Types ────────────────────────────────────────────────────
 
 export interface HealthPillar {
@@ -270,4 +284,138 @@ export function computeHealthScore(data: DashboardData): HealthScore {
     previousMonth,
     trend,
   }
+}
+
+// ── Server-side / snapshot-compatible computation ────────────
+// Uses lightweight HealthScoreInput instead of full DashboardData.
+// Returns only { total, label, pillars } — no trend (no history available).
+
+export function computeHealthScoreFromInputs(input: HealthScoreInput): HealthScore {
+  const savingsRateScore = scoreSavingsRate(input.savingsRate6m)
+  const debtRatioScore = scoreDebtRatio(input.totalAssets, input.totalDebts)
+  const emergencyScore = scoreEmergencyFund(input.emergencyFundMonths)
+  const fireScore = scoreFireProgress(input.freedomPct)
+  const diversificationScore = scoreDiversification(input.assetTypeCount)
+
+  // Budget discipline from raw categories
+  const budgetCats = input.budgetCategories.filter(c => c.limit > 0)
+  const budgetWithin = budgetCats.filter(c => c.spent <= c.limit).length
+  const budgetTotal = budgetCats.length
+  const budgetScore = budgetTotal === 0 ? 70 : Math.round((budgetWithin / budgetTotal) * 100)
+
+  const debtRatio = input.totalAssets > 0
+    ? Math.round((input.totalDebts / input.totalAssets) * 100)
+    : (input.totalDebts > 0 ? 100 : 0)
+
+  const pillars: HealthPillar[] = [
+    {
+      id: 'savings_rate',
+      name: 'Spaarquote',
+      score: savingsRateScore,
+      weight: 0.25,
+      explanation: 'Hoeveel procent van je inkomen spaar je? (6-maands gemiddelde)',
+      improvementTip: input.savingsRate6m < 10
+        ? 'Begin met 10% van je inkomen automatisch opzij te zetten.'
+        : input.savingsRate6m < 20
+        ? 'Bekijk je abonnementen en vaste lasten — kleine besparingen tellen snel op.'
+        : input.savingsRate6m < 30
+        ? 'Je bent op de goede weg! Verhoog bij elke loonsverhoging je spaarpercentage.'
+        : 'Uitstekende spaarquote — blijf dit volhouden.',
+      rawValue: `${Math.round(input.savingsRate6m)}%`,
+    },
+    {
+      id: 'debt_ratio',
+      name: 'Schuldratio',
+      score: debtRatioScore,
+      weight: 0.20,
+      explanation: 'Verhouding tussen je schulden en je totale vermogen.',
+      improvementTip: debtRatio > 50
+        ? 'Focus op de duurste schuld eerst (avalanche-methode) om sneller schuldenvrij te worden.'
+        : debtRatio > 20
+        ? 'Overweeg extra aflossingen op je duurste lening.'
+        : debtRatio > 0
+        ? 'Je schuldenlast is beheersbaar. Overweeg herfinanciering voor betere rente.'
+        : 'Schuldenvrij — uitstekend!',
+      rawValue: `${debtRatio}%`,
+    },
+    {
+      id: 'emergency_fund',
+      name: 'Noodfonds',
+      score: emergencyScore,
+      weight: 0.15,
+      explanation: 'Hoeveel maanden kun je rondkomen van je noodfonds?',
+      improvementTip: input.emergencyFundMonths < 1
+        ? 'Start met een doel van 1 maand buffer — automatiseer een vaste storting.'
+        : input.emergencyFundMonths < 3
+        ? 'Bouw naar 3 maanden — zet onverwachte meevallers direct opzij.'
+        : input.emergencyFundMonths < 6
+        ? 'Bijna op het ideaal van 6 maanden. Elke extra maand geeft meer rust.'
+        : 'Noodfonds compleet — financiële rust als vangnet.',
+      rawValue: `${input.emergencyFundMonths.toFixed(1)} mnd`,
+    },
+    {
+      id: 'fire_progress',
+      name: 'FIRE-voortgang',
+      score: fireScore,
+      weight: 0.20,
+      explanation: 'Hoever ben je op weg naar financiële vrijheid?',
+      improvementTip: input.freedomPct < 10
+        ? 'Begin klein — elke euro opgebouwd vermogen brengt je dichter bij vrijheid.'
+        : input.freedomPct < 25
+        ? 'Verhoog je maandelijkse inleg in beleggingen voor versneld vermogensopbouw.'
+        : input.freedomPct < 50
+        ? 'Je bent halverwege! Overweeg je spaarquote te optimaliseren.'
+        : input.freedomPct < 75
+        ? 'Sterk op weg — de compound interest werkt steeds harder voor je.'
+        : input.freedomPct < 100
+        ? 'Bijna vrij! Focus op het volhouden van je strategie.'
+        : 'FIRE bereikt — geniet van je financiële vrijheid!',
+      rawValue: `${Math.round(input.freedomPct)}%`,
+    },
+    {
+      id: 'diversification',
+      name: 'Diversificatie',
+      score: diversificationScore,
+      weight: 0.10,
+      explanation: 'Spreiding over verschillende vermogenstypes (cash, aandelen, vastgoed, etc.).',
+      improvementTip: input.assetTypeCount <= 1
+        ? 'Spreid je vermogen — overweeg naast cash ook een indexfonds.'
+        : input.assetTypeCount <= 2
+        ? 'Voeg een derde vermogenstype toe, bijvoorbeeld vastgoed of obligaties.'
+        : input.assetTypeCount <= 3
+        ? 'Goede basis — overweeg crypto of fysiek bezit als extra spreiding.'
+        : 'Goed gespreid — monitor je allocatie periodiek.',
+      rawValue: `${input.assetTypeCount} types`,
+    },
+    {
+      id: 'budget_discipline',
+      name: 'Budgetdiscipline',
+      score: budgetScore,
+      weight: 0.10,
+      explanation: 'Hoeveel van je budgetcategorieën blijven binnen de limiet?',
+      improvementTip: budgetTotal === 0
+        ? 'Stel budgetten in voor je belangrijkste uitgavencategorieën.'
+        : budgetWithin < budgetTotal
+        ? 'Er zijn budgetten overschreden — bekijk de kassabon voor details.'
+        : 'Alle budgetten binnen de limiet — goed gedisciplineerd!',
+      rawValue: budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
+    },
+  ]
+
+  const total = Math.round(
+    pillars.reduce((sum, p) => sum + p.score * p.weight, 0)
+  )
+
+  return {
+    total,
+    label: getLabel(total),
+    pillars,
+    previousMonth: null,
+    trend: 0,
+  }
+}
+
+/** Get health label from a numeric score (for use with snapshot data) */
+export function getHealthLabel(score: number): string {
+  return getLabel(score)
 }

@@ -7,10 +7,10 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import { X, ArrowDown, ArrowUp, TrendingDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
-  computeResilienceScore,
   MARKET_WEATHER, type MarketWeather, type FinancialInput,
-  type ScenarioPath, type ResilienceScore,
+  type ScenarioPath,
 } from '@/lib/horizon-data'
+import { computeHealthScoreFromInputs, type HealthScore } from '@/lib/financial-health'
 import {
   simulatePayoff, payoffSummary,
   type Debt, type PayoffStrategy, type StrategyMonth,
@@ -33,7 +33,7 @@ type Props = {
 
 export function ScenariosModal({ input, debts = [], open, onClose, simRows, simFireTarget, grossReturn }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioPath[]>([])
-  const [resilience, setResilience] = useState<ResilienceScore | null>(null)
+  const [healthScore, setHealthScore] = useState<HealthScore | null>(null)
   const [weather, setWeather] = useState<MarketWeather>('normal')
   const [selectedScenario, setSelectedScenario] = useState<ScenarioPath | null>(null)
   const { ref: resilienceRef, hasEntered: resilienceEntered } = useInViewAnimation({ duration: 600 })
@@ -45,7 +45,23 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
       const effectiveReturn = weather === 'normal' ? grossReturn : MARKET_WEATHER[weather].return
       setScenarios(buildScenarioPathsFromSim(simRows, effectiveReturn, simFireTarget))
     }
-    setResilience(computeResilienceScore(input))
+    // Compute 6-pillar health score
+    const savingsRate = input.monthlyIncome > 0
+      ? ((input.monthlyIncome - input.monthlyExpenses) / input.monthlyIncome) * 100
+      : 0
+    const emergencyMonths = input.monthlyExpenses > 0 ? input.totalAssets * 0.3 / input.monthlyExpenses : 0
+    const nw = input.totalAssets - input.totalDebts
+    const target = input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses / 0.04 : 0
+    const fPct = target > 0 ? Math.max(0, Math.min((nw / target) * 100, 100)) : 0
+    setHealthScore(computeHealthScoreFromInputs({
+      savingsRate6m: savingsRate,
+      totalAssets: input.totalAssets,
+      totalDebts: input.totalDebts,
+      emergencyFundMonths: emergencyMonths,
+      freedomPct: fPct,
+      assetTypeCount: 3, // approximate since we don't have asset details here
+      budgetCategories: [],
+    }))
   }, [input, weather, open, simRows, simFireTarget, grossReturn])
 
   if (!open) return null
@@ -137,11 +153,11 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
             <p className="mt-3 text-xs text-[var(--ink-3)]">{MARKET_WEATHER[weather].description}</p>
           </section>
 
-          {/* Resilience score */}
-          {resilience && (
+          {/* Health score (6 pillars) */}
+          {healthScore && (
             <section>
               <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                Gezondheidsscore
+                Financiële Gezondheid
               </h2>
               <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
                 <div className="flex flex-col items-center gap-6 sm:flex-row">
@@ -151,20 +167,19 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
                       <circle
                         cx="50" cy="50" r="42" fill="none"
                         stroke="#8B5CB8" strokeWidth="8" strokeLinecap="round"
-                        strokeDasharray={`${(resilience.total / 100) * 264} 264`}
+                        strokeDasharray={`${(healthScore.total / 100) * 264} 264`}
                         transform="rotate(-90 50 50)"
                       />
                     </svg>
-                    <span className="absolute text-2xl font-bold text-[var(--ink)]">{resilience.total}</span>
+                    <span className="absolute text-2xl font-bold text-[var(--ink)]">{healthScore.total}</span>
                   </div>
 
                   <div ref={resilienceRef} className="flex-1">
-                    <p className="text-lg font-bold text-[var(--ink)]">{resilience.label}</p>
+                    <p className="text-lg font-bold text-[var(--ink)]">{healthScore.label}</p>
                     <div className="mt-3 space-y-2">
-                      <ResilienceBar label="Noodfonds" value={resilience.breakdown.emergency} max={25} hasEntered={resilienceEntered} />
-                      <ResilienceBar label="Diversificatie" value={resilience.breakdown.diversification} max={25} hasEntered={resilienceEntered} />
-                      <ResilienceBar label="Schuldratio" value={resilience.breakdown.debtRatio} max={25} hasEntered={resilienceEntered} />
-                      <ResilienceBar label="Spaarquote" value={resilience.breakdown.savingsRate} max={25} hasEntered={resilienceEntered} />
+                      {healthScore.pillars.map(pillar => (
+                        <ResilienceBar key={pillar.id} label={pillar.name} value={pillar.score} max={100} hasEntered={resilienceEntered} />
+                      ))}
                     </div>
                   </div>
                 </div>

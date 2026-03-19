@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { computeFireProjection, computeResilienceScore, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
+import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
@@ -140,8 +141,21 @@ export async function GET() {
   const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPercentage, hasConsumerDebt)
 
-  // Compute resilience score
-  const resilience = computeResilienceScore(horizonInput)
+  // Compute 6-pillar health score (replaces old 4-pillar resilience)
+  const savingsRate6m = monthlyIncome > 0
+    ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
+    : 0
+  const emergencyFundMonths = monthlyExpenses > 0 ? totalAssets * 0.3 / monthlyExpenses : 0
+  const assetTypes = new Set(assets.map((a: { asset_type?: string }) => a.asset_type).filter(Boolean))
+  const healthScore = computeHealthScoreFromInputs({
+    savingsRate6m,
+    totalAssets,
+    totalDebts,
+    emergencyFundMonths,
+    freedomPct: freedomPercentage,
+    assetTypeCount: assetTypes.size,
+    budgetCategories: [],
+  })
 
   // Build snapshot row
   const snapshotRow: Record<string, unknown> = {
@@ -157,7 +171,7 @@ export async function GET() {
     fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
     sovereignty_level: sovereigntyLevel,
     savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
-    resilience_score: resilience.total,
+    resilience_score: healthScore.total,
   }
 
   // Try upsert with extended fields; fall back to basic if columns don't exist
@@ -225,14 +239,14 @@ export async function GET() {
       fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
-      resilience_score: resilience.total,
+      resilience_score: healthScore.total,
     },
     metrics: {
       fire_target: fireTarget,
       yearly_must_expenses: yearlyMustExpenses,
       monthly_income: monthlyIncome,
       monthly_expenses: monthlyExpenses,
-      resilience_breakdown: resilience.breakdown,
+      health_pillars: healthScore.pillars.map(p => ({ id: p.id, name: p.name, score: p.score, weight: p.weight })),
     },
     ...(warning ? { warning } : {}),
   })

@@ -12,17 +12,18 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import {
   computeFireProjection, computeFireRange, projectForward,
-  computeResilienceScore, formatFireAge, formatCountdown,
+  formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
   LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, berekenKinderopvangNetto, kinderbijslagPerMaand, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
-  type ProjectionMonth, type ResilienceScore,
+  type ProjectionMonth,
   type LifeEvent, type LifeEventImpact,
   type MonteCarloResult, type CatalogField,
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
+import { computeHealthScoreFromInputs, getHealthLabel, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
@@ -46,7 +47,7 @@ import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { usePerspective } from '@/components/app/perspective-provider'
-import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, getResilienceLabel, ResilienceContextMessage, ResilienceTrendChart, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
+import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 
 const ScenariosModal = dynamic(() =>
   import('@/components/app/horizon/scenarios-modal').then(m => ({ default: m.ScenariosModal })),
@@ -119,14 +120,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [range, setRange] = useState<FireRange | null>(() =>
     computeFireRange(initialData.effectiveInput, initialData.fireParams.effectiveSwr, undefined, initialData.fireParams.grossReturn)
   )
-  const [resilience, setResilience] = useState<ResilienceScore | null>(() => {
-    const resilienceInput: FinancialInput = {
-      ...initialData.effectiveInput,
-      monthlyIncome: initialData.avgIncome6m,
-      monthlyExpenses: initialData.avgExpenses6m,
-    }
-    return computeResilienceScore(resilienceInput)
-  })
+  const [healthScore, setHealthScore] = useState<HealthScore | null>(() => initialData.healthScore)
+  const [healthScoreInput, setHealthScoreInput] = useState<HealthScoreInput>(initialData.healthScoreInput)
   const [avgIncome6m, setAvgIncome6m] = useState<number | null>(initialData.avgIncome6m)
   const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(initialData.avgExpenses6m)
   const [snapshotResilience, setSnapshotResilience] = useState<number | null>(initialData.snapshotResilience)
@@ -547,11 +542,24 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     if (!effectiveInput) return
     setFire(computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr))
     setRange(computeFireRange(effectiveInput, fireSwr, undefined, fireParams.grossReturn))
-    // Resilience score: use 6-month averaged income/expenses for stability
-    const resilienceInput: FinancialInput = avgIncome6m !== null && avgExpenses6m !== null
-      ? { ...effectiveInput, monthlyIncome: avgIncome6m, monthlyExpenses: avgExpenses6m }
-      : effectiveInput
-    setResilience(computeResilienceScore(resilienceInput))
+    // Health score: recompute with updated inputs
+    const incomeForHealth = avgIncome6m ?? effectiveInput.monthlyIncome
+    const expensesForHealth = avgExpenses6m ?? effectiveInput.monthlyExpenses
+    const savingsRate = incomeForHealth > 0 ? ((incomeForHealth - expensesForHealth) / incomeForHealth) * 100 : 0
+    const emergencyMonths = expensesForHealth > 0 ? effectiveInput.totalAssets * 0.3 / expensesForHealth : 0
+    const nw = effectiveInput.totalAssets - effectiveInput.totalDebts
+    const target = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses / fireSwr : 0
+    const fPct = target > 0 ? Math.max(0, Math.min((nw / target) * 100, 100)) : 0
+    const newInput: HealthScoreInput = {
+      ...healthScoreInput,
+      savingsRate6m: savingsRate,
+      totalAssets: effectiveInput.totalAssets,
+      totalDebts: effectiveInput.totalDebts,
+      emergencyFundMonths: emergencyMonths,
+      freedomPct: fPct,
+    }
+    setHealthScoreInput(newInput)
+    setHealthScore(computeHealthScoreFromInputs(newInput))
     if (events.length > 0) {
       setImpacts(computeCumulativeImpacts(effectiveInput, events))
     }
@@ -1429,7 +1437,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     loadData()
   }
 
-  if (!fire || !range || !resilience) {
+  if (!fire || !range || !healthScore) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
@@ -2309,10 +2317,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
 
 
-      {/* === 5. Resilience Trend Chart (Deep Dive) === */}
+      {/* === 5. Health Score Trend Chart (Deep Dive) === */}
       {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
         <FeatureGate featureId="gezondheids_score" fallback="hidden">
-        <section className="mt-5 sm:mt-8" data-testid="resilience-trend-section">
+        <section className="mt-5 sm:mt-8" data-testid="health-trend-section">
           <div className="mb-3">
             <h2 className="label-editorial text-[var(--ink-2)]">
               <Shield className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
@@ -2424,19 +2432,19 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             type="button"
             onClick={() => setShowResilienceReceipt(true)}
             className="group flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
-            data-testid="resilience-combined-card"
+            data-testid="health-score-card"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
               <Shield className="h-5 w-5 text-horizon-600" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-[var(--ink-3)]">Veerkracht &amp; Backtesting</p>
+              <p className="text-xs font-medium text-[var(--ink-3)]">Financiële Gezondheid</p>
               <p className="text-lg font-bold text-[var(--ink)]">
-                {snapshotResilience !== null ? snapshotResilience : resilience.total} / 100
+                {snapshotResilience !== null ? snapshotResilience : healthScore.total} / 100
               </p>
               <p className="text-xs text-[var(--ink-4)]">
-                {snapshotResilience !== null ? getResilienceLabel(snapshotResilience) : resilience.label}
-                {' · '}55 jaar marktgeschiedenis
+                {snapshotResilience !== null ? getHealthLabel(snapshotResilience) : healthScore.label}
+                {' · '}6 pilaren
               </p>
             </div>
           </button>
@@ -5161,33 +5169,38 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </div>
 
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              Hoe goed je financieel bestand bent tegen tegenvallers. Samengesteld uit 4 onderdelen, elk maximaal 25 punten.
+              Een gewogen score van je financiële gezondheid, berekend uit 6 pilaren: spaarquote, schuldratio, noodfonds, FIRE-voortgang, diversificatie en budgetdiscipline.
             </div>
 
-            {resilience && (
+            {healthScore && (
               <>
                 <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-                  <div className="flex justify-between py-0.5">
-                    <span className="font-sans text-sm text-[var(--ink-2)]">Noodfonds</span>
-                    <span className="tabular-nums text-[var(--ink)]">{resilience.breakdown.emergency.toFixed(1)} / 25</span>
-                  </div>
-                  <div className="flex justify-between py-0.5">
-                    <span className="font-sans text-sm text-[var(--ink-2)]">Diversificatie</span>
-                    <span className="tabular-nums text-[var(--ink)]">{resilience.breakdown.diversification.toFixed(1)} / 25</span>
-                  </div>
-                  <div className="flex justify-between py-0.5">
-                    <span className="font-sans text-sm text-[var(--ink-2)]">Schuldverhouding</span>
-                    <span className="tabular-nums text-[var(--ink)]">{resilience.breakdown.debtRatio.toFixed(1)} / 25</span>
-                  </div>
-                  <div className="flex justify-between py-0.5">
-                    <span className="font-sans text-sm text-[var(--ink-2)]">Spaarquote</span>
-                    <span className="tabular-nums text-[var(--ink)]">{resilience.breakdown.savingsRate.toFixed(1)} / 25</span>
-                  </div>
+                  {healthScore.pillars.map(pillar => (
+                    <div key={pillar.id} className="flex justify-between py-0.5">
+                      <span className="font-sans text-sm text-[var(--ink-2)]">{pillar.name}</span>
+                      <span className="tabular-nums text-[var(--ink)]">{pillar.score} / 100 <span className="text-[var(--ink-4)] text-[10px]">({Math.round(pillar.weight * 100)}%)</span></span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pillar details with tips */}
+                <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+                  {healthScore.pillars.map(pillar => (
+                    <div key={`tip-${pillar.id}`} className="py-1">
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-1.5 w-1.5 shrink-0 rounded-full" style={{
+                          backgroundColor: pillar.score >= 70 ? '#22c55e' : pillar.score >= 40 ? '#eab308' : '#ef4444'
+                        }} />
+                        <span className="font-sans text-[11px] font-medium text-[var(--ink-2)]">{pillar.name}: {pillar.rawValue}</span>
+                      </div>
+                      <p className="ml-3 font-sans text-[10px] leading-relaxed text-[var(--ink-4)]">{pillar.improvementTip}</p>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-                  <span className="text-[var(--ink)]">{snapshotResilience !== null ? getResilienceLabel(snapshotResilience) : resilience.label}</span>
-                  <span className="tabular-nums text-[var(--ink)]">{snapshotResilience !== null ? snapshotResilience : resilience.total} / 100</span>
+                  <span className="text-[var(--ink)]">{snapshotResilience !== null ? getHealthLabel(snapshotResilience) : healthScore.label}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{snapshotResilience !== null ? snapshotResilience : healthScore.total} / 100</span>
                 </div>
               </>
             )}
