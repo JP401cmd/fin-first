@@ -1,3 +1,35 @@
+## Session 2026-03-19 - Features #384, #385
+
+### Feature #384: Fee Analyzer widget — dashboard widget met kostenimpact - PASSING
+- Created components/widgets/fee-analyzer-widget.tsx with mini/quarter/half sizes
+- Color-coded TER indicator: green (<0.3%), orange (0.3-0.8%), red (>0.8%)
+- FIRE impact sentence: "Je fondsbeheer kost je X maanden vrijheid"
+- Top 3 most expensive holdings with per-holding TER coloring
+- CTA when <50% holdings have TER filled in
+- Registered in widget-catalog.ts (id: 'fee_analyzer', module: 'kern', minLevel: 3)
+- Added to widget-renderer.tsx with dynamic import + case
+- Extended DashboardData with feeAnalysis (FeeAnalysis | null) + feeImpactMonths (number)
+- Dashboard-data-loader: queries all holdings with TER, computes feeAnalysis + FIRE impact
+- Updated all mock data objects (test page, mock-dashboard-data, grid test, regression suite)
+- Commit: 27f6a138
+
+### Feature #385: Fee detail pagina — per-holding breakdown en alternatieven suggesties - PASSING
+- Created components/widgets/fee-detail-modal.tsx (BottomSheet, kassabon patroon)
+- Per-holding breakdown table: name, ticker, TER%, value, annual cost, % of total
+- Sorted by annual cost descending (duurste eerst)
+- Fund alternatives section using existing lib/fund-alternatives.ts (26 mappings)
+- Holdings without TER: separate warning section with "Vul TER in" CTA per holding
+- Total row: weighted TER, total portfolio value, total annual cost
+- FIRE impact summary box in modal
+- Disclaimer at bottom: "geen beleggingsadvies" warning
+- Mobile-responsive: overflow-x-auto table with min-w-[480px]
+- Widget onClick opens modal (replaces href navigation for detail)
+- Commit: 7d34a361
+
+### Current Status
+- 2 features completed this session (#384, #385)
+- Progress: ~379/397 passing (95.5%)
+
 ## Session 2026-03-19 - Feature #388
 
 ### Feature #388: Regressietests — TER, kostenanalyse, en fee impact - PASSING
