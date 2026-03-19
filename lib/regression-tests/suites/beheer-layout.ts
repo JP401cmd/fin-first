@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { withUserRole } from '../server-runner'
 
 const CAT = 'beheer.layout'
 
@@ -38,21 +39,40 @@ function isRedirect(status: number): boolean {
 }
 
 const tests: TestCase[] = [
-  // ── Step 1: isSuperAdmin check ──────────────────────────────────────
+  // ── Step 1a: Superadmin kan beheer benaderen ──────────────────────────
+  {
+    id: 'beheer-admin-accessible',
+    name: 'Superadmin kan beheer benaderen',
+    category: CAT,
+    description: 'isSuperAdmin check: superadmin krijgt 200 op beheer paginas',
+    priority: 'critical',
+    estimatedDurationMs: 1000,
+    requiredRole: 'superadmin',
+    async fn() {
+      const res = await fetchNoRedirect('/beheer/ai')
+      assert(
+        res.status === 200,
+        `Expected 200 for superadmin on /beheer/ai, got ${res.status}`,
+      )
+    },
+  },
+  // ── Step 1b: Normale user heeft geen toegang ──────────────────────────
   {
     id: 'beheer-admin-only',
     name: 'Alleen super admin heeft toegang',
     category: CAT,
-    description: 'isSuperAdmin check: niet-ingelogde gebruikers worden doorgestuurd',
+    description: 'isSuperAdmin check: gebruikers met role=user worden doorgestuurd',
     priority: 'critical',
-    estimatedDurationMs: 1000,
+    estimatedDurationMs: 3000,
+    requiredRole: 'user',
     async fn() {
-      // Without auth cookies, the beheer layout should redirect
-      const res = await fetchNoRedirect('/beheer/ai')
-      assert(
-        isRedirect(res.status),
-        `Expected redirect for /beheer/ai (admin protection), got ${res.status}`,
-      )
+      await withUserRole(async () => {
+        const res = await fetchNoRedirect('/beheer/ai')
+        assert(
+          isRedirect(res.status),
+          `Expected redirect for /beheer/ai when role=user, got ${res.status}`,
+        )
+      })
     },
   },
 
@@ -63,22 +83,21 @@ const tests: TestCase[] = [
     category: CAT,
     description: 'Niet-admin gebruikers worden doorgestuurd naar /will',
     priority: 'critical',
-    estimatedDurationMs: 1000,
+    estimatedDurationMs: 3000,
+    requiredRole: 'user',
     async fn() {
-      // The beheer layout redirects non-admins to /will
-      // Without auth, middleware redirects to /login first
-      // Either way, we should get a redirect (not a 200)
-      const res = await fetchNoRedirect('/beheer/testdata')
-      assert(
-        isRedirect(res.status),
-        `Expected redirect for non-admin access to /beheer/testdata, got ${res.status}`,
-      )
-      const location = res.headers.get('location') ?? ''
-      // Should redirect to /will (non-admin) or /login (not authenticated)
-      assert(
-        location.includes('/will') || location.includes('/login'),
-        `Expected redirect to /will or /login, got ${location}`,
-      )
+      await withUserRole(async () => {
+        const res = await fetchNoRedirect('/beheer/testdata')
+        assert(
+          isRedirect(res.status),
+          `Expected redirect for non-admin access to /beheer/testdata, got ${res.status}`,
+        )
+        const location = res.headers.get('location') ?? ''
+        assert(
+          location.includes('/will') || location.includes('/login'),
+          `Expected redirect to /will or /login, got ${location}`,
+        )
+      })
     },
   },
 

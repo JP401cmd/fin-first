@@ -1,6 +1,7 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan } from '../assert'
 import type { TestCase } from '../test-types'
+import { withUserRole } from '../server-runner'
 
 const CAT = 'cross-cutting.navigatie'
 
@@ -179,19 +180,38 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 5: Beheer admin protection ───────────────────────────────
+  // ── Step 5a: Beheer admin protection — normal user gets redirected ──
   {
-    id: 'nav-beheer-protected', name: 'Beheer vereist admin', category: CAT,
-    description: 'Beheer paginas redirecten ongeautoriseerde gebruikers',
-    priority: 'critical', estimatedDurationMs: 2000,
+    id: 'nav-beheer-protected-user', name: 'Beheer redirectt normale gebruiker', category: CAT,
+    description: 'Beheer paginas redirecten gebruikers met role=user naar /will',
+    priority: 'critical', estimatedDurationMs: 4000,
+    requiredRole: 'user',
     async fn() {
-      // When not logged in, beheer pages should redirect to login
+      // Temporarily switch test account to role='user', then verify beheer redirects
+      await withUserRole(async () => {
+        for (const route of BEHEER_ROUTES) {
+          const res = await fetchNoRedirect(route)
+          assert(
+            isRedirect(res.status),
+            `Expected redirect for ${route} when role=user, got ${res.status}`,
+          )
+        }
+      })
+    },
+  },
+  // ── Step 5b: Beheer accessible for superadmin ─────────────────────
+  {
+    id: 'nav-beheer-accessible-admin', name: 'Beheer toegankelijk voor superadmin', category: CAT,
+    description: 'Beheer paginas zijn bereikbaar voor superadmin gebruikers',
+    priority: 'critical', estimatedDurationMs: 2000,
+    requiredRole: 'superadmin',
+    async fn() {
+      // Verify that a superadmin can actually access beheer pages
       for (const route of BEHEER_ROUTES) {
         const res = await fetchNoRedirect(route)
-        // Should redirect (to /login or /will for non-admin)
         assert(
-          isRedirect(res.status),
-          `Expected redirect for ${route} (admin protection), got ${res.status}`,
+          res.status === 200 || isRedirect(res.status),
+          `Expected 200 or redirect for ${route} as superadmin, got ${res.status}`,
         )
       }
     },

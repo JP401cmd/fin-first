@@ -6,6 +6,14 @@ export type TestStatus = 'pass' | 'fail' | 'skip' | 'error'
 /** Priority level for ordering/filtering */
 export type TestPriority = 'critical' | 'high' | 'medium' | 'low'
 
+/**
+ * Role required by a test case.
+ * - 'superadmin' (default): test runs as the superadmin test account
+ * - 'user': test runs after temporarily switching the test account role to 'user'
+ * - 'any': test doesn't depend on role (pure logic tests)
+ */
+export type TestRole = 'superadmin' | 'user' | 'any'
+
 /** A single test case definition */
 export interface TestCase {
   /** Unique identifier (kebab-case, e.g. "fire-sim-basic") */
@@ -20,6 +28,13 @@ export interface TestCase {
   priority: TestPriority
   /** Estimated duration in milliseconds */
   estimatedDurationMs: number
+  /**
+   * Role the test account should have when running this test.
+   * Defaults to 'superadmin' if not specified.
+   * Tests with requiredRole: 'user' will have the test account's profile.role
+   * temporarily switched to 'user' before execution, then restored to 'superadmin'.
+   */
+  requiredRole?: TestRole
   /** The actual test function — returns void on success, throws on failure */
   fn: () => void | Promise<void>
 }

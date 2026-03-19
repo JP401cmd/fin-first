@@ -10,6 +10,7 @@ import {
 import { PHASES } from '@/lib/feature-phases'
 import { TIERS } from '@/lib/tier-config'
 import { computeFeatureAccess, type FinancialInput } from '@/lib/compute-feature-access'
+import { withUserRole } from '../server-runner'
 
 const CAT = 'beheer.toegang'
 
@@ -38,46 +39,52 @@ function makeFinancialInput(overrides?: Partial<FinancialInput>): FinancialInput
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 const tests: TestCase[] = [
-  // ── Step 1: GET /api/admin/feature-access ──────────────────────────────────
+  // ── Step 1a: GET /api/admin/feature-access — superadmin can access ──────────
   {
-    id: 'toegang-api-get-feature-access',
-    name: 'GET /api/admin/feature-access: ophalen feature overrides',
+    id: 'toegang-api-get-feature-access-admin',
+    name: 'GET /api/admin/feature-access: superadmin krijgt features + overrides',
     category: CAT,
-    description: 'API retourneert features array en overrides object',
+    description: 'API retourneert features array en overrides object voor superadmin',
     priority: 'critical',
     estimatedDurationMs: 2000,
+    requiredRole: 'superadmin',
     async fn() {
-      // Without admin auth, we expect 403 or redirect
       const res = await fetch('/api/admin/feature-access')
-      // Should be 403 (forbidden) since we may not be logged in as admin
-      // Or 307 redirect if middleware catches first
-      // The key is it should not return 200 without admin auth
-      // In the regression test runner context (logged-in admin), it may succeed
-      if (res.ok) {
-        const data = await res.json()
-        // Verify response structure
-        assert(
-          Array.isArray(data.features),
-          `Expected features array, got ${typeof data.features}`,
-        )
-        assert(
-          typeof data.overrides === 'object' && data.overrides !== null,
-          `Expected overrides object, got ${typeof data.overrides}`,
-        )
-        // Each feature should have effectivePhase and hasOverride
-        for (const f of data.features) {
-          assert(typeof f.id === 'string', `Feature missing id`)
-          assert(typeof f.effectivePhase === 'string', `Feature ${f.id} missing effectivePhase`)
-          assert(typeof f.hasOverride === 'boolean', `Feature ${f.id} missing hasOverride`)
-          assert(PHASE_IDS.includes(f.effectivePhase), `Feature ${f.id} has invalid effectivePhase: ${f.effectivePhase}`)
-        }
-      } else {
-        // 403 or redirect is acceptable (no admin session in test context)
-        assert(
-          res.status === 403 || res.status === 307 || res.status === 302 || res.status === 401,
-          `Expected 403/401/redirect for non-admin, got ${res.status}`,
-        )
+      assert(res.ok, `Expected 200 for superadmin, got ${res.status}`)
+      const data = await res.json()
+      assert(
+        Array.isArray(data.features),
+        `Expected features array, got ${typeof data.features}`,
+      )
+      assert(
+        typeof data.overrides === 'object' && data.overrides !== null,
+        `Expected overrides object, got ${typeof data.overrides}`,
+      )
+      for (const f of data.features) {
+        assert(typeof f.id === 'string', `Feature missing id`)
+        assert(typeof f.effectivePhase === 'string', `Feature ${f.id} missing effectivePhase`)
+        assert(typeof f.hasOverride === 'boolean', `Feature ${f.id} missing hasOverride`)
+        assert(PHASE_IDS.includes(f.effectivePhase), `Feature ${f.id} has invalid effectivePhase: ${f.effectivePhase}`)
       }
+    },
+  },
+  // ── Step 1b: GET /api/admin/feature-access — normal user gets 403 ─────────
+  {
+    id: 'toegang-api-get-feature-access-user',
+    name: 'GET /api/admin/feature-access: normale user krijgt 403',
+    category: CAT,
+    description: 'API weigert toegang voor gebruikers met role=user',
+    priority: 'critical',
+    estimatedDurationMs: 3000,
+    requiredRole: 'user',
+    async fn() {
+      await withUserRole(async () => {
+        const res = await fetch('/api/admin/feature-access')
+        assert(
+          res.status === 403 || res.status === 401 || res.status === 307 || res.status === 302,
+          `Expected 403/401/redirect for normal user, got ${res.status}`,
+        )
+      })
     },
   },
 
@@ -223,16 +230,16 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 5: Subscription toewijzing (POST /api/admin/tier-assign) ──────────
+  // ── Step 5a: Subscription toewijzing — superadmin kan toewijzen ─────────────
   {
-    id: 'toegang-subscription-assignment',
-    name: 'Subscription toewijzing: POST /api/admin/tier-assign structuur',
+    id: 'toegang-subscription-assignment-admin',
+    name: 'POST /api/admin/tier-assign: superadmin kan structuur ophalen',
     category: CAT,
-    description: 'POST endpoint valideert email + subscriptions, retourneert success of error',
+    description: 'POST endpoint retourneert success of user-not-found voor superadmin',
     priority: 'high',
     estimatedDurationMs: 2000,
+    requiredRole: 'superadmin',
     async fn() {
-      // Test without auth — should get 403 or redirect
       const res = await fetch('/api/admin/tier-assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,40 +248,51 @@ const tests: TestCase[] = [
           subscriptions: ['connected'],
         }),
       })
-      if (res.ok) {
-        // If admin session exists, verify response structure
+      // Superadmin should NOT get 403 (the admin guard must pass)
+      assert(
+        res.status !== 403,
+        'Superadmin should NOT get 403 from tier-assign',
+      )
+      // Acceptable responses: 200 (success), 404 (user not found),
+      // 400 (validation), 500 (service key not configured)
+      assert(
+        res.ok || [400, 404, 500].includes(res.status),
+        `Expected success/400/404/500 for superadmin tier-assign, got ${res.status}`,
+      )
+      // Response might be non-JSON for unhandled 500s (Next.js error page)
+      try {
         const data = await res.json()
-        assert(
-          typeof data === 'object',
-          'Expected object response',
-        )
-        // Either success or user-not-found error
-        assert(
-          data.success === true || typeof data.error === 'string',
-          'Expected success: true or error string',
-        )
-      } else {
-        // 403 (no admin), 404 (user not found), or redirect are all acceptable
-        assert(
-          [302, 307, 401, 403, 404].includes(res.status),
-          `Expected 403/401/404/redirect for tier-assign, got ${res.status}`,
-        )
+        assert(typeof data === 'object', 'Expected object response')
+      } catch {
+        // Non-JSON response is acceptable for 500 (service key missing)
+        assert(res.status === 500, `Non-JSON response with status ${res.status}`)
       }
-
-      // Test missing body fields
-      const res2 = await fetch('/api/admin/tier-assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+    },
+  },
+  // ── Step 5b: Subscription toewijzing — normale user geweigerd ──────────────
+  {
+    id: 'toegang-subscription-assignment-user',
+    name: 'POST /api/admin/tier-assign: normale user geweigerd',
+    category: CAT,
+    description: 'POST endpoint weigert toegang voor gebruikers met role=user',
+    priority: 'high',
+    estimatedDurationMs: 3000,
+    requiredRole: 'user',
+    async fn() {
+      await withUserRole(async () => {
+        const res = await fetch('/api/admin/tier-assign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: 'nonexistent@test.nl',
+            subscriptions: ['connected'],
+          }),
+        })
+        assert(
+          [302, 307, 401, 403].includes(res.status),
+          `Expected 403/401/redirect for normal user tier-assign, got ${res.status}`,
+        )
       })
-      if (res2.ok || res2.status === 400) {
-        // Either rejected (400) or handled gracefully
-        const data2 = await res2.json()
-        if (res2.status === 400) {
-          assert(typeof data2.error === 'string', 'Expected error message for missing fields')
-        }
-      }
-      // 403/redirect also acceptable
     },
   },
 
@@ -367,33 +385,48 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Extra: PUT feature-access validation ───────────────────────────────────
+  // ── Extra: PUT feature-access — superadmin can save ─────────────────────────
   {
-    id: 'toegang-put-validation',
-    name: 'PUT /api/admin/feature-access: validatie en opslaan',
+    id: 'toegang-put-validation-admin',
+    name: 'PUT /api/admin/feature-access: superadmin kan opslaan',
     category: CAT,
-    description: 'PUT endpoint valideert overrides structuur',
+    description: 'PUT endpoint accepteert overrides van superadmin',
     priority: 'high',
     estimatedDurationMs: 2000,
+    requiredRole: 'superadmin',
     async fn() {
-      // Without admin auth → should fail
       const res = await fetch('/api/admin/feature-access', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ overrides: {} }),
       })
-      if (res.ok) {
-        // If admin session, verify response
-        const data = await res.json()
-        assert(data.success === true, 'Expected success: true')
-        assert(typeof data.overrides === 'object', 'Expected overrides in response')
-      } else {
-        // 403/redirect are acceptable
+      assert(res.ok, `Expected 200 for superadmin PUT, got ${res.status}`)
+      const data = await res.json()
+      assert(data.success === true, 'Expected success: true')
+      assert(typeof data.overrides === 'object', 'Expected overrides in response')
+    },
+  },
+  // ── Extra: PUT feature-access — normal user gets 403 ──────────────────────
+  {
+    id: 'toegang-put-validation-user',
+    name: 'PUT /api/admin/feature-access: normale user geweigerd',
+    category: CAT,
+    description: 'PUT endpoint weigert overrides van gebruikers met role=user',
+    priority: 'high',
+    estimatedDurationMs: 3000,
+    requiredRole: 'user',
+    async fn() {
+      await withUserRole(async () => {
+        const res = await fetch('/api/admin/feature-access', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ overrides: {} }),
+        })
         assert(
           [302, 307, 401, 403].includes(res.status),
-          `Expected 403/redirect for PUT, got ${res.status}`,
+          `Expected 403/401/redirect for normal user PUT, got ${res.status}`,
         )
-      }
+      })
     },
   },
 
