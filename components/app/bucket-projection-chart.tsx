@@ -3,6 +3,7 @@
 import { useState, memo } from 'react'
 import type { BucketProjectionResult, BucketRow } from '@/lib/bucket-projection'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
+import { DEBT_LAYER_COLOR } from '@/lib/wealth-composition'
 import { formatCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
 import { TrendingUp, TrendingDown, Info, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -322,8 +323,8 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         {/* FIRE target */}
         {fireInRange && (
           <>
-            <line x1={PAD_LEFT} y1={fireY!} x2={W - PAD_RIGHT} y2={fireY!} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="6 3" />
-            <text x={W - PAD_RIGHT + 2} y={fireY! + 3} className="fill-horizon-500" style={{ fontSize: 8, fontWeight: 600 }}>FIRE</text>
+            <line x1={PAD_LEFT} y1={fireY!} x2={W - PAD_RIGHT} y2={fireY!} stroke="var(--hor-t, #8a6e42)" strokeWidth="1.5" strokeDasharray="6 3" />
+            <text x={W - PAD_RIGHT - 4} y={fireY! + 3} textAnchor="end" style={{ fill: 'var(--hor-t, #8a6e42)', fontSize: 8, fontWeight: 600 }}>FIRE</text>
           </>
         )}
         {/* Hover dots on nominal line */}
@@ -357,8 +358,8 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         {/* FIRE target */}
         {fireInRange && (
           <>
-            <line x1={PAD_LEFT} y1={fireY!} x2={W - PAD_RIGHT} y2={fireY!} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="6 3" />
-            <text x={W - PAD_RIGHT + 2} y={fireY! + 3} className="fill-horizon-500" style={{ fontSize: 8, fontWeight: 600 }}>FIRE</text>
+            <line x1={PAD_LEFT} y1={fireY!} x2={W - PAD_RIGHT} y2={fireY!} stroke="var(--hor-t, #8a6e42)" strokeWidth="1.5" strokeDasharray="6 3" />
+            <text x={W - PAD_RIGHT - 4} y={fireY! + 3} textAnchor="end" style={{ fill: 'var(--hor-t, #8a6e42)', fontSize: 8, fontWeight: 600 }}>FIRE</text>
           </>
         )}
         {/* Individual asset type lines */}
@@ -367,13 +368,13 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         ))}
         {/* Debt line (negative) */}
         {hasDebts && (
-          <path d={debtLinePath} fill="none" stroke="#ef4444" strokeWidth="2" strokeLinejoin="round" pathLength={1} style={{ animation: lineAnim }} />
+          <path d={debtLinePath} fill="none" stroke={DEBT_LAYER_COLOR} strokeWidth="2" strokeLinejoin="round" pathLength={1} style={{ animation: lineAnim }} />
         )}
         {/* Net worth line (thicker, prominent) */}
         <path d={nwLinePath} fill="none" stroke={lineColor} strokeWidth="2.5" strokeLinejoin="round" pathLength={1} style={{ animation: lineAnim }} />
         {/* Alt net worth line */}
         {showAlternative && (
-          <path d={altNwLinePath} fill="none" stroke={lineColor} strokeWidth="1.5" strokeDasharray="6 4" opacity="0.5" strokeLinejoin="round" />
+          <path d={altNwLinePath} fill="none" stroke={lineColor} strokeWidth="1.5" strokeDasharray="6 4" opacity="0.5" strokeLinejoin="round" pathLength={1} style={{ animation: lineAnim }} />
         )}
         {/* Invisible hover rects per sample column for wide hit area */}
         {animationComplete && sampled.map((_, i) => {
@@ -406,7 +407,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
             const v = r.assetBuckets[type] ?? 0
             if (v > 0) dots.push({ cy: yPos(v), color: ASSET_TYPE_COLORS[type] })
           }
-          if (r.totalDebts > 0) dots.push({ cy: yPos(-r.totalDebts), color: '#ef4444' })
+          if (r.totalDebts > 0) dots.push({ cy: yPos(-r.totalDebts), color: DEBT_LAYER_COLOR })
           dots.push({ cy: yPos(r.netWorth), color: lineColor })
           return dots.map((d, i) => (
             <circle key={i} cx={xPos(hoveredMonth)} cy={d.cy} r={3.5} fill={d.color} stroke="white" strokeWidth="1.5" />
@@ -419,7 +420,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
   function renderInkomenView() {
     if (cashFlowSummary.monthlyIncome === 0) {
       return (
-        <text x={W / 2} y={H / 2} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 12 }}>
+        <text x={W / 2} y={H / 2} textAnchor="middle" style={{ fill: 'var(--ink-4)', fontSize: 12 }}>
           Stel je inkomen in om deze weergave te gebruiken.
         </text>
       )
@@ -482,7 +483,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
     const annualTaxes = computeAnnualBox3()
     if (annualTaxes.length === 0) {
       return (
-        <text x={W / 2} y={H / 2} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 12 }}>
+        <text x={W / 2} y={H / 2} textAnchor="middle" style={{ fill: 'var(--ink-4)', fontSize: 12 }}>
           Geen Box 3 belasting van toepassing.
         </text>
       )
@@ -529,7 +530,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         <path d={realLinePath} fill="none" stroke="#6b4c38" strokeWidth="1.5" strokeDasharray="6 4" opacity="0.7" strokeLinejoin="round" pathLength={1} style={{ animation: lineAnim }} />
         {/* Alt method line */}
         {showAlternative && altLinePath && (
-          <path d={altLinePath} fill="none" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.45" strokeLinejoin="round" />
+          <path d={altLinePath} fill="none" stroke={DEBT_LAYER_COLOR} strokeWidth="1.5" strokeDasharray="4 3" opacity="0.45" strokeLinejoin="round" pathLength={1} style={{ animation: lineAnim }} />
         )}
         {/* Dots on nominal line */}
         {taxPoints.map((p, i) => (
@@ -578,7 +579,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         if (showAlternative && sampledAlt[hoveredMonth]) {
           lines.push({ label: `Alt. (${alternativeMethod})`, value: formatCurrency(sampledAlt[hoveredMonth].netWorth) })
         }
-        return renderTooltipBox(hoveredMonth, PAD_TOP, lines)
+        return renderTooltipBox(hoveredMonth, yPos(r.netWorth), lines)
       }
       case 'inkomen': {
         const r = sampled[hoveredMonth]
@@ -630,7 +631,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
     const tooltipY = Math.max(anchorY, PAD_TOP)
     return (
       <g>
-        <rect x={tooltipX} y={tooltipY} width={tooltipW} height={tooltipH} rx={6} fill="white" stroke="#e4e4e7" strokeWidth="1" filter="drop-shadow(0 2px 6px rgba(0,0,0,0.12))" />
+        <rect x={tooltipX} y={tooltipY} width={tooltipW} height={tooltipH} rx={6} fill="var(--paper)" stroke="var(--border-ed)" strokeWidth="1" filter="drop-shadow(0 2px 6px rgba(26,25,22,0.1))" />
         {lines.map((line, i) => {
           const textX = tooltipX + (line.color ? 14 : 6)
           return (
@@ -640,8 +641,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
               )}
               <text
                 x={textX} y={tooltipY + 11 + i * lineH}
-                className={line.bold ? 'fill-zinc-800' : 'fill-zinc-500'}
-                style={{ fontSize: line.bold ? 10 : 9, fontWeight: line.bold ? 600 : 400 }}
+                style={{ fill: line.bold ? 'var(--ink)' : 'var(--ink-3)', fontSize: line.bold ? 10 : 9, fontWeight: line.bold ? 600 : 400 }}
               >
                 {line.value ? `${line.label}: ${line.value}` : line.label}
               </text>
@@ -690,7 +690,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
             ))}
             {hasDebtsLegend && (
               <div className="flex items-center gap-1">
-                <span className="inline-block h-0.5 w-4 rounded" style={{ backgroundColor: '#ef4444' }} />
+                <span className="inline-block h-0.5 w-4 rounded" style={{ backgroundColor: DEBT_LAYER_COLOR }} />
                 <span className="text-[10px] text-[var(--ink-3)]">Schulden</span>
               </div>
             )}
@@ -824,12 +824,13 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
       {renderContextMessage()}
 
       {/* Controls bar */}
-      <div className="mb-2 flex items-center justify-end gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
         {/* View selector dropdown */}
         <div className="relative">
           <select
             value={chartView}
             onChange={e => { setChartView(e.target.value as ChartView); setHoveredMonth(null) }}
+            aria-label="Selecteer grafiekweergave"
             className="appearance-none rounded-full border border-[var(--border-ed)] bg-[var(--paper)] py-1 pl-3 pr-7 text-[11px] font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus:outline-none focus:ring-1 focus:ring-kern-300"
           >
             {CHART_VIEWS.map(v => (
@@ -844,7 +845,8 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
           <button
             type="button"
             onClick={() => setShowAlternative(!showAlternative)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1 text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
+            aria-pressed={showAlternative}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors hover:bg-[var(--subtle)] ${showAlternative ? 'border-kern-400 bg-kern-50 text-kern-700' : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)]'}`}
           >
             {showAlternative ? <ToggleRight className="h-3.5 w-3.5 text-kern-500" /> : <ToggleLeft className="h-3.5 w-3.5" />}
             Vergelijk {alternativeMethod === 'werkelijk' ? 'werkelijk' : 'forfaitair'} rendement
@@ -858,13 +860,15 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         style={{ maxHeight: 280 }}
+        role="img"
+        aria-label={`Vermogensprognose grafiek — ${CHART_VIEW_LABELS[chartView]}`}
         data-testid="bucket-projection-chart"
       >
         {/* Grid lines */}
         {gridLines.map(({ y, val: gv }, i) => (
           <g key={i}>
             <line x1={PAD_LEFT} y1={y} x2={W - PAD_RIGHT} y2={y} stroke="#e4e4e7" strokeDasharray="4" />
-            <text x={PAD_LEFT - 6} y={y + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>
+            <text x={PAD_LEFT - 6} y={y + 3} textAnchor="end" style={{ fill: 'var(--ink-3)', fontSize: 9 }}>
               {gv >= 1_000_000 ? `${(gv / 1_000_000).toFixed(1)}M`
                 : gv >= 1000 ? `${(gv / 1000).toFixed(0)}k`
                 : gv.toFixed(0)}
@@ -874,12 +878,12 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
 
         {/* Zero line */}
         {minVal < 0 && (
-          <line x1={PAD_LEFT} y1={yPos(0)} x2={W - PAD_RIGHT} y2={yPos(0)} stroke="#a1a1aa" strokeWidth="0.5" />
+          <line x1={PAD_LEFT} y1={yPos(0)} x2={W - PAD_RIGHT} y2={yPos(0)} stroke="var(--ink-3)" strokeWidth="1" />
         )}
 
         {/* "vandaag" marker */}
         <line x1={xPos(0)} y1={PAD_TOP} x2={xPos(0)} y2={PAD_TOP + chartH} stroke="#a1a1aa" strokeWidth="1" strokeDasharray="3 3" />
-        <text x={xPos(0)} y={PAD_TOP - 4} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 8 }}>vandaag</text>
+        <text x={xPos(0)} y={PAD_TOP - 4} textAnchor="middle" style={{ fill: 'var(--ink-4)', fontSize: 8 }}>vandaag</text>
 
         {/* View-specific content */}
         {chartView === 'nom_reeel' && renderNomReelView()}
@@ -894,12 +898,12 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         {yearMarkers.map(({ idx, label }) => (
           <g key={label}>
             <line x1={xPos(idx)} y1={PAD_TOP + chartH} x2={xPos(idx)} y2={PAD_TOP + chartH + 4} stroke="#a1a1aa" strokeWidth="1" />
-            <text x={xPos(idx)} y={H - 10} textAnchor="middle" className="fill-zinc-500" style={{ fontSize: 10, fontWeight: 500 }}>{label}</text>
+            <text x={xPos(idx)} y={H - 10} textAnchor="middle" style={{ fill: 'var(--ink-3)', fontSize: 10, fontWeight: 500 }}>{label}</text>
           </g>
         ))}
 
         {/* X-axis "nu" label */}
-        <text x={xPos(0)} y={H - 10} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>nu</text>
+        <text x={xPos(0)} y={H - 10} textAnchor="middle" style={{ fill: 'var(--ink-4)', fontSize: 9 }}>nu</text>
       </svg>
 
       {/* Legend */}
