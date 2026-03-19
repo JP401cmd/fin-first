@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import type { TestReport, TestResult, TestCategory } from '@/lib/regression-tests/test-types'
 import { loadAllTests, getCategories } from '@/lib/regression-tests/test-registry'
-import { runTestSuite, runCategoryTests } from '@/lib/regression-tests/test-runner'
+import { getTestSessionStatus, REGRESSION_TEST_EMAIL } from '@/lib/regression-tests/test-session'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -47,6 +47,12 @@ type ModuleGroup = {
   totalTests: number
 }
 
+/** Shape of each NDJSON line from the server */
+type StreamLine =
+  | { type: 'result'; data: TestResult }
+  | { type: 'report'; data: TestReport }
+  | { type: 'error'; message: string }
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Parse a dot-notation category ID into module and area segments */
@@ -80,6 +86,102 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s`
 }
 
+// ── Server-side test execution via NDJSON stream ────────────────────────────
+
+/**
+ * Call POST /api/regression/run and stream NDJSON results.
+ * Calls onResult for each TestResult line and returns the final TestReport.
+ */
+async function executeServerTests(
+  categories: string[] | undefined,
+  onResult: (result: TestResult, completed: number, total: number) => void,
+  abortSignal?: AbortSignal,
+): Promise<TestReport> {
+  const body: Record<string, unknown> = {}
+  if (categories && categories.length > 0) {
+    body.categories = categories
+  }
+
+  const response = await fetch('/api/regression/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: abortSignal,
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({ error: 'Onbekende fout' }))
+    throw new Error(errorBody.error || `Server returned ${response.status}`)
+  }
+
+  if (!response.body) {
+    throw new Error('Geen streaming response ontvangen van de server')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let resultCount = 0
+  let finalReport: TestReport | null = null
+
+  // We don't know the total upfront from the stream, so we estimate
+  // based on the test count from the loaded registry. The server sends
+  // the real total as part of the report at the end.
+  const estimatedTotal = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    // Keep the last incomplete line in the buffer
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        const parsed: StreamLine = JSON.parse(line)
+        if (parsed.type === 'result') {
+          resultCount++
+          onResult(parsed.data, resultCount, estimatedTotal || resultCount)
+        } else if (parsed.type === 'report') {
+          finalReport = parsed.data
+        } else if (parsed.type === 'error') {
+          throw new Error(parsed.message)
+        }
+      } catch (parseErr) {
+        // If it's a re-thrown error from an 'error' line, propagate it
+        if (parseErr instanceof Error && !parseErr.message.startsWith('Unexpected')) {
+          throw parseErr
+        }
+        // Otherwise skip malformed lines
+        console.warn('[regressietest] Ongeldige NDJSON regel:', line)
+      }
+    }
+  }
+
+  // Process any remaining buffer content
+  if (buffer.trim()) {
+    try {
+      const parsed: StreamLine = JSON.parse(buffer)
+      if (parsed.type === 'report') {
+        finalReport = parsed.data
+      } else if (parsed.type === 'error') {
+        throw new Error(parsed.message)
+      }
+    } catch {
+      // Ignore incomplete final line
+    }
+  }
+
+  if (!finalReport) {
+    throw new Error('Geen rapport ontvangen van de server')
+  }
+
+  return finalReport
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function RegressietestPage() {
@@ -93,9 +195,10 @@ export default function RegressietestPage() {
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
   const [progress, setProgress] = useState({ completed: 0, total: 0 })
   const [liveResults, setLiveResults] = useState<TestResult[]>([])
+  const [serverError, setServerError] = useState<string | null>(null)
   const mountedRef = useRef(true)
 
-  // Load test registry
+  // Load test registry (client-side, for category listing only)
   useEffect(() => {
     mountedRef.current = true
     async function init() {
@@ -148,11 +251,12 @@ export default function RegressietestPage() {
   const runAll = useCallback(async () => {
     setRunning(true)
     setLiveResults([])
-    setProgress({ completed: 0, total: 0 })
+    setProgress({ completed: 0, total: totalTests })
     setReport(null)
+    setServerError(null)
 
     try {
-      const result = await runTestSuite({}, handleProgress)
+      const result = await executeServerTests(undefined, handleProgress)
       if (mountedRef.current) {
         setReport(result)
         // Expand modules and categories with failures
@@ -162,13 +266,16 @@ export default function RegressietestPage() {
             .map(c => c.categoryId),
         )
         setExpandedCats(failedCats)
-        // Expand modules that contain failed categories
         const failedMods = new Set(
           Array.from(failedCats).map(catId => parseModule(catId).module),
         )
         setExpandedModules(failedMods)
         // Cache
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(result)) } catch { /* full */ }
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        setServerError(err instanceof Error ? err.message : 'Onbekende fout')
       }
     } finally {
       if (mountedRef.current) {
@@ -177,15 +284,16 @@ export default function RegressietestPage() {
         setRunningModule(null)
       }
     }
-  }, [handleProgress])
+  }, [handleProgress, totalTests])
 
   const runCategory = useCallback(async (catId: string) => {
     setRunningCategory(catId)
     setLiveResults([])
     setProgress({ completed: 0, total: 0 })
+    setServerError(null)
 
     try {
-      const result = await runCategoryTests(catId, handleProgress)
+      const result = await executeServerTests([catId], handleProgress)
       if (mountedRef.current) {
         // Merge into existing report or create new
         setReport(prev => {
@@ -215,6 +323,10 @@ export default function RegressietestPage() {
         })
         setExpandedCats(prev => new Set([...prev, catId]))
       }
+    } catch (err) {
+      if (mountedRef.current) {
+        setServerError(err instanceof Error ? err.message : 'Onbekende fout')
+      }
     } finally {
       if (mountedRef.current) {
         setRunningCategory(null)
@@ -230,10 +342,11 @@ export default function RegressietestPage() {
     const catIds = group.categories.map(c => c.id)
     setRunningModule(moduleId)
     setLiveResults([])
-    setProgress({ completed: 0, total: 0 })
+    setProgress({ completed: 0, total: group.totalTests })
+    setServerError(null)
 
     try {
-      const result = await runTestSuite({ categories: catIds }, handleProgress)
+      const result = await executeServerTests(catIds, handleProgress)
       if (mountedRef.current) {
         // Merge each category result into existing report or create new
         setReport(prev => {
@@ -273,6 +386,10 @@ export default function RegressietestPage() {
             .map(c => c.categoryId),
         )
         setExpandedCats(prev => new Set([...prev, ...failedCats]))
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        setServerError(err instanceof Error ? err.message : 'Onbekende fout')
       }
     } finally {
       if (mountedRef.current) {
@@ -335,6 +452,7 @@ export default function RegressietestPage() {
     setReport(null)
     setLiveResults([])
     setProgress({ completed: 0, total: 0 })
+    setServerError(null)
     try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
   }, [])
 
@@ -411,6 +529,17 @@ export default function RegressietestPage() {
         </div>
       </div>
 
+      {/* Test account safety banner — always visible with context-dependent message */}
+      <TestSessionBanner isRunning={isBusy} serverError={serverError} />
+
+      {/* Server error banner */}
+      {serverError && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5">
+          <XCircle className="h-4 w-4 text-red-700 shrink-0" />
+          <span className="text-sm text-red-700">{serverError}</span>
+        </div>
+      )}
+
       {/* Progress bar */}
       {(running || runningCategory || runningModule) && progress.total > 0 && (
         <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-4">
@@ -429,7 +558,7 @@ export default function RegressietestPage() {
           <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
             <div
               className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-              style={{ width: `${(progress.completed / progress.total) * 100}%` }}
+              style={{ width: `${(progress.completed / Math.max(progress.total, 1)) * 100}%` }}
             />
           </div>
           {/* Live results ticker */}
@@ -643,6 +772,26 @@ function SummaryCard({ label, value, color }: { label: string; value: number | s
       <div className="mt-0.5 text-xl font-bold font-mono tabular-nums" style={{ color }}>
         {value}
       </div>
+    </div>
+  )
+}
+
+function TestSessionBanner({ isRunning, serverError }: { isRunning: boolean; serverError: string | null }) {
+  const status = getTestSessionStatus({ isRunning, serverError: null })
+
+  if (status.variant === 'running') {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+        <Shield className="h-4 w-4 text-emerald-700 shrink-0" />
+        <span className="text-sm font-medium text-emerald-700">{status.message}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5">
+      <Shield className="h-4 w-4 text-sky-700 shrink-0" />
+      <span className="text-sm text-sky-700">{status.message}</span>
     </div>
   )
 }
