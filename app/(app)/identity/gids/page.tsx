@@ -159,7 +159,7 @@ export default function GidsPage() {
           icon={Landmark}
           title="Weet waar je staat"
           color="var(--color-kern-400)"
-          subtitle="Breng al je bezittingen, schulden en rekeningen samen op één plek"
+          subtitle="Breng al je bezittingen (inclusief bankrekeningen), schulden en vermogen samen op één plek"
           statusLines={
             progress
               ? progress.steps.hasAssets || progress.steps.hasDebts
@@ -185,7 +185,7 @@ export default function GidsPage() {
               <>
                 Je bankrekeningen zijn het fundament. Elke euro die binnenkomt of vertrekt vertelt een verhaal over waar je tijd naartoe gaat.
                 <br /><br />
-                Voeg je <strong>betaal-, spaar-, gezamenlijke, bedrijfs- of overige rekeningen</strong> toe en houd je saldo actueel. Koppel je bank via <strong>TrueLayer</strong> voor automatische synchronisatie (max 10× per dag), of importeer transacties handmatig via de <strong>4-staps import-wizard</strong>: bestand selecteren (MT940, CSV of OFX), rekening kiezen, transacties reviewen en importeren. CSV-presets voor <strong>ING, Rabobank, ABN AMRO en PayPal</strong> worden automatisch herkend.
+                In de onboarding voeg je je bankrekeningen toe als onderdeel van je <strong>bezittingen</strong> — ze zijn geïntegreerd in het vermogensoverzicht. Voeg je <strong>betaal-, spaar-, gezamenlijke, bedrijfs- of overige rekeningen</strong> toe en houd je saldo actueel. Koppel je bank via <strong>TrueLayer</strong> voor automatische synchronisatie (max 10× per dag), of importeer transacties handmatig via de <strong>4-staps import-wizard</strong>: bestand selecteren (MT940, CSV of OFX), rekening kiezen, transacties reviewen en importeren. CSV-presets voor <strong>ING, Rabobank, ABN AMRO en PayPal</strong> worden automatisch herkend.
                 <br /><br />
                 Zodra je transacties binnenkomen, worden ze automatisch gecategoriseerd via drie methoden: (1) <strong>eerdere correcties</strong> (hoogste prioriteit), (2) <strong>keyword-herkenning</strong> (47 regels voor salaris, boodschappen, energie, etc.) en (3) <strong>AI-categorisatie</strong> voor onbekende transacties. Elke handmatige correctie wordt opgeslagen als regel en automatisch toegepast bij toekomstige imports — zo wordt het systeem steeds slimmer.
                 <br /><br />
@@ -194,7 +194,7 @@ export default function GidsPage() {
             }
             howTo={{
               steps: [
-                "Rekening toevoegen: Ga naar De Kern → Cash → Nieuwe rekening. Kies het type (betaal, spaar, gezamenlijk, bedrijf of overig), voer IBAN en startsaldo in",
+                "Rekening toevoegen: voeg bankrekeningen toe tijdens de onboarding (onder Bezittingen) of later via De Kern → Cash → Nieuwe rekening. Kies het type (betaal, spaar, gezamenlijk, bedrijf of overig), voer IBAN en startsaldo in",
                 "Transacties importeren: Ga naar Cash → Importeren. Sleep je bankbestand (MT940, CSV of OFX) in het uploadveld — de app herkent automatisch het formaat en je bank (ING, Rabobank, ABN AMRO, PayPal)",
                 "Controleer de transacties in de review-stap, pas categorieën aan waar nodig, en importeer",
                 "Bankconnectie: Koppel je bank via De Kern → Cash → Verbinden. Je wordt doorgestuurd naar je bank voor toestemming, daarna synchroniseren transacties automatisch",
@@ -214,7 +214,7 @@ export default function GidsPage() {
               <>
                 Al je bezittingen op één plek — van je spaarrekening tot je ETF-portfolio, van je huis tot je crypto. Samen vormen ze je <strong>opgeslagen tijd</strong>.
                 <br /><br />
-                Registreer bezittingen over <strong>11 types</strong>: cash, spaarrekening, belegging (ETF/indexfonds/aandelen/obligaties), pensioen (uitkerings-/premieregeling/lijfrente), vastgoed, crypto, voertuig, fysiek bezit, deelneming, levensverzekering en vordering. Elk type heeft eigen velden, waarderingslogica en fiscale classificatie.
+                In de onboarding voeg je al je bezittingen toe in één stap, inclusief je <strong>bankrekeningen</strong> — betaal-, spaar- en gezamenlijke rekeningen zijn geïntegreerd in het vermogensoverzicht. Registreer bezittingen over <strong>11 types</strong>: cash, spaarrekening, belegging (ETF/indexfonds/aandelen/obligaties), pensioen (uitkerings-/premieregeling/lijfrente), vastgoed, crypto, voertuig, fysiek bezit, deelneming, levensverzekering en vordering. Elk type heeft eigen velden, waarderingslogica en fiscale classificatie.
                 <br /><br />
                 Binnen beleggingen kun je <strong>individuele holdings</strong> toevoegen met naam, ticker of ISIN, aantal stuks en aankoopprijs. Registreer <strong>koop-, verkoop- en dividendtransacties</strong> voor nauwkeurig rendement per positie. Importeer je posities in bulk via <strong>broker-import</strong>: upload een CSV van <strong>DEGIRO, Saxo Bank of ING Beleggen</strong> — de app herkent je broker automatisch aan de kolomkoppen en importeert posities en transacties.
                 <br /><br />
@@ -363,25 +363,34 @@ export default function GidsPage() {
               <>
                 Een budget is geen beperking — het is een spiegel. Je ziet waar je tijd naartoe gaat, zodat je bewust kunt kiezen waar je vrijheid groeit.
                 <br /><br />
-                TriFinity verdeelt je uitgaven over <strong>6 hoofdcategorieën en 24 subcategorieën</strong> met vijf budgettypes (inkomsten, uitgaven, sparen, schulden, verborgen). Per categorie kies je een <strong>doeltype</strong>: vast bedrag, percentage van inkomen of flexibel — zo past je plan bij jouw situatie. Elke categorie markeer je als <strong>essentieel of niet-essentieel</strong>, wat rechtstreeks je FIRE-berekening bepaalt.
+                <strong>Budgetteren is een bewuste keuze.</strong> Tijdens de onboarding kies je of je wilt budgetteren. Kies je voor &lsquo;geen budget&rsquo;, dan vul je alleen je geschatte maanduitgaven in en berekent TriFinity je FIRE-projectie op basis daarvan. Kies je wel voor budgetteren, dan selecteer je een van de <strong>drie budget-templates</strong>:
+                <br /><br />
+                <strong>Minimalistisch</strong> — 5 hoofdcategorieën (wonen, boodschappen, vervoer, vrije besteding, sparen). Snel overzicht, minimale administratie. Ideaal als je grip wilt zonder detail.
+                <br />
+                <strong>Nibud</strong> — 9 categorieën gebaseerd op de Nibud huishoudboekje-indeling. Een beproefde structuur die de meeste Nederlanders herkennen.
+                <br />
+                <strong>Uitgebreid</strong> — 16 gedetailleerde categorieën met subcategorieën. Maximaal inzicht in elke uitgavenpost. Voor wie precies wil weten waar elke euro naartoe gaat.
+                <br /><br />
+                Per categorie kies je een <strong>doeltype</strong>: vast bedrag, percentage van inkomen of flexibel — zo past je plan bij jouw situatie. Elke categorie markeer je als <strong>essentieel of niet-essentieel</strong>, wat rechtstreeks je FIRE-berekening bepaalt.
                 <br /><br />
                 Drie weergaven geven inzicht: <strong>boomstructuur</strong> met voortgangsbalken, <strong>donutgrafiek</strong> voor verdeling, en <strong>sparklines</strong> voor 6-maanden trends. De <strong>maand-op-maand vergelijking</strong> toont hoe je bestedingspatroon verschuift. Tik op een categorie voor het <strong>kassabon</strong>-detail met elke transactie en zie je maandrapport in gewonnen of verloren <strong>vrijheidsdagen</strong>.
                 <br /><br />
-                Favoriete budgetten pin je als <strong>widget op je dashboard</strong> in 4 formaten (mini, quarter, half, full) zodat je ze altijd in beeld hebt. Budgetteren is volledig optioneel — vul alleen je geschatte maanduitgaven in en TriFinity doet de rest.
+                Favoriete budgetten pin je als <strong>widget op je dashboard</strong> in 4 formaten (mini, quarter, half, full) zodat je ze altijd in beeld hebt.
               </>
             }
             howTo={{
               steps: [
-                "Budgetplan opzetten: Ga naar De Kern → Budgetten → Nieuw budget. Kies een categorie (boodschappen, wonen, vervoer, etc.), stel een maandlimiet in en koppel het aan je transacties",
+                "Keuze maken: tijdens de onboarding kies je of je wilt budgetteren. Je kunt dit later altijd aanpassen via De Kern → Budgetten",
+                "Template kiezen: selecteer Minimalistisch (5 categorieën, snel overzicht), Nibud (9 categorieën, beproefde indeling) of Uitgebreid (16 categorieën, maximaal detail)",
+                "Bedragen aanpassen: pas de voorgestelde bedragen per categorie aan op basis van je inkomen. TriFinity berekent automatisch suggesties",
                 "Doeltypes kiezen: vast bedrag per maand (bijv. €400), percentage van inkomen (bijv. 30%) of flexibel zonder limiet — zo past je plan bij jouw situatie",
-                "Parent-budgetten groeperen subcategorieën: bijv. 'Wonen' bevat huur + energie + water. Zo houd je overzicht zonder detail te verliezen",
                 "Markeer elke categorie als essentieel of niet-essentieel — dit beïnvloedt je FIRE-berekening direct",
                 "Na transactie-import worden uitgaven automatisch gekoppeld via AI-categorisatie en frequentie-matching",
                 "Analyse: tik op een bedrag om de kassabon te openen — een gedetailleerde breakdown van alle transacties binnen dat budget. Vergelijk maand-op-maand met trendgrafieken",
                 "Bekijk je voortgang in boom-, donut- of sparkline-weergave en vergelijk maanden onderling om patronen te ontdekken",
                 "Favorieten: markeer een budget als favoriet (♥) en het verschijnt automatisch als widget op De Wil-pagina in 4 formaten (mini, quarter, half, full)",
               ],
-              tip: "Begin simpel — pas alleen de limieten aan van je top-5 uitgavencategorieën. De rest verfijn je later.",
+              tip: "Begin met het Minimalistisch-template als je nieuw bent. De Nibud-indeling is ideaal als je een beproefde structuur wilt. Verfijn later naar Uitgebreid als je meer detail wilt.",
             }}
           />
 
@@ -1474,6 +1483,32 @@ export default function GidsPage() {
               "Scroll door je persoonlijke briefing en tik op kaarten voor meer detail",
             ],
             tip: "Check je briefing elke ochtend als financi\u00eble routine \u2014 het kost 30 seconden en houdt je scherp.",
+          }}
+        />
+
+        <GuideTopicCard
+          icon={Sparkles}
+          title="Invulfase"
+          color="var(--ink-2)"
+          valueText="Na de onboarding helpt de invulfase je om alle belangrijke gegevens stap voor stap aan te vullen — zonder druk, op jouw tempo."
+          description={
+            <>
+              Na het voltooien van de onboarding start de <strong>invulfase</strong>: een begeleid proces dat je helpt om je financiële profiel compleet te maken. De onboarding legt de basis (profiel, eventueel budgetten, bezittingen en schulden), maar er is vaak meer data nodig voor nauwkeurige berekeningen.
+              <br /><br />
+              De invulfase toont een <strong>banner</strong> bovenaan je pagina&apos;s met je volgende stap: transacties importeren, budgetten verfijnen, doelen instellen, levensgebeurtenissen toevoegen, of je check-in doen. Elke stap is een link naar het relevante onderdeel — zo weet je altijd wat je nog kunt aanvullen.
+              <br /><br />
+              <strong>Voortgang:</strong> de banner toont hoeveel stappen je hebt voltooid en welke nog open staan. Zodra je alle kerngegevens hebt ingevuld, kun je de invulfase afsluiten via de sluitknop op de banner. De invulfase is volledig <strong>optioneel</strong> — je kunt hem op elk moment wegklikken en later terugkomen.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Na de onboarding verschijnt de invulfase-banner automatisch bovenaan je pagina\u2019s",
+              "Volg de aanbevolen volgende stap — elke stap linkt direct naar het juiste onderdeel (transacties importeren, budgetten, doelen, etc.)",
+              "De voortgangsindicator toont hoeveel stappen je hebt voltooid",
+              "Sluit de invulfase af via de \u00d7-knop als je klaar bent of later wilt verdergaan",
+              "Je kunt altijd data aanvullen via de reguliere pagina\u2019s, ook na het afsluiten van de invulfase",
+            ],
+            tip: "Neem de tijd voor de invulfase. Elke extra datapunt maakt je berekeningen nauwkeuriger \u2014 van FIRE-projectie tot budgetinzichten. Begin met transacties importeren, dat levert de meeste inzichten op.",
           }}
         />
 
