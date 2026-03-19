@@ -596,11 +596,12 @@ const roosData: PersonaData = {
   assets: [
     { name: 'Auto (private lease)', asset_type: 'vehicle', current_value: 0, purchase_value: 0, purchase_date: '2024-01-01', expected_return: 0, monthly_contribution: 0, institution: 'LeasePlan', subtype: 'auto_financial_lease', depreciation_rate: 15 },
     { name: 'Inboedel', asset_type: 'physical', current_value: 3500, purchase_value: 8000, purchase_date: '2020-01-01', expected_return: -10, monthly_contribution: 0, institution: '', subtype: 'inboedel' },
+    { name: 'Pensioen vorige werkgever', asset_type: 'retirement', current_value: 8500, purchase_value: 0, purchase_date: '2018-01-01', expected_return: 4, monthly_contribution: 0, institution: 'Nationale-Nederlanden', retirement_provider_type: 'verzekeraar' },
   ],
   debts: [
-    { name: 'Creditcard ICS Visa', debt_type: 'credit_card', original_amount: 5000, current_balance: 4800, interest_rate: 14.0, minimum_payment: 75, monthly_payment: 75, start_date: '2024-06-01', creditor: 'ICS', subtype: 'regulier', credit_limit: 5000 },
-    { name: 'Persoonlijke lening Santander', debt_type: 'personal_loan', original_amount: 15000, current_balance: 12500, interest_rate: 7.9, minimum_payment: 200, monthly_payment: 200, start_date: '2023-01-01', creditor: 'Santander', subtype: 'aflopend' },
-    { name: 'Achterstallige energierekening', debt_type: 'payment_plan', original_amount: 1500, current_balance: 1200, interest_rate: 0, minimum_payment: 50, monthly_payment: 50, start_date: '2025-06-01', creditor: 'Eneco' },
+    { name: 'Creditcard ICS Visa', debt_type: 'credit_card', original_amount: 5000, current_balance: 4800, interest_rate: 14.0, minimum_payment: 75, monthly_payment: 75, start_date: '2024-06-01', creditor: 'ICS', subtype: 'regulier', credit_limit: 5000, repayment_type: 'annuiteit' },
+    { name: 'Persoonlijke lening Santander', debt_type: 'personal_loan', original_amount: 15000, current_balance: 12500, interest_rate: 7.9, minimum_payment: 200, monthly_payment: 200, start_date: '2023-01-01', creditor: 'Santander', subtype: 'aflopend', repayment_type: 'lineair' },
+    { name: 'Achterstallige energierekening', debt_type: 'payment_plan', original_amount: 1500, current_balance: 1200, interest_rate: 0, minimum_payment: 50, monthly_payment: 50, start_date: '2025-06-01', creditor: 'Eneco', repayment_type: 'lineair' },
   ],
   budgets: makeBudgets({
     [S.INKOMEN]: 2800, [S.SALARIS_UITKERING]: 2800,
@@ -820,10 +821,10 @@ const daanData: PersonaData = {
   ],
   assets: [
     { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 2350, purchase_value: 2100, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 100, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
-    { name: 'Brand New Day Pensioen', asset_type: 'investment', current_value: 4500, purchase_value: 4141, purchase_date: '2024-06-01', expected_return: 7, monthly_contribution: 125, institution: 'Brand New Day', subtype: 'pensioen', risk_profile: 'middel', ticker_symbol: 'BND-PENSIOEN' },
+    { name: 'Brand New Day Pensioen', asset_type: 'retirement', current_value: 4500, purchase_value: 4141, purchase_date: '2024-06-01', expected_return: 5, monthly_contribution: 125, institution: 'Brand New Day', subtype: 'pensioen', risk_profile: 'middel', retirement_provider_type: 'premiepensioeninstelling' },
   ],
   debts: [
-    { name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 14000, current_balance: 13900, interest_rate: 0.46, minimum_payment: 0, monthly_payment: 100, start_date: '2024-01-01', creditor: 'DUO', subtype: 'nieuw_stelsel', draagkrachtmeting_date: '2026-09-01' },
+    { name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 14000, current_balance: 13900, interest_rate: 0.46, minimum_payment: 0, monthly_payment: 100, start_date: '2024-01-01', creditor: 'DUO', subtype: 'nieuw_stelsel', draagkrachtmeting_date: '2026-09-01', repayment_type: 'annuiteit' },
   ],
   budgets: makeBudgets({
     [S.INKOMEN]: 3400, [S.SALARIS_UITKERING]: 3400,
@@ -1069,7 +1070,7 @@ const lisaData: PersonaData = {
     { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: -12, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
   ],
   debts: [
-    { name: 'Hypotheek woning Utrecht', debt_type: 'mortgage', original_amount: 385000, current_balance: 350000, interest_rate: 2.9, minimum_payment: 1100, monthly_payment: 1100, start_date: '2015-06-01', creditor: 'Rabobank', subtype: 'annuiteit', is_tax_deductible: true, nhg: false, linked_asset_name: 'Woning Utrecht' },
+    { name: 'Hypotheek woning Utrecht', debt_type: 'mortgage', original_amount: 385000, current_balance: 350000, interest_rate: 2.9, minimum_payment: 1100, monthly_payment: 1100, start_date: '2015-06-01', creditor: 'Rabobank', subtype: 'annuiteit', is_tax_deductible: true, nhg: false, linked_asset_name: 'Woning Utrecht', repayment_type: 'annuiteit' },
   ],
   budgets: makeBudgets({
     [S.INKOMEN]: 5200, [S.SALARIS_UITKERING]: 4200,
@@ -1583,6 +1584,7 @@ const rashidData: PersonaData = {
       interest_rate: 0.46, minimum_payment: 180, monthly_payment: 180,
       start_date: '2007-09-01', creditor: 'DUO',
       subtype: 'oud_stelsel', draagkrachtmeting_date: '2025-09-01',
+      repayment_type: 'aflossingsvrij',
     },
   ],
   budgets: [],       // Kern van Rashid: GEEN budgettering

@@ -290,16 +290,18 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
 
   // Step 6: Document asset type grouping per persona
   describe('Asset type grouping correctness', () => {
-    it('roos: physical + vehicle → overig group', () => {
+    it('roos: physical + vehicle → overig, retirement → pensioen', () => {
       const assets = PERSONAS.roos.assets
-      const groups = assets.map(a => WEALTH_GROUPS[a.asset_type as keyof typeof WEALTH_GROUPS])
-      expect(groups).toContain('overig')
+      const groups = new Set(assets.map(a => WEALTH_GROUPS[a.asset_type as keyof typeof WEALTH_GROUPS]))
+      expect(groups.has('overig')).toBe(true)
+      expect(groups.has('pensioen')).toBe(true)
     })
 
-    it('daan: investment → beleggingen group', () => {
+    it('daan: investment → beleggingen, retirement → pensioen', () => {
       const assets = PERSONAS.daan.assets
-      const groups = assets.map(a => WEALTH_GROUPS[a.asset_type as keyof typeof WEALTH_GROUPS])
-      expect(groups).toContain('beleggingen')
+      const groups = new Set(assets.map(a => WEALTH_GROUPS[a.asset_type as keyof typeof WEALTH_GROUPS]))
+      expect(groups.has('beleggingen')).toBe(true)
+      expect(groups.has('pensioen')).toBe(true)
     })
 
     it('lisa: investment + eigen_huis + vehicle → beleggingen + vastgoed + overig', () => {
@@ -325,6 +327,221 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
       expect(groups.has('beleggingen')).toBe(true)
       expect(groups.has('vastgoed')).toBe(true)
       expect(groups.has('overig')).toBe(true)
+    })
+  })
+
+  // ── Feature #372 — Persona seed data controleren voor vermogensopbouw ──
+
+  describe('#372 — Step 1: Assets in min 3 different WEALTH_GROUPS per persona', () => {
+    for (const key of PERSONA_KEYS) {
+      it(`${key}: has assets in at least 3 WEALTH_GROUPS (incl. bank accounts as spaargeld)`, () => {
+        const p = PERSONAS[key]
+        const groups = new Set<string>()
+
+        // Bank accounts create cash assets → spaargeld group
+        if (p.bank_accounts.length > 0) {
+          groups.add('spaargeld')
+        }
+
+        // Categorize assets into groups
+        for (const a of p.assets) {
+          groups.add(WEALTH_GROUPS[a.asset_type as keyof typeof WEALTH_GROUPS])
+        }
+
+        expect(
+          groups.size,
+          `${key}: has ${groups.size} groups (${[...groups].join(', ')}), needs at least 3`,
+        ).toBeGreaterThanOrEqual(3)
+      })
+    }
+  })
+
+  describe('#372 — Step 2: Realistic expected_return values', () => {
+    const returnRanges: Record<string, [number, number]> = {
+      // asset_type → [min expected_return, max expected_return]
+      cash: [0, 0],
+      savings: [0, 4],
+      investment: [3, 12],
+      retirement: [3, 8],
+      levensverzekering: [1, 5],
+      eigen_huis: [1, 5],
+      real_estate: [1, 8],
+      crypto: [0, 20],
+      vehicle: [-25, 0],
+      physical: [-15, 0],
+      deelneming: [0, 15],
+      vordering: [0, 10],
+      other: [-10, 10],
+    }
+
+    for (const key of PERSONA_KEYS) {
+      it(`${key}: all assets have realistic expected_return`, () => {
+        const p = PERSONAS[key]
+        for (const a of p.assets) {
+          const range = returnRanges[a.asset_type]
+          if (range) {
+            expect(
+              a.expected_return >= range[0] && a.expected_return <= range[1],
+              `${key}: "${a.name}" (${a.asset_type}) return ${a.expected_return}% outside range [${range[0]}, ${range[1]}]`,
+            ).toBe(true)
+          }
+        }
+      })
+    }
+  })
+
+  describe('#372 — Step 3: Monthly contributions where relevant', () => {
+    it('at least 2 personas have assets with monthly_contribution > 0', () => {
+      const personasWithContribs = PERSONA_KEYS.filter(key => {
+        const p = PERSONAS[key]
+        return p.assets.some(a => a.monthly_contribution > 0)
+      })
+      expect(personasWithContribs.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('investment assets for accumulation-phase personas have contributions', () => {
+      // Daan (starter) and Lisa (growth) should be actively contributing
+      for (const key of ['daan', 'lisa'] as PersonaKey[]) {
+        const p = PERSONAS[key]
+        const investmentsWithContrib = p.assets.filter(
+          a => (a.asset_type === 'investment' || a.asset_type === 'retirement') && a.monthly_contribution > 0,
+        )
+        expect(
+          investmentsWithContrib.length,
+          `${key}: should have at least 1 asset with monthly contribution`,
+        ).toBeGreaterThanOrEqual(1)
+      }
+    })
+
+    it('retired personas (marijke) have 0 contributions on investments', () => {
+      const p = PERSONAS.marijke
+      const investContribs = p.assets
+        .filter(a => a.asset_type === 'investment')
+        .every(a => a.monthly_contribution === 0)
+      expect(investContribs).toBe(true)
+    })
+  })
+
+  describe('#372 — Step 4: Debts with different repayment_types', () => {
+    it('at least 2 different repayment_types across all personas', () => {
+      const allRepaymentTypes = new Set<string>()
+      for (const key of PERSONA_KEYS) {
+        for (const d of PERSONAS[key].debts) {
+          if (d.repayment_type) {
+            allRepaymentTypes.add(d.repayment_type)
+          }
+        }
+      }
+      expect(
+        allRepaymentTypes.size,
+        `Found types: ${[...allRepaymentTypes].join(', ')}`,
+      ).toBeGreaterThanOrEqual(2)
+    })
+
+    it('all debts with balance > 0 have a repayment_type set', () => {
+      for (const key of PERSONA_KEYS) {
+        for (const d of PERSONAS[key].debts) {
+          if (d.current_balance > 0) {
+            expect(
+              d.repayment_type,
+              `${key}: debt "${d.name}" (balance ${d.current_balance}) should have repayment_type`,
+            ).toBeTruthy()
+          }
+        }
+      }
+    })
+
+    it('mortgage debts have repayment_type annuiteit or lineair', () => {
+      for (const key of PERSONA_KEYS) {
+        for (const d of PERSONAS[key].debts) {
+          if (d.debt_type === 'mortgage') {
+            expect(
+              ['annuiteit', 'lineair', 'aflossingsvrij'].includes(d.repayment_type ?? ''),
+              `${key}: mortgage "${d.name}" has invalid repayment_type "${d.repayment_type}"`,
+            ).toBe(true)
+          }
+        }
+      }
+    })
+  })
+
+  describe('#372 — Step 5: Vermogensopbouw chart representativeness', () => {
+    it('all personas produce stacked rows where at least 2 groups have non-zero value', () => {
+      for (const key of PERSONA_KEYS) {
+        const p = PERSONAS[key]
+        const currentAge = ageAtDate(p.profile.date_of_birth)
+        const endAge = p.profile.fire_end_age ?? 90
+
+        // Build full asset list including bank accounts as cash assets
+        const allAssets: Asset[] = [
+          ...toAssets(p.assets),
+          ...p.bank_accounts.map((ba, i) => ({
+            id: `bank-${i}`,
+            user_id: 'test',
+            name: ba.name,
+            asset_type: 'cash' as const,
+            current_value: ba.balance,
+            purchase_value: ba.balance,
+            purchase_date: null,
+            expected_return: 0,
+            monthly_contribution: 0,
+            institution: ba.bank_name,
+            account_number: ba.iban,
+            notes: null,
+            is_active: ba.is_active,
+            sort_order: ba.sort_order,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            subtype: ba.account_type,
+            risk_profile: null,
+            tax_benefit: null,
+            is_liquid: true,
+            lock_end_date: null,
+            ticker_symbol: null,
+            rental_income: null,
+            woz_value: null,
+            retirement_provider_type: null,
+            depreciation_rate: null,
+            address_postcode: null,
+            address_house_number: null,
+            expiry_date: null,
+            beneficiary: null,
+            kvk_number: null,
+            ownership_percentage: null,
+            annual_dividend: null,
+            linked_asset_id: null,
+            ownership: 'personal' as const,
+            household_id: null,
+            net_worth_inclusion_pct: 100,
+            has_budget_tracking: false,
+          })),
+        ]
+
+        const rows = projectWealthComposition({
+          assets: allAssets,
+          debts: toDebts(p.debts),
+          currentAge,
+          endAge,
+          inflation: p.profile.inflation_rate ?? 0.02,
+        })
+
+        expect(rows.length).toBeGreaterThan(0)
+
+        // First row should have at least 2 non-zero groups
+        const firstRow = rows[0]
+        const nonZeroGroups = [
+          firstRow.spaargeld,
+          firstRow.beleggingen,
+          firstRow.pensioen,
+          firstRow.vastgoed,
+          firstRow.overig,
+        ].filter(v => v > 0).length
+
+        expect(
+          nonZeroGroups,
+          `${key}: first row has ${nonZeroGroups} non-zero groups, needs at least 2`,
+        ).toBeGreaterThanOrEqual(2)
+      }
     })
   })
 })
