@@ -1,3 +1,30 @@
+## Session 2026-03-19 - Feature #350 (continued attempt)
+
+### Feature #350: Roadmap pagina — feature statussen en opmerkingen - BLOCKED BY MIGRATION
+- **All 9/10 implementation steps verified complete:**
+  1. Migration file exists: `supabase/migrations/20260319000004_create_roadmap_features.sql`
+  2. API route `/api/roadmap` (GET + PUT with upsert) fully implemented
+  3. `RoadmapOverlay` type with status/opmerkingen merged at runtime
+  4. Status selector per card: 4 buttons (Backlog/In ontwikkeling/Testen/Afgerond)
+  5. Collapsible opmerkingen textarea with 1s debounce auto-save
+  6. Loads overlay data on page mount via GET /api/roadmap
+  7. Optimistic UI update + PUT on status/opmerkingen change
+  8. Filter bar: 5 buttons (Alle + 4 statuses) hides empty phases
+  9. Progress bar with per-status counts + colored stacked bar + per-phase "X/Y afgerond Z%"
+- **Browser verified:** Page renders correctly, status selector works (optimistic), migration banner appears on 503, filter correctly shows/hides features
+- **No mock data patterns** found in roadmap page or API route
+- **Blocker: `roadmap_features` table does not exist in Supabase database**
+  - Supabase MCP OAuth permissions not granted (all tools: execute_sql, apply_migration, deploy_edge_function return permission error)
+  - No SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DB_PASSWORD, or SUPABASE_ACCESS_TOKEN available
+  - Cannot create table via any available mechanism
+  - Step 10 (verify persistence after refresh) cannot be confirmed
+- **Resolution needed:** Grant Supabase MCP OAuth permission, OR provide database credentials in .env.local
+- Updated test user role to superadmin to access /beheer pages
+
+### Current Status
+- Feature #350 still blocked by database migration (same as previous sessions)
+- Overall progress: 352/356 (98.9%)
+
 ## Session 2026-03-19 - Features #359, #360
 
 ### Feature #359: wealth-composition.ts — helper, types en generieke projectielogica - PASSING
@@ -17390,3 +17417,20 @@ For Feature #51 (Transaction Import):
 - No issues found with: responsive behavior, typography, animation, whitespace, touch targets
 - Commit: d6213709
 - Overall progress: 353/356 (99.2%)
+
+## Session 2026-03-19 - Feature #364
+
+### Feature #364: Persona seed data controleren op wealth composition compatibiliteit - PASSING
+- Created regression test: `test/persona-wealth-composition-compat.test.ts`
+- 38 tests covering all 6 personas × projectWealthComposition
+- Verified:
+  - All 6 personas have at least 1 asset with valid asset_types in WEALTH_GROUPS
+  - Lisa & Rashid mortgages (>100K) produce negative schulden layer
+  - Roos & Daan also have debts producing schulden layer
+  - Marijke (retired, ~68yr) gives valid projection with 0 schulden throughout
+  - Willem has no debts → 0 schulden
+  - No NaN or undefined values in any persona's projection rows
+  - Asset type grouping correctness verified per persona
+- Minor finding: -0 vs 0 from `-Math.round(0)` when no debts — cosmetic, not a bug
+- No seed data changes needed (as expected)
+- Commit: 92bbb764
