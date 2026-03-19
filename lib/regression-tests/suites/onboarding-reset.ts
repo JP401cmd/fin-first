@@ -319,7 +319,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 100,
     fn() {
       // All tests in this file use CAT = 'onboarding-reset'
-      assertEqual(CAT, 'onboarding-reset', 'Categorie ID is onboarding-reset')
+      assertEqual(CAT, 'onboarding.reset', 'Categorie ID is onboarding.reset')
 
       // Verify this file exports a register() function
       assert(typeof register === 'function', 'register() functie geëxporteerd')

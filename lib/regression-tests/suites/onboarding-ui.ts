@@ -344,7 +344,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 100,
     fn() {
-      assertEqual(CAT, 'onboarding-ui', 'Categorie ID is onboarding-ui')
+      assertEqual(CAT, 'onboarding.ui', 'Categorie ID is onboarding.ui')
       assert(typeof register === 'function', 'register() functie geëxporteerd')
     },
   },

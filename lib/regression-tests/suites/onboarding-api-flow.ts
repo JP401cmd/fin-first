@@ -532,7 +532,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 100,
     fn() {
-      assertEqual(CAT, 'onboarding-api-flow', 'Categorie ID is onboarding-api-flow')
+      assertEqual(CAT, 'onboarding.api-flow', 'Categorie ID is onboarding.api-flow')
 
       // All test IDs start with 'ob-api-'
       const expectedPrefix = 'ob-api-'

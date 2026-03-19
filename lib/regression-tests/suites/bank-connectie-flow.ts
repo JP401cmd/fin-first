@@ -577,7 +577,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 100,
     fn() {
-      assertEqual(CAT, 'onboarding-bank-connectie', 'Categorie ID is onboarding-bank-connectie')
+      assertEqual(CAT, 'onboarding.bank-connectie', 'Categorie ID is onboarding.bank-connectie')
 
       // All test IDs start with 'ob-bank-'
       const expectedPrefix = 'ob-bank-'
