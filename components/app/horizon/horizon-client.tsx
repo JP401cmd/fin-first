@@ -78,6 +78,7 @@ import { PensionPdfUpload, uploadPensionPdfToStorage, deletePensionPdfFromStorag
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
+import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
@@ -147,6 +148,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Monte Carlo overlay state
   const [mcExpanded, setMcExpanded] = useState(false)
   const [mcData, setMcData] = useState<MonteCarloResult | null>(null)
+  const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
 
   // Kassabon modal state
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
@@ -1780,6 +1782,37 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         visibleMaxAge={visibleMax}
                         aowAgeFractional={userAowAge.fractional}
                       />
+                      {/* ── Inkomen & Uitgaven toggle + collapsible chart ── */}
+                      <button
+                        type="button"
+                        onClick={() => setIncomeExpenseExpanded(prev => !prev)}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="flex w-full items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none"
+                        style={{ minHeight: 44 }}
+                        aria-expanded={incomeExpenseExpanded}
+                      >
+                        <span>Inkomen &amp; Uitgaven</span>
+                        {incomeExpenseExpanded
+                          ? <ChevronUp size={14} />
+                          : <ChevronDown size={14} />
+                        }
+                      </button>
+                      <div
+                        className="overflow-hidden transition-all duration-300 ease-in-out"
+                        style={{
+                          maxHeight: incomeExpenseExpanded ? 250 : 0,
+                          opacity: incomeExpenseExpanded ? 1 : 0,
+                        }}
+                      >
+                        <IncomeExpenseChart
+                          rows={simResult.rows}
+                          currentAge={currentAge ?? 30}
+                          endAge={simResult.displayEndAge}
+                          visibleMinAge={visibleMin}
+                          visibleMaxAge={visibleMax}
+                        />
+                      </div>
+
                       {/* Events timeline aligned to same age axis */}
                       {events.length > 0 && (
                         <EventsTimeline
