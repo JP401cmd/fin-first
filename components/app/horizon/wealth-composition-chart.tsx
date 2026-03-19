@@ -93,7 +93,9 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
 
   // Scales
   const numBars = Math.max(maxAge - minAge + 1, 1)
-  const barGap = Math.max(1, innerW * 0.02)
+  // Target ~85% bar fill on desktop, ~75% on mobile to avoid overlap
+  const gapFraction = isDesktop ? 0.005 : 0.008
+  const barGap = Math.max(0.5, innerW * gapFraction)
   const barWidth = Math.max(2, (innerW - barGap * (numBars - 1)) / numBars)
 
   const xForAge = (age: number) =>
