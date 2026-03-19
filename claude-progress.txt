@@ -1,3 +1,21 @@
+## Session 2026-03-19 - Features #306, #307
+
+### Feature #306: Default mismatch fixen — guardrail_cut_step en guardrail_raise_step - PASSING
+- Bug: horizon-data-loader.ts used 0.05 (5%) as default for guardrail steps, while withdrawal-strategy.ts uses 0.10 (10%)
+- Fix: Imported WITHDRAWAL_DEFAULTS and replaced hardcoded 0.05 values with WITHDRAWAL_DEFAULTS.guardrailCutStep/guardrailRaiseStep
+- withdrawal-strategy.ts is now the single source of truth for all withdrawal defaults
+
+### Feature #307: Strategie pagina — defensieve error handling bij ontbrekende kolommen - PASSING
+- Bug: strategie/page.tsx queried withdrawal columns mixed into main profile query — crashes if columns don't exist
+- Fix: Split withdrawal columns into separate try/catch query (matching horizon-data-loader.ts pattern)
+- Added strategyWarning state with amber info banner when columns can't be loaded
+- Page gracefully falls back to WITHDRAWAL_DEFAULTS instead of crashing
+- Commit: f4cd8d7c
+
+### Current Status
+- 2 features completed this session (#306, #307)
+- Overall progress: 306/306 (100%)
+
 ## Session 2026-03-18 - Feature #305
 
 ### Feature #305: Widget opslag Wil pagina — save niet persistent na refresh - PASSING
