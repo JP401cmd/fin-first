@@ -15,6 +15,7 @@ import {
   linearAmortization,
   interestOnlySchedule,
 } from './debt-data'
+import type { SimRow } from './fire-simulation'
 
 // ── Wealth Groups ───────────────────────────────────────────
 
@@ -305,6 +306,216 @@ export function projectWealthComposition(
       vastgoed: Math.round(groupValues.vastgoed[y]),
       overig: Math.round(groupValues.overig[y]),
       schulden: -Math.round(debtTotals[y]),  // negative
+    })
+  }
+
+  return rows
+}
+
+// ── Ratio-based engine (SimRow as source of truth) ──────────
+
+/**
+ * Derive wealth composition from SimRows.
+ *
+ * Instead of independently projecting total portfolio value, this function:
+ * 1. Groups assets by WEALTH_GROUPS and computes per-group weighted return + initial value + contribution
+ * 2. Runs a theoretical running-balance per group (compound growth)
+ * 3. After FIRE: stops contributions, applies waterfall withdrawals
+ *    (beleggingen → spaargeld → overig → pensioen → vastgoed)
+ * 4. Converts group balances to ratios (floor 0, normalise to 100%)
+ * 5. Multiplies ratios by SimRow.endPortfolio (single source of truth)
+ * 6. Projects debts separately via projectDebtByYear()
+ * 7. Returns StackedRow[] as drop-in replacement for projectWealthComposition()
+ */
+export function deriveWealthCompositionFromSim(
+  simRows: SimRow[],
+  assets: Asset[],
+  debts: Debt[],
+  fireAge?: number | null,
+  annualExpenses?: number | null,
+): StackedRow[] {
+  if (!simRows.length) return []
+
+  const activeAssets = assets.filter(a => a.is_active)
+  const activeDebts = debts.filter(d => d.is_active && Number(d.current_balance) > 0)
+
+  // ── Step 1: Group assets and compute per-group aggregates ──
+
+  interface GroupInfo {
+    totalValue: number
+    weightedReturn: number   // value-weighted annual return (decimal)
+    totalContribution: number // annual contribution
+  }
+
+  const groupInfo: Record<WealthGroup, GroupInfo> = {
+    spaargeld:    { totalValue: 0, weightedReturn: 0, totalContribution: 0 },
+    beleggingen:  { totalValue: 0, weightedReturn: 0, totalContribution: 0 },
+    pensioen:     { totalValue: 0, weightedReturn: 0, totalContribution: 0 },
+    vastgoed:     { totalValue: 0, weightedReturn: 0, totalContribution: 0 },
+    overig:       { totalValue: 0, weightedReturn: 0, totalContribution: 0 },
+  }
+
+  for (const a of activeAssets) {
+    const g = WEALTH_GROUPS[a.asset_type]
+    const val = Number(a.current_value)
+    const ret = Number(a.expected_return) / 100  // decimal
+    const contrib = Number(a.monthly_contribution) * 12
+    groupInfo[g].totalValue += val
+    // Accumulate value × return for weighted average later
+    groupInfo[g].weightedReturn += val * ret
+    groupInfo[g].totalContribution += contrib
+  }
+
+  // Compute value-weighted return per group
+  for (const g of ALL_GROUPS) {
+    if (groupInfo[g].totalValue > 0) {
+      groupInfo[g].weightedReturn = groupInfo[g].weightedReturn / groupInfo[g].totalValue
+    } else {
+      groupInfo[g].weightedReturn = 0
+    }
+  }
+
+  // ── Step 2: Running-balance projection per group ──
+
+  const years = simRows.length
+  const startAge = simRows[0].age
+  const theoretical: Record<WealthGroup, number[]> = {
+    spaargeld:    new Array(years),
+    beleggingen:  new Array(years),
+    pensioen:     new Array(years),
+    vastgoed:     new Array(years),
+    overig:       new Array(years),
+  }
+
+  // Initialize year 0
+  for (const g of ALL_GROUPS) {
+    theoretical[g][0] = groupInfo[g].totalValue
+  }
+
+  // Forward-project each group
+  for (let y = 1; y < years; y++) {
+    const age = startAge + y
+    const isFired = fireAge != null && age >= fireAge
+
+    for (const g of ALL_GROUPS) {
+      const prev = theoretical[g][y - 1]
+      const growth = prev * groupInfo[g].weightedReturn
+      const contrib = isFired ? 0 : groupInfo[g].totalContribution
+      theoretical[g][y] = prev + growth + contrib
+    }
+
+    // ── Step 3: Post-FIRE waterfall withdrawals ──
+    if (isFired && annualExpenses != null && annualExpenses > 0) {
+      // Inflation-adjusted withdrawal
+      const yearsAfterFire = age - fireAge!
+      const withdrawal = annualExpenses * Math.pow(1 + 0.02, yearsAfterFire) // default 2% inflation
+
+      let remaining = withdrawal
+      // Waterfall order: beleggingen → spaargeld → overig → pensioen → vastgoed
+      const drawOrder: WealthGroup[] = ['beleggingen', 'spaargeld', 'overig', 'pensioen', 'vastgoed']
+      for (const g of drawOrder) {
+        if (remaining <= 0) break
+        if (theoretical[g][y] > 0) {
+          const draw = Math.min(remaining, theoretical[g][y])
+          theoretical[g][y] -= draw
+          remaining -= draw
+        }
+      }
+    }
+
+    // Floor each group at 0
+    for (const g of ALL_GROUPS) {
+      if (theoretical[g][y] < 0) theoretical[g][y] = 0
+    }
+  }
+
+  // ── Step 4: Convert to ratios and multiply by SimRow.endPortfolio ──
+
+  const rows: StackedRow[] = []
+
+  // Project debts (step 6)
+  const debtProjections = activeDebts.map(d => projectDebtByYear(d, years - 1))
+  const debtTotals = new Array(years).fill(0)
+  for (const dp of debtProjections) {
+    for (let y = 0; y < years; y++) {
+      debtTotals[y] += y < dp.length ? dp[y] : 0
+    }
+  }
+
+  for (let y = 0; y < years; y++) {
+    const totalTheoretical = ALL_GROUPS.reduce((sum, g) => sum + theoretical[g][y], 0)
+    const endPortfolio = simRows[y].endPortfolio
+
+    // Build ratio-based values
+    const values: Record<WealthGroup, number> = {
+      spaargeld: 0,
+      beleggingen: 0,
+      pensioen: 0,
+      vastgoed: 0,
+      overig: 0,
+    }
+
+    if (totalTheoretical > 0 && endPortfolio > 0) {
+      // Step 5: ratios × endPortfolio
+      let allocated = 0
+      let largestGroup: WealthGroup = 'beleggingen'
+      let largestVal = -1
+
+      for (const g of ALL_GROUPS) {
+        const ratio = theoretical[g][y] / totalTheoretical
+        values[g] = Math.round(ratio * endPortfolio)
+        allocated += values[g]
+
+        if (theoretical[g][y] > largestVal) {
+          largestVal = theoretical[g][y]
+          largestGroup = g
+        }
+      }
+
+      // Step 10: Assign rounding residual to largest group
+      const residual = Math.round(endPortfolio) - allocated
+      values[largestGroup] += residual
+    } else if (endPortfolio > 0) {
+      // No theoretical data but portfolio exists — put everything in largest initial group
+      let largestGroup: WealthGroup = 'beleggingen'
+      let largestVal = -1
+      for (const g of ALL_GROUPS) {
+        if (groupInfo[g].totalValue > largestVal) {
+          largestVal = groupInfo[g].totalValue
+          largestGroup = g
+        }
+      }
+      values[largestGroup] = Math.round(endPortfolio)
+    }
+
+    // Floor each value at 0 (step 7)
+    for (const g of ALL_GROUPS) {
+      if (values[g] < 0) values[g] = 0
+    }
+
+    // Re-normalise if sum doesn't match endPortfolio after flooring
+    const currentSum = ALL_GROUPS.reduce((s, g) => s + values[g], 0)
+    if (currentSum > 0 && Math.round(endPortfolio) > 0 && currentSum !== Math.round(endPortfolio)) {
+      const scale = Math.round(endPortfolio) / currentSum
+      let newAllocated = 0
+      let lg: WealthGroup = 'beleggingen'
+      let lgv = -1
+      for (const g of ALL_GROUPS) {
+        values[g] = Math.round(values[g] * scale)
+        newAllocated += values[g]
+        if (values[g] > lgv) { lgv = values[g]; lg = g }
+      }
+      values[lg] += Math.round(endPortfolio) - newAllocated
+    }
+
+    rows.push({
+      age: simRows[y].age,
+      spaargeld: values.spaargeld,
+      beleggingen: values.beleggingen,
+      pensioen: values.pensioen,
+      vastgoed: values.vastgoed,
+      overig: values.overig,
+      schulden: -Math.round(debtTotals[y]),
     })
   }
 
