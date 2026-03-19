@@ -27,7 +27,7 @@ import {
 } from '@/lib/budget-utils'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { ArrowLeft, Shield, TrendingUp, Landmark, Settings, Info, Check, CircleDot, Loader2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Shield, TrendingUp, Landmark, Settings, Info, Check, CircleDot, Loader2, AlertTriangle, Banknote, Heart, Infinity as InfinityIcon } from 'lucide-react'
 
 // ── Strategy metadata (Dutch) ──────────────────────────────────────────────
 
@@ -403,6 +403,13 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
   // Warning when withdrawal columns couldn't be loaded
   const [strategyWarning, setStrategyWarning] = useState<string | null>(null)
 
+  // End strategy editing state
+  const [localEndStrategy, setLocalEndStrategy] = useState<FireEndStrategy>('deplete')
+  const [localEndAge, setLocalEndAge] = useState<string>('90')
+  const [localLegacyAmount, setLocalLegacyAmount] = useState<string>('')
+  const [endStrategySaving, setEndStrategySaving] = useState(false)
+  const [endStrategyMessage, setEndStrategyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   // Activation state for switching strategies
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState<string | null>(null)
@@ -500,7 +507,11 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
 
       const dob = profileResult.data?.date_of_birth ?? null
 
-      setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+      const parsedFireStrategy = parseFireStrategy(profileResult.data ?? {})
+      setFireStrategy(parsedFireStrategy)
+      setLocalEndStrategy(parsedFireStrategy.strategy)
+      setLocalEndAge(String(parsedFireStrategy.endAge))
+      setLocalLegacyAmount(parsedFireStrategy.legacyAmount > 0 ? String(parsedFireStrategy.legacyAmount) : '')
 
       // Resolve user's FIRE parameters
       const fireParams = resolveFireParams(profileResult.data ?? {})
@@ -564,6 +575,62 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
       setActivating(false)
     }
   }, [])
+
+  // ── Save end strategy changes ────────────────────────────────────────────
+
+  const saveEndStrategy = useCallback(async (
+    strategy: FireEndStrategy,
+    endAge: string,
+    legacyAmount: string,
+  ) => {
+    setEndStrategySaving(true)
+    setEndStrategyMessage(null)
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Niet ingelogd')
+
+      const { error } = await supabase.from('profiles').update({
+        fire_end_strategy: strategy,
+        fire_end_age: Number(endAge) || 90,
+        fire_legacy_amount: legacyAmount ? Number(legacyAmount) : null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', user.id)
+
+      if (error) throw error
+
+      // Update simulation state
+      const newConfig: FireStrategyConfig = {
+        strategy,
+        endAge: Number(endAge) || 90,
+        legacyAmount: Number(legacyAmount) || 0,
+      }
+      setFireStrategy(newConfig)
+      setEndStrategyMessage({ type: 'success', text: 'Eindstrategie opgeslagen!' })
+      setTimeout(() => setEndStrategyMessage(null), 3000)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Opslaan mislukt'
+      setEndStrategyMessage({ type: 'error', text: message })
+    } finally {
+      setEndStrategySaving(false)
+    }
+  }, [])
+
+  // Handler for end strategy card click — saves immediately
+  const handleEndStrategyChange = useCallback((strategy: FireEndStrategy) => {
+    setLocalEndStrategy(strategy)
+    saveEndStrategy(strategy, localEndAge, localLegacyAmount)
+  }, [saveEndStrategy, localEndAge, localLegacyAmount])
+
+  // Handler for end age / legacy amount changes — saves on blur
+  const handleEndAgeBlur = useCallback(() => {
+    saveEndStrategy(localEndStrategy, localEndAge, localLegacyAmount)
+  }, [saveEndStrategy, localEndStrategy, localEndAge, localLegacyAmount])
+
+  const handleLegacyAmountBlur = useCallback(() => {
+    saveEndStrategy(localEndStrategy, localEndAge, localLegacyAmount)
+  }, [saveEndStrategy, localEndStrategy, localEndAge, localLegacyAmount])
 
   // ── Derived values ──────────────────────────────────────────────────────
 
@@ -730,7 +797,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
 
   if (loading) {
     return (
-      <BottomSheet open={open} onClose={onClose} title="Onttrekkingsstrategieën" size="full">
+      <BottomSheet open={open} onClose={onClose} title="Strategieën" size="full">
         <div className="px-5 py-4">
           <div className="space-y-4">
             <div className="h-8 w-48 animate-pulse rounded-[var(--r)] bg-[var(--subtle)]" />
@@ -753,7 +820,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
 
   if (error || !input) {
     return (
-      <BottomSheet open={open} onClose={onClose} title="Onttrekkingsstrategieën" size="full">
+      <BottomSheet open={open} onClose={onClose} title="Strategieën" size="full">
         <div className="px-5 py-4">
           <p className="font-sans text-sm text-[var(--ink-2)]">{error ?? 'Geen data beschikbaar.'}</p>
         </div>
@@ -766,18 +833,27 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
   const fireAge = selectedSim?.fireAge ?? null
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Onttrekkingsstrategieën" size="full">
+    <BottomSheet open={open} onClose={onClose} title="Strategieën" size="full">
       <div className="px-5 py-4">
 
-        {/* ── Subtitle + active badge ─────────────────────────────── */}
+        {/* ── Subtitle + active badges ────────────────────────────── */}
         <header className="mb-6">
           <p className="mt-1 font-sans text-sm text-[var(--ink-3)]">
-            Vergelijk hoe verschillende onttrekkingsstrategieën je portefeuille beïnvloeden na pensionering.
+            Kies je eindstrategie en onttrekkingsmethode. De combinatie bepaalt hoe je portefeuille zich ontwikkelt na FIRE.
           </p>
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
-            <span className="font-sans text-xs font-medium text-horizon-700">
-              Actieve strategie: {STRATEGY_INFO[withdrawalConfig.strategy].label}
-            </span>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
+              <span className="font-sans text-[10px] font-medium uppercase tracking-wider text-horizon-500">Eind</span>
+              <span className="font-sans text-xs font-semibold text-horizon-700">
+                {STRATEGY_LABELS[localEndStrategy].name}
+              </span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
+              <span className="font-sans text-[10px] font-medium uppercase tracking-wider text-horizon-500">Onttrekking</span>
+              <span className="font-sans text-xs font-semibold text-horizon-700">
+                {STRATEGY_INFO[withdrawalConfig.strategy].label}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -788,6 +864,147 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
           </div>
         )}
 
+        {/* ── End strategy selection (LEIDEND) ─────────────────────── */}
+        <section className="mb-6">
+          <div className="card-editorial overflow-hidden">
+            <div className="h-[3px] bg-horizon-500" />
+            <div className="px-4 py-3">
+              <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                Eindstrategie
+              </p>
+              <p className="mb-3 font-sans text-xs text-[var(--ink-3)]">
+                Wat wil je doen met je vermogen op het einde van de rit?
+              </p>
+
+              {/* 3 end strategy cards */}
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                {(Object.entries(STRATEGY_LABELS) as [FireEndStrategy, typeof STRATEGY_LABELS[FireEndStrategy]][]).map(([key, info]) => {
+                  const isSelected = localEndStrategy === key
+                  const icon = key === 'deplete'
+                    ? <Banknote className="h-4 w-4" />
+                    : key === 'legacy'
+                      ? <Heart className="h-4 w-4" />
+                      : <InfinityIcon className="h-4 w-4" />
+
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleEndStrategyChange(key)}
+                      disabled={endStrategySaving}
+                      className={`relative rounded-[var(--r)] border-2 p-3 text-left transition-all ${
+                        isSelected
+                          ? 'border-horizon-500 bg-horizon-50 shadow-sm'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                      } disabled:opacity-60`}
+                    >
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <span className={isSelected ? 'text-horizon-600' : 'text-[var(--ink-3)]'}>
+                          {icon}
+                        </span>
+                        <span className={`font-sans text-sm font-semibold ${isSelected ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
+                          {info.name}
+                        </span>
+                      </div>
+                      <p className="font-sans text-[11px] leading-snug text-[var(--ink-3)]">
+                        {info.subtitle}
+                      </p>
+                      {isSelected && (
+                        <span className="absolute -top-2 right-2 rounded-full bg-horizon-600 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-wider text-white">
+                          Actief
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Conditional inputs */}
+              {(localEndStrategy === 'deplete' || localEndStrategy === 'legacy') && (
+                <div className="mt-3 flex flex-wrap items-end gap-4">
+                  <div>
+                    <label className="font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                      Eindleeftijd
+                    </label>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={50}
+                        max={120}
+                        step={1}
+                        value={localEndAge}
+                        onChange={e => setLocalEndAge(e.target.value)}
+                        onBlur={handleEndAgeBlur}
+                        className="w-20 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-2.5 py-1.5 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:border-horizon-400"
+                      />
+                      <span className="font-sans text-xs text-[var(--ink-3)]">jaar</span>
+                    </div>
+                  </div>
+                  {localEndStrategy === 'legacy' && (
+                    <div>
+                      <label className="font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                        Na te laten bedrag (€)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={10000}
+                        value={localLegacyAmount}
+                        onChange={e => setLocalLegacyAmount(e.target.value)}
+                        onBlur={handleLegacyAmountBlur}
+                        placeholder="bv. 100.000"
+                        className="mt-1 w-36 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-2.5 py-1.5 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:border-horizon-400"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Save indicator */}
+              {endStrategySaving && (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin text-horizon-500" />
+                  <span className="font-sans text-[11px] text-[var(--ink-3)]">Opslaan...</span>
+                </div>
+              )}
+              {endStrategyMessage && (
+                <p className={`mt-2 font-sans text-[11px] ${endStrategyMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {endStrategyMessage.text}
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Incompatibility warning when current withdrawal + new end strategy clash ── */}
+        {(() => {
+          const endStrat = localEndStrategy
+          const wsStrat = withdrawalConfig.strategy
+          const entry = COMPATIBILITY_MATRIX[wsStrat]?.[endStrat]
+          if (!entry || entry.status === 'compatible') return null
+          const colors = STATUS_COLORS[entry.status]
+          return (
+            <div className={`mb-4 flex items-start gap-2.5 rounded-[var(--r)] border ${colors.border} ${colors.bg} px-4 py-2.5`}>
+              <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${entry.status === 'incompatible' ? 'text-red-500' : 'text-amber-500'}`} />
+              <div>
+                <p className={`font-sans text-xs font-semibold ${colors.text}`}>
+                  {entry.status === 'incompatible' ? 'Onverenigbare combinatie' : 'Let op'}
+                </p>
+                <p className={`mt-0.5 font-sans text-[11px] leading-snug ${colors.text}`}>
+                  Je actieve onttrekkingsstrategie ({STRATEGY_INFO[wsStrat].label}) is{' '}
+                  {entry.status === 'incompatible' ? 'niet compatibel' : 'beperkt compatibel'} met de gekozen eindstrategie ({END_STRATEGY_SHORT[endStrat]}).{' '}
+                  {entry.suggestion ?? 'Overweeg een andere onttrekkingsstrategie.'}
+                </p>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* ── Withdrawal strategy label ────────────────────────────── */}
+        <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+          Onttrekkingsstrategie
+        </p>
+
         {/* ── Strategy selector cards ─────────────────────────────── */}
         <div className="mb-6 grid grid-cols-2 gap-3">
           {ALL_STRATEGIES.map(strat => {
@@ -795,6 +1012,8 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
             const sim = simulations[strat]
             const isActive = strat === selectedStrategy
             const isCurrent = strat === withdrawalConfig.strategy
+            const compat = COMPATIBILITY_MATRIX[strat]?.[localEndStrategy]
+            const isIncompatible = compat?.status === 'incompatible'
 
             return (
               <button
@@ -802,9 +1021,11 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                 type="button"
                 onClick={() => setSelectedStrategy(strat)}
                 className={`relative rounded-[var(--r)] border-2 p-3 text-left transition-all ${
-                  isActive
-                    ? `${info.cardBg} ${info.cardBorder} shadow-sm`
-                    : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                  isIncompatible
+                    ? 'border-red-200 bg-red-50/40 opacity-60 cursor-not-allowed'
+                    : isActive
+                      ? `${info.cardBg} ${info.cardBorder} shadow-sm`
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
                 }`}
               >
                 {isCurrent && (
@@ -812,18 +1033,28 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                     Actief
                   </span>
                 )}
+                {isIncompatible && (
+                  <span className="absolute -top-2 left-2 rounded-full bg-red-500 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-wider text-white">
+                    ❌ Incompatibel
+                  </span>
+                )}
                 <div className="mb-1 flex items-center gap-1.5">
-                  <span style={{ color: info.color }}>{STRATEGY_ICONS[strat]}</span>
-                  <span className="font-sans text-sm font-semibold text-[var(--ink)]">
+                  <span style={{ color: isIncompatible ? 'var(--ink-4)' : info.color }}>{STRATEGY_ICONS[strat]}</span>
+                  <span className={`font-sans text-sm font-semibold ${isIncompatible ? 'text-[var(--ink-4)]' : 'text-[var(--ink)]'}`}>
                     {info.label}
                   </span>
                 </div>
-                <p className="font-sans text-[11px] leading-snug text-[var(--ink-3)]">
-                  {info.description}
+                <p className={`font-sans text-[11px] leading-snug ${isIncompatible ? 'text-[var(--ink-4)]' : 'text-[var(--ink-3)]'}`}>
+                  {isIncompatible ? compat.explanation : info.description}
                 </p>
-                {sim && sim.fireReachable && (
+                {!isIncompatible && sim && sim.fireReachable && (
                   <p className="mt-2 font-mono text-xs tabular-nums text-[var(--ink-2)]">
                     FIRE: {sim.fireAge} jr
+                  </p>
+                )}
+                {compat?.status === 'warning' && (
+                  <p className="mt-1 font-sans text-[10px] text-amber-600">
+                    ⚠️ {compat.suggestion ?? 'Let op bij deze combinatie'}
                   </p>
                 )}
               </button>
@@ -855,7 +1086,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
 
         {/* ── Inline incompatibility warning under activate button ─── */}
         {selectedStrategy !== withdrawalConfig.strategy && (() => {
-          const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[fireStrategy?.strategy ?? 'deplete']
+          const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[localEndStrategy]
           if (!entry || entry.status === 'compatible') return null
           const colors = STATUS_COLORS[entry.status]
           return (
@@ -1051,13 +1282,13 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
           <CompatibilityMatrix
             selectedWithdrawal={selectedStrategy}
             activeWithdrawal={withdrawalConfig.strategy}
-            activeEnd={fireStrategy?.strategy ?? 'deplete'}
+            activeEnd={localEndStrategy}
           />
         </section>
 
         {/* ── Incompatibility warning (when selected combo is incompatible) ── */}
         {(() => {
-          const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[fireStrategy?.strategy ?? 'deplete']
+          const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[localEndStrategy]
           if (!entry || entry.status !== 'incompatible') return null
           return (
             <div className="mb-6 flex items-start gap-2.5 rounded-[var(--r)] border-2 border-red-300 bg-red-50 px-4 py-3">
