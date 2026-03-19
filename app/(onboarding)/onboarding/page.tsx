@@ -145,6 +145,23 @@ function reducer(state: State, action: Action): State {
       return { ...state, debts: action.items }
     case 'SET_PREFERENCES':
       return { ...state, preferences: action.data }
+    case 'RESTORE_STATE': {
+      // Restore persisted data while keeping step/direction from the restored lastStep
+      const restoredStep = action.data.lastStep && !['saving', 'success'].includes(action.data.lastStep)
+        ? action.data.lastStep
+        : 'identity'
+      return {
+        ...state,
+        step: restoredStep,
+        direction: 'forward' as Direction,
+        identity: action.data.identity,
+        budgetAmounts: action.data.budgetAmounts,
+        bankAccounts: action.data.bankAccounts,
+        assets: action.data.assets,
+        debts: action.data.debts,
+        preferences: action.data.preferences,
+      }
+    }
     default:
       return state
   }
@@ -163,6 +180,51 @@ function StepTransition({ direction, children }: {
   )
 }
 
+// ── localStorage helpers ─────────────────────────────────────
+
+function saveToLocalStorage(state: State) {
+  try {
+    const data: PersistedData = {
+      identity: state.identity,
+      budgetAmounts: state.budgetAmounts,
+      bankAccounts: state.bankAccounts,
+      assets: state.assets,
+      debts: state.debts,
+      preferences: state.preferences,
+      lastStep: state.step,
+    }
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data))
+  } catch {
+    // localStorage may be full or unavailable — silently ignore
+  }
+}
+
+function loadFromLocalStorage(): PersistedData | null {
+  try {
+    const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as PersistedData
+    // Basic validation: identity must have a name or date
+    if (!data.identity || typeof data.identity !== 'object') return null
+    // Ensure arrays are actually arrays
+    if (!Array.isArray(data.bankAccounts)) data.bankAccounts = []
+    if (!Array.isArray(data.assets)) data.assets = []
+    if (!Array.isArray(data.debts)) data.debts = []
+    if (!data.budgetAmounts || typeof data.budgetAmounts !== 'object') data.budgetAmounts = {}
+    return data
+  } catch {
+    return null
+  }
+}
+
+function clearLocalStorage() {
+  try {
+    localStorage.removeItem(ONBOARDING_STORAGE_KEY)
+  } catch {
+    // silently ignore
+  }
+}
+
 // ── Main Component ───────────────────────────────────────────
 
 export default function OnboardingPage() {
@@ -174,11 +236,12 @@ export default function OnboardingPage() {
   const [saveProgress, setSaveProgress] = useState(0)
   const [saveMessageIdx, setSaveMessageIdx] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [restoredNotice, setRestoredNotice] = useState(false)
 
   const noBudgets = state.identity.budgettering_mode === 'none'
   const activeStepOrder = useMemo(() => getStepOrder(state.identity.budgettering_mode), [state.identity.budgettering_mode])
 
-  // Check if already onboarded
+  // Check if already onboarded + restore from localStorage
   useEffect(() => {
     async function check() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -194,13 +257,33 @@ export default function OnboardingPage() {
         .single()
 
       if (profile?.onboarding_completed) {
+        clearLocalStorage()
         router.replace('/core')
         return
       }
+
+      // Try to restore previously entered data from localStorage
+      const saved = loadFromLocalStorage()
+      if (saved && (saved.identity.full_name || saved.identity.date_of_birth)) {
+        dispatch({ type: 'RESTORE_STATE', data: saved })
+        setRestoredNotice(true)
+        // Auto-dismiss after 4 seconds
+        setTimeout(() => setRestoredNotice(false), 4000)
+      }
+
       setLoading(false)
     }
     check()
   }, [supabase, router])
+
+  // Persist state to localStorage on every step change (except saving/success)
+  useEffect(() => {
+    if (['saving', 'success'].includes(state.step)) return
+    // Only save if user has entered at least some data
+    if (state.step !== 'intro') {
+      saveToLocalStorage(state)
+    }
+  }, [state])
 
   // ── Handlers ─────────────────────────────────────────────────
 
@@ -269,6 +352,7 @@ export default function OnboardingPage() {
         body.bankAccounts = validBanks.map((a) => ({
           ...a,
           balance: Number(a.balance),
+          has_budget_tracking: a.has_budget_tracking,
         }))
       }
 
@@ -339,6 +423,9 @@ export default function OnboardingPage() {
       // Complete the progress bar
       setSaveProgress(100)
       await new Promise((r) => setTimeout(r, 400))
+
+      // Clear localStorage — onboarding is complete
+      clearLocalStorage()
 
       dispatch({ type: 'SET_STEP', step: 'success' })
     } catch (err) {
@@ -413,7 +500,30 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <div className={`w-full max-w-[480px] sm:max-w-[640px] ${saveError ? 'mt-16' : ''}`}>
+      {/* ── Restored data notice ──────────────────────────────────── */}
+      {restoredNotice && !saveError && (
+        <div
+          className="fixed inset-x-0 top-0 z-40 border-b border-green-200 bg-green-50 px-4 py-2.5 shadow-sm"
+          role="status"
+        >
+          <div className="mx-auto flex max-w-[640px] items-center justify-between gap-3">
+            <p className="text-sm text-green-700">
+              ✓ Je eerder ingevulde gegevens zijn hersteld
+            </p>
+            <button
+              onClick={() => setRestoredNotice(false)}
+              className="rounded-lg p-1 text-green-400 hover:bg-green-100 hover:text-green-600"
+              aria-label="Sluiten"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={`w-full max-w-[480px] sm:max-w-[640px] ${saveError || restoredNotice ? 'mt-16' : ''}`}>
         {/* Logo / Header */}
         {showHeader && (
           <div className="relative mb-10 sm:mb-12 text-center">
@@ -455,6 +565,7 @@ export default function OnboardingPage() {
               onNext={() => dispatch({ type: 'SET_STEP', step: noBudgets ? 'preferences' : 'budgets' })}
               onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
               hideBudgets={noBudgets}
+              budgetteringMode={state.identity.budgettering_mode}
             />
           )}
 
