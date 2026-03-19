@@ -135,11 +135,18 @@ const WeekoverzichtWidget = dynamic(() =>
 const BudgetTrendWidget = dynamic(() =>
   import('./budget-trend-widget').then(m => ({ default: m.BudgetTrendWidget }))
 )
+const RebalancingWidget = dynamic(() =>
+  import('./rebalancing-widget').then(m => ({ default: m.RebalancingWidget }))
+)
+const FeeAnalyzerWidget = dynamic(() =>
+  import('./fee-analyzer-widget').then(m => ({ default: m.FeeAnalyzerWidget }))
+)
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
+import type { FeeAnalysis } from '@/lib/fee-analysis'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 
 // ── DashboardData bundle ──────────────────────────────────────
@@ -426,6 +433,9 @@ export interface DashboardData {
   currentAge: number | null
   // Weekoverzicht widget data
   weekOverview: WeekOverviewData
+  // Fee analyzer widget data
+  feeAnalysis: FeeAnalysis | null
+  feeImpactMonths: number
 }
 
 export interface WeekOverviewData {
@@ -579,6 +589,10 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <BudgetTrendWidget budgetType="savings" size={size} data={data} href={href} />
     case 'trend_schulden':
       return <BudgetTrendWidget budgetType="debt" size={size} data={data} href={href} />
+    case 'rebalancing':
+      return <RebalancingWidget size={size} data={data} href={href} />
+    case 'fee_analyzer':
+      return <FeeAnalyzerWidget size={size} data={data} href={href} />
     default:
       return null
   }

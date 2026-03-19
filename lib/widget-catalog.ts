@@ -505,6 +505,26 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultSize: 'half',
     minLevel: -2,
   },
+  {
+    id: 'rebalancing',
+    name: 'Rebalancing',
+    description: 'Portfolio drift analyse met target vs actuele allocatie',
+    module: 'kern',
+    sizes: ['mini', 'quarter', 'half'],
+    defaultSize: 'half',
+    minLevel: 3,
+    requiredPhase: 'Momentum',
+  },
+  {
+    id: 'fee_analyzer',
+    name: 'Kostenanalyse',
+    description: 'Totale portefeuillekosten en FIRE-impact van fondsbeheer',
+    module: 'kern',
+    sizes: ['mini', 'quarter', 'half'],
+    defaultSize: 'half',
+    minLevel: 3,
+    requiredPhase: 'Momentum',
+  },
 ]
 
 export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
@@ -567,6 +587,8 @@ export const WIDGET_HREFS: Record<string, string> = {
   trend_uitgaven:          '/core/budgets',
   trend_sparen:            '/core/budgets',
   trend_schulden:          '/core/budgets',
+  rebalancing:             '/core/assets',
+  fee_analyzer:            '/core/assets',
 }
 
 // ── Widget → Feature mapping ─────────────────────────────────
