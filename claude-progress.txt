@@ -1,3 +1,32 @@
+## Session 2026-03-19 - Feature #331 (Attempt 16)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 16)
+- **Root cause unchanged**: Cannot access hosted Supabase database to apply DDL migrations
+- **All approaches still blocked**:
+  1. Supabase MCP tools (apply_migration, execute_sql, list_migrations) — "Claude requested permissions but you haven't granted it yet"
+  2. Supabase CLI (`npx supabase link/db push`) — "Access token not provided"
+  3. REST API with anon key — read-only, cannot execute DDL
+  4. No SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DB_PASSWORD, or SUPABASE_ACCESS_TOKEN in env or .env files
+  5. feature_request_human_input tool — also blocked by permissions
+- **Migration status confirmed via GET /api/apply-migration**:
+  - MISSING tables: target_allocations, holding_prices, holding_alerts
+  - MISSING holdings columns: asset_class, sector, geography, previous_close, daily_change_percent, is_favorite, currency
+  - MISSING profile columns: onboarding_idempotency_key, invulfase_active
+  - MISSING RPC: save_onboarding_data
+  - ALREADY APPLIED: withdrawal_strategy columns, snapshot columns
+- **Resolution needed (any ONE of these)**:
+  1. Grant Supabase MCP tool permissions when prompted at runtime (click "Allow" on OAuth)
+  2. Add SUPABASE_SERVICE_ROLE_KEY to .env.local (from Dashboard → Settings → API)
+  3. Add SUPABASE_DB_PASSWORD to .env.local (from Dashboard → Settings → Database)
+  4. Add SUPABASE_ACCESS_TOKEN to .env.local (from https://supabase.com/dashboard/account/tokens)
+  5. Apply migrations manually via Supabase Dashboard SQL Editor
+  6. POST to http://localhost:3000/api/apply-migration with {"db_password":"..."} or {"access_token":"..."}
+
+### Current Status
+- 0 features completed this session (external blocker)
+- Total: 345/346 features passing (99.7%)
+- Feature #331 is the ONLY remaining non-passing feature
+
 ## Session 2026-03-19 - Feature #331 (Attempt 14)
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 14)
