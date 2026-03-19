@@ -1,6 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+// ── Types ───────────────────────────────────────────────────────────
+type RoadmapOverlay = {
+  feature_nr: number
+  fase: string
+  status: string
+  opmerkingen: string | null
+  updated_at: string
+}
+
+const SETTINGS_KEY = 'roadmap_overlays'
+
 // ── GET — Return all roadmap feature statuses ─────────────────────────
 
 export async function GET() {
@@ -13,24 +24,45 @@ export async function GET() {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  const { data, error } = await supabase
+  // Try dedicated table first
+  const { data: tableData, error: tableError } = await supabase
     .from('roadmap_features')
     .select('feature_nr, fase, status, opmerkingen, updated_at')
     .order('fase')
     .order('feature_nr')
 
-  if (error) {
-    // If table doesn't exist yet, return empty array gracefully
-    if (error.message?.includes('Could not find') || error.code === 'PGRST205') {
-      return NextResponse.json([])
-    }
+  if (!tableError && tableData) {
+    return NextResponse.json(tableData)
+  }
+
+  // Fallback: read from app_settings key-value store
+  const { data: settingsRow, error: settingsError } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', SETTINGS_KEY)
+    .maybeSingle()
+
+  if (settingsError) {
     return NextResponse.json(
-      { error: 'Fout bij laden roadmap data', detail: error.message },
+      { error: 'Fout bij laden roadmap data', detail: settingsError.message },
       { status: 500 },
     )
   }
 
-  return NextResponse.json(data ?? [])
+  if (!settingsRow?.value) {
+    return NextResponse.json([])
+  }
+
+  // Parse the JSON value — it's stored as a JSON array of overlays
+  try {
+    const overlays: RoadmapOverlay[] =
+      typeof settingsRow.value === 'string'
+        ? JSON.parse(settingsRow.value)
+        : settingsRow.value
+    return NextResponse.json(Array.isArray(overlays) ? overlays : [])
+  } catch {
+    return NextResponse.json([])
+  }
 }
 
 // ── PUT — Upsert status/opmerkingen for a feature ────────────────────
@@ -72,10 +104,6 @@ export async function PUT(request: NextRequest) {
   }
 
   const validStatuses = ['backlog', 'in_ontwikkeling', 'testen', 'afgerond']
-  const updates: Record<string, unknown> = {
-    feature_nr,
-    fase,
-  }
 
   if (body.status !== undefined) {
     const status = String(body.status)
@@ -85,32 +113,84 @@ export async function PUT(request: NextRequest) {
         { status: 400 },
       )
     }
-    updates.status = status
   }
 
+  // Try dedicated table first
+  const updates: Record<string, unknown> = { feature_nr, fase }
+  if (body.status !== undefined) updates.status = String(body.status)
   if (body.opmerkingen !== undefined) {
     updates.opmerkingen = body.opmerkingen === null ? null : String(body.opmerkingen)
   }
 
-  const { data, error } = await supabase
+  const { data: tableData, error: tableError } = await supabase
     .from('roadmap_features')
     .upsert(updates, { onConflict: 'feature_nr,fase' })
     .select()
     .single()
 
-  if (error) {
-    // If table doesn't exist yet, return informative error
-    if (error.message?.includes('Could not find') || error.code === 'PGRST205') {
-      return NextResponse.json(
-        { error: 'Tabel roadmap_features bestaat nog niet. Voer de migratie uit via Supabase Dashboard.', table_missing: true },
-        { status: 503 },
-      )
+  if (!tableError && tableData) {
+    return NextResponse.json(tableData)
+  }
+
+  // Fallback: use app_settings key-value store
+  // Read current overlays
+  const { data: settingsRow } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', SETTINGS_KEY)
+    .maybeSingle()
+
+  let overlays: RoadmapOverlay[] = []
+  if (settingsRow?.value) {
+    try {
+      const parsed =
+        typeof settingsRow.value === 'string'
+          ? JSON.parse(settingsRow.value)
+          : settingsRow.value
+      if (Array.isArray(parsed)) overlays = parsed
+    } catch {
+      // Corrupt data — start fresh
     }
+  }
+
+  // Find existing entry or create new one
+  const idx = overlays.findIndex(
+    (o) => o.feature_nr === feature_nr && o.fase === fase,
+  )
+  const existing = idx >= 0 ? overlays[idx] : null
+  const updated: RoadmapOverlay = {
+    feature_nr,
+    fase,
+    status: body.status !== undefined ? String(body.status) : (existing?.status ?? 'backlog'),
+    opmerkingen:
+      body.opmerkingen !== undefined
+        ? body.opmerkingen === null
+          ? null
+          : String(body.opmerkingen)
+        : (existing?.opmerkingen ?? null),
+    updated_at: new Date().toISOString(),
+  }
+
+  if (idx >= 0) {
+    overlays[idx] = updated
+  } else {
+    overlays.push(updated)
+  }
+
+  // Upsert into app_settings (match existing pattern used throughout app)
+  const { error: upsertError } = await supabase
+    .from('app_settings')
+    .upsert(
+      { key: SETTINGS_KEY, value: JSON.stringify(overlays) },
+      { onConflict: 'key' },
+    )
+
+  if (upsertError) {
     return NextResponse.json(
-      { error: 'Fout bij opslaan', detail: error.message },
+      { error: 'Fout bij opslaan', detail: upsertError.message },
       { status: 500 },
     )
   }
 
-  return NextResponse.json(data)
+  return NextResponse.json(updated)
 }
