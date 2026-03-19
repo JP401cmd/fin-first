@@ -16945,3 +16945,17 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 0 features completed this session
 - Total: 343/346 features passing (99.1%)
+
+## Session 2026-03-19 - Feature #346
+
+### Feature #346: Legacy veerkracht code opruimen - PASSING
+- Deleted components/widgets/veerkracht-score-widget.tsx (349 lines removed)
+- Marked computeResilienceScore() as @deprecated in lib/horizon-data.ts with migration notes
+- Updated backtesting-modal.tsx: 'Historische veerkracht' → 'Historische robuustheid', 'Veerkracht' → 'Robuustheid', 'VEERKRACHTCONCLUSIE' → 'ROBUUSTHEIDSCONCLUSIE'
+- Updated test pages: test-resilience-score (Veerkrachtscore → Gezondheidsscore), test-kpi-deduplication (Veerkracht → Financiële Gezondheid), test-resilience-history (veerkracht → financiële gezondheid)
+- Updated verify routes: verify-horizon-hero, verify-kpi-deduplication, verify-resilience-score, verify-resilience-history
+- Added comments to snapshot routes (route.ts, cron/route.ts) about resilience_score column now storing 6-pillar health score
+- Updated regression test label in kern-api-routes.ts
+- No new TypeScript errors introduced
+- Verified via browser: Horizon page shows 'Financiële Gezondheid' (not 'Veerkracht')
+- Commit: cb9e3547
