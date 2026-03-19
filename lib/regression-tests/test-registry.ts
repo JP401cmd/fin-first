@@ -58,6 +58,11 @@ export function getAllTests(): TestCase[] {
   return Array.from(testCases.values()).flat()
 }
 
+/** Get a single category by id */
+export function getCategoryById(categoryId: string): TestCategory | undefined {
+  return categories.get(categoryId)
+}
+
 /** Get a single test by id */
 export function getTestById(id: string): TestCase | undefined {
   for (const tests of testCases.values()) {
@@ -168,6 +173,7 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/identiteit-household').then(m => m.register()).catch(e => { console.warn('[test-registry] identiteit-household failed:', e) }),
     import('@/lib/regression-tests/suites/beheer-notificaties').then(m => m.register()).catch(e => { console.warn('[test-registry] beheer-notificaties failed:', e) }),
     import('@/lib/regression-tests/suites/dashboard-empty-loading').then(m => m.register()).catch(e => { console.warn('[test-registry] dashboard-empty-loading failed:', e) }),
+    import('@/lib/regression-tests/suites/kostenanalyse-ter').then(m => m.register()).catch(e => { console.warn('[test-registry] kostenanalyse-ter failed:', e) }),
   ])
 
   // Log any rejected promises (shouldn't happen due to .catch, but just in case)
