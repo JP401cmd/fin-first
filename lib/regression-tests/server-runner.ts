@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { TestReport, TestSuiteConfig, TestResult } from './test-types'
 import { loadAllTests } from './test-registry'
-import { runTestSuite, type TestProgressCallback } from './test-runner'
+import { runTestSuite, type TestProgressCallback, setRoleSwitcher, clearRoleSwitcher } from './test-runner'
 import { seedTestData, cleanupTestData } from './test-seed'
 
 // ── Server-side Regression Test Runner ──────────────────────────────────────
@@ -71,7 +71,7 @@ let _supabaseUrl: string = ''
 let _supabaseAnonKey: string = ''
 let _accessToken: string = ''
 let _testUserId: string = ''
-let _currentRole: 'superadmin' | 'user' = 'superadmin'
+let _currentRole: 'superadmin' | 'user' = 'user'
 
 /**
  * Make an HTTP request WITHOUT authentication headers.
@@ -102,10 +102,10 @@ export function unauthenticatedFetch(
 
 // ── Role switching for admin vs normal-user tests ────────────────────────────
 //
-// Some tests verify that normal users (role='user') cannot access admin pages
-// or API endpoints. Since the test account is 'superadmin' by default, we
-// provide a mechanism to temporarily switch the profile role via the Supabase
-// REST API, run the test, and restore the original role.
+// The test account is 'user' by default in the database. Tests that verify
+// admin-only features (beheer pages, admin API endpoints) need 'superadmin'
+// access. The test runner auto-switches via requiredRole/defaultRole on
+// TestCase/TestCategory, then restores to 'user' after the test.
 
 /**
  * Switch the test account's profile.role in the database.
@@ -149,21 +149,19 @@ async function switchTestAccountRole(role: 'superadmin' | 'user'): Promise<boole
 
 /**
  * Run a callback with the test account temporarily set to role='user'.
- * After the callback completes (or throws), the role is restored to 'superadmin'.
+ * After the callback completes (or throws), the role is restored to its previous value.
  *
- * Usage in tests:
- * ```ts
- * import { withUserRole } from '../server-runner'
- *
- * async fn() {
- *   await withUserRole(async () => {
- *     const res = await fetch('/beheer/ai')
- *     assert(isRedirect(res.status), 'Normal user should be redirected from beheer')
- *   })
- * }
- * ```
+ * NOTE: With the new automatic role-switching (via requiredRole on TestCase or
+ * defaultRole on TestCategory), you typically don't need this anymore.
+ * The test runner handles role switching automatically.
  */
 export async function withUserRole(fn: () => void | Promise<void>): Promise<void> {
+  const previousRole = _currentRole
+  if (_currentRole === 'user') {
+    // Already user, just run
+    await fn()
+    return
+  }
   const switched = await switchTestAccountRole('user')
   if (!switched) {
     throw new Error(
@@ -174,10 +172,40 @@ export async function withUserRole(fn: () => void | Promise<void>): Promise<void
   try {
     await fn()
   } finally {
-    // Always restore superadmin role, even if the test throws
-    const restored = await switchTestAccountRole('superadmin')
-    if (!restored) {
-      console.error('[server-runner] CRITICAL: Failed to restore superadmin role! Subsequent admin tests may fail.')
+    if (previousRole !== 'user') {
+      const restored = await switchTestAccountRole(previousRole)
+      if (!restored) {
+        console.error(`[server-runner] CRITICAL: Failed to restore role to '${previousRole}'!`)
+      }
+    }
+  }
+}
+
+/**
+ * Run a callback with the test account temporarily set to role='superadmin'.
+ * After the callback completes (or throws), the role is restored to 'user'.
+ *
+ * NOTE: With the new automatic role-switching (via requiredRole on TestCase or
+ * defaultRole on TestCategory), you typically don't need this anymore.
+ */
+export async function withSuperadminRole(fn: () => void | Promise<void>): Promise<void> {
+  const previousRole = _currentRole
+  if (_currentRole === 'superadmin') {
+    await fn()
+    return
+  }
+  const switched = await switchTestAccountRole('superadmin')
+  if (!switched) {
+    throw new Error('Kon de testaccount-rol niet wisselen naar "superadmin".')
+  }
+  try {
+    await fn()
+  } finally {
+    if (previousRole !== 'superadmin') {
+      const restored = await switchTestAccountRole(previousRole)
+      if (!restored) {
+        console.error(`[server-runner] CRITICAL: Failed to restore role to '${previousRole}'!`)
+      }
     }
   }
 }
@@ -316,7 +344,16 @@ export async function runServerTestSuite(
     console.warn('[server-runner] Test data seeding warning:', seedErr)
   }
 
-  // ── 6. Load tests and run ──────────────────────────────────────────────
+  // ── 6. Confirm 'user' role (default in database) ─────────────────────
+  // The test account is 'user' in the database. No role switch needed at startup.
+  // Tests/categories that need admin access declare requiredRole: 'superadmin'
+  // or defaultRole: 'superadmin' and the test runner auto-switches.
+  _currentRole = 'user'
+
+  // Register role-switching callback with the test runner
+  setRoleSwitcher(switchTestAccountRole)
+
+  // ── 7. Load tests and run ──────────────────────────────────────────────
   try {
     await loadAllTests()
 
@@ -332,18 +369,21 @@ export async function runServerTestSuite(
     const report = await runTestSuite(suiteConfig, progressCallback)
     return report
   } finally {
-    // ── 7. Cleanup test data ──────────────────────────────────────────
+    // ── 8. Cleanup test data ──────────────────────────────────────────
     try {
       await cleanupTestData(supabase, _testUserId)
     } catch (cleanupErr) {
       console.warn('[server-runner] Test data cleanup warning:', cleanupErr)
     }
 
-    // ── 8. Restore original globals ────────────────────────────────────
-    // Ensure role is restored to superadmin before cleanup
-    if (_currentRole !== 'superadmin') {
-      await switchTestAccountRole('superadmin').catch(() => {
-        console.error('[server-runner] Failed to restore superadmin role during cleanup')
+    // Clear role switcher from test runner
+    clearRoleSwitcher()
+
+    // ── 9. Restore original globals ────────────────────────────────────
+    // Ensure role is restored to 'user' (the DB default) before cleanup
+    if (_currentRole !== 'user') {
+      await switchTestAccountRole('user').catch(() => {
+        console.error('[server-runner] Failed to restore user role during cleanup')
       })
     }
 
@@ -354,7 +394,7 @@ export async function runServerTestSuite(
     _supabaseAnonKey = ''
     _accessToken = ''
     _testUserId = ''
-    _currentRole = 'superadmin'
+    _currentRole = 'user'
 
     if (originalLocalStorage !== undefined) {
       Object.defineProperty(globalThis, 'localStorage', {
