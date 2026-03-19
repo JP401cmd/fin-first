@@ -1,5 +1,6 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan } from '../assert'
+import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 import { lookupAowAge, formatAowAge } from '@/lib/aow-leeftijd'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -53,7 +54,7 @@ async function fetchNoRedirect(path: string): Promise<Response> {
 }
 
 function isRedirectOrAuth(status: number): boolean {
-  return status >= 300 && status < 400
+  return status === 401 || (status >= 300 && status < 400)
 }
 
 const tests: TestCase[] = [
@@ -66,7 +67,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetchNoRedirect('/api/admin/aow-leeftijd')
+      const res = await unauthenticatedFetch('/api/admin/aow-leeftijd', { redirect: 'manual' })
       // Without auth: should get 403 (admin protection) or redirect
       assert(
         res.status === 403 || isRedirectOrAuth(res.status),
@@ -89,7 +90,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/admin/aow-leeftijd', {
+      const res = await unauthenticatedFetch('/api/admin/aow-leeftijd', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -117,7 +118,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/admin/aow-leeftijd', {
+      const res = await unauthenticatedFetch('/api/admin/aow-leeftijd', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -141,7 +142,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/admin/aow-leeftijd', {
+      const res = await unauthenticatedFetch('/api/admin/aow-leeftijd', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: 'fake-id' }),
@@ -163,7 +164,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 500,
     async fn() {
       // Missing birth_date_from
-      const res = await fetch('/api/admin/aow-leeftijd', {
+      const res = await unauthenticatedFetch('/api/admin/aow-leeftijd', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -373,7 +374,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetchNoRedirect('/beheer/aow-leeftijd')
+      const res = await unauthenticatedFetch('/beheer/aow-leeftijd', { redirect: 'manual' })
       assert(
         res.status === 200 || isRedirectOrAuth(res.status),
         `Expected 200 or redirect for /beheer/aow-leeftijd, got ${res.status}`,

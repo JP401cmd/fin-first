@@ -1,5 +1,6 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
+import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 
 const CAT = 'onboarding.api-flow'
@@ -62,7 +63,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Without auth → 401
-      const noAuthRes = await fetch('/api/onboarding/seed', {
+      const noAuthRes = await unauthenticatedFetch('/api/onboarding/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'persona', persona: 'roos' }),
@@ -112,7 +113,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Without auth → 401
-      const noAuthRes = await fetch('/api/onboarding/save-own-data', {
+      const noAuthRes = await unauthenticatedFetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -356,7 +357,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Auth guard
-      const noAuthRes = await fetch('/api/onboarding/reset', {
+      const noAuthRes = await unauthenticatedFetch('/api/onboarding/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
@@ -398,7 +399,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Auth guard
-      const noAuthRes = await fetch('/api/onboarding/suggest-budgets', {
+      const noAuthRes = await unauthenticatedFetch('/api/onboarding/suggest-budgets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ netMonthlyIncome: 3500, householdType: 'samen' }),

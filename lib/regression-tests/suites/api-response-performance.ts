@@ -9,6 +9,7 @@ import {
   assertDefined,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'performance.api-response'
 
@@ -98,7 +99,7 @@ async function timedFetch(
 ): Promise<{ status: number; durationMs: number; body: Record<string, unknown> }> {
   const start = performance.now()
   try {
-    const res = await fetch(path, {
+    const res = await unauthenticatedFetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

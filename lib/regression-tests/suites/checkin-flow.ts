@@ -7,6 +7,7 @@ import type { TestCase } from '../test-types'
 import type { CheckinSnapshot } from '@/lib/checkin-types'
 import type { Aandachtspunt } from '@/lib/checkin-types'
 import type { GesprekStarterData } from '@/lib/checkin-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'checkin.flow'
 
@@ -26,7 +27,7 @@ const CAT = 'checkin.flow'
 // ── Helper: simulate fetch with expected status ──────────────────────
 async function fetchAPI(path: string, options?: RequestInit): Promise<{ status: number; body: Record<string, unknown> }> {
   try {
-    const res = await fetch(path, {
+    const res = await unauthenticatedFetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

@@ -19,6 +19,7 @@ import {
   assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'kern.bank-connect'
 
@@ -132,7 +133,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/bank-connect/auth-link', {
+      const res = await unauthenticatedFetch('/api/bank-connect/auth-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider_id: 'test' }),
@@ -227,7 +228,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 500,
     async fn() {
       // Auth check happens before code/state check
-      const res = await fetch('/api/bank-connect/callback')
+      const res = await unauthenticatedFetch('/api/bank-connect/callback')
       assertEqual(res.status, 401, 'unauthenticated callback returns 401')
     },
   },
@@ -372,7 +373,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/bank-connect/status')
+      const res = await unauthenticatedFetch('/api/bank-connect/status')
       assertEqual(res.status, 401, 'unauthenticated GET returns 401')
     },
   },
@@ -451,7 +452,7 @@ const tests: TestCase[] = [
       ]
 
       for (const ep of endpoints) {
-        const res = await fetch(ep.url, {
+        const res = await unauthenticatedFetch(ep.url, {
           method: ep.method,
           headers: ep.body ? { 'Content-Type': 'application/json' } : undefined,
           body: ep.body,

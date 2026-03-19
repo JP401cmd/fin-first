@@ -10,6 +10,7 @@ import {
   assertType,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'cross-cutting.error-handling'
 
@@ -31,7 +32,7 @@ async function fetchAPI(
   options?: RequestInit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   try {
-    const res = await fetch(path, {
+    const res = await unauthenticatedFetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -660,7 +661,7 @@ const tests: TestCase[] = [
         { path: '/api/checkin/save', method: 'POST' },
       ]
       for (const { path, method } of endpoints) {
-        const res = await fetch(path, {
+        const res = await unauthenticatedFetch(path, {
           method,
           headers: { 'Content-Type': 'application/json' },
           ...(method !== 'GET' ? { body: JSON.stringify({}) } : {}),
@@ -719,7 +720,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/this-route-does-not-exist-12345')
+      const res = await unauthenticatedFetch('/api/this-route-does-not-exist-12345')
       // Middleware may return 401 (auth guard) before routing; 404 also acceptable
       assert(
         res.status === 401 || res.status === 404 || res.status === 405,
@@ -741,7 +742,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1000,
     async fn() {
       // Send raw text that is not valid JSON
-      const res = await fetch('/api/parameters', {
+      const res = await unauthenticatedFetch('/api/parameters', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: 'this is not valid json {{{',
@@ -766,7 +767,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/widgets', {
+      const res = await unauthenticatedFetch('/api/widgets', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: '',

@@ -1,5 +1,6 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThan } from '../assert'
+import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 
 const CAT = 'beheer.ai'
@@ -33,7 +34,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       // GET settings — verify structure includes ai_provider field
-      const getRes = await fetch('/api/admin/settings')
+      const getRes = await unauthenticatedFetch('/api/admin/settings')
       // May be 403 (not admin) or 307 (redirect) in test context without auth
       if (getRes.status === 403 || getRes.status === 401) {
         // Verify that access is properly denied for non-admin
@@ -56,7 +57,7 @@ const tests: TestCase[] = [
       )
 
       // Verify PUT endpoint exists (will get 403 without auth, which is correct)
-      const putRes = await fetch('/api/admin/settings', {
+      const putRes = await unauthenticatedFetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ai_provider: settings.ai_provider }),
@@ -77,7 +78,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 1000,
     async fn() {
-      const getRes = await fetch('/api/admin/settings')
+      const getRes = await unauthenticatedFetch('/api/admin/settings')
       if (getRes.status === 403 || !getRes.ok) {
         assert(true, 'Admin guard correctly blocks access')
         return
@@ -115,7 +116,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 1000,
     async fn() {
-      const getRes = await fetch('/api/admin/settings')
+      const getRes = await unauthenticatedFetch('/api/admin/settings')
       if (getRes.status === 403 || !getRes.ok) {
         assert(true, 'Admin guard correctly blocks access')
         return
@@ -143,7 +144,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 500,
     async fn() {
-      const getRes = await fetch('/api/admin/settings')
+      const getRes = await unauthenticatedFetch('/api/admin/settings')
       if (getRes.status === 403 || !getRes.ok) {
         assert(true, 'Admin guard correctly blocks access')
         return
@@ -173,7 +174,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 500,
     async fn() {
-      const getRes = await fetch('/api/admin/settings')
+      const getRes = await unauthenticatedFetch('/api/admin/settings')
       if (getRes.status === 403 || !getRes.ok) {
         assert(true, 'Admin guard correctly blocks access')
         return
@@ -203,7 +204,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/admin/ai-prompt-default')
+      const res = await unauthenticatedFetch('/api/admin/ai-prompt-default')
       if (res.status === 403 || res.status === 401) {
         assert(true, 'Admin guard correctly blocks unauthenticated access')
         return
@@ -231,7 +232,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await fetch('/api/admin/ai-prompts')
+      const res = await unauthenticatedFetch('/api/admin/ai-prompts')
       if (res.status === 403 || res.status === 401) {
         assert(true, 'Admin guard correctly blocks unauthenticated access')
         return
@@ -287,7 +288,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/admin/ai-prompts')
+      const res = await unauthenticatedFetch('/api/admin/ai-prompts')
       if (res.status === 403 || !res.ok) {
         assert(true, 'Admin guard correctly blocks access')
         return
@@ -317,7 +318,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/admin/ai-prompts')
+      const res = await unauthenticatedFetch('/api/admin/ai-prompts')
       if (res.status === 403 || !res.ok) {
         assert(true, 'Admin guard correctly blocks access')
         return

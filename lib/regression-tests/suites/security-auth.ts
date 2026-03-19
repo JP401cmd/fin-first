@@ -4,6 +4,7 @@ import {
   assertGreaterThan, assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'security.auth'
 
@@ -25,7 +26,7 @@ async function fetchAPI(
   options?: RequestInit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   try {
-    const res = await fetch(path, {
+    const res = await unauthenticatedFetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

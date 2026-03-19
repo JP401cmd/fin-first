@@ -22,6 +22,7 @@ import {
 import type { TestCase } from '../test-types'
 import type { Budget } from '@/lib/budget-data'
 import { BUDGET_SLUGS } from '@/lib/budget-data'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'kern.budget-crud'
 
@@ -342,7 +343,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/budgets/550e8400-e29b-41d4-a716-446655440000', {
+      const res = await unauthenticatedFetch('/api/budgets/550e8400-e29b-41d4-a716-446655440000', {
         method: 'DELETE',
       })
       assertEqual(res.status, 401, 'unauthenticated DELETE returns 401')
@@ -703,7 +704,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/budgets/550e8400-e29b-41d4-a716-446655440000')
+      const res = await unauthenticatedFetch('/api/budgets/550e8400-e29b-41d4-a716-446655440000')
       assertEqual(res.status, 401, 'unauthenticated GET returns 401')
     },
   },

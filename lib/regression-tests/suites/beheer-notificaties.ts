@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'beheer.notificaties'
 
@@ -10,7 +11,7 @@ async function fetchJson(
   path: string,
   init?: RequestInit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await fetch(path, init)
+  const res = await unauthenticatedFetch(path, init)
   let body: Record<string, unknown> = {}
   try {
     body = await res.json()

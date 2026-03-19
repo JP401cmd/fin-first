@@ -3,6 +3,7 @@ import {
   assertEqual, assertGreaterThan, assertGreaterThanOrEqual,
   assert, assertNotNull, assertDefined, assertFinite,
 } from '../assert'
+import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 
 const CAT = 'data.tijdreeksen'
@@ -203,10 +204,10 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const { status } = await fetchAPI('/api/snapshots/auto')
+      const res = await unauthenticatedFetch('/api/snapshots/auto')
       assert(
-        status === 401 || status === 307,
-        `Expected 401/307 for unauthenticated, got ${status}`,
+        res.status === 401 || res.status === 307,
+        `Expected 401/307 for unauthenticated, got ${res.status}`,
       )
     },
   },
@@ -286,10 +287,10 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const { status } = await fetchAPI('/api/snapshots/balances')
+      const res = await unauthenticatedFetch('/api/snapshots/balances')
       assert(
-        status === 401 || status === 307,
-        `Expected 401/307 for unauthenticated, got ${status}`,
+        res.status === 401 || res.status === 307,
+        `Expected 401/307 for unauthenticated, got ${res.status}`,
       )
     },
   },
@@ -429,10 +430,10 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const { status } = await fetchAPI('/api/valuations')
+      const res = await unauthenticatedFetch('/api/valuations')
       assert(
-        status === 401 || status === 307,
-        `Expected 401/307 for unauthenticated, got ${status}`,
+        res.status === 401 || res.status === 307,
+        `Expected 401/307 for unauthenticated, got ${res.status}`,
       )
     },
   },
@@ -567,10 +568,10 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const { status } = await fetchAPI('/api/snapshots', { method: 'POST' })
+      const res = await unauthenticatedFetch('/api/snapshots', { method: 'POST' })
       assert(
-        status === 401 || status === 307,
-        `Expected 401/307 for unauthenticated POST, got ${status}`,
+        res.status === 401 || res.status === 307,
+        `Expected 401/307 for unauthenticated POST, got ${res.status}`,
       )
     },
   },
@@ -606,7 +607,10 @@ const tests: TestCase[] = [
     async fn() {
       // If CRON_SECRET is configured, unauthenticated should get 401
       // If not configured (dev mode), it may return 200 or 500
-      const { status, body } = await fetchAPI('/api/snapshots/cron')
+      const res = await unauthenticatedFetch('/api/snapshots/cron')
+      const status = res.status
+      let body: Record<string, unknown> = {}
+      try { body = await res.json() } catch { /* Non-JSON response */ }
       // In production: 401. In dev without service role key: 500
       assert(
         status === 401 || status === 500 || status === 200,
@@ -724,10 +728,10 @@ const tests: TestCase[] = [
       ]
 
       for (const { path, method } of endpoints) {
-        const { status } = await fetchAPI(path, { method })
+        const res = await unauthenticatedFetch(path, { method })
         assert(
-          status === 401 || status === 307,
-          `${method} ${path}: expected 401/307 for unauthenticated, got ${status}`,
+          res.status === 401 || res.status === 307,
+          `${method} ${path}: expected 401/307 for unauthenticated, got ${res.status}`,
         )
       }
     },

@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'identiteit.delen-jaaroverzicht'
 
@@ -28,7 +29,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       // The freedom-card endpoint requires auth; unauthenticated should get 401 or redirect
-      const res = await fetch('/api/share/freedom-card')
+      const res = await unauthenticatedFetch('/api/share/freedom-card')
       // If 401 = correct auth gating; if 200 = logged in, check shape
       if (res.status === 200) {
         const data = await res.json()
@@ -99,7 +100,7 @@ const tests: TestCase[] = [
         content_type: 'freedom_card',
         privacy_level: 'anonymous',
       }
-      const res = await fetch('/api/share/track', {
+      const res = await unauthenticatedFetch('/api/share/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -131,7 +132,7 @@ const tests: TestCase[] = [
         share_type: 'invalid_type',
         content_type: 'freedom_card',
       }
-      const res = await fetch('/api/share/track', {
+      const res = await unauthenticatedFetch('/api/share/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -154,7 +155,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       // Test with privacy parameter
-      const res = await fetch('/api/share/freedom-card?privacy=anonymous')
+      const res = await unauthenticatedFetch('/api/share/freedom-card?privacy=anonymous')
       if (res.status === 200) {
         const data = await res.json()
         assertEqual(data.privacyLevel, 'anonymous', 'Privacy level moet anonymous zijn')
@@ -185,7 +186,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/share/freedom-card?privacy=invalid_level')
+      const res = await unauthenticatedFetch('/api/share/freedom-card?privacy=invalid_level')
       // Should be 400 (invalid privacy) or 401 (auth check first)
       assert(
         res.status === 400 || res.status === 401,
@@ -204,7 +205,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 3000,
     async fn() {
       const year = new Date().getFullYear() - 1
-      const res = await fetch(`/api/year-in-review?year=${year}`)
+      const res = await unauthenticatedFetch(`/api/year-in-review?year=${year}`)
       if (res.status === 200) {
         const data = await res.json()
         assertEqual(data.year, year, 'Jaar moet overeenkomen met request')
@@ -237,7 +238,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/year-in-review?year=1990')
+      const res = await unauthenticatedFetch('/api/year-in-review?year=1990')
       // 400 (invalid year) or 401 (auth check first)
       assert(
         res.status === 400 || res.status === 401,
@@ -277,7 +278,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       const year = new Date().getFullYear() - 1
-      const res = await fetch(`/api/year-in-review?year=${year}`)
+      const res = await unauthenticatedFetch(`/api/year-in-review?year=${year}`)
       if (res.status === 200) {
         const data = await res.json()
         // Freedom days bar chart: 12 months, each with month, label, days
@@ -330,7 +331,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       const year = new Date().getFullYear() - 1
-      const res = await fetch(`/api/year-in-review?year=${year}`)
+      const res = await unauthenticatedFetch(`/api/year-in-review?year=${year}`)
       if (res.status === 200) {
         const data = await res.json()
         // totalSaved should equal totalIncome - totalExpenses (rounded)

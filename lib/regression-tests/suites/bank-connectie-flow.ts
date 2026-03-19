@@ -1,5 +1,6 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
+import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 
 const CAT = 'onboarding.bank-connectie'
@@ -34,7 +35,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Auth guard → 401
-      const noAuthRes = await fetch('/api/bank-connect/auth-link', {
+      const noAuthRes = await unauthenticatedFetch('/api/bank-connect/auth-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider_id: 'test-bank' }),
@@ -204,7 +205,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Auth guard
-      const noAuthRes = await fetch('/api/bank-connect/sync', {
+      const noAuthRes = await unauthenticatedFetch('/api/bank-connect/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connection_account_id: 'test' }),
@@ -362,7 +363,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Auth guard
-      const noAuthRes = await fetch('/api/bank-connect/status')
+      const noAuthRes = await unauthenticatedFetch('/api/bank-connect/status')
       assert(
         noAuthRes.status === 401 || noAuthRes.status === 403,
         `Ongeauthenticeerd → 401/403, got ${noAuthRes.status}`,
@@ -390,7 +391,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Auth guard
-      const noAuthRes = await fetch('/api/bank-connect/providers')
+      const noAuthRes = await unauthenticatedFetch('/api/bank-connect/providers')
       assert(
         noAuthRes.status === 401 || noAuthRes.status === 403,
         `Ongeauthenticeerd → 401/403, got ${noAuthRes.status}`,
@@ -435,7 +436,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Auth guard
-      const noAuthRes = await fetch('/api/bank-connect/disconnect', {
+      const noAuthRes = await unauthenticatedFetch('/api/bank-connect/disconnect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connection_account_id: 'test' }),
@@ -487,7 +488,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Auth guard
-      const noAuthRes = await fetch('/api/bank-connect/balances', {
+      const noAuthRes = await unauthenticatedFetch('/api/bank-connect/balances', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connection_account_id: 'test' }),
@@ -545,7 +546,7 @@ const tests: TestCase[] = [
       assertEqual(endpoints.length, 7, '7 bank-connect endpoints')
 
       for (const ep of endpoints) {
-        const res = await fetch(ep.path, {
+        const res = await unauthenticatedFetch(ep.path, {
           method: ep.method,
           headers: { 'Content-Type': 'application/json' },
           ...(ep.method === 'POST' ? { body: JSON.stringify({}) } : {}),

@@ -1,5 +1,6 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
+import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 
 const CAT = 'onboarding.flow'
@@ -139,7 +140,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1000,
     async fn() {
       // The onboarding page is behind auth middleware — unauthenticated should redirect
-      const res = await fetch('/onboarding', { redirect: 'manual' })
+      const res = await unauthenticatedFetch('/onboarding', { redirect: 'manual' })
       assert(
         res.status === 200 || (res.status >= 300 && res.status < 400),
         `Expected 200 or redirect for /onboarding, got ${res.status}`,
@@ -336,7 +337,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1000,
     async fn() {
       // Without auth, should return 401
-      const res = await fetch('/api/onboarding/save-own-data', {
+      const res = await unauthenticatedFetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),

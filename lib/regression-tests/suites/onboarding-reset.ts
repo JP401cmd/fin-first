@@ -1,5 +1,6 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
+import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 
 const CAT = 'onboarding.reset'
@@ -71,7 +72,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      const res = await fetch('/api/onboarding/reset', {
+      const res = await unauthenticatedFetch('/api/onboarding/reset', {
         method: 'POST',
       })
       assert(

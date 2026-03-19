@@ -4,6 +4,7 @@ import {
   assertGreaterThan,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'security.privacy'
 
@@ -374,7 +375,7 @@ const tests: TestCase[] = [
     async fn() {
       // Verify the data isolation endpoint returns 401 without auth
       // (which means it properly checks authentication before returning any data)
-      const res = await fetch('/api/verify-data-isolation')
+      const res = await unauthenticatedFetch('/api/verify-data-isolation')
       const body = await res.json()
       assertEqual(res.status, 401, 'Data isolation endpoint requires auth')
       // The endpoint queries 6 tables all with .eq('user_id', user.id)
@@ -390,7 +391,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 500,
     async fn() {
       // Unauthenticated export should fail with 401
-      const res = await fetch('/api/export?type=transactions')
+      const res = await unauthenticatedFetch('/api/export?type=transactions')
       assertEqual(res.status, 401, 'Export requires authentication')
       // The export route queries with .eq('user_id', user.id) for all 6 export types
       // Verified by code inspection: transactions, budgets, net_worth, assets, debts, goals
@@ -408,7 +409,7 @@ const tests: TestCase[] = [
     async fn() {
       const types = ['transactions', 'budgets', 'net_worth', 'assets', 'debts', 'goals']
       for (const type of types) {
-        const res = await fetch(`/api/export?type=${type}`)
+        const res = await unauthenticatedFetch(`/api/export?type=${type}`)
         assertEqual(res.status, 401, `Export type "${type}" requires auth`)
       }
     },
@@ -422,7 +423,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 500,
     async fn() {
       // Invalid type should be rejected (but auth check comes first)
-      const res = await fetch('/api/export?type=invalid')
+      const res = await unauthenticatedFetch('/api/export?type=invalid')
       // Will be 401 since middleware catches unauthenticated first
       assertEqual(res.status, 401, 'Auth check comes before type validation')
     },
@@ -438,7 +439,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 500,
     async fn() {
       // Send malformed request to trigger error handling
-      const res = await fetch('/api/holdings', {
+      const res = await unauthenticatedFetch('/api/holdings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{"invalid json',
@@ -459,7 +460,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 500,
     async fn() {
       // Test 401 error response format
-      const res = await fetch('/api/holdings')
+      const res = await unauthenticatedFetch('/api/holdings')
       const body = await res.json()
       assertEqual(res.status, 401, 'Returns 401')
       const bodyStr = JSON.stringify(body)
@@ -504,7 +505,7 @@ const tests: TestCase[] = [
         { path: '/api/export', method: 'GET' },
       ]
       for (const { path, method } of endpoints) {
-        const res = await fetch(path, { method })
+        const res = await unauthenticatedFetch(path, { method })
         if (res.status === 401) {
           const body = await res.json()
           assertDefined(body.error, `${path} error field should be defined`)

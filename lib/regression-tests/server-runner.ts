@@ -56,6 +56,44 @@ class MemoryStorage implements Storage {
   [name: string]: unknown
 }
 
+// ── Unauthenticated fetch for auth-guard tests ─────────────────────────────
+//
+// The server-runner patches globalThis.fetch with Authorization headers so
+// tests run as the dedicated test account. Auth-guard tests, however, need
+// to make requests WITHOUT auth to verify 401 responses. This module-level
+// helper uses the original (unpatched) fetch while still resolving relative
+// URLs to the local dev server.
+
+let _originalFetch: typeof globalThis.fetch | null = null
+let _baseUrl: string = ''
+
+/**
+ * Make an HTTP request WITHOUT authentication headers.
+ *
+ * Use this in auth-guard tests that need to verify 401 responses.
+ * Relative paths (starting with `/`) are resolved against the local dev server.
+ * No Authorization or Cookie headers are added.
+ */
+export function unauthenticatedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const fetchFn = _originalFetch ?? globalThis.fetch
+
+  let url: string
+  if (typeof input === 'string') {
+    url = input.startsWith('/') ? `${_baseUrl}${input}` : input
+  } else if (input instanceof URL) {
+    url = input.toString()
+  } else {
+    // Request object
+    url = input.url
+    if (url.startsWith('/')) url = `${_baseUrl}${url}`
+  }
+
+  return fetchFn(url, init)
+}
+
 // ── Core runner ──────────────────────────────────────────────────────────────
 
 /**
@@ -128,6 +166,10 @@ export async function runServerTestSuite(
   const originalFetch = globalThis.fetch
   const baseUrl = `http://localhost:${process.env.PORT || 3000}`
 
+  // Expose the original fetch for unauthenticatedFetch() helper
+  _originalFetch = originalFetch
+  _baseUrl = baseUrl
+
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     let url: string
     if (typeof input === 'string') {
@@ -185,6 +227,8 @@ export async function runServerTestSuite(
   } finally {
     // ── 6. Restore original globals ────────────────────────────────────
     globalThis.fetch = originalFetch
+    _originalFetch = null
+    _baseUrl = ''
 
     if (originalLocalStorage !== undefined) {
       Object.defineProperty(globalThis, 'localStorage', {

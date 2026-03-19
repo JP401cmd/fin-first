@@ -4,6 +4,7 @@ import {
   assert, assertNotNull, assertDefined, assertType, assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'rapportages.generatie'
 
@@ -25,7 +26,7 @@ const CAT = 'rapportages.generatie'
 // ── Helper: fetch with expected status ──────────────────────────────
 async function fetchAPI(path: string, options?: RequestInit): Promise<{ status: number; body: Record<string, unknown>; raw: string }> {
   try {
-    const res = await fetch(path, {
+    const res = await unauthenticatedFetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -362,7 +363,7 @@ const tests: TestCase[] = [
     description: 'Unauthenticated CSV export returns 401',
     priority: 'critical', estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/export?type=transactions')
+      const res = await unauthenticatedFetch('/api/export?type=transactions')
       assertEqual(res.status, 401, 'GET /api/export → 401')
     },
   },
@@ -835,7 +836,7 @@ const tests: TestCase[] = [
       ]
 
       for (const ep of endpoints) {
-        const res = await fetch(ep.path, {
+        const res = await unauthenticatedFetch(ep.path, {
           method: ep.method,
           headers: { 'Content-Type': 'application/json' },
           ...(ep.method === 'POST' ? { body: JSON.stringify({}) } : {}),

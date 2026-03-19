@@ -1,5 +1,6 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
+import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
 
@@ -50,7 +51,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 1500,
     async fn() {
       // Test 1: Without auth → 401
-      const noAuthRes = await fetch('/api/onboarding/seed', {
+      const noAuthRes = await unauthenticatedFetch('/api/onboarding/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'persona', persona: 'roos' }),

@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThan, assertGreaterThanOrEqual, assertLessThanOrEqual, assertNotNull, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 import {
   WIDGET_CATALOG,
   WIDGET_HREFS,
@@ -584,7 +585,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 200,
     async fn() {
-      const res = await fetch('/api/widgets', {
+      const res = await unauthenticatedFetch('/api/widgets', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ widgets: [] }),
@@ -600,7 +601,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 200,
     async fn() {
-      const res = await fetch('/api/widgets', {
+      const res = await unauthenticatedFetch('/api/widgets', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ widgets: 'not an array' }),

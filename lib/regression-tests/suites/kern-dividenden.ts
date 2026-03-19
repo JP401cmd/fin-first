@@ -4,6 +4,7 @@ import {
   assert, assertNotNull, assertDefined, assertType, assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'kern.dividenden'
 
@@ -23,7 +24,7 @@ const CAT = 'kern.dividenden'
 // ── Helper: fetch with expected status ──────────────────────────────
 async function fetchAPI(path: string, options?: RequestInit): Promise<{ status: number; body: Record<string, unknown>; raw: string }> {
   try {
-    const res = await fetch(path, {
+    const res = await unauthenticatedFetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

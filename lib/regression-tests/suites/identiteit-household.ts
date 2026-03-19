@@ -3,6 +3,7 @@ import {
   assertEqual, assert, assertNotNull, assertGreaterThan, assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 import {
   computeSharePct,
   filterByPerspective,
@@ -26,7 +27,7 @@ async function fetchJson(
   init?: RequestInit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   try {
-    const res = await fetch(url, {
+    const res = await unauthenticatedFetch(url, {
       ...init,
       headers: { 'Content-Type': 'application/json', ...init?.headers },
     })

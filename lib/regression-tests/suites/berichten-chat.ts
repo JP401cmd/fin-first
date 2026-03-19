@@ -1,6 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'berichten.chat'
 
@@ -9,7 +10,7 @@ const CAT = 'berichten.chat'
 const BASE = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
 
 async function fetchChat(body: Record<string, unknown>, opts?: RequestInit) {
-  return fetch(`${BASE}/api/ai/chat`, {
+  return unauthenticatedFetch(`${BASE}/api/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     ...opts,

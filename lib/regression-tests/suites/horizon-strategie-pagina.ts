@@ -4,6 +4,7 @@ import {
   assertGreaterThanOrEqual, assertLessThan, assertType,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 import {
   type WithdrawalStrategyType,
   type WithdrawalStrategyConfig,
@@ -352,10 +353,10 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 300,
     async fn() {
-      const getRes = await fetch('/api/withdrawal-strategy')
+      const getRes = await unauthenticatedFetch('/api/withdrawal-strategy')
       assertEqual(getRes.status, 401, 'GET → 401')
 
-      const putRes = await fetch('/api/withdrawal-strategy', {
+      const putRes = await unauthenticatedFetch('/api/withdrawal-strategy', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ withdrawal_strategy: 'static' }),
@@ -372,10 +373,10 @@ const tests: TestCase[] = [
     estimatedDurationMs: 200,
     async fn() {
       // Verify the API route responds (auth check returns 401 for unauthenticated)
-      const getRes = await fetch('/api/withdrawal-strategy')
+      const getRes = await unauthenticatedFetch('/api/withdrawal-strategy')
       assert(getRes.status === 401 || getRes.status === 200, 'GET handler exists')
 
-      const putRes = await fetch('/api/withdrawal-strategy', {
+      const putRes = await unauthenticatedFetch('/api/withdrawal-strategy', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ withdrawal_strategy: 'invalid_strategy_xyz' }),

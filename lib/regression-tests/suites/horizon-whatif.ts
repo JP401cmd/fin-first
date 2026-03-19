@@ -5,6 +5,7 @@ import {
   assertType,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 import type { FinancialInput } from '@/lib/core-metrics'
 import { runSimulation, lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
 import { ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
@@ -352,7 +353,7 @@ const tests: TestCase[] = [
         { url: '/api/scenarios?id=test', method: 'DELETE' },
       ]
       for (const ep of endpoints) {
-        const res = await fetch(ep.url, {
+        const res = await unauthenticatedFetch(ep.url, {
           method: ep.method,
           headers: ep.method === 'POST' ? { 'Content-Type': 'application/json' } : {},
           body: ep.method === 'POST' ? JSON.stringify({ name: 'test', overrides: {} }) : undefined,
@@ -370,7 +371,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 100,
     async fn() {
       // Missing name
-      const res1 = await fetch('/api/scenarios', {
+      const res1 = await unauthenticatedFetch('/api/scenarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ overrides: {} }),
@@ -379,7 +380,7 @@ const tests: TestCase[] = [
       assert(res1.status === 400 || res1.status === 401, 'missing name → 400 of 401')
 
       // Missing overrides
-      const res2 = await fetch('/api/scenarios', {
+      const res2 = await unauthenticatedFetch('/api/scenarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'test' }),
@@ -396,11 +397,11 @@ const tests: TestCase[] = [
     estimatedDurationMs: 20,
     async fn() {
       // Verify the API route responds (can't import server-only route directly)
-      const getRes = await fetch('/api/scenarios')
+      const getRes = await unauthenticatedFetch('/api/scenarios')
       assert(getRes.status === 401 || getRes.status === 200, 'GET handler exists')
-      const postRes = await fetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const postRes = await unauthenticatedFetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       assert(postRes.status === 401 || postRes.status === 400, 'POST handler exists')
-      const delRes = await fetch('/api/scenarios?id=nonexistent', { method: 'DELETE' })
+      const delRes = await unauthenticatedFetch('/api/scenarios?id=nonexistent', { method: 'DELETE' })
       assert(delRes.status === 401 || delRes.status === 400 || delRes.status === 404, 'DELETE handler exists')
 
       // Validate the shape by constructing a mock scenario
@@ -438,7 +439,7 @@ const tests: TestCase[] = [
     async fn() {
       // The route defines MAX_SCENARIOS = 5
       // Verify the POST endpoint exists (can't import server-only route directly)
-      const postRes = await fetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const postRes = await unauthenticatedFetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       assert(postRes.status === 401 || postRes.status === 400, 'POST handler exists')
 
       // The max limit of 5 is hardcoded in the route

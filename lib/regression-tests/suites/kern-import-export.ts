@@ -4,6 +4,7 @@ import {
   assert, assertNotNull, assertDefined, assertType, assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'kern.import-export'
 
@@ -25,7 +26,7 @@ const CAT = 'kern.import-export'
 // ── Helper: fetch with expected status ──────────────────────────────
 async function fetchAPI(path: string, options?: RequestInit): Promise<{ status: number; body: Record<string, unknown>; raw: string }> {
   try {
-    const res = await fetch(path, {
+    const res = await unauthenticatedFetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -420,7 +421,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/export?type=transactions')
+      const res = await unauthenticatedFetch('/api/export?type=transactions')
       assertEqual(res.status, 401, 'GET /api/export → 401')
     },
   },
@@ -434,7 +435,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/export?type=invalid_type')
+      const res = await unauthenticatedFetch('/api/export?type=invalid_type')
       // Either 401 (auth first) or 400 (validation)
       assert(
         res.status === 401 || res.status === 400,
@@ -457,7 +458,7 @@ const tests: TestCase[] = [
 
       // Verify all endpoints are functional (will 401 since unauthenticated)
       for (const type of validTypes) {
-        const res = await fetch(`/api/export?type=${type}`)
+        const res = await unauthenticatedFetch(`/api/export?type=${type}`)
         // 401 confirms route exists and checks auth
         assertEqual(res.status, 401, `GET /api/export?type=${type} → 401 (auth guard)`)
       }
@@ -473,7 +474,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 500,
     async fn() {
-      const res = await fetch('/api/export')
+      const res = await unauthenticatedFetch('/api/export')
       // Auth check or missing param validation
       assert(
         res.status === 401 || res.status === 400,
@@ -649,7 +650,7 @@ const tests: TestCase[] = [
         if (ep.method === 'POST') {
           options.body = JSON.stringify({ holdings: [], transactions: [], broker: 'degiro' })
         }
-        const res = await fetch(ep.path, options)
+        const res = await unauthenticatedFetch(ep.path, options)
         assertEqual(
           res.status,
           401,
