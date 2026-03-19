@@ -1,3 +1,17 @@
+## Session 2026-03-19 (attempt 5) - Feature #331
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker)
+- 5th attempt, same external blocker persists
+- Confirmed Supabase MCP OAuth not authenticated: curl to mcp.supabase.com returns "Unauthorized"
+- All Supabase MCP tools fail (execute_sql, apply_migration, list_tables, get_project_url)
+- No DB credentials in env: no SUPABASE_DB_PASSWORD, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_ACCESS_TOKEN
+- Tried connecting via postgres npm package with anon key as password — "Tenant or user not found"
+- No Supabase CLI config/tokens found on system
+- The /api/apply-migration route is fully built and ready — just needs credentials
+- Missing in DB: target_allocations, holding_prices, holding_alerts tables; 7 holdings columns; 2 profile columns; save_onboarding_data RPC
+- RESOLUTION REQUIRED: User must either (a) re-authenticate Supabase MCP OAuth, (b) add SUPABASE_DB_PASSWORD to .env.local, or (c) provide service_role_key/access_token
+- Feature skipped (priority 381)
+
 ## Session 2026-03-19 - Features #324, #325
 
 ### Feature #324: Persona seeds bijwerken voor onboarding wijzigingen - PASSING
@@ -16563,3 +16577,35 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 2 features completed this session (#333, #336)
 - Overall progress: 324/336 (96.4%)
+
+## Session 2026-03-19 - Features #334, #335
+
+### Feature #334: Compatibiliteitsmatrix eindstrategie × onttrekkingsstrategie - PASSING
+- Added COMPATIBILITY_MATRIX constant with 12 entries (4 withdrawal × 3 end strategies)
+- Each entry has status (compatible/warning/incompatible), Dutch explanation, and optional suggestion
+- Built CompatibilityMatrix component:
+  - Desktop: 4×3 table with hover tooltips per cell (hidden md:block)
+  - Mobile: stacked cards per withdrawal strategy with 3 mini-badges (md:hidden)
+- Active combination highlighted with horizon ring
+- Selected combination highlighted with lighter ring
+- Inline warning under activate button for incompatible/warning combos
+- Full incompatibility warning block before strategy explanation cards
+- VPW × perpetual correctly marked as incompatible (❌)
+- Design tokens: var(--ink), var(--border-ed), horizon-500 accent
+- Kicker: 'COMPATIBILITEIT' uppercase 10px tracking 0.1em
+- Verified on 360px mobile and 1280px desktop
+- Commit: dffc930e (auto-committed by hook), verified passing
+
+### Feature #335: Gids uitbreiden met 4 onttrekkingsstrategieën - PASSING
+- Added new GuideTopicCard "Onttrekkingsmethoden" with Shield icon
+- Describes all 4 methods: Static (SWR), Guardrails, VPW, Bucket
+- Includes 5 howTo steps linking to strategy modal on De Horizon
+- References compatibiliteitsmatrix with ✅/⚠️/❌ icons
+- Tip recommending starting strategy per preference
+- Updated existing "Onttrekkingsstrategie" card with cross-reference to new card
+- Clarifies terminology: eindstrategie (what) vs onttrekkingsmethode (how)
+- Commit: f38d2d19
+
+### Current Status
+- 2 features completed this session (#334, #335)
+- Progress: 329/336 passing (97.9%)
