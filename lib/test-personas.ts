@@ -78,6 +78,8 @@ export interface PersonaProfile {
   invulfase_active?: boolean
   // Arbitrary feature preferences (JSONB)
   feature_preferences?: Record<string, unknown>
+  // Marginaal tarief (IB Box 1)
+  marginaal_tarief?: number | null // 0.3697 or 0.4950, null = auto
   // Rebalancing
   rebalance_threshold?: number // drift threshold 1-20%, default 5
   // Widget dashboard
@@ -1075,6 +1077,7 @@ const lisaData: PersonaData = {
     fire_legacy_amount: 100000,
     retirement_expense_method: 'essential_budgets',
     withdrawal_strategy: 'bucket',
+    marginaal_tarief: 0.3697, // modaal inkomen — laagste schijf
     invulfase_active: false,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
@@ -1851,6 +1854,7 @@ const marijkeData: PersonaData = {
     guardrail_ceiling: 1.20,
     guardrail_cut_step: 0.10,
     guardrail_raise_step: 0.10,
+    marginaal_tarief: 0.4950, // hoog inkomen — hoogste schijf
     net_monthly_income: 3400,
     estimated_monthly_expenses: 2800,
     invulfase_active: false,

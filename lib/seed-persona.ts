@@ -201,6 +201,9 @@ export async function seedPersonaData(
     _invulfase_active: invulfaseActive,
   }
 
+  // Marginaal tarief (optional, per-persona — null means auto-derived)
+  if (persona.profile.marginaal_tarief != null) profileData.marginaal_tarief = persona.profile.marginaal_tarief
+
   // Rebalancing threshold (optional, per-persona)
   if (persona.profile.rebalance_threshold != null) profileData.rebalance_threshold = persona.profile.rebalance_threshold
 
@@ -211,13 +214,14 @@ export async function seedPersonaData(
     .from('profiles')
     .upsert(profileData)
   if (profileError) {
-    // If the error is about a missing column (e.g. rebalance_threshold not yet migrated),
+    // If the error is about a missing column (e.g. rebalance_threshold or marginaal_tarief not yet migrated),
     // retry without the newer optional columns
     const msg = profileError.message ?? ''
-    if (msg.includes('rebalance_threshold')) {
-      console.warn(`[seed-persona] Profile upsert failed with rebalance_threshold, retrying without: ${msg}`)
+    if (msg.includes('rebalance_threshold') || msg.includes('marginaal_tarief')) {
+      console.warn(`[seed-persona] Profile upsert failed with optional column, retrying without: ${msg}`)
       const fallbackProfile = { ...profileData }
       delete fallbackProfile.rebalance_threshold
+      delete fallbackProfile.marginaal_tarief
       const { error: fallbackErr } = await supabase.from('profiles').upsert(fallbackProfile)
       if (fallbackErr) throw new Error(`Profiel update mislukt (fallback): ${fallbackErr.message}`)
     } else {

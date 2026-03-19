@@ -174,6 +174,8 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/beheer-notificaties').then(m => m.register()).catch(e => { console.warn('[test-registry] beheer-notificaties failed:', e) }),
     import('@/lib/regression-tests/suites/dashboard-empty-loading').then(m => m.register()).catch(e => { console.warn('[test-registry] dashboard-empty-loading failed:', e) }),
     import('@/lib/regression-tests/suites/kostenanalyse-ter').then(m => m.register()).catch(e => { console.warn('[test-registry] kostenanalyse-ter failed:', e) }),
+    import('@/lib/regression-tests/suites/kern-hypotheek-vs-beleggen').then(m => m.register()).catch(e => { console.warn('[test-registry] kern-hypotheek-vs-beleggen failed:', e) }),
+    import('@/lib/regression-tests/suites/rebalancing-drift').then(m => m.register()).catch(e => { console.warn('[test-registry] rebalancing-drift failed:', e) }),
   ])
 
   // Log any rejected promises (shouldn't happen due to .catch, but just in case)
