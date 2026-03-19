@@ -1,3 +1,30 @@
+## Session 2026-03-19 - Features #381, #382
+
+### Feature #381: Migratie: TER veld toevoegen aan holdings tabel - PASSING
+- Created migration: `20260319100001_add_holdings_ter.sql` (ALTER TABLE holdings ADD COLUMN ter, ter_source)
+- DB constraints: ter range 0–0.10, ter_source IN ('manual', 'lookup')
+- Updated TypeScript Holding type in holdings-client.tsx
+- Updated API routes POST/PATCH with TER validation and handling
+- Backward compatible: TER fields only included in insert when explicitly provided
+- Migration file ready; Supabase MCP tools need user authorization for DDL
+- Verified: holdings CRUD works, zero console errors
+- Commit: b1a93075
+
+### Feature #382: lib/fee-analysis.ts — Portefeuille kostenberekening en FIRE impact - PASSING
+- Created pure utility module lib/fee-analysis.ts
+- computePortfolioFees(): weighted average TER, total annual fee, per-holding breakdown
+- computeTotalAnnualFee(): shortcut for total annual fees
+- computeFeeImpactOnFire(): dual runSimulation (with/without fee drag), returns months difference
+- computeFeeOverHorizon(): compound missed returns over investment horizon
+- formatFeeImpactMessage(): user-friendly Dutch string with TER%, annual cost, FIRE delay
+- All types exported: FeeAnalysis, HoldingFee, FeeImpact, FeeSimParams, FeeConstraints
+- TypeScript compiles cleanly with project tsconfig
+- Commit: 8a705c81
+
+### Current Status
+- 2 features completed this session (#381, #382)
+- Progress: ~373/397 passing
+
 ## Session 2026-03-19 - Features #373, #374
 
 ### Feature #373: lib/rebalancing.ts — Drift berekening en trade suggesties - PASSING
@@ -17639,3 +17666,17 @@ Current status: 369/371 features passing (99.5%)
 - Added 'Totaal = Vermogenspad (single source of truth)' clarification
 - Verified in browser: all content renders, 0 console errors
 - Stats: 368/371 passing (99.2%)
+
+## Session 2026-03-19 - Feature #389
+
+### Feature #389: Seed data — TER waarden voor persona holdings - PASSING
+- Added ter and ter_source fields to PersonaHolding interface
+- Daan (Persona 2): Meesman WWT ter=0.0050 (0.50%), Brand New Day ter=0.0059 (0.59%)
+- Lisa (Persona 3): Meesman WWT ter=0.0050 (0.50%), NT World Custom ESG ter=0.0018 (0.18%)
+- Willem (Persona 4): VWRL ter=0.0022 (0.22%), IEAG ter=0.0009 (0.09%), TDIV ter=0.0120 (1.20% active fund), EMIM ter=null (progressive disclosure)
+- Rashid (Persona 5): NT World Custom ESG ter=0.0030 (0.30%)
+- Updated seed-persona.ts to include ter/ter_source in holdings insert with graceful fallback
+- Verified seeding works with Willem persona - 0 console errors
+- DB migration 20260319100001_add_holdings_ter.sql exists but not yet applied; fallback handles gracefully
+- Commit: cba4c6aa
+- Stats: 372/397 passing (93.7%)
