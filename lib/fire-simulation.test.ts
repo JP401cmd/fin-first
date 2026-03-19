@@ -92,6 +92,8 @@ describe('Setup', () => {
       expect(row).toHaveProperty('withdrawal')
       expect(row).toHaveProperty('cashflowNet')
       expect(row).toHaveProperty('endPortfolio')
+      expect(row).toHaveProperty('grossIncome')
+      expect(row).toHaveProperty('grossExpenses')
       expect(['accumulation', 'retirement']).toContain(row.phase)
     }
   })
@@ -582,4 +584,150 @@ describe('E — Binary search convergence (4×3 matrix)', () => {
       })
     }
   }
+})
+
+// ── Section F: grossIncome / grossExpenses ─────────────────────────────────
+
+describe('F — grossIncome / grossExpenses', () => {
+  // F1: Every row has grossIncome and grossExpenses as finite non-negative integers
+  it('F1: every row has finite non-negative integer grossIncome and grossExpenses', () => {
+    const result = runStandard()
+
+    for (const row of result.rows) {
+      expect(Number.isFinite(row.grossIncome)).toBe(true)
+      expect(Number.isFinite(row.grossExpenses)).toBe(true)
+      expect(row.grossIncome).toBeGreaterThanOrEqual(0)
+      expect(row.grossExpenses).toBeGreaterThanOrEqual(0)
+      expect(Number.isInteger(row.grossIncome)).toBe(true)
+      expect(Number.isInteger(row.grossExpenses)).toBe(true)
+    }
+  })
+
+  // F2: In accumulation phase, grossIncome includes salary + portfolio growth
+  it('F2: accumulation grossIncome >= annualSavings + yearlyExpenses', () => {
+    const result = runStandard()
+    const accRows = result.rows.filter(r => r.phase === 'accumulation')
+
+    expect(accRows.length).toBeGreaterThan(0)
+
+    for (const row of accRows) {
+      // grossIncome = annualSavings + yearlyExpenses + cfIncome + otIncome + max(0, growth)
+      // Without cashflows, grossIncome >= annualSavings + yearlyExpenses (growth adds more)
+      expect(row.grossIncome).toBeGreaterThanOrEqual(
+        STANDARD.annualSavings + STANDARD.yearlyExpenses,
+      )
+    }
+  })
+
+  // F3: In accumulation phase without cashflows, grossExpenses equals yearlyExpenses
+  it('F3: accumulation grossExpenses equals yearlyExpenses (no cashflows)', () => {
+    const result = runStandard()
+    const accRows = result.rows.filter(r => r.phase === 'accumulation')
+
+    expect(accRows.length).toBeGreaterThan(0)
+
+    for (const row of accRows) {
+      expect(row.grossExpenses).toBe(STANDARD.yearlyExpenses)
+    }
+  })
+
+  // F4: grossIncome - grossExpenses ≈ net portfolio change per year (accumulation)
+  it('F4: grossIncome - grossExpenses ≈ endPortfolio - startPortfolio in accumulation', () => {
+    const result = runStandard()
+    const accRows = result.rows.filter(r => r.phase === 'accumulation')
+
+    expect(accRows.length).toBeGreaterThan(0)
+
+    for (const row of accRows) {
+      const netChange = row.endPortfolio - row.startPortfolio
+      const grossNet = row.grossIncome - row.grossExpenses
+      // Allow tolerance of 2 for rounding (each field is Math.round'd independently)
+      expect(Math.abs(grossNet - netChange)).toBeLessThanOrEqual(2)
+    }
+  })
+
+  // F5: With cashflows, grossIncome includes positive cashflows, grossExpenses includes negative
+  it('F5: cashflows appear in correct gross fields', () => {
+    const aowCashflow: SimCashflow = {
+      id: 'aow-gross',
+      name: 'AOW',
+      type: 'recurring',
+      direction: 'income',
+      amount: NL_AOW_MONTHLY,
+      fromAge: 67,
+      toAge: null,
+      indexed: true,
+    }
+
+    const childCashflow: SimCashflow = {
+      id: 'child-gross',
+      name: 'Kind',
+      type: 'recurring',
+      direction: 'expense',
+      amount: 500,
+      fromAge: 36,
+      toAge: 50,
+      indexed: true,
+    }
+
+    const result = runStandard({}, [aowCashflow, childCashflow])
+    const baseResult = runStandard()
+
+    // Accumulation row at age 37 should have higher grossExpenses than base (child cost)
+    const row37 = result.rows.find(r => r.age === 37 && r.phase === 'accumulation')
+    const baseRow37 = baseResult.rows.find(r => r.age === 37 && r.phase === 'accumulation')
+    if (row37 && baseRow37) {
+      expect(row37.grossExpenses).toBeGreaterThan(baseRow37.grossExpenses)
+    }
+
+    // Retirement row at age 68 should have grossIncome boosted by AOW
+    const retRows = result.rows.filter(r => r.phase === 'retirement')
+    const row68 = retRows.find(r => r.age === 68)
+    if (row68) {
+      // AOW provides ~NL_AOW_MONTHLY * 12 annually, so grossIncome should reflect that
+      expect(row68.grossIncome).toBeGreaterThan(0)
+    }
+
+    // Retirement row at age 40 (if in retirement and child cost active) should have child cost in grossExpenses
+    const row40 = result.rows.find(r => r.age === 40 && r.phase === 'retirement')
+    const baseRow40 = baseResult.rows.find(r => r.age === 40 && r.phase === 'retirement')
+    if (row40 && baseRow40) {
+      expect(row40.grossExpenses).toBeGreaterThan(baseRow40.grossExpenses)
+    }
+  })
+
+  // F6: One-time income (inheritance) shows up in grossIncome at the right age
+  it('F6: inheritance shows up in grossIncome at target age', () => {
+    const inheritanceCashflow: SimCashflow = {
+      id: 'erfenis-gross',
+      name: 'Erfenis',
+      type: 'one_time',
+      direction: 'income',
+      amount: 100_000,
+      fromAge: 45,
+      toAge: 45,
+      indexed: false,
+    }
+
+    const result = runStandard({}, [inheritanceCashflow])
+    const baseResult = runStandard()
+
+    // Row at age 45 should have grossIncome boosted by the inheritance
+    const row45 = result.rows.find(r => r.age === 45)
+    const baseRow45 = baseResult.rows.find(r => r.age === 45)
+
+    expect(row45).toBeDefined()
+    expect(baseRow45).toBeDefined()
+
+    // grossIncome at age 45 should be at least 100_000 higher than base
+    expect(row45!.grossIncome - baseRow45!.grossIncome).toBeGreaterThanOrEqual(99_999)
+
+    // grossIncome at other ages should not include the inheritance
+    const row44 = result.rows.find(r => r.age === 44)
+    const baseRow44 = baseResult.rows.find(r => r.age === 44)
+    if (row44 && baseRow44) {
+      // At age 44, difference should be small (only indirect portfolio effect)
+      expect(Math.abs(row44.grossIncome - baseRow44.grossIncome)).toBeLessThan(1000)
+    }
+  })
 })
