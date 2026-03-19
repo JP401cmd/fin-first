@@ -1,3 +1,29 @@
+## Session 2026-03-19 - Features #361, #362
+
+### Feature #361: Toggle integratie Vermogenspad vs Vermogensopbouw - PASSING
+- Added pill-tab toggle above ZoomableChartContainer: Vermogenspad (SimChart) / Vermogensopbouw (WealthCompositionChart)
+- Smooth opacity fade transition (300ms) with no layout shift using absolute/relative positioning
+- Both charts share same zoom state (visibleMin/visibleMax from ZoomableChartContainer)
+- Computed wealthCompositionRows with useMemo, only when chartMode is 'vermogensopbouw'
+- Fixed hooks order bug in WealthCompositionChart: moved early return after useCallback hooks
+- EventsTimeline and IncomeExpenseChart toggle remain visible in both modes
+- Mobile: 44px min-height tap targets, full-width pill tabs
+- Commit: dd6ec349
+
+### Feature #362: Gids bijwerken met Vermogensopbouw weergave uitleg - PASSING
+- Added section 11 "Vermogensopbouw weergave" to GuideHorizonUitleg component
+- Explains the toggle between Vermogenspad and Vermogensopbouw
+- Documents 5 wealth categories with color-coded legend dots matching chart colors
+- Explains debt negative layer, per-asset projections, post-FIRE withdrawals
+- Difference between Vermogenspad (total line) and Vermogensopbouw (composition)
+- Life events impact on composition chart
+- Disclaimer about projection assumptions (expected return per asset)
+- Commit: 41a0f486
+
+### Current Status
+- 2 features completed this session (#361, #362)
+- Overall progress: 360/364 (98.9%)
+
 ## Session 2026-03-19 - Feature #365
 
 ### Feature #365: UI/UX review Vermogensopbouw stacked chart met ux-review-expert - PASSING
