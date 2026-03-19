@@ -8,6 +8,7 @@ import type { DashboardData } from './widget-renderer'
 import { computeHealthScore, type HealthPillar } from '@/lib/financial-health'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 
 interface Props {
   size: WidgetSize
@@ -333,7 +334,7 @@ function HealthKassabon({ health }: { health: ReturnType<typeof computeHealthSco
 
 export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size, data, href }: Props) {
   const [showKassabon, setShowKassabon] = useState(false)
-  const health = computeHealthScore(data)
+  const health = computeHealthScore(data, data.budgetingActive)
   const color = scoreColorClass(health.total)
 
   // ── Mini ─────────────────────────────────────────────────
@@ -364,7 +365,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
           </div>
         )}
         <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-          <HealthKassabon health={health} />
+          <div className="p-5"><HealthScoreReceipt health={health} /></div>
         </BottomSheet>
       </WidgetShell>
     )
@@ -389,7 +390,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
           </div>
         </div>
         <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-          <HealthKassabon health={health} />
+          <div className="p-5"><HealthScoreReceipt health={health} /></div>
         </BottomSheet>
       </WidgetShell>
     )
@@ -453,7 +454,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
       </p>
 
       <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-        <HealthKassabon health={health} />
+        <div className="p-5"><HealthScoreReceipt health={health} /></div>
       </BottomSheet>
     </WidgetShell>
   )

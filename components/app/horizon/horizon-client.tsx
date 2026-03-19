@@ -48,6 +48,7 @@ import { FeatureGate } from '@/components/app/feature-gate'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
+import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 
 const ScenariosModal = dynamic(() =>
   import('@/components/app/horizon/scenarios-modal').then(m => ({ default: m.ScenariosModal })),
@@ -122,6 +123,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   )
   const [healthScore, setHealthScore] = useState<HealthScore | null>(() => initialData.healthScore)
   const [healthScoreInput, setHealthScoreInput] = useState<HealthScoreInput>(initialData.healthScoreInput)
+  const [budgetingActive] = useState(initialData.budgetingActive)
   const [avgIncome6m, setAvgIncome6m] = useState<number | null>(initialData.avgIncome6m)
   const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(initialData.avgExpenses6m)
   const [snapshotResilience, setSnapshotResilience] = useState<number | null>(initialData.snapshotResilience)
@@ -559,7 +561,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       freedomPct: fPct,
     }
     setHealthScoreInput(newInput)
-    setHealthScore(computeHealthScoreFromInputs(newInput))
+    setHealthScore(computeHealthScoreFromInputs(newInput, budgetingActive))
     if (events.length > 0) {
       setImpacts(computeCumulativeImpacts(effectiveInput, events))
     }
@@ -2444,7 +2446,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </p>
               <p className="text-xs text-[var(--ink-4)]">
                 {snapshotResilience !== null ? getHealthLabel(snapshotResilience) : healthScore.label}
-                {' · '}6 pilaren
+                {' · '}{healthScore.activePillarCount} pilaren
               </p>
             </div>
           </button>
@@ -5162,68 +5164,34 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
       <BottomSheet open={showResilienceReceipt} onClose={() => setShowResilienceReceipt(false)} title="Financiële Gezondheid">
         <div className="p-5">
-          <KassabonShell>
-            <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">FINANCIËLE GEZONDHEID</p>
-              <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">gezondheidsscore op basis van 6 pilaren</p>
-            </div>
-
-            <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              Een gewogen score van je financiële gezondheid, berekend uit 6 pilaren: spaarquote, schuldratio, noodfonds, FIRE-voortgang, diversificatie en budgetdiscipline.
-            </div>
-
-            {healthScore && (
-              <>
-                <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-                  {healthScore.pillars.map(pillar => (
-                    <div key={pillar.id} className="flex justify-between py-0.5">
-                      <span className="font-sans text-sm text-[var(--ink-2)]">{pillar.name}</span>
-                      <span className="tabular-nums text-[var(--ink)]">{pillar.score} / 100 <span className="text-[var(--ink-4)] text-[10px]">({Math.round(pillar.weight * 100)}%)</span></span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Pillar details with tips */}
-                <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-                  {healthScore.pillars.map(pillar => (
-                    <div key={`tip-${pillar.id}`} className="py-1">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 shrink-0 rounded-full" style={{
-                          backgroundColor: pillar.score >= 70 ? '#22c55e' : pillar.score >= 40 ? '#eab308' : '#ef4444'
-                        }} />
-                        <span className="font-sans text-[11px] font-medium text-[var(--ink-2)]">{pillar.name}: {pillar.rawValue}</span>
-                      </div>
-                      <p className="ml-3 font-sans text-[10px] leading-relaxed text-[var(--ink-4)]">{pillar.improvementTip}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-                  <span className="text-[var(--ink)]">{snapshotResilience !== null ? getHealthLabel(snapshotResilience) : healthScore.label}</span>
-                  <span className="tabular-nums text-[var(--ink)]">{snapshotResilience !== null ? snapshotResilience : healthScore.total} / 100</span>
-                </div>
-              </>
-            )}
-
-            {/* Backtesting samenvatting */}
-            <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">HISTORISCHE VEERKRACHTCHECK</p>
-              <p className="mt-1 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-                Backtesting over 55 jaar marktgeschiedenis (1970–heden) toont hoe je plan standhoudt onder historische crises.
-              </p>
-              <button
-                type="button"
-                onClick={() => { setShowResilienceReceipt(false); setActiveModal('backtesting') }}
-                className="mt-2 font-serif text-sm italic text-horizon-600 transition-colors hover:text-horizon-800"
-              >
-                Bekijk volledige backtesting →
-              </button>
-            </div>
-
-            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-              {snapshotResilience !== null ? 'Op basis van meest recente snapshot' : 'Live berekend uit huidige financiële gegevens'}
-            </p>
-          </KassabonShell>
+          {healthScore && (
+            <HealthScoreReceipt
+              health={healthScore}
+              overrideTotal={snapshotResilience}
+              overrideLabel={snapshotResilience !== null ? getHealthLabel(snapshotResilience) : null}
+              footer={
+                <>
+                  {/* Backtesting samenvatting */}
+                  <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] p-3">
+                    <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">HISTORISCHE VEERKRACHTCHECK</p>
+                    <p className="mt-1 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+                      Backtesting over 55 jaar marktgeschiedenis (1970–heden) toont hoe je plan standhoudt onder historische crises.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setShowResilienceReceipt(false); setActiveModal('backtesting') }}
+                      className="mt-2 font-serif text-sm italic text-horizon-600 transition-colors hover:text-horizon-800"
+                    >
+                      Bekijk volledige backtesting →
+                    </button>
+                  </div>
+                  <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
+                    {snapshotResilience !== null ? 'Op basis van meest recente snapshot' : 'Live berekend uit huidige financiële gegevens'}
+                  </p>
+                </>
+              }
+            />
+          )}
         </div>
       </BottomSheet>
 

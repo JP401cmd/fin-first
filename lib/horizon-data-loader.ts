@@ -47,10 +47,12 @@ export interface HorizonPageData {
   snapshotResilience: number | null
   avgIncome6m: number
   avgExpenses6m: number
-  /** 6-pillar health score computed server-side */
+  /** Health score computed server-side (5 or 6 pillars) */
   healthScore: HealthScore
   /** Health score input data for client-side recomputation */
   healthScoreInput: HealthScoreInput
+  /** Whether the user has active budgeting (cash accounts with budgets) */
+  budgetingActive: boolean
   /** Error message from profile query, null if successful */
   profileError: string | null
 }
@@ -131,7 +133,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct, asset_type').eq('is_active', true),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active').single(),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
@@ -291,7 +293,10 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     ? snapshotsWithResilience[snapshotsWithResilience.length - 1].resilience_score
     : null
 
-  // ── Health Score (6-pillar) ───────────────────────────────
+  // ── Health Score (5 or 6 pillars) ──────────────────────────
+  // Detect budgetingActive from profile (defaults to true if column doesn't exist)
+  const budgetingActive = (profile as Record<string, unknown>).budgeting_active !== false
+
   // savingsRate6m
   const savingsRate6m = avgIncome6m > 0
     ? ((avgIncome6m - avgExpenses6m) / avgIncome6m) * 100
@@ -319,9 +324,9 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     emergencyFundMonths,
     freedomPct,
     assetTypeCount,
-    budgetCategories: [], // budget spending not available server-side; neutral default (70)
+    budgetCategories: [], // budget spending not available server-side
   }
-  const healthScore = computeHealthScoreFromInputs(healthScoreInput)
+  const healthScore = computeHealthScoreFromInputs(healthScoreInput, budgetingActive)
 
   // Events, actions, debts
   const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
@@ -346,6 +351,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     avgExpenses6m,
     healthScore,
     healthScoreInput,
+    budgetingActive,
     profileError: profileResult.error
       ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`
       : null,
