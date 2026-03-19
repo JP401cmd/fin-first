@@ -17537,3 +17537,30 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#363)
 - Overall progress: 362/364 (99.5%)
+
+## Session 2026-03-19 - Features #366, #367
+
+### Feature #366: deriveWealthCompositionFromSim — ratio-engine bouwen - PASSING
+- Created new function in lib/wealth-composition.ts
+- Groups assets by WEALTH_GROUPS, computes per-group weighted return
+- Running-balance projection with compound growth per group
+- Post-FIRE: contributions stop, waterfall withdrawals (beleggingen > spaargeld > overig > pensioen > vastgoed)
+- Ratio-based allocation: theoretical ratios * SimRow.endPortfolio (single source of truth)
+- Floor at 0, normalise to 100%, rounding residual to largest group
+- Debts projected separately via projectDebtByYear()
+- Returns StackedRow[] as drop-in replacement
+- 18 unit tests covering all requirements
+- Commit: cacf9018
+
+### Feature #367: horizon-client integratie — projectWealthComposition vervangen - PASSING
+- Replaced projectWealthComposition import with deriveWealthCompositionFromSim
+- Updated useMemo to pass simResult.rows, assets, debts, fireAge, annualExpenses
+- Verified via browser: toggle between Vermogenspad/Vermogensopbouw works correctly
+- Chart renders stacked bars with correct FIRE age marker and legend
+- Zero new JS errors (only pre-existing Supabase 400)
+- 33 tests passing (18 original + 15 regression tests added by another agent)
+- Commit: 76d3d2a1
+
+### Current Status
+- 2 features completed this session (#366, #367)
+- Overall progress: 366/371 (98.7%)
