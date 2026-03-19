@@ -1,3 +1,20 @@
+## Session 2026-03-19 - Feature #331 (Attempt 14)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 14)
+- **Blocker**: Cannot access hosted Supabase database to apply DDL migrations
+- **Root cause**: Supabase MCP tools return "permissions not granted" — user must click "Allow" in interactive session
+- **API migration endpoint** (`/api/apply-migration`) exists with all SQL but requires one of: db_password, service_role_key, or access_token — none available in env
+- **GET /api/apply-migration confirmed incomplete**: 3 tables missing (target_allocations, holding_prices, holding_alerts), 7 holdings columns missing, 2 profile columns missing, save_onboarding_data RPC missing
+- **Resolution needed**: User must either:
+  1. Grant Supabase MCP tool permissions when prompted (click "Allow" in interactive Claude session)
+  2. Add SUPABASE_DB_PASSWORD or SUPABASE_SERVICE_ROLE_KEY to .env.local
+  3. Run: `curl -X POST http://localhost:3000/api/apply-migration -H "Content-Type: application/json" -d '{"db_password":"YOUR_PASSWORD"}'`
+  4. Apply migrations manually via Supabase Dashboard SQL Editor
+
+### Current Status
+- 0 features completed this session (attempt 14)
+- Total: 344/346 features passing (99.4%)
+
 ## Session 2026-03-19 - Feature #331 (Attempt 12)
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 12)
