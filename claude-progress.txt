@@ -1,3 +1,24 @@
+## Session 2026-03-19 - Feature #331 (Attempt 12)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 12)
+- **Blocker**: Cannot access hosted Supabase database to apply DDL migrations
+- **Root cause**: All Supabase MCP tools (apply_migration, execute_sql, list_migrations, list_tables) require runtime OAuth permission that has never been granted by the user
+- **Also blocked**: feature_request_human_input MCP tool also denied — cannot even request user action through the tool
+- **No alternative credentials**: No service_role key, no SUPABASE_ACCESS_TOKEN, no DATABASE_URL in any .env file
+- **Supabase CLI**: `npx supabase` available but requires `supabase login` or SUPABASE_ACCESS_TOKEN
+- **Confirmed still pending** (from previous sessions):
+  - holdings.asset_class column does NOT exist
+  - target_allocations table does NOT exist
+  - save_onboarding_data RPC does NOT exist
+  - budgets unique index (user_id, slug, parent_id) not applied
+  - withdrawal strategy columns not applied
+  - invulfase_active column not applied
+- **Resolution needed**: User must do ONE of:
+  1. Grant Supabase MCP tool permissions when prompted (click "Allow" in the permission dialog)
+  2. Run `npx supabase login` and then `npx supabase db push`
+  3. Add SUPABASE_ACCESS_TOKEN to .env
+  4. Apply migration SQL manually via Supabase Dashboard → SQL Editor
+
 ## Session 2026-03-19 - Feature #331 (Attempt 10)
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 10)
