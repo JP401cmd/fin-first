@@ -52,10 +52,14 @@ export default async function HoldingDetailPage({
   const units = Number(holdingData.units) || 0
   const avgPrice = Number(holdingData.avg_purchase_price) || 0
   const currentPrice = Number(holdingData.current_price) || avgPrice
+  const isin = holdingData.isin as string | null
+  const ter = holdingData.ter != null ? Number(holdingData.ter) : null
+  const terSource = holdingData.ter_source as string | null
   const holdingValue = currentPrice * units
   const costBasis = avgPrice * units
   const returnPct = costBasis > 0 ? ((holdingValue - costBasis) / costBasis) * 100 : 0
   const returnValue = holdingValue - costBasis
+  const terAnnualCost = ter != null ? ter * holdingValue : null
 
   // Fetch total portfolio value for Box 3 proportional exemption calculation
   const { data: allHoldings } = await supabase
@@ -174,6 +178,37 @@ export default async function HoldingDetailPage({
           <span>Belastbaar: <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{formatCurrency(box3Info.taxableValue)}</span></span>
         </div>
       </div>
+
+      {/* TER (Total Expense Ratio) Section */}
+      {ter != null ? (
+        <div className="mt-4 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-4" data-testid="ter-section">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">TER (fondskosten)</p>
+              <p className="mt-1 text-lg font-bold font-mono tabular-nums text-[var(--ink)]" data-testid="ter-percentage">
+                {(ter * 100).toFixed(2).replace(/\.?0+$/, '')}%
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Jaarlijkse kosten</p>
+              <p className="mt-1 text-sm font-bold font-mono tabular-nums text-[var(--ink)]" data-testid="ter-annual-cost">
+                {formatCurrency(terAnnualCost!, currency)}
+              </p>
+            </div>
+          </div>
+          {terSource && (
+            <p className="mt-2 text-[11px] text-[var(--ink-3)]">
+              Bron: {terSource === 'manual' ? 'Handmatig ingevoerd' : 'Automatisch opgezocht'}
+            </p>
+          )}
+        </div>
+      ) : (ticker || isin) ? (
+        <div className="mt-4 rounded-lg border border-dashed border-kern-200 bg-kern-50/30 px-4 py-3" data-testid="ter-hint-detail">
+          <p className="text-[11px] text-kern-600">
+            💡 Voeg de TER toe via &quot;Bewerken&quot; om jaarlijkse fondskosten inzichtelijk te maken
+          </p>
+        </div>
+      ) : null}
 
       {/* Price Alerts Section */}
       <section className="mt-6" data-testid="alerts-section">

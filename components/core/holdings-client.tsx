@@ -1155,6 +1155,7 @@ function HoldingForm({
     return today.toISOString().split('T')[0]
   })
   const [notes, setNotes] = useState('')
+  const [ter, setTer] = useState('')
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1164,6 +1165,11 @@ function HoldingForm({
   } | null>(null)
   // Idempotency key to prevent duplicate submissions on back-button / re-render
   const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
+
+  // TER annual cost calculation
+  const terDecimal = ter ? Number(ter) / 100 : 0
+  const createFormValue = (Number(currentPrice) || Number(avgPrice) || 0) * (Number(units) || 0)
+  const terAnnualCost = terDecimal * createFormValue
 
   const validateTicker = useCallback((value: string) => {
     if (tickerDebounceRef.current) clearTimeout(tickerDebounceRef.current)
@@ -1220,6 +1226,7 @@ function HoldingForm({
           is_active: isActive,
           notes: notes || null,
           force_duplicate: forceDuplicate,
+          ...(ter ? { ter: Number(ter) / 100, ter_source: 'manual' } : {}),
         }),
       })
 
@@ -1418,6 +1425,37 @@ function HoldingForm({
             </div>
           </div>
 
+          {/* TER (Total Expense Ratio) */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">TER — Total Expense Ratio (optioneel)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="10"
+                inputMode="decimal"
+                value={ter}
+                onChange={(e) => setTer(e.target.value)}
+                className="w-32 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                placeholder="0.22"
+                data-testid="holding-ter-input"
+              />
+              <span className="text-sm text-[var(--ink-3)]">%</span>
+              {ter && createFormValue > 0 && (
+                <span className="text-xs text-[var(--ink-3)] font-mono tabular-nums" data-testid="ter-annual-cost">
+                  = {new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(terAnnualCost)}/jaar
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+              Vind de TER op de fonds factsheet of Morningstar
+            </p>
+            {Number(ter) > 10 && (
+              <p className="mt-1 text-[11px] text-red-500">TER mag maximaal 10% zijn</p>
+            )}
+          </div>
+
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
             <textarea
@@ -1427,6 +1465,15 @@ function HoldingForm({
               className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
+
+          {/* Progressive disclosure: hint when ticker/ISIN present but no TER */}
+          {!ter && ticker && (
+            <div className="rounded-lg border border-kern-100 bg-kern-50/50 px-3 py-2" data-testid="ter-hint">
+              <p className="text-[11px] text-kern-600">
+                💡 Tip: voeg de TER toe om jaarlijkse fondskosten inzichtelijk te maken
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
@@ -1495,6 +1542,7 @@ function HoldingEditForm({
   const [avgPrice, setAvgPrice] = useState(draft?.avgPrice ?? String(holding.avg_purchase_price))
   const [currentPrice, setCurrentPrice] = useState(draft?.currentPrice ?? String(holding.current_price ?? ''))
   const [notes, setNotes] = useState(draft?.notes ?? (holding.notes || ''))
+  const [ter, setTer] = useState(draft?.ter ?? (holding.ter != null ? String((holding.ter * 100).toFixed(2).replace(/\.?0+$/, '')) : ''))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showDraftNotice, setShowDraftNotice] = useState(!!draft)
@@ -1535,7 +1583,13 @@ function HoldingEditForm({
     }, 600)
   }, [])
 
+  // TER annual cost calculation for edit form
+  const editTerDecimal = ter ? Number(ter) / 100 : 0
+  const editFormValue = (Number(currentPrice) || Number(avgPrice) || 0) * (Number(units) || 1)
+  const editTerAnnualCost = editTerDecimal * editFormValue
+
   // Track dirty state (form values differ from original holding)
+  const originalTerStr = holding.ter != null ? String((holding.ter * 100).toFixed(2).replace(/\.?0+$/, '')) : ''
   const isDirty = useMemo(() => {
     return (
       name !== holding.name ||
@@ -1543,9 +1597,10 @@ function HoldingEditForm({
       units !== String(holding.units) ||
       avgPrice !== String(holding.avg_purchase_price) ||
       currentPrice !== String(holding.current_price ?? '') ||
-      notes !== (holding.notes || '')
+      notes !== (holding.notes || '') ||
+      ter !== originalTerStr
     )
-  }, [name, ticker, units, avgPrice, currentPrice, notes, holding])
+  }, [name, ticker, units, avgPrice, currentPrice, notes, ter, holding, originalTerStr])
 
   // Auto-save draft to localStorage when form is dirty
   useEffect(() => {
@@ -1553,7 +1608,7 @@ function HoldingEditForm({
       try {
         localStorage.setItem(draftKey, JSON.stringify({
           holdingId: holding.id,
-          name, ticker, units, avgPrice, currentPrice, notes,
+          name, ticker, units, avgPrice, currentPrice, notes, ter,
           savedAt: new Date().toISOString(),
         }))
       } catch { /* ignore storage errors */ }
@@ -1561,7 +1616,7 @@ function HoldingEditForm({
       // Clean up draft when form matches original
       try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
     }
-  }, [isDirty, draftKey, holding.id, name, ticker, units, avgPrice, currentPrice, notes])
+  }, [isDirty, draftKey, holding.id, name, ticker, units, avgPrice, currentPrice, notes, ter])
 
   // Warn on page refresh/close when form has unsaved changes
   useEffect(() => {
@@ -1599,6 +1654,7 @@ function HoldingEditForm({
     setAvgPrice(String(holding.avg_purchase_price))
     setCurrentPrice(String(holding.current_price ?? ''))
     setNotes(holding.notes || '')
+    setTer(holding.ter != null ? String((holding.ter * 100).toFixed(2).replace(/\.?0+$/, '')) : '')
     setShowDraftNotice(false)
     try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
   }
@@ -1621,6 +1677,8 @@ function HoldingEditForm({
         avg_purchase_price: Number(avgPrice) || 0,
         current_price: currentPrice ? Number(currentPrice) : null,
         notes: notes || null,
+        ter: ter ? Number(ter) / 100 : null,
+        ter_source: ter ? 'manual' : null,
       }
 
       // Send expected_updated_at for optimistic concurrency control
@@ -1672,6 +1730,7 @@ function HoldingEditForm({
     if (s.avg_purchase_price !== undefined) setAvgPrice(String(s.avg_purchase_price))
     if (s.current_price !== undefined) setCurrentPrice(String(s.current_price ?? ''))
     if (s.notes !== undefined) setNotes(String(s.notes || ''))
+    if (s.ter !== undefined) setTer(s.ter != null ? String((Number(s.ter) * 100).toFixed(2).replace(/\.?0+$/, '')) : '')
     setConflictData(null)
     setError(null)
   }
@@ -1882,6 +1941,37 @@ function HoldingEditForm({
             )}
           </div>
 
+          {/* TER (Total Expense Ratio) */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">TER — Total Expense Ratio (optioneel)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="10"
+                inputMode="decimal"
+                value={ter}
+                onChange={(e) => setTer(e.target.value)}
+                className="w-32 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                placeholder="0.22"
+                data-testid="holding-ter-input"
+              />
+              <span className="text-sm text-[var(--ink-3)]">%</span>
+              {ter && editFormValue > 0 && (
+                <span className="text-xs text-[var(--ink-3)] font-mono tabular-nums" data-testid="ter-annual-cost">
+                  = {new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(editTerAnnualCost)}/jaar
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+              Vind de TER op de fonds factsheet of Morningstar
+            </p>
+            {Number(ter) > 10 && (
+              <p className="mt-1 text-[11px] text-red-500">TER mag maximaal 10% zijn</p>
+            )}
+          </div>
+
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
             <textarea
@@ -1891,6 +1981,15 @@ function HoldingEditForm({
               className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
+
+          {/* Progressive disclosure: hint when ticker/ISIN present but no TER */}
+          {!ter && (holding.ticker || holding.isin) && (
+            <div className="rounded-lg border border-kern-100 bg-kern-50/50 px-3 py-2" data-testid="ter-hint">
+              <p className="text-[11px] text-kern-600">
+                💡 Tip: voeg de TER toe om jaarlijkse fondskosten inzichtelijk te maken
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-5 flex justify-end gap-2">

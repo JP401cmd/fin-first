@@ -232,26 +232,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: holding, error } = await supabase
+    const baseRow = {
+      user_id: user.id,
+      asset_id: assetId,
+      name,
+      ticker: ticker || null,
+      isin: isin || null,
+      units: Number(units) || 1,
+      avg_purchase_price: Number(avg_purchase_price) || 0,
+      current_price: current_price != null ? Number(current_price) : null,
+      currency: typeof currency === 'string' && currency.trim().length > 0 ? currency.trim().toUpperCase() : 'EUR',
+      purchase_date: purchase_date || null,
+      notes: notes || null,
+      is_active: true,
+    }
+
+    const terFields = {
+      ...(ter != null ? { ter: Number(ter), ter_source: (ter_source as string) || 'manual' } : {}),
+      ...(ter_source != null && ter == null ? { ter_source: ter_source as string } : {}),
+    }
+
+    // Try insert with TER fields first; retry without if column doesn't exist yet
+    let { data: holding, error } = await supabase
       .from('holdings')
-      .insert({
-        user_id: user.id,
-        asset_id: assetId,
-        name,
-        ticker: ticker || null,
-        isin: isin || null,
-        units: Number(units) || 1,
-        avg_purchase_price: Number(avg_purchase_price) || 0,
-        current_price: current_price != null ? Number(current_price) : null,
-        currency: typeof currency === 'string' && currency.trim().length > 0 ? currency.trim().toUpperCase() : 'EUR',
-        purchase_date: purchase_date || null,
-        notes: notes || null,
-        is_active: true,
-        ...(ter != null ? { ter: Number(ter), ter_source: (ter_source as string) || 'manual' } : {}),
-        ...(ter_source != null && ter == null ? { ter_source: ter_source as string } : {}),
-      })
+      .insert({ ...baseRow, ...terFields })
       .select()
       .single()
+
+    if (error && error.message?.includes("'ter'")) {
+      // TER column not yet in schema — retry without TER fields
+      ;({ data: holding, error } = await supabase
+        .from('holdings')
+        .insert(baseRow)
+        .select()
+        .single())
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
@@ -380,13 +395,27 @@ export async function PATCH(request: NextRequest) {
     // Always bump updated_at on write so future conflict checks work
     updates.updated_at = new Date().toISOString()
 
-    const { data: holding, error } = await supabase
+    // Try update with all fields; retry without TER if column doesn't exist yet
+    let { data: holding, error } = await supabase
       .from('holdings')
       .update(updates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single()
+
+    if (error && error.message?.includes("'ter'")) {
+      // TER column not yet in schema — retry without TER fields
+      const { ter: _t, ter_source: _ts, ...updatesNoTer } = updates
+      void _t; void _ts
+      ;({ data: holding, error } = await supabase
+        .from('holdings')
+        .update(updatesNoTer)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single())
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
