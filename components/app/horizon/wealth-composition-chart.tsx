@@ -92,14 +92,11 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   const yRange = yMax - yMin
 
   // Scales
-  const numBars = Math.max(maxAge - minAge + 1, 1)
-  // Target ~85% bar fill on desktop, ~75% on mobile to avoid overlap
-  const gapFraction = isDesktop ? 0.005 : 0.008
-  const barGap = Math.max(0.5, innerW * gapFraction)
-  const barWidth = Math.max(2, (innerW - barGap * (numBars - 1)) / numBars)
+  const xScale = (age: number) =>
+    maxAge > minAge ? ((age - minAge) / (maxAge - minAge)) * innerW : 0
 
-  const xForAge = (age: number) =>
-    ((age - minAge) / Math.max(numBars - 1, 1)) * (innerW - barWidth)
+  const yearStep = innerW / Math.max(maxAge - minAge, 1)
+  const barWidth = Math.max(2, yearStep * (isDesktop ? 0.85 : 0.75))
 
   const yScale = (val: number) =>
     PAD.top + ((yMax - val) / yRange) * innerH
@@ -126,10 +123,10 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
     const rect = svg.getBoundingClientRect()
     const mouseX = ((e.clientX - rect.left) / rect.width) * W - PAD.left
     if (mouseX < 0 || mouseX > innerW) { setHoveredAge(null); return }
-    const age = Math.round((mouseX / (innerW - barWidth)) * (maxAge - minAge) + minAge)
+    const age = Math.round((mouseX / innerW) * (maxAge - minAge) + minAge)
     const clamped = Math.max(minAge, Math.min(maxAge, age))
     setHoveredAge(clamped)
-  }, [W, innerW, barWidth, minAge, maxAge])
+  }, [W, innerW, minAge, maxAge])
 
   const handleMouseLeave = useCallback(() => setHoveredAge(null), [])
 
@@ -144,12 +141,12 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
 
   // FIRE vertical line X position
   const xFire = fireAge != null && fireAge >= minAge && fireAge <= maxAge
-    ? PAD.left + xForAge(fireAge) + barWidth / 2
+    ? PAD.left + xScale(fireAge)
     : null
 
   // Tooltip data
   const tooltipRow = hoveredAge != null ? visibleRows.find(r => r.age === hoveredAge) : null
-  const tooltipX = hoveredAge != null ? PAD.left + xForAge(hoveredAge) + barWidth / 2 : 0
+  const tooltipX = hoveredAge != null ? PAD.left + xScale(hoveredAge) : 0
   const tooltipPositiveTotal = tooltipRow
     ? tooltipRow.spaargeld + tooltipRow.beleggingen + tooltipRow.pensioen + tooltipRow.vastgoed + tooltipRow.overig
     : 0
@@ -209,7 +206,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
         {xTickAges.map(age => (
           <text
             key={age}
-            x={PAD.left + xForAge(age) + barWidth / 2}
+            x={PAD.left + xScale(age)}
             y={H - 4}
             textAnchor="middle"
             fontSize={9}
@@ -222,7 +219,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
 
         {/* Stacked bars */}
         {visibleRows.map(row => {
-          const x = PAD.left + xForAge(row.age)
+          const x = PAD.left + xScale(row.age) - barWidth / 2
           const isHovered = hoveredAge === row.age
 
           // Positive layers stacked upward from zero

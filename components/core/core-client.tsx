@@ -13,6 +13,7 @@ import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy } from '@/lib/fire-strategy'
+import { resolveWithdrawalStrategy } from '@/lib/withdrawal-strategy'
 import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot, EntityBalanceHistory } from '@/lib/net-worth-data'
 import {
@@ -759,7 +760,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     async function runCoreSimulation() {
       const sb = createClient()
       const [profileResult, lifeEventsResult, assetsContribResult] = await Promise.all([
-        sb.from('profiles').select('date_of_birth, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
+        sb.from('profiles').select('date_of_birth, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
         sb.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         sb.from('assets').select('monthly_contribution').eq('is_active', true),
       ])
@@ -773,7 +774,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       const cashflows = lifeEventsToCashflows((lifeEventsResult.data ?? []) as LifeEvent[])
       const fireStrategy = parseFireStrategy(profileResult.data)
       const simFireParams = resolveFireParams(profileResult.data ?? {})
-      const simResult = runSimulation(currentAge, fireStrategy.endAge, data.netWorth, yearlyExp, annualSavings, simFireParams.grossReturn, 'nl_box3', simFireParams.inflationRate, cashflows, fireStrategy)
+      const wsConfig = resolveWithdrawalStrategy(profileResult.data ?? {})
+      const simResult = runSimulation(currentAge, fireStrategy.endAge, data.netWorth, yearlyExp, annualSavings, simFireParams.grossReturn, 'nl_box3', simFireParams.inflationRate, cashflows, fireStrategy, wsConfig)
       if (simResult.requiredFirePortfolio > 0) setCoreSimTarget(simResult.requiredFirePortfolio)
     }
     runCoreSimulation()

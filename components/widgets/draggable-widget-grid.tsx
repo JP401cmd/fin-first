@@ -221,6 +221,9 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const previousWidgets = useRef<WidgetPref[]>(initialPrefs)
   // Debounce timer ref
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Track pending debounced save for flush on unload/unmount
+  const pendingWidgets = useRef<WidgetPref[] | null>(null)
+  const [pendingSave, setPendingSave] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -255,6 +258,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       if (!res.ok) throw new Error('Opslaan mislukt')
       previousWidgets.current = widgets
       setSaveState('saved')
+      setPendingSave(false)
       setTimeout(() => setSaveState('idle'), 1500)
       // Invalidate server component cache so changes are visible after navigation/refresh
       router.refresh()
@@ -262,16 +266,45 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       // Rollback to previous state
       setActiveWidgets(previousWidgets.current)
       setSaveState('error')
+      setPendingSave(false)
       setSaveError('Opslaan mislukt. Volgorde teruggezet.')
     }
   }, [allPrefs, router])
 
   const scheduleSave = useCallback((widgets: WidgetPref[]) => {
+    pendingWidgets.current = widgets
+    setPendingSave(true)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
+      pendingWidgets.current = null
       performSave(widgets)
     }, 800)
   }, [performSave])
+
+  // Flush pending debounced save on page unload or component unmount
+  useEffect(() => {
+    const flush = () => {
+      if (pendingWidgets.current && saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        const widgets = pendingWidgets.current
+        pendingWidgets.current = null
+        const activeIds = new Set(widgets.map(w => w.id))
+        const disabledPrefs = allPrefs
+          .filter(p => !activeIds.has(p.id))
+          .map(p => ({ ...p, enabled: false }))
+        const merged = [...widgets.map(w => ({ ...w, enabled: true })), ...disabledPrefs]
+        navigator.sendBeacon('/api/widgets', new Blob(
+          [JSON.stringify({ widgets: merged })],
+          { type: 'application/json' }
+        ))
+      }
+    }
+    window.addEventListener('beforeunload', flush)
+    return () => {
+      window.removeEventListener('beforeunload', flush)
+      flush()
+    }
+  }, [allPrefs])
 
   const handleResize = useCallback((widgetId: string, size: WidgetSize) => {
     setActiveWidgets(prev => {
@@ -341,6 +374,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     setIsEditMode(false)
     setShowAddPicker(false)
     if (saveTimer.current) clearTimeout(saveTimer.current)
+    pendingWidgets.current = null
+    setPendingSave(false)
     setSaveState('saving')
     setSaveError(null)
 
@@ -448,9 +483,11 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                 ? 'Opslaan…'
                 : saveState === 'saved' && isEditMode === false
                   ? 'Opgeslagen'
-                  : isEditMode
-                    ? 'Gereed'
-                    : 'Modify'}
+                  : pendingSave && !isEditMode
+                    ? 'Opslaan…'
+                    : isEditMode
+                      ? 'Gereed'
+                      : 'Modify'}
             </span>
           </button>
         </div>

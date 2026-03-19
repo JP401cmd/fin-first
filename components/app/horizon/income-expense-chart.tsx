@@ -70,7 +70,7 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
   function pointsToPath(pts: [number, number][]): string {
     return pts
       .map(([age, val], i) => {
-        const x = PAD.left + xScale(age + 0.5) // center in year
+        const x = PAD.left + xScale(age)
         const y = PAD.top + yScale(Math.max(val, 0))
         return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
       })
@@ -110,13 +110,13 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
       const lower = type === 'surplus' ? botPts : topPts
 
       const fwd = upper.map(([age, val]) => {
-        const x = PAD.left + xScale(age + 0.5)
+        const x = PAD.left + xScale(age)
         const y = PAD.top + yScale(Math.max(val, 0))
         return `${x.toFixed(1)} ${y.toFixed(1)}`
       })
 
       const bwd = [...lower].reverse().map(([age, val]) => {
-        const x = PAD.left + xScale(age + 0.5)
+        const x = PAD.left + xScale(age)
         const y = PAD.top + yScale(Math.max(val, 0))
         return `${x.toFixed(1)} ${y.toFixed(1)}`
       })
@@ -256,7 +256,7 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
 
         {/* Hover vertical line + tooltip */}
         {hoveredAge !== null && hoveredRow && (() => {
-          const hx = PAD.left + xScale(hoveredAge + 0.5)
+          const hx = PAD.left + xScale(hoveredAge)
           const inc = hoveredRow.grossIncome
           const exp = hoveredRow.grossExpenses
           const diff = inc - exp

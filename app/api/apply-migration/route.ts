@@ -240,7 +240,7 @@ BEGIN
     onboarding_idempotency_key, updated_at
   ) VALUES (
     v_user_id,
-    v_profile->>'full_name', v_profile->>'date_of_birth',
+    v_profile->>'full_name', (v_profile->>'date_of_birth')::date,
     v_profile->>'household_type',
     COALESCE((v_profile->>'number_of_children')::int, 0),
     (v_profile->>'net_monthly_income')::numeric,

@@ -659,6 +659,7 @@ export function mergeWidgetPrefs(saved: WidgetPrefs | null): WidgetPrefs {
     if (w.id === 'abonnementen' || w.id === 'terugkerende_transacties') {
       return { ...w, id: 'vaste_lasten' }
     }
+    if (w.id === 'veerkracht_score') return { ...w, id: 'gezondheids_score' }
     return w
   })
   // Deduplicate: if both old widgets existed, keep the enabled one (or the first)

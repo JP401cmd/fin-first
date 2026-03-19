@@ -731,3 +731,41 @@ describe('F — grossIncome / grossExpenses', () => {
     }
   })
 })
+
+// ── Section G: Kern/Horizon doelbedrag consistency ──────────────────────────
+
+describe('G — Kern/Horizon doelbedrag consistency', () => {
+  it('G1: requiredFirePortfolio differs when withdrawalStrategy is omitted vs explicit guardrails', () => {
+    // Simulates the bug: Kern (no withdrawal strategy) vs Horizon (with guardrails)
+    const withoutWs = runStandard()
+    const withGuardrails = runStandard({}, [], undefined, {
+      strategy: 'guardrails',
+      guardrailFloor: 0.80,
+      guardrailCeiling: 1.20,
+      guardrailCutStep: 0.10,
+      guardrailRaiseStep: 0.10,
+    })
+    // They should differ — this is the bug scenario
+    expect(withoutWs.requiredFirePortfolio).not.toBe(withGuardrails.requiredFirePortfolio)
+  })
+
+  it('G2: requiredFirePortfolio matches when both use the same explicit strategy', () => {
+    // After fix: both Kern and Horizon pass the same strategy
+    const guardrailsCfg: WithdrawalStrategyConfig = {
+      strategy: 'guardrails',
+      guardrailFloor: 0.80,
+      guardrailCeiling: 1.20,
+      guardrailCutStep: 0.10,
+      guardrailRaiseStep: 0.10,
+    }
+    const a = runStandard({}, [], undefined, guardrailsCfg)
+    const b = runStandard({}, [], undefined, guardrailsCfg)
+    expect(a.requiredFirePortfolio).toBe(b.requiredFirePortfolio)
+  })
+
+  it('G3: omitting withdrawalStrategy is identical to explicitly passing WITHDRAWAL_DEFAULTS', () => {
+    const omitted = runStandard()
+    const explicit = runStandard({}, [], undefined, WITHDRAWAL_DEFAULTS)
+    expect(omitted.requiredFirePortfolio).toBe(explicit.requiredFirePortfolio)
+  })
+})

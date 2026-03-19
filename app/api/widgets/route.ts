@@ -45,3 +45,6 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+// sendBeacon uses POST, not PUT — delegate to the same logic
+export const POST = PUT

@@ -20,7 +20,7 @@ import type {
   HouseholdActivityItem,
   WeekOverviewData,
 } from '@/components/widgets/widget-renderer'
-import type { WidgetPref } from '@/lib/widget-catalog'
+import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
@@ -607,7 +607,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
 
   // Widget prefs
-  const rawWidgetPrefs = profileResult.data?.widget_prefs as { widgets: { id: string; enabled: boolean; size: 'half' | 'full'; order: number }[] } | null
+  const rawWidgetPrefs = profileResult.data?.widget_prefs as WidgetPrefs | null
   const widgetPrefs = mergeWidgetPrefs(rawWidgetPrefs)
 
   // Inject dynamic favorite budget widget prefs (merge with saved positions)
