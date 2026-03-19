@@ -14,6 +14,7 @@ import {
   Settings,
   Lightbulb,
   BarChart3,
+  Layers,
 } from 'lucide-react'
 
 /* ── Section data ─────────────────────── */
@@ -518,6 +519,93 @@ export default function GuideHorizonUitleg() {
             Zoom en pan werken automatisch mee — als je inzoomt op de portfoliografiek, schaalt de
             inkomen/uitgaven-grafiek mee naar hetzelfde leeftijdsbereik.
           </p>
+        </>
+      ),
+    },
+    {
+      id: 'horizon-uitleg-vermogensopbouw',
+      number: 11,
+      title: 'Vermogensopbouw weergave',
+      icon: Layers,
+      content: (
+        <>
+          <p>
+            Boven de grafiek vind je een <strong>toggle</strong> met twee pill-tabs:{' '}
+            <strong>Vermogenspad</strong> en <strong>Vermogensopbouw</strong>. Hiermee wissel je tussen
+            twee weergaven van je vermogen over tijd.
+          </p>
+          <p>
+            <strong>Vermogenspad</strong> (standaard) — de bekende lijngrafiek die je{' '}
+            <strong>totale netto vermogen</strong> toont als één doorlopende lijn. Ideaal om je
+            FIRE-traject en de twee fases (opbouw en onttrekking) te volgen.
+          </p>
+          <p>
+            <strong>Vermogensopbouw</strong> — een gestapelde kolomgrafiek die laat zien{' '}
+            <strong>waaruit</strong> je vermogen is opgebouwd. Elke kolom is verdeeld in vijf
+            categorieën:
+          </p>
+          <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 space-y-1 mt-1">
+            <p>
+              <span className="inline-block h-2.5 w-2.5 rounded-sm mr-1.5 align-middle" style={{ backgroundColor: '#3b82f6' }} />
+              <strong>Spaargeld</strong> — je spaar- en betaalrekeningen (cash, savings)
+            </p>
+            <p>
+              <span className="inline-block h-2.5 w-2.5 rounded-sm mr-1.5 align-middle" style={{ backgroundColor: '#10b981' }} />
+              <strong>Beleggingen</strong> — aandelen, obligaties, fondsen en ETF's
+            </p>
+            <p>
+              <span className="inline-block h-2.5 w-2.5 rounded-sm mr-1.5 align-middle" style={{ backgroundColor: '#8b5cf6' }} />
+              <strong>Pensioen</strong> — pensioenaanspraken en levensverzekeringen
+            </p>
+            <p>
+              <span className="inline-block h-2.5 w-2.5 rounded-sm mr-1.5 align-middle" style={{ backgroundColor: '#f59e0b' }} />
+              <strong>Vastgoed</strong> — je eigen huis en eventueel ander onroerend goed
+            </p>
+            <p>
+              <span className="inline-block h-2.5 w-2.5 rounded-sm mr-1.5 align-middle" style={{ backgroundColor: '#71717a' }} />
+              <strong>Overig</strong> — crypto, voertuigen, fysieke bezittingen, deelnemingen,
+              vorderingen en overige activa
+            </p>
+          </div>
+          <p>
+            <strong>Schulden</strong> verschijnen als{' '}
+            <span className="inline-block h-2.5 w-2.5 rounded-sm mr-0.5 align-middle" style={{ backgroundColor: '#ef4444' }} />{' '}
+            <strong>negatieve laag</strong> onder de nullijn. Zo zie je in één oogopslag hoe je
+            schulden zich verhouden tot je bezittingen en hoe beide zich ontwikkelen.
+          </p>
+          <p>
+            <strong>Hoe wordt elke categorie geprojecteerd?</strong> Per bezitting berekent TriFinity
+            het toekomstige saldo op basis van het <strong>verwachte rendement</strong> dat je per
+            bezitting hebt ingesteld (in{' '}
+            <InLink href="/core/assets">De Kern → Bezittingen</InLink>), plus eventuele{' '}
+            <strong>maandelijkse bijdragen</strong>. Schulden worden afgelost volgens hun
+            aflossingsschema (annuïteit, lineair of aflossingsvrij).
+          </p>
+          <p>
+            Na je <strong>FIRE-leeftijd</strong> worden onttrekkingen voor levensonderhoud eerst
+            afgetrokken van beleggingen, daarna van spaargeld. Zo zie je hoe je vermogensmix
+            verschuift naarmate je ouder wordt.
+          </p>
+          <p>
+            <strong>Verschil met Vermogenspad:</strong> het Vermogenspad toont het{' '}
+            <strong>totaal</strong> als één lijn — handig voor het grote plaatje. De
+            Vermogensopbouw toont de <strong>samenstelling</strong> — handig om te zien welke
+            categorieën het zwaarst wegen en hoe de verdeling over tijd verandert.
+          </p>
+          <p>
+            <strong>Levensgebeurtenissen</strong> beïnvloeden ook de Vermogensopbouw: een erfenis
+            verschijnt als een sprong in de betreffende categorie, een huis kopen verhoogt vastgoed
+            maar verlaagt spaargeld of beleggingen. Zoom en pan werken in beide weergaven op
+            dezelfde manier.
+          </p>
+          <div className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 mt-2">
+            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+            <p className="text-[11px] leading-relaxed text-[var(--ink-3)] italic">
+              <strong>Disclaimer:</strong> de projectie is gebaseerd op het verwachte rendement dat je per
+              bezitting hebt ingesteld. Werkelijke rendementen kunnen afwijken. Gebruik de Vermogensopbouw
+              als richtlijn, niet als garantie.
+            </p>
+          </div>
         </>
       ),
     },
