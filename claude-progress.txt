@@ -1,3 +1,18 @@
+## Session 2026-03-19 - Feature #401
+
+### Feature #401: Mobiel expanded: netto vermogen vervangen door FIRE percentage — PASSING
+- Changed mobile "Meer kerngetallen" expandable section in core-client.tsx
+- Label changed from "Netto vermogen" to "Voortgang FIRE"
+- Big number changed from formatCurrency(effectiveNetWorth) to FIRE progress percentage
+- Subtitle changed from freedom time text to "X van Y" format (amount vs target)
+- Added fallback for zero fireTarget: shows "Stel je FIRE-doel in"
+- Pattern identical to desktop version (feature #399)
+- Changes were already committed as part of commit 45336682 (features #399, #400)
+- Verified on mobile viewport: screenshot confirms correct display
+- Zero console errors
+
+### Current stats: 399/401 passing (99.5%)
+
 ## Session 2026-03-19 - Feature #379
 
 ### Feature #379: Regressietests — Rebalancing drift, trades, en meldingen - PASSING
@@ -17959,3 +17974,19 @@ Current status: 369/371 features passing (99.5%)
 - Verified via browser: widget renders correctly, null-state shows for users without mortgage, href navigates to /core/debts
 - Zero console errors on dashboard
 - Marked feature #394 as passing
+
+## Session 2026-03-19 - Features #399 and #400
+
+### Feature #399: FIRE progress bar onder groot netto vermogen — PASSING
+- Added FIRE progress bar directly below the hero net worth amount and freedom subtitle
+- Bar: 8px rounded-full with kern-gradient (from-kern-400 to-kern-600)
+- Shows percentage left, FIRE target amount right
+- Calculation: effectiveNetWorth / (coreSimTarget ?? data.fireTarget) * 100
+- Only renders when fireTarget > 0, visible on both mobile and desktop
+
+### Feature #400: Desktop kolom 1 netto vermogen vervangen door FIRE percentage — PASSING
+- Replaced duplicate net worth in desktop 3-col layout column 1
+- Label: 'Voortgang FIRE', big number: XX.X%, subtitle: amount van target
+- Fallback text when no FIRE target: 'Stel je FIRE-doel in'
+- Kept household/partner subtexts and sparkline intact
+- Zero console errors, verified via browser automation
