@@ -1,3 +1,19 @@
+## Session 2026-03-19 - Feature #356
+
+### Feature #356: Persona seed data controleren op SimRow compatibiliteit - PASSING
+- Wrote comprehensive Vitest test suite: `test/persona-simrow-compat.test.ts` (34 tests)
+- Verified all 6 personas (Roos, Daan, Lisa, Willem, Rashid, Marijke) produce valid grossIncome/grossExpenses
+- Lisa: life events (sabbatical, children) correctly affect grossExpenses at expected ages
+- Marijke: retirement phase with legacy strategy + guardrails produces valid withdrawal-based grossExpenses
+- All personas with active life events produce valid cashflows (no NaN, correct direction/type)
+- Edge cases tested: zero income, zero expenses, negative portfolio (debt), empty cashflows
+- Confirmed: seed-persona.ts and test-personas.ts need NO changes (SimRow fields are runtime-computed)
+- Commit: 1d7eee03
+
+### Current Status
+- Feature #356 completed
+- Overall progress: 349/356 (98.0%)
+
 ## Session 2026-03-19 - Features #351, #352
 
 ### Feature #351: SimRow uitbreiden met grossIncome en grossExpenses - PASSING
