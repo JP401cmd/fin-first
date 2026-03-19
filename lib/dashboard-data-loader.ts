@@ -44,6 +44,7 @@ import type { Debt } from '@/lib/debt-data'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
+import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -115,6 +116,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     nextStepCompletionsResult,
     expenseTx12Result,
     favHoldingsResult,
+    allHoldingsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -138,6 +140,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('next_step_completions').select('step_key, dismissed'),
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
     supabase.from('holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
+    supabase.from('holdings').select('name, ticker, units, avg_purchase_price, current_price, ter'),
   ])
 
   // ── Derive budget subsets from single query (was 4 queries) ──
@@ -1311,6 +1314,35 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     topCategories: topWeekCategories,
   }
 
+  // ── Fee analysis ──────────────────────────────────────────────
+  const allHoldings = (allHoldingsResult.data ?? []) as {
+    name: string; ticker: string | null; units: number;
+    avg_purchase_price: number; current_price: number | null; ter: number | null
+  }[]
+  const feeAnalysis = allHoldings.length > 0 ? computePortfolioFees(allHoldings) : null
+
+  let feeImpactMonths = 0
+  if (feeAnalysis && feeAnalysis.weightedTER > 0 && dob) {
+    try {
+      const feeCurrentAge = ageAtDate(dob)
+      const feeSimParams = {
+        currentAge: feeCurrentAge,
+        endAge: fireStrategy.endAge,
+        currentPortfolio: totalAssets,
+        yearlyExpenses: effectiveMonthlyExpenses * 12,
+        annualSavings: Math.max(0, (effectiveMonthlyIncome - effectiveMonthlyExpenses)) * 12,
+        grossReturn: fireParams.grossReturn,
+        returnModel: 'nl_box3' as const,
+        inflation: fireParams.inflationRate,
+        cashflows: lifeEventsToCashflows(((eventsResult.data ?? []) as LifeEvent[])),
+      }
+      const impact = computeFeeImpactOnFire(feeSimParams, feeAnalysis.weightedTER)
+      feeImpactMonths = impact.feeImpactMonths
+    } catch {
+      // Simulation may fail — keep feeImpactMonths at 0
+    }
+  }
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -1405,6 +1437,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     grossReturn: fireParams.grossReturn,
     currentAge: dob ? ageAtDate(dob) : null,
     weekOverview,
+    feeAnalysis,
+    feeImpactMonths,
   }
 
   return {

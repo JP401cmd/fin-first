@@ -201,6 +201,19 @@ const MOCK_DATA: DashboardData = {
       { name: 'Transport', amount: 61.30, prevAmount: 58.00 },
     ],
   },
+  feeAnalysis: {
+    weightedTER: 0.0045,
+    totalAnnualFee: 675,
+    perHoldingBreakdown: [
+      { name: 'VWRL', ticker: 'VWRL', value: 80000, ter: 0.0022, annualFee: 176, percentOfTotalFees: 0.26 },
+      { name: 'Northern Trust EM', ticker: null, value: 30000, ter: 0.0085, annualFee: 255, percentOfTotalFees: 0.38 },
+      { name: 'iShares MSCI World', ticker: 'IWDA', value: 40000, ter: 0.0020, annualFee: 80, percentOfTotalFees: 0.12 },
+    ],
+    totalPortfolioValue: 150000,
+    holdingsWithTER: 3,
+    holdingsWithoutTER: 0,
+  },
+  feeImpactMonths: 8,
 }
 
 const KERN_WIDGETS = [
@@ -216,6 +229,7 @@ const KERN_WIDGETS = [
   'nibud_benchmark',
   'maandoverzicht',
   'weekoverzicht',
+  'fee_analyzer',
 ]
 
 const WIL_WIDGETS = [

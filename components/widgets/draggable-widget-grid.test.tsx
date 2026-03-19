@@ -142,6 +142,8 @@ const mockData: DashboardData = {
     prevWeekExpenses: 0,
     topCategories: [],
   },
+  feeAnalysis: null,
+  feeImpactMonths: 0,
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>

@@ -151,6 +151,8 @@ function makeEmptyDashboardData(): DashboardData {
       prevWeekExpenses: 0,
       topCategories: [],
     },
+    feeAnalysis: null,
+    feeImpactMonths: 0,
   }
 }
 

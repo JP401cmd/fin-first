@@ -258,4 +258,6 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
       { name: 'Transport', amount: 61.30, prevAmount: 58.00 },
     ],
   },
+  feeAnalysis: null,
+  feeImpactMonths: 0,
 }

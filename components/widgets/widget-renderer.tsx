@@ -213,7 +213,7 @@ export interface TopLifeEvent {
 
 export interface Notification {
   id: string
-  type: 'budget' | 'milestone' | 'anomaly' | 'positive'
+  type: 'budget' | 'milestone' | 'anomaly' | 'positive' | 'rebalance'
   message: string
   severity: 'info' | 'warning' | 'critical'
   createdAt: string
