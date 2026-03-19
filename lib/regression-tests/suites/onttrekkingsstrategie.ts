@@ -1,10 +1,12 @@
 import { registerTests } from '../test-registry'
-import { assert, assertEqual, assertGreaterThan, assertLessThan, assertLessThanOrEqual, assertGreaterThanOrEqual } from '../assert'
+import { assert, assertEqual, assertNotNull, assertGreaterThan, assertLessThan, assertLessThanOrEqual, assertGreaterThanOrEqual, assertFinite } from '../assert'
 import type { TestCase } from '../test-types'
 import {
   applyWithdrawalStrategy, resolveWithdrawalStrategy, WITHDRAWAL_DEFAULTS,
   type WithdrawalStrategyConfig, type WithdrawalContext,
 } from '@/lib/withdrawal-strategy'
+import { runSimulation, type SimCashflow } from '@/lib/fire-simulation'
+import type { FireStrategyConfig } from '@/lib/fire-strategy'
 
 const CAT = 'horizon.onttrekkingsstrategie'
 
@@ -99,6 +101,58 @@ const tests: TestCase[] = [
     fn() {
       const w = applyWithdrawalStrategy(makeConfig({ strategy: 'static' }), makeCtx({ recurringIncome: 50_000 }))
       assertGreaterThanOrEqual(w, 0, 'niet negatief')
+    },
+  },
+  // ── FIRE-leeftijd verschil per onttrekkingsstrategie ──────────────────────
+  {
+    id: 'withdrawal-fire-age-differs', name: 'FIRE-leeftijd verschilt per strategie', category: CAT,
+    description: 'Guardrails levert lagere vereiste portfolio op dan static → potentieel eerder FIRE',
+    priority: 'critical', estimatedDurationMs: 300,
+    fn() {
+      const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+      const rStatic = runSimulation(35, 90, 150_000, 36_000, 18_000, 0.07, 'nl_box3', 0.02, [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'static' })
+      const rGuardrails = runSimulation(35, 90, 150_000, 36_000, 18_000, 0.07, 'nl_box3', 0.02, [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' })
+
+      assert(rStatic.fireReachable, 'static bereikbaar')
+      assert(rGuardrails.fireReachable, 'guardrails bereikbaar')
+      // Guardrails should need less or equal portfolio (flexible withdrawal)
+      assertLessThanOrEqual(rGuardrails.requiredFirePortfolio, rStatic.requiredFirePortfolio, 'guardrails ≤ static portfolio')
+      assertLessThanOrEqual(rGuardrails.fireAge!, rStatic.fireAge!, 'guardrails fireAge ≤ static')
+    },
+  },
+  {
+    id: 'withdrawal-fire-age-vpw-valid', name: 'VPW FIRE-leeftijd geldig', category: CAT,
+    description: 'VPW+deplete convergeert en levert geldige resultaten',
+    priority: 'high', estimatedDurationMs: 200,
+    fn() {
+      const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+      const r = runSimulation(35, 90, 150_000, 36_000, 18_000, 0.07, 'nl_box3', 0.02, [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' })
+      assert(r.fireReachable, 'VPW+deplete bereikbaar')
+      assertNotNull(r.fireAge, 'fireAge niet null')
+      for (const row of r.rows) {
+        assertFinite(row.withdrawal, `row ${row.age} withdrawal`)
+        assertFinite(row.endPortfolio, `row ${row.age} endPortfolio`)
+      }
+    },
+  },
+  {
+    id: 'withdrawal-fire-age-all-strategies', name: 'Alle strategieën convergeren', category: CAT,
+    description: 'static/guardrails/vpw/bucket × deplete leveren allemaal een geldig resultaat',
+    priority: 'high', estimatedDurationMs: 400,
+    fn() {
+      const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+      const strategies: WithdrawalStrategyConfig[] = [
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+      ]
+      for (const ws of strategies) {
+        const r = runSimulation(35, 90, 150_000, 36_000, 18_000, 0.07, 'nl_box3', 0.02, [], deplete, ws)
+        assert(r.fireReachable, `${ws.strategy} bereikbaar`)
+        assertNotNull(r.fireAge, `${ws.strategy} fireAge`)
+        assertGreaterThan(r.requiredFirePortfolio, 0, `${ws.strategy} required > 0`)
+      }
     },
   },
 ]

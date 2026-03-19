@@ -7,6 +7,7 @@ import {
   type SimRow,
 } from '@/lib/fire-simulation'
 import { type FireStrategyConfig, type FireEndStrategy } from '@/lib/fire-strategy'
+import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { BOX3_DRAG, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { NIBUD_CHILDREN_MONTHLY_COST } from '@/lib/horizon-data'
 import type { LifeEvent } from '@/lib/horizon-data'
@@ -29,12 +30,13 @@ function runStandard(
   overrides: Partial<typeof STANDARD> = {},
   cashflows: SimCashflow[] = [],
   strategy?: FireStrategyConfig,
+  ws?: WithdrawalStrategyConfig,
 ): SimResult {
   const s = { ...STANDARD, ...overrides }
   return runSimulation(
     s.currentAge, s.endAge, s.currentPortfolio,
     s.yearlyExpenses, s.annualSavings, s.grossReturn,
-    s.returnModel, s.inflation, cashflows, strategy,
+    s.returnModel, s.inflation, cashflows, strategy, ws,
   )
 }
 
@@ -520,4 +522,64 @@ describe('D — Cashflows', () => {
       expect(forward.rows[i].cashflowNet).toBe(reversed.rows[i].cashflowNet)
     }
   })
+})
+
+// ── Section E: Binary search convergence per withdrawal × end strategy ──────
+
+describe('E — Binary search convergence (4×3 matrix)', () => {
+  const withdrawalStrategies: WithdrawalStrategyConfig[] = [
+    { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
+    { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
+    { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' },
+    { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+  ]
+
+  const endStrategies: FireStrategyConfig[] = [
+    { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    { strategy: 'legacy', endAge: 90, legacyAmount: 200_000 },
+    { strategy: 'perpetual', endAge: 90, legacyAmount: 0 },
+  ]
+
+  for (const ws of withdrawalStrategies) {
+    for (const es of endStrategies) {
+      // Skip VPW + perpetual/legacy (incompatible by design — VPW depletes fully at endAge)
+      if (ws.strategy === 'vpw' && (es.strategy === 'perpetual' || es.strategy === 'legacy')) {
+        it(`E: ${ws.strategy} × ${es.strategy} → incompatible`, () => {
+          const result = runStandard({}, [], es, ws)
+          expect(result.fireReachable).toBe(false)
+          expect(result.fireAge).toBeNull()
+        })
+        continue
+      }
+
+      it(`E: ${ws.strategy} × ${es.strategy} converges with finite values`, () => {
+        const result = runStandard({}, [], es, ws)
+
+        // Must produce valid output
+        expect(result.fireReachable).toBe(true)
+        expect(typeof result.fireAge).toBe('number')
+        expect(result.requiredFirePortfolio).toBeGreaterThan(0)
+
+        // All rows must be finite and valid
+        for (const row of result.rows) {
+          expect(Number.isFinite(row.startPortfolio)).toBe(true)
+          expect(Number.isFinite(row.growth)).toBe(true)
+          expect(Number.isFinite(row.withdrawal)).toBe(true)
+          expect(Number.isFinite(row.endPortfolio)).toBe(true)
+          expect(row.withdrawal).toBeGreaterThanOrEqual(0)
+          expect(row.endPortfolio).toBeGreaterThanOrEqual(0)
+        }
+
+        // Phase transitions are correct
+        const fireAge = result.fireAge!
+        for (const row of result.rows) {
+          if (row.age < fireAge) {
+            expect(row.phase).toBe('accumulation')
+          } else {
+            expect(row.phase).toBe('retirement')
+          }
+        }
+      })
+    }
+  }
 })

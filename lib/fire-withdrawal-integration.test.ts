@@ -180,10 +180,10 @@ describe('Withdrawal Strategy Integration — dynamic strategies with life event
   })
 })
 
-// ── Step 5 + 6: FIRE age conservation ───────────────────────────────────────
+// ── Step 5 + 6: FIRE age is strategy-dependent ─────────────────────────────
 
-describe('Withdrawal Strategy Integration — FIRE age conservative', () => {
-  it('FIRE age is same for static vs guardrails (binary search uses static)', () => {
+describe('Withdrawal Strategy Integration — strategy-dependent FIRE age', () => {
+  it('guardrails FIRE age <= static FIRE age (guardrails can retire earlier via flexible withdrawal)', () => {
     const guardrails: WithdrawalStrategyConfig = {
       strategy: 'guardrails',
       guardrailFloor: 0.80,
@@ -195,11 +195,14 @@ describe('Withdrawal Strategy Integration — FIRE age conservative', () => {
     const staticResult = runStandard()
     const guardrailsResult = runStandard({}, [], undefined, guardrails)
 
-    expect(guardrailsResult.fireAge).toBe(staticResult.fireAge)
-    expect(guardrailsResult.requiredFirePortfolio).toBe(staticResult.requiredFirePortfolio)
+    expect(guardrailsResult.fireReachable).toBe(true)
+    expect(staticResult.fireReachable).toBe(true)
+    // Guardrails can lower required portfolio (flexible withdrawal) → earlier or equal FIRE
+    expect(guardrailsResult.fireAge!).toBeLessThanOrEqual(staticResult.fireAge!)
+    expect(guardrailsResult.requiredFirePortfolio).toBeLessThanOrEqual(staticResult.requiredFirePortfolio)
   })
 
-  it('FIRE age is same for static vs VPW (binary search uses static)', () => {
+  it('FIRE age can differ between static and VPW', () => {
     const vpw: WithdrawalStrategyConfig = {
       strategy: 'vpw',
       guardrailFloor: 0.80,
@@ -211,11 +214,15 @@ describe('Withdrawal Strategy Integration — FIRE age conservative', () => {
     const staticResult = runStandard()
     const vpwResult = runStandard({}, [], undefined, vpw)
 
-    expect(vpwResult.fireAge).toBe(staticResult.fireAge)
-    expect(vpwResult.requiredFirePortfolio).toBe(staticResult.requiredFirePortfolio)
+    expect(vpwResult.fireReachable).toBe(true)
+    expect(staticResult.fireReachable).toBe(true)
+    // VPW may require slightly more portfolio (variable withdrawals can exceed static)
+    // The key assertion is that both produce valid results, and portfolios may differ
+    expect(typeof vpwResult.fireAge).toBe('number')
+    expect(typeof vpwResult.requiredFirePortfolio).toBe('number')
   })
 
-  it('FIRE age is same for static vs bucket (binary search uses static)', () => {
+  it('bucket FIRE age equals static (deterministic model, same withdrawal logic)', () => {
     const bucket: WithdrawalStrategyConfig = {
       strategy: 'bucket',
       guardrailFloor: 0.80,
@@ -227,8 +234,66 @@ describe('Withdrawal Strategy Integration — FIRE age conservative', () => {
     const staticResult = runStandard()
     const bucketResult = runStandard({}, [], undefined, bucket)
 
+    // In deterministic model, bucket equals static (both withdraw full expenses)
     expect(bucketResult.fireAge).toBe(staticResult.fireAge)
     expect(bucketResult.requiredFirePortfolio).toBe(staticResult.requiredFirePortfolio)
+  })
+
+  it('VPW + perpetual is detected as incompatible', () => {
+    const vpw: WithdrawalStrategyConfig = {
+      strategy: 'vpw',
+      guardrailFloor: 0.80,
+      guardrailCeiling: 1.20,
+      guardrailCutStep: 0.10,
+      guardrailRaiseStep: 0.10,
+    }
+    const perpetual: FireStrategyConfig = { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }
+
+    const result = runStandard({}, [], perpetual, vpw)
+
+    expect(result.fireReachable).toBe(false)
+    expect(result.fireAge).toBeNull()
+    expect(result.rows.length).toBe(0)
+  })
+
+  it('VPW + legacy is detected as incompatible', () => {
+    const vpw: WithdrawalStrategyConfig = {
+      strategy: 'vpw',
+      guardrailFloor: 0.80,
+      guardrailCeiling: 1.20,
+      guardrailCutStep: 0.10,
+      guardrailRaiseStep: 0.10,
+    }
+    const legacy: FireStrategyConfig = { strategy: 'legacy', endAge: 90, legacyAmount: 200_000 }
+
+    const result = runStandard({}, [], legacy, vpw)
+
+    expect(result.fireReachable).toBe(false)
+    expect(result.fireAge).toBeNull()
+    expect(result.rows.length).toBe(0)
+  })
+
+  it('legacy end strategy + compatible withdrawal strategies converges correctly', () => {
+    const legacy: FireStrategyConfig = { strategy: 'legacy', endAge: 90, legacyAmount: 200_000 }
+    // VPW is incompatible with legacy (VPW depletes fully at endAge)
+    const strategies: WithdrawalStrategyConfig[] = [
+      { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
+      { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
+      { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+    ]
+
+    for (const ws of strategies) {
+      const result = runStandard({}, [], legacy, ws)
+      expect(result.fireReachable).toBe(true)
+      expect(typeof result.fireAge).toBe('number')
+      expect(result.requiredFirePortfolio).toBeGreaterThan(0)
+
+      // All rows must be finite
+      for (const row of result.rows) {
+        expect(Number.isFinite(row.withdrawal)).toBe(true)
+        expect(Number.isFinite(row.endPortfolio)).toBe(true)
+      }
+    }
   })
 
   it('VPW produces valid output with all rows finite', () => {

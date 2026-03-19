@@ -1,7 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import {
   assert, assertEqual, assertNotNull, assertGreaterThan,
-  assertGreaterThanOrEqual, assertLessThan, assertType,
+  assertGreaterThanOrEqual, assertLessThan, assertLessThanOrEqual, assertType, assertFinite,
 } from '../assert'
 import type { TestCase } from '../test-types'
 import { unauthenticatedFetch } from '../server-runner'
@@ -483,9 +483,9 @@ const tests: TestCase[] = [
   },
   {
     id: 'strategie-bucket-low-cash',
-    name: 'Bucket strategie met lage cash',
+    name: 'Bucket allocatie bij klein vermogen',
     category: CAT,
-    description: 'Bij onvoldoende cash is onttrekking lager',
+    description: 'Klein portfolio: alles naar cash, niets naar bonds/stocks',
     priority: 'medium',
     estimatedDurationMs: 30,
     fn() {
@@ -537,6 +537,93 @@ const tests: TestCase[] = [
         const wIncome = applyWithdrawalStrategy(config, incomeCtx)
         assertGreaterThan(wBase, wIncome, `${s}: inkomen verlaagt onttrekking`)
       }
+    },
+  },
+
+  // ── Compatibiliteitsmatrix: onttrekkingsstrategie × eindstrategie ──────────
+  {
+    id: 'strategie-compat-vpw-incompatible',
+    name: 'VPW + perpetual/legacy incompatibel',
+    category: CAT,
+    description: 'VPW onttrekt per definitie volledig — perpetual en legacy markeren als onbereikbaar',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const vpw: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }
+      // VPW + perpetual
+      const rPerp = runSimulation(
+        SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
+        SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
+        [], { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, vpw,
+      )
+      assert(!rPerp.fireReachable, 'VPW+perpetual onbereikbaar')
+      assertEqual(rPerp.fireAge, null, 'perpetual: geen fireAge')
+      // VPW + legacy
+      const rLeg = runSimulation(
+        SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
+        SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
+        [], { strategy: 'legacy', endAge: 90, legacyAmount: 200_000 }, vpw,
+      )
+      assert(!rLeg.fireReachable, 'VPW+legacy onbereikbaar')
+      assertEqual(rLeg.fireAge, null, 'legacy: geen fireAge')
+    },
+  },
+  {
+    id: 'strategie-compat-matrix-valid',
+    name: 'Compatibele combinaties convergeren',
+    category: CAT,
+    description: 'static/guardrails/bucket × deplete/legacy/perpetual leveren geldig resultaat',
+    priority: 'high',
+    estimatedDurationMs: 600,
+    fn() {
+      const wsStrategies: WithdrawalStrategyConfig[] = [
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+      ]
+      const endStrategies: FireStrategyConfig[] = [
+        { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+        { strategy: 'legacy', endAge: 90, legacyAmount: 200_000 },
+        { strategy: 'perpetual', endAge: 90, legacyAmount: 0 },
+      ]
+      for (const ws of wsStrategies) {
+        for (const es of endStrategies) {
+          const r = runSimulation(
+            SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
+            SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
+            [], es, ws,
+          )
+          assert(r.fireReachable, `${ws.strategy}×${es.strategy} bereikbaar`)
+          assertNotNull(r.fireAge, `${ws.strategy}×${es.strategy} fireAge`)
+          for (const row of r.rows) {
+            assertFinite(row.endPortfolio, `${ws.strategy}×${es.strategy} row ${row.age}`)
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'strategie-compat-guardrails-earlier',
+    name: 'Guardrails levert eerder of gelijk FIRE op',
+    category: CAT,
+    description: 'Guardrails vereist minder portfolio dan static door flexibiliteit',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+      const rStatic = runSimulation(
+        SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
+        SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
+        [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
+      )
+      const rGuardrails = runSimulation(
+        SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
+        SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
+        [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
+      )
+      assert(rStatic.fireReachable, 'static bereikbaar')
+      assert(rGuardrails.fireReachable, 'guardrails bereikbaar')
+      assertLessThanOrEqual(rGuardrails.fireAge!, rStatic.fireAge!, 'guardrails FIRE ≤ static')
     },
   },
 ]

@@ -480,10 +480,11 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'fire-sim-ws-end-strategy', name: 'Eindstrategie werkt met elke onttrekkingsstrategie', category: CAT,
-    description: 'deplete/legacy/perpetual combineert correct met static/guardrails/bucket',
+    id: 'fire-sim-ws-end-strategy', name: 'Eindstrategie werkt met compatibele onttrekkingsstrategieën', category: CAT,
+    description: 'deplete/legacy/perpetual combineert correct met static/guardrails/bucket (VPW alleen met deplete)',
     priority: 'high', estimatedDurationMs: 600,
     fn() {
+      // VPW is alleen compatibel met deplete (onttrekt volledig per definitie)
       const strategies: Array<{ ws: WithdrawalStrategyConfig; label: string }> = [
         { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'static' }, label: 'static' },
         { ws: { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' }, label: 'guardrails' },
@@ -505,15 +506,21 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'fire-sim-vpw-perpetual-incompatible', name: 'VPW + perpetual onverenigbaar', category: CAT,
-    description: 'VPW onttrekt per definitie volledig — perpetual moet als onbereikbaar gemeld worden',
+    id: 'fire-sim-vpw-perpetual-incompatible', name: 'VPW + perpetual/legacy onverenigbaar', category: CAT,
+    description: 'VPW onttrekt per definitie volledig — perpetual en legacy worden als onbereikbaar gemeld',
     priority: 'high', estimatedDurationMs: 50,
     fn() {
       const vpw: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }
-      const r = runStd({}, [], { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, vpw)
-      assert(!r.fireReachable, 'VPW+perpetual onbereikbaar')
-      assertEqual(r.fireAge, null, 'geen fireAge')
-      assertEqual(r.rows.length, 0, 'geen rows')
+      // VPW + perpetual
+      const rPerp = runStd({}, [], { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, vpw)
+      assert(!rPerp.fireReachable, 'VPW+perpetual onbereikbaar')
+      assertEqual(rPerp.fireAge, null, 'perpetual: geen fireAge')
+      assertEqual(rPerp.rows.length, 0, 'perpetual: geen rows')
+      // VPW + legacy
+      const rLeg = runStd({}, [], { strategy: 'legacy', endAge: 90, legacyAmount: 200_000 }, vpw)
+      assert(!rLeg.fireReachable, 'VPW+legacy onbereikbaar')
+      assertEqual(rLeg.fireAge, null, 'legacy: geen fireAge')
+      assertEqual(rLeg.rows.length, 0, 'legacy: geen rows')
     },
   },
   {
