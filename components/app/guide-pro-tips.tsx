@@ -1,6 +1,6 @@
 'use client'
 
-import { Receipt, Clock, SlidersHorizontal, Unlock, MessageSquare, CalendarCheck, GitBranch, Users, Lightbulb, type LucideIcon } from 'lucide-react'
+import { Receipt, Clock, SlidersHorizontal, Unlock, MessageSquare, CalendarCheck, GitBranch, Users, Scale, Lightbulb, type LucideIcon } from 'lucide-react'
 
 /* ── Tip definitions ──────────────────────── */
 
@@ -41,6 +41,10 @@ const PRO_TIPS: ProTip[] = [
   {
     icon: Users,
     text: 'Voeg je partner toe voor gezamenlijke vermogensberekeningen en per-partner FIRE-prognoses.',
+  },
+  {
+    icon: Scale,
+    text: 'Herbalanceer je portfolio jaarlijks rond de Box 3 peildatum (1 jan) — zo houd je risico in lijn én optimaliseer je belasting.',
   },
 ]
 

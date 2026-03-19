@@ -26,6 +26,7 @@ import {
   Bell,
   FileText,
   Users,
+  Scale,
   Settings,
   Smartphone,
   type LucideIcon,
@@ -90,6 +91,13 @@ const MODULES: NaslagwerkModule[] = [
         icon: Receipt,
         title: 'Belasting',
         summary: 'Inzicht in Box 3-belasting, fictief rendement en belastingdruk op je vermogen.',
+        anchor: 'guide-reis-2',
+      },
+      {
+        icon: Scale,
+        title: 'Rebalancing & Allocatie',
+        summary:
+          'Herbalanceer je portfolio naar je doelallocatie. Begrijp drift, kleurcodes en Box 3 peildatumtips.',
         anchor: 'guide-reis-2',
       },
       {

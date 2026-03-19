@@ -28,6 +28,7 @@ import {
   Sun,
   Rss,
   SlidersHorizontal,
+  Scale,
   Shield,
   Activity,
 } from "lucide-react";
@@ -446,6 +447,43 @@ export default function GidsPage() {
                 "Bij een BV of holding: bekijk de Box 2 berekening met DGA-leningdrempel en dividendbelasting",
               ],
               tip: "Verschuif vermogen tussen sparen en beleggen in het scenariomodel om te zien welk fictief rendement je het minste kost. Elke €10.000 verschuiving kan tientallen euro's per jaar schelen.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Scale}
+            title="Rebalancing & Allocatie"
+            color="var(--color-kern-400)"
+            description={
+              <>
+                <strong>Rebalancing houdt je portfolio in lijn met je plan.</strong> Na verloop van tijd verschuift je allocatie doordat sommige beleggingen harder groeien dan andere. Een portfolio dat begon als 80% aandelen / 20% obligaties kan na een goed beursjaar 90/10 worden — meer risico dan je bedoeld had.
+                <br /><br />
+                <strong>Wat is drift?</strong> Drift is het verschil tussen je huidige allocatie en je doelallocatie, uitgedrukt in procentpunten. Als je doel 80% aandelen is en je zit op 87%, dan is je drift +7 procentpunt. Hoe groter de drift, hoe verder je portfolio afwijkt van je plan.
+                <br /><br />
+                <strong>Kleurcodes:</strong> TriFinity gebruikt drie kleuren om drift zichtbaar te maken:
+                <br />
+                🟢 <strong>Groen</strong> — in balans (drift &lt; 5pp). Geen actie nodig.
+                <br />
+                🟠 <strong>Oranje</strong> — let op (drift 5–10pp). Overweeg herbalancering bij je volgende check-in.
+                <br />
+                🔴 <strong>Rood</strong> — actie nodig (drift &gt; 10pp). Je risicoprofiel wijkt significant af.
+                <br /><br />
+                <strong>Waarom rebalancen?</strong> Onderzoek van Vanguard (2019) toont aan dat regelmatig herbalanceren het risico van je portfolio verlaagt zonder significant rendement op te offeren. Je verkoopt wat duur is geworden en koopt bij wat achterbleef — een gedisciplineerde &lsquo;sell high, buy low&rsquo;-strategie.
+                <br /><br />
+                <strong>Box 3 peildatum tip:</strong> In Nederland wordt je vermogen belast op basis van de <strong>peildatum 1 januari</strong>. Als je toch gaat herbalanceren, doe het dan vóór 1 januari. Door overwogen posities vóór de peildatum te verkopen en tijdelijk op een spaarrekening te zetten (lager fictief rendement), kun je Box 3 belasting optimaliseren. Na de peildatum koop je weer terug in je gewenste allocatie.
+                <br /><br />
+                <strong>Doelallocatie instellen:</strong> Stel je targets in via <strong>De Kern → Portfolio → Allocatie</strong>. Kies per assetklasse (aandelen, obligaties, vastgoed, cash, overig) welk percentage je nastreeft. De rebalancing-widget op je dashboard toont vervolgens realtime je drift en geeft concrete suggesties welke posities je moet bij- of verkopen.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Kern → Portfolio → Allocatie en stel je doelallocatie in per assetklasse (aandelen, obligaties, vastgoed, cash, overig)",
+                "Bekijk de rebalancing-widget op je dashboard — deze toont je huidige drift per assetklasse met kleurcodes (groen/oranje/rood)",
+                "Bij oranje of rode drift: bekijk de concrete trade-suggesties — welke posities verkopen en welke bijkopen om terug in balans te komen",
+                "Plan herbalancering rond de Box 3 peildatum (1 januari) — verkoop overwogen posities vóór de peildatum voor belastingvoordeel",
+                "Na herbalancering: verifieer via de widget dat alle assetklassen weer groen zijn (drift < 5 procentpunt)",
+              ],
+              tip: "Herbalanceer maximaal 1–2 keer per jaar, idealiter rond de Box 3 peildatum. Te vaak handelen kost transactiekosten en levert nauwelijks extra risicobeheersing op. Vanguard-onderzoek bevestigt dat jaarlijks of halfjaarlijks voldoende is.",
             }}
           />
 
