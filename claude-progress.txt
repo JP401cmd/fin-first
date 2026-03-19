@@ -1,3 +1,24 @@
+## Session 2026-03-19 - Feature #331 (Attempt 24)
+
+### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 24)
+- **Root cause unchanged**: ALL Supabase MCP tools AND ask_user/feature_request_human_input tools are blocked by OAuth permissions
+- Confirmed via GET /api/apply-migration that migrations are still needed:
+  - Tables missing: target_allocations, holding_prices, holding_alerts
+  - Holdings columns missing: asset_class, sector, geography, previous_close, daily_change_percent, is_favorite, currency
+  - Profile columns missing: onboarding_idempotency_key, invulfase_active
+  - RPC missing: save_onboarding_data
+- **Ready-to-use solution exists**: POST /api/apply-migration accepts db_password, service_role_key, or access_token
+- **Action for user**: Provide ONE credential by adding to .env.local:
+  - `SUPABASE_DB_PASSWORD=your_password` (Dashboard > Settings > Database)
+  - OR `SUPABASE_SERVICE_ROLE_KEY=your_key` (Dashboard > Settings > API)
+  - OR `SUPABASE_ACCESS_TOKEN=your_token` (supabase.com/dashboard/account/tokens)
+  - Then run: `curl -X POST http://localhost:3000/api/apply-migration -H "Content-Type: application/json" -d '{}'`
+  - OR apply migrations manually via Supabase Dashboard SQL Editor using the SQL in app/api/apply-migration/route.ts
+
+### Current Status
+- 0 features completed this session (external blocker)
+- Total: 346/348 features passing (99.4%)
+
 ## Session 2026-03-19 - Feature #331 (Attempt 22)
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker, attempt 22)
