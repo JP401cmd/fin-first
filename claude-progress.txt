@@ -1,3 +1,25 @@
+## Session 2026-03-19 - Features #373, #374
+
+### Feature #373: lib/rebalancing.ts — Drift berekening en trade suggesties - PASSING
+- Created pure utility module lib/rebalancing.ts with full TypeScript types
+- computeDrift(): compares actual vs target allocation per asset_class/sector/geography
+- suggestTrades(): generates buy/sell suggestions with per-holding breakdown, respects minTradeAmount
+- isBox3Window(): Nov-Dec peildatum awareness with fiscal disclaimer
+- getUnclassifiedHoldings(): flags holdings missing classification metadata
+- generateRebalancingReport(): full report builder combining all functions
+- All types exported: DriftResult, Trade, TradeConstraints, RebalancingReport, UnclassifiedHolding, HoldingSuggestion
+- Commit: 3a19ea7f
+
+### Feature #374: API route /api/rebalancing/check — Drift check endpoint - PASSING
+- Created GET /api/rebalancing/check with view_mode and threshold query params
+- Fetches holdings + target_allocations from Supabase, returns RebalancingReport JSON
+- Auth check (401 for unauthenticated), input validation (400 for invalid view_mode)
+- Progressive disclosure: returns empty drifts/trades when no targets configured
+- Returns metadata: hasTargets, unclassifiedCount, lastCheckedAt, isBox3Window
+- Verified in browser: auth check works, valid JSON response, query params functional
+- Commit: 91043e64
+- Stats: 373/397 passing (93.9%)
+
 ## Session 2026-03-19 - Feature #386
 
 ### Feature #386: Goedkopere alternatieven database — fund-alternatives.ts - PASSING
