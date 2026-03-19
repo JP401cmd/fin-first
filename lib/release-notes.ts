@@ -44,6 +44,160 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.86',
+    date: '2026-03-19',
+    title:
+      'Vermogensopbouw, rebalancing, kostenanalyse (TER), hypotheek vs beleggen & FIRE voortgangsbalk',
+    sections: [
+      {
+        module: 'De Horizon — Vermogensopbouw & Inkomen',
+        color: 'purple',
+        items: [
+          {
+            title: 'Inkomen & Uitgaven chart',
+            description:
+              'Nieuw dual-line area chart component (IncomeExpenseChart) toont bruto inkomen en bruto uitgaven over de simulatiehorizon. Inklapbare toggle op de horizon-pagina, bijbehorende guide-sectie en regressietests voor SimRow compatibiliteit.',
+          },
+          {
+            title: 'Vermogensopbouw stacked bar chart',
+            description:
+              'Volledig nieuwe vermogensopbouw-weergave: wealth-composition.ts projectie-engine berekent vermogens­ratio\'s per assettype over tijd. WealthCompositionChart als gestapelde SVG-balkgrafiek met ~85% kolomvulling. Toggle tussen Vermogenspad en Vermogensopbouw view op de horizon-pagina.',
+          },
+          {
+            title: 'Ratio-engine op basis van simulatie',
+            description:
+              'deriveWealthCompositionFromSim vervangt de oude projectWealthComposition — ratio\'s worden nu direct afgeleid uit de simulatieresultaten (single source of truth). Inclusief regressietests en persona seed-data validatie.',
+          },
+          {
+            title: 'Compact chart mode',
+            description:
+              'Nieuwe compact/expanded toggle rechtsboven de horizon-charts. BucketProjectionChart UX-verbeteringen en responsive chart-hoogte (260px desktop, 220px mobiel).',
+          },
+          {
+            title: 'Vermogensopbouw guide-sectie',
+            description:
+              'Uitgebreide uitleg bij de horizon-pagina met waterfall-uitleg en single source of truth principe. Inclusief inkomen & uitgaven guide-sectie met contextbeschrijvingen.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Rebalancing & Allocatie',
+        color: 'amber',
+        items: [
+          {
+            title: 'Rebalancing engine',
+            description:
+              'Nieuw lib/rebalancing.ts met drift-berekening per view (asset class, sector, geografie), trade-suggesties en Box 3-bewustzijn. API-endpoint /api/rebalancing/check retourneert driftanalyse met concrete herbalanceringsvoorstellen.',
+          },
+          {
+            title: 'Rebalancing dashboard widget',
+            description:
+              'Nieuw widget met visuele drift-indicator per allocatiecategorie. Toont afwijking van doelallocatie met kleurgecodeerde balken en waarschuwingen bij overschrijding van de drempelwaarde.',
+          },
+          {
+            title: 'Rebalancing notificaties',
+            description:
+              'Automatische alerts in het notificatiesysteem wanneer portfoliodrift de ingestelde drempel overschrijdt. Drempelwaarde wordt nu uit het gebruikersprofiel gelezen (rebalance_threshold) in plaats van alleen via query parameter.',
+          },
+          {
+            title: 'Rebalancing guide & tests',
+            description:
+              'Nieuwe guide-sectie "Rebalancing & Allocatie" met uitleg over drift, kleuraanduiding en Box 3-tips. Regressietestsuite met 17 tests. Target allocations en rebalance threshold toegevoegd aan seed-persona\'s.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Kostenanalyse & TER',
+        color: 'amber',
+        items: [
+          {
+            title: 'TER-velden op holdings',
+            description:
+              'Databasemigratie voegt TER (Total Expense Ratio) toe aan holdings-tabel. API en TypeScript-types bijgewerkt. TER-invoerveld op create/edit-formulieren en detailpagina van holdings.',
+          },
+          {
+            title: 'Fee Analyzer',
+            description:
+              'Nieuw lib/fee-analysis.ts berekent portfoliokosten en FIRE-impact van lopende kosten. Dashboard widget toont totale kostenratio, jaarlijkse kosten in euro\'s en het samengestelde effect op eindvermogen.',
+          },
+          {
+            title: 'Fee detail BottomSheet',
+            description:
+              'Kassabon-stijl modal met per-holding kostenopsplitsing: TER-percentage, jaarlijkse kosten en aandeel in totale portfoliokosten.',
+          },
+          {
+            title: 'Fondsalternatieven-database',
+            description:
+              '26 Nederlandse fondsmappings met goedkopere alternatieven (bijv. actief → indexfonds). Suggesties voor kostenverlaging bij dure fondsen.',
+          },
+          {
+            title: 'Kostenanalyse guide & tests',
+            description:
+              'Guide-sectie "Beleggingskosten & TER" met compound cost-voorbeelden. Regressietestsuite met 23 tests. TER-waarden toegevoegd aan persona seed-data.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Hypotheek vs Beleggen',
+        color: 'amber',
+        items: [
+          {
+            title: 'Vergelijkingsengine',
+            description:
+              'Nieuw lib/hypotheek-vs-beleggen comparison engine berekent scenario\'s voor extra aflossen vs beleggen, rekening houdend met hypotheekrenteaftrek (marginaal tarief), Box 3-belasting en verwacht rendement. Marginaal_tarief veld toegevoegd aan profielen.',
+          },
+          {
+            title: 'Hypotheek vs Beleggen modal & actieknop',
+            description:
+              'HypotheekVsBeleggenModal als BottomSheet met side-by-side vergelijking van aflossen vs beleggen over de looptijd. "Aflossen vs Beleggen"-knop op hypotheekkaarten in de schulden-pagina.',
+          },
+          {
+            title: 'Dashboard widget & briefing',
+            description:
+              'Nieuw dashboard widget met hypotheek vs beleggen-samenvatting (met null-state voor gebruikers zonder hypotheek). Hypotheek vs beleggen context geïntegreerd in het AI-briefingsysteem.',
+          },
+          {
+            title: 'Guide & tests',
+            description:
+              'Nieuwe guide topic card met uitleg over HRA, Box 3 en breakeven-punt. Regressietests en marginaal_tarief toegevoegd aan seed-persona\'s.',
+          },
+        ],
+      },
+      {
+        module: 'Dashboard',
+        color: 'blue',
+        items: [
+          {
+            title: 'FIRE voortgangsbalk',
+            description:
+              'Nieuw FIRE progress bar component op het dashboard toont voortgang richting financiële onafhankelijkheid als percentage. Vervangt het dubbele netto-vermogen display door een FIRE-percentage indicator.',
+          },
+        ],
+      },
+      {
+        module: 'Platform & Testing',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Roadmap-pagina met persistentie',
+            description:
+              'Dynamische status en opmerkingen op de roadmap-pagina. Persistentie via app_settings fallback met graceful degradation bij ontbrekende database-kolommen.',
+          },
+          {
+            title: 'Test runner role-switching',
+            description:
+              'Regressietest runner ondersteunt nu automatisch role-switching per test. Categorieën kunnen een defaultRole instellen (user/superadmin/any). De runner schakelt het testaccount-profiel automatisch om vóór elke test.',
+          },
+          {
+            title: 'authenticatedFetch in testsuites',
+            description:
+              'Alle testsuites gebruiken nu authenticatedFetch in plaats van bare fetch(), waardoor base URL-configuratie correct wordt afgehandeld in alle omgevingen.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.85',
     date: '2026-03-13',
     title:

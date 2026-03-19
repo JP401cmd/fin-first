@@ -99,7 +99,8 @@ export const SimChart = memo(function SimChart({
   }, [ref])
 
   const W = containerW
-  const H = 220
+  const isDesktop = containerW >= 768
+  const H = isDesktop ? 260 : 220
   const PAD = { top: 16, right: 16, bottom: 28, left: 60 }
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
@@ -311,7 +312,7 @@ export const SimChart = memo(function SimChart({
 
   return (
     <div ref={ref}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 220 }} overflow="hidden" aria-hidden="true">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" overflow="hidden" aria-hidden="true">
         {/* Grid lines */}
         {yTicks.map(({ val, y }) => (
           <line key={val} x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y}

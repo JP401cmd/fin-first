@@ -357,6 +357,7 @@ export function register(): void {
     description: 'AI provider/model/keys, systeem prompts, prompt overzicht',
     icon: 'Bot',
     testCount: 0,
+    defaultRole: 'superadmin' as const,
   })
   registerTests(tests)
 }

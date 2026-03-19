@@ -31,10 +31,20 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const viewMode = (searchParams.get('view_mode') || 'asset_class') as AllocationViewMode
-  const threshold = Number(searchParams.get('threshold') || '5')
 
   if (!['asset_class', 'sector', 'geography'].includes(viewMode)) {
     return NextResponse.json({ error: 'Ongeldig view_mode' }, { status: 400 })
+  }
+
+  // Read user's drift threshold preference (fallback to query param, then 5%)
+  let threshold = Number(searchParams.get('threshold') || '0')
+  if (!threshold) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('rebalance_threshold')
+      .eq('id', user.id)
+      .single()
+    threshold = profile?.rebalance_threshold ?? 5
   }
 
   if (isNaN(threshold) || threshold < 0 || threshold > 100) {
