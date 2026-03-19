@@ -1,3 +1,26 @@
+## Session 2026-03-19 - Feature #321
+
+### Feature #321: Post-onboarding invulfase automatisch starten - PASSING
+- Created InvulfaseBanner component: sticky banner below header showing progress (5/9), next step, and dismiss button
+- Created InvulfaseWelcomeCard component: welcome card on /core with 3 next-step suggestions and progress bar
+- Created API: GET/PUT /api/invulfase for invulfase state management
+- Stores flag in profiles.feature_preferences._invulfase_active (JSONB) — avoids DDL migration
+- Integrates with existing /api/next-steps for dynamic, data-driven suggestions
+- Modified save-own-data route: activates invulfase after onboarding completion (step 8)
+- Modified app layout: detects invulfase_active from feature_preferences, renders banner
+- Modified core-client: renders InvulfaseWelcomeCard before hero section
+- All 10 feature steps verified via browser automation:
+  - Banner shows with progress and next step
+  - Dismiss button works and persists across refresh
+  - Welcome card shows 3 pending steps with clickable links
+  - Next-steps dynamically loaded from real data
+- Zero TypeScript errors, zero mock data patterns
+- Commit: 383fda49
+
+### Current Status
+- 1 feature completed this session (#321)
+- Overall progress: 321/330 (97.3%)
+
 ## Session 2026-03-19 - Feature #331
 
 ### Feature #331: Pending migraties toepassen (20260316-20260319) - SKIPPED (External Blocker)
