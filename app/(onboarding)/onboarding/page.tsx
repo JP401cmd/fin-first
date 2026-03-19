@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useReducer, useCallback } from 'react'
+import { useState, useEffect, useReducer, useCallback, useMemo } from 'react'
 import './onboarding.css'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -40,7 +40,14 @@ type Step =
 
 type Direction = 'forward' | 'back'
 
-const STEP_ORDER: Step[] = ['intro', 'identity', 'extras', 'budgets', 'preferences', 'saving', 'success']
+const FULL_STEP_ORDER: Step[] = ['intro', 'identity', 'extras', 'budgets', 'preferences', 'saving', 'success']
+
+function getStepOrder(budgetteringMode: string): Step[] {
+  if (budgetteringMode === 'none') {
+    return FULL_STEP_ORDER.filter(s => s !== 'budgets')
+  }
+  return FULL_STEP_ORDER
+}
 
 interface State {
   step: Step
@@ -92,13 +99,26 @@ const initialState: State = {
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_STEP': {
-      const oldIdx = STEP_ORDER.indexOf(state.step)
-      const newIdx = STEP_ORDER.indexOf(action.step)
+      const stepOrder = getStepOrder(state.identity.budgettering_mode)
+      const oldIdx = stepOrder.indexOf(state.step)
+      const newIdx = stepOrder.indexOf(action.step)
       const direction: Direction = newIdx >= oldIdx ? 'forward' : 'back'
       return { ...state, step: action.step, direction }
     }
-    case 'SET_IDENTITY':
-      return { ...state, identity: action.data }
+    case 'SET_IDENTITY': {
+      let newState = { ...state, identity: action.data }
+      // When switching to no-budgets, clean up budget_cashflow from preferences
+      if (action.data.budgettering_mode === 'none' && state.preferences.focuses.includes('budget_cashflow')) {
+        newState = {
+          ...newState,
+          preferences: {
+            ...newState.preferences,
+            focuses: newState.preferences.focuses.filter(f => f !== 'budget_cashflow'),
+          },
+        }
+      }
+      return newState
+    }
     case 'SET_BUDGET_AMOUNTS':
       return { ...state, budgetAmounts: action.amounts }
     case 'SET_BANK_ACCOUNTS':
@@ -138,6 +158,9 @@ export default function OnboardingPage() {
   const [saveProgress, setSaveProgress] = useState(0)
   const [saveMessageIdx, setSaveMessageIdx] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  const noBudgets = state.identity.budgettering_mode === 'none'
+  const activeStepOrder = useMemo(() => getStepOrder(state.identity.budgettering_mode), [state.identity.budgettering_mode])
 
   // Check if already onboarded
   useEffect(() => {
@@ -275,9 +298,9 @@ export default function OnboardingPage() {
         }))
       }
 
-      // Timeout after 10 seconds
+      // Timeout after 30 seconds (allows time for batched DB operations including retry cleanup)
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
 
       const res = await fetch('/api/onboarding/save-own-data', {
         method: 'POST',
@@ -397,6 +420,7 @@ export default function OnboardingPage() {
               onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
               onNext={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
               onBack={() => dispatch({ type: 'SET_STEP', step: 'intro' })}
+              hideBudgets={noBudgets}
             />
           )}
 
@@ -408,8 +432,9 @@ export default function OnboardingPage() {
               onBankChange={(items) => dispatch({ type: 'SET_BANK_ACCOUNTS', items })}
               onAssetChange={(items) => dispatch({ type: 'SET_ASSETS', items })}
               onDebtChange={(items) => dispatch({ type: 'SET_DEBTS', items })}
-              onNext={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
+              onNext={() => dispatch({ type: 'SET_STEP', step: noBudgets ? 'preferences' : 'budgets' })}
               onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
+              hideBudgets={noBudgets}
             />
           )}
 
@@ -430,8 +455,9 @@ export default function OnboardingPage() {
               data={state.preferences}
               onChange={(data) => dispatch({ type: 'SET_PREFERENCES', data })}
               onNext={handleSaveOwnData}
-              onBack={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
+              onBack={() => dispatch({ type: 'SET_STEP', step: noBudgets ? 'extras' : 'budgets' })}
               saving={saving}
+              hideBudgetFocus={noBudgets}
             />
           )}
 

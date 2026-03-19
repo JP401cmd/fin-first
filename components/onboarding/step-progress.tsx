@@ -1,4 +1,4 @@
-const STEPS = [
+const ALL_STEPS = [
   { key: 'profiel', label: 'Profiel & Vrijheid', icon: '👤' },
   { key: 'startpunt', label: 'Startpunt', icon: '📍' },
   { key: 'budgetten', label: 'Budgetten', icon: '💰' },
@@ -6,9 +6,10 @@ const STEPS = [
   { key: 'klaar', label: 'Klaar', icon: '✓' },
 ] as const
 
-export type StepKey = (typeof STEPS)[number]['key']
+export type StepKey = (typeof ALL_STEPS)[number]['key']
 
-export function StepProgress({ current }: { current: StepKey }) {
+export function StepProgress({ current, hideBudgets = false }: { current: StepKey; hideBudgets?: boolean }) {
+  const STEPS = hideBudgets ? ALL_STEPS.filter((s) => s.key !== 'budgetten') : ALL_STEPS
   const currentIdx = STEPS.findIndex((s) => s.key === current)
   const progressPct = Math.round((currentIdx / (STEPS.length - 1)) * 100)
 

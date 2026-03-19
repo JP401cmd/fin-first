@@ -20,6 +20,7 @@ export function OnboardingExtras({
   onNext,
   onBack,
   saving = false,
+  hideBudgets = false,
 }: {
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -30,6 +31,7 @@ export function OnboardingExtras({
   onNext: () => void
   onBack: () => void
   saving?: boolean
+  hideBudgets?: boolean
 }) {
   const [openSections, setOpenSections] = useState<Record<Section, boolean>>({
     bank: false,
@@ -62,7 +64,7 @@ export function OnboardingExtras({
       </button>
 
       <div className="mb-8">
-        <StepProgress current="startpunt" />
+        <StepProgress current="startpunt" hideBudgets={hideBudgets} />
       </div>
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Je startpunt</p>

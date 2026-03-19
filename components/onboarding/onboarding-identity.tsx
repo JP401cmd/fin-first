@@ -148,11 +148,13 @@ export function OnboardingIdentity({
   onChange,
   onNext,
   onBack,
+  hideBudgets = false,
 }: {
   data: IdentityData
   onChange: (data: IdentityData) => void
   onNext: () => void
   onBack: () => void
+  hideBudgets?: boolean
 }) {
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)
@@ -208,7 +210,7 @@ export function OnboardingIdentity({
       </button>
 
       <div className="mb-8">
-        <StepProgress current="profiel" />
+        <StepProgress current="profiel" hideBudgets={hideBudgets} />
       </div>
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Jouw gegevens</p>
@@ -375,7 +377,14 @@ export function OnboardingIdentity({
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => onChange({ ...data, budgettering_mode: mode })}
+                  onClick={() => {
+                    const updates: Partial<IdentityData> = { budgettering_mode: mode }
+                    // When switching to 'none', reset essential_budgets (requires budgets) to current_income
+                    if (mode === 'none' && data.retirement_expense_method === 'essential_budgets') {
+                      updates.retirement_expense_method = 'current_income'
+                    }
+                    onChange({ ...data, ...updates })
+                  }}
                   className={`flex min-h-[56px] items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all active:scale-[0.98] ${
                     isSelected
                       ? 'border-wil-500 bg-wil-50 shadow-sm'
@@ -437,7 +446,7 @@ export function OnboardingIdentity({
         <div>
           <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">Pensioenuitgaven methode</span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-            {RETIREMENT_METHODS.map(({ value, label, desc }) => {
+            {RETIREMENT_METHODS.filter(m => !(data.budgettering_mode === 'none' && m.value === 'essential_budgets')).map(({ value, label, desc }) => {
               const isSelected = data.retirement_expense_method === value
               return (
                 <button

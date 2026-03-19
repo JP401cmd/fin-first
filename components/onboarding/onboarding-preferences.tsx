@@ -101,12 +101,14 @@ export function OnboardingPreferences({
   onNext,
   onBack,
   saving = false,
+  hideBudgetFocus = false,
 }: {
   data: PreferencesData
   onChange: (data: PreferencesData) => void
   onNext: () => void
   onBack: () => void
   saving?: boolean
+  hideBudgetFocus?: boolean
 }) {
   function handleSkipDefaults() {
     onChange(DEFAULT_PREFERENCES)
@@ -137,7 +139,7 @@ export function OnboardingPreferences({
       </button>
 
       <div className="mb-8">
-        <StepProgress current="voorkeuren" />
+        <StepProgress current="voorkeuren" hideBudgets={hideBudgetFocus} />
       </div>
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Voorkeuren</p>
@@ -171,7 +173,7 @@ export function OnboardingPreferences({
         </h2>
         <p className="text-sm text-[var(--ink-3)]">Kies maximaal 2 onderwerpen</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-          {FOCUS_OPTIONS.map((opt) => {
+          {FOCUS_OPTIONS.filter(opt => !(hideBudgetFocus && opt.id === 'budget_cashflow')).map((opt) => {
             const selected = data.focuses.includes(opt.id)
             const atMax = !selected && data.focuses.length >= 2
             const Icon = opt.icon
@@ -221,7 +223,8 @@ export function OnboardingPreferences({
       <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-8 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
           onClick={onBack}
-          className="flex-1 min-h-[44px] rounded-xl border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)] transition-colors duration-150"
+          disabled={saving}
+          className="flex-1 min-h-[44px] rounded-xl border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Terug
         </button>
