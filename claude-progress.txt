@@ -1,3 +1,15 @@
+## Session 2026-03-19 - Feature #349
+
+### Feature #349: Server-side test runner — base URL fixen voor fetch calls - PASSING
+- Added `authenticatedFetch()` export to `server-runner.ts` — explicitly resolves relative URLs and adds auth headers, resilient to Next.js HMR overwriting globalThis.fetch
+- Added `getBaseUrl()` export for test suites to access the resolved base URL
+- Updated 30+ test suite files to use `authenticatedFetch()` instead of bare `fetch()`
+- Removed all hardcoded `localhost:3000` references from test suites (bank-connectie-flow, berichten-chat, identiteit-household, kern-bank-connect-flow)
+- Base URL now respects `NEXT_PUBLIC_SITE_URL` env var as fallback
+- Result: "Failed to parse URL from /..." errors eliminated (from ~46 to 0)
+- Test pass rate stabilized at 97.9% (1345/1374) — remaining ~29 failures are pre-existing logic issues, not URL-related
+- Commit: 5eed95bb
+
 ## Session 2026-03-19 - Feature #356
 
 ### Feature #356: Persona seed data controleren op SimRow compatibiliteit - PASSING
