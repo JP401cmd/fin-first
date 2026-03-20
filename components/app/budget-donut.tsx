@@ -555,6 +555,102 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
 
 /* ── BudgetDonut (orchestrator) ──────────────────────────────── */
 
+/* ── MiniDonut (compact summary donut) ────────────────────────── */
+
+export interface MiniDonutSlice {
+  type: BudgetType
+  spent: number
+  limit: number
+}
+
+interface MiniDonutProps {
+  /** Array of budget type summaries with spent/limit */
+  slices: MiniDonutSlice[]
+  /** Diameter in px — default 56 */
+  size?: number
+  /** Stroke width in px — default 7 */
+  strokeWidth?: number
+  /** Optional className for wrapper */
+  className?: string
+}
+
+/**
+ * Compact donut chart (48-64px) showing budget allocation by type.
+ * Purely visual — no tooltip/interaction. Uses typeColors for consistency.
+ */
+export function MiniDonut({ slices, size = 56, strokeWidth = 7, className }: MiniDonutProps) {
+  const totalLimit = slices.reduce((s, sl) => s + sl.limit, 0)
+  if (totalLimit <= 0) return null
+
+  const r = (size - strokeWidth) / 2
+  const cx = size / 2
+  const cy = size / 2
+  const circumference = 2 * Math.PI * r
+  const gap = 2 // px gap between segments
+
+  // Build arcs
+  let offset = 0
+  const arcs = slices
+    .filter(sl => sl.limit > 0)
+    .map((sl) => {
+      const fraction = sl.limit / totalLimit
+      const arcLen = fraction * circumference - gap
+      const spentFraction = sl.limit > 0 ? Math.min(sl.spent / sl.limit, 1) : 0
+      const spentLen = spentFraction * (fraction * circumference - gap)
+      const tc = typeColors(sl.type)
+      const currentOffset = offset
+      offset += fraction * circumference
+      return { sl, arcLen: Math.max(arcLen, 1), spentLen, tc, offset: currentOffset, fullArcLen: fraction * circumference }
+    })
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className={className}
+      style={{ transform: 'rotate(-90deg)' }}
+    >
+      {arcs.map((arc, i) => (
+        <g key={arc.sl.type}>
+          {/* Track (budget limit — light color) */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            strokeWidth={strokeWidth}
+            strokeLinecap="butt"
+            style={{
+              stroke: arc.tc.budget,
+              strokeDasharray: `${arc.arcLen} ${circumference - arc.arcLen}`,
+              strokeDashoffset: -arc.offset - gap / 2,
+            }}
+          />
+          {/* Fill (spent — dark color) */}
+          {arc.spentLen > 0.5 && (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill="none"
+              strokeWidth={strokeWidth}
+              strokeLinecap="butt"
+              style={{
+                stroke: arc.tc.spent,
+                strokeDasharray: `${arc.spentLen} ${circumference - arc.spentLen}`,
+                strokeDashoffset: -arc.offset - gap / 2,
+              }}
+            />
+          )}
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+/* ── BudgetDonut (orchestrator) ──────────────────────────────── */
+
 export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) {
   const segments = useMemo(() => buildSegments(groups, spending), [groups, spending])
 
