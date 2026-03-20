@@ -17,10 +17,16 @@ const activeColors: Record<string, string> = {
   purple: 'text-horizon-600',
 }
 
-const pillColors: Record<string, string> = {
-  amber: 'bg-kern-100',
-  teal: 'bg-wil-100',
-  purple: 'bg-horizon-100',
+const activeBg: Record<string, string> = {
+  amber: 'bg-kern-50/40',
+  teal: 'bg-wil-50/40',
+  purple: 'bg-horizon-50/40',
+}
+
+const activeBorder: Record<string, string> = {
+  amber: 'border-kern-500',
+  teal: 'border-wil-500',
+  purple: 'border-horizon-500',
 }
 
 export function BottomNav() {
@@ -41,13 +47,14 @@ export function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium uppercase tracking-[0.06em] transition-colors ${
+              className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium uppercase tracking-[0.06em] transition-colors border-t-3 ${
                 tab.requiresActivation ? 'animate-nav-reveal' : ''
               } ${
-                isActive ? activeColors[tab.color] : 'text-[var(--ink-3)]'
+                isActive
+                  ? `${activeColors[tab.color]} ${activeBorder[tab.color]} ${activeBg[tab.color]} rounded-b-sm`
+                  : 'text-[var(--ink-3)] border-transparent'
               }`}
             >
-              <span className={`absolute top-1.5 h-4 w-12 rounded-full transition-opacity duration-200 ${pillColors[tab.color]} ${isActive ? 'opacity-40' : 'opacity-0'}`} />
               <Icon className="relative h-5 w-5" />
               <span className="relative">{tab.label}</span>
             </Link>
