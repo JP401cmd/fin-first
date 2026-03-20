@@ -18179,3 +18179,14 @@ Current status: 369/371 features passing (99.5%)
 - Assets/Debts row has its own natural height, no coupled ratio
 - Verified via browser automation: layout correct, 0 console errors
 - Commit: e48850dc
+
+## Session 2026-03-20 - Feature #415
+
+### Feature #415: VERVANGT #411 — Geen mini-donut in Budgets-kaart - PASSING
+- Removed MiniDonut component and MiniDonutSlice type import from kern-mission-control.tsx
+- Left column of Budgets card now shows only: total budget amount + Inkomen/Sparen/Schulden with progress bars
+- No donut chart in the Budgets card (clean, simple design)
+- Verified via browser: 0 console errors, layout renders correctly
+- buildSegments import retained (still used for expense segments in right column)
+
+### Stats: 413/414 passing (99.8%)
