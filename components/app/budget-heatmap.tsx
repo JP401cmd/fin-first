@@ -690,10 +690,10 @@ function TreemapCell({
 
   return (
     <g
-      className={isMini ? undefined : 'cursor-pointer'}
+      className="cursor-pointer"
       onMouseEnter={isMini ? undefined : onMouseEnter}
       onMouseLeave={isMini ? undefined : onMouseLeave}
-      onClick={isMini ? undefined : onClick}
+      onClick={onClick}
     >
       {/* Background rect */}
       <rect
@@ -855,6 +855,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
   }, [])
 
   const isMini = size === 'mini'
+  const isCompact = size === 'mini' || size === 'quarter'
 
   // Edge case: no sections with data
   const hasData = sections.some((s) => s.groups.length > 0)
@@ -869,7 +870,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
             viewBox={`0 0 ${VB_W} ${totalVbH}`}
             className="h-auto w-full"
             preserveAspectRatio="xMidYMid meet"
-            onMouseMove={isMini ? undefined : handleMouseMove}
+            onMouseMove={isCompact ? undefined : handleMouseMove}
             style={{
               animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
               opacity: hasEntered ? undefined : 0,
@@ -957,8 +958,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
           />
         </div>
 
-        {/* Tooltip (desktop only, positioned via mouse coords — disabled at mini) */}
-        {!isMini && tooltip && (
+        {/* Tooltip (desktop only, positioned via mouse coords — disabled at mini/quarter) */}
+        {!isCompact && tooltip && (
           <div className="hidden md:block">
             <HeatmapTooltip
               data={tooltip}
