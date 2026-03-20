@@ -1,3 +1,24 @@
+## Session 2026-03-20 - Feature #447
+
+### Feature #447: Gids bijwerken voor fd.nl design wijzigingen - PASSING
+- Added 4 SectionDivider (asterisk variant: * * *) between the 5 ReisStapSections in gids/page.tsx
+- Imported SectionDivider component into gids page
+- Updated body text in GuideTopicCard description from text-[12px] to text-base + leading-relaxed
+- Updated GuideTopicCard valueText from text-[12px] to text-base + leading-relaxed
+- Updated GuideHowTo step text from text-[12px] to text-base (auto-linted from text-sm)
+- Updated GuideHowTo tip text from text-[11px] to text-base
+- Added zebra striping to GuideNaslagwerk items (even rows get bg-[var(--subtle)]/20)
+- Increased NaslagwerkItem padding from py-2 px-2 to py-2.5 px-2.5
+- Passed index prop through NaslagwerkItem for zebra pattern (desktop tabs + mobile accordions)
+- Verified: no "Assets" label found in gids — all use "Vermogen" consistently
+- Verified: no timestamps in guide components (step 3 not applicable)
+- Tested on desktop (1280px) and mobile (360px) — no overflow, text readable
+- Zero console errors, zero warnings
+- Changes committed in 7f7589a1 (shared with feature #444 agent)
+
+### Current Status
+- 1 feature completed this session (#447)
+
 ## Session 2026-03-20 - Features #437, #438
 
 ### Feature #437: Semantische kleur-tokens: positief/negatief/neutraal - PASSING
