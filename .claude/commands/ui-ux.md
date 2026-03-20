@@ -41,12 +41,14 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Kickers zijn UPPERCASE, 10-11px, letter-spacing 0.08-0.12em?
 - [ ] Geldbedragen in DM Mono met tabular-nums?
 - [ ] Geen font-mixing binnen één element?
+- [ ] Content-secties (artikelen, uitleg, gidstekst) gebruiken `text-base` + `leading-relaxed` voor leesbare body-tekst. Data-secties (tabellen, lijsten, metrics) blijven compact (`text-sm`/`text-xs`).
 
 ### Kleur
 - [ ] Module-kleur alleen voor de actieve module, niet voor neutrale UI?
 - [ ] Contrast ratio minimaal 4.5:1 (AA) voor tekst, 7:1 (AAA) voor kleine tekst?
 - [ ] Inkt-hiërarchie correct? (--ink voor primair, --ink-2 voor secundair, --ink-3 voor meta)
 - [ ] Geen pure zwart (#000) of pure wit (#fff) als achtergrond?
+- [ ] Semantische value-change tokens gebruikt? `--positive` (groen, oklch 0.50 0.09 162) voor stijging, `--negative` (rood, oklch 0.50 0.09 25) voor daling, `--neutral-change` (grijs, oklch 0.67 0.005 88) voor ongewijzigd. Gebruik `text-positive`/`text-negative` classes, NOOIT hardcoded groen/rood.
 
 ### Ruimte & Layout
 - [ ] Consistent gebruik van spacing (4px grid: 4, 8, 12, 16, 20, 24, 32)?
@@ -59,6 +61,14 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Klikbare kaarten als `<button type="button">` met `text-left`?
 - [ ] Transitions 0.15-0.2s, geen abrupte veranderingen?
 - [ ] Focus state zichtbaar voor keyboard-navigatie?
+- [ ] Bij waardeveranderingen (herberekening, data-refresh): `flash-up` (groene puls) of `flash-down` (rode puls) CSS-class via `useFlashChange(value)` hook (`lib/hooks/use-flash-change.ts`). Animatie duurt 1s, respecteert `prefers-reduced-motion`. Toepassen op saldi, budgetbedragen, vermogensupdates.
+
+### Tabellen
+- [ ] Numerieke kolommen rechts uitgelijnd (`text-right font-mono tabular-nums`)?
+- [ ] Header-rij: `text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]` — nooit bold of groot?
+- [ ] Hover op rijen: `hover:bg-[var(--subtle)]` voor scanbaar browsen?
+- [ ] Zebra-striping optioneel (`even:bg-[var(--subtle)]/30`) — alleen bij >10 rijen?
+- [ ] Geen verticale borders — alleen horizontale `border-b border-[var(--border-ed)]`?
 
 ### Grafiek-animaties
 - [ ] Elke chart/sparkline/voortgangsbalk gebruikt `useInViewAnimation` (`lib/hooks/use-in-view-animation.ts`)?
@@ -76,6 +86,14 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Geen nieuwe kleuren, fonts of patronen zonder goede reden?
 - [ ] Hergebruik van bestaande tokens en utilities?
 - [ ] Geen `rounded-*` classes (behalve `rounded-full`) — alle hoeken zijn scherp?
+- [ ] Elke `WidgetShell` MOET een `kicker` prop hebben — het UPPERCASE label bovenaan de widget. Geen widget zonder kicker.
+- [ ] `SectionDivider` gebruiken voor visuele scheiding tussen content-blokken. Twee varianten: (1) dunne lijn `border-t border-[var(--border-ed)]` met `my-6`, of (2) redactioneel asterisk-patroon `* * *` in `text-[var(--ink-4)] text-center my-8`.
+- [ ] Tijdnotatie krant-stijl: `HH:mm` voor vandaag, `d MMM` voor dit jaar, `d MMM yyyy` voor oudere datums. NOOIT relatieve tijden als "2 uur geleden" of "3 dagen geleden" — dit doorbreekt de krant-esthetiek.
+
+### Navigatie
+- [ ] Actieve tab heeft `border-b-3` onderstreep + subtiele achtergrond `bg-[module-50]/40`?
+- [ ] Tab-tekst matcht module-kleur bij active state?
+- [ ] Alle navigatie-elementen minimaal 44px touch target?
 
 ## Hoe je communiceert
 
@@ -95,6 +113,7 @@ Raadpleeg deze bestanden voor context:
 - `components/app/bottom-sheet.tsx` — Modal/sheet patroon
 - `components/app/app-header.tsx` — Masthead/navigatie
 - `components/app/bottom-nav.tsx` — Mobiele navigatie
+- `lib/hooks/use-flash-change.ts` — Flash-animatie hook voor waardeveranderingen
 
 ## Voorbeeldtaken
 
