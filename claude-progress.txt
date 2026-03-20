@@ -18448,3 +18448,25 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#435)
 - Overall progress: 432/434 passing (99.5%)
+
+## Session 2026-03-20 - Feature #433
+
+### Feature #433: WidgetAddPicker: inklapbare dropdowns per module - PASSING
+- Converted flat module headers into collapsible accordion sections
+- Added useState<Set<WidgetModule>> for openModules (default: empty = all collapsed)
+- Module headers now clickable buttons with ChevronRight icon that rotates 90° when expanded
+- Widget count displayed per module: "De Kern (18)", "De Wil (5)", etc.
+- Smooth open/close animation via max-height/opacity CSS transitions (duration-200)
+- Widget items only visible when module is expanded (overflow: hidden + max-height: 0)
+- Added aria-expanded attribute for accessibility
+- All existing functionality preserved: onAdd, disabled/lock icons, accessible check
+- Verified via browser automation: compact collapsed view, expand/collapse toggle, widget add works
+- Zero console errors, all 8 existing tests pass
+- Commit: 86f6e2ec
+
+### Files Modified
+- components/widgets/draggable-widget-grid.tsx — ChevronRight import, openModules state, accordion UI
+
+### Current Status
+- 1 feature completed this session (#433)
+- Overall progress: 432/433 passing (99.8%)
