@@ -1,3 +1,34 @@
+## Session 2026-03-20 - Features #448, #449
+
+### Feature #448: Regressietests aanvullen voor fd.nl design tokens en patronen - PASSING
+- Created lib/regression-tests/suites/design-system-tokens.ts with 13 tests:
+  - 3 tests: --positive, --negative, --neutral-change CSS tokens in globals.css
+  - 2 tests: @keyframes flash-up and flash-down animations
+  - 3 tests: SectionDivider component exists with line + asterisk variants
+  - 3 tests: formatTimestamp exists, returns HH:mm for today, never returns relative times
+  - 1 test: Active nav-tabs have bg-*-50/40 background tints
+  - 1 test: WidgetShell kicker is required (not optional) + all instances have kicker
+- Registered in test-registry
+- All assertions verified via standalone verification script
+- Commit: 860d0e2f
+
+### Feature #449: Regressietests: tabel-design en typografie consistentie - PASSING
+- Created lib/regression-tests/suites/design-system-typography.ts with 11 tests:
+  - 2 tests: kern-mission-control uses font-mono + tabular-nums for amounts
+  - 2 tests: Kickers/headers use uppercase + --ink-3 (widget-shell, news-components)
+  - 3 tests: Content sections use text-base + leading-relaxed (guide, rapportages, briefing)
+  - 1 test: No relative timestamps ("geleden"/"ago") in user-facing components
+  - 1 test: All WidgetShell instances have non-empty kicker strings
+  - 1 test: formatCurrency always paired with font-mono in widget files
+  - 1 test: formatCurrency count check in kern-mission-control
+- All 13 verification checks pass
+- Registered in test-registry
+- Commit: 4c395154
+
+### Current Status
+- 2 features completed this session (#448, #449)
+- Overall progress: 443/451 passing (98.2%)
+
 ## Session 2026-03-20 - Feature #446
 
 ### Feature #446: UX skill files updaten met fd.nl-geïnspireerde richtlijnen - PASSING
