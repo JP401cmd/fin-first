@@ -1,3 +1,19 @@
+## Session 2026-03-20 - Feature #424
+
+### Feature #424: Uitgaven Heatmap als dashboard widget - PASSING
+- Added HeatmapBudgetGroup interface and heatmapExpenseGroups/heatmapSpending/heatmapBeschikbaarMap to DashboardData
+- Computed heatmap data from existing budget queries in dashboard-data-loader.ts
+- Registered uitgaven_heatmap widget in widget-catalog.ts, widget-renderer.tsx switch, BUDGET_WIDGETS set
+- Created budget-heatmap-widget.tsx wrapping BudgetHeatmap with expense-only sections
+- Reverted accidental modification of budget-heatmap.tsx (coder agent changed constants to configurable)
+- Updated all test mocks (draggable-widget-grid.test, test-kern-widgets, mock-dashboard-data, dashboard-empty-loading)
+- Verified in browser: widget shows treemap of expense budgets with color coding, tooltip on hover works
+- Zero console errors
+- Commit: 55ec2d89
+
+### Current Status
+- 423/424 features passing (99.8%)
+
 ## Session 2026-03-20 - Feature #423
 
 ### Feature #423: Subtiele achtergrondkleuren Vermogen en Schulden - PASSING
