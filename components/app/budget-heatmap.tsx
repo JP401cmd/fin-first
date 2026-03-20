@@ -79,9 +79,9 @@ interface HeatmapConstants {
 function getHeatmapConstants(size?: WidgetSize): HeatmapConstants {
   switch (size) {
     case 'mini':
-      return { VB_W: 200, VB_H: 150, CELL_GAP: 1, CELL_RADIUS: 3, SECTION_LABEL_H: 10 }
+      return { VB_W: 200, VB_H: 150, CELL_GAP: 1, CELL_RADIUS: 3, SECTION_LABEL_H: 0 }
     case 'quarter':
-      return { VB_W: 400, VB_H: 300, CELL_GAP: 2, CELL_RADIUS: 4, SECTION_LABEL_H: 14 }
+      return { VB_W: 400, VB_H: 300, CELL_GAP: 2, CELL_RADIUS: 4, SECTION_LABEL_H: 12 }
     case 'full':
       return { VB_W: 800, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
     case 'half':
@@ -868,13 +868,13 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
               opacity: hasEntered ? undefined : 0,
             }}
           >
-            {/* Section labels */}
-            {labels.map((label) => (
+            {/* Section labels — hidden at mini, compact at quarter */}
+            {size !== 'mini' && labels.map((label) => (
               <text
                 key={`section-${label.budgetType}`}
                 x={label.x + 4}
-                y={label.y + 13}
-                className="fill-[var(--ink-2)] font-sans text-[12px] font-semibold uppercase tracking-wider"
+                y={label.y + (size === 'quarter' ? 10 : 13)}
+                className={`fill-[var(--ink-2)] font-sans font-semibold uppercase tracking-wider ${size === 'quarter' ? 'text-[9px]' : 'text-[12px]'}`}
                 opacity={hasEntered ? 1 : 0}
                 style={{ transition: 'opacity 0.4s ease-out 0.1s', letterSpacing: '0.05em' }}
               >
@@ -882,8 +882,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
               </text>
             ))}
 
-            {/* Parent group outlines — subtle dashed borders with labels */}
-            {parentOutlines.map(([pid, outline]) => (
+            {/* Parent group outlines — only at half/full where there's room */}
+            {(size === 'half' || size === 'full' || !size) && parentOutlines.map(([pid, outline]) => (
               <g key={`outline-${pid}`}>
                 <rect
                   x={outline.minX - 1}
@@ -962,8 +962,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
         )}
       </div>
 
-      {/* Combined legend */}
-      <CombinedHeatmapLegend />
+      {/* Combined legend — only at half/full where there's room */}
+      {(size === 'half' || size === 'full' || !size) && <CombinedHeatmapLegend />}
     </div>
   )
 })
