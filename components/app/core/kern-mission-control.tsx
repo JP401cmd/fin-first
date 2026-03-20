@@ -448,7 +448,7 @@ export function KernMissionControl({
                                   </div>
                                   <span className="truncate text-[var(--ink-2)]">{item.name}</span>
                                 </div>
-                                <span className={`shrink-0 font-mono font-medium ${item.value >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
+                                <span className={`shrink-0 font-mono font-medium ${item.value >= 0 ? 'text-[var(--ink-2)]' : 'text-negative'}`}>
                                   {formatCurrency(item.value)}
                                 </span>
                               </div>
@@ -483,7 +483,7 @@ export function KernMissionControl({
                                   </div>
                                   <span className="truncate text-[var(--ink-2)]">{item.name}</span>
                                 </div>
-                                <span className={`shrink-0 font-mono font-medium ${item.value >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
+                                <span className={`shrink-0 font-mono font-medium ${item.value >= 0 ? 'text-[var(--ink-2)]' : 'text-negative'}`}>
                                   {formatCurrency(item.value)}
                                 </span>
                               </div>
@@ -539,7 +539,7 @@ export function KernMissionControl({
                   <div>
                     <p className="text-sm font-semibold text-[var(--ink-2)]">Schulden</p>
                     {/* Compact total on desktop header (always visible) */}
-                    <p className={`hidden lg:block font-mono text-lg font-bold tabular-nums rounded-sm ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-emerald-600'} ${debtsFlash}`}>
+                    <p className={`hidden lg:block font-mono text-lg font-bold tabular-nums rounded-sm ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-positive'} ${debtsFlash}`}>
                       {rawTotalDebts > 0 ? formatCurrency(rawTotalDebts) : 'Schuldvrij'}
                     </p>
                   </div>
@@ -562,11 +562,11 @@ export function KernMissionControl({
               <div className={`grid transition-[grid-template-rows] duration-200 ease-out grid-rows-[1fr] ${!debtsOpen ? 'lg:grid-rows-[0fr]' : 'lg:grid-rows-[1fr]'}`}>
                 <div className="overflow-hidden">
                   {/* Big total — mobile only (desktop shows it in header) */}
-                  <p className={`font-mono text-2xl font-bold lg:hidden rounded-sm ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-emerald-600'} ${debtsFlash}`}>
+                  <p className={`font-mono text-2xl font-bold lg:hidden rounded-sm ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-positive'} ${debtsFlash}`}>
                     {rawTotalDebts > 0 ? formatCurrency(rawTotalDebts) : 'Schuldvrij'}
                   </p>
                   <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium lg:hidden ${
-                    rawTotalDebts === 0 ? 'bg-emerald-50 text-emerald-700' : debtProgress && debtProgress.progressPct > 50 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
+                    rawTotalDebts === 0 ? 'bg-positive/10 text-positive' : debtProgress && debtProgress.progressPct > 50 ? 'bg-positive/10 text-positive' : 'bg-kern-50 text-kern-700'
                   }`}>
                     {rawTotalDebts === 0 ? (
                       <><CheckCircle2 className="h-3 w-3" />Schuldvrij!</>
@@ -603,7 +603,7 @@ export function KernMissionControl({
                               </div>
                               <span className="truncate text-[var(--ink-2)]">{debt.name}</span>
                             </div>
-                            <span className="shrink-0 font-mono font-medium text-red-600">
+                            <span className="shrink-0 font-mono font-medium text-negative">
                               {formatCurrency(debt.current_balance)}
                             </span>
                           </div>

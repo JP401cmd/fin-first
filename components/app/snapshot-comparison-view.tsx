@@ -144,7 +144,7 @@ function DeltaIndicator({ delta, invert }: { delta: number; invert?: boolean }) 
   }
   const isPositive = invert ? delta < 0 : delta > 0
   return (
-    <div className={`flex items-center gap-1 ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+    <div className={`flex items-center gap-1 ${isPositive ? 'text-positive' : 'text-negative'}`}>
       {isPositive ? (
         <TrendingUp className="h-3.5 w-3.5" />
       ) : (
@@ -179,8 +179,8 @@ function MetricRow({
       : delta === 0
         ? 'text-[var(--ink-3)]'
         : (metric.invertColor ? delta < 0 : delta > 0)
-          ? 'text-emerald-600'
-          : 'text-red-500'
+          ? 'text-positive'
+          : 'text-negative'
 
   const deltaBg =
     delta === null
@@ -188,8 +188,8 @@ function MetricRow({
       : delta === 0
         ? 'bg-[var(--subtle)]'
         : (metric.invertColor ? delta < 0 : delta > 0)
-          ? 'bg-emerald-50'
-          : 'bg-red-50'
+          ? 'bg-positive/10'
+          : 'bg-negative/10'
 
   return (
     <div
@@ -365,13 +365,13 @@ export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProp
         <div className="mb-5 flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3" data-testid="comparison-summary">
           <div className="flex items-center gap-4">
             {improvements > 0 && (
-              <span className="flex items-center gap-1 text-sm font-semibold text-emerald-600">
+              <span className="flex items-center gap-1 text-sm font-semibold text-positive">
                 <TrendingUp className="h-4 w-4" />
                 {improvements} verbetering{improvements !== 1 ? 'en' : ''}
               </span>
             )}
             {regressions > 0 && (
-              <span className="flex items-center gap-1 text-sm font-semibold text-red-500">
+              <span className="flex items-center gap-1 text-sm font-semibold text-negative">
                 <TrendingDown className="h-4 w-4" />
                 {regressions} achteruitgang{regressions !== 1 ? '' : ''}
               </span>

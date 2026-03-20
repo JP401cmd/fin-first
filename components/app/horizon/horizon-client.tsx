@@ -2028,7 +2028,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       <p className="text-xs text-[var(--ink-3)]">
                         {ev.target_age != null ? `Leeftijd ${ev.target_age}` : 'Geen leeftijd'}
                         {evImpact && evImpact.fireDelayMonths !== 0 && (
-                          <span className={evImpact.fireDelayMonths > 0 ? ' text-red-500' : ' text-emerald-500'}>
+                          <span className={evImpact.fireDelayMonths > 0 ? ' text-negative' : ' text-positive'}>
                             {' · '}{evImpact.fireDelayMonths > 0 ? '+' : ''}{evImpact.fireDelayMonths} mnd
                           </span>
                         )}
@@ -2321,7 +2321,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           {eventCashflows.map((cf) => (
                             <div key={cf.id} className="flex items-baseline justify-between py-0.5">
                               <span className="text-[var(--ink-2)]">{cf.name}</span>
-                              <span className={`font-mono tabular-nums ${cf.direction === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                              <span className={`font-mono tabular-nums ${cf.direction === 'income' ? 'text-positive' : 'text-negative'}`}>
                                 {cf.direction === 'income' ? '+' : '-'}{formatCurrency(cf.amount)}
                                 {cf.type === 'recurring' ? '/mnd' : ''}
                                 {cf.durationMonths > 0 ? ` · ${Math.ceil(cf.durationMonths / 12)}j` : ''}
@@ -2335,7 +2335,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 {nettoMonthly !== 0 && (
                                   <div className="flex justify-between font-semibold">
                                     <span className="text-[var(--ink)]">Netto maandelijks</span>
-                                    <span className={`font-mono tabular-nums ${nettoMonthly >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    <span className={`font-mono tabular-nums ${nettoMonthly >= 0 ? 'text-positive' : 'text-negative'}`}>
                                       {nettoMonthly >= 0 ? '+' : ''}{formatCurrency(nettoMonthly)}/mnd
                                     </span>
                                   </div>
@@ -2343,7 +2343,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 {nettoOneTime !== 0 && (
                                   <div className="flex justify-between font-semibold">
                                     <span className="text-[var(--ink)]">Netto eenmalig</span>
-                                    <span className={`font-mono tabular-nums ${nettoOneTime >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    <span className={`font-mono tabular-nums ${nettoOneTime >= 0 ? 'text-positive' : 'text-negative'}`}>
                                       {nettoOneTime >= 0 ? '+' : ''}{formatCurrency(nettoOneTime)}
                                     </span>
                                   </div>
@@ -2382,7 +2382,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             {' · '}{formatCurrency(absCost)}
                           </p>
                           {freedomTimeStr && (
-                            <p className={`mt-1 text-sm font-medium ${isPositiveImpact ? 'text-emerald-600' : 'text-red-600'}`}>
+                            <p className={`mt-1 text-sm font-medium ${isPositiveImpact ? 'text-positive' : 'text-negative'}`}>
                               ≈ {freedomTimeStr} {isPositiveImpact ? 'gewonnen vrijheid' : 'aan vrijheidstijd'}
                             </p>
                           )}
@@ -3420,7 +3420,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                               <div className="flex justify-between">
                                 <span>Opbouwpercentage</span>
-                                <span className={`font-mono tabular-nums font-semibold ${opbouwPct < 100 ? 'text-amber-600' : 'text-emerald-600'}`}>{opbouwPct}%</span>
+                                <span className={`font-mono tabular-nums font-semibold ${opbouwPct < 100 ? 'text-amber-600' : 'text-positive'}`}>{opbouwPct}%</span>
                               </div>
                               <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                 <span>Gecorrigeerd bedrag</span>
@@ -3460,7 +3460,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                   <span>Overdrachtsbelasting (2%)</span>
                                   <span className="font-mono tabular-nums">
                                     {overdracht === 0 ? (
-                                      <span className="text-emerald-600">Vrijgesteld (starter &lt;35j)</span>
+                                      <span className="text-positive">Vrijgesteld (starter &lt;35j)</span>
                                     ) : (
                                       formatCurrency(overdracht)
                                     )}
@@ -3488,11 +3488,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between"><span>Hypotheeklasten</span><span className="font-mono tabular-nums">{formatCurrency(hypotheekLasten)}/mnd</span></div>
                                 <div className="flex justify-between"><span>Onderhoud (~1% woningwaarde/jaar)</span><span className="font-mono tabular-nums">{formatCurrency(onderhoudMaand)}/mnd</span></div>
-                                <div className="flex justify-between"><span>Huidige huur (besparing)</span><span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(huidigeHuur)}/mnd</span></div>
+                                <div className="flex justify-between"><span>Huidige huur (besparing)</span><span className="font-mono tabular-nums text-positive">-{formatCurrency(huidigeHuur)}/mnd</span></div>
                                 <div className="h-px bg-horizon-200 my-1" />
                                 <div className="flex justify-between font-semibold">
                                   <span>Netto extra maandlast</span>
-                                  <span className={`font-mono tabular-nums ${nettoMaandlast > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                  <span className={`font-mono tabular-nums ${nettoMaandlast > 0 ? 'text-negative' : 'text-positive'}`}>
                                     {nettoMaandlast > 0 ? '+' : ''}{formatCurrency(nettoMaandlast)}/mnd
                                   </span>
                                 </div>
@@ -3520,9 +3520,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Geschatte opvangkosten</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Bruto opvang ({opvangDagen} dgn × {aantalKinderen} {aantalKinderen === 1 ? 'kind' : 'kinderen'})</span><span className="font-mono tabular-nums">{formatCurrency(brutoOpvang)}/mnd</span></div>
-                              <div className="flex justify-between text-emerald-600"><span>Kinderopvangtoeslag (~70%)</span><span className="font-mono tabular-nums">-{formatCurrency(brutoOpvang - nettoOpvang)}/mnd</span></div>
+                              <div className="flex justify-between text-positive"><span>Kinderopvangtoeslag (~70%)</span><span className="font-mono tabular-nums">-{formatCurrency(brutoOpvang - nettoOpvang)}/mnd</span></div>
                               <div className="h-px bg-horizon-200 my-0.5" />
-                              <div className="flex justify-between font-semibold"><span>Netto eigen bijdrage</span><span className="font-mono tabular-nums text-red-600">+{formatCurrency(nettoOpvang)}/mnd</span></div>
+                              <div className="flex justify-between font-semibold"><span>Netto eigen bijdrage</span><span className="font-mono tabular-nums text-negative">+{formatCurrency(nettoOpvang)}/mnd</span></div>
                             </div>
                             <p className="text-[10px] text-[var(--ink-4)] leading-relaxed">
                               Kinderopvangtoeslag dekt 33–96% afhankelijk van je inkomen. Hier is uitgegaan van ~70% dekking (modaal inkomen). Check <span className="underline">toeslagen.nl</span> voor je persoonlijke situatie.
@@ -3551,21 +3551,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht kinderen</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <p className="text-[10px] font-semibold text-horizon-500 mb-1">Eenmalige kosten</p>
-                              <div className="flex justify-between"><span>Babyuitzet &amp; kinderkamer</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(babyuitzet)}</span></div>
+                              <div className="flex justify-between"><span>Babyuitzet &amp; kinderkamer</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(babyuitzet)}</span></div>
                               <div className="h-px bg-horizon-200 my-1" />
                               <p className="text-[10px] font-semibold text-horizon-500 mb-1">Netto maandkosten</p>
-                              <div className="flex justify-between"><span>Basiskosten ({aantalKinderen} {aantalKinderen === 1 ? 'kind' : 'kinderen'})</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(basiskosten)}/mnd</span></div>
+                              <div className="flex justify-between"><span>Basiskosten ({aantalKinderen} {aantalKinderen === 1 ? 'kind' : 'kinderen'})</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(basiskosten)}/mnd</span></div>
                               {opvangDagen > 0 && (
-                                <div className="flex justify-between"><span>Kinderopvang netto ({opvangDagen} dgn/wk, ~4 jr)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(nettoOpvang)}/mnd</span></div>
+                                <div className="flex justify-between"><span>Kinderopvang netto ({opvangDagen} dgn/wk, ~4 jr)</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(nettoOpvang)}/mnd</span></div>
                               )}
                               {useKinderbijslag && (
-                                <div className="flex justify-between text-emerald-600"><span>Kinderbijslag (~{formatCurrency(kbPerMaand * 3)}/kwt × {aantalKinderen})</span><span className="font-mono tabular-nums">+{formatCurrency(kbPerMaand)}/mnd</span></div>
+                                <div className="flex justify-between text-positive"><span>Kinderbijslag (~{formatCurrency(kbPerMaand * 3)}/kwt × {aantalKinderen})</span><span className="font-mono tabular-nums">+{formatCurrency(kbPerMaand)}/mnd</span></div>
                               )}
                               <div className="h-px bg-horizon-200 my-0.5" />
-                              <div className="flex justify-between font-semibold"><span>Netto maandkosten</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(Math.max(0, nettoMaandkosten))}/mnd</span></div>
+                              <div className="flex justify-between font-semibold"><span>Netto maandkosten</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(Math.max(0, nettoMaandkosten))}/mnd</span></div>
                               <div className="flex justify-between text-[var(--ink-4)]"><span>Duur</span><span>{Math.round(duurMaanden / 12)} jaar ({duurMaanden} mnd)</span></div>
                               <div className="h-px bg-horizon-200 my-1" />
-                              <div className="flex justify-between font-semibold"><span>Totale geschatte kosten</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(Math.max(0, totaal))}</span></div>
+                              <div className="flex justify-between font-semibold"><span>Totale geschatte kosten</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(Math.max(0, totaal))}</span></div>
                             </div>
                           </div>
                         )
@@ -3599,7 +3599,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 </div>
                                 <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                   <span>Inkomensverlies</span>
-                                  <span className="font-mono tabular-nums text-red-600">-{formatCurrency(ptInkomensVerlies)}/mnd</span>
+                                  <span className="font-mono tabular-nums text-negative">-{formatCurrency(ptInkomensVerlies)}/mnd</span>
                                 </div>
                               </div>
                             </div>
@@ -3631,13 +3631,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Erfbelasting berekening (2026)</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Bruto erfenis</span><span className="font-mono tabular-nums">{formatCurrency(bruto)}</span></div>
-                              <div className="flex justify-between text-emerald-600"><span>Vrijstelling ({relatie})</span><span className="font-mono tabular-nums">-{formatCurrency(erf.vrijstelling)}</span></div>
+                              <div className="flex justify-between text-positive"><span>Vrijstelling ({relatie})</span><span className="font-mono tabular-nums">-{formatCurrency(erf.vrijstelling)}</span></div>
                               <div className="flex justify-between"><span>Belastbaar bedrag</span><span className="font-mono tabular-nums">{formatCurrency(erf.belastbaar)}</span></div>
-                              {erf.belastingLaag > 0 && (<div className="flex justify-between text-[var(--ink-3)]"><span className="pl-3">Schijf 1 ({tariefLabel[relatie]})</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(erf.belastingLaag)}</span></div>)}
-                              {erf.belastingHoog > 0 && (<div className="flex justify-between text-[var(--ink-3)]"><span className="pl-3">Schijf 2</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(erf.belastingHoog)}</span></div>)}
-                              <div className="flex justify-between"><span>Totaal erfbelasting</span><span className={`font-mono tabular-nums ${erf.totaalBelasting > 0 ? 'text-red-600' : ''}`}>{erf.totaalBelasting > 0 ? `-${formatCurrency(erf.totaalBelasting)}` : formatCurrency(0)}</span></div>
+                              {erf.belastingLaag > 0 && (<div className="flex justify-between text-[var(--ink-3)]"><span className="pl-3">Schijf 1 ({tariefLabel[relatie]})</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(erf.belastingLaag)}</span></div>)}
+                              {erf.belastingHoog > 0 && (<div className="flex justify-between text-[var(--ink-3)]"><span className="pl-3">Schijf 2</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(erf.belastingHoog)}</span></div>)}
+                              <div className="flex justify-between"><span>Totaal erfbelasting</span><span className={`font-mono tabular-nums ${erf.totaalBelasting > 0 ? 'text-negative' : ''}`}>{erf.totaalBelasting > 0 ? `-${formatCurrency(erf.totaalBelasting)}` : formatCurrency(0)}</span></div>
                               {erf.effectiefTarief > 0 && (<div className="flex justify-between text-[var(--ink-4)]"><span>Effectief tarief</span><span className="font-mono tabular-nums">{erf.effectiefTarief}%</span></div>)}
-                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold"><span>Netto erfenis</span><span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(erf.netto)}</span></div>
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold"><span>Netto erfenis</span><span className="font-mono tabular-nums text-positive">+{formatCurrency(erf.netto)}</span></div>
                             </div>
                             {relatie === 'partner' && bruto <= erf.vrijstelling && (<p className="text-[10px] text-emerald-700">Volledig vrijgesteld: de partnervrijstelling ({formatCurrency(erf.vrijstelling)}) overschrijdt het bedrag.</p>)}
                           </div>
@@ -3656,10 +3656,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Inkomensverlies berekening</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Netto maandinkomen</span><span className="font-mono tabular-nums">{formatCurrency(nettoInkomen)}/mnd</span></div>
-                              {doorbetalingsPct > 0 && (<div className="flex justify-between text-emerald-600"><span>Doorbetaling werkgever ({doorbetalingsPct}%)</span><span className="font-mono tabular-nums">+{formatCurrency(doorbetaling)}/mnd</span></div>)}
-                              <div className="flex justify-between font-semibold"><span>Maandelijks inkomensverlies</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(inkomensverlies)}/mnd</span></div>
-                              {extraKosten > 0 && (<div className="flex justify-between"><span>Extra kosten (eenmalig)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(extraKosten)}</span></div>)}
-                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold"><span>Totaal impact ({durMnd} mnd)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaalVerlies)}</span></div>
+                              {doorbetalingsPct > 0 && (<div className="flex justify-between text-positive"><span>Doorbetaling werkgever ({doorbetalingsPct}%)</span><span className="font-mono tabular-nums">+{formatCurrency(doorbetaling)}/mnd</span></div>)}
+                              <div className="flex justify-between font-semibold"><span>Maandelijks inkomensverlies</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(inkomensverlies)}/mnd</span></div>
+                              {extraKosten > 0 && (<div className="flex justify-between"><span>Extra kosten (eenmalig)</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(extraKosten)}</span></div>)}
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold"><span>Totaal impact ({durMnd} mnd)</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(totaalVerlies)}</span></div>
                             </div>
                             {doorbetalingsPct === 0 && (<p className="text-[10px] text-[var(--ink-4)]">Tip: vraag je werkgever naar sabbaticalregelingen. Sommige cao&#39;s bieden gedeeltelijke doorbetaling.</p>)}
                             {doorbetalingsPct === 100 && (<p className="text-[10px] text-emerald-700">Volledig doorbetaald sabbatical — alleen extra kosten zijn van toepassing.</p>)}
@@ -3699,7 +3699,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 </div>
                                 <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                   <span>AOW-gat</span>
-                                  <span className={`font-mono tabular-nums ${aowGapJaren > 5 ? 'text-red-600' : 'text-amber-600'}`}>
+                                  <span className={`font-mono tabular-nums ${aowGapJaren > 5 ? 'text-negative' : 'text-amber-600'}`}>
                                     {aowGapJaren} jaar ({aowGapMaanden} maanden)
                                   </span>
                                 </div>
@@ -3715,13 +3715,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 {overbrugging > 0 && (
                                   <div className="flex justify-between">
                                     <span>Overbruggingsuitkering</span>
-                                    <span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(overbrugging)}/mnd</span>
+                                    <span className="font-mono tabular-nums text-positive">-{formatCurrency(overbrugging)}/mnd</span>
                                   </div>
                                 )}
                                 {vroegpensioen > 0 && phase2Maanden > 0 && (
                                   <div className="flex justify-between">
                                     <span>Vroegpensioen (vanaf {vroegpensioenVanaf}j)</span>
-                                    <span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(vroegpensioen)}/mnd</span>
+                                    <span className="font-mono tabular-nums text-positive">-{formatCurrency(vroegpensioen)}/mnd</span>
                                   </div>
                                 )}
                                 {phase1Maanden > 0 && (
@@ -3736,7 +3736,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 )}
                                 <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                   <span>Totaal overbruggen uit vermogen</span>
-                                  <span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaalOverbrugging)}</span>
+                                  <span className="font-mono tabular-nums text-negative">-{formatCurrency(totaalOverbrugging)}</span>
                                 </div>
                                 {effectiveNetWorth > 0 && (
                                   <div className="flex justify-between text-[var(--ink-4)]">
@@ -3783,7 +3783,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                               <div className="flex justify-between">
                                 <span>Wegenbelasting</span>
-                                <span className={`font-mono tabular-nums ${breakdown.wegenbelasting === 0 ? 'text-emerald-600' : ''}`}>
+                                <span className={`font-mono tabular-nums ${breakdown.wegenbelasting === 0 ? 'text-positive' : ''}`}>
                                   {breakdown.wegenbelasting === 0 ? 'Vrijgesteld (EV)' : `${formatCurrency(breakdown.wegenbelasting)}/mnd`}
                                 </span>
                               </div>
@@ -3801,13 +3801,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                               {vervangt && (
                                 <>
-                                  <div className="flex justify-between text-emerald-600">
+                                  <div className="flex justify-between text-positive">
                                     <span>Huidige autokosten</span>
                                     <span className="font-mono tabular-nums">-{formatCurrency(huidigeKosten)}/mnd</span>
                                   </div>
                                   <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                     <span>Netto verschil</span>
-                                    <span className={`font-mono tabular-nums ${netto <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    <span className={`font-mono tabular-nums ${netto <= 0 ? 'text-positive' : 'text-negative'}`}>
                                       {netto <= 0 ? '-' : '+'}{formatCurrency(Math.abs(netto))}/mnd
                                     </span>
                                   </div>
@@ -3833,11 +3833,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto overwaarde</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Verkoopprijs</span><span className="font-mono tabular-nums">{formatCurrency(vp)}</span></div>
-                              <div className="flex justify-between"><span>Resterende hypotheek</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(rh)}</span></div>
-                              <div className="flex justify-between"><span>Makelaarskosten ({mkPct}%)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(mkBedrag)}</span></div>
+                              <div className="flex justify-between"><span>Resterende hypotheek</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(rh)}</span></div>
+                              <div className="flex justify-between"><span>Makelaarskosten ({mkPct}%)</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(mkBedrag)}</span></div>
                               <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                 <span>Netto overwaarde</span>
-                                <span className={`font-mono tabular-nums ${netto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                <span className={`font-mono tabular-nums ${netto >= 0 ? 'text-positive' : 'text-negative'}`}>
                                   {netto >= 0 ? '+' : ''}{formatCurrency(netto)}
                                 </span>
                               </div>
@@ -3857,7 +3857,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               <div className="flex justify-between"><span>Nieuwe woonlasten</span><span className="font-mono tabular-nums">{formatCurrency(nieuweLasten)}/mnd</span></div>
                               <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                 <span>Verschil</span>
-                                <span className={`font-mono tabular-nums ${verschil >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                <span className={`font-mono tabular-nums ${verschil >= 0 ? 'text-positive' : 'text-negative'}`}>
                                   {verschil >= 0 ? '+' : ''}{formatCurrency(verschil)}/mnd
                                 </span>
                               </div>
@@ -3891,7 +3891,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
                                 <span>Transitievergoeding</span>
-                                <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(transitie)}</span>
+                                <span className="font-mono tabular-nums text-positive">+{formatCurrency(transitie)}</span>
                               </div>
                               <div className="flex justify-between">
                                 <span>WW-uitkering (gem.)</span>
@@ -3908,14 +3908,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               <div className="h-px bg-horizon-200 my-1" />
                               <div className="flex justify-between">
                                 <span>Inkomensgat per maand</span>
-                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(inkomensgat)}/mnd</span>
+                                <span className="font-mono tabular-nums text-negative">-{formatCurrency(inkomensgat)}/mnd</span>
                               </div>
                               <div className="flex justify-between font-semibold">
                                 <span>Totaal inkomensverlies ({totaleDuur} mnd)</span>
-                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaalInkomensVerlies)}</span>
+                                <span className="font-mono tabular-nums text-negative">-{formatCurrency(totaalInkomensVerlies)}</span>
                               </div>
                               {transitie >= totaalInkomensVerlies && (
-                                <p className="text-[10px] text-emerald-600 mt-1">
+                                <p className="text-[10px] text-positive mt-1">
                                   ✓ Transitievergoeding dekt het geschatte inkomensverlies
                                 </p>
                               )}
@@ -3940,23 +3940,23 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht carrière switch</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <p className="text-[10px] font-semibold text-horizon-500 mb-1">Fase 1 — Geen inkomen ({ccGapMnd} mnd)</p>
-                              <div className="flex justify-between"><span>Inkomensverlies</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(ccVerliesFase1)}</span></div>
+                              <div className="flex justify-between"><span>Inkomensverlies</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(ccVerliesFase1)}</span></div>
                               <p className="text-[10px] font-semibold text-horizon-500 mt-2 mb-1">Fase 2 — Overgangsperiode ({ccOvergangMnd} mnd)</p>
                               <div className="flex justify-between"><span>Salaris tijdens overgang</span><span className="font-mono tabular-nums">{formatCurrency(ccOvergangSalaris)}/mnd</span></div>
-                              <div className="flex justify-between"><span>Inkomensverlies t.o.v. huidig</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(ccVerliesFase2)}</span></div>
+                              <div className="flex justify-between"><span>Inkomensverlies t.o.v. huidig</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(ccVerliesFase2)}</span></div>
                               <p className="text-[10px] font-semibold text-horizon-500 mt-2 mb-1">Fase 3 — Nieuw normaal</p>
                               <div className="flex justify-between"><span>Nieuw netto salaris</span><span className="font-mono tabular-nums">{formatCurrency(ccNieuw)}/mnd</span></div>
                               {ccDelta !== 0 && (
-                                <div className="flex justify-between"><span>Salarisverschil</span><span className={`font-mono tabular-nums ${ccDelta > 0 ? 'text-emerald-600' : 'text-red-600'}`}>{ccDelta > 0 ? '+' : ''}{formatCurrency(ccDelta)}/mnd</span></div>
+                                <div className="flex justify-between"><span>Salarisverschil</span><span className={`font-mono tabular-nums ${ccDelta > 0 ? 'text-positive' : 'text-negative'}`}>{ccDelta > 0 ? '+' : ''}{formatCurrency(ccDelta)}/mnd</span></div>
                               )}
                               <div className="h-px bg-horizon-200 my-1" />
                               {ccOmscholing > 0 && (
-                                <div className="flex justify-between"><span>Omscholingskosten (eenmalig)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(ccOmscholing)}</span></div>
+                                <div className="flex justify-between"><span>Omscholingskosten (eenmalig)</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(ccOmscholing)}</span></div>
                               )}
-                              <div className="flex justify-between font-semibold"><span>Totale kosten overgangsperiode</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(ccTotaalKosten)}</span></div>
+                              <div className="flex justify-between font-semibold"><span>Totale kosten overgangsperiode</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(ccTotaalKosten)}</span></div>
                             </div>
                             {ccDelta > 0 && ccTotaalKosten > 0 && (
-                              <p className="text-[10px] text-emerald-600 mt-1">✓ Na de overgang verdien je {formatCurrency(ccDelta)}/mnd meer — terugverdiend in {Math.ceil(ccTotaalKosten / ccDelta)} maanden</p>
+                              <p className="text-[10px] text-positive mt-1">✓ Na de overgang verdien je {formatCurrency(ccDelta)}/mnd meer — terugverdiend in {Math.ceil(ccTotaalKosten / ccDelta)} maanden</p>
                             )}
                             {ccDelta < 0 && (
                               <p className="text-[10px] text-[var(--ink-4)] mt-1">Let op: je nieuwe salaris is {formatCurrency(Math.abs(ccDelta))}/mnd lager dan je huidige inkomen</p>
@@ -3982,13 +3982,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               <div className="flex justify-between"><span>Inrichtingskosten</span><span className="font-mono tabular-nums">{formatCurrency(inrichtingskosten)}</span></div>
                               <div className="flex justify-between"><span>Dubbele lasten ({dubbeleLastenMaanden} mnd × {formatCurrency(dubbeleLastenBedrag)})</span><span className="font-mono tabular-nums">{formatCurrency(dubbeleLastenTotaal)}</span></div>
                               <div className="h-px bg-horizon-200 my-1" />
-                              <div className="flex justify-between font-semibold"><span>Totaal eenmalig</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(eenmaligTotaal)}</span></div>
+                              <div className="flex justify-between font-semibold"><span>Totaal eenmalig</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(eenmaligTotaal)}</span></div>
                               {huurverschil !== 0 && (
                                 <>
                                   <p className="text-[10px] font-semibold text-horizon-500 mt-2 mb-1">Structureel maandlastenverschil</p>
                                   <div className="flex justify-between">
                                     <span>{huurverschil > 0 ? 'Duurder wonen' : 'Goedkoper wonen'}</span>
-                                    <span className={`font-mono tabular-nums ${huurverschil > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{huurverschil > 0 ? '+' : ''}{formatCurrency(huurverschil)}/mnd</span>
+                                    <span className={`font-mono tabular-nums ${huurverschil > 0 ? 'text-negative' : 'text-positive'}`}>{huurverschil > 0 ? '+' : ''}{formatCurrency(huurverschil)}/mnd</span>
                                   </div>
                                   <div className="flex justify-between text-[var(--ink-4)]">
                                     <span>Duur</span>
@@ -4018,7 +4018,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 <div className="flex justify-between"><span>Notaris huwelijksvoorwaarden</span><span className="font-mono tabular-nums">{formatCurrency(notariskosten)}</span></div>
                               )}
                               <div className="h-px bg-horizon-200 my-1" />
-                              <div className="flex justify-between font-semibold"><span>Totale kosten</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaal)}</span></div>
+                              <div className="flex justify-between font-semibold"><span>Totale kosten</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(totaal)}</span></div>
                             </div>
                             <p className="text-[10px] text-[var(--ink-4)] mt-1">💍 Na trouwen word je fiscaal partners — Box 3 vermogen en vrijstelling (€57.000 p.p.) worden gezamenlijk berekend.</p>
                           </div>
@@ -4041,27 +4041,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Schenkingsoverzicht</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Bedrag per ontvanger</span><span className="font-mono tabular-nums">{formatCurrency(bedragPerOntvanger)}</span></div>
-                              <div className="flex justify-between"><span>Vrijstelling ({relatie === 'kind' ? 'kind' : 'overig'})</span><span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(result.vrijstelling)}</span></div>
+                              <div className="flex justify-between"><span>Vrijstelling ({relatie === 'kind' ? 'kind' : 'overig'})</span><span className="font-mono tabular-nums text-positive">-{formatCurrency(result.vrijstelling)}</span></div>
                               <div className="flex justify-between"><span>Belastbaar per ontvanger</span><span className="font-mono tabular-nums">{formatCurrency(result.belastbaar)}</span></div>
                               {result.belasting > 0 && (
-                                <div className="flex justify-between"><span>Schenkbelasting per ontvanger ({relatie === 'kind' ? '10–20%' : relatie === 'kleinkind' ? '18–36%' : '30–40%'})</span><span className="font-mono tabular-nums text-red-600">{formatCurrency(result.belasting)}</span></div>
+                                <div className="flex justify-between"><span>Schenkbelasting per ontvanger ({relatie === 'kind' ? '10–20%' : relatie === 'kleinkind' ? '18–36%' : '30–40%'})</span><span className="font-mono tabular-nums text-negative">{formatCurrency(result.belasting)}</span></div>
                               )}
                               {aantalOntvangers > 1 && (
                                 <>
                                   <div className="h-px bg-horizon-200 my-1" />
-                                  <div className="flex justify-between"><span>Totale vrijstelling ({aantalOntvangers}×)</span><span className="font-mono tabular-nums text-emerald-600">{formatCurrency(totaleVrijstelling)}</span></div>
+                                  <div className="flex justify-between"><span>Totale vrijstelling ({aantalOntvangers}×)</span><span className="font-mono tabular-nums text-positive">{formatCurrency(totaleVrijstelling)}</span></div>
                                   {totaleBelasting > 0 && (
-                                    <div className="flex justify-between"><span>Totale schenkbelasting ({aantalOntvangers}×)</span><span className="font-mono tabular-nums text-red-600">{formatCurrency(totaleBelasting)}</span></div>
+                                    <div className="flex justify-between"><span>Totale schenkbelasting ({aantalOntvangers}×)</span><span className="font-mono tabular-nums text-negative">{formatCurrency(totaleBelasting)}</span></div>
                                   )}
                                 </>
                               )}
                               <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                 <span>Totale kosten{isJaarlijks ? ` (${jaren} jaar)` : ''}</span>
-                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaalOverJaren)}</span>
+                                <span className="font-mono tabular-nums text-negative">-{formatCurrency(totaalOverJaren)}</span>
                               </div>
                             </div>
                             {result.belasting === 0 && (
-                              <p className="text-[10px] text-emerald-600">
+                              <p className="text-[10px] text-positive">
                                 ✓ Volledig binnen de vrijstelling — geen schenkbelasting verschuldigd
                               </p>
                             )}
@@ -4093,7 +4093,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
                                 <span>Vertrekkosten (eenmalig)</span>
-                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(vertrekkosten)}</span>
+                                <span className="font-mono tabular-nums text-negative">{formatCurrency(vertrekkosten)}</span>
                               </div>
                               <div className="h-px bg-horizon-200 my-1" />
                               <div className="flex justify-between">
@@ -4112,23 +4112,23 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                   <span className="font-mono tabular-nums">{formatCurrency(vasteLastenBedrag)}/mnd</span>
                                 </div>
                               ) : (
-                                <div className="flex justify-between text-emerald-600">
+                                <div className="flex justify-between text-positive">
                                   <span>Vaste lasten thuis (opgezegd)</span>
                                   <span className="font-mono tabular-nums">€0/mnd</span>
                                 </div>
                               )}
                               <div className="flex justify-between">
                                 <span>Inkomensverlies</span>
-                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(inkomensverlies)}/mnd</span>
+                                <span className="font-mono tabular-nums text-negative">-{formatCurrency(inkomensverlies)}/mnd</span>
                               </div>
                               <div className="h-px bg-horizon-200 my-1" />
                               <div className="flex justify-between font-semibold">
                                 <span>Totale maandlast</span>
-                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(totaalMaandlast)}/mnd</span>
+                                <span className="font-mono tabular-nums text-negative">{formatCurrency(totaalMaandlast)}/mnd</span>
                               </div>
                               <div className="flex justify-between font-semibold">
                                 <span>Geschatte totaalkosten ({duur} mnd)</span>
-                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(totaalKosten)}</span>
+                                <span className="font-mono tabular-nums text-negative">{formatCurrency(totaalKosten)}</span>
                               </div>
                             </div>
                           </div>
@@ -4147,16 +4147,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
                                 <span>Verbouwingskosten ({preset?.label ?? 'Keuken'})</span>
-                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(kosten)}</span>
+                                <span className="font-mono tabular-nums text-negative">{formatCurrency(kosten)}</span>
                               </div>
                               <div className="flex justify-between">
                                 <span>Geschatte waardevermeerdering ({waardePct}%)</span>
-                                <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(waardevermeerdering)}</span>
+                                <span className="font-mono tabular-nums text-positive">+{formatCurrency(waardevermeerdering)}</span>
                               </div>
                               <div className="h-px bg-horizon-200 my-1" />
                               <div className="flex justify-between font-semibold">
                                 <span>Netto impact</span>
-                                <span className={`font-mono tabular-nums ${nettoImpact > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                <span className={`font-mono tabular-nums ${nettoImpact > 0 ? 'text-negative' : 'text-positive'}`}>
                                   {nettoImpact > 0 ? '' : '+'}{formatCurrency(Math.abs(nettoImpact))}
                                 </span>
                               </div>
@@ -4185,7 +4185,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
                                 <span>Studiekosten ({preset?.label ?? 'Studie'})</span>
-                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(collegegeld)}</span>
+                                <span className="font-mono tabular-nums text-negative">{formatCurrency(collegegeld)}</span>
                               </div>
                               <div className="flex justify-between">
                                 <span>Studieduur</span>
@@ -4196,7 +4196,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                   <div className="h-px bg-horizon-200 my-1" />
                                   <div className="flex justify-between">
                                     <span>Salarisverhoging na afronding</span>
-                                    <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(salarisstijging)}/mnd</span>
+                                    <span className="font-mono tabular-nums text-positive">+{formatCurrency(salarisstijging)}/mnd</span>
                                   </div>
                                   <div className="flex justify-between">
                                     <span>Terugverdientijd</span>
@@ -4205,7 +4205,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                   {freedomDaysPerYear > 0 && (
                                     <div className="flex justify-between font-semibold">
                                       <span>Extra vrijheidstijd per jaar</span>
-                                      <span className="font-mono tabular-nums text-emerald-600">+{freedomDaysPerYear} dagen</span>
+                                      <span className="font-mono tabular-nums text-positive">+{freedomDaysPerYear} dagen</span>
                                     </div>
                                   )}
                                 </>
@@ -4246,7 +4246,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 </div>
                                 <div className="flex justify-between text-xs text-[var(--ink-2)]">
                                   <span>Verwachte daling ({kostendalingPct}%)</span>
-                                  <span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(kostendaling)}/mnd</span>
+                                  <span className="font-mono tabular-nums text-positive">-{formatCurrency(kostendaling)}/mnd</span>
                                 </div>
                               </div>
                             )}
@@ -4256,29 +4256,29 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between">
                                   <span>Wegvallend partnerinkomen</span>
-                                  <span className="font-mono tabular-nums text-red-600">-{formatCurrency(partnerInkomen)}/mnd</span>
+                                  <span className="font-mono tabular-nums text-negative">-{formatCurrency(partnerInkomen)}/mnd</span>
                                 </div>
                                 {nabestaanden > 0 && (
                                   <div className="flex justify-between">
                                     <span>Nabestaandenpensioen</span>
-                                    <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(nabestaanden)}/mnd</span>
+                                    <span className="font-mono tabular-nums text-positive">+{formatCurrency(nabestaanden)}/mnd</span>
                                   </div>
                                 )}
                                 {anwNetto > 0 && (
                                   <div className="flex justify-between">
                                     <span>Anw-uitkering (netto)</span>
-                                    <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(anwNetto)}/mnd</span>
+                                    <span className="font-mono tabular-nums text-positive">+{formatCurrency(anwNetto)}/mnd</span>
                                   </div>
                                 )}
                                 {kostendaling > 0 && (
                                   <div className="flex justify-between">
                                     <span>Kostendaling ({kostendalingPct}%)</span>
-                                    <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(kostendaling)}/mnd</span>
+                                    <span className="font-mono tabular-nums text-positive">+{formatCurrency(kostendaling)}/mnd</span>
                                   </div>
                                 )}
                                 <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                   <span>Netto impact per maand</span>
-                                  <span className={`font-mono tabular-nums ${nettoMaandImpact < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                  <span className={`font-mono tabular-nums ${nettoMaandImpact < 0 ? 'text-negative' : 'text-positive'}`}>
                                     {nettoMaandImpact < 0 ? '-' : '+'}{formatCurrency(Math.abs(nettoMaandImpact))}/mnd
                                   </span>
                                 </div>
@@ -4289,7 +4289,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
                                 <div className="flex justify-between text-xs text-[var(--ink-2)]">
                                   <span className="font-semibold">Eenmalige uitkering levensverzekering</span>
-                                  <span className="font-mono tabular-nums text-emerald-600 font-semibold">+{formatCurrency(verzekering)}</span>
+                                  <span className="font-mono tabular-nums text-positive font-semibold">+{formatCurrency(verzekering)}</span>
                                 </div>
                               </div>
                             )}
@@ -4328,11 +4328,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 </div>
                                 <div className="flex justify-between">
                                   <span>Kosten per maand</span>
-                                  <span className="font-mono tabular-nums text-red-600">-{formatCurrency(kosten)}/mnd</span>
+                                  <span className="font-mono tabular-nums text-negative">-{formatCurrency(kosten)}/mnd</span>
                                 </div>
                                 <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                   <span>Netto verdienste per maand</span>
-                                  <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(nettoPM)}/mnd</span>
+                                  <span className="font-mono tabular-nums text-positive">+{formatCurrency(nettoPM)}/mnd</span>
                                 </div>
                                 <div className="flex justify-between text-[var(--ink-4)]">
                                   <span className="pl-3">Geschat jaarresultaat</span>
@@ -4341,7 +4341,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 {opstartkosten > 0 && (
                                   <div className="flex justify-between">
                                     <span>Eenmalige opstartkosten</span>
-                                    <span className="font-mono tabular-nums text-red-600">-{formatCurrency(opstartkosten)}</span>
+                                    <span className="font-mono tabular-nums text-negative">-{formatCurrency(opstartkosten)}</span>
                                   </div>
                                 )}
                               </div>
@@ -4366,7 +4366,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                   </div>
                                   <div className="flex justify-between">
                                     <span>Netto tijdens opbouw</span>
-                                    <span className={`font-mono tabular-nums ${opbouwNetto > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    <span className={`font-mono tabular-nums ${opbouwNetto > 0 ? 'text-positive' : 'text-negative'}`}>
                                       {opbouwNetto > 0 ? '+' : ''}{formatCurrency(opbouwNetto)}/mnd
                                     </span>
                                   </div>
@@ -4391,11 +4391,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Huidig netto vermogen</span><span className="font-mono tabular-nums">{formatCurrency(effectiveNetWorth)}</span></div>
                               <div className="flex justify-between"><span>Je behoudt {behoudPct}%</span><span className="font-mono tabular-nums">{formatCurrency(Math.round(effectiveNetWorth * behoudPct / 100))}</span></div>
-                              <div className="flex justify-between"><span>Vermogensverlies</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(vermogensverlies)}</span></div>
-                              <div className="flex justify-between"><span>Advocaat/mediation</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(advocaat)}</span></div>
+                              <div className="flex justify-between"><span>Vermogensverlies</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(vermogensverlies)}</span></div>
+                              <div className="flex justify-between"><span>Advocaat/mediation</span><span className="font-mono tabular-nums text-negative">-{formatCurrency(advocaat)}</span></div>
                               <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                 <span>Totale eenmalige klap</span>
-                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(vermogensverlies + advocaat)}</span>
+                                <span className="font-mono tabular-nums text-negative">-{formatCurrency(vermogensverlies + advocaat)}</span>
                               </div>
                             </div>
                           </div>
@@ -4466,7 +4466,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       </div>
                       <div className="flex justify-between">
                         <span>Gezamenlijke schulden</span>
-                        <span className="font-mono tabular-nums text-red-600">{formatCurrency(totalDebts)}</span>
+                        <span className="font-mono tabular-nums text-negative">{formatCurrency(totalDebts)}</span>
                       </div>
                       <div className="h-px bg-horizon-200 my-1" />
                       <div className="flex justify-between font-semibold">
@@ -4475,7 +4475,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       </div>
                       <div className="flex justify-between text-[var(--ink-3)]">
                         <span className="pl-3">— waarvan schulden</span>
-                        <span className="font-mono tabular-nums text-red-600">{formatCurrency(myDebts)}</span>
+                        <span className="font-mono tabular-nums text-negative">{formatCurrency(myDebts)}</span>
                       </div>
                       <div className="flex justify-between font-semibold">
                         <span>{partnerName || 'Partner'} ({partnerPct}%)</span>
@@ -4483,7 +4483,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       </div>
                       <div className="flex justify-between text-[var(--ink-3)]">
                         <span className="pl-3">— waarvan schulden</span>
-                        <span className="font-mono tabular-nums text-red-600">{formatCurrency(partnerDebts)}</span>
+                        <span className="font-mono tabular-nums text-negative">{formatCurrency(partnerDebts)}</span>
                       </div>
                     </div>
                     {/* Per-partner FIRE age estimate */}
@@ -4516,7 +4516,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           {monthlySavings > 0 && (
                             <div className="flex justify-between text-xs">
                               <span>Maandelijkse spaarkracht na scheiding</span>
-                              <span className={`font-mono tabular-nums ${adjustedSavings < monthlySavings ? 'text-red-600' : ''}`}>
+                              <span className={`font-mono tabular-nums ${adjustedSavings < monthlySavings ? 'text-negative' : ''}`}>
                                 {formatCurrency(adjustedSavings)}/mnd
                               </span>
                             </div>
@@ -4689,7 +4689,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         <p className="text-xs text-[var(--ink-3)]">
                           {cf.direction === 'income' ? 'Inkomen' : 'Kosten'}
                           {' · '}
-                          <span className={`font-mono tabular-nums ${cf.direction === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          <span className={`font-mono tabular-nums ${cf.direction === 'income' ? 'text-positive' : 'text-negative'}`}>
                             {cf.direction === 'income' ? '+' : '-'}{formatCurrency(cf.amount)}
                             {cf.type === 'recurring' ? '/mnd' : ''}
                           </span>
@@ -4735,12 +4735,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 return (
                   <div className="rounded-[var(--r)] border-t border-[var(--border-ed)] pt-2 text-xs text-[var(--ink-2)]">
                     {netRecurring !== 0 && (
-                      <p>Netto: <span className={`font-mono tabular-nums font-semibold ${netRecurring >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <p>Netto: <span className={`font-mono tabular-nums font-semibold ${netRecurring >= 0 ? 'text-positive' : 'text-negative'}`}>
                         {netRecurring >= 0 ? '+' : ''}{formatCurrency(netRecurring)}/mnd
                       </span></p>
                     )}
                     {netOneTime !== 0 && (
-                      <p>Eenmalig: <span className={`font-mono tabular-nums font-semibold ${netOneTime >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <p>Eenmalig: <span className={`font-mono tabular-nums font-semibold ${netOneTime >= 0 ? 'text-positive' : 'text-negative'}`}>
                         {netOneTime >= 0 ? '+' : ''}{formatCurrency(netOneTime)}
                       </span></p>
                     )}
@@ -4766,7 +4766,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     {isOneTime && (
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Eenmalig</p>
-                        <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-red-600' : 'text-emerald-600'}`}>
+                        <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-negative' : 'text-positive'}`}>
                           {isExpense ? '-' : '+'}{formatCurrency(amt)}
                         </p>
                       </div>
@@ -4776,7 +4776,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     {!isOneTime && (
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Per maand</p>
-                        <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-red-600' : 'text-emerald-600'}`}>
+                        <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-negative' : 'text-positive'}`}>
                           {isExpense ? '-' : '+'}{formatCurrency(amt)}/mnd
                         </p>
                       </div>
@@ -4787,7 +4787,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">
                         {isOneTime ? 'Totaal' : isPeriod && dur > 0 ? `Totaal (${dur} mnd)` : 'Totaal (10 jaar)'}
                       </p>
-                      <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-red-600' : 'text-emerald-600'}`}>
+                      <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-negative' : 'text-positive'}`}>
                         {isExpense ? '-' : '+'}{formatCurrency(Math.abs(totalImpact))}
                       </p>
                     </div>
@@ -4799,8 +4799,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       <Hourglass className="h-3.5 w-3.5 text-horizon-500 shrink-0" />
                       <p className="text-xs text-[var(--ink-2)]">
                         {isExpense
-                          ? <><span className="font-medium text-red-600">{freedomStr}</span> aan vrijheid die dit kost</>
-                          : <><span className="font-medium text-emerald-600">{freedomStr}</span> aan vrijheid die dit oplevert</>
+                          ? <><span className="font-medium text-negative">{freedomStr}</span> aan vrijheid die dit kost</>
+                          : <><span className="font-medium text-positive">{freedomStr}</span> aan vrijheid die dit oplevert</>
                         }
                       </p>
                     </div>

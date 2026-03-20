@@ -953,13 +953,13 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         {/* Te Verdelen + Dekkingsgraad */}
         {/* FeatureGate: budget_optimalisatie — Te Verdelen allocatie bar + tools */}
         <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
-          <div className={`mt-3 sm:mt-4 flex items-center justify-between gap-2 sm:gap-3 rounded-lg border px-3 sm:px-4 py-2 sm:py-3 ${teVerdelen >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+          <div className={`mt-3 sm:mt-4 flex items-center justify-between gap-2 sm:gap-3 rounded-lg border px-3 sm:px-4 py-2 sm:py-3 ${teVerdelen >= 0 ? 'border-positive/20 bg-positive/10' : 'border-negative/20 bg-negative/10'}`}>
             <div>
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>Te Verdelen</p>
-              <p className={`mt-0.5 font-mono text-base sm:text-lg font-bold ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+              <p className={`text-[10px] font-semibold uppercase tracking-wider ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>Te Verdelen</p>
+              <p className={`mt-0.5 font-mono text-base sm:text-lg font-bold ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
                 {teVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(teVerdelen))}
               </p>
-              <p className={`text-[11px] ${teVerdelen >= 0 ? 'text-emerald-600/70' : 'text-red-600/70'}`}>
+              <p className={`text-[11px] ${teVerdelen >= 0 ? 'text-positive/70' : 'text-negative/70'}`}>
                 {dekkingsgraad.toFixed(0)}% van inkomen toegewezen
               </p>
               {dekkingsgraad > 100 && (
@@ -1388,9 +1388,9 @@ function BudgetAllocationModal({
 
         {/* Footer: live te verdelen + opslaan */}
         <div className="space-y-3 border-t border-[var(--border-ed)] px-6 py-4">
-          <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${localTeVerdelen >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+          <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${localTeVerdelen >= 0 ? 'border-positive/20 bg-positive/10' : 'border-negative/20 bg-negative/10'}`}>
             <span className="text-xs font-medium text-[var(--ink-2)]">Te Verdelen</span>
-            <span className={`font-mono text-sm font-bold ${localTeVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+            <span className={`font-mono text-sm font-bold ${localTeVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
               {localTeVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(localTeVerdelen))}
             </span>
           </div>
@@ -1469,7 +1469,7 @@ function DetailModalDonut({
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <p className={`font-mono text-2xl font-semibold tabular-nums leading-tight ${
-              overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'
+              overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'
             }`}>
               {pct}%
             </p>
@@ -1498,7 +1498,7 @@ function DetailModalDonut({
             {remaining >= 0 ? 'Resterend' : (overPositive ? 'Boven doel' : 'Over budget')}
           </p>
           <p className={`mt-0.5 font-mono text-base font-bold tabular-nums ${
-            remaining >= 0 ? 'text-emerald-600' : (overPositive ? 'text-emerald-600' : 'text-red-600')
+            remaining >= 0 ? 'text-positive' : (overPositive ? 'text-positive' : 'text-negative')
           }`} data-testid="modal-remaining">
             {formatCurrency(Math.abs(remaining))}
           </p>
@@ -2272,7 +2272,7 @@ function BudgetDetailModal({
                             )}
                             {hasFreedomData && childSpent > childLimit && childSpent - childLimit >= 100 && (
                               <p className="text-sm italic text-[var(--ink-3)]" data-testid="child-freedom-over">
-                                <span className={isOverPositive(budgetType) ? 'text-emerald-500' : 'text-red-500'}>
+                                <span className={isOverPositive(budgetType) ? 'text-positive' : 'text-negative'}>
                                   {isOverPositive(budgetType)
                                     ? `+${eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen}`
                                     : `${eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd`}
@@ -2327,8 +2327,8 @@ function BudgetDetailModal({
                 const isSplitRow = tx.is_split_row === true
                 const isExpense = budgetType !== 'income'
                 const amountColor = isSplitRow
-                  ? (isExpense ? 'text-red-600' : 'text-emerald-600')
-                  : (Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600')
+                  ? (isExpense ? 'text-negative' : 'text-positive')
+                  : (Number(tx.amount) < 0 ? 'text-negative' : 'text-positive')
                 const canOpen = !!(tx.id && tx.account_id)
                 return (
                   <button
@@ -2451,8 +2451,8 @@ function BudgetDetailModal({
                       {hEntry.limit > 0 && <span>/ {formatCurrency(hEntry.limit)} limiet</span>}
                       {hEntry.limit > 0 && (
                         <span className={hEntry.spent > hEntry.limit
-                          ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600')
-                          : 'text-emerald-600'}>
+                          ? (isOverPositive(budgetType) ? 'font-semibold text-positive' : 'font-semibold text-negative')
+                          : 'text-positive'}>
                           {hEntry.spent > hEntry.limit ? '+' : '-'}{formatCurrency(Math.abs(hEntry.spent - hEntry.limit))}
                         </span>
                       )}
@@ -2482,7 +2482,7 @@ function BudgetDetailModal({
                               )}
                             </p>
                           </div>
-                          <span className={`ml-3 shrink-0 text-xs font-medium tabular-nums ${Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                          <span className={`ml-3 shrink-0 text-xs font-medium tabular-nums ${Number(tx.amount) < 0 ? 'text-negative' : 'text-positive'}`}>
                             {formatCurrency(Math.abs(Number(tx.amount)))}
                           </span>
                         </button>
@@ -2588,7 +2588,7 @@ function BudgetDetailModal({
                           <div
                             className={`h-full rounded-full transition-all ${
                               forecast.exceedsLimit
-                                ? (isOverPositive(budgetType) ? 'bg-emerald-500' : 'bg-red-500')
+                                ? (isOverPositive(budgetType) ? 'bg-positive' : 'bg-negative')
                                 : forecast.predicted / limit > 0.8 ? 'bg-kern-400' : 'bg-[var(--border-md)]'
                             }`}
                             style={{ width: `${Math.min((forecast.predicted / limit) * 100, 100)}%` }}
@@ -2692,8 +2692,8 @@ function BudgetDetailModal({
                     </div>
                     <div className={`flex justify-between py-0.5 font-sans text-[11px] font-medium ${
                       forecast.exceedsLimit
-                        ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600')
-                        : 'text-emerald-600'
+                        ? (isOverPositive(budgetType) ? 'text-positive' : 'text-negative')
+                        : 'text-positive'
                     }`}>
                       <span>{forecast.exceedsLimit ? (isOverPositive(budgetType) ? 'Verwacht boven doel' : 'Verwachte overschrijding') : 'Verwachte ruimte'}</span>
                       <span className="tabular-nums">{forecast.exceedsLimit ? '+' : ''}{formatCurrency(Math.abs(forecast.predicted - limit))}</span>
@@ -2733,7 +2733,7 @@ function BudgetDetailModal({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium text-[var(--ink-2)]">{formatCurrency(change.amount)}</span>
                       {delta != null && delta !== 0 && (
-                        <span className={`text-[10px] font-medium ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        <span className={`text-[10px] font-medium ${delta > 0 ? 'text-positive' : 'text-negative'}`}>
                           {delta > 0 ? '+' : ''}{formatCurrency(delta)}
                         </span>
                       )}

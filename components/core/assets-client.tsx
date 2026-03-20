@@ -434,11 +434,11 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Rendement (totaal)</p>
             {totalPurchase > 0 ? (
               <>
-                <p className={`mt-1 text-xl font-bold ${totalValue >= totalPurchase ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className={`mt-1 text-xl font-bold ${totalValue >= totalPurchase ? 'text-positive' : 'text-negative'}`}>
                   {totalValue >= totalPurchase ? '+' : ''}{formatCurrency(totalValue - totalPurchase)}
                 </p>
                 {dailyExpenses > 0 && Math.abs(totalValue - totalPurchase) > 0 && (
-                  <p className={`mt-0.5 text-xs ${totalValue >= totalPurchase ? 'text-emerald-500/70' : 'text-red-500/70'}`} data-testid="return-freedom">
+                  <p className={`mt-0.5 text-xs ${totalValue >= totalPurchase ? 'text-positive/70' : 'text-negative/70'}`} data-testid="return-freedom">
                     {(() => {
                       const fd = calculateFreedomTime(Math.abs(totalValue - totalPurchase), dailyExpenses)
                       const fdStr = formatFreedomTimeString(fd, 'short', true)
@@ -693,7 +693,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                           </p>
                         )}
                         {!hasBudget && purchase > 0 && (
-                          <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
                             {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
                           </p>
                         )}
@@ -936,10 +936,10 @@ function AssetDetailModal({
             </p>
           )}
           {purchase > 0 && (
-            <p className={`mt-1 text-sm font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`mt-1 text-sm font-medium ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
               {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% ({returnPct >= 0 ? '+' : ''}{formatCurrency(value - purchase)})
               {dailyExpenses > 0 && Math.abs(value - purchase) > 0 && (
-                <span className={`ml-1 text-xs ${returnPct >= 0 ? 'text-emerald-500/60' : 'text-red-500/60'}`} data-testid="detail-return-freedom">
+                <span className={`ml-1 text-xs ${returnPct >= 0 ? 'text-positive/60' : 'text-negative/60'}`} data-testid="detail-return-freedom">
                   — {(() => {
                     const fd = calculateFreedomTime(Math.abs(value - purchase), dailyExpenses)
                     return formatFreedomTimeString(fd, 'short', true)
@@ -1015,7 +1015,7 @@ function AssetDetailModal({
                     {(() => {
                       const overwaarde = value - mortgage.balance
                       return (
-                        <span className={`text-sm font-bold ${overwaarde >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <span className={`text-sm font-bold ${overwaarde >= 0 ? 'text-positive' : 'text-negative'}`}>
                           {formatCurrency(overwaarde)}
                         </span>
                       )
@@ -1495,7 +1495,7 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
               const diff = last - first
               const pct = first > 0 ? ((last - first) / first) * 100 : 0
               return (
-                <span className={`font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <span className={`font-medium ${diff >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {diff >= 0 ? '+' : ''}{formatCurrency(diff)} ({diff >= 0 ? '+' : ''}{pct.toFixed(1)}%)
                 </span>
               )
@@ -1526,7 +1526,7 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
               </span>
               <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
               {diff !== null && (
-                <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
                 </span>
               )}
@@ -1832,7 +1832,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="text-right">
                         <p className="text-xs font-medium text-[var(--ink)]">{formatCurrency(value)}</p>
-                        <p className={`text-[10px] ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <p className={`text-[10px] ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
                           {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
                         </p>
                       </div>
@@ -1880,7 +1880,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                 <div className="text-right">
                   <span className="text-xs font-semibold text-[var(--ink)]">{formatCurrency(totalValue)}</span>
                   {totalCost > 0 && (
-                    <span className={`ml-1.5 text-[10px] ${totalValue >= totalCost ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <span className={`ml-1.5 text-[10px] ${totalValue >= totalCost ? 'text-positive' : 'text-negative'}`}>
                       ({totalValue >= totalCost ? '+' : ''}{((totalValue - totalCost) / totalCost * 100).toFixed(1)}%)
                     </span>
                   )}
@@ -3231,7 +3231,7 @@ function ValuationHistory({
               </span>
               <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
               {diff !== null && (
-                <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
                 </span>
               )}
