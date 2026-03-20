@@ -82,17 +82,9 @@ export function KernMissionControl({
   const allAssetItems = [...cashItems, ...nonCashItems].sort((a, b) => b.value - a.value)
   const heroTotal = totalNonCashAssets + totalCash
 
-  // Build tabs (cash merged into assets — no separate cash tab)
+  // Build tabs — vermogen bovenaan, budgetten onderaan
   type TabConfig = { key: TabKey; label: string; metric: string; subtitle: string }
   const tabs: TabConfig[] = [
-    ...(budgetingActive ? [
-      {
-        key: 'budgets' as const,
-        label: 'Budg.',
-        metric: totalBudgetLimit > 0 ? `${budgetPct}%` : '\u2014',
-        subtitle: overBudgetCount > 0 ? `${overBudgetCount} over` : 'op schema',
-      },
-    ] : []),
     {
       key: 'assets' as const,
       label: 'Assets',
@@ -105,9 +97,17 @@ export function KernMissionControl({
       metric: rawTotalDebts > 0 ? formatCurrency(rawTotalDebts) : 'Vrij',
       subtitle: rawTotalDebts === 0 ? 'schuldvrij' : debtProgress ? `${debtProgress.progressPct.toFixed(0)}% afgelost` : 'actief',
     },
+    ...(budgetingActive ? [
+      {
+        key: 'budgets' as const,
+        label: 'Budg.',
+        metric: totalBudgetLimit > 0 ? `${budgetPct}%` : '\u2014',
+        subtitle: overBudgetCount > 0 ? `${overBudgetCount} over` : 'op schema',
+      },
+    ] : []),
   ]
 
-  const [activeTab, setActiveTab] = useState<TabKey>(tabs[0].key)
+  const [activeTab, setActiveTab] = useState<TabKey>('assets')
 
   // Health score: percentage of "missions" with positive status
   const healthScore = (() => {
@@ -128,17 +128,22 @@ export function KernMissionControl({
   })()
 
   // Border classes for grid on desktop
+  // Layout: Assets | Debts (top row), Budgets full-width (bottom row)
   const getBorderClasses = (key: TabKey) => {
-    if (budgetingActive) {
-      // 3-col: budgets | assets | debts
-      if (key === 'budgets') return 'lg:border-r lg:border-[var(--border-ed)]'
-      if (key === 'assets') return 'lg:border-r lg:border-[var(--border-ed)]'
-      return ''
-    } else {
-      // 2-col: assets | debts
-      if (key === 'assets') return 'lg:border-r lg:border-[var(--border-ed)]'
-      return ''
+    if (key === 'assets') {
+      // Top-left: right border + bottom border when budgets visible
+      return budgetingActive
+        ? 'lg:border-r lg:border-b lg:border-[var(--border-ed)]'
+        : 'lg:border-r lg:border-[var(--border-ed)]'
     }
+    if (key === 'debts') {
+      // Top-right: bottom border when budgets visible
+      return budgetingActive
+        ? 'lg:border-b lg:border-[var(--border-ed)]'
+        : ''
+    }
+    // Budgets: full-width bottom row, no extra borders
+    return ''
   }
 
   return (
@@ -194,85 +199,9 @@ export function KernMissionControl({
         </div>
       </div>
 
-      {/* Content grid — tabs on mobile, responsive grid on desktop */}
-      <div className={`grid grid-cols-1 ${budgetingActive ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
-        {/* ── Budget card ── */}
-        {budgetingActive && (
-          <div
-            onClick={() => onCardClick('budgets')}
-            className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('budgets')} ${activeTab !== 'budgets' ? 'hidden lg:block' : ''}`}
-          >
-            <div className="mb-2 sm:mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-                  <ShoppingCart className="h-5 w-5 text-kern-600" />
-                </div>
-                <p className="text-sm font-semibold text-[var(--ink-2)]">Budgetten</p>
-              </div>
-              {overBudgetCount === 0 ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              ) : (
-                <AlertTriangle className="h-4 w-4 text-kern-500" />
-              )}
-            </div>
-
-            <p className="font-mono text-2xl font-bold text-[var(--ink)]">
-              {formatCurrency(totalBudgetSpent)} <span className="text-base font-normal text-[var(--ink-3)]">/ {formatCurrency(totalBudgetLimit)}</span>
-            </p>
-            <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              overBudgetCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
-            }`}>
-              {overBudgetCount === 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-              {overBudgetCount === 0 ? `${budgetPct}% besteed` : `${overBudgetCount} over budget`}
-            </div>
-
-            <div className="space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-              {budgetTypeSummaries.map((ts) => {
-                const pct = ts.limit > 0 ? Math.round((ts.spent / ts.limit) * 100) : 0
-                const isOver = ts.spent > ts.limit && ts.limit > 0
-                const overPos = isOver && isOverPositive(ts.type)
-                const tc = typeColors(ts.type)
-                return (
-                  <div key={ts.type} onClick={(e) => { e.stopPropagation(); onCardClick('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: tc.bg }}>
-                          {ts.type === 'income' && <TrendingUp className="h-3 w-3" style={{ color: tc.text }} />}
-                          {ts.type === 'expense' && <ShoppingCart className="h-3 w-3" style={{ color: tc.text }} />}
-                          {ts.type === 'savings' && <PiggyBank className="h-3 w-3" style={{ color: tc.text }} />}
-                          {ts.type === 'debt' && <Building2 className="h-3 w-3" style={{ color: tc.text }} />}
-                        </div>
-                        <span className="truncate font-medium text-[var(--ink-2)]">{ts.label}</span>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className={`font-mono font-medium ${isOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
-                          {formatCurrency(ts.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(ts.limit)}</span>
-                        </span>
-                        <span className={`font-mono font-bold ${isOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>{pct}%</span>
-                      </div>
-                    </div>
-                    <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${isOver ? (overPos ? 'bg-emerald-400' : 'bg-red-400') : ''}`}
-                        style={{ width: `${Math.min(pct, 100)}%`, ...(!isOver ? { backgroundColor: pct >= 80 ? tc.text : tc.spent } : {}) }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-              {budgetTypeSummaries.length === 0 && (
-                <p className="text-xs text-[var(--ink-4)]">Geen budgetten ingesteld</p>
-              )}
-            </div>
-
-            <div className="mt-2 sm:mt-3 flex items-center justify-between">
-              <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Beheer budgetten</span>
-              <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-            </div>
-          </div>
-        )}
-
-        {/* ── Assets card (includes cash / liquide middelen) ── */}
+      {/* Content grid — tabs on mobile; Assets+Debts top row, Budgets full-width bottom on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2">
+        {/* ── Assets card (includes cash / liquide middelen) — top left ── */}
         {(() => {
           const maxValue = allAssetItems.length > 0 ? Math.max(...allAssetItems.map(a => Math.abs(a.value))) : 1
           return (
@@ -383,7 +312,7 @@ export function KernMissionControl({
           )
         })()}
 
-        {/* ── Debts card ── */}
+        {/* ── Debts card — top right ── */}
         {(() => {
           const maxDebtBalance = debtsList.length > 0 ? Math.max(...debtsList.map(d => d.current_balance)) : 1
           return (
@@ -476,6 +405,86 @@ export function KernMissionControl({
             </div>
           )
         })()}
+
+        {/* ── Budget card — full-width bottom row ── */}
+        {budgetingActive && (
+          <div
+            onClick={() => onCardClick('budgets')}
+            className={`group cursor-pointer p-3 sm:p-5 lg:col-span-2 lg:border-t lg:border-[var(--border-ed)] ${activeTab !== 'budgets' ? 'hidden lg:block' : ''}`}
+          >
+            <div className="mb-2 sm:mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                  <ShoppingCart className="h-5 w-5 text-kern-600" />
+                </div>
+                <p className="text-sm font-semibold text-[var(--ink-2)]">Budgetten</p>
+              </div>
+              {overBudgetCount === 0 ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-kern-500" />
+              )}
+            </div>
+
+            <div className="lg:flex lg:items-start lg:gap-8">
+              <div className="lg:shrink-0">
+                <p className="font-mono text-2xl font-bold text-[var(--ink)]">
+                  {formatCurrency(totalBudgetSpent)} <span className="text-base font-normal text-[var(--ink-3)]">/ {formatCurrency(totalBudgetLimit)}</span>
+                </p>
+                <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  overBudgetCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
+                }`}>
+                  {overBudgetCount === 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                  {overBudgetCount === 0 ? `${budgetPct}% besteed` : `${overBudgetCount} over budget`}
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3 lg:border-t-0 lg:pt-0 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-1.5 lg:space-y-0">
+                {budgetTypeSummaries.map((ts) => {
+                  const pct = ts.limit > 0 ? Math.round((ts.spent / ts.limit) * 100) : 0
+                  const isOver = ts.spent > ts.limit && ts.limit > 0
+                  const overPos = isOver && isOverPositive(ts.type)
+                  const tc = typeColors(ts.type)
+                  return (
+                    <div key={ts.type} onClick={(e) => { e.stopPropagation(); onCardClick('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: tc.bg }}>
+                            {ts.type === 'income' && <TrendingUp className="h-3 w-3" style={{ color: tc.text }} />}
+                            {ts.type === 'expense' && <ShoppingCart className="h-3 w-3" style={{ color: tc.text }} />}
+                            {ts.type === 'savings' && <PiggyBank className="h-3 w-3" style={{ color: tc.text }} />}
+                            {ts.type === 'debt' && <Building2 className="h-3 w-3" style={{ color: tc.text }} />}
+                          </div>
+                          <span className="truncate font-medium text-[var(--ink-2)]">{ts.label}</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className={`font-mono font-medium ${isOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
+                            {formatCurrency(ts.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(ts.limit)}</span>
+                          </span>
+                          <span className={`font-mono font-bold ${isOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>{pct}%</span>
+                        </div>
+                      </div>
+                      <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${isOver ? (overPos ? 'bg-emerald-400' : 'bg-red-400') : ''}`}
+                          style={{ width: `${Math.min(pct, 100)}%`, ...(!isOver ? { backgroundColor: pct >= 80 ? tc.text : tc.spent } : {}) }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+                {budgetTypeSummaries.length === 0 && (
+                  <p className="text-xs text-[var(--ink-4)]">Geen budgetten ingesteld</p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-2 sm:mt-3 flex items-center justify-between">
+              <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Beheer budgetten</span>
+              <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
