@@ -1,3 +1,25 @@
+## Session 2026-03-20 - Features #430, #431
+
+### Feature #430: Legenda en parent outlines conditioneel per size - PASSING
+- CombinedHeatmapLegend: only rendered at half/full/undefined (not mini/quarter)
+- Parent outlines (dashed borders + group labels): only at half/full/undefined
+- Section labels: hidden at mini (SECTION_LABEL_H=0), compact (9px, y+10) at quarter
+- Full-page heatmap (no size prop) retains all elements unchanged
+- Zero console errors (only pre-existing hydration mismatch)
+- Commit: bf5517e3
+
+### Feature #431: Mini-modus: compacte kleurblokken zonder tekst - PASSING
+- TreemapCell skips foreignObject/text entirely at mini — color-only rect blocks
+- Tooltip disabled at mini (no mouse events on cells, no SVG onMouseMove)
+- Stagger animation faster at mini (15ms vs 40ms per cell delay)
+- Widget clickable as whole via WidgetShell href (per-cell onClick disabled)
+- Stroke reduced to 0.3px at mini for cleaner appearance
+- Commit: 16d0bd0c
+
+### Current Status
+- 2 features completed this session (#430, #431)
+- Overall progress: 430/431 passing (99.8%)
+
 ## Session 2026-03-20 - Features #428, #429
 
 ### Feature #428: SVG viewBox en constanten schalen per size - PASSING
