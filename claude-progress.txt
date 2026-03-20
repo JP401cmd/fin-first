@@ -1,3 +1,14 @@
+## Session 2026-03-20 - Feature #419
+
+### Feature #419: Alle budget_types gelijke opmaak - PASSING
+- Verified that all 4 budget types (Inkomen, Sparen, Schulden, Uitgaven) now use identical formatting
+- Uniform renderTypeSection function renders: type-header (icon + label + amount/percentage + progress bar) + indented parent budgets
+- Left column: Inkomen + Sparen + Schulden (each with type-header + children)
+- Right column: Uitgaven (same structure, individual parent budget items)
+- Types without budgets are hidden (per spec option)
+- Zero console errors, verified via browser automation
+- Changes were already present from feature #418 commit; feature #419 verified and passing
+
 ## Session 2026-03-20 - Feature #417
 
 ### Feature #417: Uitgaven-lijst zonder horizontale scrollbar — PASSING
