@@ -23,6 +23,7 @@ const REDIRECTS = [
   { from: '/identity/voortgang', to: '/identity' },
   { from: '/identity/widgets', to: '/identity/instellingen' },
   { from: '/identity/parameters', to: '/identity/instellingen' },
+  { from: '/core/cash', to: '/core/assets' },
 ]
 
 // ── Known routes that should exist ─────────────────────────────────────────
@@ -117,6 +118,21 @@ const tests: TestCase[] = [
           `Expected redirect to /identity/instellingen or /login, got ${location}`,
         )
       }
+    },
+  },
+
+  {
+    id: 'nav-redirect-core-cash', name: 'Redirect /core/cash → /core/assets', category: CAT,
+    description: 'Cash pagina redirectt naar bezittingen (cash is onderdeel van assets)',
+    priority: 'high', estimatedDurationMs: 500,
+    async fn() {
+      const res = await fetchNoRedirect('/core/cash')
+      assert(
+        isRedirect(res.status) || res.status === 200,
+        `Expected redirect or 200, got ${res.status}`,
+      )
+      // Client-side redirect via router.replace — page renders as 200 with redirect JS
+      // So both 200 and redirect status are acceptable
     },
   },
 

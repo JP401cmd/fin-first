@@ -3,13 +3,23 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 /**
- * Verification API for Feature #199: Mission control card layout for De Kern
- * Checks the De Kern page source code for all required mission control card elements.
+ * Verification API for Mission control layout for De Kern.
+ * Updated for #403–#406 refactor: 3-tab layout (Assets+Debts top, Budgets bottom).
+ * Cash is merged into Assets. Budgets has two-column split layout.
  */
 export async function GET() {
   const results: { test: string; pass: boolean; detail: string }[] = []
 
-  // Read the De Kern page source
+  // Read the KernMissionControl component source
+  const componentPath = path.join(process.cwd(), 'components/app/core/kern-mission-control.tsx')
+  let componentSrc = ''
+  try {
+    componentSrc = fs.readFileSync(componentPath, 'utf-8')
+  } catch {
+    return NextResponse.json({ error: 'Could not read kern-mission-control.tsx' }, { status: 500 })
+  }
+
+  // Read the core page source
   const corePagePath = path.join(process.cwd(), 'app/(app)/core/page.tsx')
   let coreSrc = ''
   try {
@@ -18,172 +28,104 @@ export async function GET() {
     return NextResponse.json({ error: 'Could not read core/page.tsx' }, { status: 500 })
   }
 
-  // Test 1: Cash card exists with income/expenses + health status
+  // Test 1: 3-tab layout (no separate Cash tab)
   results.push({
-    test: 'Cash card with income/expenses and health status',
-    pass: coreSrc.includes('mission-cash') &&
-          coreSrc.includes('monthlyIncome') &&
-          coreSrc.includes('monthlyExpenses') &&
-          (coreSrc.includes("'healthy'") || coreSrc.includes('"healthy"')) &&
-          (coreSrc.includes("'attention'") || coreSrc.includes('"attention"')),
-    detail: 'Cash card renders income vs expenses with healthy/attention status'
+    test: '3-tab layout: Assets, Schulden, Budgetten (no Cash tab)',
+    pass: componentSrc.includes("type TabKey = 'budgets' | 'assets' | 'debts'") &&
+          !componentSrc.includes("'cash' as const"),
+    detail: 'TabKey has exactly 3 values, no cash tab key',
   })
 
-  // Test 2: Cash card shows income and expenses in details
-  // Find the Cash Card section using the comment marker
-  const cashCardStart = coreSrc.indexOf('{/* Cash Card */')
-  const budgettenCardStart = coreSrc.indexOf('{/* Budgetten Card */')
-  const cashCardSection = cashCardStart >= 0 && budgettenCardStart > cashCardStart
-    ? coreSrc.substring(cashCardStart, budgettenCardStart)
-    : ''
+  // Test 2: Assets card includes cash accounts
   results.push({
-    test: 'Cash card shows income and expenses details',
-    pass: cashCardSection.includes('Inkomen') && cashCardSection.includes('Uitgaven'),
-    detail: 'Cash card detail lines include Inkomen and Uitgaven'
+    test: 'Assets card merges cash into assets',
+    pass: componentSrc.includes('Always merge cash into assets') &&
+          componentSrc.includes('Liquide middelen') &&
+          componentSrc.includes('allAssetItems = [...cashItems, ...nonCashItems]'),
+    detail: 'Cash accounts shown as "Liquide middelen" subsection in Assets card',
   })
 
-  // Test 3: Budgetten card exists with over-budget count + status
+  // Test 3: Budgets two-column split
   results.push({
-    test: 'Budgetten card with over-budget count and status',
-    pass: coreSrc.includes('mission-budgetten') &&
-          coreSrc.includes('overBudgetCount'),
-    detail: 'Budgetten card renders over-budget count with status indicator'
+    test: 'Budgets card has two-column split layout',
+    pass: componentSrc.includes('lg:flex-row') &&
+          componentSrc.includes('lg:w-[40%]') &&
+          componentSrc.includes('nonExpenseTypeSummaries') &&
+          componentSrc.includes('expenseSegments'),
+    detail: 'Left column (40%): Inkomen/Sparen/Schulden. Right: individual Uitgaven',
   })
 
-  // Test 4: Budgetten card status logic - shows "Op koers" or over-budget count
-  const assetsCardStart = coreSrc.indexOf('{/* Assets Card */')
-  const budgettenCardSection = budgettenCardStart >= 0 && assetsCardStart > budgettenCardStart
-    ? coreSrc.substring(budgettenCardStart, assetsCardStart)
-    : ''
+  // Test 4: Grid layout — Assets+Debts top, Budgets bottom
   results.push({
-    test: 'Budgetten card shows "Op koers" or over-budget count',
-    pass: budgettenCardSection.includes('Op koers') && budgettenCardSection.includes('over budget'),
-    detail: 'Conditional metric: "Op koers" when on track, "{n} over budget" otherwise'
+    test: 'Grid: Assets+Debts top row, Budgets full-width bottom',
+    pass: componentSrc.includes('lg:grid-cols-2') &&
+          componentSrc.includes('lg:col-span-2'),
+    detail: '2-column grid with budgets spanning full width on bottom row',
   })
 
-  // Test 5: Assets card with total + growth direction arrow
+  // Test 5: Growth direction arrows in Assets card
   results.push({
-    test: 'Assets card with total and growth direction',
-    pass: coreSrc.includes('mission-assets') &&
-          coreSrc.includes('totalAssets') &&
-          coreSrc.includes('assetGrowthDirection'),
-    detail: 'Assets card shows total asset value with growth direction'
+    test: 'Assets card shows growth direction arrows',
+    pass: componentSrc.includes('ArrowUpRight') &&
+          componentSrc.includes('ArrowDownRight') &&
+          componentSrc.includes('assetGrowthDirection'),
+    detail: 'ArrowUpRight for up, ArrowDownRight for down, Minus for flat',
   })
 
-  // Test 6: Growth direction arrows rendered
+  // Test 6: Debt progress bar
   results.push({
-    test: 'Growth direction arrows (up/down/flat) in Assets card',
-    pass: coreSrc.includes('ArrowUpRight') &&
-          coreSrc.includes('ArrowDownRight') &&
-          coreSrc.includes('growthDirection'),
-    detail: 'ArrowUpRight for up, ArrowDownRight for down, Minus for flat'
+    test: 'Schulden card has payoff progress bar',
+    pass: componentSrc.includes('debtProgress') &&
+          componentSrc.includes('progressPct') &&
+          componentSrc.includes('from-emerald-500 to-emerald-400'),
+    detail: 'Progress bar with emerald gradient based on progressPct',
   })
 
-  // Test 7: Schulden card with total + payoff progress bar
+  // Test 7: Status icons present
   results.push({
-    test: 'Schulden card with total and payoff progress bar',
-    pass: coreSrc.includes('mission-schulden') &&
-          coreSrc.includes('debtProgress') &&
-          coreSrc.includes('progressPct'),
-    detail: 'Schulden card shows debt total with payoff progress bar'
+    test: 'Cards have status icons (CheckCircle2 / AlertTriangle)',
+    pass: componentSrc.includes('CheckCircle2') &&
+          componentSrc.includes('AlertTriangle'),
+    detail: 'CheckCircle2 for healthy status, AlertTriangle for attention',
   })
 
-  // Test 8: Each card has 1 key metric (the metric prop displayed in large text)
+  // Test 8: CTAs in cards
   results.push({
-    test: 'Each card shows 1 key metric in large text',
-    pass: coreSrc.includes('text-2xl font-bold') &&
-          coreSrc.includes('{metric}'),
-    detail: 'Key metric rendered in text-2xl font-bold'
+    test: 'Cards have CTA labels',
+    pass: componentSrc.includes('Bekijk portfolio') &&
+          componentSrc.includes('Beheer schulden') &&
+          componentSrc.includes('Beheer budgetten'),
+    detail: 'CTAs: Bekijk portfolio, Beheer schulden, Beheer budgetten',
   })
 
-  // Test 9: Each card has status icon (CheckCircle2 or AlertTriangle)
+  // Test 9: KernMissionControl used in core client component
+  const coreClientPath = path.join(process.cwd(), 'components/core/core-client.tsx')
+  let coreClientSrc = ''
+  try {
+    coreClientSrc = fs.readFileSync(coreClientPath, 'utf-8')
+  } catch {
+    // May not exist
+  }
   results.push({
-    test: 'Each card has status icon (check or warning)',
-    pass: coreSrc.includes('CheckCircle2') &&
-          coreSrc.includes('AlertTriangle') &&
-          coreSrc.includes('status-label'),
-    detail: 'CheckCircle2 for healthy, AlertTriangle for attention status'
+    test: 'KernMissionControl component used in core client',
+    pass: coreClientSrc.includes('KernMissionControl'),
+    detail: 'Core client imports and renders KernMissionControl',
   })
 
-  // Test 10: Each card has a clear CTA
+  // Test 10: Health score computation
   results.push({
-    test: 'Each card has a clear CTA button text',
-    pass: coreSrc.includes('Bekijk transacties') &&
-          coreSrc.includes('Beheer budgetten') &&
-          coreSrc.includes('Bekijk portfolio') &&
-          coreSrc.includes('Beheer schulden'),
-    detail: 'CTAs: Bekijk transacties, Beheer budgetten, Bekijk portfolio, Beheer schulden'
-  })
-
-  // Test 11: Cards use real Supabase data (not mock/hardcoded)
-  const usesRealData = coreSrc.includes('createClient()') &&
-    coreSrc.includes("from('transactions')") &&
-    coreSrc.includes("from('assets')") &&
-    coreSrc.includes("from('debts')") &&
-    coreSrc.includes("from('budgets')")
-  results.push({
-    test: 'Cards use real data from Supabase',
-    pass: usesRealData,
-    detail: 'Data fetched from transactions, assets, debts, budgets tables via createClient()'
-  })
-
-  // Test 12: Responsive grid layout (2-col mobile, 4-col desktop)
-  results.push({
-    test: 'Responsive grid layout (sm:2-col, lg:4-col)',
-    pass: coreSrc.includes('grid-cols-1') &&
-          coreSrc.includes('sm:grid-cols-2') &&
-          coreSrc.includes('lg:grid-cols-4'),
-    detail: 'Grid: grid-cols-1 (mobile), sm:grid-cols-2 (tablet), lg:grid-cols-4 (desktop)'
-  })
-
-  // Test 13: MissionControlCard component is a Link (navigates on click)
-  results.push({
-    test: 'Cards are clickable links (Link component)',
-    pass: coreSrc.includes('<Link') &&
-          coreSrc.includes('href={href}') &&
-          coreSrc.includes('href="/core/cash"') &&
-          coreSrc.includes('href="/core/budgets"') &&
-          coreSrc.includes('href="/core/assets"') &&
-          coreSrc.includes('href="/core/debts"'),
-    detail: 'Each card is a Link to the relevant sub-page'
-  })
-
-  // Test 14: Debt payoff progress bar renders with gradient
-  results.push({
-    test: 'Debt payoff progress bar with gradient fill',
-    pass: coreSrc.includes('progress-bar') &&
-          coreSrc.includes('from-emerald-500 to-emerald-400') &&
-          coreSrc.includes('progressPct'),
-    detail: 'Progress bar has emerald gradient, width based on progressPct'
-  })
-
-  // Test 15: Section has data-testid for testing (testId prop passed to MissionControlCard which renders data-testid)
-  results.push({
-    test: 'Section and cards have data-testid attributes',
-    pass: coreSrc.includes('data-testid="mission-control-section"') &&
-          coreSrc.includes('testId="mission-cash"') &&
-          coreSrc.includes('testId="mission-budgetten"') &&
-          coreSrc.includes('testId="mission-assets"') &&
-          coreSrc.includes('testId="mission-schulden"') &&
-          // MissionControlCard renders data-testid={testId}
-          coreSrc.includes('data-testid={testId}'),
-    detail: 'All 4 cards have testId prop, section has data-testid, component renders data-testid={testId}'
-  })
-
-  // Test 16: Over-budget count computed from real spending data
-  results.push({
-    test: 'Over-budget count computed from transaction spending',
-    pass: coreSrc.includes('setOverBudgetCount') &&
-          coreSrc.includes('spendMap') &&
-          coreSrc.includes('spent > limit'),
-    detail: 'overBudgetCount computed by comparing actual spending to budget limits'
+    test: 'Health score includes cash and asset growth checks',
+    pass: componentSrc.includes('healthScore') &&
+          componentSrc.includes('totalCash >= 0') &&
+          componentSrc.includes("assetGrowthDirection !== 'down'"),
+    detail: 'Health score considers cash balance and asset growth direction',
   })
 
   const passing = results.filter(r => r.pass).length
   const total = results.length
 
   return NextResponse.json({
-    feature: '#199: Mission control card layout for De Kern',
+    feature: 'Mission control layout for De Kern (refactored #403–#406)',
     passing,
     total,
     allPassing: passing === total,
