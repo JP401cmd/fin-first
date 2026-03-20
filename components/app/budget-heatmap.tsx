@@ -64,21 +64,31 @@ interface TooltipData {
 /** Minimum block weight so even 0-limit budgets remain visible */
 const MIN_WEIGHT = 20
 
-/** SVG viewBox dimensions — 16:10 aspect ratio */
-const VB_W = 800
-const VB_H = 500
-
-/** Padding between cells */
-const CELL_GAP = 3
-
-/** Corner radius on cells */
-const CELL_RADIUS = 6
-
-/** Height reserved for section label headers in the SVG */
-const SECTION_LABEL_H = 18
-
-/** Gap between sections */
+/** Gap between sections (constant across sizes) */
 const SECTION_GAP = 6
+
+/** Size-dependent SVG constants for optimal rendering per widget format */
+interface HeatmapConstants {
+  VB_W: number
+  VB_H: number
+  CELL_GAP: number
+  CELL_RADIUS: number
+  SECTION_LABEL_H: number
+}
+
+function getHeatmapConstants(size?: WidgetSize): HeatmapConstants {
+  switch (size) {
+    case 'mini':
+      return { VB_W: 200, VB_H: 150, CELL_GAP: 1, CELL_RADIUS: 3, SECTION_LABEL_H: 10 }
+    case 'quarter':
+      return { VB_W: 400, VB_H: 300, CELL_GAP: 2, CELL_RADIUS: 4, SECTION_LABEL_H: 14 }
+    case 'full':
+      return { VB_W: 800, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
+    case 'half':
+    default:
+      return { VB_W: 800, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
+  }
+}
 
 /* ── Color interpolation ─────────────────────────────────────── */
 
@@ -141,6 +151,7 @@ function squarify(
   w: number,
   h: number,
   startIndex: number,
+  cellGap: number,
 ): TreemapRect[] {
   if (items.length === 0 || w <= 0 || h <= 0) return []
 
@@ -148,10 +159,10 @@ function squarify(
   if (items.length === 1) {
     return [{
       ...items[0],
-      x: x + CELL_GAP / 2,
-      y: y + CELL_GAP / 2,
-      w: Math.max(0, w - CELL_GAP),
-      h: Math.max(0, h - CELL_GAP),
+      x: x + cellGap / 2,
+      y: y + cellGap / 2,
+      w: Math.max(0, w - cellGap),
+      h: Math.max(0, h - cellGap),
       index: startIndex,
     }]
   }
@@ -213,10 +224,10 @@ function squarify(
 
     rects.push({
       ...row[i],
-      x: rx + CELL_GAP / 2,
-      y: ry + CELL_GAP / 2,
-      w: Math.max(0, rw - CELL_GAP),
-      h: Math.max(0, rh - CELL_GAP),
+      x: rx + cellGap / 2,
+      y: ry + cellGap / 2,
+      w: Math.max(0, rw - cellGap),
+      h: Math.max(0, rh - cellGap),
       index: startIndex + i,
     })
 
@@ -230,7 +241,7 @@ function squarify(
     const ny = isVertical ? y : y + rowMainSize
     const nw = isVertical ? w - rowMainSize : w
     const nh = isVertical ? h : h - rowMainSize
-    rects.push(...squarify(remaining, nx, ny, nw, nh, startIndex + row.length))
+    rects.push(...squarify(remaining, nx, ny, nw, nh, startIndex + row.length, cellGap))
   }
 
   return rects
@@ -306,8 +317,11 @@ function buildTreemapItems(
 function buildCombinedLayout(
   sections: HeatmapSection[],
   spending: Record<string, number>,
+  constants: HeatmapConstants,
   beschikbaarMap?: Record<string, number>,
 ): { rects: TreemapRect[]; labels: SectionLabel[]; allGroups: BudgetWithChildren[] } {
+  const { VB_W, VB_H, CELL_GAP, SECTION_LABEL_H } = constants
+
   // Build items per section
   const sectionData = sections
     .filter((s) => s.groups.length > 0)
@@ -351,7 +365,7 @@ function buildCombinedLayout(
     yOffset += SECTION_LABEL_H
 
     // Squarify within this section's area
-    const sectionRects = squarify(section.items, 0, yOffset, VB_W, sectionH, globalIndex)
+    const sectionRects = squarify(section.items, 0, yOffset, VB_W, sectionH, globalIndex, CELL_GAP)
     allRects.push(...sectionRects)
     globalIndex += sectionRects.length
 
@@ -637,6 +651,7 @@ function TreemapCell({
   rect,
   isHovered,
   hasEntered,
+  cellRadius,
   onMouseEnter,
   onMouseLeave,
   onClick,
@@ -644,6 +659,7 @@ function TreemapCell({
   rect: TreemapRect
   isHovered: boolean
   hasEntered: boolean
+  cellRadius: number
   onMouseEnter: (e: React.MouseEvent) => void
   onMouseLeave: () => void
   onClick: () => void
@@ -676,8 +692,8 @@ function TreemapCell({
         y={rect.y}
         width={rect.w}
         height={rect.h}
-        rx={CELL_RADIUS}
-        ry={CELL_RADIUS}
+        rx={cellRadius}
+        ry={cellRadius}
         fill={color}
         stroke={isHovered ? 'var(--ink)' : 'rgba(255,255,255,0.4)'}
         strokeWidth={isHovered ? 2 : 0.5}
@@ -766,10 +782,14 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
+  // Size-dependent constants
+  const constants = useMemo(() => getHeatmapConstants(size), [size])
+  const { VB_W, VB_H, CELL_RADIUS } = constants
+
   // Build combined sectioned layout
   const { rects, labels, allGroups } = useMemo(
-    () => buildCombinedLayout(sections, spending, beschikbaarMap),
-    [sections, spending, beschikbaarMap],
+    () => buildCombinedLayout(sections, spending, constants, beschikbaarMap),
+    [sections, spending, constants, beschikbaarMap],
   )
 
   // Compute total viewbox height based on actual layout
@@ -777,7 +797,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
     if (rects.length === 0) return VB_H
     const maxY = Math.max(...rects.map((r) => r.y + r.h))
     return Math.max(maxY + 4, VB_H)
-  }, [rects])
+  }, [rects, VB_H])
 
   // Group parent outlines for SVG labels
   const parentOutlines = useMemo(() => {
@@ -895,6 +915,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
                 rect={rect}
                 isHovered={hoveredId === rect.id}
                 hasEntered={hasEntered}
+                cellRadius={CELL_RADIUS}
                 onMouseEnter={(e) => handleMouseEnter(rect, e)}
                 onMouseLeave={handleMouseLeave}
                 onClick={() => onNavigate(rect.id)}
