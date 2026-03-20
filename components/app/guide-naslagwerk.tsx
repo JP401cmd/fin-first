@@ -60,7 +60,7 @@ const MODULES: NaslagwerkModule[] = [
     topics: [
       {
         icon: Wallet,
-        title: 'Cash rekeningen',
+        title: 'Bankrekeningen',
         summary: 'Beheer je betaal- en spaarrekeningen, importeer transacties en synchroniseer met je bank.',
         anchor: 'guide-reis-1',
       },

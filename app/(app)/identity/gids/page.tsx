@@ -184,7 +184,7 @@ export default function GidsPage() {
         >
           <GuideTopicCard
             icon={Wallet}
-            title="Cash rekeningen"
+            title="Bankrekeningen"
             color="var(--color-kern-400)"
             description={
               <>
@@ -199,10 +199,10 @@ export default function GidsPage() {
             }
             howTo={{
               steps: [
-                "Rekening toevoegen: voeg bankrekeningen toe tijdens de onboarding (onder Bezittingen) of later via De Kern → Cash → Nieuwe rekening. Kies het type (betaal, spaar, gezamenlijk, bedrijf of overig), voer IBAN en startsaldo in",
-                "Transacties importeren: Ga naar Cash → Importeren. Sleep je bankbestand (MT940, CSV of OFX) in het uploadveld — de app herkent automatisch het formaat en je bank (ING, Rabobank, ABN AMRO, PayPal)",
+                "Rekening toevoegen: voeg bankrekeningen toe tijdens de onboarding (onder Bezittingen) of later via De Kern → Bezittingen → Nieuwe rekening. Kies het type (betaal, spaar, gezamenlijk, bedrijf of overig), voer IBAN en startsaldo in",
+                "Transacties importeren: Ga naar Bezittingen → Importeren. Sleep je bankbestand (MT940, CSV of OFX) in het uploadveld — de app herkent automatisch het formaat en je bank (ING, Rabobank, ABN AMRO, PayPal)",
                 "Controleer de transacties in de review-stap, pas categorieën aan waar nodig, en importeer",
-                "Bankconnectie: Koppel je bank via De Kern → Cash → Verbinden. Je wordt doorgestuurd naar je bank voor toestemming, daarna synchroniseren transacties automatisch",
+                "Bankconnectie: Koppel je bank via De Kern → Bezittingen → Verbinden. Je wordt doorgestuurd naar je bank voor toestemming, daarna synchroniseren transacties automatisch",
                 "Automatische categorisatie: bij import worden transacties gekoppeld aan budgetten via (1) eerdere correcties, (2) keyword-herkenning en (3) AI voor onbekende transacties",
                 "Corrigeer waar nodig — elke correctie wordt automatisch een regel die bij volgende imports direct wordt toegepast",
                 "Eigen overboekingen tussen je rekeningen worden automatisch herkend en gekoppeld, zodat ze niet dubbel tellen in je budget",
@@ -357,7 +357,7 @@ export default function GidsPage() {
           }
           valueSentence="Ontdek waar je tijd weglekt zonder dat je het doorhebt."
           ctaLabel={progress?.steps.hasTransactions ? "Bekijk je kas" : "Importeer transacties"}
-          ctaHref={progress?.steps.hasTransactions ? "/core/cash" : "/core/cash/import"}
+          ctaHref={progress?.steps.hasTransactions ? "/core/assets" : "/core/cash/import"}
           isComplete={!!progress?.steps.hasTransactions}
         >
           <GuideTopicCard
@@ -863,7 +863,7 @@ export default function GidsPage() {
             }
             howTo={{
               steps: [
-                "Overzicht \u2014 Ga naar De Kern \u2192 Cash \u2192 Vaste lasten. Je ziet al je terugkerende kosten: abonnementen, verzekeringen, lidmaatschappen.",
+                "Overzicht \u2014 Ga naar De Kern \u2192 Bezittingen \u2192 Vaste lasten. Je ziet al je terugkerende kosten: abonnementen, verzekeringen, lidmaatschappen.",
                 "Detectie \u2014 De app herkent automatisch terugkerende transacties in je bankdata. Importeer minimaal 3 maanden \u2014 hoe meer, hoe beter de detectie. Je kunt ook handmatig toevoegen.",
                 "Impact \u2014 Per abonnement zie je de jaarlijkse kosten en hoeveel vrijheidsdagen het je kost. Klein bedrag, groot effect over jaren.",
                 "Opzeggen \u2014 De app toont welke abonnementen de meeste vrijheidstijd kosten. Overweeg of de waarde opweegt tegen de prijs.",
