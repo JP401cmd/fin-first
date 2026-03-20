@@ -18710,3 +18710,26 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#450)
+
+## Session 2026-03-20 - Feature #451
+
+### Feature #451: Mobiele browser optimalisatie voor design system wijzigingen - PASSING
+- Enhanced bottom-nav.tsx active tab: replaced pill indicator with border-t-3 + bg-module-50/40 + rounded-b-sm
+- Now consistent with header active tab styling (border-b-3 + bg-module-50/40 + rounded-t-sm)
+- Verified all 9 test steps:
+  1. SectionDivider: max-w-[80%] mx-auto fits at 360px, asterisk variant readable
+  2. Flash animations: CSS keyframes smooth, 1s ease-out
+  3. prefers-reduced-motion: both CSS (animation:none !important) and JS hook handle it
+  4. FinTable: overflow-x-auto wrapper enables horizontal scroll, inline minWidth style
+  5. Bottom-nav: border-t-3 + bg-module-50/40 active state consistent with header
+  6. Body text: no horizontal overflow on /core, /will, /horizon, /rapportages at 360px
+  7. Color tokens: --positive (L≈43%) and --negative (L≈41%) vs white → >7:1 contrast (WCAG AAA)
+  8. Widget kickers: text-[9px] readable on mini widgets at 360px
+  9. Viewport meta: maximum-scale=5, viewport-fit=cover confirmed
+- Zero new JS console errors (only pre-existing Supabase net_worth_snapshots 400)
+- Touch targets: bottom-nav links 120x59px (well above 44x44px minimum)
+- Commit: fc311bb6
+
+### Current Status
+- 1 feature completed this session (#451)
+- Overall progress: 447/451 passing (99.1%)
