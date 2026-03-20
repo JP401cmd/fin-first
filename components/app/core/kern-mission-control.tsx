@@ -3,7 +3,7 @@
 import { useState, Fragment } from 'react'
 import {
   ShoppingCart, Wallet, PiggyBank, Building2, TrendingUp,
-  ArrowRight, BarChart3,
+  ArrowRight,
   CheckCircle2, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
@@ -31,10 +31,10 @@ interface KernMissionControlProps {
   rawTotalDebts: number
   debtProgress: { totalOriginal: number; totalCurrent: number; progressPct: number } | null
   // Callbacks
-  onCardClick: (type: 'budgets' | 'cash' | 'assets' | 'debts', itemId?: string) => void
+  onCardClick: (type: 'budgets' | 'assets' | 'debts', itemId?: string) => void
 }
 
-type TabKey = 'budgets' | 'cash' | 'assets' | 'debts'
+type TabKey = 'budgets' | 'assets' | 'debts'
 
 const MOBILE_ITEMS = 3
 const DESKTOP_ITEMS = 4
@@ -76,17 +76,13 @@ export function KernMissionControl({
       .map(t => ({ type: t as BudgetType, label: labels[t] || t, ...map.get(t)! }))
   })()
 
-  // Merge cash into assets when budgeting is off
-  const cashFromAssets = !budgetingActive
-    ? cashAccounts.filter(a => a.source === 'asset').map(a => ({ id: a.id, name: a.name, value: a.balance, isCash: true }))
-    : []
-  const nonCashItems = nonCashAssets.map(a => ({ id: a.id, name: a.name, value: a.current_value, isCash: false }))
-  const allAssetItems = [...nonCashItems, ...cashFromAssets].sort((a, b) => b.value - a.value)
-  const heroTotal = budgetingActive
-    ? totalNonCashAssets
-    : totalNonCashAssets + cashFromAssets.reduce((s, a) => s + a.value, 0)
+  // Always merge cash into assets — cash is a subset of assets
+  const cashItems = cashAccounts.map(a => ({ id: a.id, name: a.name, value: a.balance, isCash: true, source: a.source }))
+  const nonCashItems = nonCashAssets.map(a => ({ id: a.id, name: a.name, value: a.current_value, isCash: false, source: 'asset' as const }))
+  const allAssetItems = [...cashItems, ...nonCashItems].sort((a, b) => b.value - a.value)
+  const heroTotal = totalNonCashAssets + totalCash
 
-  // Build tabs
+  // Build tabs (cash merged into assets — no separate cash tab)
   type TabConfig = { key: TabKey; label: string; metric: string; subtitle: string }
   const tabs: TabConfig[] = [
     ...(budgetingActive ? [
@@ -95,12 +91,6 @@ export function KernMissionControl({
         label: 'Budg.',
         metric: totalBudgetLimit > 0 ? `${budgetPct}%` : '\u2014',
         subtitle: overBudgetCount > 0 ? `${overBudgetCount} over` : 'op schema',
-      },
-      {
-        key: 'cash' as const,
-        label: 'Cash',
-        metric: formatCurrency(totalCash),
-        subtitle: `${cashAccounts.length} rek.`,
       },
     ] : []),
     {
@@ -126,24 +116,26 @@ export function KernMissionControl({
     if (budgetingActive) {
       green += overBudgetCount === 0 ? 1 : 0
       total++
-      green += totalCash >= 0 ? 1 : 0
-      total++
     }
+    // Assets (includes cash) health
     green += assetGrowthDirection !== 'down' ? 1 : 0
+    total++
+    green += totalCash >= 0 ? 1 : 0
     total++
     green += rawTotalDebts === 0 || (debtProgress != null && debtProgress.progressPct > 50) ? 1 : 0
     total++
     return total > 0 ? Math.round((green / total) * 100) : 0
   })()
 
-  // Border classes for 2x2 grid on desktop
+  // Border classes for grid on desktop
   const getBorderClasses = (key: TabKey) => {
     if (budgetingActive) {
-      if (key === 'budgets') return 'lg:border-r lg:border-b lg:border-[var(--border-ed)]'
-      if (key === 'cash') return 'lg:border-b lg:border-[var(--border-ed)]'
+      // 3-col: budgets | assets | debts
+      if (key === 'budgets') return 'lg:border-r lg:border-[var(--border-ed)]'
       if (key === 'assets') return 'lg:border-r lg:border-[var(--border-ed)]'
       return ''
     } else {
+      // 2-col: assets | debts
       if (key === 'assets') return 'lg:border-r lg:border-[var(--border-ed)]'
       return ''
     }
@@ -202,8 +194,8 @@ export function KernMissionControl({
         </div>
       </div>
 
-      {/* Content grid — tabs on mobile, 2x2 with rules on desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-2">
+      {/* Content grid — tabs on mobile, responsive grid on desktop */}
+      <div className={`grid grid-cols-1 ${budgetingActive ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
         {/* ── Budget card ── */}
         {budgetingActive && (
           <div
@@ -280,81 +272,7 @@ export function KernMissionControl({
           </div>
         )}
 
-        {/* ── Cash card ── */}
-        {budgetingActive && (() => {
-          const maxCashBalance = cashAccounts.length > 0 ? Math.max(...cashAccounts.map(a => Math.abs(a.balance))) : 1
-          return (
-            <div
-              onClick={() => onCardClick('cash')}
-              className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('cash')} ${activeTab !== 'cash' ? 'hidden lg:block' : ''}`}
-            >
-              <div className="mb-2 sm:mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-                    <Wallet className="h-5 w-5 text-kern-600" />
-                  </div>
-                  <p className="text-sm font-semibold text-[var(--ink-2)]">Cash</p>
-                </div>
-                {totalCash >= 0 ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 text-kern-500" />
-                )}
-              </div>
-
-              <p className="font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(totalCash)}</p>
-              <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                totalCash >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
-              }`}>
-                {totalCash >= 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                {cashAccounts.length} {cashAccounts.length === 1 ? 'rekening' : 'rekeningen'}
-              </div>
-
-              <div className="space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                {cashAccounts.slice(0, DESKTOP_ITEMS).map((acc, idx) => {
-                  const pct = maxCashBalance > 0 ? Math.round((Math.abs(acc.balance) / maxCashBalance) * 100) : 0
-                  return (
-                    <div key={acc.id} className={`rounded-md -mx-1 px-1 py-0.5 ${idx >= MOBILE_ITEMS ? 'hidden lg:block' : ''}`}>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50">
-                            <Wallet className="h-3 w-3 text-emerald-600" />
-                          </div>
-                          <span className="truncate text-[var(--ink-2)]">{acc.name}</span>
-                          <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 border border-emerald-200">
-                            <BarChart3 className="h-2.5 w-2.5" /> Transacties
-                          </span>
-                        </div>
-                        <span className={`shrink-0 font-mono font-medium ${acc.balance >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
-                          {formatCurrency(acc.balance)}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${acc.balance >= 0 ? 'bg-emerald-400' : 'bg-red-400'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-                {cashAccounts.length > MOBILE_ITEMS && (
-                  <p className={`text-xs text-kern-600 ${cashAccounts.length <= DESKTOP_ITEMS ? 'lg:hidden' : ''}`}>en <span className="lg:hidden">{cashAccounts.length - MOBILE_ITEMS}</span><span className="hidden lg:inline">{cashAccounts.length - DESKTOP_ITEMS}</span> meer &rarr;</p>
-                )}
-                {cashAccounts.length === 0 && (
-                  <p className="text-xs text-[var(--ink-4)]">Geen cash-rekeningen</p>
-                )}
-              </div>
-
-              <div className="mt-2 sm:mt-3 flex items-center justify-between">
-                <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Bekijk overzicht</span>
-                <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* ── Assets card ── */}
+        {/* ── Assets card (includes cash / liquide middelen) ── */}
         {(() => {
           const maxValue = allAssetItems.length > 0 ? Math.max(...allAssetItems.map(a => Math.abs(a.value))) : 1
           return (
@@ -384,31 +302,73 @@ export function KernMissionControl({
               </div>
 
               <div className="space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                {allAssetItems.slice(0, DESKTOP_ITEMS).map((item, idx) => {
-                  const pct = maxValue > 0 ? Math.round((Math.abs(item.value) / maxValue) * 100) : 0
-                  return (
-                    <div key={item.id} onClick={(e) => { e.stopPropagation(); onCardClick('assets', item.id) }} className={`cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50 ${idx >= MOBILE_ITEMS ? 'hidden lg:block' : ''}`}>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${item.isCash ? 'bg-kern-50' : 'bg-emerald-50'}`}>
-                            {item.isCash
-                              ? <Wallet className="h-3 w-3 text-kern-600" />
-                              : <PiggyBank className="h-3 w-3 text-emerald-600" />}
+                {/* Liquide middelen sub-section */}
+                {cashItems.length > 0 && (
+                  <>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">
+                      Liquide middelen
+                      <span className="ml-1.5 font-mono normal-case">{formatCurrency(totalCash)}</span>
+                    </p>
+                    {cashItems.slice(0, 2).map((item) => {
+                      const pct = maxValue > 0 ? Math.round((Math.abs(item.value) / maxValue) * 100) : 0
+                      return (
+                        <div key={item.id} onClick={(e) => { e.stopPropagation(); onCardClick('assets', item.id) }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-kern-50">
+                                <Wallet className="h-3 w-3 text-kern-600" />
+                              </div>
+                              <span className="truncate text-[var(--ink-2)]">{item.name}</span>
+                            </div>
+                            <span className={`shrink-0 font-mono font-medium ${item.value >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
+                              {formatCurrency(item.value)}
+                            </span>
                           </div>
-                          <span className="truncate text-[var(--ink-2)]">{item.name}</span>
+                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                            <div className="h-full rounded-full bg-kern-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+                          </div>
                         </div>
-                        <span className={`shrink-0 font-mono font-medium ${item.value >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
-                          {formatCurrency(item.value)}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                        <div className={`h-full rounded-full transition-all duration-500 ${item.isCash ? 'bg-kern-400' : 'bg-emerald-400'}`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
-                {allAssetItems.length > MOBILE_ITEMS && (
-                  <p className={`text-xs text-kern-600 ${allAssetItems.length <= DESKTOP_ITEMS ? 'lg:hidden' : ''}`}>en <span className="lg:hidden">{allAssetItems.length - MOBILE_ITEMS}</span><span className="hidden lg:inline">{allAssetItems.length - DESKTOP_ITEMS}</span> meer &rarr;</p>
+                      )
+                    })}
+                    {cashItems.length > 2 && (
+                      <p className="text-[10px] text-kern-600">en {cashItems.length - 2} meer</p>
+                    )}
+                  </>
+                )}
+                {/* Beleggingen & overig sub-section */}
+                {nonCashItems.length > 0 && (
+                  <>
+                    {cashItems.length > 0 && (
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)] pt-1">
+                        Beleggingen &amp; overig
+                        <span className="ml-1.5 font-mono normal-case">{formatCurrency(totalNonCashAssets)}</span>
+                      </p>
+                    )}
+                    {nonCashItems.slice(0, 2).map((item) => {
+                      const pct = maxValue > 0 ? Math.round((Math.abs(item.value) / maxValue) * 100) : 0
+                      return (
+                        <div key={item.id} onClick={(e) => { e.stopPropagation(); onCardClick('assets', item.id) }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50">
+                                <PiggyBank className="h-3 w-3 text-emerald-600" />
+                              </div>
+                              <span className="truncate text-[var(--ink-2)]">{item.name}</span>
+                            </div>
+                            <span className={`shrink-0 font-mono font-medium ${item.value >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
+                              {formatCurrency(item.value)}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                            <div className="h-full rounded-full bg-emerald-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {nonCashItems.length > 2 && (
+                      <p className="text-[10px] text-kern-600">en {nonCashItems.length - 2} meer</p>
+                    )}
+                  </>
                 )}
                 {allAssetItems.length === 0 && (
                   <p className="text-xs text-[var(--ink-4)]">Geen assets</p>

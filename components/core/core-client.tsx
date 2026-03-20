@@ -49,14 +49,6 @@ const DynBudgetsPage = dynamic(() => import('@/components/app/budgets-client'), 
 const DynAssetsPage = dynamic(() => import('@/components/core/assets-client'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
-const DynCashOverview = dynamic(
-  () => import('@/components/app/cash-overview').then(m => ({ default: m.CashOverview })),
-  { loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div> },
-)
-const DynCashAccountView = dynamic(
-  () => import('@/components/app/cash-account-view').then(m => ({ default: m.CashAccountView })),
-  { loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div> },
-)
 const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
@@ -105,8 +97,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [heroExpanded, setHeroExpanded] = useState(false)
   const [coreSimTarget, setCoreSimTarget] = useState<number | null>(null)
   // Mission Control modal state
-  const [activeModal, setActiveModal] = useState<{ type: 'cash' | 'budgets' | 'assets' | 'debts'; itemId?: string } | null>(null)
-  const [cashAccountId, setCashAccountId] = useState<string | undefined>(undefined)
+  const [activeModal, setActiveModal] = useState<{ type: 'budgets' | 'assets' | 'debts'; itemId?: string } | null>(null)
   const [showProjectionModal, setShowProjectionModal] = useState(false)
   // Kassabon modal state
   const [incomeByMonth, setIncomeByMonth] = useState<{month: string; amount: number}[]>([])
@@ -1294,28 +1285,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       </section>
 
       {/* === Mission Control Modals === */}
-      {budgetingActive && (
-        <FullScreenModal
-          open={activeModal?.type === 'cash'}
-          onClose={() => { setCashAccountId(undefined); setActiveModal(null); loadData() }}
-          title="Cash"
-          href="/core/cash"
-        >
-          {cashAccountId ? (
-            <DynCashAccountView
-              key={cashAccountId}
-              accountId={cashAccountId}
-              embedded
-              onNavigateToAccount={(id) => setCashAccountId(id)}
-            />
-          ) : (
-            <DynCashOverview
-              embedded
-              onNavigateToAccount={(id: string) => setCashAccountId(id)}
-            />
-          )}
-        </FullScreenModal>
-      )}
       {budgetingActive && (
         <FullScreenModal
           open={activeModal?.type === 'budgets'}
