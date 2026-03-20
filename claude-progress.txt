@@ -18307,3 +18307,14 @@ Current status: 369/371 features passing (99.5%)
 - Verified desktop (1280px): Left/right layout unchanged
 - Zero console errors
 - Changes already included in commit 97c9485f (via concurrent agent file save)
+
+## Session 2026-03-20 - Feature #425
+
+### Feature #425: Budget type headers groter lettertype dan hoofdbudgetten - PASSING
+- Changed type header font in `kern-mission-control.tsx` from `text-xs` (0.75rem/12px) to `text-[0.9375rem]` (15px)
+- Budget items remain at `text-sm` (0.875rem/14px), creating 1pt hierarchy difference
+- Added `leading-tight` for proper line-height at the new size
+- Verified on desktop (1280px): Inkomen, Sparen, Uitgaven headers visibly larger than child budget items
+- Verified on mobile (390px): hierarchy maintained, no overflow, text fits properly
+- Zero console errors
+- Commit: ace7f2e4
