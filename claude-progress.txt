@@ -18487,3 +18487,34 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#433)
 - Overall progress: 432/433 passing (99.8%)
+
+## Session 2026-03-20 - Features #445, #452
+
+### Feature #445: Flash-animatie voor live waardeveranderingen - PASSING
+- Added @keyframes flash-up (green oklch pulse) and flash-down (red oklch pulse) to globals.css
+- Both animations: background-color fade to transparent over 1s
+- Created useFlashChange(value) hook in lib/hooks/use-flash-change.ts
+  - Tracks previous value, adds flash-up class on increase, flash-down on decrease
+  - Respects prefers-reduced-motion (checked on mount)
+  - Auto-removes class after 1.05s
+- Applied to kern-mission-control.tsx: assets heroTotal, debts rawTotalDebts, budget totalBudgetSpent
+- prefers-reduced-motion: both CSS (animation:none !important) and hook (skip flash) handle it
+- Zero console errors, verified via browser
+- Commit: f7e450fb
+
+### Feature #452: UX skill: UIUX command bijwerken met fd.nl richtlijnen - PASSING
+- Updated .claude/commands/ui-ux.md with 9 new design guidelines:
+  1. Kleur: --positive/--negative/--neutral-change semantic tokens
+  2. Tabellen: new checklist block (right-align, header style, hover, zebra, no vertical borders)
+  3. Interactie: flash-up/flash-down for value changes
+  4. Typografie: body text text-base + leading-relaxed rule
+  5. Consistentie: WidgetShell kicker requirement
+  6. Consistentie: SectionDivider pattern (line or asterisk)
+  7. Consistentie: newspaper-style timestamp format (no relative times)
+  8. Navigatie: new section with active tab border-b-3 + bg-[module-50]/40
+  9. Referenties: added use-flash-change.ts reference
+- Commit: ff480148
+
+### Current Status
+- 2 features completed this session (#445, #452)
+- Overall progress: 437/451 passing (96.9%)
