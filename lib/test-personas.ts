@@ -83,7 +83,7 @@ export interface PersonaProfile {
   // Rebalancing
   rebalance_threshold?: number // drift threshold 1-20%, default 5
   // Widget dashboard
-  widget_prefs?: { widgets: { id: string; enabled: boolean; size: 'quarter' | 'half' | 'full'; order: number }[] }
+  widget_prefs?: { widgets: { id: string; enabled: boolean; size: 'mini' | 'quarter' | 'half' | 'full'; order: number }[] }
 }
 
 export interface PersonaBankAccount {
@@ -368,8 +368,8 @@ export function makeBudgets(overrides: Record<string, number>): PersonaBudget[] 
 // ── Helper: generate widget preferences ───────────────────────
 
 function makeWidgetPrefs(
-  enabled: (string | { id: string; size: 'quarter' | 'half' | 'full' })[],
-): { widgets: { id: string; enabled: boolean; size: 'quarter' | 'half' | 'full'; order: number }[] } {
+  enabled: (string | { id: string; size: 'mini' | 'quarter' | 'half' | 'full' })[],
+): { widgets: { id: string; enabled: boolean; size: 'mini' | 'quarter' | 'half' | 'full'; order: number }[] } {
   return {
     widgets: enabled.map((w, i) => {
       const id = typeof w === 'string' ? w : w.id
@@ -1081,7 +1081,8 @@ const lisaData: PersonaData = {
     invulfase_active: false,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
-      'assets', 'holdings', 'budgetten', 'monte_carlo', 'trend_sparen', 'acties',
+      'assets', 'holdings', 'budgetten', { id: 'uitgaven_heatmap', size: 'half' },
+      'monte_carlo', 'trend_sparen', 'acties', { id: 'inflatie_impact', size: 'mini' },
     ]),
   },
   bank_accounts: [
@@ -1352,6 +1353,7 @@ const willemData: PersonaData = {
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
       'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'gezondheids_score',
+      { id: 'beleggingsrendement', size: 'mini' }, { id: 'rebalancing', size: 'mini' },
     ]),
   },
   bank_accounts: [
