@@ -452,8 +452,8 @@ export function KernMissionControl({
                       const overPos = isOver && isOverPositive(ts.type)
                       const tc = typeColors(ts.type)
                       return (
-                        <div key={ts.type} onClick={(e) => { e.stopPropagation(); onCardClick('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
-                          <div className="flex items-center justify-between text-xs">
+                        <div key={ts.type} onClick={(e) => { e.stopPropagation(); onCardClick('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-1.5 sm:py-0.5 min-h-[44px] sm:min-h-0 flex flex-col justify-center transition-colors hover:bg-kern-50">
+                          <div className="flex items-center justify-between text-xs gap-1">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: tc.bg }}>
                                 {ts.type === 'income' && <TrendingUp className="h-3 w-3" style={{ color: tc.text }} />}
@@ -462,9 +462,9 @@ export function KernMissionControl({
                               </div>
                               <span className="truncate font-medium text-[var(--ink-2)]">{ts.label}</span>
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="flex shrink-0 items-center gap-1.5">
                               <span className={`font-mono font-medium ${isOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
-                                {formatCurrency(ts.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(ts.limit)}</span>
+                                {formatCurrency(ts.spent)} <span className="hidden sm:inline text-[var(--ink-4)]">/ {formatCurrency(ts.limit)}</span>
                               </span>
                               <span className={`font-mono font-bold ${isOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>{pct}%</span>
                             </div>
@@ -500,8 +500,8 @@ export function KernMissionControl({
                             </div>
                             <span className="text-sm font-semibold text-[var(--ink-2)]">Uitgaven</span>
                           </div>
-                          <span className={`font-mono text-sm font-bold ${expOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
-                            {formatCurrency(expenseTypeSummary.spent)} <span className="text-xs font-normal text-[var(--ink-4)]">/ {formatCurrency(expenseTypeSummary.limit)}</span>
+                          <span className={`font-mono text-xs sm:text-sm font-bold ${expOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+                            {formatCurrency(expenseTypeSummary.spent)} <span className="hidden sm:inline text-xs font-normal text-[var(--ink-4)]">/ {formatCurrency(expenseTypeSummary.limit)}</span>
                           </span>
                         </div>
                         <div className="h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
@@ -515,20 +515,20 @@ export function KernMissionControl({
                   })()}
 
                   {/* Individual expense parent budgets */}
-                  <div className="space-y-1 max-h-[220px] overflow-y-auto lg:max-h-[180px]">
+                  <div className="space-y-0.5 max-h-[260px] overflow-y-auto lg:max-h-[180px]">
                     {expenseSegments.slice(0, MAX_EXPENSE_ITEMS).map((seg) => {
                       const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
                       const isOver = seg.spent > seg.limit && seg.limit > 0
                       const tc = typeColors('expense')
                       return (
-                        <div key={seg.id} onClick={(e) => { e.stopPropagation(); onCardClick('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
-                          <div className="flex items-center justify-between text-xs">
+                        <div key={seg.id} onClick={(e) => { e.stopPropagation(); onCardClick('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-1.5 sm:py-0.5 min-h-[44px] sm:min-h-0 flex flex-col justify-center transition-colors hover:bg-kern-50">
+                          <div className="flex items-center justify-between text-xs gap-1">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="truncate text-[var(--ink-2)]">{seg.name}</span>
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="flex shrink-0 items-center gap-1.5">
                               <span className={`font-mono font-medium ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
-                                {formatCurrency(seg.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(seg.limit)}</span>
+                                {formatCurrency(seg.spent)} <span className="hidden sm:inline text-[var(--ink-4)]">/ {formatCurrency(seg.limit)}</span>
                               </span>
                               <span className={`font-mono text-[10px] font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>{pct}%</span>
                             </div>
