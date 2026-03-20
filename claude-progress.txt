@@ -1,3 +1,24 @@
+## Session 2026-03-20 - Features #437, #438
+
+### Feature #437: Semantische kleur-tokens: positief/negatief/neutraal - PASSING
+- Added 3 OKLCH semantic tokens to :root in globals.css: --positive (oklch 0.50 0.09 162), --negative (oklch 0.50 0.09 25), --neutral-change (oklch 0.67 0.005 88)
+- Registered in @theme inline block for Tailwind v4: text-positive, text-negative, bg-positive, bg-negative, text-neutral-change
+- Replaced 170+ hardcoded emerald/red Tailwind classes with semantic tokens across 7 files
+- Files modified: globals.css, budgets-client.tsx, kern-mission-control.tsx, horizon-client.tsx, snapshot-comparison-view.tsx, assets-client.tsx, core-client.tsx, holdings-client.tsx
+- Only replaced VALUE CHANGE colors (gains/losses/over-under); preserved error states, action buttons, decorative uses
+- Muted editorial colors with good contrast against white background
+- Verified on core, assets, budgets, horizon pages — zero new console errors
+
+### Feature #438: Verplichte kicker op elke WidgetShell - PASSING (audit, no changes needed)
+- Audited all WidgetShell calls — every single one has a kicker prop
+- kicker is already TypeScript-required (not optional) in WidgetShellProps
+- No empty string kickers found
+- Consistent styling via label-editorial class: uppercase, 11px, font-weight 600, letter-spacing 0.08em
+- Verified visually on dashboard: all widgets show uppercase kicker labels
+
+### Current Status
+- 2 features completed this session (#437, #438)
+
 ## Session 2026-03-20 - Features #439, #440
 
 ### Feature #439: SectionDivider component voor redactionele scheiding - PASSING
@@ -18547,3 +18568,32 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#445, #452)
 - Overall progress: 437/451 passing (96.9%)
+
+## Session 2026-03-20 - Features #441, #442
+
+### Feature #441: Tabel-design standaard voor financiële data - PASSING
+- Created reusable FinTable compound component (components/app/fin-table.tsx)
+- fd.nl-inspired design: 11px uppercase tracking-wider headers, hover states, font-mono tabular-nums for amounts
+- Compound API: FinTable.Header, FinTable.Body (with zebra), FinTable.Footer, FinTable.Row (with total), FinTable.Th, FinTable.Td (with numeric/bold/color/muted)
+- Applied to 4 key files:
+  1. bucket-projection-table.tsx — assets, debts, costs, yearly breakdown tables
+  2. fee-detail-modal.tsx — holdings TER breakdown table
+  3. monthly-table.tsx (rapportages) — maandoverzicht with zebra striping
+  4. hypotheek-vs-beleggen-modal.tsx — yearly comparison table with zebra
+- Added .fin-table-zebra CSS rule in globals.css for even-row striping
+- Responsive: overflow-x-auto built into FinTable root, minWidth prop for horizontal scroll
+- Zero TypeScript errors, zero JS console errors (only pre-existing Supabase 400)
+- Commit: 3034afae
+
+### Feature #442: Actieve navigatie-tab versterken met achtergrondtint - PASSING
+- Added bg-[module-50]/40 to active nav items in app-header.tsx
+- kern: bg-kern-50/40 (warm brown tint), wil: bg-wil-50/40 (purple tint), horizon: bg-horizon-50/40 (gold tint)
+- Added rounded-t-sm for polished tab appearance
+- Verified all 3 modules render correctly with distinct background tints
+- Mobile bottom-nav already had its own pill indicator (opacity-40) — no changes needed
+- No hover conflicts: tint only on active state, hover classes only on inactive
+- Zero JS console errors
+- Commit: bd239727
+
+### Current Status
+- 2 features completed this session (#441, #442)
