@@ -1,3 +1,28 @@
+## Session 2026-03-20 - Feature #407
+
+### Feature #407: Update regression tests and seed data for core page changes — PASSING
+- Created new regression test suite `kern-layout-refactor.ts` with 12 tests covering:
+  - 3-tab KernMissionControl (Assets, Schulden, Budgetten) — no separate Cash tab
+  - Assets card merges cash accounts ("Liquide middelen" subsection)
+  - Budgets card two-column split layout (left: Inkomen/Sparen/Schulden, right: Uitgaven)
+  - Grid structure (Assets+Debts top row, Budgets full-width bottom)
+  - /core/cash → /core/assets redirect
+  - Gids references updated from Cash to Bezittingen
+  - Component props interface, conditional rendering, health score
+  - validate-hrefs compatibility
+- Added `/core/cash` → `/core/assets` redirect test to navigatie.ts
+- Updated verify-mission-control API route to reflect refactored layout (10/10 passing)
+- Registered new suite in test-registry.ts
+- Verified: all 12 kern-layout-refactor tests pass, core-metrics.test.ts passes (42/42)
+- Zero console errors on /core page, /core/cash redirect works correctly
+- Current status: 406/407 features passing (99.8%)
+
+### Files Modified
+- lib/regression-tests/suites/kern-layout-refactor.ts — NEW: 12-test suite for core page refactor
+- lib/regression-tests/suites/navigatie.ts — added /core/cash redirect test + redirect mapping
+- lib/regression-tests/test-registry.ts — registered kern-layout-refactor suite
+- app/api/verify-mission-control/route.ts — updated to match new 3-tab layout
+
 ## Session 2026-03-20 - Feature #406
 
 ### Feature #406: Update Gids (guide) references for new core page structure — PASSING
