@@ -179,6 +179,7 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/kern-hero-fire-progress').then(m => m.register()).catch(e => { console.warn('[test-registry] kern-hero-fire-progress failed:', e) }),
     import('@/lib/regression-tests/suites/kern-layout-refactor').then(m => m.register()).catch(e => { console.warn('[test-registry] kern-layout-refactor failed:', e) }),
     import('@/lib/regression-tests/suites/design-system-tokens').then(m => m.register()).catch(e => { console.warn('[test-registry] design-system-tokens failed:', e) }),
+    import('@/lib/regression-tests/suites/design-system-typography').then(m => m.register()).catch(e => { console.warn('[test-registry] design-system-typography failed:', e) }),
   ])
 
   // Log any rejected promises (shouldn't happen due to .catch, but just in case)
