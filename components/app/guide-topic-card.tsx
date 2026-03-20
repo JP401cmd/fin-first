@@ -44,11 +44,11 @@ export default function GuideTopicCard({
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-[var(--ink)]">{title}</p>
           {valueText && (
-            <p className="mt-1 text-[12px] font-medium leading-relaxed text-[var(--ink)]">
+            <p className="mt-1 text-base font-medium leading-relaxed text-[var(--ink)]">
               {valueText}
             </p>
           )}
-          <div className="mt-1 text-[12px] leading-relaxed text-[var(--ink-2)]">
+          <div className="mt-1 text-base leading-relaxed text-[var(--ink-2)]">
             {description}
           </div>
         </div>

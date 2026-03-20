@@ -306,18 +306,23 @@ function scrollToAnchor(anchor: string) {
 function NaslagwerkItem({
   topic,
   color,
+  index = 0,
 }: {
   topic: NaslagwerkTopic
   color: string
+  index?: number
 }) {
   const hasAnchor = !!topic.anchor
+  const isEven = index % 2 === 0
 
   return (
     <button
       type="button"
       onClick={hasAnchor ? () => scrollToAnchor(topic.anchor!) : undefined}
       disabled={!hasAnchor}
-      className={`flex items-start gap-2.5 w-full text-left py-2 px-2 rounded-[var(--r-sm)] transition-colors ${
+      className={`flex items-start gap-2.5 w-full text-left py-2.5 px-2.5 rounded-[var(--r-sm)] transition-colors ${
+        isEven ? 'bg-[var(--subtle)]/20' : ''
+      } ${
         hasAnchor
           ? 'hover:bg-[var(--subtle)]/60 cursor-pointer'
           : 'cursor-default'
@@ -390,11 +395,12 @@ function AccordionModule({
       >
         <div className="overflow-hidden">
           <div className="px-1 pb-3 space-y-0.5">
-            {mod.topics.map((topic) => (
+            {mod.topics.map((topic, i) => (
               <NaslagwerkItem
                 key={topic.title}
                 topic={topic}
                 color={mod.color}
+                index={i}
               />
             ))}
           </div>
@@ -482,11 +488,12 @@ export default function GuideNaslagwerk() {
 
         {/* Tab content */}
         <div className="p-3 space-y-0.5">
-          {activeModule.topics.map((topic) => (
+          {activeModule.topics.map((topic, i) => (
             <NaslagwerkItem
               key={topic.title}
               topic={topic}
               color={activeModule.color}
+              index={i}
             />
           ))}
         </div>

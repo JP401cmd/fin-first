@@ -80,7 +80,7 @@ function SectionBlock({
       >
         <div className="overflow-hidden">
           <div className="px-3 pb-4 sm:px-4 sm:pb-5 pl-[60px] sm:pl-[72px]">
-            <div className="text-[12px] leading-relaxed text-[var(--ink-2)] space-y-2">
+            <div className="text-base leading-relaxed text-[var(--ink-2)] space-y-2">
               {section.content}
             </div>
           </div>
@@ -458,7 +458,7 @@ export default function GuideHorizonUitleg() {
           </div>
           <div className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 mt-2">
             <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-            <p className="text-[11px] leading-relaxed text-[var(--ink-3)] italic">
+            <p className="text-sm leading-relaxed text-[var(--ink-3)] italic">
               Elke aanpassing werkt direct door in de grafiek. Experimenteer gerust — je kunt
               altijd terug naar de standaardwaarden via Instellingen.
             </p>
@@ -642,7 +642,7 @@ export default function GuideHorizonUitleg() {
           </p>
           <div className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 mt-2">
             <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-            <p className="text-[11px] leading-relaxed text-[var(--ink-3)] italic">
+            <p className="text-sm leading-relaxed text-[var(--ink-3)] italic">
               <strong>Disclaimer:</strong> de projectie is gebaseerd op het verwachte rendement dat je per
               bezitting hebt ingesteld. Werkelijke rendementen kunnen afwijken. Gebruik de Vermogensopbouw
               als richtlijn, niet als garantie.
@@ -678,12 +678,12 @@ export default function GuideHorizonUitleg() {
             <p className="text-[13px] font-semibold text-[var(--ink)]">
               Hoe de Horizon-grafiek werkt
             </p>
-            <p className="mt-1 text-[12px] font-medium leading-relaxed text-[var(--ink)]">
+            <p className="mt-1 text-base font-medium leading-relaxed text-[var(--ink)]">
               De grafiek op De Horizon is het hart van TriFinity. Hij toont je volledige
               vermogenspad — van nu tot voorbij je pensioen. Hieronder leggen we stap voor stap
               uit wat je ziet en welke knoppen je kunt draaien.
             </p>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--ink-2)]">
+            <p className="mt-1.5 text-base leading-relaxed text-[var(--ink-2)]">
               Klik op een sectie om de uitleg te lezen. Geen jargon, geen formules — gewoon
               helder Nederlands.
             </p>

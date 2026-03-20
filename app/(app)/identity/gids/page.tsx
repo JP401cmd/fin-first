@@ -44,6 +44,7 @@ import ReisStapSection from "@/components/app/reis-stap-section";
 import GuideTopicCard from "@/components/app/guide-topic-card";
 import GuideNaslagwerk from "@/components/app/guide-naslagwerk";
 import GuideHorizonUitleg from "@/components/app/guide-horizon-uitleg";
+import { SectionDivider } from "@/components/app/section-divider";
 
 /* ── Types ─────────────────────── */
 
@@ -337,6 +338,8 @@ export default function GidsPage() {
             }}
           />
         </ReisStapSection>
+
+        <SectionDivider variant="asterisk" className="my-6" />
 
         {/* ── Stap 2: Begrijp je patronen ── */}
         <ReisStapSection
@@ -646,6 +649,8 @@ export default function GidsPage() {
             }
           />
         </ReisStapSection>
+
+        <SectionDivider variant="asterisk" className="my-6" />
 
         {/* ── Stap 3: Onderneem actie ── */}
         <ReisStapSection
@@ -981,6 +986,8 @@ export default function GidsPage() {
           />
         </ReisStapSection>
 
+        <SectionDivider variant="asterisk" className="my-6" />
+
         {/* ── Stap 4: Kijk vooruit ── */}
         <ReisStapSection
           id="guide-reis-4"
@@ -1304,6 +1311,8 @@ export default function GidsPage() {
             }}
           />
         </ReisStapSection>
+
+        <SectionDivider variant="asterisk" className="my-6" />
 
         {/* ── Stap 5: Droom en plan ── */}
         <ReisStapSection

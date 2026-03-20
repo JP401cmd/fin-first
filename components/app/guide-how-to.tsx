@@ -25,7 +25,7 @@ export default function GuideHowTo({ steps, tip, color = 'var(--ink)' }: GuideHo
             >
               {i + 1}
             </div>
-            <p className="text-[12px] leading-relaxed text-[var(--ink-2)]">{step}</p>
+            <p className="text-base leading-relaxed text-[var(--ink-2)]">{step}</p>
           </div>
         ))}
       </div>
@@ -34,7 +34,7 @@ export default function GuideHowTo({ steps, tip, color = 'var(--ink)' }: GuideHo
       {tip && (
         <div className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5">
           <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-          <p className="text-[11px] leading-relaxed text-[var(--ink-3)] italic">
+          <p className="text-base leading-relaxed text-[var(--ink-3)] italic">
             {tip}
           </p>
         </div>

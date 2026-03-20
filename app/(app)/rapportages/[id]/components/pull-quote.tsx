@@ -18,7 +18,7 @@ export function PullQuote({ insight }: { insight: ReportAiInsight }) {
 
   return (
     <div className={`pull-quote border-l-[3px] ${config.borderColor} pl-4 py-2`}>
-      <p className="font-source-serif text-[15px] italic leading-relaxed text-[var(--ink-2)]">
+      <p className="font-source-serif text-base italic leading-relaxed text-[var(--ink-2)]">
         &ldquo;{insight.quote}&rdquo;
       </p>
       <p className="mt-1 font-inter text-[11px] text-[var(--ink-3)]">

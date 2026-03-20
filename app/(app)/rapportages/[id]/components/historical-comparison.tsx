@@ -56,7 +56,7 @@ export function HistoricalComparison({
           Historisch Perspectief — afgelopen periodes
         </p>
         <div className="rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4">
-          <p className="text-center font-source-serif text-sm italic text-[var(--ink-3)]">
+          <p className="text-center font-source-serif text-base italic text-[var(--ink-3)]">
             Geen eerdere periodes beschikbaar voor vergelijking.
           </p>
         </div>

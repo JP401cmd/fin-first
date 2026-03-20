@@ -54,7 +54,7 @@ export function PensionParseSummaryCard({
   return (
     <div className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50/40 p-4 space-y-3">
       {/* Samenvatting */}
-      <p className="text-sm text-[var(--ink-2)] leading-relaxed">{result.samenvatting}</p>
+      <p className="text-base text-[var(--ink-2)] leading-relaxed">{result.samenvatting}</p>
 
       {/* AOW bedrag */}
       {result.aowBedrag != null && (

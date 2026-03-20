@@ -24,7 +24,7 @@ export function InsightCard({ spec }: Props) {
         {styles.label && (
           <p className="label-editorial text-[var(--ink-4)] mb-1">{styles.label}</p>
         )}
-        <p className="font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
+        <p className="font-serif italic text-base leading-relaxed text-[var(--ink-2)]">
           {spec.text}
         </p>
       </div>

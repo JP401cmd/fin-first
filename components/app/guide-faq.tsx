@@ -80,7 +80,7 @@ function FaqAccordionItem({
         className="flex w-full items-center gap-3 py-3 px-1 min-h-[44px] text-left transition-colors hover:bg-[var(--subtle)]/40"
         aria-expanded={open}
       >
-        <span className="flex-1 text-[12px] font-semibold text-[var(--ink)]">
+        <span className="flex-1 text-sm font-semibold text-[var(--ink)]">
           {item.question}
         </span>
         <ChevronDown
@@ -95,13 +95,13 @@ function FaqAccordionItem({
       >
         <div className="overflow-hidden">
           <div className="px-1 pb-3">
-            <p className="text-[12px] leading-relaxed text-[var(--ink-2)]">
+            <p className="text-base leading-relaxed text-[var(--ink-2)]">
               {item.answer}
             </p>
             {item.link && (
               <Link
                 href={item.link.href}
-                className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
+                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
               >
                 {item.link.label} &rarr;
               </Link>

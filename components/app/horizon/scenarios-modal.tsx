@@ -132,7 +132,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
             <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Marktweeer
             </h2>
-            <p className="mb-4 text-sm text-[var(--ink-3)]">Hoe presteren de scenario&apos;s bij verschillende marktomstandigheden?</p>
+            <p className="mb-4 text-base leading-relaxed text-[var(--ink-3)]">Hoe presteren de scenario&apos;s bij verschillende marktomstandigheden?</p>
 
             <div className="flex flex-wrap gap-2">
               {(Object.entries(MARKET_WEATHER) as [MarketWeather, typeof MARKET_WEATHER[MarketWeather]][]).map(([key, val]) => (
@@ -444,7 +444,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
         <TrendingDown className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
         Aflossingsstrategieën vergelijken
       </h2>
-      <p className="mb-4 text-sm text-[var(--ink-3)]">
+      <p className="mb-4 text-base leading-relaxed text-[var(--ink-3)]">
         Vergelijk snowball (kleinste schuld eerst) vs. avalanche (hoogste rente eerst) om je FIRE-datum te versnellen.
       </p>
 
