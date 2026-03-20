@@ -18392,3 +18392,25 @@ Current status: 369/371 features passing (99.5%)
 - Commit: 5ff6a0f3
 
 Current status: 425/431 passing (98.6%)
+
+## Session 2026-03-20 - Feature #432
+
+### Feature #432: Responsive heatmap: regressietest alle 4 formaten - PASSING
+- Created test page `app/test-heatmap-formats/page.tsx` with static budget data (no auth required)
+- Renders all 4 formats (mini, quarter, half, full) side by side with 15 automated DOM assertions
+- All 15 tests pass:
+  - 4 SVG render checks (all formats)
+  - mini: no foreignObject (text), color blocks present, no legend, clickable (cursor-pointer)
+  - quarter: foreignObjects present (names+%), no legend, no parent outlines
+  - half: legend (2 gradients), parent outlines (4 dashed rects), section labels
+  - full: legend, parent outlines, foreignObjects with amounts
+  - mobile: MobileCombinedHeatmap renders 17 buttons
+- Fixes applied to budget-heatmap.tsx:
+  1. Tooltip now disabled for both mini AND quarter (was only mini) — uses `isCompact` flag
+  2. Mini cells now clickable (cursor-pointer on all g elements, onClick always wired)
+- Zero console errors, existing tests unaffected (568 pass, 2 pre-existing failures)
+- Commit: b8962a6b
+
+### Current Status
+- 1 feature completed this session (#432)
+- Overall progress: 431/431 passing (100%)
