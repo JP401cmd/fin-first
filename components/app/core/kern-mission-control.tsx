@@ -233,7 +233,7 @@ export function KernMissionControl({
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: tc.bg }}>
                         <Icon className="h-3 w-3" style={{ color: tc.text }} />
                       </div>
-                      <span className="text-xs font-medium text-[var(--ink)]">{label}</span>
+                      <span className="text-[0.9375rem] font-medium leading-tight text-[var(--ink)]">{label}</span>
                     </div>
                     {summary && (
                       <div className="flex shrink-0 items-center gap-1.5">
