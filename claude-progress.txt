@@ -18283,3 +18283,14 @@ Current status: 369/371 features passing (99.5%)
 - Verified via browser: core page, assets page breadcrumb all show "Vermogen"
 - Zero console errors
 - Commit: 9dcde17a
+
+### Feature #421: Mobile: Uitgaven boven Inkomen in smalle weergave - PASSING
+- Added CSS `order` to budget two-column layout in kern-mission-control.tsx
+- Uitgaven column gets `order-1`, Inkomen/Sparen/Schulden gets `order-2` on mobile (< lg)
+- `lg:order-none` resets to DOM order on desktop (side-by-side layout preserved)
+- Moved border-t separator from Uitgaven to Inkomen column (since Uitgaven is now first on mobile)
+- Verified at 375px: Uitgaven on top, no horizontal scroll
+- Verified at 390px: Same correct order
+- Verified desktop (1280px): Left/right layout unchanged
+- Zero console errors
+- Changes already included in commit 97c9485f (via concurrent agent file save)
