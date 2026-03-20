@@ -55,6 +55,7 @@ const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
 
 import { usePerspective } from '@/components/app/perspective-provider'
 import { KernMissionControl } from '@/components/app/core/kern-mission-control'
+import { SectionDivider } from '@/components/app/section-divider'
 import { Users, EyeOff } from 'lucide-react'
 import { FhinAvatar } from '@/components/app/avatars'
 
@@ -987,7 +988,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-kern-300"
             >
               <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Spaarquote</p>
-              <p className={`font-mono text-xl font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-red-400'}`}>{savingsRate6m.toFixed(1)}%</p>
+              <p className={`font-mono text-xl font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-negative'}`}>{savingsRate6m.toFixed(1)}%</p>
               <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
                 {savingsRateMonths < 6 ? `${savingsRateMonths}m data` : '6m'}
               </p>
@@ -1047,13 +1048,13 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     <div className="mt-2">
                       <div className="flex items-baseline justify-between">
                         <span className="text-sm text-[var(--ink-3)]">Budget</span>
-                        <span className={`text-sm font-mono font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-600' : 'text-red-400'}`}>
+                        <span className={`text-sm font-mono font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-600' : 'text-negative'}`}>
                           {Math.round((totalBudgetSpent / totalBudgetLimit) * 100)}%
                         </span>
                       </div>
                       <div className="mt-1 h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                         <div
-                          className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300' : 'bg-red-400'}`}
+                          className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300' : 'bg-negative'}`}
                           style={{ width: `${Math.min((totalBudgetSpent / totalBudgetLimit) * 100, 100)}%` }}
                         />
                       </div>
@@ -1119,13 +1120,13 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 <div className="mt-2">
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm text-[var(--ink-3)]">Budget</span>
-                    <span className={`text-sm font-mono font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-600' : 'text-red-400'}`}>
+                    <span className={`text-sm font-mono font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-600' : 'text-negative'}`}>
                       {Math.round((totalBudgetSpent / totalBudgetLimit) * 100)}%
                     </span>
                   </div>
                   <div className="mt-1 h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300' : 'bg-red-400'}`}
+                      className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300' : 'bg-negative'}`}
                       style={{ width: `${Math.min((totalBudgetSpent / totalBudgetLimit) * 100, 100)}%` }}
                     />
                   </div>
@@ -1144,7 +1145,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   onClick={() => setShowSavingsReceipt(true)}
                   className="flex items-center gap-1.5 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
                 >
-                  <p className={`font-mono text-2xl font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-red-400'}`}>
+                  <p className={`font-mono text-2xl font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-negative'}`}>
                     {savingsRate6m.toFixed(1)}%
                   </p>
                   <span className="text-sm text-[var(--ink-3)]">spaarquote</span>
@@ -1200,6 +1201,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         />
       </section>
 
+      <SectionDivider variant="line" />
+
       {/* === 7. Financiële Kerngetallen (Deep Dive) === */}
       <section className="mt-4 sm:mt-8">
         <div className="mb-3 sm:mb-5 flex items-end justify-between">
@@ -1244,9 +1247,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           </button>
         </div>
 
-        {/* Full cards on desktop */}
-        <div className="hidden sm:grid sm:grid-cols-2 sm:gap-4">
-          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
+        {/* Full cards on desktop — 2-col tablet, 3-col desktop */}
+        <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
+          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 lg:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-emerald-50">
                 <TrendingUp className="h-6 w-6 text-emerald-600" />
@@ -1263,7 +1266,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </p>
           </button>
 
-          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
+          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 lg:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-[var(--subtle)]">
                 <ShoppingCart className="h-6 w-6 text-[var(--ink-3)]" />
@@ -1279,6 +1282,26 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <a href="/identity/profiel" className="text-[var(--kern-t)] underline-offset-2 hover:underline" onClick={(e) => e.stopPropagation()}>
                 Identiteit → Profiel
               </a>.
+            </p>
+          </button>
+
+          {/* 3rd KPI card — Dagelijkse Kosten (visible on lg ≥1024px) */}
+          <button type="button" onClick={() => setShowFreeDaysReceipt(true)} className="hidden lg:block rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 lg:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-kern-50">
+                <Wallet className="h-6 w-6 text-kern-600" />
+              </div>
+              <KpiTooltip text="Wat je gemiddeld per dag nodig hebt voor essentiële kosten. Dit is de basis voor je vrijheidstijd-berekening." />
+            </div>
+            <p className="text-sm font-medium text-[var(--ink-3)]">Dagelijkse Kosten</p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
+              {formatCurrency(data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses / 365 : data.yearlyExpenses / 365)}
+            </p>
+            <p className="mt-1 text-xs text-[var(--ink-3)]">per dag aan essentiële uitgaven</p>
+            <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
+              Elke euro die je spaart = {data.yearlyMustExpenses > 0
+                ? (1 / (data.yearlyMustExpenses / 365)).toFixed(1)
+                : data.yearlyExpenses > 0 ? (1 / (data.yearlyExpenses / 365)).toFixed(1) : '0'} dag extra vrijheid
             </p>
           </button>
         </div>
@@ -1586,7 +1609,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <div key={type} className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2">
                 <div className="flex justify-between py-0.5">
                   <span className="font-medium text-[var(--ink-2)]">{typeLabel}</span>
-                  <span className="tabular-nums font-medium text-red-600">- {formatCurrency(typeTotal)}</span>
+                  <span className="tabular-nums font-medium text-negative">- {formatCurrency(typeTotal)}</span>
                 </div>
                 {items.map(b => (
                   <div key={b.name} className="flex items-center justify-between py-0.5 pl-2 text-[11px]">
@@ -1615,7 +1638,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <>
                 <div className="flex justify-between py-1">
                   <span className="font-medium text-[var(--ink-2)]">Resterend</span>
-                  <span className={`tabular-nums font-medium ${remaining >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
+                  <span className={`tabular-nums font-medium ${remaining >= 0 ? 'text-[var(--ink-2)]' : 'text-negative'}`}>
                     {formatCurrency(remaining)}
                   </span>
                 </div>
@@ -1625,7 +1648,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   <div className="border-t border-dashed border-[var(--border-ed)] mt-2 pt-2 mb-2 pb-2 border-b">
                     <div className="flex justify-between py-0.5">
                       <span className="font-medium text-[var(--ink-2)]">Bewust gespaard</span>
-                      <span className="tabular-nums font-medium text-emerald-600">+ {formatCurrency(savingsTotal)}</span>
+                      <span className="tabular-nums font-medium text-positive">+ {formatCurrency(savingsTotal)}</span>
                     </div>
                     {savingsItems.map(b => (
                       <div key={b.name} className="flex items-center justify-between py-0.5 pl-2 text-[11px]">
@@ -1644,7 +1667,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 {/* Totaal bespaard */}
                 <div className="flex justify-between py-1">
                   <span className="font-medium text-[var(--ink-2)]">Totaal bespaard 6 mnd</span>
-                  <span className={`tabular-nums font-medium ${totalSaved >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <span className={`tabular-nums font-medium ${totalSaved >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {totalSaved >= 0 ? '+' : ''}{formatCurrency(totalSaved)}
                   </span>
                 </div>
@@ -1653,7 +1676,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           })()}
           <div className="mt-2 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
             <span className="font-bold text-[var(--ink)]">Spaarquote</span>
-            <span className={`tabular-nums font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-red-600'}`}>{savingsRate6m.toFixed(1)}%</span>
+            <span className={`tabular-nums font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-negative'}`}>{savingsRate6m.toFixed(1)}%</span>
           </div>
 
           {savingsRateMonths < 6 && (
@@ -1874,7 +1897,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                         <span className="ml-1 text-[10px] text-[var(--ink-4)]">({pct}%)</span>
                       )}
                     </span>
-                    <span className="tabular-nums text-red-600">−{formatCurrency(effectiveBalance)}</span>
+                    <span className="tabular-nums text-negative">−{formatCurrency(effectiveBalance)}</span>
                   </div>
                 )
               })}
@@ -1885,7 +1908,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             <>
               <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
                 <span className="font-sans text-[var(--ink)]">Netto vermogen</span>
-                <span className={`tabular-nums ${data.netWorth >= 0 ? 'text-[var(--ink)]' : 'text-red-600'}`}>{formatCurrency(data.netWorth)}</span>
+                <span className={`tabular-nums ${data.netWorth >= 0 ? 'text-[var(--ink)]' : 'text-negative'}`}>{formatCurrency(data.netWorth)}</span>
               </div>
               <div className="mt-3 flex justify-center">
                 <FreedomTimeBadge amount={Math.abs(data.netWorth)} />
@@ -2297,7 +2320,7 @@ function SnapshotComparisonContent({ snapshots }: { snapshots: NetWorthSnapshot[
 
   function DeltaValue({ value, invert }: { value: number; invert?: boolean }) {
     const isPositive = invert ? value < 0 : value > 0
-    const color = value === 0 ? 'text-[var(--ink-3)]' : isPositive ? 'text-emerald-600' : 'text-red-500'
+    const color = value === 0 ? 'text-neutral-change' : isPositive ? 'text-positive' : 'text-negative'
     const prefix = value > 0 ? '+' : ''
     return (
       <span className={`text-lg font-bold ${color}`}>
@@ -2706,7 +2729,7 @@ function BudgetLegendOverview({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[var(--ink)]">{seg.name}</p>
                 <p className="text-xs text-[var(--ink-3)]">
-                  <span className={isOver ? (overPositive ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
+                  <span className={isOver ? (overPositive ? 'font-semibold text-positive' : 'font-semibold text-negative') : ''}>
                     {formatCurrency(seg.spent)}
                   </span>
                   {' / '}
@@ -2714,7 +2737,7 @@ function BudgetLegendOverview({
                 </p>
               </div>
 
-              <span className={`shrink-0 text-xs font-bold ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
+              <span className={`shrink-0 text-xs font-bold ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}`}>
                 {pct}%
               </span>
             </button>
@@ -2743,13 +2766,13 @@ function BudgetLegendOverview({
                       </div>
                       <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]">{child.name}</span>
                       <span className="text-xs text-[var(--ink-3)]">
-                        <span className={childOver ? (childOverPos ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
+                        <span className={childOver ? (childOverPos ? 'font-semibold text-positive' : 'font-semibold text-negative') : ''}>
                           {formatCurrency(child.spent)}
                         </span>
                         {' / '}
                         {formatCurrency(child.limit)}
                       </span>
-                      <span className={`w-8 text-right text-xs font-medium ${childOver ? (childOverPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>
+                      <span className={`w-8 text-right text-xs font-medium ${childOver ? (childOverPos ? 'text-positive' : 'text-negative') : 'text-[var(--ink-3)]'}`}>
                         {childPct}%
                       </span>
                     </button>
@@ -2809,11 +2832,11 @@ function EstimatesForm({ initialIncome, initialExpenses, onSave, onCancel }: {
         </div>
       </div>
       {income > 0 && (
-        <div className={`rounded-[var(--r)] px-3 py-2 ${savingsRate < 0 ? 'bg-red-50' : 'bg-[var(--subtle)]'}`}>
+        <div className={`rounded-[var(--r)] px-3 py-2 ${savingsRate < 0 ? 'bg-negative/10' : 'bg-[var(--subtle)]'}`}>
           <p className="text-xs text-[var(--ink-3)]">
             {savingsRate < 0 ? 'Tekort per maand' : 'Berekende spaarquote'}
           </p>
-          <p className={`font-mono text-lg font-bold tabular-nums ${savingsRate < 0 ? 'text-red-600' : 'text-[var(--ink)]'}`}>{savingsRate}%</p>
+          <p className={`font-mono text-lg font-bold tabular-nums ${savingsRate < 0 ? 'text-negative' : 'text-[var(--ink)]'}`}>{savingsRate}%</p>
           <p className="text-xs text-[var(--ink-3)]">
             {formatCurrency(Math.abs(income - expenses))} per maand
           </p>

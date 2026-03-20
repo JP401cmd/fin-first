@@ -7,6 +7,7 @@ import type { WidgetPref } from '@/lib/widget-catalog'
 import type { WillPageData } from '@/lib/will-data-loader'
 import type { TemporalContext } from '@/lib/briefing/types'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
+import { SectionDivider } from '@/components/app/section-divider'
 import { DAIshboard } from '@/components/daishboard/daishboard'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
@@ -128,6 +129,8 @@ export function WillLanding({
         <div className="mt-2">
           <MonthlyCheckinCard />
         </div>
+
+        <SectionDivider variant="asterisk" />
 
         {/* ── Sectie 3: Actiecentrum met KPI-header ──────────── */}
         <section className="mt-4" aria-label="Actiecentrum">
