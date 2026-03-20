@@ -21,7 +21,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, Plus, Lock, Wand2 } from 'lucide-react'
+import { GripVertical, X, Plus, Lock, Wand2, ChevronRight } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
 import { AutoDashboardWizard } from './auto-dashboard-wizard'
@@ -664,6 +664,8 @@ interface WidgetAddPickerProps {
 }
 
 function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker, onToggle, onAdd, onClose }: WidgetAddPickerProps) {
+  const [openModules, setOpenModules] = useState<Set<WidgetModule>>(new Set())
+
   const availableWidgets = WIDGET_CATALOG.filter(
     w => !activeWidgets.some(a => a.id === w.id)
       && (budgetingActive || !BUDGET_WIDGETS.has(w.id))
@@ -672,6 +674,15 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
   const grouped = MODULE_ORDER
     .map(m => ({ module: m, widgets: availableWidgets.filter(w => w.module === m) }))
     .filter(g => g.widgets.length > 0)
+
+  const toggleModule = (mod: WidgetModule) => {
+    setOpenModules(prev => {
+      const next = new Set(prev)
+      if (next.has(mod)) next.delete(mod)
+      else next.add(mod)
+      return next
+    })
+  }
 
   return (
     <div className="relative">
@@ -695,41 +706,63 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
                 Alle widgets zijn al actief
               </div>
             ) : (
-              grouped.map(g => (
-                <div key={g.module}>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-[var(--border-ed)]">
-                    <span className={`h-1.5 w-1.5 rounded-full ${MODULE_DOT_COLORS[g.module]}`} />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-                      {MODULE_LABELS[g.module]}
-                    </span>
-                  </div>
-                  {g.widgets.map(w => {
-                    const accessible = isWidgetAccessible(w.id, features)
-                    return (
-                      <button
-                        key={w.id}
-                        type="button"
-                        onClick={() => accessible && onAdd(w.id)}
-                        disabled={!accessible}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--subtle)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between gap-2 transition-colors"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-medium text-[var(--ink-2)] truncate">{w.name}</div>
-                          <div className="text-[var(--ink-4)] truncate">{w.description}</div>
-                        </div>
-                        {!accessible && (
-                          <div className="flex items-center gap-1 shrink-0 text-[var(--ink-4)]">
-                            <Lock className="h-3 w-3" />
-                            {w.requiredPhase && (
-                              <span className="text-[10px]">{w.requiredPhase}</span>
+              grouped.map(g => {
+                const isOpen = openModules.has(g.module)
+                return (
+                  <div key={g.module}>
+                    <button
+                      type="button"
+                      onClick={() => toggleModule(g.module)}
+                      aria-expanded={isOpen}
+                      className="w-full flex items-center gap-1.5 px-3 py-1.5 border-b border-[var(--border-ed)] hover:bg-[var(--subtle)] transition-colors cursor-pointer"
+                    >
+                      <ChevronRight
+                        className={`h-3 w-3 text-[var(--ink-4)] transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
+                      />
+                      <span className={`h-1.5 w-1.5 rounded-full ${MODULE_DOT_COLORS[g.module]}`} />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                        {MODULE_LABELS[g.module]}
+                      </span>
+                      <span className="text-[10px] text-[var(--ink-4)] ml-auto">
+                        ({g.widgets.length})
+                      </span>
+                    </button>
+                    <div
+                      className="overflow-hidden transition-[max-height,opacity] duration-200 ease-in-out"
+                      style={{
+                        maxHeight: isOpen ? `${g.widgets.length * 52}px` : '0px',
+                        opacity: isOpen ? 1 : 0,
+                      }}
+                    >
+                      {g.widgets.map(w => {
+                        const accessible = isWidgetAccessible(w.id, features)
+                        return (
+                          <button
+                            key={w.id}
+                            type="button"
+                            onClick={() => accessible && onAdd(w.id)}
+                            disabled={!accessible}
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--subtle)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between gap-2 transition-colors"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-medium text-[var(--ink-2)] truncate">{w.name}</div>
+                              <div className="text-[var(--ink-4)] truncate">{w.description}</div>
+                            </div>
+                            {!accessible && (
+                              <div className="flex items-center gap-1 shrink-0 text-[var(--ink-4)]">
+                                <Lock className="h-3 w-3" />
+                                {w.requiredPhase && (
+                                  <span className="text-[10px]">{w.requiredPhase}</span>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })
             )}
           </div>
         </>
