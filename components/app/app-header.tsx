@@ -16,9 +16,9 @@ const staticNavItems = [
 ] as const
 
 const activeClasses: Record<string, string> = {
-  amber: 'text-kern-600 border-kern-500',
-  teal: 'text-wil-600 border-wil-500',
-  purple: 'text-horizon-600 border-horizon-500',
+  amber: 'text-kern-600 border-kern-500 bg-kern-50/40',
+  teal: 'text-wil-600 border-wil-500 bg-wil-50/40',
+  purple: 'text-horizon-600 border-horizon-500 bg-horizon-50/40',
 }
 
 const hoverClasses: Record<string, string> = {
@@ -74,7 +74,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 ${
+                  className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 rounded-t-sm ${
                     item.requiresActivation ? 'animate-nav-reveal' : ''
                   } ${
                     isActive
