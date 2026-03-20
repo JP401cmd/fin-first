@@ -1,3 +1,23 @@
+## Session 2026-03-20 - Features #428, #429
+
+### Feature #428: SVG viewBox en constanten schalen per size - PASSING
+- Created getHeatmapConstants(size) helper returning VB_W, VB_H, CELL_GAP, CELL_RADIUS, SECTION_LABEL_H per widget size
+- mini: 200x150, gap 1, radius 3, label 10; quarter: 400x300, gap 2, radius 4, label 14; half/full: 800x500, gap 3, radius 6, label 18
+- Replaced all hardcoded constants in squarify(), buildCombinedLayout(), TreemapCell, and SVG viewBox
+- squarify() now accepts cellGap parameter, buildCombinedLayout() accepts HeatmapConstants, TreemapCell accepts cellRadius prop
+- Zero TypeScript errors, zero new console errors
+- Commit: f6c41206
+
+### Feature #429: TreemapCell rendering aanpassen per size - PASSING
+- Added size prop to TreemapCell component
+- mini: no text, no icons - only colored blocks (canFitIcon/canFitName/canFitPct all false)
+- quarter: name + percentage with lower thresholds and smaller fonts (text-[8px]), no icons, no amounts
+- half: icons + name + percentage (existing behavior preserved)
+- full: icons + name + percentage + amounts (canFitAmount only true for full)
+- Font sizes adjusted: quarter uses text-[8px] for names and percentages
+- Zero TypeScript errors, zero new console errors
+- Commit: 4450de63
+
 ## Session 2026-03-20 - Feature #424
 
 ### Feature #424: Uitgaven Heatmap als dashboard widget - PASSING
