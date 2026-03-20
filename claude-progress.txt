@@ -18650,3 +18650,18 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#443, #444)
 - Overall progress: 437/451 features passing (96.9%)
+
+## Session 2026-03-20 - Feature #450
+
+### Feature #450: Persona widget_prefs bijwerken met mini size en heatmap widget - PASSING
+- Updated PersonaProfile type: size union now includes 'mini' | 'quarter' | 'half' | 'full'
+- Updated makeWidgetPrefs helper to accept 'mini' size in input and output types
+- Lisa (persona 3): added uitgaven_heatmap (half) + inflatie_impact (mini)
+- Willem (persona 4): added beleggingsrendement (mini) + rebalancing (mini)
+- All 4 new widget IDs validated against widget-catalog.ts (all support assigned sizes)
+- 3 total mini widgets across 2 personas (Lisa: 1, Willem: 2)
+- TypeScript compilation clean, 676 tests pass (all failures pre-existing in worktrees)
+- Commit: 7546f597
+
+### Current Status
+- 1 feature completed this session (#450)
