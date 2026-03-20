@@ -1,3 +1,15 @@
+## Session 2026-03-20 - Feature #417
+
+### Feature #417: Uitgaven-lijst zonder horizontale scrollbar — PASSING
+- Added `min-w-0 overflow-hidden` to right column (Uitgaven) container to prevent flex child overflow
+- Added `overflow-x-hidden` alongside `overflow-y-auto` on expense items scroll container
+- Added `gap-2`, `min-w-0`, `truncate`, and `shrink-0` to Uitgaven header row for proper flex sizing
+- Category names already use `truncate` with `min-w-0` container
+- Progress bars use relative width (`lg:w-3/5`) — no fixed pixel widths
+- Verified at 1024px desktop and 768px tablet viewports — no horizontal scrollbar
+- Zero console errors confirmed
+- Current stats: 413/416 passing (99.3%)
+
 ## Session 2026-03-20 - Feature #414
 
 ### Feature #414: Budgets-kaart: gelijke 50/50 kolomverdeling en kortere progress bars uitgaven — PASSING
