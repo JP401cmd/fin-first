@@ -93,6 +93,26 @@ For every piece of UI you review, systematically evaluate:
 
 **9. Grafiek-animaties (Chart Animation Standards)**
 
+**10. Waardeverandering-animaties (Value Change Animations)**
+- Bij herberekening of data-refresh: `flash-up` (groene puls) of `flash-down` (rode puls) CSS-class via `useFlashChange(value)` hook (`lib/hooks/use-flash-change.ts`)
+- Animatie duurt 1s, respecteert `prefers-reduced-motion`
+- Toepassen op: saldi, budgetbedragen, vermogensupdates, netto-vermogen
+- NOOIT handmatig CSS-classes toekennen — altijd via de hook
+
+| Trigger | CSS-class | Kleur | Duur |
+|---|---|---|---|
+| Waarde stijgt | `flash-up` | `--positive` (groen oklch puls) | 1s |
+| Waarde daalt | `flash-down` | `--negative` (rood oklch puls) | 1s |
+| Geen verandering | — | — | — |
+
+**11. Navigatie (Navigation Patterns)**
+- Actieve nav-tab MOET `border-b-3` onderstreep + subtiele achtergrond `bg-[module-50]/40` hebben
+- Module-specifieke tinting: kern → `bg-kern-50/40`, wil → `bg-wil-50/40`, horizon → `bg-horizon-50/40`
+- Actieve tab-tekst matcht module-kleur
+- `rounded-t-sm` op actieve tab voor gepolijste look
+- Alle navigatie-elementen minimaal 44px touch target
+- Mobiele bottom-nav heeft eigen pill-indicator (opacity-40)
+
 ## Trigger-regels (KRITISCH)
 - **Pagina-component** (scrollbare inhoud) → gebruik `useInViewAnimation` uit `lib/hooks/use-in-view-animation.ts`
 - **Modal/BottomSheet-component** (altijd zichtbaar bij openen) → gebruik `useModalAnimation` uit `lib/hooks/use-modal-animation.ts`
