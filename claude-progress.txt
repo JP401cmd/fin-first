@@ -18247,3 +18247,19 @@ Current status: 369/371 features passing (99.5%)
 - The total still exists in the header badge (e.g. "71% besteed") — just removed from the left column
 - Verified via browser: no console errors, correct layout with budget types shown directly
 - Overall: 417/418 features passing (99.8%)
+
+## Session 2026-03-20 - Feature #420
+
+### Feature #420: VERVANGT #419 — Links alleen type-headers, rechts Uitgaven met hoofdbudgetten - PASSING
+- Modified renderTypeSection to accept optional showChildren parameter (defaults to true)
+- Left column calls renderTypeSection with showChildren=false: only type headers (Inkomen, Sparen, Schulden) with aggregated progress bars and amounts
+- Right column calls renderTypeSection with default showChildren=true: Uitgaven header + individual parent budgets (Vaste lasten, Dagelijkse uitgaven, Vervoer, Leuke dingen)
+- Click on type-header in left column still opens Budgets modal (verified)
+- Left column is compact, right column shows detail where it matters (at expenses)
+- 0 console errors, 0 TypeScript errors in modified file
+- Commit: 97c9485f
+
+### Files Modified
+- components/app/core/kern-mission-control.tsx — added showChildren param to renderTypeSection, left column passes false
+
+### Stats: 420/420 passing (100%)
