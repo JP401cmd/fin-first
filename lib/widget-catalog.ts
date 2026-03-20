@@ -102,6 +102,15 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     minLevel: -2,
   },
   {
+    id: 'uitgaven_heatmap',
+    name: 'Uitgaven Heatmap',
+    description: 'Treemap-visualisatie van uitgaven per hoofdcategorie',
+    module: 'kern',
+    sizes: ['mini', 'quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
+  {
     id: 'assets',
     name: 'Vermogen',
     description: 'Portfolio allocatie en groei',
@@ -554,6 +563,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   netto_vermogen:           '/core',
   cash_flow:                '/core/cash',
   budgetten:                '/core/budgets',
+  uitgaven_heatmap:         '/core/budgets',
   assets:                   '/core/assets',
   schulden:                 '/core/debts',
   holdings:                 '/core/assets',
@@ -624,6 +634,7 @@ for (const widget of WIDGET_CATALOG) {
 export const BUDGET_WIDGETS = new Set([
   'cash_flow',
   'budgetten',
+  'uitgaven_heatmap',
   'spaarquote',
   'vaste_lasten',
   'nibud_benchmark',
