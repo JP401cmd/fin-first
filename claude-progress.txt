@@ -1,3 +1,16 @@
+## Session 2026-03-20 - Feature #423
+
+### Feature #423: Subtiele achtergrondkleuren Vermogen en Schulden - PASSING
+- Verified subtle green tint (bg-emerald-500/[0.035]) on Vermogen card
+- Verified subtle red tint (bg-red-500/[0.035]) on Schulden card
+- Budgets section remains neutral (no background tint)
+- Tested on both desktop (side-by-side cards) and mobile (tabbed view)
+- Zero console errors
+- Change was already present in codebase from a previous commit (97c9485f)
+
+### Current Status
+- Overall: ~419/422 features passing (99.1%)
+
 ## Session 2026-03-20 - Feature #419
 
 ### Feature #419: Alle budget_types gelijke opmaak - PASSING
