@@ -1299,9 +1299,14 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </p>
             <p className="mt-1 text-xs text-[var(--ink-3)]">per dag aan essentiële uitgaven</p>
             <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
-              Elke euro die je spaart = {data.yearlyMustExpenses > 0
-                ? (1 / (data.yearlyMustExpenses / 365)).toFixed(1)
-                : data.yearlyExpenses > 0 ? (1 / (data.yearlyExpenses / 365)).toFixed(1) : '0'} dag extra vrijheid
+              {(() => {
+                const daily = data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses / 365 : data.yearlyExpenses / 365
+                if (daily <= 0) return 'Voeg uitgaven toe om vrijheidstijd te berekenen'
+                const minutesPerEuro = (24 * 60) / daily
+                return minutesPerEuro >= 60
+                  ? `€ 1 spaart = ${(minutesPerEuro / 60).toFixed(1)} uur vrijheid`
+                  : `€ 1 spaart = ${Math.round(minutesPerEuro)} min vrijheid`
+              })()}
             </p>
           </button>
         </div>
