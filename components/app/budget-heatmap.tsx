@@ -685,12 +685,15 @@ function TreemapCell({
   // Text color: use white with shadow for readability on colored backgrounds
   const textShadow = '0 1px 2px rgba(0,0,0,0.3)'
 
+  // Mini: faster stagger (15ms vs 40ms), no hover/interaction
+  const staggerDelay = isMini ? rect.index * 15 : rect.index * 40
+
   return (
     <g
-      className="cursor-pointer"
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      onClick={onClick}
+      className={isMini ? undefined : 'cursor-pointer'}
+      onMouseEnter={isMini ? undefined : onMouseEnter}
+      onMouseLeave={isMini ? undefined : onMouseLeave}
+      onClick={isMini ? undefined : onClick}
     >
       {/* Background rect */}
       <rect
@@ -701,73 +704,75 @@ function TreemapCell({
         rx={cellRadius}
         ry={cellRadius}
         fill={color}
-        stroke={isHovered ? 'var(--ink)' : 'rgba(255,255,255,0.4)'}
-        strokeWidth={isHovered ? 2 : 0.5}
+        stroke={isMini ? 'rgba(255,255,255,0.3)' : (isHovered ? 'var(--ink)' : 'rgba(255,255,255,0.4)')}
+        strokeWidth={isMini ? 0.3 : (isHovered ? 2 : 0.5)}
         style={{
           opacity: hasEntered ? 1 : 0,
           transform: hasEntered ? 'scale(1)' : 'scale(0.92)',
           transformOrigin: `${rect.x + rect.w / 2}px ${rect.y + rect.h / 2}px`,
-          transition: `opacity 0.4s ease-out ${rect.index * 40}ms, transform 0.4s ease-out ${rect.index * 40}ms, stroke 0.15s ease`,
+          transition: `opacity 0.3s ease-out ${staggerDelay}ms, transform 0.3s ease-out ${staggerDelay}ms, stroke 0.15s ease`,
         }}
       />
 
-      {/* Cell content via foreignObject for proper text rendering */}
-      <foreignObject
-        x={rect.x}
-        y={rect.y}
-        width={rect.w}
-        height={rect.h}
-        style={{
-          opacity: hasEntered ? 1 : 0,
-          transition: `opacity 0.4s ease-out ${rect.index * 40 + 100}ms`,
-          pointerEvents: 'none',
-        }}
-      >
-        <div
-          // @ts-expect-error xmlns required for foreignObject but not in React types
-          xmlns="http://www.w3.org/1999/xhtml"
-          className="flex h-full w-full flex-col items-center justify-center overflow-hidden px-1 py-0.5"
+      {/* Cell content via foreignObject — skip entirely at mini for clean color-only blocks */}
+      {!isMini && (
+        <foreignObject
+          x={rect.x}
+          y={rect.y}
+          width={rect.w}
+          height={rect.h}
+          style={{
+            opacity: hasEntered ? 1 : 0,
+            transition: `opacity 0.4s ease-out ${staggerDelay + 100}ms`,
+            pointerEvents: 'none',
+          }}
         >
-          {/* Icon */}
-          {canFitIcon && (
-            <div className="mb-0.5 flex h-5 w-5 items-center justify-center">
-              <BudgetIcon name={rect.icon} className="h-3.5 w-3.5 text-white drop-shadow-sm" />
-            </div>
-          )}
+          <div
+            // @ts-expect-error xmlns required for foreignObject but not in React types
+            xmlns="http://www.w3.org/1999/xhtml"
+            className="flex h-full w-full flex-col items-center justify-center overflow-hidden px-1 py-0.5"
+          >
+            {/* Icon */}
+            {canFitIcon && (
+              <div className="mb-0.5 flex h-5 w-5 items-center justify-center">
+                <BudgetIcon name={rect.icon} className="h-3.5 w-3.5 text-white drop-shadow-sm" />
+              </div>
+            )}
 
-          {/* Name (truncated) */}
-          {canFitName && (
-            <p
-              className={`w-full truncate text-center font-medium leading-tight text-white ${isQuarter ? 'text-[8px]' : 'text-[9px]'}`}
-              style={{ textShadow }}
-            >
-              {rect.name}
-            </p>
-          )}
+            {/* Name (truncated) */}
+            {canFitName && (
+              <p
+                className={`w-full truncate text-center font-medium leading-tight text-white ${isQuarter ? 'text-[8px]' : 'text-[9px]'}`}
+                style={{ textShadow }}
+              >
+                {rect.name}
+              </p>
+            )}
 
-          {/* Percentage */}
-          {canFitPct && (
-            <p
-              className={`font-mono font-bold tabular-nums leading-tight ${isQuarter ? 'text-[8px]' : 'text-[10px]'} ${
-                isOver ? (overPositive ? 'text-emerald-100' : 'text-red-100') : 'text-white'
-              }`}
-              style={{ textShadow }}
-            >
-              {pct}%
-            </p>
-          )}
+            {/* Percentage */}
+            {canFitPct && (
+              <p
+                className={`font-mono font-bold tabular-nums leading-tight ${isQuarter ? 'text-[8px]' : 'text-[10px]'} ${
+                  isOver ? (overPositive ? 'text-emerald-100' : 'text-red-100') : 'text-white'
+                }`}
+                style={{ textShadow }}
+              >
+                {pct}%
+              </p>
+            )}
 
-          {/* Spent amount */}
-          {canFitAmount && (
-            <p
-              className="font-mono text-[8px] tabular-nums leading-tight text-white/80"
-              style={{ textShadow }}
-            >
-              {formatCurrency(rect.spent)}
-            </p>
-          )}
-        </div>
-      </foreignObject>
+            {/* Spent amount */}
+            {canFitAmount && (
+              <p
+                className="font-mono text-[8px] tabular-nums leading-tight text-white/80"
+                style={{ textShadow }}
+              >
+                {formatCurrency(rect.spent)}
+              </p>
+            )}
+          </div>
+        </foreignObject>
+      )}
     </g>
   )
 }
@@ -849,6 +854,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
     setTooltip(null)
   }, [])
 
+  const isMini = size === 'mini'
+
   // Edge case: no sections with data
   const hasData = sections.some((s) => s.groups.length > 0)
   if (!hasData) return null
@@ -862,7 +869,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
             viewBox={`0 0 ${VB_W} ${totalVbH}`}
             className="h-auto w-full"
             preserveAspectRatio="xMidYMid meet"
-            onMouseMove={handleMouseMove}
+            onMouseMove={isMini ? undefined : handleMouseMove}
             style={{
               animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
               opacity: hasEntered ? undefined : 0,
@@ -950,8 +957,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
           />
         </div>
 
-        {/* Tooltip (desktop only, positioned via mouse coords) */}
-        {tooltip && (
+        {/* Tooltip (desktop only, positioned via mouse coords — disabled at mini) */}
+        {!isMini && tooltip && (
           <div className="hidden md:block">
             <HeatmapTooltip
               data={tooltip}
