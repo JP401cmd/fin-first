@@ -4,6 +4,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, Notification } from './widget-renderer'
 import { Bell } from 'lucide-react'
+import { formatTimestamp } from '@/lib/format'
 
 interface Props {
   size: WidgetSize
@@ -27,18 +28,6 @@ const TYPE_LABELS: Record<Notification['type'], string> = {
   rebalance: 'Rebalancing',
 }
 
-function formatTimestamp(dateStr: string): string {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m geleden`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}u geleden`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d geleden`
-  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-}
 
 export const MeldingenWidget = memo(function MeldingenWidget({ size, data, href }: Props) {
   const { notifications } = data

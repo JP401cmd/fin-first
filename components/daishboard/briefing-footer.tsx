@@ -1,6 +1,7 @@
 'use client'
 
 import { RefreshCw } from 'lucide-react'
+import { formatTimestamp } from '@/lib/format'
 
 interface Props {
   composedAt: string
@@ -9,27 +10,14 @@ interface Props {
   refreshing?: boolean
 }
 
-function relativeDay(composedAt: string): string {
-  const now = new Date()
-  const then = new Date(composedAt)
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const thenStart = new Date(then.getFullYear(), then.getMonth(), then.getDate()).getTime()
-  const diffDays = Math.round((todayStart - thenStart) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return 'vandaag'
-  if (diffDays === 1) return 'gisteren'
-  return `${diffDays} dagen geleden`
-}
-
 export function BriefingFooter({ composedAt, onRefresh, refreshing }: Props) {
-  const time = new Date(composedAt)
-  const timeStr = time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-  const dayLabel = relativeDay(composedAt)
+  const label = formatTimestamp(composedAt)
 
   return (
     <footer className="mt-6 sm:mt-8 border-t border-[var(--border-ed)] pt-3">
       <div className="flex items-center justify-center gap-3">
         <p className="text-[10px] text-[var(--ink-4)] tracking-wide">
-          Samengesteld door Will &middot; {dayLabel}, {timeStr}
+          Samengesteld door Will &middot; {label}
         </p>
         {onRefresh && (
           <button

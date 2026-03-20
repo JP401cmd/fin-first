@@ -1,6 +1,7 @@
 'use client'
 
 import { RefreshCw } from 'lucide-react'
+import { formatTimestamp } from '@/lib/format'
 
 interface BriefingStaleBannerProps {
   composedAt: string
@@ -9,26 +10,22 @@ interface BriefingStaleBannerProps {
   refreshing: boolean
 }
 
-function relativeAge(composedAt: string): string | null {
+function isStale(composedAt: string): boolean {
   const ms = Date.now() - new Date(composedAt).getTime()
-  const hours = ms / (1000 * 60 * 60)
-  if (hours < 24) return null
-  if (hours < 48) return 'gisteren'
-  const days = Math.floor(hours / 24)
-  if (days <= 6) return `${days} dagen geleden`
-  return 'meer dan een week geleden'
+  return ms / (1000 * 60 * 60) >= 24
 }
 
 export function BriefingStaleBanner({ composedAt, dataChanged, onRefresh, refreshing }: BriefingStaleBannerProps) {
-  const age = relativeAge(composedAt)
-  if (!age) return null
+  if (!isStale(composedAt)) return null
+
+  const label = formatTimestamp(composedAt)
 
   return (
     <div className="animate-fade-up mb-4 flex items-center gap-3 rounded-[var(--r)] border-l-[3px] border-[var(--wil)] bg-[var(--wil-l)] px-4 py-3">
       <RefreshCw className="h-4 w-4 shrink-0 text-[var(--wil-t)]" />
       <div className="min-w-0 flex-1">
         <p className="text-xs text-[var(--ink-2)]">
-          Je briefing is van {age}.
+          Je briefing is van {label}.
           {dataChanged && <span className="ml-1 text-[var(--ink-3)]">Je financiele gegevens zijn gewijzigd.</span>}
         </p>
       </div>

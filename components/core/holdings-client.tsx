@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
+import { formatTimestamp } from '@/lib/format'
 import { calculatePortfolioBox3 } from '@/lib/box3-holdings'
 import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/components/app/portfolio-allocation-chart'
 import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
@@ -264,19 +265,10 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     return hoursSinceUpdate > 24
   }, [])
 
-  // Format relative time for stale indicator
+  // Format timestamp for stale indicator (newspaper style)
   const formatLastUpdate = useCallback((dateStr: string | null): string => {
     if (!dateStr) return 'Nooit bijgewerkt'
-    const date = new Date(dateStr)
-    const now = new Date()
-    const hours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-    if (hours < 1) return 'Minder dan een uur geleden'
-    if (hours < 24) return `${hours} uur geleden`
-    const days = Math.floor(hours / 24)
-    if (days === 1) return 'Gisteren'
-    if (days < 7) return `${days} dagen geleden`
-    if (days < 30) return `${Math.floor(days / 7)} weken geleden`
-    return date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+    return formatTimestamp(dateStr)
   }, [])
 
   // Refresh all prices from Yahoo Finance
@@ -505,7 +497,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Rendement</p>
             {totalCost > 0 ? (
-              <p className={`mt-1 text-xl font-bold ${totalReturn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <p className={`mt-1 text-xl font-bold ${totalReturn >= 0 ? 'text-positive' : 'text-negative'}`}>
                 {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(1)}%
                 <span className="ml-1 text-sm font-medium">
                   ({totalReturn >= 0 ? '+' : ''}{formatCurrency(totalValue - totalCost)})
@@ -761,7 +753,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
                 {/* Daily change from price feed */}
                 {dailyPct !== null && !soldOut && !stale && (
                   <p
-                    className={`text-[11px] font-semibold ${dailyPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                    className={`text-[11px] font-semibold ${dailyPct >= 0 ? 'text-positive' : 'text-negative'}`}
                     data-testid={`holding-daily-change-${holding.id}`}
                   >
                     {dailyPct >= 0 ? '▲' : '▼'} {dailyPct >= 0 ? '+' : ''}{dailyPct.toFixed(2)}% vandaag
@@ -769,7 +761,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
                 )}
                 {/* Total return */}
                 {cost > 0 && !soldOut && (
-                  <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% totaal
                   </p>
                 )}
@@ -996,7 +988,7 @@ function ManualPriceOverrideModal({
               <span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(currentValue)}</span>
             </div>
             {currentValue !== oldValue && (
-              <p className={`mt-1 text-xs font-medium ${currentValue >= oldValue ? 'text-emerald-600' : 'text-red-600'}`}>
+              <p className={`mt-1 text-xs font-medium ${currentValue >= oldValue ? 'text-positive' : 'text-negative'}`}>
                 {currentValue >= oldValue ? '+' : ''}{formatCurrency(currentValue - oldValue)} verschil
               </p>
             )}
@@ -1935,7 +1927,7 @@ function HoldingEditForm({
               <span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(newValue)}</span>
             </div>
             {newValue !== oldValue && (
-              <p className={`mt-1 text-xs font-medium ${newValue >= oldValue ? 'text-emerald-600' : 'text-red-600'}`}>
+              <p className={`mt-1 text-xs font-medium ${newValue >= oldValue ? 'text-positive' : 'text-negative'}`}>
                 {newValue >= oldValue ? '+' : ''}{formatCurrency(newValue - oldValue)} t.o.v. huidige waarde
               </p>
             )}

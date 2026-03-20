@@ -1,6 +1,7 @@
 'use client'
 
 import { Clock, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { formatTimestamp } from '@/lib/format'
 
 type SyncStatusBadgeProps = {
   lastSyncedAt: string | null
@@ -53,14 +54,7 @@ export function SyncStatusBadge({ lastSyncedAt, dailyRequests, tokenExpiresAt, c
     )
   }
 
-  const syncDate = new Date(lastSyncedAt)
-  const hoursAgo = Math.floor((now.getTime() - syncDate.getTime()) / (1000 * 60 * 60))
-
-  const timeLabel = hoursAgo < 1
-    ? 'Zojuist'
-    : hoursAgo < 24
-      ? `${hoursAgo}u geleden`
-      : `${Math.floor(hoursAgo / 24)}d geleden`
+  const timeLabel = formatTimestamp(lastSyncedAt)
 
   return (
     <div className="flex items-center gap-2">

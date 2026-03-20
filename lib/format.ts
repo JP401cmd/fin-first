@@ -252,3 +252,59 @@ export function formatWithFreedom(
 
   return `${currencyStr} (${timeStr}${deficitSuffix})`
 }
+
+// ── Newspaper-style timestamp formatting ──────────────────────────────
+
+const NL_DAY_ABBR = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
+const NL_MONTH_ABBR = [
+  'jan', 'feb', 'mrt', 'apr', 'mei', 'jun',
+  'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
+]
+
+/**
+ * Format a date in newspaper (krant) style — no relative timestamps.
+ *
+ * Rules:
+ * - Vandaag:     HH:mm             (bijv. 13:30)
+ * - Deze week:   dag HH:mm         (bijv. ma 13:30)
+ * - Deze maand:  d MMM             (bijv. 5 mrt)
+ * - Ouder:       d MMM yyyy        (bijv. 5 mrt 2026)
+ */
+export function formatTimestamp(date: Date | string | number, now?: Date): string {
+  const d = date instanceof Date ? date : new Date(date)
+  const ref = now ?? new Date()
+
+  if (isNaN(d.getTime())) return ''
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const hhmm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+
+  // Same calendar day → time only
+  if (
+    d.getFullYear() === ref.getFullYear() &&
+    d.getMonth() === ref.getMonth() &&
+    d.getDate() === ref.getDate()
+  ) {
+    return hhmm
+  }
+
+  // Within 7 calendar days → day abbr + time
+  const diffMs = ref.getTime() - d.getTime()
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+  if (diffDays > 0 && diffDays < 7) {
+    return `${NL_DAY_ABBR[d.getDay()]} ${hhmm}`
+  }
+
+  // Same month & year → d MMM
+  if (d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth()) {
+    return `${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]}`
+  }
+
+  // Same year → d MMM (no year suffix needed in current year context)
+  if (d.getFullYear() === ref.getFullYear()) {
+    return `${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]}`
+  }
+
+  // Older → d MMM yyyy
+  return `${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`
+}
