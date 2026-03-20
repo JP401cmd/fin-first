@@ -1,3 +1,17 @@
+## Session 2026-03-20 - Feature #446
+
+### Feature #446: UX skill files updaten met fd.nl-geïnspireerde richtlijnen - PASSING
+- Verified all 8 steps: 6 already present in ui-ux.md (from feature #452), 2 missing from ux-review-expert.md
+- Added section 10 (Waardeverandering-animaties) to ux-review-expert.md:
+  - flash-up/flash-down CSS-class documentation with timing table
+  - useFlashChange(value) hook reference
+  - prefers-reduced-motion compliance note
+- Added section 11 (Navigatie) to ux-review-expert.md:
+  - Active tab border-b-3 + bg-[module-50]/40 rule
+  - Module-specific tinting (kern/wil/horizon)
+  - Touch target and mobile bottom-nav guidance
+- Commit: d5f6b542
+
 ## Session 2026-03-20 - Feature #447
 
 ### Feature #447: Gids bijwerken voor fd.nl design wijzigingen - PASSING
