@@ -652,6 +652,7 @@ function TreemapCell({
   isHovered,
   hasEntered,
   cellRadius,
+  size,
   onMouseEnter,
   onMouseLeave,
   onClick,
@@ -660,6 +661,7 @@ function TreemapCell({
   isHovered: boolean
   hasEntered: boolean
   cellRadius: number
+  size?: WidgetSize
   onMouseEnter: (e: React.MouseEvent) => void
   onMouseLeave: () => void
   onClick: () => void
@@ -670,11 +672,15 @@ function TreemapCell({
   const overPositive = isOverPositive(budgetType)
   const isOver = rect.spent > rect.limit && rect.limit > 0
 
-  // Determine what text fits inside the cell
-  const canFitIcon = rect.w > 50 && rect.h > 50
-  const canFitName = rect.w > 40 && rect.h > 30
-  const canFitPct = rect.w > 30 && rect.h > 20
-  const canFitAmount = rect.w > 70 && rect.h > 55
+  // Determine what text fits inside the cell — adjusted per widget size
+  const isMini = size === 'mini'
+  const isQuarter = size === 'quarter'
+  const isFull = size === 'full'
+
+  const canFitIcon = !isMini && !isQuarter && rect.w > 50 && rect.h > 50
+  const canFitName = !isMini && (isQuarter ? rect.w > 25 && rect.h > 18 : rect.w > 40 && rect.h > 30)
+  const canFitPct = !isMini && (isQuarter ? rect.w > 20 && rect.h > 14 : rect.w > 30 && rect.h > 20)
+  const canFitAmount = isFull && rect.w > 70 && rect.h > 55
 
   // Text color: use white with shadow for readability on colored backgrounds
   const textShadow = '0 1px 2px rgba(0,0,0,0.3)'
@@ -732,7 +738,7 @@ function TreemapCell({
           {/* Name (truncated) */}
           {canFitName && (
             <p
-              className="w-full truncate text-center text-[9px] font-medium leading-tight text-white"
+              className={`w-full truncate text-center font-medium leading-tight text-white ${isQuarter ? 'text-[8px]' : 'text-[9px]'}`}
               style={{ textShadow }}
             >
               {rect.name}
@@ -742,7 +748,7 @@ function TreemapCell({
           {/* Percentage */}
           {canFitPct && (
             <p
-              className={`font-mono text-[10px] font-bold tabular-nums leading-tight ${
+              className={`font-mono font-bold tabular-nums leading-tight ${isQuarter ? 'text-[8px]' : 'text-[10px]'} ${
                 isOver ? (overPositive ? 'text-emerald-100' : 'text-red-100') : 'text-white'
               }`}
               style={{ textShadow }}
@@ -916,6 +922,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
                 isHovered={hoveredId === rect.id}
                 hasEntered={hasEntered}
                 cellRadius={CELL_RADIUS}
+                size={size}
                 onMouseEnter={(e) => handleMouseEnter(rect, e)}
                 onMouseLeave={handleMouseLeave}
                 onClick={() => onNavigate(rect.id)}
