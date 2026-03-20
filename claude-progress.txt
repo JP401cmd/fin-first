@@ -18227,3 +18227,12 @@ Current status: 369/371 features passing (99.5%)
 - Changes already committed in f91ca083
 
 ### Stats: 413/415 passing (99.5%)
+
+## Session 2026-03-20 - Feature #418
+
+### Feature #418: Geen totaalbedrag boven Inkomen in Budgets linkerkolom - PASSING
+- Removed the total spent/limit summary (totalBudgetSpent / totalBudgetLimit) displayed above the budget type list in the left column of the Budgets card in kern-mission-control.tsx
+- The left column now starts directly with Inkomen, Sparen, Schulden as individual items
+- The total still exists in the header badge (e.g. "71% besteed") — just removed from the left column
+- Verified via browser: no console errors, correct layout with budget types shown directly
+- Overall: 417/418 features passing (99.8%)
