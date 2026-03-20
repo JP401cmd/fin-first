@@ -18318,3 +18318,19 @@ Current status: 369/371 features passing (99.5%)
 - Verified on mobile (390px): hierarchy maintained, no overflow, text fits properly
 - Zero console errors
 - Commit: ace7f2e4
+
+## Session 2026-03-20 - Features #426, #427
+
+### Feature #426: Widget catalog: alle 4 formaten toestaan - PASSING
+- Changed uitgaven_heatmap sizes from ['half', 'full'] to ['mini', 'quarter', 'half', 'full'] in lib/widget-catalog.ts
+- defaultSize remains 'half'
+- Commit: 9b20f727
+
+### Feature #427: Size prop doorgeven aan BudgetHeatmap - PASSING
+- Added size?: WidgetSize to CombinedBudgetHeatmapProps in budget-heatmap.tsx
+- Added WidgetSize import to budget-heatmap.tsx
+- Passed size prop from BudgetHeatmapWidget to BudgetHeatmap
+- No TypeScript errors
+- Commit: 5ff6a0f3
+
+Current status: 425/431 passing (98.6%)
