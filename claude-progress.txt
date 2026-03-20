@@ -1,3 +1,15 @@
+## Session 2026-03-20 - Feature #414
+
+### Feature #414: Budgets-kaart: gelijke 50/50 kolomverdeling en kortere progress bars uitgaven — PASSING
+- Verified existing implementation: left column (Inkomen/Sparen/Schulden) and right column (Uitgaven) use `lg:basis-1/2` for exact 50/50 split
+- Expense progress bars in right column use `lg:w-3/5` (60% width) to leave room for amount labels
+- Left column progress bars remain full-width
+- Vertical divider (border-l) with padding (pr-5/pl-5) between columns
+- Mobile: stacked columns with full-width progress bars
+- Tested on 375px (mobile), 1024px (tablet), 1280px (desktop)
+- Zero console errors, all data from real database
+- Current status: 415/416 passing (99.8%)
+
 ## Session 2026-03-20 - Features #409, #410
 
 ### Feature #409: Reorganize Mission Control: Budgets top, Assets + Debts bottom — PASSING
@@ -18190,3 +18202,16 @@ Current status: 369/371 features passing (99.5%)
 - buildSegments import retained (still used for expense segments in right column)
 
 ### Stats: 413/414 passing (99.8%)
+
+## Session 2026-03-20 - Feature #416
+
+### Feature #416: Visuele scheiding tussen Budgets-rij en Assets/Debts-rij - PASSING
+- Added visual separator div (1px `--border-md` line) between Budgets row and Assets/Debts row on desktop
+- Added subtle background tint (`bg-[var(--subtle)]/40`) to Assets and Debts cards on desktop
+- Removed redundant `lg:border-b` from Budgets card (separator div handles it now)
+- Updated grid rows from `auto_auto` to `auto_auto_auto` to accommodate separator row
+- Separator hidden on mobile (`hidden lg:block`) since tabs are used on small screens
+- Verified via browser: clear visual separation, 0 console errors, no mock data
+- Changes already committed in f91ca083
+
+### Stats: 413/415 passing (99.5%)
