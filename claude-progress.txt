@@ -1,3 +1,19 @@
+## Session 2026-03-20 - Feature #434
+
+### Feature #434: Fix heatmap widget: verticale schaling M-formaat en afsnijding L-formaat - PASSING
+- **Bug 1 (M-formaat / half):** VB_H reduced from 500 to 250 (16:5 ratio), CELL_GAP 3→2, SECTION_LABEL_H 18→14
+- Legend hidden at half size (only shown at full) — saves ~50px vertical space
+- **Bug 2 (L-formaat / full):** totalVbH capped at VB_H * 1.1 preventing content overflow clipping
+- Widget wrapper: -mx-1 removed, overflow changed from hidden to visible
+- All 15 regression tests passing on test-heatmap-formats page
+- Updated test expectation: half no longer expects legend (was FAIL, now PASS)
+- Zero console errors on dashboard and test page
+- Changes committed in f650ca29 (concurrent agent committed same files)
+
+### Current Status
+- 1 feature completed this session (#434)
+- Overall progress: 432/433 passing (99.8%)
+
 ## Session 2026-03-20 - Features #430, #431
 
 ### Feature #430: Legenda en parent outlines conditioneel per size - PASSING
