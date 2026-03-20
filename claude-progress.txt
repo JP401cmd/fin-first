@@ -1,3 +1,19 @@
+## Session 2026-03-20 - Feature #406
+
+### Feature #406: Update Gids (guide) references for new core page structure — PASSING
+- Renamed 'Cash rekeningen' to 'Bankrekeningen' in gids/page.tsx (GuideTopicCard title)
+- Updated navigation paths from 'De Kern → Cash → ...' to 'De Kern → Bezittingen → ...' (3 howTo steps)
+- Updated naslagwerk entry title from 'Cash rekeningen' to 'Bankrekeningen' in guide-naslagwerk.tsx
+- Changed CTA href from '/core/cash' to '/core/assets' in guide step 2 (Begrijp je patronen)
+- Added client-side redirect from /core/cash to /core/assets (router.replace)
+- Kept /core/cash/import href intact (import page still exists and works)
+- Verified invulfase-banner.tsx has no cash references (already clean)
+- Verified api/next-steps/route.ts import_transactions href still points to /core/cash/import (correct)
+- Zero console errors on guide page and assets page
+- Commit: 9e4fcc27
+
+Current status: 403/407 features passing (99.0%)
+
 ## Session 2026-03-19 - Feature #402
 
 ### Feature #402: Regressietests kern hero FIRE progress — PASSING
@@ -18034,3 +18050,43 @@ Current status: 369/371 features passing (99.5%)
 - Fallback text when no FIRE target: 'Stel je FIRE-doel in'
 - Kept household/partner subtexts and sparkline intact
 - Zero console errors, verified via browser automation
+
+### Feature 403: Merge Cash into Assets section — PASSING
+- Removed separate Cash tab and card from KernMissionControl
+- Cash accounts always merged into Assets card with sub-grouped display
+- Added 'Liquide middelen' and 'Beleggingen & overig' sub-headers with totals
+- Removed standalone cash modal and DynCashOverview/DynCashAccountView imports from core-client.tsx
+- Net worth still correctly includes cash in hero section (verified: €1,354,700)
+
+### Feature 404: Reorganize Mission Control layout — PASSING
+- Changed grid: Assets + Debts in 2-col top row, Budgets full-width bottom row
+- Mobile tab order updated: Assets, Schulden, Budg. (Assets as default)
+- Budget card on desktop uses horizontal 2-col grid for type summaries
+- Updated border/divider rules for new layout
+- Zero console errors, all card click modals work correctly
+
+### Files Modified (both features)
+- components/app/core/kern-mission-control.tsx — removed Cash tab/card, merged cash into assets, reorganized grid layout
+- components/core/core-client.tsx — removed cash modal, DynCashOverview/DynCashAccountView imports, updated activeModal type
+
+### Feature 405: Split Budgets card: Income/Savings/Debts left, Expenditures right — PASSING
+- Redesigned the Budgets card (full-width bottom row) with a two-column split layout
+- Left column: Inkomen, Sparen, Schulden budget type summaries with spent/limit/progress bars
+- Right column: Uitgaven header with total, then individual parent expense budgets (Vaste lasten, Dagelijkse uitgaven, Vervoer, Leuke dingen) with name, spent/limit, percentage, and mini progress bar
+- Right column scrollable if many expense budgets (max 8 visible with 'meer bekijken' link)
+- Mobile: stacks vertically (left on top, right below) with clear border separation
+- Desktop: side-by-side with vertical border separator
+- Over-budget indicators display correctly for individual expense budgets
+- Click-through to full Budgets modal maintained
+- Zero TypeScript errors, zero browser console errors
+
+### Feature 408: Mobile optimization for new core page layout — PASSING
+- Verified 3-tab bar (Assets, Schulden, Budg.) fits comfortably at 320px without horizontal scroll
+- Budgets split layout stacks vertically on mobile with clear visual separation (border-t)
+- Added min-h-[44px] touch targets on all budget rows for mobile (sm:min-h-0 for desktop)
+- Added py-1.5 padding on mobile (sm:py-0.5 for desktop) for comfortable tap targets
+- Hidden "/ limit" values on very small screens to prevent overflow
+- Tested all modals (Assets with cash, Debts, Budgets) open/close correctly at all viewports
+- No horizontal overflow verified at 320px and 390px viewports
+- Compact hero section shows correct data after restructuring
+- All console errors are pre-existing Supabase household_members 500s, not related to changes
