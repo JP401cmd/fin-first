@@ -104,7 +104,7 @@ export const BudgetHeatmapWidget = memo(function BudgetHeatmapWidget({ size, dat
 
   return (
     <WidgetShell module="kern" size={size} kicker="Uitgaven Heatmap" href={href}>
-      <div className="h-full overflow-hidden -mx-1">
+      <div className="h-full overflow-visible">
         <BudgetHeatmap
           sections={sections}
           spending={data.heatmapSpending ?? {}}

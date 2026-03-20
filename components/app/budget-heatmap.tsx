@@ -79,12 +79,12 @@ interface HeatmapConstants {
 function getHeatmapConstants(size?: WidgetSize): HeatmapConstants {
   switch (size) {
     case 'mini':
-      return { VB_W: 200, VB_H: 150, CELL_GAP: 1, CELL_RADIUS: 3, SECTION_LABEL_H: 0 }
+      return { VB_W: 200, VB_H: 100, CELL_GAP: 1, CELL_RADIUS: 3, SECTION_LABEL_H: 0 }
     case 'quarter':
       return { VB_W: 400, VB_H: 300, CELL_GAP: 2, CELL_RADIUS: 4, SECTION_LABEL_H: 12 }
-    case 'full':
-      return { VB_W: 800, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
     case 'half':
+      return { VB_W: 800, VB_H: 250, CELL_GAP: 2, CELL_RADIUS: 5, SECTION_LABEL_H: 14 }
+    case 'full':
     default:
       return { VB_W: 800, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
   }
@@ -803,11 +803,12 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
     [sections, spending, constants, beschikbaarMap],
   )
 
-  // Compute total viewbox height based on actual layout
+  // Clamp viewBox height: use actual content extent but cap at VB_H * 1.1
+  // to prevent the SVG from shrinking when content exceeds VB_H
   const totalVbH = useMemo(() => {
     if (rects.length === 0) return VB_H
     const maxY = Math.max(...rects.map((r) => r.y + r.h))
-    return Math.max(maxY + 4, VB_H)
+    return Math.min(maxY + 4, VB_H * 1.1)
   }, [rects, VB_H])
 
   // Group parent outlines for SVG labels
@@ -970,8 +971,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
         )}
       </div>
 
-      {/* Combined legend — only at half/full where there's room */}
-      {(size === 'half' || size === 'full' || !size) && <CombinedHeatmapLegend />}
+      {/* Combined legend — only at full size where there's room (hidden at half — too compact) */}
+      {(size === 'full' || !size) && <CombinedHeatmapLegend />}
     </div>
   )
 })

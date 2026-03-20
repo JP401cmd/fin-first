@@ -204,12 +204,12 @@ export default function TestHeatmapFormatsPage() {
         detail: `Dashed outline rects: ${quarterOutlines?.length ?? 0}`,
       })
 
-      // Test 8: half — has legend
+      // Test 8: half — no legend (too compact at 160px widget height)
       const halfContainer = document.getElementById('heatmap-half')
       const halfLegendGradients = halfContainer?.querySelectorAll('linearGradient[id*="legend"]')
       results.push({
-        name: 'half: legend present',
-        pass: (halfLegendGradients?.length ?? 0) >= 2,
+        name: 'half: no legend (compact)',
+        pass: (halfLegendGradients?.length ?? 0) === 0,
         detail: `Legend gradients: ${halfLegendGradients?.length ?? 0}`,
       })
 
@@ -304,7 +304,7 @@ export default function TestHeatmapFormatsPage() {
       <div className="grid grid-cols-2 gap-6">
         {/* MINI */}
         <div className="rounded-lg border border-[var(--border-ed)] p-3">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Mini (200x150)</h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Mini (200x100)</h3>
           <div id="heatmap-mini" style={{ maxWidth: 200 }}>
             <BudgetHeatmap
               sections={SECTIONS}
@@ -330,7 +330,7 @@ export default function TestHeatmapFormatsPage() {
 
         {/* HALF */}
         <div className="rounded-lg border border-[var(--border-ed)] p-3">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Half (800x500) — current default</h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Half (800x250) — current default</h3>
           <div id="heatmap-half">
             <BudgetHeatmap
               sections={SECTIONS}
