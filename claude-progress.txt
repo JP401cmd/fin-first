@@ -18158,3 +18158,13 @@ Current status: 369/371 features passing (99.5%)
 ### Current Status
 - Feature #411 completed and marked passing
 - 408/410 features passing (99.5%)
+
+## Session 2026-03-20 - Feature #412
+
+### Feature #412: Budgets-kaart 50% meer verticale hoogte dan Assets/Debts rij - PASSING
+- Added `lg:grid-rows-[3fr_2fr]` to Mission Control grid — Budgets row gets 3fr, Assets/Debts row gets 2fr (50% more height)
+- Added `lg:min-h-[280px]` to Budgets card for empty state minimum height
+- Increased expense items `lg:max-h` from 180px to 280px to fill the extra vertical space
+- Mobile layout unaffected — grid-rows only applies at lg breakpoint, tabs have their own scroll height
+- Verified: 0 console errors, layout visually correct on desktop (1280px) and mobile
+- Commit: f2fe38fb
