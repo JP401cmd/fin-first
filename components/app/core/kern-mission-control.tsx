@@ -8,7 +8,7 @@ import {
   ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
 import { formatCurrency, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
-import { buildSegments, typeColors, MiniDonut, type MiniDonutSlice } from '@/components/app/budget-donut'
+import { buildSegments, typeColors } from '@/components/app/budget-donut'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 
 interface KernMissionControlProps {
@@ -129,17 +129,18 @@ export function KernMissionControl({
 
   // Border classes for grid on desktop
   // Layout: Budgets full-width (top row), Assets | Debts (bottom row)
+  // Visual separation: border + subtle background tint on bottom row (vermogen)
   const getBorderClasses = (key: TabKey) => {
     if (key === 'budgets') {
-      // Budgets: full-width top row, bottom border as separator
-      return 'lg:border-b lg:border-[var(--border-ed)]'
+      // Budgets: full-width top row — no extra border, separator div handles it
+      return ''
     }
     if (key === 'assets') {
-      // Bottom-left: right border separator
-      return 'lg:border-r lg:border-[var(--border-ed)]'
+      // Bottom-left: subtle bg tint + right border separator
+      return 'lg:bg-[var(--subtle)]/40 lg:border-r lg:border-[var(--border-ed)]'
     }
-    // Debts: bottom-right, no extra borders
-    return ''
+    // Debts: bottom-right, subtle bg tint
+    return 'lg:bg-[var(--subtle)]/40'
   }
 
   return (
@@ -197,7 +198,7 @@ export function KernMissionControl({
 
       {/* Content grid — tabs on mobile; Budgets full-width top, Assets+Debts bottom row on desktop */}
       {/* Budgets row height is content-driven (adapts to number of expense categories) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-[auto_auto]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-[auto_auto_auto]">
         {/* ── Budget card — full-width top row, two-column split ── */}
         {budgetingActive && (() => {
           // Separate expense parent budgets from other types
@@ -230,24 +231,16 @@ export function KernMissionControl({
               </div>
 
               {/* Two-column split: Left = Inkomen/Sparen/Schulden, Right = Uitgaven detail */}
-              <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-                {/* ─── Left column: Mini donut + Inkomen, Sparen, Schulden type summaries ─── */}
-                <div className="lg:w-[40%] lg:shrink-0">
-                  <div className="flex items-center gap-3 mb-2">
-                    <MiniDonut
-                      slices={budgetTypeSummaries.map(ts => ({ type: ts.type, spent: ts.spent, limit: ts.limit }))}
-                      size={56}
-                      strokeWidth={7}
-                      className="shrink-0 sm:h-14 sm:w-14 h-10 w-10"
-                    />
-                    <div>
-                      <p className="font-mono text-lg font-bold text-[var(--ink)]">
-                        {formatCurrency(totalBudgetSpent)}
-                      </p>
-                      <p className="text-xs text-[var(--ink-3)]">
-                        van {formatCurrency(totalBudgetLimit)}
-                      </p>
-                    </div>
+              <div className="flex flex-col gap-4 lg:flex-row lg:gap-0">
+                {/* ─── Left column: Inkomen, Sparen, Schulden type summaries ─── */}
+                <div className="lg:basis-1/2 lg:shrink-0 lg:pr-5">
+                  <div className="mb-2">
+                    <p className="font-mono text-lg font-bold text-[var(--ink)]">
+                      {formatCurrency(totalBudgetSpent)}
+                    </p>
+                    <p className="text-xs text-[var(--ink-3)]">
+                      van {formatCurrency(totalBudgetLimit)}
+                    </p>
                   </div>
 
                   <div className="space-y-1.5">
@@ -290,7 +283,7 @@ export function KernMissionControl({
                 </div>
 
                 {/* ─── Right column: Uitgaven with individual parent budgets ─── */}
-                <div className="flex-1 border-t border-[var(--border-ed)] pt-3 lg:border-t-0 lg:border-l lg:border-[var(--border-ed)] lg:pl-6 lg:pt-0">
+                <div className="lg:basis-1/2 min-w-0 overflow-hidden border-t border-[var(--border-ed)] pt-3 lg:border-t-0 lg:border-l lg:border-[var(--border-ed)] lg:pl-5 lg:pt-0">
                   {/* Uitgaven header with total */}
                   {expenseTypeSummary && (() => {
                     const expPct = expenseTypeSummary.limit > 0 ? Math.round((expenseTypeSummary.spent / expenseTypeSummary.limit) * 100) : 0
@@ -298,14 +291,14 @@ export function KernMissionControl({
                     const tc = typeColors('expense')
                     return (
                       <div className="mb-2">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: tc.bg }}>
                               <ShoppingCart className="h-3 w-3" style={{ color: tc.text }} />
                             </div>
-                            <span className="text-sm font-semibold text-[var(--ink-2)]">Uitgaven</span>
+                            <span className="text-sm font-semibold text-[var(--ink-2)] truncate">Uitgaven</span>
                           </div>
-                          <span className={`font-mono text-xs sm:text-sm font-bold ${expOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+                          <span className={`shrink-0 font-mono text-xs sm:text-sm font-bold ${expOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
                             {formatCurrency(expenseTypeSummary.spent)} <span className="hidden sm:inline text-xs font-normal text-[var(--ink-4)]">/ {formatCurrency(expenseTypeSummary.limit)}</span>
                           </span>
                         </div>
@@ -320,7 +313,7 @@ export function KernMissionControl({
                   })()}
 
                   {/* Individual expense parent budgets */}
-                  <div className="space-y-0.5 max-h-[260px] overflow-y-auto lg:max-h-[280px]">
+                  <div className="space-y-0.5 max-h-[260px] overflow-y-auto overflow-x-hidden lg:max-h-[280px]">
                     {expenseSegments.slice(0, MAX_EXPENSE_ITEMS).map((seg) => {
                       const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
                       const isOver = seg.spent > seg.limit && seg.limit > 0
@@ -338,7 +331,7 @@ export function KernMissionControl({
                               <span className={`font-mono text-[10px] font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>{pct}%</span>
                             </div>
                           </div>
-                          <div className="mt-0.5 h-[2px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                          <div className="mt-0.5 h-[2px] w-full lg:w-3/5 overflow-hidden rounded-full bg-[var(--subtle)]">
                             <div
                               className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-400' : ''}`}
                               style={{ width: `${Math.min(pct, 100)}%`, ...(!isOver ? { backgroundColor: pct >= 80 ? tc.text : tc.spent } : {}) }}
@@ -368,6 +361,11 @@ export function KernMissionControl({
             </div>
           )
         })()}
+
+        {/* ── Visual separator between Budgets (cashflow) and Assets/Debts (vermogen) ── */}
+        {budgetingActive && (
+          <div className="hidden lg:block lg:col-span-2 h-px bg-[var(--border-md)]" role="separator" />
+        )}
 
         {/* ── Assets card (includes cash / liquide middelen) — bottom left ── */}
         {(() => {
