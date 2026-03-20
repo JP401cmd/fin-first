@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, Fragment } from 'react'
+import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import {
   ShoppingCart, Wallet, PiggyBank, Building2, TrendingUp,
   ArrowRight, ChevronDown,
@@ -56,6 +57,11 @@ export function KernMissionControl({
   debtProgress,
   onCardClick,
 }: KernMissionControlProps) {
+  // Flash animations for live value changes
+  const { flashClass: assetsFlash } = useFlashChange(totalNonCashAssets + totalCash)
+  const { flashClass: debtsFlash } = useFlashChange(rawTotalDebts)
+  const { flashClass: budgetFlash } = useFlashChange(totalBudgetSpent)
+
   // Compute derived data
   const segments = buildSegments(overviewBudgetGroups, overviewSpending)
   const budgetPct = totalBudgetLimit > 0 ? Math.round((totalBudgetSpent / totalBudgetLimit) * 100) : 0
@@ -241,17 +247,17 @@ export function KernMissionControl({
                     </div>
                     {summary && (
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <span className={`font-mono text-xs font-medium ${typeOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
+                        <span className={`font-mono text-xs font-medium ${typeOver ? (overPos ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}`}>
                           {formatCurrency(summary.spent)} <span className="hidden sm:inline text-[var(--ink-4)]">/ {formatCurrency(summary.limit)}</span>
                         </span>
-                        <span className={`font-mono text-[10px] font-bold ${typeOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>{typePct}%</span>
+                        <span className={`font-mono text-[10px] font-bold ${typeOver ? (overPos ? 'text-positive' : 'text-negative') : 'text-[var(--ink-3)]'}`}>{typePct}%</span>
                       </div>
                     )}
                   </div>
                   {summary && summary.limit > 0 && (
                     <div className="h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${typeOver ? (overPos ? 'bg-emerald-400' : 'bg-red-400') : ''}`}
+                        className={`h-full rounded-full transition-all duration-500 ${typeOver ? (overPos ? 'bg-positive' : 'bg-negative') : ''}`}
                         style={{ width: `${Math.min(typePct, 100)}%`, ...(!typeOver ? { backgroundColor: typePct >= 80 ? tc.text : tc.spent } : {}) }}
                       />
                     </div>
@@ -270,15 +276,15 @@ export function KernMissionControl({
                         <div className="flex items-center justify-between text-xs gap-1">
                           <span className="truncate text-sm text-[var(--ink-2)]">{seg.name}</span>
                           <div className="flex shrink-0 items-center gap-1.5">
-                            <span className={`font-mono text-xs font-medium ${isOver ? (segOverPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
+                            <span className={`font-mono text-xs font-medium ${isOver ? (segOverPos ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}`}>
                               {formatCurrency(seg.spent)} <span className="hidden sm:inline text-[var(--ink-4)]">/ {formatCurrency(seg.limit)}</span>
                             </span>
-                            <span className={`font-mono text-[10px] font-bold ${isOver ? (segOverPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>{pct}%</span>
+                            <span className={`font-mono text-[10px] font-bold ${isOver ? (segOverPos ? 'text-positive' : 'text-negative') : 'text-[var(--ink-3)]'}`}>{pct}%</span>
                           </div>
                         </div>
                         <div className="mt-0.5 h-[2px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                           <div
-                            className={`h-full rounded-full transition-all duration-500 ${isOver ? (segOverPos ? 'bg-emerald-400' : 'bg-red-400') : ''}`}
+                            className={`h-full rounded-full transition-all duration-500 ${isOver ? (segOverPos ? 'bg-positive' : 'bg-negative') : ''}`}
                             style={{ width: `${Math.min(pct, 100)}%`, ...(!isOver ? { backgroundColor: pct >= 80 ? tc.text : tc.spent } : {}) }}
                           />
                         </div>
@@ -321,7 +327,7 @@ export function KernMissionControl({
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-[var(--ink-2)]">Budgetten</p>
-                    <p className="text-xs text-[var(--ink-3)]">
+                    <p className={`text-xs text-[var(--ink-3)] rounded-sm ${budgetFlash}`}>
                       <span className="font-mono tabular-nums">{formatCurrency(totalBudgetSpent)}</span>
                       <span className="text-[var(--ink-4)]"> van </span>
                       <span className="font-mono tabular-nums">{formatCurrency(totalBudgetLimit)}</span>
@@ -397,12 +403,12 @@ export function KernMissionControl({
                   <div>
                     <p className="text-sm font-semibold text-[var(--ink-2)]">Vermogen</p>
                     {/* Compact total on desktop header (always visible) */}
-                    <p className="hidden lg:block font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(heroTotal)}</p>
+                    <p className={`hidden lg:block font-mono text-lg font-bold tabular-nums text-[var(--ink)] rounded-sm ${assetsFlash}`}>{formatCurrency(heroTotal)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {assetGrowthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-emerald-500" />}
-                  {assetGrowthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-red-500" />}
+                  {assetGrowthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-positive" />}
+                  {assetGrowthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-negative" />}
                   {assetGrowthDirection === 'flat' && <Minus className="h-4 w-4 text-[var(--ink-4)]" />}
                   {/* Chevron — desktop only */}
                   <ChevronDown className={`hidden lg:block h-4 w-4 text-[var(--ink-3)] transition-transform duration-200 ${assetsOpen ? 'rotate-180' : ''}`} />
@@ -414,9 +420,9 @@ export function KernMissionControl({
               <div className={`grid transition-[grid-template-rows] duration-200 ease-out grid-rows-[1fr] ${!assetsOpen ? 'lg:grid-rows-[0fr]' : 'lg:grid-rows-[1fr]'}`}>
                 <div className="overflow-hidden">
                   {/* Big total — mobile only (desktop shows it in header) */}
-                  <p className="font-mono text-2xl font-bold text-[var(--ink)] lg:hidden">{formatCurrency(heroTotal)}</p>
+                  <p className={`font-mono text-2xl font-bold text-[var(--ink)] lg:hidden rounded-sm ${assetsFlash}`}>{formatCurrency(heroTotal)}</p>
                   <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium lg:hidden ${
-                    assetGrowthDirection === 'down' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                    assetGrowthDirection === 'down' ? 'bg-negative/10 text-negative' : 'bg-positive/10 text-positive'
                   }`}>
                     {assetGrowthDirection === 'up' && <><ArrowUpRight className="h-3 w-3" />Groeiend</>}
                     {assetGrowthDirection === 'down' && <><ArrowDownRight className="h-3 w-3" />Dalend</>}
@@ -533,7 +539,7 @@ export function KernMissionControl({
                   <div>
                     <p className="text-sm font-semibold text-[var(--ink-2)]">Schulden</p>
                     {/* Compact total on desktop header (always visible) */}
-                    <p className={`hidden lg:block font-mono text-lg font-bold tabular-nums ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-emerald-600'}`}>
+                    <p className={`hidden lg:block font-mono text-lg font-bold tabular-nums rounded-sm ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-emerald-600'} ${debtsFlash}`}>
                       {rawTotalDebts > 0 ? formatCurrency(rawTotalDebts) : 'Schuldvrij'}
                     </p>
                   </div>
@@ -556,7 +562,7 @@ export function KernMissionControl({
               <div className={`grid transition-[grid-template-rows] duration-200 ease-out grid-rows-[1fr] ${!debtsOpen ? 'lg:grid-rows-[0fr]' : 'lg:grid-rows-[1fr]'}`}>
                 <div className="overflow-hidden">
                   {/* Big total — mobile only (desktop shows it in header) */}
-                  <p className={`font-mono text-2xl font-bold lg:hidden ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-emerald-600'}`}>
+                  <p className={`font-mono text-2xl font-bold lg:hidden rounded-sm ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-emerald-600'} ${debtsFlash}`}>
                     {rawTotalDebts > 0 ? formatCurrency(rawTotalDebts) : 'Schuldvrij'}
                   </p>
                   <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium lg:hidden ${

@@ -189,6 +189,11 @@
   --color-phase-mastery-900: oklch(0.414 0.0537 76.6);
   --color-phase-mastery-950: oklch(0.292 0.0364 76.6);
 
+  /* ── Semantic value-change tokens (editorial, muted) ── */
+  --positive: oklch(0.50 0.09 162);
+  --negative: oklch(0.50 0.09 25);
+  --neutral-change: oklch(0.67 0.005 88);
+
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
@@ -366,6 +371,11 @@
   --color-phase-mastery-800: var(--color-phase-mastery-800);
   --color-phase-mastery-900: var(--color-phase-mastery-900);
   --color-phase-mastery-950: var(--color-phase-mastery-950);
+
+  /* ── Semantic value-change tokens (text-positive, bg-negative, etc.) ── */
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-neutral-change: var(--neutral-change);
 }
 
 /* Landing page animations */
@@ -936,7 +946,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-nav-reveal,
   .roadmap-step-forward,
-  .roadmap-step-back {
+  .roadmap-step-back,
+  .flash-up,
+  .flash-down {
     animation: none !important;
   }
+}
+
+/* ── Flash animations for live value changes (fd.nl-inspired) ── */
+@keyframes flash-up {
+  0%   { background-color: oklch(0.95 0.05 145); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-down {
+  0%   { background-color: oklch(0.95 0.05 20); }
+  100% { background-color: transparent; }
+}
+.flash-up {
+  animation: flash-up 1s ease-out forwards;
+}
+.flash-down {
+  animation: flash-down 1s ease-out forwards;
 }
