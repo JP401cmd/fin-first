@@ -18597,3 +18597,35 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#441, #442)
+
+## Session 2026-03-20 - Features #443, #444
+
+### Feature #443: Content-dichtheid verhogen op desktop met multi-kolom layout - PASSING
+- Added 3rd KPI card "Dagelijkse Kosten" (daily expenses) to Financiële Kerngetallen section
+- KPI section now uses responsive 3-column grid: 1-col mobile (<640px), 2-col tablet (sm), 3-col desktop (lg >=1024px)
+- 3rd card shows daily essential expenses with freedom-time insight: "€ 1 spaart = X min vrijheid"
+- 3rd card uses `hidden lg:block` to only appear on desktop where space is available
+- Padding adjusted: p-5 tablet, p-6 desktop for better density
+- Considered md:grid-cols-3 for widget grid but reverted — col-span-2 widgets designed for even-column grids (2/4)
+- Zero console errors, no mock data
+- Commit: 72940317
+
+### Feature #444: Body-tekst vergroten naar text-base voor content-secties - PASSING
+- Increased body text from text-sm/text-[12px] to text-base (16px) with leading-relaxed in:
+  1. guide-how-to.tsx: step instructions + tip text
+  2. guide-faq.tsx: FAQ answers (12px -> 16px), questions (12px -> 14px), links (11px -> 14px)
+  3. guide-horizon-uitleg.tsx: section body content (12px -> 16px), intro paragraphs, tip text (11px -> 14px)
+  4. scenarios-modal.tsx: explanatory text in market weather + debt strategy sections
+  5. horizon-helpers.tsx: pension summary description
+  6. insight-card.tsx: AI-generated briefing insights
+  7. pull-quote.tsx: editorial quotes (15px -> 16px)
+  8. historical-comparison.tsx: empty state message
+- Kept compact as specified: data tables, widget content, metric labels, card titles, pro-tips, naslagwerk index
+- Verified visual hierarchy: headings still clearly larger than body text
+- Mobile layout verified at 375px: text wraps properly, no overflow
+- Zero console errors on guide page
+- Commit: 7f7589a1
+
+### Current Status
+- 2 features completed this session (#443, #444)
+- Overall progress: 437/451 features passing (96.9%)
