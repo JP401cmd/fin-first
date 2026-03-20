@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef, memo } from 'react'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, formatCurrency, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import type { WidgetSize } from '@/lib/widget-catalog'
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -20,6 +21,7 @@ interface CombinedBudgetHeatmapProps {
   onNavigate: (budgetId: string) => void
   beschikbaarMap?: Record<string, number>
   previousSpending?: Record<string, number>
+  size?: WidgetSize
 }
 
 /** A positioned rectangle in the treemap layout */
@@ -756,6 +758,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
   onNavigate,
   beschikbaarMap,
   previousSpending,
+  size,
 }: CombinedBudgetHeatmapProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 900 })
   const containerRef = useRef<HTMLDivElement | null>(null)
