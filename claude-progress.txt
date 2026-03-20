@@ -1,3 +1,32 @@
+## Session 2026-03-20 - Features #439, #440
+
+### Feature #439: SectionDivider component voor redactionele scheiding - PASSING
+- Created reusable SectionDivider component at components/app/section-divider.tsx
+- Two variants: 'line' (hr with border-ed, mx-auto max-w-80%, my-8) and 'asterisk' (* * * in ink-4, letter-spacing 0.5em)
+- Applied line divider on kern page between Mission Control and Financiële Kerngetallen sections
+- Applied asterisk divider on will/dashboard page between check-in card and Actiecentrum
+- Zero console errors, verified via browser automation
+- Commit: 5bd3e194
+
+### Feature #440: Timestamp-formatting standaardiseren: krant-stijl - PASSING
+- Created formatTimestamp() utility in lib/format.ts with newspaper-style rules:
+  - Today: HH:mm (e.g. 13:30)
+  - This week: dag HH:mm (e.g. ma 13:30)
+  - This month: d MMM (e.g. 5 mrt)
+  - Older: d MMM yyyy (e.g. 5 mrt 2026)
+- Replaced relative timestamps ("X geleden") in 5 components:
+  - meldingen-widget.tsx (removed local formatTimestamp, uses shared import)
+  - briefing-footer.tsx (removed relativeDay function)
+  - briefing-stale-banner.tsx (removed relativeAge function, kept isStale check)
+  - sync-status-badge.tsx (removed relative time calculation)
+  - holdings-client.tsx (replaced formatLastUpdate with formatTimestamp)
+- Zero console errors on core, will, and assets pages
+- Commit: 9f6b35c8
+
+### Current Status
+- 2 features completed this session (#439, #440)
+- Overall progress: 437/451 features passing (96.9%)
+
 ## Session 2026-03-20 - Feature #436
 
 ### Feature #436: Vermogen and Schulden als dropdown op desktop kern-pagina - PASSING
