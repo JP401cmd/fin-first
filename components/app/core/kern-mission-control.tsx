@@ -196,7 +196,8 @@ export function KernMissionControl({
       </div>
 
       {/* Content grid — tabs on mobile; Budgets full-width top, Assets+Debts bottom row on desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-2">
+      {/* Budgets row is 3fr vs 2fr for Assets/Debts → 50% more vertical height */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-[3fr_2fr]">
         {/* ── Budget card — full-width top row, two-column split ── */}
         {budgetingActive && (() => {
           // Separate expense parent budgets from other types
@@ -208,7 +209,7 @@ export function KernMissionControl({
           return (
             <div
               onClick={() => onCardClick('budgets')}
-              className={`group cursor-pointer p-3 sm:p-5 lg:col-span-2 ${activeTab !== 'budgets' ? 'hidden lg:block' : ''}`}
+              className={`group cursor-pointer p-3 sm:p-5 lg:col-span-2 lg:min-h-[280px] ${activeTab !== 'budgets' ? 'hidden lg:block' : ''}`}
             >
               {/* Header */}
               <div className="mb-2 sm:mb-3 flex items-center justify-between">
@@ -319,7 +320,7 @@ export function KernMissionControl({
                   })()}
 
                   {/* Individual expense parent budgets */}
-                  <div className="space-y-0.5 max-h-[260px] overflow-y-auto lg:max-h-[180px]">
+                  <div className="space-y-0.5 max-h-[260px] overflow-y-auto lg:max-h-[280px]">
                     {expenseSegments.slice(0, MAX_EXPENSE_ITEMS).map((seg) => {
                       const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
                       const isOver = seg.spent > seg.limit && seg.limit > 0
