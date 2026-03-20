@@ -196,8 +196,8 @@ export function KernMissionControl({
       </div>
 
       {/* Content grid — tabs on mobile; Budgets full-width top, Assets+Debts bottom row on desktop */}
-      {/* Budgets row is 3fr vs 2fr for Assets/Debts → 50% more vertical height */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-[3fr_2fr]">
+      {/* Budgets row height is content-driven (adapts to number of expense categories) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-[auto_auto]">
         {/* ── Budget card — full-width top row, two-column split ── */}
         {budgetingActive && (() => {
           // Separate expense parent budgets from other types
@@ -209,7 +209,7 @@ export function KernMissionControl({
           return (
             <div
               onClick={() => onCardClick('budgets')}
-              className={`group cursor-pointer p-3 sm:p-5 lg:col-span-2 lg:min-h-[280px] ${activeTab !== 'budgets' ? 'hidden lg:block' : ''}`}
+              className={`group cursor-pointer p-3 sm:p-5 lg:col-span-2 ${activeTab !== 'budgets' ? 'hidden lg:block' : ''}`}
             >
               {/* Header */}
               <div className="mb-2 sm:mb-3 flex items-center justify-between">
