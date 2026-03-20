@@ -95,7 +95,7 @@ export function KernMissionControl({
     ] : []),
     {
       key: 'assets' as const,
-      label: 'Assets',
+      label: 'Vermogen',
       metric: formatCurrency(heroTotal),
       subtitle: assetGrowthDirection === 'up' ? 'groeiend' : assetGrowthDirection === 'down' ? 'dalend' : 'stabiel',
     },
@@ -129,18 +129,19 @@ export function KernMissionControl({
 
   // Border classes for grid on desktop
   // Layout: Budgets full-width (top row), Assets | Debts (bottom row)
-  // Visual separation: border + subtle background tint on bottom row (vermogen)
+  // Visual separation: border + subtle colored background tints
+  // Vermogen = very faint green, Schulden = very faint red (both light + dark mode)
   const getBorderClasses = (key: TabKey) => {
     if (key === 'budgets') {
-      // Budgets: full-width top row — no extra border, separator div handles it
+      // Budgets: full-width top row — neutral, no background tint
       return ''
     }
     if (key === 'assets') {
-      // Bottom-left: subtle bg tint + right border separator
-      return 'lg:bg-[var(--subtle)]/40 lg:border-r lg:border-[var(--border-ed)]'
+      // Bottom-left: subtle green tint + right border separator
+      return 'bg-emerald-500/[0.035] lg:border-r lg:border-[var(--border-ed)]'
     }
-    // Debts: bottom-right, subtle bg tint
-    return 'lg:bg-[var(--subtle)]/40'
+    // Debts: bottom-right, subtle red tint
+    return 'bg-red-500/[0.035]'
   }
 
   return (
@@ -209,8 +210,8 @@ export function KernMissionControl({
           const expenseSegments = segmentsByType('expense')
           const MAX_ITEMS_PER_TYPE = 8
 
-          // Reusable renderer for a budget type section (header + parent budgets)
-          const renderTypeSection = (type: BudgetType, typeSegs: typeof segments, summary: typeof budgetTypeSummaries[0] | undefined) => {
+          // Reusable renderer for a budget type section (header + optional parent budgets)
+          const renderTypeSection = (type: BudgetType, typeSegs: typeof segments, summary: typeof budgetTypeSummaries[0] | undefined, showChildren = true) => {
             const tc = typeColors(type)
             const Icon = typeIcons[type] || ShoppingCart
             const label = typeLabels[type] || type
@@ -253,7 +254,8 @@ export function KernMissionControl({
                   )}
                 </div>
 
-                {/* Individual parent budgets */}
+                {/* Individual parent budgets (only shown when showChildren is true) */}
+                {showChildren && (
                 <div className="space-y-0.5 pl-7">
                   {typeSegs.slice(0, MAX_ITEMS_PER_TYPE).map((seg) => {
                     const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
@@ -288,6 +290,7 @@ export function KernMissionControl({
                     <p className="text-[11px] text-[var(--ink-4)] italic">Geen budgetten</p>
                   )}
                 </div>
+                )}
               </div>
             )
           }
@@ -332,18 +335,19 @@ export function KernMissionControl({
               </div>
 
               {/* Two-column split: Left = Inkomen/Sparen/Schulden, Right = Uitgaven — all with same structure */}
+              {/* On mobile (< lg): Uitgaven first (order-1), then Inkomen/Sparen/Schulden (order-2) */}
               <div className="flex flex-col gap-4 lg:flex-row lg:gap-0">
-                {/* ─── Left column: Inkomen, Sparen, Schulden (each with type-header + parent budgets) ─── */}
-                <div className="lg:basis-1/2 lg:shrink-0 lg:pr-5 space-y-3">
+                {/* ─── Left column: Inkomen, Sparen, Schulden (type-headers only, no individual budgets) ─── */}
+                <div className="order-2 lg:order-none lg:basis-1/2 lg:shrink-0 lg:pr-5 space-y-3 border-t border-[var(--border-ed)] pt-3 lg:border-t-0 lg:pt-0">
                   {leftTypes.filter(lt => lt.summary || lt.segs.length > 0).length > 0 ? (
-                    leftTypes.map(({ type, segs, summary }) => renderTypeSection(type, segs, summary))
+                    leftTypes.map(({ type, segs, summary }) => renderTypeSection(type, segs, summary, false))
                   ) : (
                     <p className="text-xs text-[var(--ink-4)]">Geen inkomen/sparen/schulden budgetten</p>
                   )}
                 </div>
 
-                {/* ─── Right column: Uitgaven (same structure as left types) ─── */}
-                <div className="lg:basis-1/2 min-w-0 overflow-hidden border-t border-[var(--border-ed)] pt-3 lg:border-t-0 lg:border-l lg:border-[var(--border-ed)] lg:pl-5 lg:pt-0">
+                {/* ─── Right column: Uitgaven (same structure as left types) — shown first on mobile ─── */}
+                <div className="order-1 lg:order-none lg:basis-1/2 min-w-0 overflow-hidden lg:border-l lg:border-[var(--border-ed)] lg:pl-5">
                   {renderTypeSection('expense', expenseSegments, expenseSummary) || (
                     <p className="text-xs text-[var(--ink-4)]">Geen uitgavenbudgetten</p>
                   )}
@@ -376,7 +380,7 @@ export function KernMissionControl({
                   <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
                     <PiggyBank className="h-5 w-5 text-kern-600" />
                   </div>
-                  <p className="text-sm font-semibold text-[var(--ink-2)]">Assets</p>
+                  <p className="text-sm font-semibold text-[var(--ink-2)]">Vermogen</p>
                 </div>
                 {assetGrowthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-emerald-500" />}
                 {assetGrowthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-red-500" />}
