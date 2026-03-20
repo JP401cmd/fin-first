@@ -1,3 +1,20 @@
+## Session 2026-03-20 - Feature #436
+
+### Feature #436: Vermogen and Schulden als dropdown op desktop kern-pagina - PASSING
+- Added collapsible dropdown behavior for Vermogen and Schulden cards on desktop (lg+)
+- Collapsed state: title + total amount + chevron icon only
+- Open state: full detail list (liquide middelen, beleggingen, individual debts)
+- useState toggles: assetsOpen/debtsOpen (default false)
+- Header onClick with stopPropagation + toggle on desktop only
+- ChevronDown rotates 180deg when open, hidden on mobile
+- Grid-rows transition for smooth collapse animation
+- Mobile behavior unchanged: tab system preserved
+- Green/red background tints maintained
+- Individual items still open FullScreenModal correctly
+- Zero new JS console errors
+- Commit: b882a75f
+- Overall progress: 434/435 passing (99.8%)
+
 ## Session 2026-03-20 - Feature #434
 
 ### Feature #434: Fix heatmap widget: verticale schaling M-formaat en afsnijding L-formaat - PASSING
