@@ -18115,3 +18115,23 @@ Current status: 369/371 features passing (99.5%)
 - No horizontal overflow verified at 320px and 390px viewports
 - Compact hero section shows correct data after restructuring
 - All console errors are pre-existing Supabase household_members 500s, not related to changes
+
+## Session 2026-03-20 - Feature #411
+
+### Feature #411: Mini donut-chart in Budgets card op core page - PASSING
+- Created MiniDonut component in budget-donut.tsx (exported, reusable)
+- Compact SVG donut (56px default) showing budget type proportions (income/expense/savings/debt)
+- Uses typeColors for consistent track (light) and spent (dark) segment colors
+- Integrated into Budgets card left column in kern-mission-control.tsx
+- Responsive: h-10 w-10 on mobile, sm:h-14 sm:w-14 on desktop
+- Purely visual - no tooltip/interaction at this compact size
+- Zero console errors, zero mock data patterns
+- Commit: 025af755
+
+### Files Modified
+- components/app/budget-donut.tsx - added MiniDonut + MiniDonutSlice exports
+- components/app/core/kern-mission-control.tsx - integrated MiniDonut in Budgets card
+
+### Current Status
+- Feature #411 completed and marked passing
+- 408/410 features passing (99.5%)
