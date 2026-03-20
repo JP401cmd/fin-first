@@ -18168,3 +18168,14 @@ Current status: 369/371 features passing (99.5%)
 - Mobile layout unaffected — grid-rows only applies at lg breakpoint, tabs have their own scroll height
 - Verified: 0 console errors, layout visually correct on desktop (1280px) and mobile
 - Commit: f2fe38fb
+
+## Session 2026-03-20 - Feature #413
+
+### Feature #413: Budgets-hoogte past zich aan op hoofdcategorieën uitgaven - PASSING
+- Replaced fixed `lg:grid-rows-[3fr_2fr]` with content-driven `lg:grid-rows-[auto_auto]`
+- Removed `lg:min-h-[280px]` from Budgets card — height now follows content
+- With 4 expense categories, card is appropriately compact
+- Max-height scroll preserved for >8 categories
+- Assets/Debts row has its own natural height, no coupled ratio
+- Verified via browser automation: layout correct, 0 console errors
+- Commit: e48850dc
