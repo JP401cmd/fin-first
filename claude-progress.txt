@@ -1,3 +1,26 @@
+## Session 2026-03-20 - Features #409, #410
+
+### Feature #409: Reorganize Mission Control: Budgets top, Assets + Debts bottom — PASSING
+- Layout was already implemented by a previous agent session
+- Verified: Budgets card full-width top row with two-column split (Inkomen/Sparen left, Uitgaven right)
+- Verified: Assets (bottom-left) and Debts (bottom-right) in bottom row
+- Verified: Mobile tab order Budgets → Assets → Debts, default active tab is Budgets
+- Verified: Border separation between top and bottom rows
+- Zero console errors on desktop and mobile
+
+### Feature #410: Mobile optimization met Budgets-eerst layout — PASSING
+- Verified 3-tab bar fits at 320px without horizontal scroll
+- Verified budget split-layout stacks vertically on mobile (flex-col → lg:flex-row)
+- Confirmed min-h-[44px] touch targets on budget items
+- Tested all 3 modals (Budgets, Assets, Schulden) open and close at 320px
+- No horizontal overflow at 320px viewport
+- Hero section shows correct data after restructuring
+- Zero console errors on fresh page load (only pre-existing Supabase household_members 500 on modal interactions)
+
+### Current Status
+- Features #409 and #410 completed and marked passing
+- 409/411 tests passing (99.5%+)
+
 ## Session 2026-03-20 - Feature #407
 
 ### Feature #407: Update regression tests and seed data for core page changes — PASSING
