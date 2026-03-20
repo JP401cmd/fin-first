@@ -209,7 +209,7 @@ export default function TestMissionControlPage() {
 
           <MissionControlCardDemo
             icon={<PiggyBank className="h-5 w-5 text-emerald-600" />}
-            title="Assets"
+            title="Vermogen"
             metric={formatCurrency(demoData.totalAssets)}
             metricColor="text-emerald-600"
             status="healthy"

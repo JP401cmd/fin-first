@@ -412,7 +412,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
             className="inline-flex items-center gap-1 text-sm text-kern-600 hover:text-kern-700"
           >
             <ArrowLeft className="h-4 w-4" />
-            Assets
+            Vermogen
           </Link>
         </div>
         <div className="flex items-center justify-between">

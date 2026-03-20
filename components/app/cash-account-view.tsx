@@ -86,7 +86,7 @@ type DetectedPattern = {
 export function CashAccountView({
   accountId,
   backHref = '/core/assets',
-  backLabel = 'Assets',
+  backLabel = 'Vermogen',
   embedded = false,
   onNavigateToAccount,
   initialMonth,

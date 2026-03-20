@@ -98,7 +98,7 @@ export default function PropositiePage() {
             <div className="grid gap-2 sm:grid-cols-2">
               {[
                 ['Nettovermogen', 'Bezittingen minus schulden, in euro\u2019s en vrijheidstijd'],
-                ['Assets', 'Spaargeld, beleggingen, vastgoed, crypto, pensioen'],
+                ['Vermogen', 'Spaargeld, beleggingen, vastgoed, crypto, pensioen'],
                 ['Schulden', 'Hypotheek, leningen, creditcard, studieschuld'],
                 ['Transacties', 'Bankimport (MT940/CAMT.053/CSV), automatisch gecategoriseerd'],
                 ['Budgetteren (optioneel)', 'Budgetten per categorie, maandoverzichten, trends — of werk met geschatte maanduitgaven'],

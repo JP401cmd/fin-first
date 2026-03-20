@@ -393,7 +393,7 @@ const tests: TestCase[] = [
       const expectedHeaders: Record<string, string[]> = {
         transactions: ['Datum', 'Bedrag', 'Beschrijving', 'Tegenpartij', 'IBAN', 'Inkomen', 'Referentie', 'Budget'],
         budgets: ['Naam', 'Slug', 'Type', 'Limiet', 'Besteed deze maand', 'Essentieel'],
-        net_worth: ['Datum', 'Assets', 'Schulden', 'Netto Vermogen'],
+        net_worth: ['Datum', 'Vermogen', 'Schulden', 'Netto Vermogen'],
         assets: ['Naam', 'Type', 'Huidige waarde', 'Aankoopwaarde', 'Verwacht rendement %', 'Maandelijkse inleg', 'Instelling', 'Actief', 'Notities'],
         debts: ['Naam', 'Type', 'Oorspronkelijk bedrag', 'Huidig saldo', 'Rente %', 'Maandelijkse betaling', 'Kredietverstrekker', 'Startdatum', 'Einddatum', 'Actief', 'Notities'],
         goals: ['Naam', 'Type', 'Doelbedrag', 'Huidig bedrag', 'Doeldatum', 'Voltooid'],

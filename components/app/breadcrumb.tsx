@@ -26,7 +26,7 @@ const segmentLabels: Record<string, string> = {
   cash: 'Cash',
   import: 'Importeren',
   debts: 'Schulden',
-  assets: 'Assets',
+  assets: 'Vermogen',
   belasting: 'Belasting',
   identity: 'Identiteit',
   profiel: 'Profiel',

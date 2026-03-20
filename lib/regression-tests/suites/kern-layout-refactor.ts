@@ -59,7 +59,7 @@ const tests: TestCase[] = [
       )
 
       // Tab labels present
-      assert(src.includes("label: 'Assets'"), 'Assets tab label aanwezig')
+      assert(src.includes("label: 'Vermogen'"), 'Vermogen tab label aanwezig')
       assert(src.includes("label: 'Schulden'"), 'Schulden tab label aanwezig')
       assert(src.includes("label: 'Budg.'"), 'Budgetten tab label aanwezig')
     },

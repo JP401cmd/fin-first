@@ -1298,7 +1298,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       <FullScreenModal
         open={activeModal?.type === 'assets'}
         onClose={() => { setActiveModal(null); loadData() }}
-        title="Assets"
+        title="Vermogen"
         href="/core/assets"
       >
         <DynAssetsPage initialAssetId={activeModal?.type === 'assets' ? activeModal.itemId : undefined} />
@@ -2244,7 +2244,7 @@ const EXPORT_OPTIONS = [
   { type: 'transactions', label: 'Transacties' },
   { type: 'budgets', label: 'Budgetten' },
   { type: 'net_worth', label: 'Vermogen' },
-  { type: 'assets', label: 'Assets' },
+  { type: 'assets', label: 'Vermogen' },
   { type: 'debts', label: 'Schulden' },
   { type: 'goals', label: 'Doelen' },
 ]
@@ -2318,7 +2318,7 @@ function SnapshotComparisonContent({ snapshots }: { snapshots: NetWorthSnapshot[
         </div>
       </div>
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-5">
-        <p className="text-sm font-medium text-[var(--ink-3)]">Assets</p>
+        <p className="text-sm font-medium text-[var(--ink-3)]">Vermogen</p>
         <DeltaValue value={assetDelta} />
         <div className="mt-1 flex gap-3 text-xs text-[var(--ink-3)]">
           <span>{formatCurrency(Number(previous.total_assets))}</span>
@@ -2603,7 +2603,7 @@ function NetWorthChart({ snapshots, fireTarget = 0, earnedBadges = [] }: {
 
         {/* Legend */}
         <circle cx={PAD} cy={12} r="4" fill="#10b981" />
-        <text x={PAD + 8} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Assets</text>
+        <text x={PAD + 8} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Vermogen</text>
         <circle cx={PAD + 60} cy={12} r="4" fill="#ef4444" />
         <text x={PAD + 68} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Schulden</text>
         <circle cx={PAD + 140} cy={12} r="4" fill="#f59e0b" />

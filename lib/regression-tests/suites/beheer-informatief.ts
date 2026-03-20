@@ -526,7 +526,7 @@ const tests: TestCase[] = [
       // Kern features (from propositie page)
       const kernFeatures = [
         'Nettovermogen',
-        'Assets',
+        'Vermogen',
         'Schulden',
         'Transacties',
         'Budgetteren (optioneel)',

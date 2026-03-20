@@ -17,7 +17,7 @@ export default function CashAccountDetailPage({
     <CashAccountView
       accountId={accountId}
       backHref="/core/assets"
-      backLabel="Assets"
+      backLabel="Vermogen"
       initialMonth={month}
     />
   )

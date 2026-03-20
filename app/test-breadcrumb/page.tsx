@@ -21,7 +21,7 @@ function buildSegments(path: string): { label: string; href: string }[] {
     cash: 'Cash',
     import: 'Importeren',
     debts: 'Schulden',
-    assets: 'Assets',
+    assets: 'Vermogen',
     belasting: 'Belasting',
     identity: 'Identiteit',
     beheer: 'Beheer',
@@ -108,7 +108,7 @@ export default function TestBreadcrumbPage() {
             In addition to breadcrumbs, the ModuleNav bar provides tab-style navigation within each module:
           </p>
           <div className="flex gap-1 border-b border-amber-100 pb-1">
-            {['Overzicht', 'Budgetten', 'Cash', 'Schulden', 'Assets', 'Belasting'].map((item) => (
+            {['Overzicht', 'Budgetten', 'Cash', 'Schulden', 'Vermogen', 'Belasting'].map((item) => (
               <span
                 key={item}
                 className={`px-3 py-2 text-sm font-medium border-b-2 ${

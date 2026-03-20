@@ -124,7 +124,7 @@ export async function GET(req: Request) {
       ])
 
       csv = toCSV(
-        ['Datum', 'Assets', 'Schulden', 'Netto Vermogen'],
+        ['Datum', 'Vermogen', 'Schulden', 'Netto Vermogen'],
         rows,
       )
       filename = `netto-vermogen-${new Date().toISOString().split('T')[0]}.csv`
