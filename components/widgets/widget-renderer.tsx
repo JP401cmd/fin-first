@@ -144,6 +144,9 @@ const FeeAnalyzerWidget = dynamic(() =>
 const HypotheekVsBeleggenWidget = dynamic(() =>
   import('./hypotheek-vs-beleggen-widget').then(m => ({ default: m.HypotheekVsBeleggenWidget }))
 )
+const BudgetHeatmapWidget = dynamic(() =>
+  import('./budget-heatmap-widget').then(m => ({ default: m.BudgetHeatmapWidget }))
+)
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
@@ -277,6 +280,14 @@ export interface FavoriteHolding {
   returnPct: number
   dailyChangePct: number
   lastPriceUpdate: string | null
+}
+
+export interface HeatmapBudgetGroup {
+  id: string
+  name: string
+  icon: string
+  default_limit: number
+  children: { id: string; name: string; icon: string; default_limit: number }[]
 }
 
 export interface DashboardData {
@@ -441,6 +452,10 @@ export interface DashboardData {
   feeImpactMonths: number
   // Hypotheek vs Beleggen summary (null if no mortgage)
   hvbSummary: HvbSummary | null
+  // Heatmap widget data: expense budget groups with children + per-budget spending
+  heatmapExpenseGroups: HeatmapBudgetGroup[]
+  heatmapSpending: Record<string, number>
+  heatmapBeschikbaarMap: Record<string, number>
 }
 
 /** Compact mortgage-vs-invest summary for briefing context */
@@ -522,6 +537,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <CashFlowWidget size={size} data={data} href={href} />
     case 'budgetten':
       return <BudgettenWidget size={size} data={data} href={href} />
+    case 'uitgaven_heatmap':
+      return <BudgetHeatmapWidget size={size} data={data} href={href} />
     case 'assets':
       return <AssetsWidget size={size} data={data} href={href} />
     case 'schulden':

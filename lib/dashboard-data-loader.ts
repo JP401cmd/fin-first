@@ -1441,6 +1441,44 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // HvB computation may fail — keep null
   }
 
+  // ── Heatmap widget data: expense groups + per-budget spending ──
+  const heatmapExpenseGroups = allParentBudgets
+    .filter(b => b.budget_type === 'expense')
+    .map(parent => ({
+      id: parent.id,
+      name: parent.name,
+      icon: (parent as unknown as { icon: string }).icon,
+      default_limit: Number(parent.default_limit),
+      children: allChildren
+        .filter(c => c.parent_id === parent.id)
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          icon: c.icon,
+          default_limit: Number(c.default_limit),
+        })),
+    }))
+
+  // Per-budget spending map (all budget ids → absolute amount spent this month)
+  const heatmapSpending: Record<string, number> = {}
+  for (const tx of txResult.data ?? []) {
+    const bid = (tx as { budget_id?: string | null }).budget_id
+    if (!bid) continue
+    const amt = Math.abs(Number(tx.amount))
+    heatmapSpending[bid] = (heatmapSpending[bid] ?? 0) + amt
+  }
+
+  // Beschikbaar map: effective limit - spent for each budget
+  const heatmapBeschikbaarMap: Record<string, number> = {}
+  for (const group of heatmapExpenseGroups) {
+    const items = group.children.length > 0 ? group.children : [group]
+    for (const b of items) {
+      const limit = Number(b.default_limit)
+      const spent = heatmapSpending[b.id] ?? 0
+      heatmapBeschikbaarMap[b.id] = limit - spent
+    }
+  }
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -1538,6 +1576,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     feeAnalysis,
     feeImpactMonths,
     hvbSummary,
+    heatmapExpenseGroups,
+    heatmapSpending,
+    heatmapBeschikbaarMap,
   }
 
   return {

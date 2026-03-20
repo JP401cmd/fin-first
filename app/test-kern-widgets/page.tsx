@@ -215,6 +215,9 @@ const MOCK_DATA: DashboardData = {
   },
   feeImpactMonths: 8,
   hvbSummary: null,
+  heatmapExpenseGroups: [],
+  heatmapSpending: {},
+  heatmapBeschikbaarMap: {},
 }
 
 const KERN_WIDGETS = [

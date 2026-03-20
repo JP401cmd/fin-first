@@ -261,4 +261,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   feeAnalysis: null,
   feeImpactMonths: 0,
   hvbSummary: null,
+  heatmapExpenseGroups: [],
+  heatmapSpending: {},
+  heatmapBeschikbaarMap: {},
 }

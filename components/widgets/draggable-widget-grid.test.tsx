@@ -145,6 +145,9 @@ const mockData: DashboardData = {
   feeAnalysis: null,
   feeImpactMonths: 0,
   hvbSummary: null,
+  heatmapExpenseGroups: [],
+  heatmapSpending: {},
+  heatmapBeschikbaarMap: {},
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>
