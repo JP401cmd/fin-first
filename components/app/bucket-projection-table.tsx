@@ -7,6 +7,7 @@ import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 import { REPAYMENT_TYPE_LABELS } from '@/lib/debt-data'
 import { formatCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
 import { ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react'
+import { FinTable } from '@/components/app/fin-table'
 
 /**
  * Per-bucket projection table with expandable asset details, debt summaries,
@@ -181,43 +182,41 @@ export function BucketProjectionTable({
           {showReal && (
             <p className="mb-2 text-[10px] italic text-[var(--ink-4)]">Bedragen in euro&apos;s van vandaag</p>
           )}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dashed border-[var(--border-ed)]">
-                  <th className="py-2 pr-3 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Type</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Huidig</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Rendement</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Box 3</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">1 jaar</th>
-                  <th className="py-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{endColLabel}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bucketSummaries.map(bucket => (
-                  <BucketRow
-                    key={bucket.assetType}
-                    bucket={bucket}
-                    expanded={expandedBuckets.has(bucket.assetType)}
-                    onToggle={() => toggleBucket(bucket.assetType)}
-                    showReal={showReal}
-                    factor1y={factor1y}
-                    factorEnd={factorEnd}
-                    isLongHorizon={isLongHorizon}
-                  />
-                ))}
-                {/* Total assets row */}
-                <tr className="border-t border-[var(--border-md)] font-semibold">
-                  <td className="py-2 pr-3 text-[var(--ink)]">Totaal bezittingen</td>
-                  <td className="py-2 px-3 text-right font-mono tabular-nums text-[var(--ink)]">{formatCurrency(totalCurrentAssets)}</td>
-                  <td className="py-2 px-3" />
-                  <td className="py-2 px-3" />
-                  <td className="py-2 px-3 text-right font-mono tabular-nums text-[var(--ink)]">{formatCurrency(deflate(totalAssets1y, factor1y))}</td>
-                  <td className="py-2 pl-3 text-right font-mono tabular-nums text-[var(--ink)]">{formatCurrency(deflate(totalAssetsEnd, factorEnd))}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <FinTable>
+            <FinTable.Header>
+              <FinTable.Row>
+                <FinTable.Th>Type</FinTable.Th>
+                <FinTable.Th align="right">Huidig</FinTable.Th>
+                <FinTable.Th align="right">Rendement</FinTable.Th>
+                <FinTable.Th align="right">Box 3</FinTable.Th>
+                <FinTable.Th align="right">1 jaar</FinTable.Th>
+                <FinTable.Th align="right">{endColLabel}</FinTable.Th>
+              </FinTable.Row>
+            </FinTable.Header>
+            <FinTable.Body>
+              {bucketSummaries.map(bucket => (
+                <BucketRow
+                  key={bucket.assetType}
+                  bucket={bucket}
+                  expanded={expandedBuckets.has(bucket.assetType)}
+                  onToggle={() => toggleBucket(bucket.assetType)}
+                  showReal={showReal}
+                  factor1y={factor1y}
+                  factorEnd={factorEnd}
+                  isLongHorizon={isLongHorizon}
+                />
+              ))}
+              {/* Total assets row */}
+              <FinTable.Row total>
+                <FinTable.Td bold>Totaal bezittingen</FinTable.Td>
+                <FinTable.Td numeric bold>{formatCurrency(totalCurrentAssets)}</FinTable.Td>
+                <FinTable.Td />
+                <FinTable.Td />
+                <FinTable.Td numeric bold>{formatCurrency(deflate(totalAssets1y, factor1y))}</FinTable.Td>
+                <FinTable.Td numeric bold>{formatCurrency(deflate(totalAssetsEnd, factorEnd))}</FinTable.Td>
+              </FinTable.Row>
+            </FinTable.Body>
+          </FinTable>
         </div>
       )}
 
@@ -227,34 +226,32 @@ export function BucketProjectionTable({
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
             Schulden
           </h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dashed border-[var(--border-ed)]">
-                  <th className="py-2 pr-3 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Schuld</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Saldo</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Rente</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Maand</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">1 jaar</th>
-                  <th className="py-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{endColLabel}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {debtSummaries.map(debt => (
-                  <DebtRow key={debt.id} debt={debt} showReal={showReal} factor1y={factor1y} factorEnd={factorEnd} isLongHorizon={isLongHorizon} />
-                ))}
-                {/* Total debts row */}
-                <tr className="border-t border-[var(--border-md)] font-semibold">
-                  <td className="py-2 pr-3 text-[var(--ink)]">Totaal schulden</td>
-                  <td className="py-2 px-3 text-right font-mono tabular-nums text-red-600">{formatCurrency(totalCurrentDebts)}</td>
-                  <td className="py-2 px-3" />
-                  <td className="py-2 px-3" />
-                  <td className="py-2 px-3 text-right font-mono tabular-nums text-red-600">{formatCurrency(deflate(totalDebts1y, factor1y))}</td>
-                  <td className="py-2 pl-3 text-right font-mono tabular-nums text-red-600">{formatCurrency(deflate(totalDebtsEnd, factorEnd))}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <FinTable>
+            <FinTable.Header>
+              <FinTable.Row>
+                <FinTable.Th>Schuld</FinTable.Th>
+                <FinTable.Th align="right">Saldo</FinTable.Th>
+                <FinTable.Th align="right">Rente</FinTable.Th>
+                <FinTable.Th align="right">Maand</FinTable.Th>
+                <FinTable.Th align="right">1 jaar</FinTable.Th>
+                <FinTable.Th align="right">{endColLabel}</FinTable.Th>
+              </FinTable.Row>
+            </FinTable.Header>
+            <FinTable.Body>
+              {debtSummaries.map(debt => (
+                <DebtRow key={debt.id} debt={debt} showReal={showReal} factor1y={factor1y} factorEnd={factorEnd} isLongHorizon={isLongHorizon} />
+              ))}
+              {/* Total debts row */}
+              <FinTable.Row total>
+                <FinTable.Td bold>Totaal schulden</FinTable.Td>
+                <FinTable.Td numeric bold color="text-red-600">{formatCurrency(totalCurrentDebts)}</FinTable.Td>
+                <FinTable.Td />
+                <FinTable.Td />
+                <FinTable.Td numeric bold color="text-red-600">{formatCurrency(deflate(totalDebts1y, factor1y))}</FinTable.Td>
+                <FinTable.Td numeric bold color="text-red-600">{formatCurrency(deflate(totalDebtsEnd, factorEnd))}</FinTable.Td>
+              </FinTable.Row>
+            </FinTable.Body>
+          </FinTable>
         </div>
       )}
 
@@ -264,61 +261,59 @@ export function BucketProjectionTable({
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
             Kosten
           </h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dashed border-[var(--border-ed)]">
-                  <th className="py-2 pr-3 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Kostenpost</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Per jaar</th>
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]" colSpan={2} />
-                  <th className="py-2 px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Cumulatief 1j</th>
-                  <th className="py-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Cumulatief {endColLabel}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {costSummaries.map(cost => {
-                  const cumulEnd = isLongHorizon
-                    ? (rows[rows.length - 1]?.cumulativeBox3Tax ?? cost.cumulative5y)
-                    : cost.cumulative5y
-                  return (
-                    <tr key={cost.id} className="border-b border-dashed border-[var(--border-ed)]">
-                      <td className="py-2 pr-3">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-[var(--ink)]">{cost.label}</span>
-                          <span className="text-[10px] text-[var(--ink-4)]">{cost.description}</span>
-                        </div>
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono tabular-nums text-orange-600">
-                        {formatCurrency(cost.current)}/jr
-                      </td>
-                      <td className="py-2 px-3" colSpan={2} />
-                      <td className="py-2 px-3 text-right font-mono tabular-nums text-orange-600">
-                        {formatCurrency(deflate(cost.cumulative1y, factor1y))}
-                      </td>
-                      <td className="py-2 pl-3 text-right font-mono tabular-nums text-orange-600">
-                        {formatCurrency(deflate(cumulEnd, factorEnd))}
-                      </td>
-                    </tr>
-                  )
-                })}
-                {/* Total costs row */}
-                <tr className="border-t border-[var(--border-md)] font-semibold">
-                  <td className="py-2 pr-3 text-[var(--ink)]">Totaal kosten ({endColLabel})</td>
-                  <td className="py-2 px-3" />
-                  <td className="py-2 px-3" colSpan={2} />
-                  <td className="py-2 px-3" />
-                  <td className="py-2 pl-3 text-right font-mono tabular-nums text-orange-600">
-                    {formatCurrency(deflate(
-                      isLongHorizon
-                        ? (rows[rows.length - 1]?.cumulativeBox3Tax ?? costSummaries.reduce((s, c) => s + c.cumulative5y, 0))
-                        : costSummaries.reduce((s, c) => s + c.cumulative5y, 0),
-                      factorEnd
+          <FinTable>
+            <FinTable.Header>
+              <FinTable.Row>
+                <FinTable.Th>Kostenpost</FinTable.Th>
+                <FinTable.Th align="right">Per jaar</FinTable.Th>
+                <FinTable.Th colSpan={2} />
+                <FinTable.Th align="right">Cumulatief 1j</FinTable.Th>
+                <FinTable.Th align="right">Cumulatief {endColLabel}</FinTable.Th>
+              </FinTable.Row>
+            </FinTable.Header>
+            <FinTable.Body>
+              {costSummaries.map(cost => {
+                const cumulEnd = isLongHorizon
+                  ? (rows[rows.length - 1]?.cumulativeBox3Tax ?? cost.cumulative5y)
+                  : cost.cumulative5y
+                return (
+                  <FinTable.Row key={cost.id}>
+                    <FinTable.Td>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-[var(--ink)]">{cost.label}</span>
+                        <span className="text-[10px] text-[var(--ink-4)]">{cost.description}</span>
+                      </div>
+                    </FinTable.Td>
+                    <FinTable.Td numeric color="text-orange-600">
+                      {formatCurrency(cost.current)}/jr
+                    </FinTable.Td>
+                    <FinTable.Td colSpan={2} />
+                    <FinTable.Td numeric color="text-orange-600">
+                      {formatCurrency(deflate(cost.cumulative1y, factor1y))}
+                    </FinTable.Td>
+                    <FinTable.Td numeric color="text-orange-600">
+                      {formatCurrency(deflate(cumulEnd, factorEnd))}
+                    </FinTable.Td>
+                  </FinTable.Row>
+                )
+              })}
+              {/* Total costs row */}
+              <FinTable.Row total>
+                <FinTable.Td bold>Totaal kosten ({endColLabel})</FinTable.Td>
+                <FinTable.Td />
+                <FinTable.Td colSpan={2} />
+                <FinTable.Td />
+                <FinTable.Td numeric bold color="text-orange-600">
+                  {formatCurrency(deflate(
+                    isLongHorizon
+                      ? (rows[rows.length - 1]?.cumulativeBox3Tax ?? costSummaries.reduce((s, c) => s + c.cumulative5y, 0))
+                      : costSummaries.reduce((s, c) => s + c.cumulative5y, 0),
+                    factorEnd
                     ))}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                </FinTable.Td>
+              </FinTable.Row>
+            </FinTable.Body>
+          </FinTable>
         </div>
       )}
 
@@ -463,21 +458,21 @@ export function BucketProjectionTable({
             const baseYearlyIncome = assumptions?.estimatedYearlyIncome ?? cf.monthlyIncome * 12
 
             return (
-              <div className="mt-2 overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-dashed border-[var(--border-ed)]">
-                      <th className="py-1.5 pr-2 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Jaar</th>
-                      <th className="py-1.5 px-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Inkomen</th>
-                      <th className="py-1.5 px-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Inleg</th>
-                      <th className="py-1.5 px-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Spaarquote</th>
-                      <th className="py-1.5 px-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Netto verm.</th>
-                      <th className="py-1.5 px-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Box 3</th>
-                      <th className="py-1.5 px-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Groei NV</th>
-                      <th className="py-1.5 pl-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Inflatie</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="mt-2">
+                <FinTable tableClassName="text-xs">
+                  <FinTable.Header>
+                    <FinTable.Row>
+                      <FinTable.Th>Jaar</FinTable.Th>
+                      <FinTable.Th align="right">Inkomen</FinTable.Th>
+                      <FinTable.Th align="right">Inleg</FinTable.Th>
+                      <FinTable.Th align="right">Spaarquote</FinTable.Th>
+                      <FinTable.Th align="right">Netto verm.</FinTable.Th>
+                      <FinTable.Th align="right">Box 3</FinTable.Th>
+                      <FinTable.Th align="right">Groei NV</FinTable.Th>
+                      <FinTable.Th align="right">Inflatie</FinTable.Th>
+                    </FinTable.Row>
+                  </FinTable.Header>
+                  <FinTable.Body zebra>
                     {yearlyRows.map((row, idx) => {
                       const prevNw = idx > 0 ? yearlyRows[idx - 1].netWorth : currentNetWorth
                       const growth = row.netWorth - prevNw
@@ -492,24 +487,24 @@ export function BucketProjectionTable({
                         ? (kernSpaarquote / 100) * baseYearlyIncome * gf
                         : (baseSurplus * 12 * gf) + baseContributions * 12 + baseDebtPayments * 12
                       return (
-                        <tr key={row.month} className="border-b border-dotted border-[var(--border-ed)]">
-                          <td className="py-1.5 pr-2 font-mono tabular-nums text-[var(--ink-2)]">{year}</td>
-                          <td className="py-1.5 px-2 text-right font-mono tabular-nums text-[var(--ink)]">{formatCurrency(yearlyIncome / f)}</td>
-                          <td className="py-1.5 px-2 text-right font-mono tabular-nums text-kern-600">{formatCurrency(yearlyInleg / f)}</td>
-                          <td className="py-1.5 px-2 text-right font-mono tabular-nums text-kern-600">
+                        <FinTable.Row key={row.month} className="border-b border-dotted border-[var(--border-ed)]">
+                          <FinTable.Td numeric muted>{year}</FinTable.Td>
+                          <FinTable.Td numeric>{formatCurrency(yearlyIncome / f)}</FinTable.Td>
+                          <FinTable.Td numeric color="text-kern-600">{formatCurrency(yearlyInleg / f)}</FinTable.Td>
+                          <FinTable.Td numeric color="text-kern-600">
                             {kernSpaarquote != null ? `${kernSpaarquote.toFixed(1)}%` : '—'}
-                          </td>
-                          <td className="py-1.5 px-2 text-right font-mono tabular-nums text-[var(--ink)]">{formatCurrency(row.netWorth / f)}</td>
-                          <td className="py-1.5 px-2 text-right font-mono tabular-nums text-orange-600">{formatCurrency(row.cumulativeBox3Tax / f)}</td>
-                          <td className={`py-1.5 px-2 text-right font-mono tabular-nums ${growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          </FinTable.Td>
+                          <FinTable.Td numeric>{formatCurrency(row.netWorth / f)}</FinTable.Td>
+                          <FinTable.Td numeric color="text-orange-600">{formatCurrency(row.cumulativeBox3Tax / f)}</FinTable.Td>
+                          <FinTable.Td numeric color={growth >= 0 ? 'text-emerald-600' : 'text-red-600'}>
                             {idx === 0 ? '—' : `${growth >= 0 ? '+' : ''}${formatCurrency(growth / f)}`}
-                          </td>
-                          <td className="py-1.5 pl-2 text-right font-mono tabular-nums text-[var(--ink-3)]">{row.inflationFactor.toFixed(3)}×</td>
-                        </tr>
+                          </FinTable.Td>
+                          <FinTable.Td numeric muted>{row.inflationFactor.toFixed(3)}×</FinTable.Td>
+                        </FinTable.Row>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </FinTable.Body>
+                </FinTable>
               </div>
             )
           })()}

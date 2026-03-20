@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp, Scale, ShieldCheck, TrendingUp, AlertTriangle, Info } from 'lucide-react'
+import { FinTable } from '@/components/app/fin-table'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { compareMortgageVsInvest, type HvBParams, type HvBResult, type RepaymentType } from '@/lib/hypotheek-vs-beleggen'
 import { formatCurrency } from '@/lib/format'
@@ -159,35 +160,31 @@ function JaarVergelijkingTabel({ result }: { result: HvBResult }) {
         )}
       </button>
       {open && (
-        <div className="border-t border-[var(--border-ed)] overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
-                <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ink-3)]">Jaar</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ink-3)]">Aflossen</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ink-3)]">Beleggen</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ink-3)]">Verschil</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="border-t border-[var(--border-ed)]">
+          <FinTable>
+            <FinTable.Header>
+              <FinTable.Row className="bg-[var(--subtle)]">
+                <FinTable.Th>Jaar</FinTable.Th>
+                <FinTable.Th align="right">Aflossen</FinTable.Th>
+                <FinTable.Th align="right">Beleggen</FinTable.Th>
+                <FinTable.Th align="right">Verschil</FinTable.Th>
+              </FinTable.Row>
+            </FinTable.Header>
+            <FinTable.Body zebra>
               {result.jaarlijkseVergelijking.map((row) => (
-                <tr key={row.jaar} className="border-b border-[var(--border-ed)] last:border-b-0">
-                  <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink)]">{row.jaar}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.aflossen)}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.beleggen)}
-                  </td>
-                  <td className={`px-3 py-2 text-right font-mono tabular-nums font-medium ${
+                <FinTable.Row key={row.jaar}>
+                  <FinTable.Td numeric>{row.jaar}</FinTable.Td>
+                  <FinTable.Td numeric>{formatCurrency(row.aflossen)}</FinTable.Td>
+                  <FinTable.Td numeric>{formatCurrency(row.beleggen)}</FinTable.Td>
+                  <FinTable.Td numeric bold color={
                     row.verschil > 0 ? 'text-emerald-600' : row.verschil < 0 ? 'text-red-500' : 'text-[var(--ink-3)]'
-                  }`}>
+                  }>
                     {row.verschil > 0 ? '+' : ''}{formatCurrency(row.verschil)}
-                  </td>
-                </tr>
+                  </FinTable.Td>
+                </FinTable.Row>
               ))}
-            </tbody>
-          </table>
+            </FinTable.Body>
+          </FinTable>
         </div>
       )}
     </div>

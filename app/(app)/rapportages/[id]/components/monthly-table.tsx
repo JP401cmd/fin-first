@@ -1,6 +1,7 @@
 import type { ReportMonthRow } from '@/lib/report-data'
 import { formatCurrency } from '@/lib/format'
 import { ReportSparkline } from './report-sparkline'
+import { FinTable } from '@/components/app/fin-table'
 
 export function MonthlyTable({
   rows,
@@ -34,48 +35,46 @@ export function MonthlyTable({
         />
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-[var(--border-ed)] text-[var(--ink-3)]">
-              <th className="pb-2 text-left font-inter font-semibold uppercase tracking-wider text-[10px]">Maand</th>
-              <th className="pb-2 text-right font-inter font-semibold uppercase tracking-wider text-[10px]">Inkomen</th>
-              <th className="pb-2 text-right font-inter font-semibold uppercase tracking-wider text-[10px]">Uitgaven</th>
-              <th className="pb-2 text-right font-inter font-semibold uppercase tracking-wider text-[10px]">Gespaard</th>
-              <th className="pb-2 text-right font-inter font-semibold uppercase tracking-wider text-[10px]">Quote</th>
-            </tr>
-          </thead>
-          <tbody className="font-dm-mono">
-            {rows.map((row) => {
-              const rate = row.income > 0 ? Math.round((row.savings / row.income) * 100 * 10) / 10 : 0
-              return (
-                <tr key={row.month} className="border-b border-dashed border-[var(--border-ed)] last:border-0">
-                  <td className="py-1.5 font-inter text-xs text-[var(--ink-2)]">{row.label}</td>
-                  <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{formatCurrency(row.income)}</td>
-                  <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{formatCurrency(row.expenses)}</td>
-                  <td className={`py-1.5 text-right tabular-nums ${row.savings >= 0 ? 'text-kern-600' : 'text-red-600'}`}>
-                    {formatCurrency(row.savings)}
-                  </td>
-                  <td className="py-1.5 text-right tabular-nums text-[var(--ink-3)]">{rate}%</td>
-                </tr>
-              )
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-[var(--ink)] font-bold">
-              <td className="pt-2 font-inter text-xs text-[var(--ink)]">Totaal</td>
-              <td className="pt-2 text-right tabular-nums text-[var(--ink)]">{formatCurrency(totalIncome)}</td>
-              <td className="pt-2 text-right tabular-nums text-[var(--ink)]">{formatCurrency(totalExpenses)}</td>
-              <td className={`pt-2 text-right tabular-nums ${totalSaved >= 0 ? 'text-kern-600' : 'text-red-600'}`}>
-                {formatCurrency(totalSaved)}
-              </td>
-              <td className="pt-2 text-right tabular-nums text-[var(--ink)]">
-                {savingsRate != null ? `${savingsRate}%` : '–'}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      <FinTable tableClassName="text-xs">
+        <FinTable.Header>
+          <FinTable.Row>
+            <FinTable.Th>Maand</FinTable.Th>
+            <FinTable.Th align="right">Inkomen</FinTable.Th>
+            <FinTable.Th align="right">Uitgaven</FinTable.Th>
+            <FinTable.Th align="right">Gespaard</FinTable.Th>
+            <FinTable.Th align="right">Quote</FinTable.Th>
+          </FinTable.Row>
+        </FinTable.Header>
+        <FinTable.Body zebra>
+          {rows.map((row) => {
+            const rate = row.income > 0 ? Math.round((row.savings / row.income) * 100 * 10) / 10 : 0
+            return (
+              <FinTable.Row key={row.month}>
+                <FinTable.Td muted className="font-inter">{row.label}</FinTable.Td>
+                <FinTable.Td numeric muted>{formatCurrency(row.income)}</FinTable.Td>
+                <FinTable.Td numeric muted>{formatCurrency(row.expenses)}</FinTable.Td>
+                <FinTable.Td numeric color={row.savings >= 0 ? 'text-kern-600' : 'text-red-600'}>
+                  {formatCurrency(row.savings)}
+                </FinTable.Td>
+                <FinTable.Td numeric muted>{rate}%</FinTable.Td>
+              </FinTable.Row>
+            )
+          })}
+        </FinTable.Body>
+        <FinTable.Footer>
+          <FinTable.Row total>
+            <FinTable.Td bold className="font-inter">Totaal</FinTable.Td>
+            <FinTable.Td numeric bold>{formatCurrency(totalIncome)}</FinTable.Td>
+            <FinTable.Td numeric bold>{formatCurrency(totalExpenses)}</FinTable.Td>
+            <FinTable.Td numeric bold color={totalSaved >= 0 ? 'text-kern-600' : 'text-red-600'}>
+              {formatCurrency(totalSaved)}
+            </FinTable.Td>
+            <FinTable.Td numeric bold>
+              {savingsRate != null ? `${savingsRate}%` : '–'}
+            </FinTable.Td>
+          </FinTable.Row>
+        </FinTable.Footer>
+      </FinTable>
     </div>
   )
 }

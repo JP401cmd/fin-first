@@ -968,3 +968,8 @@ body {
 .flash-down {
   animation: flash-down 1s ease-out forwards;
 }
+
+/* FinTable — zebra striping for financial data tables */
+.fin-table-zebra > tr:nth-child(even) {
+  background-color: color-mix(in srgb, var(--subtle) 30%, transparent);
+}

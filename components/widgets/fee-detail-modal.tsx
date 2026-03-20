@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/format'
 import { findAlternatives, FUND_ALTERNATIVES_DISCLAIMER, berekenJaarlijkseBesparing, type FindAlternativesResult } from '@/lib/fund-alternatives'
 import type { FeeAnalysis, HoldingFee } from '@/lib/fee-analysis'
 import { AlertTriangle, ArrowRight, Info, TrendingDown } from 'lucide-react'
+import { FinTable } from '@/components/app/fin-table'
 
 interface Props {
   open: boolean
@@ -86,63 +87,48 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
           <h3 className="text-xs uppercase tracking-wider font-medium text-[var(--ink-3)] mb-2">
             Per-holding breakdown
           </h3>
-          <div className="overflow-x-auto -mx-4 px-4">
-            <table className="w-full text-sm min-w-[480px]">
-              <thead>
-                <tr className="border-b border-[var(--border-ed)]">
-                  <th className="text-left text-[11px] uppercase tracking-wider font-medium text-[var(--ink-4)] pb-2 pr-3">Holding</th>
-                  <th className="text-right text-[11px] uppercase tracking-wider font-medium text-[var(--ink-4)] pb-2 px-2">TER</th>
-                  <th className="text-right text-[11px] uppercase tracking-wider font-medium text-[var(--ink-4)] pb-2 px-2">Waarde</th>
-                  <th className="text-right text-[11px] uppercase tracking-wider font-medium text-[var(--ink-4)] pb-2 px-2">Kosten/jaar</th>
-                  <th className="text-right text-[11px] uppercase tracking-wider font-medium text-[var(--ink-4)] pb-2 pl-2">% totaal</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="-mx-4 px-4">
+            <FinTable minWidth="480px">
+              <FinTable.Header>
+                <FinTable.Row>
+                  <FinTable.Th>Holding</FinTable.Th>
+                  <FinTable.Th align="right">TER</FinTable.Th>
+                  <FinTable.Th align="right">Waarde</FinTable.Th>
+                  <FinTable.Th align="right">Kosten/jaar</FinTable.Th>
+                  <FinTable.Th align="right">% totaal</FinTable.Th>
+                </FinTable.Row>
+              </FinTable.Header>
+              <FinTable.Body>
                 {holdingsWithFees.map((h, i) => {
                   const holdingSeverity = getTerSeverity(h.ter)
                   return (
-                    <tr key={h.name + i} className="border-b border-[var(--border-ed)] last:border-0">
-                      <td className="py-2 pr-3">
-                        <span className="text-[var(--ink)] font-medium">{h.name}</span>
+                    <FinTable.Row key={h.name + i}>
+                      <FinTable.Td>
+                        <span className="font-medium">{h.name}</span>
                         {h.ticker && (
                           <span className="text-[var(--ink-4)] text-xs ml-1">({h.ticker})</span>
                         )}
-                      </td>
-                      <td className={`text-right font-mono tabular-nums py-2 px-2 ${SEVERITY_TEXT[holdingSeverity]}`}>
+                      </FinTable.Td>
+                      <FinTable.Td numeric color={SEVERITY_TEXT[holdingSeverity]}>
                         {(h.ter * 100).toFixed(2).replace('.', ',')}%
-                      </td>
-                      <td className="text-right font-mono tabular-nums text-[var(--ink-2)] py-2 px-2">
-                        {formatCurrency(h.value)}
-                      </td>
-                      <td className="text-right font-mono tabular-nums font-semibold text-[var(--ink)] py-2 px-2">
-                        {formatCurrency(h.annualFee)}
-                      </td>
-                      <td className="text-right font-mono tabular-nums text-[var(--ink-3)] py-2 pl-2">
-                        {(h.percentOfTotalFees * 100).toFixed(0)}%
-                      </td>
-                    </tr>
+                      </FinTable.Td>
+                      <FinTable.Td numeric muted>{formatCurrency(h.value)}</FinTable.Td>
+                      <FinTable.Td numeric bold>{formatCurrency(h.annualFee)}</FinTable.Td>
+                      <FinTable.Td numeric muted>{(h.percentOfTotalFees * 100).toFixed(0)}%</FinTable.Td>
+                    </FinTable.Row>
                   )
                 })}
-              </tbody>
-              {/* Total row */}
-              <tfoot>
-                <tr className="border-t-2 border-[var(--border-md)]">
-                  <td className="py-2 pr-3 font-semibold text-[var(--ink)]">Totaal</td>
-                  <td className={`text-right font-mono tabular-nums font-semibold py-2 px-2 ${SEVERITY_TEXT[severity]}`}>
-                    {terPctStr}%
-                  </td>
-                  <td className="text-right font-mono tabular-nums text-[var(--ink-2)] py-2 px-2">
-                    {formatCurrency(totalPortfolioValue)}
-                  </td>
-                  <td className="text-right font-mono tabular-nums font-semibold text-[var(--ink)] py-2 px-2">
-                    {formatCurrency(totalAnnualFee)}
-                  </td>
-                  <td className="text-right font-mono tabular-nums text-[var(--ink-3)] py-2 pl-2">
-                    100%
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+              </FinTable.Body>
+              <FinTable.Footer>
+                <FinTable.Row total>
+                  <FinTable.Td bold>Totaal</FinTable.Td>
+                  <FinTable.Td numeric bold color={SEVERITY_TEXT[severity]}>{terPctStr}%</FinTable.Td>
+                  <FinTable.Td numeric muted>{formatCurrency(totalPortfolioValue)}</FinTable.Td>
+                  <FinTable.Td numeric bold>{formatCurrency(totalAnnualFee)}</FinTable.Td>
+                  <FinTable.Td numeric muted>100%</FinTable.Td>
+                </FinTable.Row>
+              </FinTable.Footer>
+            </FinTable>
           </div>
         </div>
 
