@@ -18263,3 +18263,23 @@ Current status: 369/371 features passing (99.5%)
 - components/app/core/kern-mission-control.tsx — added showChildren param to renderTypeSection, left column passes false
 
 ### Stats: 420/420 passing (100%)
+
+## Session 2026-03-20 - Feature #422
+
+### Feature #422: Hernoem Assets naar Vermogen - PASSING
+- Renamed all UI-facing "Assets" labels to "Vermogen" across the app
+- Files changed:
+  - components/core/core-client.tsx (modal title, export dropdown, snapshot card, SVG legend)
+  - components/core/holdings-client.tsx (back link)
+  - components/app/breadcrumb.tsx (breadcrumb label)
+  - components/app/cash-account-view.tsx (default back label)
+  - components/app/core/kern-mission-control.tsx (tab label + card title)
+  - app/api/export/route.ts (CSV column header)
+  - app/(app)/core/assets/cash/[accountId]/page.tsx (back label)
+  - app/(app)/beheer/propositie/page.tsx (feature list)
+  - app/test-breadcrumb/page.tsx + app/test-mission-control/page.tsx (test pages)
+  - 3 regression test suites updated to match
+- Internal variable names (assets, totalAssets, etc.) left unchanged
+- Verified via browser: core page, assets page breadcrumb all show "Vermogen"
+- Zero console errors
+- Commit: 9dcde17a
