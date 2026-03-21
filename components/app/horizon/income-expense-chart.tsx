@@ -12,12 +12,21 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
   endAge,
   visibleMinAge,
   visibleMaxAge,
+  fireAge,
+  planningMode = 'fire',
+  aowAgeFractional,
 }: {
   rows: SimRow[]
   currentAge: number
   endAge: number
   visibleMinAge?: number
   visibleMaxAge?: number
+  /** FIRE age for reference line (hidden in pensioen mode) */
+  fireAge?: number | null
+  /** Planning mode: 'fire' (default) shows FIRE line, 'pensioen' shows AOW line */
+  planningMode?: 'fire' | 'pensioen'
+  /** AOW pension age as fractional value (e.g. 67.25 for 67j+3m) */
+  aowAgeFractional?: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200 })
 
@@ -176,6 +185,18 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
   const COLOR_SURPLUS = 'var(--horizon-500, #8b5cf6)'
   const COLOR_DEFICIT = 'var(--kern-500, #f59e0b)'
 
+  const isPensioenMode = planningMode === 'pensioen'
+
+  // FIRE reference line (hidden in pensioen mode)
+  const xFireLine = !isPensioenMode && fireAge != null && fireAge >= minAge && fireAge <= maxAge
+    ? PAD.left + xScale(fireAge)
+    : null
+
+  // AOW reference line (promoted in pensioen mode)
+  const xAowLine = isPensioenMode && aowAgeFractional != null && aowAgeFractional >= minAge && aowAgeFractional <= maxAge
+    ? PAD.left + xScale(aowAgeFractional)
+    : null
+
   return (
     <div ref={ref}>
       <svg
@@ -252,6 +273,72 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
             strokeDashoffset={hasEntered ? 0 : 1}
             style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1) 0.15s' : 'none' }}
           />
+        )}
+
+        {/* FIRE reference line (hidden in pensioen mode) */}
+        {xFireLine !== null && (
+          <g>
+            <line
+              x1={xFireLine}
+              x2={xFireLine}
+              y1={PAD.top}
+              y2={PAD.top + innerH}
+              stroke="var(--hor-t, #8a6e42)"
+              strokeWidth={1.5}
+              strokeDasharray="4 2"
+              opacity={0.85}
+            />
+            <text
+              x={xFireLine + 4}
+              y={PAD.top + 10}
+              fontSize={7}
+              fill="var(--hor-t, #8a6e42)"
+              fontFamily="var(--font-inter, sans-serif)"
+              fontWeight={600}
+            >
+              FIRE {fireAge}
+            </text>
+          </g>
+        )}
+
+        {/* AOW pensioenleeftijd line (promoted in pensioen mode) */}
+        {xAowLine !== null && aowAgeFractional != null && (
+          <g>
+            <line
+              x1={xAowLine}
+              x2={xAowLine}
+              y1={PAD.top}
+              y2={PAD.top + innerH}
+              stroke="var(--hor-t, #8a6e42)"
+              strokeWidth={1.8}
+              strokeDasharray="4 2"
+              opacity={0.85}
+            />
+            <text
+              x={xAowLine - 4}
+              y={PAD.top + 10}
+              textAnchor="end"
+              fontSize={7}
+              fill="var(--hor-t, #8a6e42)"
+              fontFamily="var(--font-inter, sans-serif)"
+              fontWeight={600}
+            >
+              AOW
+            </text>
+            <text
+              x={xAowLine - 4}
+              y={PAD.top + 19}
+              textAnchor="end"
+              fontSize={7}
+              fill="var(--hor-t, #8a6e42)"
+              fontFamily="var(--font-dm-mono, monospace)"
+              fontWeight={500}
+            >
+              {aowAgeFractional % 1 === 0
+                ? `${aowAgeFractional}`
+                : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
+            </text>
+          </g>
         )}
 
         {/* Hover vertical line + tooltip */}

@@ -603,6 +603,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     ? Math.max(Math.min((effectiveNetWorth / effectiveFireTarget) * 100, 100), 0)
     : (fire?.freedomPercentage ?? 0)
 
+  // ── Pensioen-modus afgeleid ──────────────────────────────────────────────
+  const isPensioenMode = simResult?.strategy === 'pensioen'
+  const planningMode: 'fire' | 'pensioen' = isPensioenMode ? 'pensioen' : 'fire'
+
+  // Pensioen-specific computed values
+  const aowAgeFormatted = userAowAge.months > 0
+    ? `${userAowAge.years}j + ${userAowAge.months}m`
+    : `${userAowAge.years} jaar`
+  const aowAgeInt = Math.floor(userAowAge.fractional)
+  const portfolioAtAow = isPensioenMode && simResult
+    ? (simResult.rows.find(r => r.age === aowAgeInt)?.endPortfolio ?? simResult.requiredFirePortfolio)
+    : null
+  const monthlyWithdrawalAtAow = isPensioenMode && portfolioAtAow != null
+    ? (fireSwr * portfolioAtAow) / 12
+    : null
+
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const effectiveCountdown = simResult?.fireAgeFractional != null && currentAge != null
     ? deriveCountdown(simResult.fireAgeFractional, currentAge)
@@ -1518,61 +1534,65 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               <span className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)]">
                 {hasPerspectiveHero
                   ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
-                  : simResult?.fireAgeFractional != null
-                    ? simResult.fireAgeFractional.toFixed(1)
-                    : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
+                  : isPensioenMode
+                    ? aowAgeFormatted
+                    : simResult?.fireAgeFractional != null
+                      ? simResult.fireAgeFractional.toFixed(1)
+                      : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
               </span>
-              <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheidsleeftijd</span>
+              <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">{isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd'}</span>
             </button>
           </div>
 
           {/* Desktop: 4-col stat grid */}
           <div className="hidden sm:grid sm:grid-cols-4 gap-3 mb-5">
-            {/* Vrijheidsleeftijd */}
+            {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd */}
             <button
               type="button"
               onClick={() => setShowFireAgeReceipt(true)}
               className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
               data-testid="hero-stat-fire-age"
-              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-leeftijd van ${perspectiveHero!.householdName}` : 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven') : undefined}
+              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-leeftijd van ${perspectiveHero!.householdName}` : 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven') : isPensioenMode ? 'AOW-leeftijd op basis van je geboortedatum' : undefined}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Hourglass className="h-3.5 w-3.5 text-horizon-500" />
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vrijheidsleeftijd</span>
+                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
               </div>
               <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
                 {hasPerspectiveHero
                   ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
-                  : simResult?.fireAgeFractional != null
-                    ? simResult.fireAgeFractional.toFixed(1)
-                    : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
+                  : isPensioenMode
+                    ? aowAgeFormatted
+                    : simResult?.fireAgeFractional != null
+                      ? simResult.fireAgeFractional.toFixed(1)
+                      : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
               </p>
               <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
-                {hasPerspectiveHero ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)') : 'jaar'}
+                {hasPerspectiveHero ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)') : isPensioenMode ? 'AOW-leeftijd' : 'jaar'}
               </p>
             </button>
 
-            {/* FIRE Doelbedrag */}
+            {/* KPI 2: Doelbedrag / Verwacht vermogen op AOW */}
             <button
               type="button"
               onClick={() => setShowFireTargetReceipt(true)}
               className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
               data-testid="hero-stat-fire-target"
-              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-doelbedrag van ${perspectiveHero!.householdName}` : 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven') : undefined}
+              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-doelbedrag van ${perspectiveHero!.householdName}` : 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven') : isPensioenMode ? 'Geprojecteerd vermogen op je AOW-leeftijd' : undefined}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5 text-horizon-500" />
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Doelbedrag</span>
+                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Vermogen op AOW' : 'Doelbedrag'}</span>
               </div>
               <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
                 {hasPerspectiveHero
                   ? formatCurrency(perspectiveHero!.fireTarget)
-                  : formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)}
+                  : formatCurrency(isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget))}
               </p>
-              <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">benodigd</p>
+              <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">{isPensioenMode ? 'geprojecteerd' : 'benodigd'}</p>
             </button>
 
-            {/* Opnamepercentage */}
+            {/* KPI 3: Opnamerate / Maandelijkse onttrekking */}
             <button
               type="button"
               onClick={() => setShowSwrReceipt(true)}
@@ -1581,15 +1601,17 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Percent className="h-3.5 w-3.5 text-horizon-500" />
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Opnamerate</span>
+                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Mnd. onttrekking' : 'Opnamerate'}</span>
               </div>
               <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                {simResult?.implicitWithdrawalRate != null
-                  ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
-                  : `${(fireSwr * 100).toFixed(2)}%`}
+                {isPensioenMode && monthlyWithdrawalAtAow != null
+                  ? formatCurrency(Math.round(monthlyWithdrawalAtAow))
+                  : simResult?.implicitWithdrawalRate != null
+                    ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
+                    : `${(fireSwr * 100).toFixed(2)}%`}
               </p>
               <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
-                {simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
+                {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
               </p>
             </button>
 
@@ -1627,7 +1649,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               <span className="font-mono">
                 {hasPerspectiveHero
                   ? `${formatCurrency(perspectiveHero!.fireTarget)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
-                  : `${formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)} — volledige vrijheid`}
+                  : isPensioenMode
+                    ? `${formatCurrency(portfolioAtAow ?? 0)} — vermogen op AOW`
+                    : `${formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)} — volledige vrijheid`}
               </span>
               <span>100%</span>
             </div>
@@ -1641,13 +1665,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 onClick={() => setShowFireTargetReceipt(true)}
                 className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-horizon-300"
               >
-                <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Doelbedrag</p>
+                <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Vermogen op AOW' : 'Doelbedrag'}</p>
                 <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
                   {hasPerspectiveHero
                     ? formatCurrency(perspectiveHero!.fireTarget)
-                    : formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)}
+                    : formatCurrency(isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget))}
                 </p>
-                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">benodigd</p>
+                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">{isPensioenMode ? 'geprojecteerd' : 'benodigd'}</p>
               </button>
               <button
                 type="button"
@@ -1678,14 +1702,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   onClick={() => setShowSwrReceipt(true)}
                   className="w-full rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-horizon-300"
                 >
-                  <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Opnamerate</p>
+                  <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Mnd. onttrekking' : 'Opnamerate'}</p>
                   <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                    {simResult?.implicitWithdrawalRate != null
-                      ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
-                      : `${(fireSwr * 100).toFixed(2)}%`}
+                    {isPensioenMode && monthlyWithdrawalAtAow != null
+                      ? formatCurrency(Math.round(monthlyWithdrawalAtAow))
+                      : simResult?.implicitWithdrawalRate != null
+                        ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
+                        : `${(fireSwr * 100).toFixed(2)}%`}
                   </p>
                   <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
-                    {simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
+                    {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
                   </p>
                 </button>
               </div>
@@ -1727,7 +1753,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             <>
               <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
 
-              {!simResult.fireReachable && (
+              {!simResult.fireReachable && !isPensioenMode && (
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                   <p className="font-sans text-[12px] text-orange-700">
@@ -1814,6 +1840,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           aria-hidden={chartMode !== 'vermogenspad'}
                         >
                           <SimChart
+                            key={planningMode}
                             rows={simResult.rows}
                             fireAge={simResult.fireAge}
                             fireAgeFractional={simResult.fireAgeFractional}
@@ -1830,7 +1857,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             aowAgeFractional={userAowAge.fractional}
-                            planningMode={simResult.strategy === 'pensioen' ? 'pensioen' : 'fire'}
+                            planningMode={planningMode}
                           />
                         </div>
 
@@ -1854,7 +1881,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             fireAge={simResult.fireAge}
-                            planningMode={simResult.strategy === 'pensioen' ? 'pensioen' : 'fire'}
+                            planningMode={planningMode}
                             aowAgeFractional={userAowAge.fractional}
                           />
                         </div>
@@ -1891,7 +1918,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
                           fireAge={simResult.fireAge}
-                          planningMode={simResult.strategy === 'pensioen' ? 'pensioen' : 'fire'}
+                          planningMode={planningMode}
                           aowAgeFractional={userAowAge.fractional}
                         />
                       </div>
@@ -1968,6 +1995,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               <p className="mt-3 font-sans text-[10px] text-[var(--ink-4)]">
                 {STRATEGY_LABELS[simResult.strategy].name} &middot; Simulatie tot leeftijd {simResult.displayEndAge} &middot; Klik Details voor jaar-op-jaar tabel
               </p>
+
+              {/* Context-hint: modus indicator + link to StrategieModal */}
+              <button
+                type="button"
+                onClick={() => setActiveModal('strategie')}
+                className="mt-1 block font-sans text-[10px] text-[var(--ink-4)] transition-colors hover:text-horizon-600"
+                style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}
+              >
+                {isPensioenMode
+                  ? <>Pensioen-modus actief &middot; <span className="ml-0.5 underline underline-offset-2">Instellingen &rarr;</span></>
+                  : <>Berekend als FIRE-pad &middot; <span className="ml-0.5 underline underline-offset-2">Pensioen-modus beschikbaar &rarr;</span></>}
+              </button>
 
               {/* What-If entrypoint — dream gate portal */}
               <button
@@ -4860,18 +4899,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       })()}
 
       {/* === KPI Kassabon Modals === */}
-      <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title="Vrijheidsleeftijd">
+      <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title={isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}>
         <div className="p-5">
           <KassabonShell>
             <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">VRIJHEIDSLEEFTIJD</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isPensioenMode ? 'PENSIOENLEEFTIJD' : 'VRIJHEIDSLEEFTIJD'}</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-                {simResult?.fireAgeFractional != null ? 'Simulatie-engine berekening' : 'Statische projectie'}
+                {isPensioenMode ? 'AOW-leeftijd op basis van geboortedatum' : simResult?.fireAgeFractional != null ? 'Simulatie-engine berekening' : 'Statische projectie'}
               </p>
             </div>
 
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              De leeftijd waarop je vermogen voldoende is om je uitgaven te dekken zonder te werken.
+              {isPensioenMode
+                ? 'Je AOW-leeftijd bepaalt wanneer je staatspensioen ingaat. De simulatie berekent je vermogen op dat moment.'
+                : 'De leeftijd waarop je vermogen voldoende is om je uitgaven te dekken zonder te werken.'}
             </div>
 
             <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
@@ -4891,22 +4932,44 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <span className="font-sans text-sm text-[var(--ink-2)]">Pensioenuitgaven/jr</span>
                 <span className="tabular-nums text-[var(--ink)]">{formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)}</span>
               </div>
-              <div className="flex justify-between py-0.5">
-                <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
-                <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
-              </div>
+              {isPensioenMode && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">AOW-leeftijd</span>
+                  <span className="tabular-nums text-[var(--ink)]">{aowAgeFormatted}</span>
+                </div>
+              )}
+              {isPensioenMode && portfolioAtAow != null && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Vermogen op AOW</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Math.round(portfolioAtAow))}</span>
+                </div>
+              )}
+              {isPensioenMode && monthlyWithdrawalAtAow != null && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Mnd. onttrekking</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Math.round(monthlyWithdrawalAtAow))}</span>
+                </div>
+              )}
+              {!isPensioenMode && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
+                  <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
+                </div>
+              )}
             </div>
 
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-              <span className="text-[var(--ink)]">Vrijheidsleeftijd</span>
+              <span className="text-[var(--ink)]">{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
               <span className="tabular-nums text-[var(--ink)]">
-                {simResult?.fireAgeFractional != null
-                  ? `${simResult.fireAgeFractional.toFixed(1)} jaar`
-                  : fire?.fireAge !== null ? `${Math.round(fire!.fireAge!)} jaar` : 'Niet bereikbaar'}
+                {isPensioenMode
+                  ? aowAgeFormatted
+                  : simResult?.fireAgeFractional != null
+                    ? `${simResult.fireAgeFractional.toFixed(1)} jaar`
+                    : fire?.fireAge !== null ? `${Math.round(fire!.fireAge!)} jaar` : 'Niet bereikbaar'}
               </span>
             </div>
 
-            {range && range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
+            {!isPensioenMode && range && range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
               <div className="mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-sm text-[var(--ink-2)]">Optimistisch</span>
@@ -4919,25 +4982,38 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
             )}
 
+            {isPensioenMode && originalFireAgeFractional != null && (
+              <div className="mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">FIRE-leeftijd (referentie)</span>
+                  <span className="tabular-nums text-[var(--ink)]">{originalFireAgeFractional.toFixed(1)} jaar</span>
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Portfolio groeit met rendement + jaarlijkse besparing. FIRE is bereikt wanneer portfolio ≥ doelbedrag.</p>
+              <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> {isPensioenMode
+                ? 'AOW-leeftijd is wettelijk bepaald op basis van je geboortedatum. Vermogen op AOW = simulatie-projectie op die leeftijd.'
+                : 'Portfolio groeit met rendement + jaarlijkse besparing. FIRE is bereikt wanneer portfolio ≥ doelbedrag.'}</p>
             </div>
 
-            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van huidig vermogen, spaargedrag en verwacht rendement</p>
+            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{isPensioenMode ? 'Pensioen-modus — gebaseerd op AOW-leeftijd' : 'Berekend op basis van huidig vermogen, spaargedrag en verwacht rendement'}</p>
           </KassabonShell>
         </div>
       </BottomSheet>
 
-      <BottomSheet open={showCountdownReceipt} onClose={() => setShowCountdownReceipt(false)} title="Aftellen naar vrijheid">
+      <BottomSheet open={showCountdownReceipt} onClose={() => setShowCountdownReceipt(false)} title={isPensioenMode ? 'Aftellen naar pensioen' : 'Aftellen naar vrijheid'}>
         <div className="p-5">
           <KassabonShell>
             <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">AFTELLEN NAAR VRIJHEID</p>
-              <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">resterende tijd tot volledige vrijheid</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isPensioenMode ? 'AFTELLEN NAAR PENSIOEN' : 'AFTELLEN NAAR VRIJHEID'}</p>
+              <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">{isPensioenMode ? 'resterende tijd tot AOW-leeftijd' : 'resterende tijd tot volledige vrijheid'}</p>
             </div>
 
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              Het aantal dagen tot je verwachte moment van volledige financiële vrijheid.
+              {isPensioenMode
+                ? 'Het aantal dagen tot je AOW-leeftijd, het moment waarop je staatspensioen ingaat.'
+                : 'Het aantal dagen tot je verwachte moment van volledige financiële vrijheid.'}
             </div>
 
             <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
@@ -4948,15 +5024,17 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 </div>
               )}
               <div className="flex justify-between py-0.5">
-                <span className="font-sans text-sm text-[var(--ink-2)]">Vrijheidsleeftijd</span>
+                <span className="font-sans text-sm text-[var(--ink-2)]">{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
                 <span className="tabular-nums text-[var(--ink)]">
-                  {simResult?.fireAgeFractional != null
-                    ? `${simResult.fireAgeFractional.toFixed(1)} jaar`
-                    : fire?.fireAge !== null ? `${Math.round(fire!.fireAge!)} jaar` : '-'}
+                  {isPensioenMode
+                    ? aowAgeFormatted
+                    : simResult?.fireAgeFractional != null
+                      ? `${simResult.fireAgeFractional.toFixed(1)} jaar`
+                      : fire?.fireAge !== null ? `${Math.round(fire!.fireAge!)} jaar` : '-'}
                 </span>
               </div>
               <div className="flex justify-between py-0.5">
-                <span className="font-sans text-sm text-[var(--ink-2)]">Jaren tot vrijheid</span>
+                <span className="font-sans text-sm text-[var(--ink-2)]">{isPensioenMode ? 'Jaren tot pensioen' : 'Jaren tot vrijheid'}</span>
                 <span className="tabular-nums text-[var(--ink)]">
                   {`${effectiveCountdown.countdownYears} jaar en ${effectiveCountdown.countdownMonths} maanden`}
                 </span>
@@ -4976,23 +5054,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </span>
             </div>
 
-            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend vanuit je geboortedatum en verwachte vrijheidsleeftijd</p>
+            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{isPensioenMode ? 'Berekend vanuit je geboortedatum en AOW-leeftijd' : 'Berekend vanuit je geboortedatum en verwachte vrijheidsleeftijd'}</p>
           </KassabonShell>
         </div>
       </BottomSheet>
 
-      <BottomSheet open={showFireTargetReceipt} onClose={() => setShowFireTargetReceipt(false)} title="FIRE Doelbedrag">
+      <BottomSheet open={showFireTargetReceipt} onClose={() => setShowFireTargetReceipt(false)} title={isPensioenMode ? 'Verwacht vermogen op AOW' : 'FIRE Doelbedrag'}>
         <div className="p-5">
           <KassabonShell>
             <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">FIRE DOELBEDRAG</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isPensioenMode ? 'VERWACHT VERMOGEN OP AOW' : 'FIRE DOELBEDRAG'}</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-                {simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : `Klassieke FIRE-berekening (${(fireSwr * 100).toFixed(2)}% SWR)`}
+                {isPensioenMode
+                  ? 'Geprojecteerd vermogen op AOW-leeftijd'
+                  : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : `Klassieke FIRE-berekening (${(fireSwr * 100).toFixed(2)}% SWR)`}
               </p>
             </div>
 
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              Het minimale vermogen waarmee je jaarlijkse pensioenuitgaven volledig kunt dekken.
+              {isPensioenMode
+                ? 'Het verwachte vermogen op het moment dat je AOW ingaat, op basis van je huidige situatie en spaargedrag.'
+                : 'Het minimale vermogen waarmee je jaarlijkse pensioenuitgaven volledig kunt dekken.'}
             </div>
 
             <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
@@ -5000,11 +5082,23 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <span className="font-sans text-sm text-[var(--ink-2)]">Jaarlijkse pensioenuitgaven</span>
                 <span className="tabular-nums text-[var(--ink)]">{formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)}</span>
               </div>
+              {isPensioenMode && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">AOW-leeftijd</span>
+                  <span className="tabular-nums text-[var(--ink)]">{aowAgeFormatted}</span>
+                </div>
+              )}
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
                 <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
               </div>
-              {simResult?.requiredFirePortfolio != null && (
+              {isPensioenMode && monthlyWithdrawalAtAow != null && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Mnd. onttrekking op AOW</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Math.round(monthlyWithdrawalAtAow))}</span>
+                </div>
+              )}
+              {!isPensioenMode && simResult?.requiredFirePortfolio != null && (
                 <div className="py-0.5 font-sans text-[11px] italic text-[var(--ink-3)]">
                   Simulatie houdt rekening met AOW, pensioen en levensgebeurtenissen
                 </div>
@@ -5012,25 +5106,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </div>
 
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-              <span className="text-[var(--ink)]">Benodigd</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(effectiveFireTarget)}</span>
+              <span className="text-[var(--ink)]">{isPensioenMode ? 'Verwacht vermogen' : 'Benodigd'}</span>
+              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(isPensioenMode ? (portfolioAtAow ?? 0) : effectiveFireTarget)}</span>
             </div>
 
             <div className="mt-3 flex justify-center">
-              <FreedomTimeBadge amount={effectiveFireTarget} />
+              <FreedomTimeBadge amount={isPensioenMode ? (portfolioAtAow ?? 0) : effectiveFireTarget} />
             </div>
 
             <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
               <p>
                 <strong className="font-semibold text-[var(--ink-3)]">Formule:</strong>{' '}
-                {simResult?.requiredFirePortfolio != null
-                  ? 'Levenslange simulatie (opbouw + verbruik tot leeftijd 90, incl. Box 3 en inflatie)'
-                  : `Doelbedrag = Jaaruitgaven ÷ SWR = ${formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)} ÷ ${(fireSwr * 100).toFixed(2)}%`}
+                {isPensioenMode
+                  ? 'Vermogensprojectie op AOW-leeftijd via simulatie-engine (incl. Box 3, inflatie en levensgebeurtenissen)'
+                  : simResult?.requiredFirePortfolio != null
+                    ? 'Levenslange simulatie (opbouw + verbruik tot leeftijd 90, incl. Box 3 en inflatie)'
+                    : `Doelbedrag = Jaaruitgaven ÷ SWR = ${formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)} ÷ ${(fireSwr * 100).toFixed(2)}%`}
               </p>
             </div>
 
             <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-              {simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : 'Klassieke FIRE-berekening'}
+              {isPensioenMode ? 'Pensioen-modus — geprojecteerd op AOW-leeftijd' : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : 'Klassieke FIRE-berekening'}
             </p>
           </KassabonShell>
         </div>

@@ -40,6 +40,8 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   visibleMaxAge,
   fireAge,
   forModal,
+  planningMode = 'fire',
+  aowAgeFractional,
 }: {
   stackedRows: StackedRow[]
   currentAge: number
@@ -48,6 +50,10 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   visibleMaxAge?: number
   fireAge?: number | null
   forModal?: boolean
+  /** Planning mode: 'fire' (default) uses FIRE age as split point, 'pensioen' uses AOW age */
+  planningMode?: 'fire' | 'pensioen'
+  /** AOW pension age as fractional value (e.g. 67.25 for 67j+3m) */
+  aowAgeFractional?: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredAge, setHoveredAge] = useState<number | null>(null)
@@ -139,9 +145,22 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
     )
   }
 
-  // FIRE vertical line X position
-  const xFire = fireAge != null && fireAge >= minAge && fireAge <= maxAge
+  // Planning mode logic
+  const isPensioenMode = planningMode === 'pensioen'
+
+  // Determine which age to use as the split/reference line
+  const refAge = isPensioenMode
+    ? (aowAgeFractional != null ? Math.ceil(aowAgeFractional) : null)
+    : fireAge
+
+  // FIRE vertical line X position (hidden in pensioen mode)
+  const xFire = !isPensioenMode && fireAge != null && fireAge >= minAge && fireAge <= maxAge
     ? PAD.left + xScale(fireAge)
+    : null
+
+  // AOW vertical line X position (promoted in pensioen mode)
+  const xAow = isPensioenMode && aowAgeFractional != null && aowAgeFractional >= minAge && aowAgeFractional <= maxAge
+    ? PAD.left + xScale(aowAgeFractional)
     : null
 
   // Tooltip data
@@ -281,7 +300,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
           )
         })}
 
-        {/* FIRE age vertical dashed line */}
+        {/* FIRE age vertical dashed line (hidden in pensioen mode) */}
         {xFire !== null && (
           <line
             x1={xFire}
@@ -295,7 +314,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
           />
         )}
 
-        {/* FIRE label */}
+        {/* FIRE label (hidden in pensioen mode) */}
         {xFire !== null && fireAge != null && (
           <text
             x={xFire + 4}
@@ -307,6 +326,46 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
           >
             FIRE {fireAge}
           </text>
+        )}
+
+        {/* AOW pensioenleeftijd vertical dashed line (promoted in pensioen mode) */}
+        {xAow !== null && aowAgeFractional != null && (
+          <g>
+            <line
+              x1={xAow}
+              x2={xAow}
+              y1={PAD.top}
+              y2={PAD.top + innerH}
+              stroke="var(--hor-t, #8a6e42)"
+              strokeWidth={1.8}
+              strokeDasharray="4 2"
+              opacity={0.85}
+            />
+            <text
+              x={xAow - 4}
+              y={PAD.top + 10}
+              textAnchor="end"
+              fontSize={7}
+              fill="var(--hor-t, #8a6e42)"
+              fontFamily="var(--font-inter, sans-serif)"
+              fontWeight={600}
+            >
+              AOW
+            </text>
+            <text
+              x={xAow - 4}
+              y={PAD.top + 19}
+              textAnchor="end"
+              fontSize={7}
+              fill="var(--hor-t, #8a6e42)"
+              fontFamily="var(--font-dm-mono, monospace)"
+              fontWeight={500}
+            >
+              {aowAgeFractional % 1 === 0
+                ? `${aowAgeFractional}`
+                : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
+            </text>
+          </g>
         )}
 
         {/* Hover tooltip */}

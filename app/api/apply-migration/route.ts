@@ -481,6 +481,31 @@ $$ LANGUAGE plpgsql`,
   // ── 20260319100001: Holdings TER column ───────────────────────────
   `ALTER TABLE holdings ADD COLUMN IF NOT EXISTS ter numeric`,
 
+  // ── 20260321000001: Allow 'pensioen' in fire_end_strategy CHECK constraint ──
+  `DO $$ BEGIN
+    -- Drop existing fire_end_strategy CHECK if it exists
+    IF EXISTS (
+      SELECT 1 FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+      JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+      WHERE rel.relname = 'profiles' AND nsp.nspname = 'public'
+        AND con.contype = 'c' AND pg_get_constraintdef(con.oid) LIKE '%fire_end_strategy%'
+    ) THEN
+      EXECUTE (
+        SELECT format('ALTER TABLE public.profiles DROP CONSTRAINT %I', con.conname)
+        FROM pg_constraint con
+        JOIN pg_class rel ON rel.oid = con.conrelid
+        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+        WHERE rel.relname = 'profiles' AND nsp.nspname = 'public'
+          AND con.contype = 'c' AND pg_get_constraintdef(con.oid) LIKE '%fire_end_strategy%'
+        LIMIT 1
+      );
+    END IF;
+  END $$`,
+  `ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_fire_end_strategy_check`,
+  `ALTER TABLE public.profiles ADD CONSTRAINT profiles_fire_end_strategy_check
+    CHECK (fire_end_strategy IS NULL OR fire_end_strategy IN ('perpetual', 'legacy', 'deplete', 'pensioen'))`,
+
   // ── PostgREST schema cache reload ───────────────────────────────────
   `NOTIFY pgrst, 'reload schema'`,
 ]

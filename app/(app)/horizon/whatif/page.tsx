@@ -294,7 +294,7 @@ export default function WhatIfPage() {
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
     const cashflows = lifeEventsToCashflows(activeEvents)
 
-    const result = runSimulation(
+    let result = runSimulation(
       currentAge,
       strategyForSim.endAge,
       currentPortfolio,
@@ -307,8 +307,22 @@ export default function WhatIfPage() {
       strategyForSim,
     )
 
+    // Pensioen-modus override: use AOW age as FIRE age
+    if (strategyForSim.strategy === 'pensioen') {
+      const aowAge = userAowAge.fractional
+      const aowAgeInt = Math.floor(aowAge)
+      const rowAtAow = result.rows.find(r => r.age === aowAgeInt)
+      result = {
+        ...result,
+        fireAgeFractional: aowAge,
+        fireAge: aowAgeInt,
+        requiredFirePortfolio: rowAtAow?.endPortfolio ?? result.requiredFirePortfolio,
+        fireReachable: true,
+      }
+    }
+
     return { result, cashflows }
-  }, [input, activeEvents, fireStrategy, userGrossReturn, userInflation])
+  }, [input, activeEvents, fireStrategy, userGrossReturn, userInflation, userAowAge])
 
   // ── Run what-if simulation ───────────────────────────────
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
@@ -327,7 +341,7 @@ export default function WhatIfPage() {
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
     const cashflows = lifeEventsToCashflows(activeEvents)
 
-    const result = runSimulation(
+    let result = runSimulation(
       currentAge,
       strategyForSim.endAge,
       currentPortfolio,
@@ -340,8 +354,22 @@ export default function WhatIfPage() {
       strategyForSim,
     )
 
+    // Pensioen-modus override: use AOW age as FIRE age
+    if (strategyForSim.strategy === 'pensioen') {
+      const aowAge = userAowAge.fractional
+      const aowAgeInt = Math.floor(aowAge)
+      const rowAtAow = result.rows.find(r => r.age === aowAgeInt)
+      result = {
+        ...result,
+        fireAgeFractional: aowAge,
+        fireAge: aowAgeInt,
+        requiredFirePortfolio: rowAtAow?.endPortfolio ?? result.requiredFirePortfolio,
+        fireReachable: true,
+      }
+    }
+
     return { result, cashflows }
-  }, [whatIfInput, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation])
+  }, [whatIfInput, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation, userAowAge])
 
   // ── Impact computation (per-event FIRE delta) ──────────────
   const computeImpact = useCallback((eventId: string) => {
