@@ -5,7 +5,7 @@ import { TrendingUp, ArrowRightLeft, Wallet } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type FaseId = 'opbouw' | 'overgang' | 'onttrekking'
+export type FaseId = 'opbouw' | 'overgang' | 'onttrekking'
 
 interface PhaseSegment {
   id: FaseId
@@ -179,7 +179,7 @@ function buildSegments({
   endAge,
   fireReachable,
   isPensioenMode,
-}: Omit<PhaseBarProps, 'onSegmentClick'>): PhaseSegment[] {
+}: Omit<PhaseBarProps, 'onSegmentClick' | 'visibleMinAge' | 'visibleMaxAge'>): PhaseSegment[] {
   const segments: PhaseSegment[] = []
 
   // Normalize ages

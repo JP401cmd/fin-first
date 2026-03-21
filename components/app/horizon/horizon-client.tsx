@@ -1957,25 +1957,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           visibleMaxAge={visibleMax}
                         />
                       )}
+
+                      {/* ── Fase-balk (Opbouw / Overgang / Onttrekking) ── */}
+                      {simResult && currentAge != null && (
+                        <div className="mt-2">
+                          <PhaseBar
+                            currentAge={currentAge}
+                            fireAge={simResult.fireAge}
+                            aowAge={userAowAge.fractional}
+                            endAge={simResult.displayEndAge}
+                            fireReachable={simResult.fireReachable}
+                            isPensioenMode={isPensioenMode}
+                            onSegmentClick={(fase) => setActiveFaseModal(fase)}
+                            visibleMinAge={visibleMin}
+                            visibleMaxAge={visibleMax}
+                          />
+                        </div>
+                      )}
                     </>
                   )}
                 </ZoomableChartContainer>
               </div>
-
-              {/* ── Fase-balk (Opbouw / Overgang / Onttrekking) ── */}
-              {simResult && currentAge != null && (
-                <div className="mt-2 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8">
-                  <PhaseBar
-                    currentAge={currentAge}
-                    fireAge={simResult.fireAge}
-                    aowAge={userAowAge.fractional}
-                    endAge={simResult.displayEndAge}
-                    fireReachable={simResult.fireReachable}
-                    isPensioenMode={isPensioenMode}
-                    onSegmentClick={(fase) => setActiveFaseModal(fase)}
-                  />
-                </div>
-              )}
 
               {/* ── Legenda + detail-links onder de grafiek ── */}
               <div className="mt-2 space-y-2">
@@ -4951,6 +4953,43 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           rows={simResult.rows}
         />
       )}
+      {/* Overgang phase modal */}
+      {(() => {
+        if (!simResult || currentAge == null || simResult.fireAge == null || !simResult.fireReachable || isPensioenMode) return null
+        const effectiveFireAge = Math.round(simResult.fireAge)
+        const effectiveAowAge = Math.round(userAowAge.fractional)
+        const transitionScenario = effectiveFireAge < effectiveAowAge
+          ? 'gap' as const
+          : effectiveFireAge > effectiveAowAge
+          ? 'shortfall' as const
+          : 'none' as const
+        if (transitionScenario === 'none') return null
+        const overgangStart = transitionScenario === 'gap' ? effectiveFireAge : effectiveAowAge
+        const overgangEnd = transitionScenario === 'gap' ? effectiveAowAge : effectiveFireAge
+        const yearlyExpenses = (effectiveInput?.monthlyExpenses ?? 0) * 12
+        const baseAowMonthly = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+        const yearlyAowIncome = baseAowMonthly * 12
+        const portfolioRow = simResult.rows.find(r => r.age === effectiveFireAge)
+        const portfolioAtTransitionStart = portfolioRow?.endPortfolio ?? simResult.firePortfolioAtFire
+        const yearlyWithdrawal = transitionScenario === 'gap'
+          ? yearlyExpenses
+          : Math.max(yearlyExpenses - yearlyAowIncome, 0)
+        return (
+          <PhaseModalOvergang
+            open={activeFaseModal === 'overgang'}
+            onClose={() => setActiveFaseModal(null)}
+            transitionScenario={transitionScenario}
+            startAge={overgangStart}
+            endAge={overgangEnd}
+            fireAge={effectiveFireAge}
+            aowAge={effectiveAowAge}
+            yearlyWithdrawal={yearlyWithdrawal}
+            yearlyAowIncome={yearlyAowIncome}
+            yearlyExpenses={yearlyExpenses}
+            portfolioAtTransitionStart={portfolioAtTransitionStart}
+          />
+        )
+      })()}
 
       {/* === KPI Kassabon Modals === */}
       <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title={isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}>
