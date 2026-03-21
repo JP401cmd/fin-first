@@ -56,6 +56,7 @@ export const SimChart = memo(function SimChart({
   visibleMinAge,
   visibleMaxAge,
   aowAgeFractional,
+  planningMode = 'fire',
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -82,6 +83,8 @@ export const SimChart = memo(function SimChart({
   visibleMaxAge?: number
   /** AOW pension age as fractional value (e.g. 67.25 for 67j+3m) */
   aowAgeFractional?: number
+  /** Planning mode: 'fire' (default) uses FIRE age as split point, 'pensioen' uses AOW age */
+  planningMode?: 'fire' | 'pensioen'
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -179,16 +182,36 @@ export const SimChart = memo(function SimChart({
     }
   }
 
-  // Split at fractional FIRE point for two-colour rendering (green = acc, orange = dec)
-  const accPts: [number, number][] = fireFractionalPt !== null && fireAge !== null
-    ? [...allPts.filter(([age]) => age < fireAge), fireFractionalPt]
-    : fireAge !== null
-    ? allPts.filter(([age]) => age <= fireAge)
+  // In pensioen mode, compute AOW junction point for path splitting
+  const isPensioenMode = planningMode === 'pensioen'
+  let aowFractionalPt: [number, number] | null = null
+  if (isPensioenMode && aowAgeFractional != null) {
+    const aowFloor = Math.floor(aowAgeFractional)
+    if (aowFloor > currentAge) {
+      const t = aowAgeFractional - aowFloor
+      const ptBefore = allPts.find(([a]) => a === aowFloor)?.[1] ?? 0
+      const ptAfter  = allPts.find(([a]) => a === aowFloor + 1)?.[1] ?? 0
+      aowFractionalPt = [aowAgeFractional, ptBefore + t * (ptAfter - ptBefore)]
+    } else {
+      aowFractionalPt = [currentAge, allPts[0]?.[1] ?? 0]
+    }
+  }
+
+  // Determine split point: AOW age in pensioen mode, FIRE age otherwise
+  const splitAge = isPensioenMode ? (aowAgeFractional != null ? Math.ceil(aowAgeFractional) : null) : fireAge
+  const splitFractionalPt = isPensioenMode ? aowFractionalPt : fireFractionalPt
+  const splitFractionalAge = isPensioenMode ? aowAgeFractional ?? null : fireAgeFractional
+
+  // Split at fractional point for two-colour rendering (opbouw = acc, pensioen/afbouw = dec)
+  const accPts: [number, number][] = splitFractionalPt !== null && splitAge !== null
+    ? [...allPts.filter(([age]) => age < splitAge), splitFractionalPt]
+    : splitAge !== null
+    ? allPts.filter(([age]) => age <= splitAge)
     : allPts
-  const decPts: [number, number][] = fireFractionalPt !== null && fireAge !== null
-    ? [fireFractionalPt, ...allPts.filter(([age]) => age > fireAge)]
-    : fireAge !== null
-    ? allPts.filter(([age]) => age >= fireAge)
+  const decPts: [number, number][] = splitFractionalPt !== null && splitAge !== null
+    ? [splitFractionalPt, ...allPts.filter(([age]) => age > splitAge)]
+    : splitAge !== null
+    ? allPts.filter(([age]) => age >= splitAge)
     : []
 
   // Use fractional position for the FIRE vertical line
@@ -352,8 +375,8 @@ export const SimChart = memo(function SimChart({
             fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{age}</text>
         ))}
 
-        {/* FIRE doelbedrag — horizontale dashed lijn */}
-        {fireTarget != null && fireTarget > 0 && (
+        {/* FIRE doelbedrag — horizontale dashed lijn (hidden in pensioen mode) */}
+        {!isPensioenMode && fireTarget != null && fireTarget > 0 && (
           <>
             <line
               x1={PAD.left} x2={PAD.left + innerW}
@@ -379,8 +402,8 @@ export const SimChart = memo(function SimChart({
           </>
         )}
 
-        {/* Legacy target — horizontal dashed line at target portfolio value */}
-        {strategy === 'legacy' && targetEndPortfolio != null && targetEndPortfolio > 0 && (
+        {/* Legacy target — horizontal dashed line at target portfolio value (hidden in pensioen mode) */}
+        {!isPensioenMode && strategy === 'legacy' && targetEndPortfolio != null && targetEndPortfolio > 0 && (
           <>
             <line
               x1={PAD.left} x2={PAD.left + innerW}
@@ -413,20 +436,23 @@ export const SimChart = memo(function SimChart({
           )
         })}
 
-        {/* FIRE dashed vertical */}
-        {xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
+        {/* FIRE dashed vertical (hidden in pensioen mode) */}
+        {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
           <line x1={xFire} x2={xFire} y1={PAD.top} y2={PAD.top + innerH}
             stroke={COLOR_OPBOUW} strokeWidth={1.5} strokeDasharray="4 2" opacity={0.85} />
         )}
 
-        {/* AOW pensioenleeftijd dashed vertical */}
+        {/* AOW pensioenleeftijd dashed vertical (promoted in pensioen mode) */}
         {aowAgeFractional != null && aowAgeFractional > minAge && aowAgeFractional < maxAge && (
           <>
             <line
               x1={PAD.left + xScale(aowAgeFractional)}
               x2={PAD.left + xScale(aowAgeFractional)}
               y1={PAD.top} y2={PAD.top + innerH}
-              stroke="var(--ink-3, #8a8680)" strokeWidth={1.2} strokeDasharray="3 3" opacity={0.6}
+              stroke={isPensioenMode ? COLOR_OPBOUW : "var(--ink-3, #8a8680)"}
+              strokeWidth={isPensioenMode ? 1.8 : 1.2}
+              strokeDasharray={isPensioenMode ? "4 2" : "3 3"}
+              opacity={isPensioenMode ? 0.85 : 0.6}
             />
             <text
               x={PAD.left + xScale(aowAgeFractional) - 4}
@@ -451,6 +477,17 @@ export const SimChart = memo(function SimChart({
                 ? `${aowAgeFractional}`
                 : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
             </text>
+            {/* AOW dot at junction point (pensioen mode only) */}
+            {isPensioenMode && aowFractionalPt !== null && (
+              <circle
+                cx={PAD.left + xScale(aowFractionalPt[0])}
+                cy={PAD.top + yScale(Math.max(aowFractionalPt[1], 0))}
+                r={5}
+                fill={COLOR_OPBOUW}
+                stroke="var(--paper)"
+                strokeWidth={1.5}
+              />
+            )}
           </>
         )}
 
@@ -559,12 +596,12 @@ export const SimChart = memo(function SimChart({
           />
         )}
 
-        {/* Decumulation path — kern bruin (or horizon goud for perpetual) */}
+        {/* Decumulation path — kern bruin (or horizon goud for perpetual in fire mode) */}
         {decPts.length > 1 && (
           <path
             d={pointsToPath(decPts)}
             fill="none"
-            stroke={strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
+            stroke={!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -591,8 +628,8 @@ export const SimChart = memo(function SimChart({
           />
         )}
 
-        {/* Dot at FIRE junction */}
-        {xFire !== null && yFireDot !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
+        {/* Dot at FIRE junction (hidden in pensioen mode) */}
+        {!isPensioenMode && xFire !== null && yFireDot !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
           <circle cx={xFire} cy={yFireDot} r={5}
             fill={COLOR_OPBOUW} stroke="var(--paper)" strokeWidth={1.5} />
         )}
@@ -659,27 +696,27 @@ export const SimChart = memo(function SimChart({
           </g>
         ))}
 
-        {/* Phase label: OPBOUW */}
-        {fireAgeFractional !== null && fireAgeFractional > minAge + 3 && (
-          <text x={PAD.left + xScale((minAge + fireAgeFractional) / 2)} y={PAD.top + 14}
+        {/* Phase label: OPBOUW / VERMOGENSGROEI */}
+        {splitFractionalAge !== null && splitFractionalAge > minAge + 3 && (
+          <text x={PAD.left + xScale((minAge + splitFractionalAge) / 2)} y={PAD.top + 14}
             textAnchor="middle" fontSize={10} fill={COLOR_OPBOUW}
             fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-            OPBOUW
+            {isPensioenMode ? 'VERMOGENSGROEI' : 'OPBOUW'}
           </text>
         )}
 
-        {/* Phase label: AFBOUW or BEHOUD (perpetual) */}
-        {fireAgeFractional !== null && fireAgeFractional < maxAge - 3 && (
-          <text x={PAD.left + xScale((fireAgeFractional + maxAge) / 2)} y={PAD.top + 14}
+        {/* Phase label: AFBOUW / BEHOUD / PENSIOEN */}
+        {splitFractionalAge !== null && splitFractionalAge < maxAge - 3 && (
+          <text x={PAD.left + xScale((splitFractionalAge + maxAge) / 2)} y={PAD.top + 14}
             textAnchor="middle" fontSize={10}
-            fill={strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
+            fill={!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
             fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-            {strategy === 'perpetual' ? 'BEHOUD' : 'AFBOUW'}
+            {isPensioenMode ? 'PENSIOEN' : strategy === 'perpetual' ? 'BEHOUD' : 'AFBOUW'}
           </text>
         )}
 
-        {/* FIRE age label */}
-        {xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
+        {/* FIRE age label (hidden in pensioen mode) */}
+        {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
           <text x={xFire + 4} y={PAD.top + 24} fontSize={8}
             fill={COLOR_OPBOUW} fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
             FIRE {fireAgeFractional.toFixed(1)}
