@@ -755,6 +755,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             positionCount: trackedHoldings.length,
             top3,
           })
+        } else {
+          setHoldingsPortfolio(null)
         }
       } catch {
         // Holdings portfolio is non-critical
@@ -772,6 +774,66 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     if (initialData) return // Skip client-side fetch when server-provided data is available
     loadData()
   }, [loadData, initialData])
+
+  // Refresh holdings portfolio when user returns to the page (e.g., after toggling tracking on an asset)
+  useEffect(() => {
+    const reloadHoldings = async () => {
+      try {
+        const sb = createClient()
+        const { data: holdingsData } = await sb
+          .from('holdings')
+          .select('id, name, ticker, units, current_price, avg_purchase_price, daily_change_percent, asset_id, asset:assets!asset_id(has_holdings_tracking)')
+          .eq('is_active', true)
+        const rawHoldings = (holdingsData ?? []) as Array<Record<string, unknown>>
+        const trackedHoldings = rawHoldings.filter(h => {
+          const asset = h.asset as { has_holdings_tracking?: boolean } | null
+          return asset?.has_holdings_tracking === true
+        })
+        if (trackedHoldings.length > 0) {
+          let totalValue = 0
+          let dailyChangeAbsolute = 0
+          const holdingValues: { ticker: string; value: number }[] = []
+          for (const h of trackedHoldings) {
+            const units = Number(h.units) || 0
+            const currentPrice = h.current_price != null ? Number(h.current_price) : Number(h.avg_purchase_price) || 0
+            const dailyChangePct = Number(h.daily_change_percent) || 0
+            const value = units * currentPrice
+            totalValue += value
+            dailyChangeAbsolute += value * (dailyChangePct / 100)
+            holdingValues.push({ ticker: (h.ticker as string) || (h.name as string) || '?', value })
+          }
+          holdingValues.sort((a, b) => b.value - a.value)
+          const top3 = holdingValues.slice(0, 3)
+          const overallDailyChangePct = totalValue > 0 ? (dailyChangeAbsolute / (totalValue - dailyChangeAbsolute)) * 100 : 0
+          setHoldingsPortfolio({
+            totalValue,
+            dailyChangeAbsolute,
+            dailyChangePct: overallDailyChangePct,
+            positionCount: trackedHoldings.length,
+            top3,
+          })
+        } else {
+          setHoldingsPortfolio(null)
+        }
+      } catch {
+        // Holdings refresh is non-critical
+      }
+    }
+
+    // Reload on tab re-focus (external navigation) and visibility change
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        reloadHoldings()
+      }
+    }
+    const handleFocus = () => reloadHoldings()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [])
 
   useEffect(() => {
     if (searchParams.get('showEstimates') === 'true') {
