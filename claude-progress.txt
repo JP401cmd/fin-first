@@ -1,3 +1,31 @@
+## Session 2026-03-21 - Features #453, #455
+
+### Feature #453: Type-uitbreiding FireEndStrategy + parseFireStrategy - PASSING
+- Extended FireEndStrategy type with 'pensioen' as 4th variant
+- Added STRATEGY_LABELS entry: { name: 'Pensioenleeftijd', subtitle: 'Vermogensopbouw tot AOW, daarna onttrekking' }
+- Updated parseFireStrategy() valid values array to include 'pensioen'
+- DEFAULT_FIRE_STRATEGY remains 'deplete' (backward compatible)
+- Added pensioen compatibility entries to all 4 withdrawal strategies in strategie-modal.tsx
+- No DB CHECK constraint found — TEXT column accepts any value
+- Zero TypeScript errors in production code
+- Commit: 7d95c6f1
+
+### Feature #455: SimChart visuele aanpassingen pensioen-modus - PASSING
+- Added planningMode?: 'fire' | 'pensioen' prop to SimChart (default 'fire')
+- Pensioen mode: path split at aowAgeFractional instead of fireAgeFractional
+- Phase labels: 'VERMOGENSGROEI' / 'PENSIOEN' (instead of 'OPBOUW' / 'AFBOUW')
+- Hidden FIRE elements in pensioen mode: vertical dashed line, FIRE dot, target line, age label, legacy target
+- AOW line promoted: strokeWidth 1.2→1.8, opacity 0.6→0.85, stroke color = COLOR_OPBOUW
+- AOW dot at junction: r=5, fill=COLOR_OPBOUW, stroke=var(--paper), strokeWidth=1.5
+- Perpetual single-color logic disabled in pensioen mode (always two-color split)
+- Verified chart renders correctly in default fire mode (no regression)
+- Zero JS console errors (only pre-existing Supabase 400)
+- Commit: 00094008
+
+### Current Status
+- 2 features completed this session (#453, #455)
+- Overall progress: 453/460 passing (98.5%)
+
 ## Session 2026-03-20 - Features #448, #449
 
 ### Feature #448: Regressietests aanvullen voor fd.nl design tokens en patronen - PASSING
@@ -18733,3 +18761,16 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#451)
 - Overall progress: 447/451 passing (99.1%)
+
+## Session 2026-03-21 - Feature #461
+
+### Feature #461: Persona seeds — Marijke naar pensioen-strategie - PASSING
+- Changed Marijke Vermeer fire_end_strategy from 'legacy' to 'pensioen' in lib/test-personas.ts
+- Updated PersonaProfile type union to include 'pensioen'
+- Updated comments/descriptions to reflect new strategy
+- Updated VALID_FIRE_STRATEGIES in testdata-persona-validatie.ts to include 'pensioen'
+- Updated Marijke test assertions: assertEqual now checks for 'pensioen' instead of 'legacy'
+- Updated persona-simrow-compat.test.ts comments and test names
+- test-seed.ts left untouched (as required)
+- All 34 simrow tests pass, all 57 wealth-composition tests pass
+- Commit: 15d6e5cf
