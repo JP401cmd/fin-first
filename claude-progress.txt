@@ -1,3 +1,32 @@
+## Session 2026-03-21 - Feature #458
+
+### Feature #458: Sub-charts: Wealth Composition + Income/Expense pensioen-modus - PASSING
+- WealthCompositionChart: added planningMode prop ('fire' | 'pensioen'), aowAgeFractional prop
+  - In pensioen mode: FIRE vertical line hidden, AOW vertical line shown at aowAgeFractional
+  - AOW line styling matches SimChart: strokeWidth 1.8, dashed 4 2, horizon color, with AOW label + age
+- IncomeExpenseChart: added planningMode, aowAgeFractional, and fireAge props
+  - In fire mode: shows FIRE reference line at fireAge
+  - In pensioen mode: hides FIRE line, shows AOW line with same styling
+- horizon-client.tsx: passes planningMode and aowAgeFractional to WealthCompositionChart, IncomeExpenseChart, and SimChart
+  - planningMode derived from simResult.strategy === 'pensioen'
+- DB migration: added supabase/migrations/20260321000001_allow_pensioen_fire_end_strategy.sql
+  - Drops old CHECK constraint on fire_end_strategy, re-adds with 'pensioen' included
+  - Also added to app/api/apply-migration/route.ts MIGRATION_STATEMENTS
+- All 20 existing chart tests pass (13 WealthComposition + 7 IncomeExpense)
+- Zero new console errors, zero TypeScript errors
+- Commit: c8a557bc
+
+### Files Modified
+- components/app/horizon/wealth-composition-chart.tsx — planningMode + aowAgeFractional props, AOW reference line
+- components/app/horizon/income-expense-chart.tsx — planningMode + aowAgeFractional + fireAge props, reference lines
+- components/app/horizon/horizon-client.tsx — pass planningMode/aowAgeFractional to all 3 charts
+- app/api/apply-migration/route.ts — pensioen CHECK constraint migration
+- supabase/migrations/20260321000001_allow_pensioen_fire_end_strategy.sql — new migration file
+
+### Current Status
+- Feature #458 completed and marked passing
+- Overall progress: 455/460 passing (98.9%)
+
 ## Session 2026-03-21 - Features #453, #455
 
 ### Feature #453: Type-uitbreiding FireEndStrategy + parseFireStrategy - PASSING
