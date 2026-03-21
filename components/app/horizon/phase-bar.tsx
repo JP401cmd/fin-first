@@ -173,7 +173,7 @@ export function PhaseBar({
 
 // ── Segment builder ─────────────────────────────────────────────────────────
 
-function buildSegments({
+export function buildSegments({
   currentAge,
   fireAge,
   aowAge,
