@@ -132,12 +132,13 @@ interface CompatibilityEntry {
   suggestion?: string
 }
 
-const END_STRATEGIES: FireEndStrategy[] = ['deplete', 'legacy', 'perpetual']
+const END_STRATEGIES: FireEndStrategy[] = ['deplete', 'legacy', 'perpetual', 'pensioen']
 
 const END_STRATEGY_SHORT: Record<FireEndStrategy, string> = {
   deplete: 'Opteren',
   legacy: 'Erfenis',
   perpetual: 'Behouden',
+  pensioen: 'Pensioen',
 }
 
 /**
@@ -161,6 +162,10 @@ const COMPATIBILITY_MATRIX: Record<WithdrawalStrategyType, Record<FireEndStrateg
       explanation: 'Bij een vast onttrekkingspercentage boven het reëel rendement daalt de koopkracht geleidelijk.',
       suggestion: 'Stel het percentage lager in dan je verwachte reëel rendement.',
     },
+    pensioen: {
+      status: 'compatible',
+      explanation: 'Vaste onttrekking na AOW-leeftijd is eenvoudig en voorspelbaar.',
+    },
   },
   guardrails: {
     deplete: {
@@ -175,6 +180,10 @@ const COMPATIBILITY_MATRIX: Record<WithdrawalStrategyType, Record<FireEndStrateg
       status: 'warning',
       explanation: 'Guardrails kunnen soms boven het duurzame niveau onttrekken in goede jaren.',
       suggestion: 'Stel een conservatief plafond in om vermogensbehoud te waarborgen.',
+    },
+    pensioen: {
+      status: 'compatible',
+      explanation: 'Guardrails passen onttrekking dynamisch aan na AOW-leeftijd, ideaal voor pensioeninkomen.',
     },
   },
   vpw: {
@@ -192,6 +201,10 @@ const COMPATIBILITY_MATRIX: Record<WithdrawalStrategyType, Record<FireEndStrateg
       explanation: 'VPW is ontworpen om vermogen op te maken. Vermogensbehoud is tegenstrijdig met VPW.',
       suggestion: 'Kies Guardrails of Vast (SWR) met een laag percentage voor vermogensbehoud.',
     },
+    pensioen: {
+      status: 'compatible',
+      explanation: 'VPW berekent optimale onttrekking na AOW-leeftijd op basis van resterende levensverwachting.',
+    },
   },
   bucket: {
     deplete: {
@@ -206,6 +219,10 @@ const COMPATIBILITY_MATRIX: Record<WithdrawalStrategyType, Record<FireEndStrateg
       status: 'warning',
       explanation: 'Cash-emmer verliest waarde door inflatie, wat op lange termijn je koopkracht aantast.',
       suggestion: 'Minimaliseer de cash-allocatie en hervul vaker vanuit de groei-emmer.',
+    },
+    pensioen: {
+      status: 'compatible',
+      explanation: 'Emmer-strategie biedt een stabiele cash-buffer voor de eerste pensioenjaren na AOW.',
     },
   },
 }

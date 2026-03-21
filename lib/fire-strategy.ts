@@ -1,15 +1,16 @@
 /**
  * FIRE Eindstrategie — types, defaults en labels.
  *
- * Drie modi:
+ * Vier modi:
  *  - deplete:   Portfolio → €0 op instelbare leeftijd (default 90)
  *  - legacy:    Portfolio → instelbaar bedrag op instelbare leeftijd
  *  - perpetual: Portfolio behoudt koopkracht, eeuwigdurend geïndexeerd
+ *  - pensioen:  Opbouw tot AOW-leeftijd, daarna onttrekking
  *
  * Pure types, geen Supabase dependency.
  */
 
-export type FireEndStrategy = 'perpetual' | 'legacy' | 'deplete'
+export type FireEndStrategy = 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
 
 export interface FireStrategyConfig {
   strategy: FireEndStrategy
@@ -36,6 +37,10 @@ export const STRATEGY_LABELS: Record<FireEndStrategy, { name: string; subtitle: 
     name: 'Behouden van vermogen',
     subtitle: 'Koopkracht blijft intact, eeuwigdurend',
   },
+  pensioen: {
+    name: 'Pensioenleeftijd',
+    subtitle: 'Vermogensopbouw tot AOW, daarna onttrekking',
+  },
 }
 
 /** Parse profile data to FireStrategyConfig with safe defaults. */
@@ -45,7 +50,7 @@ export function parseFireStrategy(profile: {
   fire_legacy_amount?: number | string | null
 }): FireStrategyConfig {
   return {
-    strategy: (['perpetual', 'legacy', 'deplete'].includes(profile.fire_end_strategy ?? '')
+    strategy: (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(profile.fire_end_strategy ?? '')
       ? profile.fire_end_strategy as FireEndStrategy
       : 'deplete'),
     endAge: profile.fire_end_age ?? 90,
