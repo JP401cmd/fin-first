@@ -526,14 +526,14 @@ export default function GidsPage() {
                 <br />
                 • <strong>Fondsaanbieder</strong> — Vanguard, iShares, Northern Trust publiceren TER op hun website
                 <br /><br />
-                <strong>TriFinity &amp; kosten:</strong> Voer de TER per holding in bij <strong>De Kern → Portfolio → Holdings</strong>. De <strong>fee analyzer-widget</strong> op je dashboard berekent vervolgens je gewogen totale kosten, de impact op je FIRE-datum en hoeveel vrijheidsdagen de kosten je over tijd kosten.
+                <strong>TriFinity &amp; kosten:</strong> Voer de TER per holding in via de <strong>Portfolio Holdings-kaart</strong> op De Kern (verschijnt zodra je &apos;Holdings bijhouden&apos; activeert op een bezitting). De <strong>fee analyzer-widget</strong> op je dashboard berekent vervolgens je gewogen totale kosten, de impact op je FIRE-datum en hoeveel vrijheidsdagen de kosten je over tijd kosten.
                 <br /><br />
                 <em>Disclaimer: TER is niet de enige kostenmaat. Tracking difference kan positief of negatief afwijken van de TER. Bekijk altijd het totaalplaatje inclusief transactiekosten van je broker.</em>
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Kern → Portfolio → Holdings en voer de TER in bij elk fonds (te vinden in het KID/factsheet of op Morningstar.nl)",
+                "Open de Portfolio Holdings-kaart op De Kern en voer de TER in bij elk fonds (te vinden in het KID/factsheet of op Morningstar.nl)",
                 "Bekijk de fee analyzer-widget op je dashboard — deze toont je gewogen portfoliokosten en de impact op je FIRE-datum",
                 "Vergelijk fondsen: een indexfonds (TER ~0,20%) vs een actief fonds (TER ~1,50%) kan tienduizenden euro's verschil maken over 20 jaar",
                 "Check ook de tracking difference naast de TER — sommige fondsen presteren beter dan hun TER suggereert door securities lending of belastingefficiëntie",
