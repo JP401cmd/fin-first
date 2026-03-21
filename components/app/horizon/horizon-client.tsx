@@ -5433,7 +5433,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           />
         </>
       )}
-      <StrategieModal open={activeModal === 'strategie'} onClose={() => setActiveModal(null)} />
+      <StrategieModal open={activeModal === 'strategie'} onClose={() => { setActiveModal(null); loadData() }} />
     </div>
   )
 }
