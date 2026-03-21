@@ -153,7 +153,7 @@ export default function InstellingenPage() {
   const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
   const [retirementCustomAmount, setRetirementCustomAmount] = useState<string>('')
   const [fireEndStrategy, setFireEndStrategy] = useState<FireEndStrategy>('perpetual')
-  const [fireEndAge, setFireEndAge] = useState<string>('85')
+  const [fireEndAge, setFireEndAge] = useState<string>('90')
   const [fireLegacyAmount, setFireLegacyAmount] = useState<string>('')
   const [fireSaving, setFireSaving] = useState(false)
   const [fireMessage, setFireMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -239,10 +239,28 @@ export default function InstellingenPage() {
         if (d.box3_method === 'werkelijk') setBox3Method('werkelijk')
         if (d.retirement_expense_method) setRetirementMethod(d.retirement_expense_method as RetirementExpenseMethod)
         if (d.retirement_expense_custom_amount) setRetirementCustomAmount(String(d.retirement_expense_custom_amount))
-        const fs = parseFireStrategy(d)
-        setFireEndStrategy(fs.strategy)
-        if (fs.endAge) setFireEndAge(String(fs.endAge))
-        if (fs.legacyAmount) setFireLegacyAmount(String(fs.legacyAmount))
+        // Use fire-settings API which handles app_settings fallback for pensioen
+        try {
+          const fsRes = await fetch('/api/fire-settings')
+          if (fsRes.ok) {
+            const fsData = await fsRes.json()
+            setFireEndStrategy(fsData.fire_end_strategy as FireEndStrategy)
+            setFireEndAge(String(fsData.fire_end_age ?? 90))
+            if (fsData.fire_legacy_amount) setFireLegacyAmount(String(fsData.fire_legacy_amount))
+          } else {
+            // Fallback to profile data if API fails
+            const fs = parseFireStrategy(d)
+            setFireEndStrategy(fs.strategy)
+            if (fs.endAge) setFireEndAge(String(fs.endAge))
+            if (fs.legacyAmount) setFireLegacyAmount(String(fs.legacyAmount))
+          }
+        } catch {
+          // Fallback to profile data if fetch fails
+          const fs = parseFireStrategy(d)
+          setFireEndStrategy(fs.strategy)
+          if (fs.endAge) setFireEndAge(String(fs.endAge))
+          if (fs.legacyAmount) setFireLegacyAmount(String(fs.legacyAmount))
+        }
 
         // Weergave: module colors
         if (d.module_colors) {
@@ -470,24 +488,27 @@ export default function InstellingenPage() {
     setFireSaving(true)
     setFireMessage(null)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { error } = await supabase.from('profiles').update({
-        retirement_expense_method: retirementMethod,
-        retirement_expense_custom_amount: retirementCustomAmount ? Number(retirementCustomAmount) : null,
-        fire_end_strategy: fireEndStrategy,
-        fire_end_age: Number(fireEndAge) || 90,
-        fire_legacy_amount: fireLegacyAmount ? Number(fireLegacyAmount) : null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', user.id)
-      if (error) throw error
+      const res = await fetch('/api/fire-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          retirement_expense_method: retirementMethod,
+          retirement_expense_custom_amount: retirementCustomAmount ? Number(retirementCustomAmount) : null,
+          fire_end_strategy: fireEndStrategy,
+          fire_end_age: Number(fireEndAge) || 90,
+          fire_legacy_amount: fireLegacyAmount ? Number(fireLegacyAmount) : null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Opslaan mislukt')
       setFireMessage({ type: 'success', text: 'FIRE instellingen opgeslagen!' })
       setTimeout(() => setFireMessage(null), 3000)
-    } catch {
-      setFireMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Opslaan mislukt. Probeer opnieuw.'
+      setFireMessage({ type: 'error', text: msg })
     }
     setFireSaving(false)
-  }, [supabase, retirementMethod, retirementCustomAmount, fireEndStrategy, fireEndAge, fireLegacyAmount])
+  }, [retirementMethod, retirementCustomAmount, fireEndStrategy, fireEndAge, fireLegacyAmount])
 
   const saveWithdrawalStrategy = useCallback(async () => {
     setWsSaving(true)
@@ -1205,7 +1226,7 @@ export default function InstellingenPage() {
           </div>
 
           {/* Extra inputs for deplete / legacy */}
-          {(fireEndStrategy === 'deplete' || fireEndStrategy === 'legacy') && (
+          {(fireEndStrategy === 'deplete' || fireEndStrategy === 'legacy' || fireEndStrategy === 'pensioen') && (
             <div className="mt-4">
               <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Eindleeftijd</label>
               <input

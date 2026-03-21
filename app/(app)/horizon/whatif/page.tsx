@@ -139,7 +139,22 @@ export default function WhatIfPage() {
 
       const dob = profileResult.data?.date_of_birth ?? null
 
-      setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+      // Use fire-settings API which handles app_settings fallback for pensioen
+      try {
+        const fsRes = await fetch('/api/fire-settings')
+        if (fsRes.ok) {
+          const fsData = await fsRes.json()
+          setFireStrategy({
+            strategy: (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsData.fire_end_strategy) ? fsData.fire_end_strategy : 'deplete') as FireStrategyConfig['strategy'],
+            endAge: fsData.fire_end_age ?? 90,
+            legacyAmount: Number(fsData.fire_legacy_amount ?? 0),
+          })
+        } else {
+          setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+        }
+      } catch {
+        setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+      }
 
       // AOW-leeftijd ophalen op basis van geboortedatum
       try {

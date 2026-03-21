@@ -525,7 +525,17 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
 
       const dob = profileResult.data?.date_of_birth ?? null
 
-      const parsedFireStrategy = parseFireStrategy(profileResult.data ?? {})
+      // Use fire-settings API for pensioen fallback support
+      let parsedFireStrategy = parseFireStrategy(profileResult.data ?? {})
+      try {
+        const fsRes = await fetch('/api/fire-settings')
+        if (fsRes.ok) {
+          const fsData = await fsRes.json()
+          if (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsData.fire_end_strategy)) {
+            parsedFireStrategy = { strategy: fsData.fire_end_strategy, endAge: fsData.fire_end_age ?? 90, legacyAmount: Number(fsData.fire_legacy_amount ?? 0) }
+          }
+        }
+      } catch { /* fallback to profile data */ }
       setFireStrategy(parsedFireStrategy)
       setLocalEndStrategy(parsedFireStrategy.strategy)
       setLocalEndAge(String(parsedFireStrategy.endAge))
@@ -605,18 +615,18 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
     setEndStrategyMessage(null)
 
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Niet ingelogd')
-
-      const { error } = await supabase.from('profiles').update({
-        fire_end_strategy: strategy,
-        fire_end_age: Number(endAge) || 90,
-        fire_legacy_amount: legacyAmount ? Number(legacyAmount) : null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', user.id)
-
-      if (error) throw error
+      // Use fire-settings API which handles CHECK constraint fallback for pensioen
+      const res = await fetch('/api/fire-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fire_end_strategy: strategy,
+          fire_end_age: Number(endAge) || 90,
+          fire_legacy_amount: legacyAmount ? Number(legacyAmount) : null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Opslaan mislukt')
 
       // Update simulation state
       const newConfig: FireStrategyConfig = {

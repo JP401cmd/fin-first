@@ -57,3 +57,32 @@ export function parseFireStrategy(profile: {
     legacyAmount: Number(profile.fire_legacy_amount ?? 0),
   }
 }
+
+/**
+ * Resolve the fire strategy with feature_preferences fallback.
+ * When the DB CHECK constraint doesn't yet include 'pensioen', the fire-settings API
+ * stores the strategy override in profiles.feature_preferences.fire_strategy_override.
+ *
+ * Use this on server-side (e.g. dashboard-data-loader) where you have the profile data.
+ */
+export function resolveFireStrategyWithOverride(
+  profile: {
+    fire_end_strategy?: string | null
+    fire_end_age?: number | null
+    fire_legacy_amount?: number | string | null
+    feature_preferences?: Record<string, unknown> | null
+  },
+): FireStrategyConfig {
+  const base = parseFireStrategy(profile)
+
+  // If DB already has 'pensioen', no fallback needed
+  if (base.strategy === 'pensioen') return base
+
+  // Check feature_preferences for pensioen override
+  const fp = profile.feature_preferences ?? {}
+  if (fp.fire_strategy_override === 'pensioen') {
+    return { ...base, strategy: 'pensioen' }
+  }
+
+  return base
+}

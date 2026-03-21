@@ -643,6 +643,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     ? (fireSwr * portfolioAtAow) / 12
     : null
 
+  // ── Overgang (transition phase) berekening ──────────────────────────────────
+  console.log('[PhaseModal] debug:', { hasSimResult: !!simResult, currentAge, fireAge: simResult?.fireAge, fireReachable: simResult?.fireReachable, isPensioenMode })
+  const overgangData = (() => {
+    if (!simResult || currentAge == null || simResult.fireAge == null || !simResult.fireReachable || isPensioenMode) return null
+    const oFireAge = Math.round(simResult.fireAge)
+    const oAowAge = Math.round(userAowAge.fractional)
+    const scenario = oFireAge < oAowAge ? 'gap' as const : oFireAge > oAowAge ? 'shortfall' as const : 'none' as const
+    if (scenario === 'none') return null
+    const start = scenario === 'gap' ? oFireAge : oAowAge
+    const end = scenario === 'gap' ? oAowAge : oFireAge
+    const yearlyExp = (effectiveInput?.monthlyExpenses ?? 0) * 12
+    const baseAow = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+    const yearlyAow = baseAow * 12
+    const pRow = simResult.rows.find(r => r.age === oFireAge)
+    const portfolioAtStart = pRow?.endPortfolio ?? simResult.firePortfolioAtFire
+    const withdrawal = scenario === 'gap' ? yearlyExp : Math.max(yearlyExp - yearlyAow, 0)
+    const result = { scenario, start, end, fireAge: oFireAge, aowAge: oAowAge, yearlyExp, yearlyAow, portfolioAtStart, withdrawal }
+    console.log('[PhaseModal] overgangData:', result)
+    return result
+  })()
+
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const effectiveCountdown = simResult?.fireAgeFractional != null && currentAge != null
     ? deriveCountdown(simResult.fireAgeFractional, currentAge)
@@ -4954,42 +4975,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         />
       )}
       {/* Overgang phase modal */}
-      {(() => {
-        if (!simResult || currentAge == null || simResult.fireAge == null || !simResult.fireReachable || isPensioenMode) return null
-        const effectiveFireAge = Math.round(simResult.fireAge)
-        const effectiveAowAge = Math.round(userAowAge.fractional)
-        const transitionScenario = effectiveFireAge < effectiveAowAge
-          ? 'gap' as const
-          : effectiveFireAge > effectiveAowAge
-          ? 'shortfall' as const
-          : 'none' as const
-        if (transitionScenario === 'none') return null
-        const overgangStart = transitionScenario === 'gap' ? effectiveFireAge : effectiveAowAge
-        const overgangEnd = transitionScenario === 'gap' ? effectiveAowAge : effectiveFireAge
-        const yearlyExpenses = (effectiveInput?.monthlyExpenses ?? 0) * 12
-        const baseAowMonthly = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
-        const yearlyAowIncome = baseAowMonthly * 12
-        const portfolioRow = simResult.rows.find(r => r.age === effectiveFireAge)
-        const portfolioAtTransitionStart = portfolioRow?.endPortfolio ?? simResult.firePortfolioAtFire
-        const yearlyWithdrawal = transitionScenario === 'gap'
-          ? yearlyExpenses
-          : Math.max(yearlyExpenses - yearlyAowIncome, 0)
-        return (
-          <PhaseModalOvergang
-            open={activeFaseModal === 'overgang'}
-            onClose={() => setActiveFaseModal(null)}
-            transitionScenario={transitionScenario}
-            startAge={overgangStart}
-            endAge={overgangEnd}
-            fireAge={effectiveFireAge}
-            aowAge={effectiveAowAge}
-            yearlyWithdrawal={yearlyWithdrawal}
-            yearlyAowIncome={yearlyAowIncome}
-            yearlyExpenses={yearlyExpenses}
-            portfolioAtTransitionStart={portfolioAtTransitionStart}
-          />
-        )
-      })()}
+      {overgangData && (
+        <PhaseModalOvergang
+          open={activeFaseModal === 'overgang'}
+          onClose={() => setActiveFaseModal(null)}
+          transitionScenario={overgangData.scenario}
+          startAge={overgangData.start}
+          endAge={overgangData.end}
+          fireAge={overgangData.fireAge}
+          aowAge={overgangData.aowAge}
+          yearlyWithdrawal={overgangData.withdrawal}
+          yearlyAowIncome={overgangData.yearlyAow}
+          yearlyExpenses={overgangData.yearlyExp}
+          portfolioAtTransitionStart={overgangData.portfolioAtStart}
+        />
+      )}
 
       {/* === KPI Kassabon Modals === */}
       <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title={isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}>

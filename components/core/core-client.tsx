@@ -764,7 +764,17 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         .reduce((s, a) => s + Number((a as { monthly_contribution?: number | null }).monthly_contribution ?? 0), 0)
       const annualSavings = monthlyContributions * 12
       const cashflows = lifeEventsToCashflows((lifeEventsResult.data ?? []) as LifeEvent[])
-      const fireStrategy = parseFireStrategy(profileResult.data)
+      // Use fire-settings API for pensioen fallback support
+      let fireStrategy = parseFireStrategy(profileResult.data)
+      try {
+        const fsRes = await fetch('/api/fire-settings')
+        if (fsRes.ok) {
+          const fsData = await fsRes.json()
+          if (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsData.fire_end_strategy)) {
+            fireStrategy = { strategy: fsData.fire_end_strategy, endAge: fsData.fire_end_age ?? 90, legacyAmount: Number(fsData.fire_legacy_amount ?? 0) }
+          }
+        }
+      } catch { /* fallback to profile data */ }
       const simFireParams = resolveFireParams(profileResult.data ?? {})
       const wsConfig = resolveWithdrawalStrategy(profileResult.data ?? {})
       const simResult = runSimulation(currentAge, fireStrategy.endAge, data.netWorth, yearlyExp, annualSavings, simFireParams.grossReturn, 'nl_box3', simFireParams.inflationRate, cashflows, fireStrategy, wsConfig)
