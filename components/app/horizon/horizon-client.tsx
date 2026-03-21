@@ -78,6 +78,10 @@ const PhaseModalOvergang = dynamic(() =>
   import('@/components/app/horizon/phase-modal-overgang').then(m => ({ default: m.PhaseModalOvergang })),
   { ssr: false }
 )
+const PhaseModalOnttrekking = dynamic(() =>
+  import('@/components/app/horizon/phase-modal-onttrekking').then(m => ({ default: m.PhaseModalOnttrekking })),
+  { ssr: false }
+)
 const SimChartModal = dynamic(() =>
   import('@/components/app/horizon/sim-chart-widget').then(m => ({ default: m.SimChartModal })),
   { ssr: false }
@@ -659,6 +663,33 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     const portfolioAtStart = pRow?.endPortfolio ?? simResult.firePortfolioAtFire
     const withdrawal = scenario === 'gap' ? yearlyExp : Math.max(yearlyExp - yearlyAow, 0)
     return { scenario, start, end, fireAge: oFireAge, aowAge: oAowAge, yearlyExp, yearlyAow, portfolioAtStart, withdrawal }
+  })()
+
+  // ── Onttrekking (withdrawal phase) berekening ──────────────────────────────
+  const onttrekkingData = (() => {
+    if (!simResult || !simResult.fireReachable || simResult.fireAge == null) return null
+    const retirementRows = simResult.rows.filter(r => r.phase === 'retirement')
+    if (retirementRows.length === 0) return null
+    const oStart = retirementRows[0].age
+    const oEnd = simResult.displayEndAge
+    const startRow = retirementRows[0]
+    const startPortfolio = startRow.startPortfolio
+    const yearlyExp = (effectiveInput?.monthlyExpenses ?? 0) * 12
+    const baseAow = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+    const yearlyAow = baseAow * 12
+    // Yearly withdrawal from sim: average of withdrawal amounts in retirement rows
+    const avgWithdrawal = retirementRows.length > 0
+      ? retirementRows.reduce((s, r) => s + r.withdrawal, 0) / retirementRows.length
+      : yearlyExp
+    return {
+      start: oStart,
+      end: oEnd,
+      startPortfolio,
+      strategy: simResult.strategy,
+      targetEndPortfolio: simResult.targetEndPortfolio,
+      yearlyWithdrawal: avgWithdrawal,
+      yearlyAow,
+    }
   })()
 
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
@@ -4985,6 +5016,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           yearlyAowIncome={overgangData.yearlyAow}
           yearlyExpenses={overgangData.yearlyExp}
           portfolioAtTransitionStart={overgangData.portfolioAtStart}
+        />
+      )}
+      {/* Onttrekking phase modal */}
+      {onttrekkingData && simResult && (
+        <PhaseModalOnttrekking
+          open={activeFaseModal === 'onttrekking'}
+          onClose={() => setActiveFaseModal(null)}
+          startAge={onttrekkingData.start}
+          endAge={onttrekkingData.end}
+          startPortfolio={onttrekkingData.startPortfolio}
+          strategy={onttrekkingData.strategy}
+          targetEndPortfolio={onttrekkingData.targetEndPortfolio}
+          yearlyWithdrawal={onttrekkingData.yearlyWithdrawal}
+          yearlyAowIncome={onttrekkingData.yearlyAow}
+          rows={simResult.rows}
         />
       )}
 
