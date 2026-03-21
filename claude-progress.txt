@@ -1,3 +1,43 @@
+## Session 2026-03-21 - Feature #462
+
+### Feature #462: Fix: Eindstrategie pensioenleeftijd opslaan werkt niet - PASSING
+- Three related bugs identified:
+  1. Eindleeftijd-input hidden for pensioen — already fixed in previous PR (line 1211 includes pensioen)
+  2. Inconsistent default endAge — already fixed (default is '90', matching DEFAULT_FIRE_STRATEGY)
+  3. Database CHECK constraint doesn't include 'pensioen' — FIXED with feature_preferences fallback
+
+- Root cause: DB CHECK constraint on profiles.fire_end_strategy only allows ('perpetual', 'legacy', 'deplete')
+  - Migration file exists (20260321000001) but not applied to remote DB
+  - No DB credentials available (SUPABASE_DB_PASSWORD, SUPABASE_ACCESS_TOKEN not set)
+  - Supabase MCP tools not approved for DDL operations
+  - app_settings table has RLS blocking regular user writes
+
+- Solution: feature_preferences fallback in profiles table
+  - fire-settings API PUT: on CHECK constraint violation (23514), saves 'deplete' to profiles + stores 'pensioen' override in profiles.feature_preferences.fire_strategy_override
+  - fire-settings API GET: reads fire_end_strategy, if not 'pensioen' checks feature_preferences override
+  - When DB migration is eventually applied, direct column value takes precedence and override is ignored
+
+- All consumers updated to use fire-settings API:
+  - instellingen/page.tsx: reads strategy via /api/fire-settings instead of parseFireStrategy
+  - horizon-client.tsx: reads via /api/fire-settings with parseFireStrategy fallback
+  - strategie-modal.tsx: saves via /api/fire-settings PUT instead of direct Supabase update
+  - core-client.tsx: reads via /api/fire-settings with parseFireStrategy fallback
+  - whatif/page.tsx: reads via /api/fire-settings with parseFireStrategy fallback
+  - dashboard-data-loader.ts: uses resolveFireStrategyWithOverride (reads feature_preferences)
+
+- New utility: resolveFireStrategyWithOverride() in lib/fire-strategy.ts (sync, no Supabase dependency)
+- fire-settings API made retirement_expense_method optional in PUT (prevents overwrites from strategie-modal)
+
+- Verified via browser:
+  - Select Pensioenleeftijd → end age input visible → set to 67 → save → success message
+  - Reload page → Pensioenleeftijd still selected → end age 67 preserved
+  - Zero new console errors (only pre-existing household/privacy 404)
+- Commit: 6906ba86
+
+### Current Status
+- 1 feature completed this session (#462)
+- Overall progress: 461/461 passing (100%)
+
 ## Session 2026-03-21 - Features #457, #459
 
 ### Feature #457: Horizon-client integratie + KPI-metrics + context-hint - PASSING
