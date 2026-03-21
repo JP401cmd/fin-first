@@ -1,3 +1,25 @@
+## Session 2026-03-21 - Feature #473
+
+### Feature #473: Fix: KPI 'Vermogen op AOW' en 'Mnd. Onttrekking' correct bij pensioen - PASSING
+- Bug: KPIs showed misleading values (€19,020 instead of €1M+) because `requiredFirePortfolio` is the binary-search minimum, not the actual projected portfolio
+- Root cause: pensioen post-processing in use-horizon-fire-sim.ts didn't override `requiredFirePortfolio`
+- Fix 1: Override `requiredFirePortfolio` with `firePortfolioAtFire` (actual portfolio) in pensioen post-processing
+- Fix 2: `portfolioAtAow` now uses `startPortfolio` instead of `endPortfolio` (portfolio AT AOW, not after first withdrawal year), with fallback to `firePortfolioAtFire`
+- Fix 3: `monthlyWithdrawalAtAow` now uses actual withdrawal from sim engine (guardrails-aware) instead of simple SWR calculation
+- Also fixes `effectiveFireTarget` and freedom percentage bar for pensioen mode
+- Verified with browser automation:
+  - Pensioen + Vast (SWR): € 7.904.313 vermogen, € 12.075/mnd onttrekking
+  - Pensioen + Guardrails: € 8.634.234 vermogen, € 20.745/mnd onttrekking
+  - Receipt modal shows correct details
+  - FIRE mode (deplete) still shows correct € 2.391.745 doelbedrag + 3.30% SWR
+  - Zero new console errors (only pre-existing net_worth_snapshots 400)
+- All 48 fire-simulation vitest tests pass
+- Commit: 80ea8c3f
+
+### Files Modified
+- lib/hooks/use-horizon-fire-sim.ts — override requiredFirePortfolio in pensioen post-processing
+- components/app/horizon/horizon-client.tsx — use startPortfolio + actual withdrawal for KPIs
+
 ## Session 2026-03-21 - Features #472, #474
 
 ### Feature #472: Fix: Decumulatie bij pensioen-strategie start vanuit werkelijk portfolio - PASSING
