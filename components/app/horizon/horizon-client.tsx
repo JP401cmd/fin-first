@@ -70,6 +70,14 @@ const StrategieModal = dynamic(() =>
   import('@/components/app/horizon/strategie-modal').then(m => ({ default: m.StrategieModal })),
   { ssr: false }
 )
+const PhaseModalOpbouw = dynamic(() =>
+  import('@/components/app/horizon/phase-modal-opbouw').then(m => ({ default: m.PhaseModalOpbouw })),
+  { ssr: false }
+)
+const PhaseModalOvergang = dynamic(() =>
+  import('@/components/app/horizon/phase-modal-overgang').then(m => ({ default: m.PhaseModalOvergang })),
+  { ssr: false }
+)
 const SimChartModal = dynamic(() =>
   import('@/components/app/horizon/sim-chart-widget').then(m => ({ default: m.SimChartModal })),
   { ssr: false }
@@ -143,6 +151,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   const [simModalOpen, setSimModalOpen] = useState(false)
+  const [activeFaseModal, setActiveFaseModal] = useState<'opbouw' | 'overgang' | 'onttrekking' | null>(null)
 
   // Scenario overlay state
   const [scenariosExpanded, setScenariosExpanded] = useState(false)
@@ -362,8 +371,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
       const dob = profileResult.data?.date_of_birth ?? null
 
-      // FIRE strategy from profile
-      setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+      // FIRE strategy from profile — use API for pensioen fallback
+      try {
+        const fsRes = await fetch('/api/fire-settings')
+        if (fsRes.ok) {
+          const fsData = await fsRes.json()
+          if (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsData.fire_end_strategy)) {
+            setFireStrategy({ strategy: fsData.fire_end_strategy, endAge: fsData.fire_end_age ?? 90, legacyAmount: Number(fsData.fire_legacy_amount ?? 0) })
+          } else {
+            setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+          }
+        } else {
+          setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+        }
+      } catch {
+        setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+      }
 
       // Berekeningsparameters uit profiel
       setFireParams(resolveFireParams(profileResult.data ?? {}))
@@ -1949,6 +1972,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     endAge={simResult.displayEndAge}
                     fireReachable={simResult.fireReachable}
                     isPensioenMode={isPensioenMode}
+                    onSegmentClick={(fase) => setActiveFaseModal(fase)}
                   />
                 </div>
               )}
@@ -4912,6 +4936,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         </BottomSheet>
         )
       })()}
+
+      {/* === Phase Modals === */}
+      {simResult && currentAge != null && simResult.fireAge != null && (
+        <PhaseModalOpbouw
+          open={activeFaseModal === 'opbouw'}
+          onClose={() => setActiveFaseModal(null)}
+          currentAge={currentAge}
+          fireAge={simResult.fireAge}
+          currentNetWorth={(effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)}
+          expectedPortfolioAtFire={simResult.firePortfolioAtFire}
+          yearlySavings={(fire?.monthlySavings ?? 0) * 12}
+          expectedReturn={fireParams.grossReturn}
+          rows={simResult.rows}
+        />
+      )}
 
       {/* === KPI Kassabon Modals === */}
       <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title={isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}>

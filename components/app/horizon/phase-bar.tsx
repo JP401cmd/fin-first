@@ -25,6 +25,8 @@ interface PhaseBarProps {
   fireReachable: boolean
   isPensioenMode: boolean
   onSegmentClick?: (fase: FaseId) => void
+  visibleMinAge?: number       // zoom viewport start (clip segments to this)
+  visibleMaxAge?: number       // zoom viewport end (clip segments to this)
 }
 
 // ── Display mode thresholds ──────────────────────────────────────────────────
@@ -43,6 +45,8 @@ export function PhaseBar({
   fireReachable,
   isPensioenMode,
   onSegmentClick,
+  visibleMinAge,
+  visibleMaxAge,
 }: PhaseBarProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
@@ -61,12 +65,28 @@ export function PhaseBar({
   // ── Build segments based on edge cases ──────────────────────────────────
 
   const segments = buildSegments({ currentAge, fireAge, aowAge, endAge, fireReachable, isPensioenMode })
-  const totalAgeSpan = endAge - currentAge
+
+  // ── Clip segments to visible zoom viewport ──────────────────────────────
+
+  const vpMin = visibleMinAge ?? currentAge
+  const vpMax = visibleMaxAge ?? endAge
+  const totalAgeSpan = vpMax - vpMin
   if (totalAgeSpan <= 0 || segments.length === 0) return null
+
+  // Clip each segment to the visible viewport, filtering out fully hidden ones
+  const clippedSegments = segments
+    .map(s => ({
+      ...s,
+      clippedStart: Math.max(s.startAge, vpMin),
+      clippedEnd: Math.min(s.endAge, vpMax),
+    }))
+    .filter(s => s.clippedEnd > s.clippedStart)
+
+  if (clippedSegments.length === 0) return null
 
   // ── Calculate widths (proportional to age span, with minimums) ──────────
 
-  const rawFractions = segments.map(s => (s.endAge - s.startAge) / totalAgeSpan)
+  const rawFractions = clippedSegments.map(s => (s.clippedEnd - s.clippedStart) / totalAgeSpan)
   const segmentWidths = applyMinWidths(rawFractions, containerWidth)
 
   return (
@@ -77,7 +97,7 @@ export function PhaseBar({
       className="flex w-full"
       style={{ height: 36, gap: 1 }}
     >
-      {segments.map((seg, i) => {
+      {clippedSegments.map((seg, i) => {
         const widthPx = segmentWidths[i]
         const isCollapsed = widthPx < MIN_SEGMENT_PX
         const isWide = widthPx >= WIDE_THRESHOLD
@@ -85,11 +105,11 @@ export function PhaseBar({
 
         const Icon = seg.icon
         const borderRadius =
-          i === 0 && i === segments.length - 1
+          i === 0 && i === clippedSegments.length - 1
             ? 'var(--r, 8px)'
             : i === 0
             ? 'var(--r, 8px) 0 0 var(--r, 8px)'
-            : i === segments.length - 1
+            : i === clippedSegments.length - 1
             ? '0 var(--r, 8px) var(--r, 8px) 0'
             : '0'
 
