@@ -18967,3 +18967,25 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#467)
 - Overall progress: 462/467 passing (98.9%)
+
+## Session 2026-03-21 - Feature #469
+
+### Feature #469: PhaseBar meeschalen met grafiek-zoom - PASSING
+- Added optional `visibleMinAge` and `visibleMaxAge` props to PhaseBarProps in phase-bar.tsx
+- Implemented segment clipping: segments outside the visible viewport are filtered out, partially visible segments are proportionally clipped
+- Moved PhaseBar from outside ZoomableChartContainer to inside its render-prop in horizon-client.tsx
+- Passed `visibleMin`/`visibleMax` from the zoom state as `visibleMinAge`/`visibleMaxAge` props
+- Updated `buildSegments` type to omit new optional props
+- Verified via browser automation:
+  - Zoomed in (48-54 range): only Overgang phase visible, Opbouw (35-38) hidden correctly
+  - Zoomed in (57-62 range): only Overgang visible, fills entire bar
+  - Reset zoom (press '0'): all phases restored (Opbouw + Overgang), backward compatible
+  - Zero new console errors (only pre-existing Supabase 400)
+- Commit: 40d9e21a
+
+### Files Modified
+- components/app/horizon/phase-bar.tsx — added visibleMinAge/visibleMaxAge props, viewport clipping logic
+- components/app/horizon/horizon-client.tsx — moved PhaseBar inside ZoomableChartContainer render-prop
+
+### Current Status
+- 1 feature completed this session (#469)
