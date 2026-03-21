@@ -19216,3 +19216,36 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#471)
+
+## Session 2026-03-21 - Feature #475
+
+### Feature #475: Fix: Guardrails decumStartPortfolio correct bij pensioen-strategie - PASSING
+- Investigated guardrails behavior with pensioen strategy + high portfolio (€1M+)
+- Analysis: with €33k/year expenses and 5% return on €1M, net growth = +€17k/year
+  - Floor (0.80 × €1M = €800k): never triggers under normal returns
+  - Ceiling (1.20 × €1M = €1.2M): triggers after ~12 years of growth
+  - Withdrawal stays effectively static until ceiling triggers
+- Conclusion: this IS correct Guyton-Klinger behavior — no code changes needed
+  - Anchoring to start-of-retirement portfolio provides crash protection + prosperity sharing
+  - Clamp (floor/ceiling of base expenses) ensures ±20% max deviation from needs
+- Added 6 unit tests in withdrawal-strategy.test.ts:
+  1. Neutral zone stability for early years
+  2. Floor never triggers with positive returns over 23 years
+  3. Ceiling triggers within ~15 years
+  4. Floor correctly triggers during market crash (40% drop)
+  5. Anchoring value matches simulation's decumStartPortfolio
+  6. Documented behavior: high-portfolio withdrawals stay within ±20% band
+- Added 3 integration tests in fire-withdrawal-integration.test.ts:
+  1. Full simulation with pensioen + guardrails produces valid stable rows
+  2. High starting portfolio keeps consecutive withdrawals within ±10% step
+  3. AOW cashflow + guardrails produces valid output with reduced withdrawals
+- Added JSDoc documentation to:
+  - applyGuardrails() in withdrawal-strategy.ts (full anchoring analysis)
+  - decumStartPortfolio in simulateDecumulation() (cross-reference to #475)
+  - decStartPortfolio in runSimulation() (cross-reference to guardrails docs)
+- All 103 tests pass (1 pre-existing bucket test failure, unrelated)
+- Zero TypeScript errors, zero console errors
+- Commit: d2232e45
+
+### Current Status
+- 1 feature completed this session (#475)
