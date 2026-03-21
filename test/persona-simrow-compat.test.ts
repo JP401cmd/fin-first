@@ -290,7 +290,7 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
       )
 
       const retRows = result.rows.filter(r => r.phase === 'retirement')
-      // Marijke has legacy strategy with guardrails — she should have retirement rows
+      // Marijke has pensioen strategy with guardrails — she should have retirement rows
       // Note: if FIRE age is already reached, all rows are retirement
       for (const row of retRows) {
         assertValidSimRow(row, `marijke ret age=${row.age}`)
@@ -301,7 +301,7 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
       }
     })
 
-    it('legacy strategy produces rows until end age', () => {
+    it('pensioen strategy produces rows until end age', () => {
       const result = runSimulation(
         params.currentAge,
         params.endAge,

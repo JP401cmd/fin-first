@@ -31,7 +31,7 @@ const VALID_BUDGET_TYPES = ['income', 'expense', 'savings', 'debt', 'archive']
 
 const VALID_HOUSEHOLD_TYPES = ['solo', 'samen', 'gezin']
 
-const VALID_FIRE_STRATEGIES = ['perpetual', 'legacy', 'deplete']
+const VALID_FIRE_STRATEGIES = ['perpetual', 'legacy', 'deplete', 'pensioen']
 
 const VALID_SOVEREIGNTY_PHASES = ['recovery', 'stability', 'momentum', 'mastery']
 
@@ -137,13 +137,13 @@ const tests: TestCase[] = [
     id: 'tp-marijke-complete-data',
     name: 'Marijke (gepensioneerd): complete persona data',
     category: CAT,
-    description: 'Marijke is retired with legacy strategy',
+    description: 'Marijke is retired with pensioen strategy',
     priority: 'critical',
     estimatedDurationMs: 200,
     fn() {
       const marijke = p('marijke')
       assertEqual(marijke.meta.name, 'Marijke Vermeer', 'name')
-      assertEqual(marijke.profile.fire_end_strategy, 'legacy', 'legacy strategy')
+      assertEqual(marijke.profile.fire_end_strategy, 'pensioen', 'pensioen strategy')
       assertDefined(marijke.profile.fire_legacy_amount, 'legacy amount defined')
       assertGreaterThan(marijke.profile.fire_legacy_amount!, 0, 'legacy amount > 0')
       assertGreaterThan(marijke.life_events.length, 0, 'has life events')

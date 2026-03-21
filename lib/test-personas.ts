@@ -7,7 +7,7 @@
  * 3. Lisa de Groot — "De 100K milestone" (family, hit 100K net worth)
  * 4. Willem Jansen — "Bijna binnen" (near financial independence)
  * 5. Rashid Dimohammed — "De Genieter" (no budgets, no transactions, check-in based)
- * 6. Marijke Vermeer — "De Gepensioneerde" (retired, legacy strategy)
+ * 6. Marijke Vermeer — "De Gepensioneerde" (retired, pensioen strategy)
  */
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'
@@ -60,7 +60,7 @@ export interface PersonaProfile {
   // FIRE parameters
   expected_return?: number        // bijv. 0.07
   inflation_rate?: number         // bijv. 0.02
-  fire_end_strategy?: 'perpetual' | 'legacy' | 'deplete'
+  fire_end_strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
   fire_end_age?: number           // 60–120
   fire_legacy_amount?: number     // alleen bij 'legacy'
   retirement_expense_method?: 'essential_budgets' | 'custom_amount' | 'current_income'
@@ -1778,7 +1778,7 @@ const rashidData: PersonaData = {
 
 // ══════════════════════════════════════════════════════════════
 // Persona 6 — Marijke Vermeer ("De Gepensioneerde")
-// Uniek: al met pensioen, uitkeringsfase, legacy strategie
+// Uniek: al met pensioen, uitkeringsfase, pensioen strategie
 // ══════════════════════════════════════════════════════════════
 
 const marijkeTransactions: PersonaTransactionTemplate[] = [
@@ -1847,7 +1847,7 @@ const marijkeData: PersonaData = {
     temporal_balance: 5,
     expected_return: 0.05,
     inflation_rate: 0.02,
-    fire_end_strategy: 'legacy',
+    fire_end_strategy: 'pensioen',
     fire_legacy_amount: 200000,
     retirement_expense_method: 'custom_amount',
     retirement_expense_custom_amount: 2800,
