@@ -19029,3 +19029,41 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#469)
+
+## Session 2026-03-21 - Features #465, #466
+
+### Feature #465: PhaseModal Overgang — gap/tekort analyse - PASSING
+- Created PhaseModalOvergang component (phase-modal-overgang.tsx) with BottomSheet + KassabonShell
+- Two scenarios with uniform layout:
+  - Scenario A (gap, FIRE < AOW): shows duration, portfolio at FIRE, yearly expenses, withdrawal/year, total needed
+  - Scenario B (shortfall, FIRE > AOW): shows duration, yearly expenses, AOW income, supplement needed, total shortfall
+- transitionScenario computed as discriminating variable: 'gap' | 'shortfall' | 'none'
+- Philosophical note: "X jaar overgang = X jaar eerder verdiende vrijheid die je nu overbrugt"
+- Modal not rendered when isPensioenMode or FIRE=AOW (Overgang segment collapses)
+- Fixed PhaseBar click handling: added onPointerDown stopPropagation on buttons to prevent ZoomableChartContainer's setPointerCapture from intercepting clicks
+- Computed overgangData outside JSX (not IIFE) for stable React rendering
+- Verified: modal opens with correct GAP-ANALYSE data, amounts in font-mono tabular-nums
+- Commit: 6f4d54e1
+
+### Feature #466: PhaseModal Onttrekking — afbouwanalyse - PASSING
+- Created PhaseModalOnttrekking component (phase-modal-onttrekking.tsx)
+- KassabonShell with 5 receipt rows: Startvermogen, Strategie, Jaarlijkse onttrekking, AOW-inkomen, Geschat eindvermogen
+- Mini withdrawal curve SVG with portfolio decline visualization (kern-500 color)
+- useModalAnimation hook for animated chart reveal on modal open
+- Strategy label from STRATEGY_LABELS (Deplete/Legacy/Perpetual/Pensioen)
+- Computed onttrekkingData from SimResult.rows (retirement phase)
+- Dynamic import + wired into horizon-client.tsx via activeFaseModal state
+- TypeScript compilation clean, zero new console errors
+- Commit: 1515c45b
+
+### Files Created
+- components/app/horizon/phase-modal-overgang.tsx
+- components/app/horizon/phase-modal-onttrekking.tsx
+
+### Files Modified
+- components/app/horizon/phase-bar.tsx — exported FaseId type, added onPointerDown stopPropagation
+- components/app/horizon/horizon-client.tsx — dynamic imports, overgangData/onttrekkingData computed values, modal rendering
+
+### Current Status
+- 2 features completed this session (#465, #466)
+- Overall progress: 463/467 passing (99.1%)
