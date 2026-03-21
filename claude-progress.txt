@@ -1,3 +1,35 @@
+## Session 2026-03-21 - Features #472, #474
+
+### Feature #472: Fix: Decumulatie bij pensioen-strategie start vanuit werkelijk portfolio - PASSING
+- Bug: simulateDecumulation() used `requiredFirePortfolioExact` (binary-search minimum) as start value
+- This caused a visual discontinuity: chart showed ~1M+ accumulation, then jumped to ~19k at AOW age
+- Fix: when `forcedFireAge != null` (pensioen-modus), use actual `portfolio` as decumulation start
+- One line change in fire-simulation.ts line 443: `const decStartPortfolio = forcedFireAge != null ? portfolio : requiredFirePortfolioExact`
+- Other strategies (deplete, perpetual, legacy) unchanged — still use requiredFirePortfolioExact
+- All 48 fire-simulation tests pass, verified in browser: continuous chart line at AOW age
+- Commit: a5fb003c
+
+### Feature #474: Fix: Binary search guardrails-interactie stabiliseren - PASSING
+- Bug: binary search in `requiredAt()` used the chosen withdrawal strategy (guardrails/VPW)
+- Guardrails uses `startPortfolio` (= trial value `mid`) as anchor for floor/ceiling thresholds
+- Lower trial values shift thresholds down proportionally, creating self-reinforcing spiral
+- This converged to unrealistically low required portfolios for guardrails strategy
+- Fix (Option A): binary search always uses static strategy for reliable convergence
+- Changed `simulateDecumulation(mid, ..., true)` to `simulateDecumulation(mid, ..., false)` in requiredAt()
+- The chosen strategy is still used for final visualization rows (line 443+)
+- Updated test G1 to assert requiredFirePortfolio is now identical regardless of withdrawal strategy
+- Updated convergence comments in the code
+- All 48 fire-simulation tests + 13 withdrawal integration tests pass
+- Verified in browser: guardrails now shows realistic doelbedrag (same as static)
+- Commit: 6d4fc4ab
+
+### Files Modified
+- lib/fire-simulation.ts — both fixes applied
+- lib/fire-simulation.test.ts — updated G1 test assertion
+
+### Current Status
+- 2 features completed this session (#472, #474)
+
 ## Session 2026-03-21 - Feature #470
 
 ### Feature #470: Fix: Pensioen-eindstrategie gebruikt AOW-leeftijd als simulatie-eindleeftijd - PASSING
