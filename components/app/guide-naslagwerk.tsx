@@ -198,7 +198,7 @@ const MODULES: NaslagwerkModule[] = [
       {
         icon: LineChart,
         title: 'Hoe de Horizon-grafiek werkt',
-        summary: 'Volledige uitleg: fases, FIRE-leeftijd, belasting, eindstrategie en alle instelbare parameters.',
+        summary: 'Volledige uitleg: fases, FIRE-leeftijd, belasting, eindstrategie (incl. pensioen-modus) en alle instelbare parameters.',
         anchor: 'guide-horizon-grafiek',
       },
       {
@@ -216,7 +216,7 @@ const MODULES: NaslagwerkModule[] = [
       {
         icon: ArrowDownToLine,
         title: 'Onttrekkingsstrategie',
-        summary: 'Kies hoe je je vermogen na FIRE aanspreekt: perpetueel, legacy of deplete.',
+        summary: 'Kies hoe je je vermogen na FIRE of pensioen aanspreekt: deplete, legacy, perpetueel of pensioenleeftijd.',
         anchor: 'guide-reis-4',
       },
       {
@@ -228,7 +228,7 @@ const MODULES: NaslagwerkModule[] = [
       {
         icon: Rocket,
         title: 'Wat komt er nog? (Horizon)',
-        summary: 'Glijpad-visualisatie, pensioen-integratie en scenario-vergelijker.',
+        summary: 'Glijpad-visualisatie, scenario-vergelijker en geavanceerde pensioenplanning.',
         anchor: 'guide-reis-5',
       },
     ],

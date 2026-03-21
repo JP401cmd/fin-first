@@ -59,6 +59,12 @@ const FAQ_ITEMS: FaqItem[] = [
       'Ga naar Identiteit \u2192 Profiel en vul de partnergegevens in bij het huishoudprofiel. Na activatie zie je gecombineerde vermogensoverzichten, per-partner splits bij schulden, en een gezamenlijke FIRE-berekening.',
     link: { label: 'Profiel bewerken', href: '/identity/profiel' },
   },
+  {
+    question: 'Wat als ik niet voor FIRE ga?',
+    answer:
+      'Niet iedereen streeft naar vroeg stoppen met werken \u2014 en dat hoeft ook niet. Schakel de pensioen-modus in via de strategie-instellingen op De Horizon. In deze modus berekent TriFinity je verwachte vermogen op je AOW-leeftijd en hoeveel je daaruit maandelijks kunt onttrekken. Je kunt altijd wisselen tussen FIRE en Pensioen \u2014 je data blijft bewaard.',
+    link: { label: 'Strategie-instellingen', href: '/horizon?strategie=open' },
+  },
 ]
 
 /* ── FAQ accordion item ──────────────────────── */

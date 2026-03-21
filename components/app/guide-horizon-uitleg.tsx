@@ -15,6 +15,7 @@ import {
   Lightbulb,
   BarChart3,
   Layers,
+  Compass,
 } from 'lucide-react'
 
 /* ── Section data ─────────────────────── */
@@ -316,6 +317,13 @@ export default function GuideHorizonUitleg() {
             blijft de curve na FIRE vrijwel vlak.
           </p>
           <p>
+            <strong>4. Pensioenleeftijd</strong> — het vermogen wordt opgebouwd tot je{' '}
+            <strong>AOW-leeftijd</strong>, waarna de onttrekkingsfase begint. Dit is ideaal als
+            je niet voor vroeg stoppen gaat maar wel grip wilt op je financiële situatie bij
+            pensionering. De grafiek splitst in twee kleuren: opbouw (goud) tot AOW en
+            onttrekking (bruin) daarna.
+          </p>
+          <p>
             Stel je eindstrategie in via{' '}
             <InLink href="/identity/instellingen">Instellingen → FIRE Instellingen</InLink> of
             via de strategie-modal op{' '}
@@ -434,7 +442,7 @@ export default function GuideHorizonUitleg() {
               </span>
             </p>
             <p>
-              <strong>Eindstrategie</strong> — deplete, legacy of perpetual.
+              <strong>Eindstrategie</strong> — deplete, legacy, perpetual of pensioenleeftijd.
               <br />
               <span className="text-[var(--ink-3)]">
                 → <InLink href="/identity/instellingen">Identiteit → Instellingen</InLink> of strategie-modal op{' '}
@@ -646,6 +654,70 @@ export default function GuideHorizonUitleg() {
               <strong>Disclaimer:</strong> de projectie is gebaseerd op het verwachte rendement dat je per
               bezitting hebt ingesteld. Werkelijke rendementen kunnen afwijken. Gebruik de Vermogensopbouw
               als richtlijn, niet als garantie.
+            </p>
+          </div>
+        </>
+      ),
+    },
+    {
+      id: 'horizon-uitleg-planningshorizon',
+      number: 12,
+      title: 'Planningshorizon: FIRE vs. Pensioen',
+      icon: Compass,
+      content: (
+        <>
+          <p>
+            TriFinity biedt twee planningsmodi die bepalen <strong>wanneer je onttrekkingsfase
+            begint</strong>:
+          </p>
+          <p>
+            <strong>1. FIRE-modus (standaard)</strong> — de grafiek berekent het exacte moment
+            waarop je vermogen voldoende is om je uitgaven te dekken zonder te werken. Dit kan
+            op elke leeftijd zijn — van 35 tot 65. De FIRE-leeftijd wordt dynamisch berekend
+            op basis van je vermogen, besparing en rendement.
+          </p>
+          <p>
+            <strong>2. Pensioen-modus</strong> — de grafiek richt zich op vermogensopbouw tot
+            je <strong>AOW-leeftijd</strong> (wettelijk bepaald, momenteel rond 67 jaar). In
+            plaats van een FIRE-doelbedrag toont de grafiek hoeveel vermogen je op je
+            pensioenleeftijd verwacht te hebben, en hoeveel je daaruit maandelijks kunt
+            onttrekken.
+          </p>
+          <p>
+            <strong>Wanneer kies je pensioen-modus?</strong> Als je niet streeft naar vroeg
+            stoppen met werken maar wel inzicht wilt in je financiële situatie bij pensionering.
+            Of als je al bijna met pensioen gaat en wilt zien of je vermogen toereikend is.
+          </p>
+          <p>
+            <strong>Wat verandert er in de interface?</strong>
+          </p>
+          <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 space-y-1 mt-1">
+            <p>
+              <strong>KPI 1:</strong> Vrijheidsleeftijd → <strong>Pensioenleeftijd</strong> (je AOW-leeftijd)
+            </p>
+            <p>
+              <strong>KPI 2:</strong> Doelbedrag → <strong>Verwacht vermogen op AOW</strong> (geprojecteerd bedrag)
+            </p>
+            <p>
+              <strong>KPI 3:</strong> Opnamerate → <strong>Maandelijkse onttrekking</strong> (SWR × vermogen / 12)
+            </p>
+            <p>
+              <strong>Grafiek:</strong> twee kleuren — <strong>goud</strong> (opbouw tot AOW) en{' '}
+              <strong>bruin</strong> (onttrekking na AOW)
+            </p>
+            <p>
+              <strong>Waarschuwing:</strong> &quot;FIRE niet bereikbaar&quot; wordt verborgen (AOW is altijd bereikbaar)
+            </p>
+          </div>
+          <p>
+            Wissel tussen modi via de context-hint onder de grafiek, of via{' '}
+            <InLink href="/horizon?strategie=open">de strategie-instellingen</InLink>.
+          </p>
+          <div className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 mt-2">
+            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+            <p className="text-sm leading-relaxed text-[var(--ink-3)] italic">
+              <strong>Pro tip:</strong> je kunt altijd wisselen tussen FIRE en Pensioen in de
+              strategie-instellingen. Je data blijft bewaard — alleen de weergave verandert.
             </p>
           </div>
         </>
