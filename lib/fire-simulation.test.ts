@@ -735,8 +735,9 @@ describe('F — grossIncome / grossExpenses', () => {
 // ── Section G: Kern/Horizon doelbedrag consistency ──────────────────────────
 
 describe('G — Kern/Horizon doelbedrag consistency', () => {
-  it('G1: requiredFirePortfolio differs when withdrawalStrategy is omitted vs explicit guardrails', () => {
-    // Simulates the bug: Kern (no withdrawal strategy) vs Horizon (with guardrails)
+  it('G1: requiredFirePortfolio is identical regardless of withdrawalStrategy (binary search uses static)', () => {
+    // Binary search always uses static strategy for reliable convergence.
+    // The chosen withdrawal strategy only affects visualization rows, not requiredFirePortfolio.
     const withoutWs = runStandard()
     const withGuardrails = runStandard({}, [], undefined, {
       strategy: 'guardrails',
@@ -745,8 +746,8 @@ describe('G — Kern/Horizon doelbedrag consistency', () => {
       guardrailCutStep: 0.10,
       guardrailRaiseStep: 0.10,
     })
-    // They should differ — this is the bug scenario
-    expect(withoutWs.requiredFirePortfolio).not.toBe(withGuardrails.requiredFirePortfolio)
+    // After fix: binary search is always static, so requiredFirePortfolio matches
+    expect(withoutWs.requiredFirePortfolio).toBe(withGuardrails.requiredFirePortfolio)
   })
 
   it('G2: requiredFirePortfolio matches when both use the same explicit strategy', () => {

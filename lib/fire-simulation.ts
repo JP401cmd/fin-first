@@ -282,11 +282,10 @@ export function runSimulation(
    * zodat elke strategie een eigen FIRE-leeftijd oplevert.
    *
    * Convergentie-notities:
-   * - Static: monotoon, altijd convergent
-   * - Guardrails: guardrail-drempels schalen mee met startPortfolio → monotoon
-   * - VPW: annuity-based percentage × portfolio → monotoon (hoger start → hoger eind)
-   * - Bucket: BucketState wordt elke iteratie opnieuw geïnitialiseerd vanuit mid-waarde;
-   *   geen state-carry-over tussen iteraties (bekende beperking, acceptabel voor FIRE-schatting)
+   * Binary search uses static withdrawal strategy for all strategies to ensure
+   * reliable convergence. Dynamic strategies (guardrails/VPW) have circular
+   * dependencies with the trial value that cause unrealistic convergence.
+   * The chosen strategy is used for final visualization rows only.
    */
   function requiredAt(candidateFireAge: number): number {
     // Verification horizon: perpetual simulates 100 years post-FIRE
@@ -306,10 +305,14 @@ export function runSimulation(
       ? legacyAmount * Math.pow(1 + inflation, effectiveEndAge - currentAge)
       : 0
 
-    // Use withdrawal strategy in binary search — each strategy yields its own FIRE age
+    // Binary search always uses static withdrawal strategy for reliable convergence.
+    // Guardrails/VPW use startPortfolio as anchor for thresholds — when startPortfolio
+    // equals the trial value `mid`, lower trials shift thresholds down, creating a
+    // self-reinforcing spiral that converges to unrealistically low required portfolios.
+    // The chosen strategy is still used for the final visualization rows (line 443+).
     for (let iter = 0; iter < 80; iter++) {
       const mid = (lo + hi) / 2
-      const { endPortfolio: ep } = simulateDecumulation(mid, candidateFireAge, false, verifyEndAge, true)
+      const { endPortfolio: ep } = simulateDecumulation(mid, candidateFireAge, false, verifyEndAge, false)
 
       if (strategy === 'legacy') {
         if (ep >= indexedLegacy) hi = mid; else lo = mid
