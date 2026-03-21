@@ -19323,3 +19323,116 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features verified and marked passing this session (#478, #479)
 - Overall progress: 479/481 passing (99.6%)
+
+## Session 2026-03-21 - Features #482, #480
+
+### Feature #482: Regressietests: holdings tracking validatie - PASSING
+- All required test suites already existed from dependency features (#476, #477, #479, #481):
+  - kern-layout-refactor.ts: steps 10-11 (holdings portfolio card, data loader)
+  - kern-assets-crud.ts: step 9 (has_holdings_tracking toggle tests)
+  - testdata-persona-validatie.ts: step 8 (3 holdings tracking tests)
+  - kern-holdings-card.ts: full suite (10 tests)
+- Added NEW test to onboarding-persona-seed.ts: `ob-seed-holdings-tracking-phase4`
+  - Validates Phase 4 seeding includes has_holdings_tracking flag
+  - Verifies personas with holdings have tracked assets
+  - Verifies Roos has no tracked assets (correct default)
+  - Verifies ?? false fallback for missing has_holdings_tracking
+- Updated registration test count from 9 to 10
+- All 104/108 regression tests pass (4 pre-existing failures unrelated to changes)
+- Zero TypeScript errors
+- Commit: ec7d28d7
+
+### Feature #480: Gids aanpassen: holdings tracking uitleg - PASSING
+- Vermogensbeheer topic card already fully updated by dependency #479
+- Updated 2 remaining old navigation references in Kostenanalyse section:
+  - Line 529: "De Kern → Portfolio → Holdings" → "Portfolio Holdings-kaart op De Kern"
+  - Line 536: "Ga naar De Kern → Portfolio → Holdings" → "Open de Portfolio Holdings-kaart op De Kern"
+- Guide page loads correctly, zero console errors
+- Commit: 5d2b64fa
+
+### Current Status
+- 2 features completed this session (#482, #480)
+
+## Session 2026-03-21 - Features #483, #484
+
+### Feature #483: Portfolio Holdings kaart verplaatsen naar Missie Controle - PASSING
+- Removed standalone Holdings Portfolio card from core-client.tsx (was between hero and Missie Controle)
+- Added holdingsPortfolio prop to KernMissionControl component interface
+- Rendered Holdings card as subsection inside the Vermogen (assets) tab panel
+- Styled with emerald tint (bg-emerald-500/[0.04], border-emerald-200/60) to match Vermogen panel
+- Card shows: Waarde, Dagwijziging %, Posities count, Top 3 holdings
+- Links to /core/assets/holdings, click stopPropagation prevents parent card click
+- Visible only in Vermogen tab (mobile) and Vermogen column (desktop)
+- Zero new console errors
+- Commit: aa5f0356
+
+### Feature #484: Fix: Holdings kaart blijft zichtbaar na uitschakelen tracking - PASSING
+- Added else-branch after trackedHoldings check: setHoldingsPortfolio(null) when no tracked holdings
+- Added visibilitychange + focus event listeners to reload holdings data on page return
+- When user disables tracking on all assets and returns to /core, card now correctly disappears
+- Handles both: SPA navigation (focus event) and tab switching (visibilitychange event)
+- Zero new console errors
+- Commit: 00f667a8
+
+### Current Status
+- 2 features completed this session (#483, #484)
+
+## Session 2026-03-21 - Features #485, #486
+
+### Feature #485: Portfolio Holdings verplaatsen naar eigen rij onder Vermogen+Schulden - PASSING
+- Removed nested holdingsPortfolio block from inside the Vermogen card (was lines 517-573)
+- Added new full-width row (lg:col-span-2) after the Schulden card in the Missie Controle grid
+- New layout: header with TrendingUp icon + "Portfolio Holdings" title + total value
+- 3-column metrics grid: Waarde, Dagwijziging, Posities (same content as before)
+- Top 3 holdings section preserved
+- On mobile: always visible regardless of active tab (not wrapped in activeTab conditional)
+- On desktop: full-width spanning both columns
+- Link to /core/assets/holdings preserved
+- Zero console errors, zero TypeScript errors
+- Commit: 4c9829a8
+
+### Feature #486: Fix: Holdings card verdwijnt niet na uitschakelen tracking - PASSING
+- Added Supabase realtime subscription on assets table UPDATE events
+- Channel 'assets-tracking-changes' triggers reloadHoldings() on any asset update
+- reloadHoldings() checks has_holdings_tracking and sets holdingsPortfolio to null when no tracked assets
+- Created migration: 20260321200001_enable_realtime_assets.sql (ALTER PUBLICATION supabase_realtime ADD TABLE assets)
+- Existing focus/visibility event handlers preserved as fallback
+- Proper cleanup: sb.removeChannel(channel) in useEffect return
+- Zero console errors
+- Commit: 19c442e5
+
+### Files Modified
+- components/app/core/kern-mission-control.tsx — moved holdings card from nested to own row
+- components/core/core-client.tsx — added realtime subscription for assets table changes
+
+### Files Created
+- supabase/migrations/20260321200001_enable_realtime_assets.sql — enable realtime on assets
+
+### Current Status
+- 2 features completed this session (#485, #486)
+
+## Session 2026-03-21 - Feature #487
+
+### Feature #487: Fix: PhaseBar alignment met SimChart — gedeelde CHART_PAD constante - PASSING
+- Created `lib/chart-constants.ts` with shared `CHART_PAD = { top: 16, right: 16, bottom: 28, left: 60 }`
+- Updated `sim-chart.tsx`: replaced hardcoded PAD with imported CHART_PAD
+- Updated `events-timeline.tsx`: replaced hardcoded PAD with imported CHART_PAD, updated comment
+- Updated `horizon-client.tsx`: imported CHART_PAD, added `style={{ marginLeft: CHART_PAD.left, marginRight: CHART_PAD.right }}` to PhaseBar wrapper div
+- PhaseBar now pixel-perfectly aligns with the SimChart plot area
+- Verified: FIRE age marker at 49 aligns with Opbouw→Overgang boundary
+- Verified: AOW age at 67 aligns with Overgang→Onttrekking boundary
+- Verified: zoom in/out keeps PhaseBar synchronized with chart
+- Verified: PhaseBar segment clicks still open phase modals correctly
+- Zero new JS console errors (only pre-existing net_worth_snapshots 400)
+- Commit: 1c1be179
+
+### Files Created
+- lib/chart-constants.ts
+
+### Files Modified
+- components/app/horizon/sim-chart.tsx
+- components/app/horizon/events-timeline.tsx
+- components/app/horizon/horizon-client.tsx
+
+### Current Status
+- 1 feature completed this session (#487)

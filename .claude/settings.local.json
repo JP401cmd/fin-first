@@ -58,7 +58,8 @@
       "Bash(git add:*)",
       "Bash(playwright-cli goto:*)",
       "Bash(playwright-cli eval:*)",
-      "Bash(playwright-cli resize:*)"
+      "Bash(playwright-cli resize:*)",
+      "Bash(ls -la '/c/Users/janpa/cd/development/fin/app/\\(app\\)/core/')"
     ]
   },
   "enableAllProjectMcpServers": true,
