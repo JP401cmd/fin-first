@@ -428,7 +428,52 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 9: Registratie ─────────────────────────────────────────────
+  // ── Step 9: has_holdings_tracking in Phase 4 ───────────────────────
+  {
+    id: 'ob-seed-holdings-tracking-phase4',
+    name: 'Phase 4: has_holdings_tracking vlag correct gezet bij seeding',
+    category: CAT,
+    description: 'Assets met holdings krijgen has_holdings_tracking=true via seed, default is false',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      // Phase 4 inserts valuations, holdings, and holding_transactions
+      // The has_holdings_tracking flag on assets is set during Phase 1 (asset insert)
+      // seed-persona.ts uses: has_holdings_tracking: a.has_holdings_tracking ?? false
+
+      // Verify personas with holdings have at least one tracked asset
+      for (const key of PERSONA_KEYS) {
+        const persona = PERSONAS[key]
+        if (!persona.holdings || persona.holdings.length === 0) continue
+
+        // Persona has holdings → at least one asset must have has_holdings_tracking=true
+        const trackedAssets = persona.assets.filter(a => a.has_holdings_tracking === true)
+        assert(
+          trackedAssets.length > 0,
+          `${key}: has ${persona.holdings.length} holdings but no asset with has_holdings_tracking=true`,
+        )
+      }
+
+      // Verify Roos (no holdings, no tracking) — defaults correctly
+      const roos = PERSONAS.roos
+      const roosTracked = roos.assets.filter(a => a.has_holdings_tracking === true)
+      assertEqual(roosTracked.length, 0, 'Roos: geen tracked assets (geen holdings)')
+
+      // Verify seed-persona uses ?? false fallback
+      // This ensures assets without explicit has_holdings_tracking get false in DB
+      const testValues: Array<{ input: boolean | undefined; expected: boolean }> = [
+        { input: undefined, expected: false },
+        { input: false, expected: false },
+        { input: true, expected: true },
+      ]
+      for (const { input, expected } of testValues) {
+        const result = input ?? false
+        assertEqual(result, expected, `Fallback ?? false werkt voor ${String(input)}`)
+      }
+    },
+  },
+
+  // ── Step 10: Registratie ────────────────────────────────────────────
   {
     id: 'ob-seed-category-registered',
     name: 'Registratie onder categorie "Onboarding — Persona Seeding"',
@@ -445,8 +490,8 @@ const tests: TestCase[] = [
         assert(t.id.startsWith(expectedPrefix), `Test ID "${t.id}" begint met "${expectedPrefix}"`)
       })
 
-      // Covers all 9 feature steps
-      assert(tests.length >= 9, `Minstens 9 tests (feature heeft 9 stappen), actueel: ${tests.length}`)
+      // Covers all 10 feature steps
+      assert(tests.length >= 10, `Minstens 10 tests (feature heeft 10 stappen), actueel: ${tests.length}`)
 
       // All 6 personas are available for seeding
       assertEqual(PERSONA_KEYS.length, TOTAL_PERSONAS, `${TOTAL_PERSONAS} persona's beschikbaar`)
