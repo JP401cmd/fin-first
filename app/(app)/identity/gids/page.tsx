@@ -222,17 +222,18 @@ export default function GidsPage() {
                 <br /><br />
                 In de onboarding voeg je al je bezittingen toe in één stap, inclusief je <strong>bankrekeningen</strong> — betaal-, spaar- en gezamenlijke rekeningen zijn geïntegreerd in het vermogensoverzicht. Registreer bezittingen over <strong>11 types</strong>: cash, spaarrekening, belegging (ETF/indexfonds/aandelen/obligaties), pensioen (uitkerings-/premieregeling/lijfrente), vastgoed, crypto, voertuig, fysiek bezit, deelneming, levensverzekering en vordering. Elk type heeft eigen velden, waarderingslogica en fiscale classificatie.
                 <br /><br />
-                Binnen beleggingen kun je <strong>individuele holdings</strong> toevoegen met naam, ticker of ISIN, aantal stuks en aankoopprijs. Registreer <strong>koop-, verkoop- en dividendtransacties</strong> voor nauwkeurig rendement per positie. Importeer je posities in bulk via <strong>broker-import</strong>: upload een CSV van <strong>DEGIRO, Saxo Bank of ING Beleggen</strong> — de app herkent je broker automatisch aan de kolomkoppen en importeert posities en transacties.
+                Binnen beleggingen, crypto, spaargeld en pensioen kun je <strong>holdings bijhouden</strong> activeren — een toggle per bezitting die gedetailleerde positietracking inschakelt. Zodra je dat doet, verschijnt een <strong>Holdings-badge</strong> op de kaart en kun je individuele holdings toevoegen met naam, ticker of ISIN, aantal stuks en aankoopprijs. Registreer <strong>koop-, verkoop- en dividendtransacties</strong> voor nauwkeurig rendement per positie. Importeer je posities in bulk via <strong>broker-import</strong>: upload een CSV van <strong>DEGIRO, Saxo Bank of ING Beleggen</strong> — de app herkent je broker automatisch aan de kolomkoppen en importeert posities en transacties.
                 <br /><br />
-                Twee views geven je overzicht: het <strong>Vermogen-overzicht</strong> toont al je bezittingen per type, terwijl het <strong>Holdings-overzicht</strong> je totale beleggingsportfolio toont met allocatie-donut, rendement en dividendhistorie. Update waardes handmatig of via de <strong>maandelijkse check-in</strong> — elke waardering wordt opgeslagen als snapshot voor historisch verloop. Markeer een holding als <strong>favoriet</strong> en volg hem als widget op je dashboard.
+                Op <strong>De Kern</strong> verschijnt automatisch een <strong>Portfolio Holdings-kaart</strong> zodra je minstens één bezitting volgt — dit is je primaire toegangspunt tot het holdings-overzicht met allocatie-donut, rendement en dividendhistorie. Het <strong>Vermogen-overzicht</strong> toont al je bezittingen per type. Update waardes handmatig of via de <strong>maandelijkse check-in</strong> — elke waardering wordt opgeslagen als snapshot voor historisch verloop. Markeer een holding als <strong>favoriet</strong> en volg hem als widget op je dashboard.
               </>
             }
             howTo={{
               steps: [
                 "Ga naar De Kern → Vermogen → Nieuw. Kies het type (belegging, vastgoed, crypto, etc.), geef een naam en huidige waarde op. Stel het risicoprofiel in (laag/middel/hoog).",
-                "Bij beleggingen: voeg individuele holdings toe met naam, ticker/ISIN, aantal stuks en aankoopprijs. Registreer koop-, verkoop- en dividendtransacties voor nauwkeurig rendement.",
-                "Of importeer in bulk: ga naar Vermogen → Holdings → Importeren. Upload je CSV-export van DEGIRO, Saxo Bank of ING Beleggen — de app herkent je broker automatisch.",
-                "Het Vermogen-overzicht toont al je bezittingen per type. Het Holdings-overzicht toont je totale beleggingsportfolio met allocatie (donut), rendement en dividendhistorie.",
+                "Activeer 'Holdings bijhouden' op een belegging, crypto, spaar- of pensioenrekening om gedetailleerde positietracking in te schakelen. Er verschijnt een Holdings-badge op de kaart.",
+                "Voeg individuele holdings toe met naam, ticker/ISIN, aantal stuks en aankoopprijs. Registreer koop-, verkoop- en dividendtransacties voor nauwkeurig rendement.",
+                "Of importeer in bulk: upload je CSV-export van DEGIRO, Saxo Bank of ING Beleggen — de app herkent je broker automatisch.",
+                "Op De Kern verschijnt een Portfolio Holdings-kaart zodra je minstens één bezitting volgt. Klik door voor het volledige holdings-overzicht met allocatie (donut), rendement en dividendhistorie.",
                 "Update waardes handmatig of via de maandelijkse check-in. Elke waardering wordt opgeslagen als snapshot voor historisch verloop.",
                 "Markeer een holding als favoriet en volg hem als widget op je dashboard.",
               ],

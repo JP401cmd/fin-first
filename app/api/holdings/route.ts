@@ -23,18 +23,20 @@ export async function GET(request: NextRequest) {
   const assetIdFilter = searchParams.get('asset_id')
 
   try {
+    // Join with assets to include parent asset name and filter by has_holdings_tracking
     let query = supabase
       .from('holdings')
-      .select('*')
+      .select('*, asset:assets!asset_id(id, name, has_holdings_tracking)')
       .eq('user_id', user.id)
       .eq('is_active', true)
+      .eq('assets.has_holdings_tracking', true)
       .order('created_at', { ascending: false })
 
     if (assetIdFilter) {
       query = query.eq('asset_id', assetIdFilter)
     }
 
-    const { data: holdings, error } = await query
+    const { data: rawHoldings, error } = await query
 
     if (error) {
       return NextResponse.json({
@@ -46,17 +48,28 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const totalValue = holdings.reduce((sum, h) => {
-      const price = h.current_price ?? h.avg_purchase_price
+    // Exclude rows where the asset filter didn't match (nested object is null)
+    // and flatten asset_name onto each holding for client-side grouping.
+    const holdings = (rawHoldings ?? [])
+      .filter((h: Record<string, unknown>) => h.asset != null)
+      .map((h: Record<string, unknown>) => {
+        const asset = h.asset as { id: string; name: string } | null
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { asset: _nested, ...rest } = h
+        return { ...rest, asset_name: asset?.name ?? null }
+      })
+
+    const totalValue = holdings.reduce((sum: number, h: Record<string, unknown>) => {
+      const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number)
       const currency = (h.currency as string) || 'EUR'
       const eurRate = getEURRateSync(currency)
-      return sum + (price * h.units * eurRate)
+      return sum + (price * (h.units as number) * eurRate)
     }, 0)
 
-    const totalCost = holdings.reduce((sum, h) => {
+    const totalCost = holdings.reduce((sum: number, h: Record<string, unknown>) => {
       const currency = (h.currency as string) || 'EUR'
       const eurRate = getEURRateSync(currency)
-      return sum + (h.avg_purchase_price * h.units * eurRate)
+      return sum + ((h.avg_purchase_price as number) * (h.units as number) * eurRate)
     }, 0)
 
     return NextResponse.json({

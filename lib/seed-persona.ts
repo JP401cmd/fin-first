@@ -293,6 +293,7 @@ export async function seedPersonaData(
     depreciation_rate: a.depreciation_rate ?? null,
     address_postcode: a.address_postcode || null,
     address_house_number: a.address_house_number || null,
+    has_holdings_tracking: a.has_holdings_tracking ?? false,
   }))
 
   const goalRows = persona.goals.map((g, i) => ({

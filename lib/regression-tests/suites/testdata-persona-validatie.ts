@@ -907,6 +907,87 @@ const tests: TestCase[] = [
       }
     },
   },
+
+  // ── Step 8: Holdings tracking validatie per persona ──────────────────
+
+  {
+    id: 'tp-holdings-tracking-personas-with-holdings',
+    name: 'Holdings tracking: personas met holdings hebben minstens 1 tracked asset',
+    category: CAT,
+    description: 'Personas that have holdings arrays should have at least one asset with has_holdings_tracking=true',
+    priority: 'critical',
+    estimatedDurationMs: 200,
+    fn() {
+      for (const key of PERSONA_KEYS) {
+        const persona = PERSONAS[key]
+        if (!persona.holdings || persona.holdings.length === 0) continue
+
+        // If a persona has holdings, at least one asset must have has_holdings_tracking=true
+        // Otherwise the holdings would be invisible on the central holdings page
+        const trackedAssets = persona.assets.filter(a => a.has_holdings_tracking === true)
+        assertGreaterThan(
+          trackedAssets.length, 0,
+          `${key}: has ${persona.holdings.length} holdings but no asset with has_holdings_tracking=true`,
+        )
+      }
+    },
+  },
+
+  {
+    id: 'tp-holdings-tracking-roos-no-tracking',
+    name: 'Roos: geen assets met has_holdings_tracking=true',
+    category: CAT,
+    description: 'Roos (schulden persona) should NOT have any assets with holdings tracking enabled',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      const roos = p('roos')
+      const trackedAssets = roos.assets.filter(a => a.has_holdings_tracking === true)
+      assertEqual(
+        trackedAssets.length, 0,
+        `Roos should have 0 tracked assets, found ${trackedAssets.length}: ${trackedAssets.map(a => a.name).join(', ')}`,
+      )
+
+      // Roos's assets are: vehicle (private lease), physical (inboedel), retirement (pensioen)
+      // None of these are actively managed investment portfolios
+      assertGreaterThan(roos.assets.length, 0, 'Roos has assets (but none tracked)')
+      for (const asset of roos.assets) {
+        assert(
+          asset.has_holdings_tracking !== true,
+          `Roos asset "${asset.name}" should not have holdings tracking`,
+        )
+      }
+    },
+  },
+
+  {
+    id: 'tp-holdings-tracking-investment-personas',
+    name: 'Holdings tracking: investment personas hebben tracked assets',
+    category: CAT,
+    description: 'Personas with investment assets and holdings have has_holdings_tracking=true on relevant assets',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      // These personas are known to have investment assets with holdings tracking:
+      // daan, lisa, willem, rashid, marijke
+      const investmentPersonas: PersonaKey[] = ['daan', 'lisa', 'willem', 'rashid', 'marijke']
+      for (const key of investmentPersonas) {
+        const persona = PERSONAS[key]
+        const investmentAssets = persona.assets.filter(
+          a => a.asset_type === 'investment' || a.asset_type === 'retirement',
+        )
+        // At least some investment/retirement assets exist
+        assertGreaterThan(investmentAssets.length, 0, `${key}: has investment/retirement assets`)
+
+        // At least one should be tracked (the ones with holdings)
+        const trackedInvestments = investmentAssets.filter(a => a.has_holdings_tracking === true)
+        assertGreaterThan(
+          trackedInvestments.length, 0,
+          `${key}: at least 1 investment/retirement asset with has_holdings_tracking=true`,
+        )
+      }
+    },
+  },
 ]
 
 // ── Registration ──────────────────────────────────────────────────────

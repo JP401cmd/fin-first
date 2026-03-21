@@ -105,6 +105,7 @@ export async function seedTestData(
           sort_order: 1,
           net_worth_inclusion_pct: 100,
           has_budget_tracking: false,
+          has_holdings_tracking: true,
         },
         {
           user_id: userId,

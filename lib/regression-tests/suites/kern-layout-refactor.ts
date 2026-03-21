@@ -328,7 +328,77 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 10: Health score computation includes cash ──────────────────
+  // ── Step 10: Holdings portfolio card conditionally rendered on Kern page ──
+  {
+    id: 'kern-layout-holdings-portfolio-card',
+    name: 'Kern page: Holdings portfolio card conditioneel op tracked holdings',
+    category: CAT,
+    description: 'CoreClient toont een Portfolio Holdings card wanneer holdingsPortfolio niet null is',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      const src = readSourceFile('components/core/core-client.tsx')
+      assert(src.length > 0, 'core-client.tsx kan gelezen worden')
+
+      // Holdings portfolio state is initialized
+      assert(
+        src.includes("holdingsPortfolio"),
+        'CoreClient heeft holdingsPortfolio state',
+      )
+
+      // Conditional rendering: card only shows when holdingsPortfolio is truthy
+      assert(
+        src.includes('{holdingsPortfolio && ('),
+        'Holdings portfolio card wordt conditioneel gerenderd',
+      )
+
+      // data-testid for the card
+      assert(
+        src.includes('data-testid="holdings-portfolio-card"'),
+        'Holdings portfolio card heeft data-testid',
+      )
+
+      // Card links to /core/assets/holdings
+      assert(
+        src.includes('href="/core/assets/holdings"'),
+        'Holdings portfolio card linkt naar /core/assets/holdings',
+      )
+
+      // The card is NOT a tab — it's a separate card below the mission control
+      assert(
+        !src.includes("type TabKey = 'budgets' | 'assets' | 'debts' | 'holdings'"),
+        'Holdings is geen tab in KernMissionControl (het is een apart card)',
+      )
+    },
+  },
+
+  // ── Step 11: Holdings portfolio data loaded from core-data-loader ──────
+  {
+    id: 'kern-layout-holdings-data-loader',
+    name: 'Core data loader: holdings portfolio met has_holdings_tracking filter',
+    category: CAT,
+    description: 'core-data-loader.ts filtert holdings op has_holdings_tracking = true voor portfolio card',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      const src = readSourceFile('lib/core-data-loader.ts')
+      assert(src.length > 0, 'core-data-loader.ts kan gelezen worden')
+
+      // Filter on has_holdings_tracking via joined asset
+      assert(
+        src.includes('has_holdings_tracking'),
+        'core-data-loader filtert op has_holdings_tracking',
+      )
+
+      // Only tracked holdings are included in the portfolio summary
+      assert(
+        src.includes('trackedHoldings'),
+        'core-data-loader bouwt trackedHoldings array na filtering',
+      )
+    },
+  },
+
+  // ── Step 12: Health score computation includes cash ──────────────────
   {
     id: 'kern-layout-health-includes-cash',
     name: 'Health score: berekening omvat cash gezondheid',
@@ -402,7 +472,7 @@ const tests: TestCase[] = [
         assert(t.id.startsWith(expectedPrefix), `Test ID "${t.id}" begint met "${expectedPrefix}"`)
       })
 
-      assert(tests.length >= 10, `Minstens 10 tests, actueel: ${tests.length}`)
+      assert(tests.length >= 12, `Minstens 12 tests, actueel: ${tests.length}`)
     },
   },
 ]

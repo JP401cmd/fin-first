@@ -97,6 +97,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [showBudgetModal, setShowBudgetModal] = useState(false)
   const [heroExpanded, setHeroExpanded] = useState(false)
   const [coreSimTarget, setCoreSimTarget] = useState<number | null>(null)
+  // Holdings portfolio card state
+  const [holdingsPortfolio, setHoldingsPortfolio] = useState<CorePageData['holdingsPortfolio']>(null)
   // Mission Control modal state
   const [activeModal, setActiveModal] = useState<{ type: 'budgets' | 'assets' | 'debts'; itemId?: string } | null>(null)
   const [showProjectionModal, setShowProjectionModal] = useState(false)
@@ -189,6 +191,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     setProfileIncome(initialData.profileIncome)
     setProfileExpenses(initialData.profileExpenses)
     setSnapshots(initialData.snapshots)
+    setHoldingsPortfolio(initialData.holdingsPortfolio)
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Run once on mount — initialData is stable from server
@@ -718,6 +721,45 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         setSpendingInsightsLoading(false)
       }
 
+      // Load holdings portfolio summary for tracked assets
+      try {
+        const { data: holdingsData } = await supabase
+          .from('holdings')
+          .select('id, name, ticker, units, current_price, avg_purchase_price, daily_change_percent, asset_id, asset:assets!asset_id(has_holdings_tracking)')
+          .eq('is_active', true)
+        const rawHoldings = (holdingsData ?? []) as Array<Record<string, unknown>>
+        const trackedHoldings = rawHoldings.filter(h => {
+          const asset = h.asset as { has_holdings_tracking?: boolean } | null
+          return asset?.has_holdings_tracking === true
+        })
+        if (trackedHoldings.length > 0) {
+          let totalValue = 0
+          let dailyChangeAbsolute = 0
+          const holdingValues: { ticker: string; value: number }[] = []
+          for (const h of trackedHoldings) {
+            const units = Number(h.units) || 0
+            const currentPrice = h.current_price != null ? Number(h.current_price) : Number(h.avg_purchase_price) || 0
+            const dailyChangePct = Number(h.daily_change_percent) || 0
+            const value = units * currentPrice
+            totalValue += value
+            dailyChangeAbsolute += value * (dailyChangePct / 100)
+            holdingValues.push({ ticker: (h.ticker as string) || (h.name as string) || '?', value })
+          }
+          holdingValues.sort((a, b) => b.value - a.value)
+          const top3 = holdingValues.slice(0, 3)
+          const overallDailyChangePct = totalValue > 0 ? (dailyChangeAbsolute / (totalValue - dailyChangeAbsolute)) * 100 : 0
+          setHoldingsPortfolio({
+            totalValue,
+            dailyChangeAbsolute,
+            dailyChangePct: overallDailyChangePct,
+            positionCount: trackedHoldings.length,
+            top3,
+          })
+        }
+      } catch {
+        // Holdings portfolio is non-critical
+      }
+
     } catch (err) {
       console.error('Error loading core data:', err)
       setError('Kon gegevens niet laden. Probeer het opnieuw.')
@@ -1185,6 +1227,67 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           </div>
         </div>
       </section>
+
+      {/* === Holdings Portfolio Card (only when tracked holdings exist) === */}
+      {holdingsPortfolio && (
+        <Link
+          href="/core/assets/holdings"
+          className="mt-4 sm:mt-6 block card-editorial p-4 sm:p-5 transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
+          data-testid="holdings-portfolio-card"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-kern-500" />
+              <span className="label-editorial text-[var(--ink-2)]">Portfolio Holdings</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-medium text-kern-600">
+              Bekijk
+              <ArrowRight className="h-3.5 w-3.5" />
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-3 sm:gap-5">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Totale waarde</p>
+              <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-[var(--ink)] sm:text-lg">
+                {formatCurrency(holdingsPortfolio.totalValue)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Dagwijziging</p>
+              <p className={`mt-0.5 font-mono text-base font-bold tabular-nums sm:text-lg ${
+                holdingsPortfolio.dailyChangeAbsolute >= 0 ? 'text-emerald-600' : 'text-red-600'
+              }`}>
+                {holdingsPortfolio.dailyChangeAbsolute >= 0 ? '+' : ''}{formatCurrency(holdingsPortfolio.dailyChangeAbsolute)}
+                <span className="ml-1 text-xs font-medium">
+                  ({holdingsPortfolio.dailyChangeAbsolute >= 0 ? '+' : ''}{holdingsPortfolio.dailyChangePct.toFixed(2)}%)
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Posities</p>
+              <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-[var(--ink)] sm:text-lg">
+                {holdingsPortfolio.positionCount} <span className="text-xs font-medium text-[var(--ink-3)]">actief</span>
+              </p>
+            </div>
+          </div>
+
+          {holdingsPortfolio.top3.length > 0 && (
+            <p className="mt-3 truncate border-t border-[var(--border-ed)] pt-3 text-xs text-[var(--ink-3)]">
+              <span className="font-semibold text-[var(--ink-2)]">Top {holdingsPortfolio.top3.length}:</span>
+              {' '}
+              {holdingsPortfolio.top3.map((h, i) => (
+                <span key={h.ticker}>
+                  {i > 0 && <span className="mx-1 text-[var(--ink-4)]">&middot;</span>}
+                  <span className="font-medium text-[var(--ink-2)]">{h.ticker}</span>
+                  {' '}
+                  <span className="font-mono tabular-nums">{formatCurrency(h.value)}</span>
+                </span>
+              ))}
+            </p>
+          )}
+        </Link>
+      )}
 
       {/* === Missie Controle (direct onder hero) === */}
       <section className="mt-4 sm:mt-8" data-testid="mission-control-section">

@@ -92,6 +92,8 @@ export interface Asset {
   net_worth_inclusion_pct: number // 0–100, default 100
   // Budget tracking (cash assets)
   has_budget_tracking: boolean
+  // Holdings tracking (investment assets managed by portfolio tracker)
+  has_holdings_tracking?: boolean
 }
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {

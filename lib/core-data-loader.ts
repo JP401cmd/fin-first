@@ -88,6 +88,15 @@ export interface CorePageData {
   // Sparklines
   budgetSparklines: { id: string; name: string; icon: string; budgetType: string; data: SparklineDataPoint[] }[]
   budgetSpendingHistory: { label: string; spent: number; isProjection: boolean }[]
+
+  // Holdings portfolio summary (tracked assets only)
+  holdingsPortfolio: {
+    totalValue: number
+    dailyChangeAbsolute: number
+    dailyChangePct: number
+    positionCount: number
+    top3: { ticker: string; value: number }[]
+  } | null
 }
 
 // ── Main loader ────────────────────────────────────────────────
@@ -358,6 +367,7 @@ export const loadCoreData = cache(async function loadCoreData(
   const [
     budgetResult, spendingResult, snapshotResult,
     debtFullResult, assetValuationResult, goalsResult, spending6mResult,
+    holdingsResult,
   ] = await Promise.all([
     supabase.from('budgets').select('id, name, icon, default_limit, budget_type, parent_id, is_essential, interval, is_favorite, alert_threshold').limit(500),
     supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
@@ -366,6 +376,11 @@ export const loadCoreData = cache(async function loadCoreData(
     supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
     supabase.from('goals').select('id').limit(1),
     supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd),
+    // Holdings from tracked assets for portfolio card
+    supabase
+      .from('holdings')
+      .select('id, name, ticker, units, current_price, avg_purchase_price, daily_change_percent, asset_id, asset:assets!asset_id(has_holdings_tracking)')
+      .eq('is_active', true),
   ])
 
   // Goals state
@@ -596,6 +611,49 @@ export const loadCoreData = cache(async function loadCoreData(
     // Budget sparklines are non-critical
   }
 
+  // ── Aggregate holdings portfolio for the card ──
+  let holdingsPortfolio: CorePageData['holdingsPortfolio'] = null
+  try {
+    const rawHoldings = (holdingsResult.data ?? []) as Array<Record<string, unknown>>
+    // Filter to only holdings where the joined asset has has_holdings_tracking = true
+    const trackedHoldings = rawHoldings.filter(h => {
+      const asset = h.asset as { has_holdings_tracking?: boolean } | null
+      return asset?.has_holdings_tracking === true
+    })
+
+    if (trackedHoldings.length > 0) {
+      let totalValue = 0
+      let dailyChangeAbsolute = 0
+      const holdingValues: { ticker: string; value: number }[] = []
+
+      for (const h of trackedHoldings) {
+        const units = Number(h.units) || 0
+        const currentPrice = h.current_price != null ? Number(h.current_price) : Number(h.avg_purchase_price) || 0
+        const dailyChangePct = Number(h.daily_change_percent) || 0
+        const value = units * currentPrice
+        totalValue += value
+        dailyChangeAbsolute += value * (dailyChangePct / 100)
+        holdingValues.push({ ticker: (h.ticker as string) || (h.name as string) || '?', value })
+      }
+
+      // Top 3 by value
+      holdingValues.sort((a, b) => b.value - a.value)
+      const top3 = holdingValues.slice(0, 3)
+
+      const dailyChangePct = totalValue > 0 ? (dailyChangeAbsolute / (totalValue - dailyChangeAbsolute)) * 100 : 0
+
+      holdingsPortfolio = {
+        totalValue,
+        dailyChangeAbsolute,
+        dailyChangePct,
+        positionCount: trackedHoldings.length,
+        top3,
+      }
+    }
+  } catch {
+    // Holdings portfolio is non-critical
+  }
+
   // ── Return complete data bundle ──
   return {
     budgetingActive,
@@ -649,5 +707,7 @@ export const loadCoreData = cache(async function loadCoreData(
 
     budgetSparklines,
     budgetSpendingHistory,
+
+    holdingsPortfolio,
   }
 })

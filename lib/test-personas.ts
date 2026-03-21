@@ -118,6 +118,7 @@ export interface PersonaAsset {
   depreciation_rate?: number
   address_postcode?: string
   address_house_number?: string
+  has_holdings_tracking?: boolean
 }
 
 export interface PersonaDebt {
@@ -834,8 +835,8 @@ const daanData: PersonaData = {
     { name: 'Spaarrekening ING', iban: 'NL11INGB0001234568', bank_name: 'ING', account_type: 'savings', balance: 2000, is_active: true, sort_order: 1 },
   ],
   assets: [
-    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 2350, purchase_value: 2100, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 100, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
-    { name: 'Brand New Day Pensioen', asset_type: 'retirement', current_value: 4500, purchase_value: 4141, purchase_date: '2024-06-01', expected_return: 5, monthly_contribution: 125, institution: 'Brand New Day', subtype: 'pensioen', risk_profile: 'middel', retirement_provider_type: 'premiepensioeninstelling' },
+    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 2350, purchase_value: 2100, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 100, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT', has_holdings_tracking: true },
+    { name: 'Brand New Day Pensioen', asset_type: 'retirement', current_value: 4500, purchase_value: 4141, purchase_date: '2024-06-01', expected_return: 5, monthly_contribution: 125, institution: 'Brand New Day', subtype: 'pensioen', risk_profile: 'middel', retirement_provider_type: 'premiepensioeninstelling', has_holdings_tracking: true },
   ],
   debts: [
     { name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 14000, current_balance: 13900, interest_rate: 0.46, minimum_payment: 0, monthly_payment: 100, start_date: '2024-01-01', creditor: 'DUO', subtype: 'nieuw_stelsel', draagkrachtmeting_date: '2026-09-01', repayment_type: 'annuiteit' },
@@ -1091,8 +1092,8 @@ const lisaData: PersonaData = {
     { name: 'Eigen betaalrekening', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 850, is_active: true, sort_order: 2 },
   ],
   assets: [
-    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 42000, purchase_value: 33600, purchase_date: '2020-03-01', expected_return: 7, monthly_contribution: 400, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
-    { name: 'NT World Custom ESG Kinderbelegging', asset_type: 'investment', current_value: 8000, purchase_value: 7140, purchase_date: '2023-12-01', expected_return: 7, monthly_contribution: 0, institution: 'Northern Trust', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'NL0011225305' },
+    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 42000, purchase_value: 33600, purchase_date: '2020-03-01', expected_return: 7, monthly_contribution: 400, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT', has_holdings_tracking: true },
+    { name: 'NT World Custom ESG Kinderbelegging', asset_type: 'investment', current_value: 8000, purchase_value: 7140, purchase_date: '2023-12-01', expected_return: 7, monthly_contribution: 0, institution: 'Northern Trust', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'NL0011225305', has_holdings_tracking: true },
     { name: 'Woning Utrecht', asset_type: 'eigen_huis', current_value: 385000, purchase_value: 285000, purchase_date: '2015-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 385000, address_postcode: '3581 KP', address_house_number: '24' },
     { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: -12, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
   ],
@@ -1362,7 +1363,7 @@ const willemData: PersonaData = {
     { name: 'Gezamenlijke rekening', iban: 'NL39RABO0300065264', bank_name: 'Rabobank', account_type: 'checking', balance: 4200, is_active: true, sort_order: 2 },
   ],
   assets: [
-    { name: 'DEGIRO beleggingsportefeuille', asset_type: 'investment', current_value: 570000, purchase_value: 420000, purchase_date: '2008-01-01', expected_return: 7, monthly_contribution: 2500, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel', ticker_symbol: 'VWRL' },
+    { name: 'DEGIRO beleggingsportefeuille', asset_type: 'investment', current_value: 570000, purchase_value: 420000, purchase_date: '2008-01-01', expected_return: 7, monthly_contribution: 2500, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel', ticker_symbol: 'VWRL', has_holdings_tracking: true },
     { name: 'Pensioenfonds ABP', asset_type: 'retirement', current_value: 285000, purchase_value: 0, purchase_date: '1995-01-01', expected_return: 5.5, monthly_contribution: 0, institution: 'ABP', subtype: 'uitkeringsregeling', risk_profile: 'laag', tax_benefit: true, retirement_provider_type: 'bedrijfspensioenfonds' },
     { name: 'Woning Wassenaar', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 380000, purchase_date: '2002-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 720000, address_postcode: '2242 PJ', address_house_number: '8' },
     { name: 'Garage (verhuurd)', asset_type: 'real_estate', current_value: 35000, purchase_value: 18000, purchase_date: '2010-01-01', expected_return: 3, monthly_contribution: 0, institution: '', subtype: 'beleggingspand', rental_income: 500 },
@@ -1616,7 +1617,7 @@ const rashidData: PersonaData = {
     { name: 'Spaarrekening ING', iban: 'NL91INGB0006543211', bank_name: 'ING', account_type: 'savings', balance: 20000, is_active: true, sort_order: 1 },
   ],
   assets: [
-    { name: 'Beleggingsrekening DEGIRO', asset_type: 'investment', current_value: 170000, purchase_value: 130000, purchase_date: '2016-01-01', expected_return: 7, monthly_contribution: 800, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel' },
+    { name: 'Beleggingsrekening DEGIRO', asset_type: 'investment', current_value: 170000, purchase_value: 130000, purchase_date: '2016-01-01', expected_return: 7, monthly_contribution: 800, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel', has_holdings_tracking: true },
     { name: 'Eigen woning', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 630000, purchase_date: '2023-03-01', expected_return: 3, monthly_contribution: 0, institution: '' },
     { name: 'Auto (Audi A4)', asset_type: 'vehicle', current_value: 24000, purchase_value: 38000, purchase_date: '2022-06-01', expected_return: -15, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },
   ],
@@ -1871,7 +1872,7 @@ const marijkeData: PersonaData = {
     { name: 'Spaarrekening ASN', iban: 'NL55ASNB0708956432', bank_name: 'ASN Bank', account_type: 'savings', balance: 15000, is_active: true, sort_order: 2 },
   ],
   assets: [
-    { name: 'Beleggingsportefeuille Rabobank', asset_type: 'investment', current_value: 320000, purchase_value: 260000, purchase_date: '2005-01-01', expected_return: 5, monthly_contribution: 0, institution: 'Rabobank', subtype: 'etf', risk_profile: 'laag' },
+    { name: 'Beleggingsportefeuille Rabobank', asset_type: 'investment', current_value: 320000, purchase_value: 260000, purchase_date: '2005-01-01', expected_return: 5, monthly_contribution: 0, institution: 'Rabobank', subtype: 'etf', risk_profile: 'laag', has_holdings_tracking: true },
     { name: 'Eigen woning Zwolle', asset_type: 'eigen_huis', current_value: 420000, purchase_value: 180000, purchase_date: '1992-03-01', expected_return: 3, monthly_contribution: 0, institution: '', woz_value: 440000, address_postcode: '8024 AA', address_house_number: '12' },
     { name: 'Stacaravan Drenthe', asset_type: 'physical', current_value: 25000, purchase_value: 35000, purchase_date: '2018-06-01', expected_return: -5, monthly_contribution: 0, institution: '', depreciation_rate: 5 },
   ],

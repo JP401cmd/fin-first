@@ -393,13 +393,6 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           </div>
           <div className="flex items-center gap-2">
             <Link
-              href="/core/assets/holdings"
-              className="inline-flex items-center gap-2 rounded-[var(--r)] border border-kern-200 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Holdings
-            </Link>
-            <Link
               href="/core/assets/revalue"
               className="inline-flex items-center gap-2 rounded-[var(--r)] border border-kern-200 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
             >
@@ -605,6 +598,11 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                           {hasBudget && (
                             <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 border border-emerald-200">
                               <BarChart3 className="h-2.5 w-2.5" /> Transacties
+                            </span>
+                          )}
+                          {asset.has_holdings_tracking && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-kern-50 px-1.5 py-0.5 text-[9px] font-medium text-kern-700 border border-kern-200">
+                              <TrendingUp className="h-2.5 w-2.5" /> Holdings
                             </span>
                           )}
                         </p>
@@ -2189,6 +2187,7 @@ function AssetForm({
   const [name, setName] = useState(asset?.name ?? '')
   const [assetType, setAssetType] = useState<AssetType>(asset?.asset_type ?? defaultType ?? 'savings')
   const [hasBudgetTracking, setHasBudgetTracking] = useState(asset?.has_budget_tracking ?? false)
+  const [hasHoldingsTracking, setHasHoldingsTracking] = useState(asset?.has_holdings_tracking ?? false)
   const [iban, setIban] = useState(asset?.account_number ?? '')
   const [currentValue, setCurrentValue] = useState(String(asset?.current_value ?? ''))
   const [purchaseValue, setPurchaseValue] = useState(String(asset?.purchase_value ?? ''))
@@ -2401,6 +2400,8 @@ function AssetForm({
       net_worth_inclusion_pct: netWorthInclusionPct,
       // Budget tracking
       has_budget_tracking: isCashType ? hasBudgetTracking : false,
+      // Holdings tracking
+      has_holdings_tracking: ['investment', 'crypto', 'savings', 'retirement'].includes(assetType) ? hasHoldingsTracking : false,
       // Ensure new assets are visible
       is_active: true,
     }
@@ -2745,6 +2746,45 @@ function AssetForm({
                           Annuleer
                         </button>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Holdings tracking toggle (investment, crypto, savings, retirement) */}
+          {['investment', 'crypto', 'savings', 'retirement'].includes(assetType) && (
+            <>
+              <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasHoldingsTracking}
+                  onChange={(e) => {
+                    setHasHoldingsTracking(e.target.checked)
+                  }}
+                  className="mt-0.5 rounded border-[var(--border-md)]"
+                />
+                <div>
+                  <span className="text-sm font-medium text-[var(--ink)]">Holdings bijhouden</span>
+                  <p className="text-xs text-[var(--ink-3)]">
+                    Schakel in om individuele posities, transacties en portfolio-allocatie bij te houden.
+                  </p>
+                </div>
+              </label>
+
+              {/* Warning when disabling with active holdings */}
+              {!hasHoldingsTracking && isEdit && asset?.has_holdings_tracking && hasActiveHoldings && (
+                <div className="rounded-[var(--r)] border border-amber-300 bg-amber-50 p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">
+                        Er zijn {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''} gekoppeld.
+                      </p>
+                      <p className="mt-1 text-xs text-amber-700">
+                        Deze worden niet verwijderd maar verschijnen niet meer op de centrale holdings pagina.
+                      </p>
                     </div>
                   </div>
                 </div>

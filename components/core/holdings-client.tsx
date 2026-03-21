@@ -15,7 +15,7 @@ import dynamic from 'next/dynamic'
 const HoldingsHeatmap = dynamic(() => import('@/components/app/holdings-heatmap'), { ssr: false })
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
 
 type Holding = {
@@ -51,6 +51,8 @@ type Holding = {
   institution?: string
   expected_return?: number
   monthly_contribution?: number
+  // Parent asset name (from joined assets table) for grouping
+  asset_name?: string | null
 }
 
 // Per-holding price data from refresh API
@@ -62,6 +64,9 @@ type HoldingPriceUpdate = {
 
 export default function HoldingsPage({ initialData }: { initialData?: HoldingsPageData } = {}) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Optional URL filter: ?asset=<uuid> shows only holdings from that asset
+  const assetFilter = searchParams.get('asset')
   const [holdings, setHoldings] = useState<Holding[]>(initialData ? initialData.holdings as Holding[] : [])
   const [totalValue, setTotalValue] = useState(initialData?.totalValue ?? 0)
   const [totalCost, setTotalCost] = useState(initialData?.totalCost ?? 0)
@@ -384,6 +389,32 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       .filter((h) => h.value > 0)
   }, [holdings])
 
+  // Apply optional asset filter from URL and group holdings by parent asset
+  const filteredHoldings = useMemo(() => {
+    if (!assetFilter) return holdings
+    return holdings.filter((h) => h.asset_id === assetFilter)
+  }, [holdings, assetFilter])
+
+  // Group holdings by parent asset name for section rendering.
+  // Returns an ordered array of { assetId, assetName, items } groups.
+  const groupedHoldings = useMemo(() => {
+    const groups = new Map<string, { assetId: string; assetName: string; items: Holding[] }>()
+    for (const h of filteredHoldings) {
+      const key = h.asset_id ?? '__no_asset__'
+      const existing = groups.get(key)
+      if (existing) {
+        existing.items.push(h)
+      } else {
+        groups.set(key, {
+          assetId: key,
+          assetName: h.asset_name ?? 'Overig',
+          items: [h],
+        })
+      }
+    }
+    return Array.from(groups.values())
+  }, [filteredHoldings])
+
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
@@ -632,16 +663,26 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         </section>
       )}
 
-      {/* Holdings list */}
-      <section className={`mt-3 sm:mt-6 space-y-2 ${viewMode === 'heatmap' && holdings.length > 0 ? 'hidden' : ''}`}>
-        {holdings.length === 0 && !loading && (
+      {/* Holdings list — grouped by parent asset */}
+      <section className={`mt-3 sm:mt-6 space-y-4 ${viewMode === 'heatmap' && filteredHoldings.length > 0 ? 'hidden' : ''}`}>
+        {filteredHoldings.length === 0 && !loading && (
           <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
             <Briefcase className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
-            <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">Nog geen holdings</p>
+            <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">Geen holdings gevonden</p>
             <p className="mt-1 text-xs text-[var(--ink-3)]">
-              Voeg je eerste holding toe of importeer vanuit je broker.
+              {assetFilter
+                ? 'Dit vermogensbestanddeel heeft geen holdings met tracking ingeschakeld.'
+                : "Schakel 'Holdings bijhouden' in bij een belegging om je posities hier te zien."}
             </p>
             <div className="mt-4 flex items-center justify-center gap-3">
+              {assetFilter && (
+                <Link
+                  href="/core/assets/holdings"
+                  className="inline-flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100"
+                >
+                  Alle holdings bekijken
+                </Link>
+              )}
               <button
                 onClick={() => setShowForm(true)}
                 className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
@@ -660,170 +701,199 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
           </div>
         )}
 
-        {holdings.map((holding) => {
-          const price = holding.current_price ?? holding.avg_purchase_price
-          const value = price * Math.max(0, holding.units)
-          const cost = holding.avg_purchase_price * Math.max(0, holding.units)
-          const returnPct = cost > 0 ? ((value - cost) / cost) * 100 : 0
-          const stale = isPriceStale(holding)
-          const soldOut = holding.units <= 0
-          // Daily change: prefer DB column, fallback to refresh result
-          const priceUpdate = priceUpdates.get(holding.id)
-          const dailyPct = holding.daily_change_percent ?? priceUpdate?.dailyChangePercent ?? null
-
-          return (
-            <div
-              key={holding.id}
-              className={`flex items-center gap-3 rounded-xl border bg-[var(--paper)] p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30 ${
-                soldOut ? 'border-[var(--border-md)] bg-[var(--subtle)]/50 opacity-75' :
-                stale ? 'border-kern-300 bg-kern-50/20' : 'border-[var(--border-ed)]'
-              }`}
-              data-testid={`holding-item-${holding.id}`}
-              data-sold-out={soldOut ? 'true' : 'false'}
-              data-units={Math.max(0, holding.units)}
+        {/* Asset filter indicator */}
+        {assetFilter && filteredHoldings.length > 0 && (
+          <div className="flex items-center gap-2 text-sm text-[var(--ink-3)]">
+            <span>Gefilterd op: <span className="font-medium text-kern-600">{groupedHoldings[0]?.assetName}</span></span>
+            <Link
+              href="/core/assets/holdings"
+              className="rounded px-1.5 py-0.5 text-xs font-medium text-kern-600 hover:bg-kern-50"
             >
-              {/* Clickable area — navigates to holding detail page */}
-              <Link
-                href={`/core/assets/holdings/${holding.id}`}
-                className="flex min-w-0 flex-1 items-center gap-3"
-                data-testid={`holding-link-${holding.id}`}
-              >
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                soldOut ? 'bg-zinc-100' :
-                stale ? 'bg-kern-100' : 'bg-kern-50'
-              }`}>
-                {soldOut ? (
-                  <CheckCircle className="h-4 w-4 text-[var(--ink-3)]" />
-                ) : stale ? (
-                  <Clock className="h-4 w-4 text-kern-500" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 text-kern-600" />
-                )}
+              Filter wissen
+            </Link>
+          </div>
+        )}
+
+        {groupedHoldings.map((group, groupIdx) => (
+          <div key={group.assetId}>
+            {/* Group header — only show when multiple groups are visible */}
+            {groupedHoldings.length > 1 && (
+              <div className={`flex items-center gap-2 ${groupIdx > 0 ? 'mt-6 pt-4 border-t border-kern-100' : ''}`}>
+                <Briefcase className="h-4 w-4 text-kern-500" />
+                <h2 className="text-sm font-semibold text-kern-700">{group.assetName}</h2>
+                <span className="text-xs text-[var(--ink-3)]">
+                  {group.items.length} holding{group.items.length !== 1 ? 's' : ''}
+                </span>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className={`truncate text-sm font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>{holding.name}</p>
-                  {soldOut && (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-2)]"
-                      data-testid="sold-out-indicator"
-                    >
-                      <CheckCircle className="h-2.5 w-2.5" />
-                      Uitverkocht
-                    </span>
-                  )}
-                  {stale && !soldOut && (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full bg-kern-100 px-1.5 py-0.5 text-[10px] font-semibold text-kern-700"
-                      title={`Laatste update: ${formatLastUpdate(holding.last_price_update)}`}
-                      data-testid="stale-indicator"
-                    >
-                      <AlertTriangle className="h-2.5 w-2.5" />
-                      Verouderd
-                    </span>
-                  )}
-                </div>
-                <p className="truncate text-xs text-[var(--ink-3)]">
-                  {holding.ticker && <span className={`font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-kern-600'}`}>{holding.ticker}</span>}
-                  {holding.ticker && ' · '}
-                  {holding.currency && holding.currency !== 'EUR' && (
-                    <><span className="font-medium text-kern-500">{holding.currency}</span>{' · '}</>
-                  )}
-                  {soldOut ? <span className="text-[var(--ink-3)]">0 eenheden</span> : `${holding.units} eenheden`}
-                  {holding.institution && ` · ${holding.institution}`}
-                  {holding.purchase_date && ` · ${new Date(holding.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })}`}
-                  {stale && holding.last_price_update && (
-                    <span className="ml-1 text-kern-500">
-                      · Prijs van {formatLastUpdate(holding.last_price_update)}
-                    </span>
-                  )}
-                  {stale && !holding.last_price_update && (
-                    <span className="ml-1 text-kern-500">· Prijs nooit bijgewerkt</span>
-                  )}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className={`text-sm font-semibold ${soldOut ? 'text-[var(--ink-3)]' : stale ? 'text-kern-700' : 'text-[var(--ink)]'}`} data-testid={`holding-value-${holding.id}`}>
-                  {holding.currency && holding.currency !== 'EUR'
-                    ? new Intl.NumberFormat('nl-NL', { style: 'currency', currency: holding.currency }).format(Math.max(0, value))
-                    : formatCurrency(Math.max(0, value))
-                  }
-                  {stale && !soldOut && <span className="text-[10px] font-normal text-kern-500 block">laatste bekende prijs</span>}
-                </p>
-                {/* Daily change from price feed */}
-                {dailyPct !== null && !soldOut && !stale && (
-                  <p
-                    className={`text-[11px] font-semibold ${dailyPct >= 0 ? 'text-positive' : 'text-negative'}`}
-                    data-testid={`holding-daily-change-${holding.id}`}
+            )}
+            <div className={`space-y-2 ${groupedHoldings.length > 1 ? 'mt-2' : ''}`}>
+              {group.items.map((holding) => {
+                const price = holding.current_price ?? holding.avg_purchase_price
+                const value = price * Math.max(0, holding.units)
+                const cost = holding.avg_purchase_price * Math.max(0, holding.units)
+                const returnPct = cost > 0 ? ((value - cost) / cost) * 100 : 0
+                const stale = isPriceStale(holding)
+                const soldOut = holding.units <= 0
+                // Daily change: prefer DB column, fallback to refresh result
+                const priceUpdate = priceUpdates.get(holding.id)
+                const dailyPct = holding.daily_change_percent ?? priceUpdate?.dailyChangePercent ?? null
+
+                return (
+                  <div
+                    key={holding.id}
+                    className={`flex items-center gap-3 rounded-xl border bg-[var(--paper)] p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30 ${
+                      soldOut ? 'border-[var(--border-md)] bg-[var(--subtle)]/50 opacity-75' :
+                      stale ? 'border-kern-300 bg-kern-50/20' : 'border-[var(--border-ed)]'
+                    }`}
+                    data-testid={`holding-item-${holding.id}`}
+                    data-sold-out={soldOut ? 'true' : 'false'}
+                    data-units={Math.max(0, holding.units)}
                   >
-                    {dailyPct >= 0 ? '▲' : '▼'} {dailyPct >= 0 ? '+' : ''}{dailyPct.toFixed(2)}% vandaag
-                  </p>
-                )}
-                {/* Total return */}
-                {cost > 0 && !soldOut && (
-                  <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                    {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% totaal
-                  </p>
-                )}
-              </div>
-              </Link>
-              <div className="flex shrink-0 items-center gap-1">
-                {stale && (
-                  <button
-                    onClick={() => setOverrideHolding(holding)}
-                    className="rounded-lg p-1.5 text-kern-500 hover:bg-kern-50 hover:text-kern-700"
-                    title="Prijs handmatig bijwerken"
-                    data-testid="manual-override-btn"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </button>
-                )}
-                <button
-                  onClick={() => setTxHolding(holding)}
-                  className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-emerald-50 hover:text-emerald-600"
-                  title="Transactie registreren"
-                >
-                  <Receipt className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setEditHolding(holding)}
-                  className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-kern-50 hover:text-kern-600"
-                  title="Bewerken"
-                >
-                  <Edit3 className="h-4 w-4" />
-                </button>
-                {deleteConfirm === holding.id ? (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => handleDelete(holding.id)}
-                      disabled={deleting === holding.id}
-                      className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      data-testid={`delete-confirm-${holding.id}`}
+                    {/* Clickable area — navigates to holding detail page */}
+                    <Link
+                      href={`/core/assets/holdings/${holding.id}`}
+                      className="flex min-w-0 flex-1 items-center gap-3"
+                      data-testid={`holding-link-${holding.id}`}
                     >
-                      {deleting === holding.id ? '...' : 'Ja'}
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm(null)}
-                      disabled={deleting === holding.id}
-                      className="rounded-lg border border-[var(--border-ed)] px-2 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Nee
-                    </button>
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      soldOut ? 'bg-zinc-100' :
+                      stale ? 'bg-kern-100' : 'bg-kern-50'
+                    }`}>
+                      {soldOut ? (
+                        <CheckCircle className="h-4 w-4 text-[var(--ink-3)]" />
+                      ) : stale ? (
+                        <Clock className="h-4 w-4 text-kern-500" />
+                      ) : (
+                        <TrendingUp className="h-4 w-4 text-kern-600" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className={`truncate text-sm font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>{holding.name}</p>
+                        {soldOut && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-2)]"
+                            data-testid="sold-out-indicator"
+                          >
+                            <CheckCircle className="h-2.5 w-2.5" />
+                            Uitverkocht
+                          </span>
+                        )}
+                        {stale && !soldOut && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-kern-100 px-1.5 py-0.5 text-[10px] font-semibold text-kern-700"
+                            title={`Laatste update: ${formatLastUpdate(holding.last_price_update)}`}
+                            data-testid="stale-indicator"
+                          >
+                            <AlertTriangle className="h-2.5 w-2.5" />
+                            Verouderd
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-[var(--ink-3)]">
+                        {holding.ticker && <span className={`font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-kern-600'}`}>{holding.ticker}</span>}
+                        {holding.ticker && ' · '}
+                        {holding.currency && holding.currency !== 'EUR' && (
+                          <><span className="font-medium text-kern-500">{holding.currency}</span>{' · '}</>
+                        )}
+                        {soldOut ? <span className="text-[var(--ink-3)]">0 eenheden</span> : `${holding.units} eenheden`}
+                        {holding.institution && ` · ${holding.institution}`}
+                        {holding.purchase_date && ` · ${new Date(holding.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })}`}
+                        {stale && holding.last_price_update && (
+                          <span className="ml-1 text-kern-500">
+                            · Prijs van {formatLastUpdate(holding.last_price_update)}
+                          </span>
+                        )}
+                        {stale && !holding.last_price_update && (
+                          <span className="ml-1 text-kern-500">· Prijs nooit bijgewerkt</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className={`text-sm font-semibold ${soldOut ? 'text-[var(--ink-3)]' : stale ? 'text-kern-700' : 'text-[var(--ink)]'}`} data-testid={`holding-value-${holding.id}`}>
+                        {holding.currency && holding.currency !== 'EUR'
+                          ? new Intl.NumberFormat('nl-NL', { style: 'currency', currency: holding.currency }).format(Math.max(0, value))
+                          : formatCurrency(Math.max(0, value))
+                        }
+                        {stale && !soldOut && <span className="text-[10px] font-normal text-kern-500 block">laatste bekende prijs</span>}
+                      </p>
+                      {/* Daily change from price feed */}
+                      {dailyPct !== null && !soldOut && !stale && (
+                        <p
+                          className={`text-[11px] font-semibold ${dailyPct >= 0 ? 'text-positive' : 'text-negative'}`}
+                          data-testid={`holding-daily-change-${holding.id}`}
+                        >
+                          {dailyPct >= 0 ? '▲' : '▼'} {dailyPct >= 0 ? '+' : ''}{dailyPct.toFixed(2)}% vandaag
+                        </p>
+                      )}
+                      {/* Total return */}
+                      {cost > 0 && !soldOut && (
+                        <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
+                          {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% totaal
+                        </p>
+                      )}
+                    </div>
+                    </Link>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {stale && (
+                        <button
+                          onClick={() => setOverrideHolding(holding)}
+                          className="rounded-lg p-1.5 text-kern-500 hover:bg-kern-50 hover:text-kern-700"
+                          title="Prijs handmatig bijwerken"
+                          data-testid="manual-override-btn"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setTxHolding(holding)}
+                        className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-emerald-50 hover:text-emerald-600"
+                        title="Transactie registreren"
+                      >
+                        <Receipt className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setEditHolding(holding)}
+                        className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-kern-50 hover:text-kern-600"
+                        title="Bewerken"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </button>
+                      {deleteConfirm === holding.id ? (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleDelete(holding.id)}
+                            disabled={deleting === holding.id}
+                            className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            data-testid={`delete-confirm-${holding.id}`}
+                          >
+                            {deleting === holding.id ? '...' : 'Ja'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(null)}
+                            disabled={deleting === holding.id}
+                            className="rounded-lg border border-[var(--border-ed)] px-2 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Nee
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirm(holding.id)}
+                          className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-red-50 hover:text-red-600"
+                          title="Verwijderen"
+                          data-testid={`delete-trigger-${holding.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setDeleteConfirm(holding.id)}
-                    className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-red-50 hover:text-red-600"
-                    title="Verwijderen"
-                    data-testid={`delete-trigger-${holding.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+                )
+              })}
             </div>
-          )
-        })}
+          </div>
+        ))}
       </section>
 
       {/* New holding form modal */}
