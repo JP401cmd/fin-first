@@ -1,3 +1,35 @@
+## Session 2026-03-21 - Features #457, #459
+
+### Feature #457: Horizon-client integratie + KPI-metrics + context-hint - PASSING
+- Derived isPensioenMode/planningMode at top level from simResult.strategy
+- SimChart key set to planningMode for re-animation on mode switch
+- KPI 1: Pensioenleeftijd with AOW age (67j + 3m format) in pensioen mode
+- KPI 2: Verwacht vermogen op AOW (projected portfolio at AOW age)
+- KPI 3: Maandelijkse onttrekking (SWR × portfolio / 12)
+- All 3 kassabon receipts adapted for pensioen-specific breakdowns
+- Context-hint under chart: FIRE → "Pensioen-modus beschikbaar →", Pensioen → "Instellingen →"
+- Context-hint has 44px min-height tap target, opens StrategieModal
+- FIRE-niet-bereikbaar warning hidden in pensioen mode
+- What-If baseline pensioen-aware in whatif/page.tsx (both baseline + what-if simulations)
+- StrategieModal onClose triggers loadData() for immediate KPI refresh
+- All planningMode references consolidated to derived constant
+- NOTE: DB CHECK constraint migration needed (20260321000001) to allow 'pensioen' value in profiles.fire_end_strategy
+- Commit: a4048a99
+
+### Feature #459: De Gids — pensioen-modus documentatie - PASSING
+- Section 12 added: "Planningshorizon: FIRE vs. Pensioen" in guide-horizon-uitleg.tsx
+- Section 6 updated: 4th eindstrategie "Pensioenleeftijd" added with full description
+- Section 9 updated: "deplete, legacy, perpetual of pensioenleeftijd" reference
+- Naslagwerk topics updated: pensioen references in summaries
+- FAQ added: "Wat als ik niet voor FIRE ga?" → pensioen-modus explanation with CTA
+- Pro tip: wisselen tussen FIRE en Pensioen in strategie-instellingen
+- Zero console errors on /identity/gids
+- Commit: a8f6ca5a
+
+### Current Status
+- 2 features completed this session (#457, #459)
+- Overall: 458/460 features passing (99.6%)
+
 ## Session 2026-03-21 - Feature #458
 
 ### Feature #458: Sub-charts: Wealth Composition + Income/Expense pensioen-modus - PASSING
@@ -18837,3 +18869,49 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#454, #456)
 - Overall progress: 454/460 passing (98.7%)
+
+## Session 2026-03-21 - Feature #460
+
+### Feature #460: Regressietests — pensioen-modus dekking - PASSING
+- Added comprehensive regression test coverage for the pensioen-modus feature across 5 files:
+
+**fire-simulation.test.ts — Section H (10 vitest unit tests):**
+- H1: pensioen strategy produces valid SimResult
+- H2: pensioen behaves like deplete in engine (post-processing in hook)
+- H3: all 4 withdrawal strategies × pensioen produce valid output
+- H4: AOW cashflows work correctly with pensioen
+- H5: endAge parameter respected
+- H6: rows are monotonically aging
+- H7-H8: parseFireStrategy correctly parses pensioen (with/without custom endAge)
+- H9: fireAge found when portfolio sufficient
+- H10: life events don't crash pensioen simulation
+
+**horizon-parameters.ts (6 new regression tests):**
+- parseFireStrategy pensioen config, custom age, all 4 strategies validation
+- STRATEGY_LABELS includes pensioen with name+subtitle
+- pensioen simulation runs without errors
+- AOW fallback NL_AOW_AGE = 67
+
+**fire-simulatie.ts (4 new regression tests):**
+- pensioen basic simulation, portfolio chain consistency
+- AOW cashflows in pensioen mode
+- All 4 withdrawal strategies × pensioen compatibility
+
+**horizon-grafiek.ts (4 new regression tests):**
+- SimChart pensioen data validation
+- AOW-dot data (row at NL_AOW_AGE exists)
+- Phase labels VERMOGENSGROEI/PENSIOEN
+- Chart re-animation key-based remount
+
+**horizon-strategie-pagina.ts (6 new regression tests):**
+- 4th card: all 4 FireEndStrategy labels present
+- Slider hidden for pensioen (default endAge preserved)
+- Save/reload roundtrip
+- KPI: AOW-leeftijd fallback, expected portfolio at AOW
+- All 4 withdrawal strategies × pensioen combination
+
+### Verification
+- All 48 vitest tests pass (including 10 new Section H)
+- Zero TypeScript errors in modified files
+- Zero console errors in browser
+- Commit: cda4fa2e
