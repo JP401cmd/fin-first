@@ -829,9 +829,19 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     const handleFocus = () => reloadHoldings()
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('focus', handleFocus)
+
+    // Realtime subscription: reload holdings when has_holdings_tracking changes on any asset
+    const sb = createClient()
+    const channel = sb.channel('assets-tracking-changes')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'assets' }, () => {
+        reloadHoldings()
+      })
+      .subscribe()
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleFocus)
+      sb.removeChannel(channel)
     }
   }, [])
 
