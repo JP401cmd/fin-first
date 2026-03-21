@@ -21,7 +21,7 @@ import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementEx
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
-import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { resolveFireStrategyWithOverride, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
@@ -137,7 +137,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct, asset_type').eq('is_active', true),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences').single(),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
@@ -271,8 +271,8 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
 
   const dob = profile.date_of_birth ?? null
 
-  // FIRE strategy from profile
-  const fireStrategy = parseFireStrategy(profile)
+  // FIRE strategy from profile — use override-aware resolver for pensioen fallback
+  const fireStrategy = resolveFireStrategyWithOverride(profile)
 
   // Withdrawal strategy from profile (static/guardrails/vpw/bucket)
   const withdrawalStrategy = resolveWithdrawalStrategy(profile)

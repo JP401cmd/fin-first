@@ -121,29 +121,25 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       forcedFireAge,
     )
 
-    // ── Pensioen post-processing ─────────────────────────────────────
+    // ── Pensioen post-processing (#471) ─────────────────────────────
     // The engine ran as 'deplete' with forcedFireAge at AOW, producing rows
-    // from currentAge → endAge with accumulation (→AOW) + retirement (AOW→90).
-    // For pensioen: trim rows to AOW age so the chart ends at AOW (no withdrawal
-    // phase displayed — the user transitions to state pension at AOW).
+    // from currentAge all the way to endAge (90) with both accumulation
+    // (currentAge → AOW) and retirement (AOW → 90) phases.
+    //
+    // IMPORTANT: Do NOT trim rows or override displayEndAge to AOW age.
+    // The chart must show the FULL timeline including the withdrawal phase
+    // after AOW, where portfolio growth continues but savings stop and
+    // withdrawals begin. This lets users see their end-of-life portfolio.
+    // See feature #471 for the specification.
     if (isPensioen) {
       const originalFireAge = result.fireAge
       const originalFireAgeFractional = result.fireAgeFractional
 
-      // Trim rows: only show accumulation up to (but not including) AOW age
-      const trimmedRows = result.rows.filter(r => r.age < aowAgeInt)
-      const portfolioAtAow = trimmedRows.length > 0
-        ? trimmedRows[trimmedRows.length - 1].endPortfolio
-        : result.requiredFirePortfolio
-
       const pensioenResult: SimResult = {
         ...result,
-        rows: trimmedRows,
         strategy: 'pensioen',
-        displayEndAge: aowAgeInt,
         fireAgeFractional: aowAge,
         fireAge: aowAgeInt,
-        requiredFirePortfolio: portfolioAtAow,
         fireReachable: true, // AOW is altijd bereikbaar qua leeftijd
       }
 
