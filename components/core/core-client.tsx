@@ -1228,67 +1228,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         </div>
       </section>
 
-      {/* === Holdings Portfolio Card (only when tracked holdings exist) === */}
-      {holdingsPortfolio && (
-        <Link
-          href="/core/assets/holdings"
-          className="mt-4 sm:mt-6 block card-editorial p-4 sm:p-5 transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
-          data-testid="holdings-portfolio-card"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-kern-500" />
-              <span className="label-editorial text-[var(--ink-2)]">Portfolio Holdings</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs font-medium text-kern-600">
-              Bekijk
-              <ArrowRight className="h-3.5 w-3.5" />
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-3 sm:gap-5">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Totale waarde</p>
-              <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-[var(--ink)] sm:text-lg">
-                {formatCurrency(holdingsPortfolio.totalValue)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Dagwijziging</p>
-              <p className={`mt-0.5 font-mono text-base font-bold tabular-nums sm:text-lg ${
-                holdingsPortfolio.dailyChangeAbsolute >= 0 ? 'text-emerald-600' : 'text-red-600'
-              }`}>
-                {holdingsPortfolio.dailyChangeAbsolute >= 0 ? '+' : ''}{formatCurrency(holdingsPortfolio.dailyChangeAbsolute)}
-                <span className="ml-1 text-xs font-medium">
-                  ({holdingsPortfolio.dailyChangeAbsolute >= 0 ? '+' : ''}{holdingsPortfolio.dailyChangePct.toFixed(2)}%)
-                </span>
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Posities</p>
-              <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-[var(--ink)] sm:text-lg">
-                {holdingsPortfolio.positionCount} <span className="text-xs font-medium text-[var(--ink-3)]">actief</span>
-              </p>
-            </div>
-          </div>
-
-          {holdingsPortfolio.top3.length > 0 && (
-            <p className="mt-3 truncate border-t border-[var(--border-ed)] pt-3 text-xs text-[var(--ink-3)]">
-              <span className="font-semibold text-[var(--ink-2)]">Top {holdingsPortfolio.top3.length}:</span>
-              {' '}
-              {holdingsPortfolio.top3.map((h, i) => (
-                <span key={h.ticker}>
-                  {i > 0 && <span className="mx-1 text-[var(--ink-4)]">&middot;</span>}
-                  <span className="font-medium text-[var(--ink-2)]">{h.ticker}</span>
-                  {' '}
-                  <span className="font-mono tabular-nums">{formatCurrency(h.value)}</span>
-                </span>
-              ))}
-            </p>
-          )}
-        </Link>
-      )}
-
       {/* === Missie Controle (direct onder hero) === */}
       <section className="mt-4 sm:mt-8" data-testid="mission-control-section">
         <div className="mb-3 sm:mb-4 flex items-center gap-2">
@@ -1310,6 +1249,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           debtsList={debtsList}
           rawTotalDebts={rawFinancials!.totalDebts}
           debtProgress={debtProgress}
+          holdingsPortfolio={holdingsPortfolio}
           onCardClick={(type, itemId) => setActiveModal({ type, itemId })}
         />
       </section>

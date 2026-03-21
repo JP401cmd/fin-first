@@ -2,6 +2,7 @@
 
 import { useState, Fragment } from 'react'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
+import Link from 'next/link'
 import {
   ShoppingCart, Wallet, PiggyBank, Building2, TrendingUp,
   ArrowRight, ChevronDown,
@@ -31,6 +32,14 @@ interface KernMissionControlProps {
   debtsList: Array<{ id: string; name: string; current_balance: number; net_worth_inclusion_pct: number }>
   rawTotalDebts: number
   debtProgress: { totalOriginal: number; totalCurrent: number; progressPct: number } | null
+  // Holdings portfolio summary (tracked assets only)
+  holdingsPortfolio: {
+    totalValue: number
+    dailyChangeAbsolute: number
+    dailyChangePct: number
+    positionCount: number
+    top3: { ticker: string; value: number }[]
+  } | null
   // Callbacks
   onCardClick: (type: 'budgets' | 'assets' | 'debts', itemId?: string) => void
 }
@@ -55,6 +64,7 @@ export function KernMissionControl({
   debtsList,
   rawTotalDebts,
   debtProgress,
+  holdingsPortfolio,
   onCardClick,
 }: KernMissionControlProps) {
   // Flash animations for live value changes
@@ -502,6 +512,65 @@ export function KernMissionControl({
                       <p className="text-xs text-[var(--ink-4)]">Geen assets</p>
                     )}
                   </div>
+
+                  {/* ── Holdings Portfolio subsection (only when tracked holdings exist) ── */}
+                  {holdingsPortfolio && (
+                    <Link
+                      href="/core/assets/holdings"
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-3 block rounded-[var(--r)] border border-emerald-200/60 bg-emerald-500/[0.04] p-3 transition-all hover:bg-emerald-500/[0.08] hover:shadow-sm"
+                      data-testid="holdings-portfolio-card"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Portfolio Holdings</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-600">
+                          Bekijk
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        <div>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">Waarde</p>
+                          <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-[var(--ink)]">
+                            {formatCurrency(holdingsPortfolio.totalValue)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">Dag</p>
+                          <p className={`mt-0.5 font-mono text-xs font-bold tabular-nums ${
+                            holdingsPortfolio.dailyChangeAbsolute >= 0 ? 'text-emerald-600' : 'text-red-600'
+                          }`}>
+                            {holdingsPortfolio.dailyChangeAbsolute >= 0 ? '+' : ''}{holdingsPortfolio.dailyChangePct.toFixed(2)}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">Posities</p>
+                          <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-[var(--ink)]">
+                            {holdingsPortfolio.positionCount}
+                          </p>
+                        </div>
+                      </div>
+
+                      {holdingsPortfolio.top3.length > 0 && (
+                        <p className="mt-2 truncate border-t border-emerald-200/40 pt-2 text-[10px] text-[var(--ink-3)]">
+                          <span className="font-semibold text-[var(--ink-2)]">Top {holdingsPortfolio.top3.length}:</span>
+                          {' '}
+                          {holdingsPortfolio.top3.map((h, i) => (
+                            <span key={h.ticker}>
+                              {i > 0 && <span className="mx-0.5 text-[var(--ink-4)]">&middot;</span>}
+                              <span className="font-medium text-[var(--ink-2)]">{h.ticker}</span>
+                              {' '}
+                              <span className="font-mono tabular-nums">{formatCurrency(h.value)}</span>
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                    </Link>
+                  )}
 
                   <div className="mt-2 sm:mt-3 flex items-center justify-between">
                     <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Bekijk portfolio</span>
