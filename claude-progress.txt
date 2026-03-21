@@ -1,3 +1,39 @@
+## Session 2026-03-21 - Feature #470
+
+### Feature #470: Fix: Pensioen-eindstrategie gebruikt AOW-leeftijd als simulatie-eindleeftijd - PASSING
+- Root cause: simEndAge was always taken from strategyForSim.endAge (default 90), the post-processing only relabeled FIRE age but didn't change the simulation horizon
+- Added `forcedFireAge` parameter to `runSimulation()` in fire-simulation.ts:
+  - Skips binary-search FIRE detection when set
+  - Forces accumulation→retirement transition at specified age
+  - Accumulation ends at forcedFireAge (not at binary-search FIRE age)
+- Modified `use-horizon-fire-sim.ts`:
+  - Pensioen mode uses 'deplete' internally with forcedFireAge = Math.ceil(aowAge)
+  - Ensures endAge >= 90 (via Math.max) so engine has proper horizon
+  - Post-processing trims rows to AOW age (no retirement phase displayed)
+  - Overrides displayEndAge to aowAgeInt so chart ends at AOW
+  - Sets requiredFirePortfolio to projected portfolio at last accumulation row
+- Modified `strategie-modal.tsx`:
+  - When switching to pensioen, ensures endAge >= 90 (fixes DB values of 67)
+- Verified via browser automation:
+  - Pensioen mode: chart ends at AOW (70), shows only VERMOGENSGROEI, no AFBOUW
+  - KPIs show correct values: Pensioenleeftijd 69j+3m, Vermogen op AOW €9M+
+  - PhaseBar shows single Opbouw phase (35-70)
+  - Text: "Simulatie tot leeftijd 70"
+  - Deplete mode: unchanged (FIRE 38.0, AFBOUW, Overgang 38-67)
+  - Only pre-existing Supabase 400 errors on net_worth_snapshots
+- All 48 fire-simulation tests pass
+- Zero TypeScript errors
+- Commit: 9ac19291
+
+### Files Modified
+- lib/fire-simulation.ts — added forcedFireAge parameter support
+- lib/hooks/use-horizon-fire-sim.ts — pensioen override with forcedFireAge + row trimming + displayEndAge
+- components/app/horizon/strategie-modal.tsx — ensure pensioen endAge >= 90
+
+### Current Status
+- 1 feature completed this session (#470)
+- Overall progress: 469/470 passing (99.8%)
+
 ## Session 2026-03-21 - Feature #468
 
 ### Feature #468: Regressietests fasebalk + persona-validatie - PASSING
