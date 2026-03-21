@@ -19249,3 +19249,49 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#475)
+
+## Session 2026-03-21 - Feature #481
+
+### Feature #481: Persona seeds: has_holdings_tracking vlag - PASSING
+- All steps already implemented by previous sessions:
+  1. PersonaAsset interface has `has_holdings_tracking?: boolean` (line 121)
+  2. Daan: both assets (Meesman, Brand New Day) have `has_holdings_tracking: true`
+  3. Lisa: both investment assets (Meesman, NT World) have `has_holdings_tracking: true`
+  4. Willem: DEGIRO asset has `has_holdings_tracking: true`
+  5. Rashid: DEGIRO asset has `has_holdings_tracking: true`
+  6. Marijke: Rabobank asset has `has_holdings_tracking: true`
+  7. Roos: no holdings, no flag set (defaults to false) — correct
+  8. seed-persona.ts includes `has_holdings_tracking: a.has_holdings_tracking ?? false` in insert
+  9. test-seed.ts includes `has_holdings_tracking: true` on test account DEGIRO asset
+  10. Regression tests in testdata-persona-validatie.ts cover all 3 scenarios
+- All 91 persona tests pass (persona-simrow-compat + persona-wealth-composition-compat)
+- No code changes needed — marked as passing
+
+### Current Status
+- 1 feature completed this session (#481)
+- Overall progress: 476/481 passing (98.9%)
+
+## Session 2026-03-21 - Features #476, #477
+
+### Feature #476: DB migratie: has_holdings_tracking kolom + auto-detect - PASSING
+- Migration file: supabase/migrations/20260321100001_add_assets_has_holdings_tracking.sql
+- ALTER TABLE assets ADD COLUMN IF NOT EXISTS has_holdings_tracking BOOLEAN NOT NULL DEFAULT false
+- Auto-detect: UPDATE assets SET has_holdings_tracking = true WHERE id IN (SELECT DISTINCT asset_id FROM holdings WHERE is_active = true)
+- Verified column exists in DB, DEGIRO investment asset correctly set to true
+- TypeScript Asset interface updated with has_holdings_tracking?: boolean
+- Commit: 9d572414
+
+### Feature #477: Asset toggle UI: 'Holdings bijhouden' checkbox + pill badge - PASSING
+- Holdings bijhouden checkbox in edit form for investment/crypto/savings/retirement asset types
+- Label: "Holdings bijhouden", description: "Schakel in om individuele posities, transacties en portfolio-allocatie bij te houden."
+- Warning when disabling with active holdings: shows count of active holdings
+- Holdings pill badge on asset card: bg-kern-50 text-kern-700 border-kern-200, TrendingUp icon
+- Standalone Holdings button removed from assets header
+- has_holdings_tracking saved via direct Supabase client update
+- Verified via browser: pill visible on DEGIRO card, checkbox checked in edit form
+- Zero console errors
+- Commit: 9d572414
+
+### Current Status
+- 2 features completed this session (#476, #477)
+- Overall progress: 476/481 passing (98.9%)
