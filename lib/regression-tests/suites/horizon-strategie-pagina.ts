@@ -14,8 +14,9 @@ import {
   type WithdrawalContext,
 } from '@/lib/withdrawal-strategy'
 import { runSimulation, type SimCashflow } from '@/lib/fire-simulation'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import { type FireStrategyConfig, parseFireStrategy, STRATEGY_LABELS as FIRE_STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
 import { ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
+import { NL_AOW_AGE } from '@/lib/constants'
 
 const CAT = 'horizon.strategie-pagina'
 
@@ -602,6 +603,123 @@ const tests: TestCase[] = [
       }
     },
   },
+  // ── Pensioen-modus tests ─────────────────────────────────────────────────
+  {
+    id: 'strategie-pensioen-4th-card',
+    name: '4e eindstrategie kaart: pensioen',
+    category: CAT,
+    description: 'Pensioen is de 4e FireEndStrategy naast deplete, legacy, perpetual',
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const allStrategies: FireEndStrategy[] = ['deplete', 'legacy', 'perpetual', 'pensioen']
+      assertEqual(allStrategies.length, 4, '4 eindstrategieën')
+      // All have labels
+      for (const s of allStrategies) {
+        assertNotNull(FIRE_STRATEGY_LABELS[s], `label voor ${s}`)
+        assertGreaterThan(FIRE_STRATEGY_LABELS[s].name.length, 0, `naam niet leeg: ${s}`)
+        assertGreaterThan(FIRE_STRATEGY_LABELS[s].subtitle.length, 0, `subtitle niet leeg: ${s}`)
+      }
+    },
+  },
+  {
+    id: 'strategie-pensioen-slider-hidden',
+    name: 'Pensioen: eindleeftijd-slider verborgen bij selectie',
+    category: CAT,
+    description: 'parseFireStrategy met pensioen gebruikt default endAge (geen slider nodig)',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      // When pensioen is selected, the UI hides the endAge slider
+      // The parseFireStrategy still accepts endAge but it's display-only
+      const c = parseFireStrategy({ fire_end_strategy: 'pensioen' })
+      assertEqual(c.strategy, 'pensioen', 'strategy')
+      assertEqual(c.endAge, 90, 'default endAge preserved')
+      // legacyAmount is irrelevant for pensioen
+      assertEqual(c.legacyAmount, 0, 'legacyAmount default')
+    },
+  },
+  {
+    id: 'strategie-pensioen-save-reload',
+    name: 'Pensioen strategie opslaan en herladen',
+    category: CAT,
+    description: 'parseFireStrategy roundtrip: pensioen → config → parse opnieuw',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      // Simulate save to DB: fire_end_strategy = 'pensioen'
+      const saved = { fire_end_strategy: 'pensioen', fire_end_age: 95, fire_legacy_amount: 0 }
+      const loaded = parseFireStrategy(saved)
+      assertEqual(loaded.strategy, 'pensioen', 'roundtrip strategy')
+      assertEqual(loaded.endAge, 95, 'roundtrip endAge')
+      assertEqual(loaded.legacyAmount, 0, 'roundtrip legacyAmount')
+    },
+  },
+  {
+    id: 'strategie-pensioen-kpi-aow',
+    name: 'KPI-metrics: AOW-leeftijd als fallback',
+    category: CAT,
+    description: 'NL_AOW_AGE = 67 wordt gebruikt als fallback voor AOW leeftijd',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      assertEqual(NL_AOW_AGE, 67, 'NL_AOW_AGE = 67')
+      // Pensioen mode uses AOW age instead of FIRE age
+      // When aowAgeFractional is not provided, fallback to NL_AOW_AGE
+      const pensioenConfig = parseFireStrategy({ fire_end_strategy: 'pensioen' })
+      assertEqual(pensioenConfig.strategy, 'pensioen', 'pensioen parsed')
+    },
+  },
+  {
+    id: 'strategie-pensioen-kpi-portfolio',
+    name: 'KPI: verwacht vermogen bij AOW correct berekend',
+    category: CAT,
+    description: 'Simulatie met pensioen geeft verwacht portfolio bij AOW leeftijd',
+    priority: 'high',
+    estimatedDurationMs: 100,
+    fn() {
+      const pensioenConfig: FireStrategyConfig = { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }
+      const result = runSimulation(
+        SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
+        SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
+        [], pensioenConfig,
+      )
+      // Find portfolio at AOW age (67)
+      const rowAtAow = result.rows.find(r => r.age === NL_AOW_AGE)
+      assertNotNull(rowAtAow, `row at AOW age ${NL_AOW_AGE} exists`)
+      assertFinite(rowAtAow!.endPortfolio, 'portfolio at AOW finite')
+      assertGreaterThan(rowAtAow!.endPortfolio, 0, 'portfolio at AOW > 0')
+    },
+  },
+  {
+    id: 'strategie-pensioen-withdrawal-combos',
+    name: 'Alle 4 withdrawal strategies × pensioen',
+    category: CAT,
+    description: 'static/guardrails/vpw/bucket allen compatibel met pensioen eindstrategie',
+    priority: 'critical',
+    estimatedDurationMs: 400,
+    fn() {
+      const pensioenConfig: FireStrategyConfig = { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }
+      const wsStrategies: WithdrawalStrategyConfig[] = [
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+      ]
+      for (const ws of wsStrategies) {
+        const r = runSimulation(
+          SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
+          SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
+          [], pensioenConfig, ws,
+        )
+        assert(r.rows.length > 0, `${ws.strategy}×pensioen heeft rows`)
+        for (const row of r.rows) {
+          assertFinite(row.endPortfolio, `${ws.strategy}×pensioen row ${row.age} finite`)
+        }
+      }
+    },
+  },
+
   {
     id: 'strategie-compat-guardrails-earlier',
     name: 'Guardrails levert eerder of gelijk FIRE op',

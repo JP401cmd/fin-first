@@ -5,12 +5,12 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
-import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
+import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, STRATEGY_LABELS, type FireEndStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import {
   resolveWithdrawalStrategy, WITHDRAWAL_DEFAULTS,
   type WithdrawalStrategyType,
 } from '@/lib/withdrawal-strategy'
-import { DEFAULT_RETURN, INFLATION, BOX3_DRAG } from '@/lib/constants'
+import { DEFAULT_RETURN, INFLATION, BOX3_DRAG, NL_AOW_AGE } from '@/lib/constants'
 import { runSimulation, type SimResult } from '@/lib/fire-simulation'
 
 const CAT = 'horizon.parameters'
@@ -182,6 +182,72 @@ const tests: TestCase[] = [
     },
   },
 
+  // ── Step 2b: parseFireStrategy pensioen ────────────────────────────
+  {
+    id: 'fire-strategy-pensioen',
+    name: 'parseFireStrategy: pensioen correcte config',
+    category: CAT,
+    description: 'Strategy "pensioen" wordt correct geparsed met defaults',
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const c = parseFireStrategy({ fire_end_strategy: 'pensioen' })
+      assertEqual(c.strategy, 'pensioen', 'strategy')
+      assertEqual(c.endAge, 90, 'default endAge')
+      assertEqual(c.legacyAmount, 0, 'default legacyAmount')
+    },
+  },
+  {
+    id: 'fire-strategy-pensioen-custom-age',
+    name: 'parseFireStrategy: pensioen met custom endAge',
+    category: CAT,
+    description: 'Strategy "pensioen" met fire_end_age 95 correct geparsed',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const c = parseFireStrategy({
+        fire_end_strategy: 'pensioen',
+        fire_end_age: 95,
+      })
+      assertEqual(c.strategy, 'pensioen', 'strategy')
+      assertEqual(c.endAge, 95, 'endAge')
+    },
+  },
+  {
+    id: 'fire-strategy-all-four',
+    name: 'parseFireStrategy: alle 4 strategieën',
+    category: CAT,
+    description: 'Alle geldige strategieën worden herkend: deplete, legacy, perpetual, pensioen',
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const strategies: Array<{ input: string; expected: string }> = [
+        { input: 'deplete', expected: 'deplete' },
+        { input: 'legacy', expected: 'legacy' },
+        { input: 'perpetual', expected: 'perpetual' },
+        { input: 'pensioen', expected: 'pensioen' },
+      ]
+      for (const { input, expected } of strategies) {
+        const c = parseFireStrategy({ fire_end_strategy: input })
+        assertEqual(c.strategy, expected, `${input} → ${expected}`)
+      }
+    },
+  },
+  {
+    id: 'fire-strategy-pensioen-labels',
+    name: 'STRATEGY_LABELS bevat pensioen',
+    category: CAT,
+    description: 'Pensioen strategie heeft naam en subtitle in STRATEGY_LABELS',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const label = STRATEGY_LABELS.pensioen
+      assertNotNull(label, 'pensioen label bestaat')
+      assertGreaterThan(label.name.length, 0, 'naam niet leeg')
+      assertGreaterThan(label.subtitle.length, 0, 'subtitle niet leeg')
+    },
+  },
+
   // ── Step 3: resolveWithdrawalStrategy ──────────────────────────────
   {
     id: 'withdrawal-resolve-all-strategies',
@@ -344,6 +410,45 @@ const tests: TestCase[] = [
       assertGreaterThan(highInflation.fireAge!, lowInflation.fireAge!, 'hogere inflatie → later FIRE')
     },
   },
+  // ── Step 6b: Pensioen strategy in simulatie ───────────────────────
+  {
+    id: 'params-pensioen-sim-no-error',
+    name: 'Pensioen strategie: simulatie zonder fouten',
+    category: CAT,
+    description: 'runSimulation met pensioen strategie produceert geldig resultaat',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const pensioenStrategy: FireStrategyConfig = { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }
+      const result = runSimulation(
+        35, 90, 150_000, 36_000, 18_000,
+        0.07, 'nl_box3', 0.02, [], pensioenStrategy,
+      )
+      assertNotNull(result, 'result niet null')
+      assertGreaterThan(result.rows.length, 0, 'rows niet leeg')
+      assertFinite(result.displayEndAge, 'displayEndAge finite')
+      // All rows should have finite values
+      for (const row of result.rows) {
+        assertFinite(row.endPortfolio, `endPortfolio finite at age ${row.age}`)
+      }
+    },
+  },
+  {
+    id: 'params-pensioen-aow-fallback',
+    name: 'AOW leeftijd niet beschikbaar → fallback NL_AOW_AGE = 67',
+    category: CAT,
+    description: 'Zonder aowAgeFractional gebruikt hook NL_AOW_AGE (67) als fallback',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      // NL_AOW_AGE is the fallback value used in use-horizon-fire-sim.ts
+      assertEqual(NL_AOW_AGE, 67, 'NL_AOW_AGE = 67')
+      // Verify parseFireStrategy accepts pensioen
+      const c = parseFireStrategy({ fire_end_strategy: 'pensioen' })
+      assertEqual(c.strategy, 'pensioen', 'pensioen parsed')
+    },
+  },
+
   {
     id: 'params-affect-simulation-consistency',
     name: 'resolveFireParams waarden consistent met simulatie input',

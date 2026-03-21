@@ -6,7 +6,7 @@ import {
   type SimResult,
   type SimRow,
 } from '@/lib/fire-simulation'
-import { type FireStrategyConfig, type FireEndStrategy } from '@/lib/fire-strategy'
+import { type FireStrategyConfig, type FireEndStrategy, parseFireStrategy } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { BOX3_DRAG, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { NIBUD_CHILDREN_MONTHLY_COST } from '@/lib/horizon-data'
@@ -767,5 +767,154 @@ describe('G — Kern/Horizon doelbedrag consistency', () => {
     const omitted = runStandard()
     const explicit = runStandard({}, [], undefined, WITHDRAWAL_DEFAULTS)
     expect(omitted.requiredFirePortfolio).toBe(explicit.requiredFirePortfolio)
+  })
+})
+
+// ── Section H: Pensioen-modus ───────────────────────────────────────────────
+
+describe('H — Pensioen-modus', () => {
+  const pensioenStrategy: FireStrategyConfig = {
+    strategy: 'pensioen',
+    endAge: 90,
+    legacyAmount: 0,
+  }
+
+  it('H1: pensioen strategy produces valid SimResult without errors', () => {
+    const result = runStandard({}, [], pensioenStrategy)
+
+    expect(result).toBeDefined()
+    expect(result.rows.length).toBeGreaterThan(0)
+    expect(result.displayEndAge).toBe(90)
+    // All rows should have finite endPortfolio
+    for (const row of result.rows) {
+      expect(Number.isFinite(row.endPortfolio)).toBe(true)
+    }
+  })
+
+  it('H2: pensioen strategy runs through simulation engine like deplete', () => {
+    // Pensioen uses the same engine as deplete — the post-processing happens
+    // in the hook, not in runSimulation itself. So the raw result should be
+    // similar to deplete.
+    const pensioenResult = runStandard({}, [], pensioenStrategy)
+    const depleteResult = runStandard({}, [], { strategy: 'deplete', endAge: 90, legacyAmount: 0 })
+
+    // Both should produce rows and a valid fireAge (or null)
+    expect(pensioenResult.rows.length).toBe(depleteResult.rows.length)
+    // Both have same displayEndAge
+    expect(pensioenResult.displayEndAge).toBe(depleteResult.displayEndAge)
+  })
+
+  it('H3: pensioen strategy with all 4 withdrawal strategies produces valid output', () => {
+    const withdrawalStrategies: WithdrawalStrategyConfig[] = [
+      { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
+      { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
+      { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' },
+      { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+    ]
+
+    for (const ws of withdrawalStrategies) {
+      const result = runStandard({}, [], pensioenStrategy, ws)
+      expect(result).toBeDefined()
+      expect(result.rows.length).toBeGreaterThan(0)
+      // All rows should have finite values
+      for (const row of result.rows) {
+        expect(Number.isFinite(row.endPortfolio)).toBe(true)
+        expect(Number.isFinite(row.grossIncome)).toBe(true)
+        expect(Number.isFinite(row.grossExpenses)).toBe(true)
+      }
+    }
+  })
+
+  it('H4: pensioen strategy with AOW cashflows produces valid results', () => {
+    const aowCashflows: SimCashflow[] = [
+      {
+        id: 'aow', name: 'AOW', type: 'recurring', direction: 'income',
+        amount: 1250, fromAge: 67, toAge: null, indexed: true,
+      },
+      {
+        id: 'pensioen', name: 'Pensioen', type: 'recurring', direction: 'income',
+        amount: 1500, fromAge: 68, toAge: null, indexed: true,
+      },
+    ]
+
+    const result = runStandard({}, aowCashflows, pensioenStrategy)
+    expect(result).toBeDefined()
+    expect(result.rows.length).toBeGreaterThan(0)
+
+    // Row at age 67 should have AOW cashflow income
+    const row67 = result.rows.find(r => r.age === 67)
+    expect(row67).toBeDefined()
+    // cashflowNet should reflect AOW income
+    expect(row67!.cashflowNet).toBeGreaterThan(0)
+  })
+
+  it('H5: pensioen strategy respects endAge parameter', () => {
+    const short = runStandard({}, [], { ...pensioenStrategy, endAge: 80 })
+    const long = runStandard({}, [], { ...pensioenStrategy, endAge: 100 })
+
+    // Different endAge should produce different numbers of rows
+    expect(short.rows.length).toBeLessThan(long.rows.length)
+    expect(short.displayEndAge).toBe(80)
+    expect(long.displayEndAge).toBe(100)
+  })
+
+  it('H6: pensioen strategy rows are monotonically aging', () => {
+    const result = runStandard({}, [], pensioenStrategy)
+
+    // Each row's age should increment by 1
+    for (let i = 0; i < result.rows.length - 1; i++) {
+      expect(result.rows[i + 1].age).toBe(result.rows[i].age + 1)
+    }
+    // First row starts at currentAge
+    expect(result.rows[0].age).toBe(STANDARD.currentAge)
+  })
+
+  it('H7: parseFireStrategy correctly parses pensioen', () => {
+    const config = parseFireStrategy({ fire_end_strategy: 'pensioen' })
+    expect(config.strategy).toBe('pensioen')
+    expect(config.endAge).toBe(90) // default
+    expect(config.legacyAmount).toBe(0) // default
+  })
+
+  it('H8: parseFireStrategy with pensioen + custom endAge', () => {
+    const config = parseFireStrategy({
+      fire_end_strategy: 'pensioen',
+      fire_end_age: 95,
+    })
+    expect(config.strategy).toBe('pensioen')
+    expect(config.endAge).toBe(95)
+  })
+
+  it('H9: pensioen strategy fireAge is found when portfolio is sufficient', () => {
+    // With enough savings, FIRE should be reachable even with pensioen strategy
+    // (the engine treats it the same as deplete internally)
+    const result = runStandard(
+      { currentPortfolio: 500_000, annualSavings: 30_000 },
+      [],
+      pensioenStrategy,
+    )
+    expect(result.fireReachable).toBe(true)
+    expect(result.fireAge).not.toBeNull()
+    expect(result.fireAge).toBeGreaterThan(35) // current age
+    expect(result.fireAge).toBeLessThan(90) // before endAge
+  })
+
+  it('H10: pensioen with life events does not crash', () => {
+    const events: LifeEvent[] = [
+      makeEvent({
+        id: 'sabbatical',
+        name: 'Sabbatical',
+        event_type: 'sabbatical',
+        target_age: 45,
+        one_time_cost: 15_000,
+        monthly_income_change: -3000,
+        duration_months: 6,
+      }),
+    ]
+
+    const cashflows = lifeEventsToCashflows(events)
+    const result = runStandard({}, cashflows, pensioenStrategy)
+    expect(result).toBeDefined()
+    expect(result.rows.length).toBeGreaterThan(0)
   })
 })

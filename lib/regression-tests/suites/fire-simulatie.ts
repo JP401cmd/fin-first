@@ -599,6 +599,75 @@ const tests: TestCase[] = [
       }
     },
   },
+
+  // ── Pensioen-modus simulatie tests ──────────────────────────────────────────
+  {
+    id: 'fire-sim-pensioen-basic',
+    name: 'Pensioen strategie: simulatie zonder fouten',
+    category: CAT,
+    description: 'runSimulation met pensioen strategie produceert geldig resultaat',
+    priority: 'critical', estimatedDurationMs: 100,
+    fn() {
+      const pensioenStrat: FireStrategyConfig = { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }
+      const r = runStd({}, [], pensioenStrat)
+      assert(r.rows.length > 0, 'pensioen heeft rows')
+      assertEqual(r.displayEndAge, 90, 'displayEndAge = 90')
+      for (const row of r.rows) {
+        assertFinite(row.endPortfolio, `pensioen row ${row.age} endPortfolio finite`)
+        assertFinite(row.grossIncome, `pensioen row ${row.age} grossIncome finite`)
+        assertFinite(row.grossExpenses, `pensioen row ${row.age} grossExpenses finite`)
+      }
+    },
+  },
+  {
+    id: 'fire-sim-pensioen-portfolio-chain',
+    name: 'Pensioen: portfolio chain consistent',
+    category: CAT,
+    description: 'endPortfolio[n] = startPortfolio[n+1] in pensioen-modus',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      const r = runStd({}, [], { strategy: 'pensioen', endAge: 90, legacyAmount: 0 })
+      for (let i = 0; i < r.rows.length - 1; i++) {
+        const diff = Math.abs(r.rows[i].endPortfolio - r.rows[i + 1].startPortfolio)
+        assertLessThanOrEqual(diff, 1, `chain consistent at age ${r.rows[i].age}`)
+      }
+    },
+  },
+  {
+    id: 'fire-sim-pensioen-with-cashflows',
+    name: 'Pensioen + AOW cashflows',
+    category: CAT,
+    description: 'AOW inkomen wordt correct verwerkt in pensioen-modus',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      const cfs: SimCashflow[] = [
+        { id: 'aow', name: 'AOW', type: 'recurring', direction: 'income', amount: 1250, fromAge: 67, toAge: null, indexed: true },
+      ]
+      const r = runStd({}, cfs, { strategy: 'pensioen', endAge: 90, legacyAmount: 0 })
+      assert(r.rows.length > 0, 'heeft rows')
+      const row67 = r.rows.find(row => row.age === 67)
+      assertNotNull(row67, 'row at 67 exists')
+      assertGreaterThan(row67!.cashflowNet, 0, 'cashflowNet > 0 at AOW age')
+    },
+  },
+  {
+    id: 'fire-sim-pensioen-all-ws',
+    name: 'Pensioen × 4 withdrawal strategies',
+    category: CAT,
+    description: 'Alle 4 onttrekkingsstrategieën combineerbaar met pensioen',
+    priority: 'critical', estimatedDurationMs: 400,
+    fn() {
+      const pensioenStrat: FireStrategyConfig = { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }
+      const wsTypes: Array<'static' | 'guardrails' | 'vpw' | 'bucket'> = ['static', 'guardrails', 'vpw', 'bucket']
+      for (const ws of wsTypes) {
+        const r = runStd({}, [], pensioenStrat, { ...WITHDRAWAL_DEFAULTS, strategy: ws })
+        assert(r.rows.length > 0, `${ws}×pensioen heeft rows`)
+        for (const row of r.rows) {
+          assertFinite(row.endPortfolio, `${ws}×pensioen row ${row.age} finite`)
+        }
+      }
+    },
+  },
 ]
 
 export function register(): void {
