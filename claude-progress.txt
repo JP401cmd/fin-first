@@ -19126,3 +19126,39 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#465, #466)
 - Overall progress: 463/467 passing (99.1%)
+
+## Session 2026-03-21 - Feature #471
+
+### Feature #471: Fix: Pensioen eindstrategie — volledige simulatie tot 90 met vaste pensioendatum - PASSING
+- Fixed the pensioen strategy which previously stopped the simulation at AOW age (67)
+- The simulation now runs from currentAge all the way to endAge (90) with full timeline:
+  - Accumulation phase: currentAge → AOW (savings + portfolio growth)
+  - Retirement phase: AOW → 90 (withdrawals + portfolio growth, no savings)
+- Key changes in `use-horizon-fire-sim.ts`:
+  - Removed row trimming at AOW age (was: `result.rows.filter(r => r.age < aowAgeInt)`)
+  - Removed displayEndAge override to AOW age
+  - Added `pensioenEndAge = Math.max(strategyForSim.endAge, 90)` to ensure minimum endAge of 90
+  - Uses 'deplete' strategy internally with forcedFireAge at AOW age
+  - Post-processing only relabels strategy to 'pensioen' and sets fireAge to AOW
+- Key changes in `horizon-data-loader.ts`:
+  - Added `feature_preferences` to profiles query (needed for pensioen fallback)
+  - Changed from `parseFireStrategy` to `resolveFireStrategyWithOverride` for pensioen DB fallback
+- `strategie-modal.tsx`: endAge bumped to min 90 when switching to pensioen (from #470 commit)
+- `fire-simulation.ts`: forcedFireAge parameter skips binary search (from #470 commit)
+- Verified in browser:
+  - KPIs: Pensioenleeftijd 67 jaar, Vermogen op AOW, Mnd. onttrekking, Aftellen
+  - Chart x-axis extends to 90 (was truncated at 67)
+  - PhaseBar: Opbouw 35-70 + Onttrekking 70-90
+  - Context hint: "Pensioenleeftijd · Simulatie tot leeftijd 90"
+  - Pensioen-modus actief indicator shown
+  - Switching to deplete and back works correctly
+  - Zero new JS console errors (only pre-existing net_worth_snapshots 400)
+- All 107 vitest tests pass (48 fire-simulation + 11 chart + 14 withdrawal + 34 persona)
+- Commit: f5a1c66a
+
+### Files Modified
+- lib/hooks/use-horizon-fire-sim.ts — removed row trimming, kept full timeline to 90
+- lib/horizon-data-loader.ts — added feature_preferences to query, use resolveFireStrategyWithOverride
+
+### Current Status
+- 1 feature completed this session (#471)
