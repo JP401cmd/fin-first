@@ -136,6 +136,7 @@ export function PhaseBar({
             type="button"
             aria-haspopup="dialog"
             aria-label={`${seg.label}: leeftijd ${seg.startAge} tot ${seg.endAge}`}
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={() => onSegmentClick?.(seg.id)}
             style={{
               width: widthPx,

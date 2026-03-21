@@ -644,7 +644,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     : null
 
   // ── Overgang (transition phase) berekening ──────────────────────────────────
-  console.log('[PhaseModal] debug:', { hasSimResult: !!simResult, currentAge, fireAge: simResult?.fireAge, fireReachable: simResult?.fireReachable, isPensioenMode })
   const overgangData = (() => {
     if (!simResult || currentAge == null || simResult.fireAge == null || !simResult.fireReachable || isPensioenMode) return null
     const oFireAge = Math.round(simResult.fireAge)
@@ -659,9 +658,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     const pRow = simResult.rows.find(r => r.age === oFireAge)
     const portfolioAtStart = pRow?.endPortfolio ?? simResult.firePortfolioAtFire
     const withdrawal = scenario === 'gap' ? yearlyExp : Math.max(yearlyExp - yearlyAow, 0)
-    const result = { scenario, start, end, fireAge: oFireAge, aowAge: oAowAge, yearlyExp, yearlyAow, portfolioAtStart, withdrawal }
-    console.log('[PhaseModal] overgangData:', result)
-    return result
+    return { scenario, start, end, fireAge: oFireAge, aowAge: oAowAge, yearlyExp, yearlyAow, portfolioAtStart, withdrawal }
   })()
 
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
