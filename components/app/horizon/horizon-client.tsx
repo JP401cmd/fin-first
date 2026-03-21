@@ -78,6 +78,7 @@ import { PensionPdfUpload, uploadPensionPdfToStorage, deletePensionPdfFromStorag
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
+import { PhaseBar } from '@/components/app/horizon/phase-bar'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { deriveWealthCompositionFromSim, type StackedRow } from '@/lib/wealth-composition'
@@ -1937,6 +1938,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   )}
                 </ZoomableChartContainer>
               </div>
+
+              {/* ── Fase-balk (Opbouw / Overgang / Onttrekking) ── */}
+              {simResult && currentAge != null && (
+                <div className="mt-2 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8">
+                  <PhaseBar
+                    currentAge={currentAge}
+                    fireAge={simResult.fireAge}
+                    aowAge={userAowAge.fractional}
+                    endAge={simResult.displayEndAge}
+                    fireReachable={simResult.fireReachable}
+                    isPensioenMode={isPensioenMode}
+                  />
+                </div>
+              )}
 
               {/* ── Legenda + detail-links onder de grafiek ── */}
               <div className="mt-2 space-y-2">
