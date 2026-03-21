@@ -19295,3 +19295,31 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#476, #477)
 - Overall progress: 476/481 passing (98.9%)
+
+## Session 2026-03-21 - Features #478, #479
+
+### Feature #478: Centrale holdings pagina: filter op tracked assets - PASSING
+- All functionality was already implemented by previous sessions:
+  - lib/holdings-data-loader.ts: JOINs with assets table, filters on has_holdings_tracking = true
+  - API route /api/holdings: same JOIN + filter
+  - holdings-client.tsx: groups holdings by parent asset with section headers (groupedHoldings)
+  - URL parameter ?asset=<id> supported for filtering on specific asset
+- Verified in browser: 4 holdings shown, filtering works, empty state message correct
+- Zero console errors
+
+### Feature #479: Kern pagina: Holdings portfolio kaart - PASSING
+- All functionality was already implemented by previous sessions:
+  - loadCoreData() extended with holdings query (JOIN with assets, filter has_holdings_tracking)
+  - Aggregates: totalValue, dailyChangeAbsolute, dailyChangePct, positionCount, top3
+  - HoldingsPortfolioCard in core-client.tsx: card-editorial with kern-500 accent
+  - Desktop: 3-column grid (Totale waarde, Dagwijziging, Posities) + Top 3 holdings
+  - Conditional rendering: only shown when holdingsPortfolio is not null
+  - Placed between hero section and Missie Controle
+  - Click navigates to /core/assets/holdings
+  - font-mono tabular-nums for all amounts
+- Verified in browser: card visible with € 570.016 total, 4 positions, Top 3 VWRL/IEAG/TDIV
+- Zero console errors
+
+### Current Status
+- 2 features verified and marked passing this session (#478, #479)
+- Overall progress: 479/481 passing (99.6%)
