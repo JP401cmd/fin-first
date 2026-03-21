@@ -122,12 +122,12 @@ export default function GuideHorizonUitleg() {
     {
       id: 'horizon-uitleg-fases',
       number: 1,
-      title: 'De twee fases',
+      title: 'De drie fases',
       icon: LineChart,
       content: (
         <>
           <p>
-            De Horizon-grafiek toont je vermogen over de tijd in <strong>twee fases</strong>:
+            De Horizon-grafiek toont je vermogen over de tijd in <strong>drie fases</strong>:
           </p>
           <p>
             <strong>1. Opbouwfase</strong> — van nu tot je FIRE-leeftijd. In deze periode groeit je
@@ -137,15 +137,29 @@ export default function GuideHorizonUitleg() {
             rendement, hoe steiler.
           </p>
           <p>
-            <strong>2. Onttrekkingsfase</strong> — van je FIRE-leeftijd tot je eindleeftijd. Je
-            stopt met werken (of het wordt optioneel) en leeft van je opgebouwde vermogen. De
+            <strong>2. Overgangsfase</strong> — van je FIRE-leeftijd tot je AOW-leeftijd (67). Dit
+            is de periode waarin je financieel onafhankelijk bent, maar nog geen AOW ontvangt.
+            Je overbrugt de <strong>gap</strong> tussen stoppen met werken en het ingaan van je
+            staatspensioen. Als je FIRE-leeftijd vóór de AOW-leeftijd valt, heb je een{' '}
+            <strong>positieve gap</strong>: jaren waarin je volledig op je eigen vermogen leunt.
+            Valt je FIRE-leeftijd ná de AOW-leeftijd, dan is er een{' '}
+            <strong>tekort</strong>: je moet langer doorwerken dan gehoopt, en de overgangsfase
+            krimpt tot nul.
+          </p>
+          <p>
+            <strong>3. Onttrekkingsfase</strong> — van je AOW-leeftijd tot je eindleeftijd. Je
+            leeft van je opgebouwde vermogen aangevuld met AOW en eventueel pensioen. De
             lijn daalt omdat je elk jaar een deel opneemt voor je uitgaven. Hoe snel de lijn
             daalt hangt af van je onttrekkingsmethode en eindstrategie.
           </p>
           <p>
             Het <strong>hoogste punt</strong> van de grafiek is je FIRE-moment — het moment waarop
-            je vermogen piekt voordat de onttrekkingen beginnen. Alles links van dat punt is
-            opbouw, alles rechts is onttrekking.
+            je vermogen piekt voordat de onttrekkingen beginnen.
+          </p>
+          <p>
+            Onder de grafiek vind je de <strong>fasebalk</strong> — een interactieve balk die de
+            drie fases proportioneel weergeeft. Klik op een fase om de bijbehorende analyse te
+            openen en de details van die periode te bekijken.
           </p>
         </>
       ),
@@ -233,8 +247,8 @@ export default function GuideHorizonUitleg() {
             maakt de daling na FIRE minder steil, terugkerende kosten maken de opbouw trager.
           </p>
           <p>
-            Levensgebeurtenissen worden meegenomen in <strong>beide fases</strong> — zowel opbouw
-            als onttrekking. Een AOW-uitkering die begint op 67 vermindert bijvoorbeeld je
+            Levensgebeurtenissen worden meegenomen in <strong>alle drie fases</strong> — opbouw,
+            overgang én onttrekking. Een AOW-uitkering die begint op 67 vermindert bijvoorbeeld je
             benodigde onttrekking uit je portfolio, waardoor je vermogen langer meegaat. Een kind
             dat op je 35e wordt geboren verhoogt je uitgaven tijdens de opbouwfase.
           </p>
@@ -495,9 +509,14 @@ export default function GuideHorizonUitleg() {
             portfolio. Samen vormen deze drie bronnen je totale bruto inkomen.
           </p>
           <p>
-            <strong>Onttrekkingsfase</strong> — je hebt geen salaris meer, dus inkomen bestaat uit
-            beleggingsrendement op je portfolio en eventuele positieve levensgebeurtenissen (AOW,
-            pensioenuitkering, huurinkomsten).
+            <strong>Overgangsfase</strong> — je hebt geen salaris meer, maar nog geen AOW. Inkomen
+            bestaat uit beleggingsrendement op je portfolio en eventuele positieve
+            levensgebeurtenissen (huurinkomsten, parttime werk).
+          </p>
+          <p>
+            <strong>Onttrekkingsfase</strong> — inkomen bestaat uit beleggingsrendement op je
+            portfolio, AOW-uitkering, eventueel pensioen en overige positieve
+            levensgebeurtenissen.
           </p>
           <p>
             <strong>Wat telt als uitgaven?</strong>
@@ -507,9 +526,13 @@ export default function GuideHorizonUitleg() {
             levensgebeurtenissen (huis kopen, auto, bruiloft, kinderopvang).
           </p>
           <p>
+            <strong>Overgangsfase</strong> — je jaarlijkse onttrekking uit je portfolio plus
+            negatieve levensgebeurtenissen. Geen salaris meer, maar ook nog geen AOW — je leeft
+            volledig van je vermogen.
+          </p>
+          <p>
             <strong>Onttrekkingsfase</strong> — je jaarlijkse onttrekking uit je portfolio plus
-            negatieve levensgebeurtenissen. De onttrekking is het bedrag dat je opneemt om je
-            levenskosten te dekken.
+            negatieve levensgebeurtenissen, verminderd met AOW- en pensioeninkomsten.
           </p>
           <p>
             <strong>De gap tussen de lijnen</strong> is je netto vermogensmutatie per jaar. Waar
@@ -545,7 +568,7 @@ export default function GuideHorizonUitleg() {
           <p>
             <strong>Vermogenspad</strong> (standaard) — de bekende lijngrafiek die je{' '}
             <strong>totale netto vermogen</strong> toont als één doorlopende lijn. Ideaal om je
-            FIRE-traject en de twee fases (opbouw en onttrekking) te volgen.
+            FIRE-traject en de drie fases (opbouw, overgang en onttrekking) te volgen.
           </p>
           <p>
             <strong>Vermogensopbouw</strong> — een gestapelde kolomgrafiek die laat zien{' '}
