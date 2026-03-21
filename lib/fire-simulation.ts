@@ -438,7 +438,10 @@ export function runSimulation(
 
   // Use withdrawal strategy for visualisation rows — consistent with binary search
   // which now also uses the chosen strategy (since FIRE-leeftijd is strategie-afhankelijk)
-  const { rows: decRows } = simulateDecumulation(requiredFirePortfolioExact, computedFireAge, true, displayEndAge, true)
+  // When forcedFireAge is set (pensioen-modus), start decumulation from actual portfolio
+  // instead of the binary-search minimum to avoid visual discontinuity at AOW age
+  const decStartPortfolio = forcedFireAge != null ? portfolio : requiredFirePortfolioExact
+  const { rows: decRows } = simulateDecumulation(decStartPortfolio, computedFireAge, true, displayEndAge, true)
 
   const implicitWithdrawalRate = requiredFirePortfolio > 0
     ? yearlyExpenses / requiredFirePortfolio
