@@ -18774,3 +18774,37 @@ Current status: 425/431 passing (98.6%)
 - test-seed.ts left untouched (as required)
 - All 34 simrow tests pass, all 57 wealth-composition tests pass
 - Commit: 15d6e5cf
+
+## Session 2026-03-21 - Features #454, #456
+
+### Feature #454: Simulatie-hook aanpassing voor pensioen-modus - PASSING
+- Modified `lib/hooks/use-horizon-fire-sim.ts` to handle pensioen strategy:
+  - Added `aowAgeFractional` as optional parameter (fallback: NL_AOW_AGE = 67)
+  - When strategy === 'pensioen': runSimulation() runs normally, then post-processes result
+  - Override fireAgeFractional with aowAgeFractional, fireAge with Math.floor(aowAge)
+  - Replace requiredFirePortfolio with projected portfolio at AOW age from sim rows
+  - Set fireReachable = true (AOW is always reachable)
+  - Save original FIRE values in originalFireAge/originalFireAgeFractional for fallback
+  - Snapshot persistence writes AOW-data as fire_age (no breaking changes)
+- Updated `horizon-client.tsx` to pass userAowAge.fractional to hook
+- Added NL_AOW_AGE import from lib/constants
+- Extended HorizonFireSimResult with originalFireAge/originalFireAgeFractional fields
+- TypeScript compiles cleanly, zero new console errors
+- Commit: f81020f5
+
+### Feature #456: StrategieModal — 4e eindstrategie kaart - PASSING
+- Changed strategy card grid: grid-cols-2 mobile, sm:grid-cols-4 desktop (was grid-cols-1/sm:grid-cols-3)
+- Added Landmark icon for pensioen card (was defaulting to InfinityIcon)
+- Added min-h-[44px] tap target on all strategy cards
+- Eindleeftijd slider and legacy input correctly hidden for pensioen (existing conditional check)
+- Withdrawal strategy cards show "AOW: 67 jr" instead of "FIRE: X jr" when pensioen is selected
+- Summary row label changes to "AOW-leeftijd" with "67 jaar" for pensioen strategy
+- Subtitle updated: "Kies je planningshorizon, eindstrategie en onttrekkingsmethode."
+- NL_AOW_AGE imported from lib/constants
+- Zero new console errors (only pre-existing Supabase 400s on profiles/net_worth_snapshots)
+- Note: DB save fails for regression test account (pre-existing RLS issue), but local state updates correctly
+- Commit: ecfeedc9
+
+### Current Status
+- 2 features completed this session (#454, #456)
+- Overall progress: 454/460 passing (98.7%)
