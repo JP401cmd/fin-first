@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { formatCurrency } from '@/lib/format'
+import { CHART_PAD } from '@/lib/chart-constants'
 import { EVENT_ICONS } from './log-timeline'
 
 // ── EventsTimeline ──────────────────────────────────────────────────────────
@@ -49,9 +50,9 @@ export function EventsTimeline({
 
   if (visibleEvents.length === 0) return null
 
-  // Must match SimChart's padding exactly
+  // Uses shared CHART_PAD to match SimChart's padding exactly
   const W = containerW
-  const PAD = { left: 60, right: 16 }
+  const PAD = CHART_PAD
   const innerW = W - PAD.left - PAD.right
   const H = 52 // compact height
   const Y_LINE = 26

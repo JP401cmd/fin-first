@@ -5,6 +5,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { NL_SWR, type ScenarioPath, type ProjectionMonth } from '@/lib/horizon-data'
+import { CHART_PAD } from '@/lib/chart-constants'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export const SimChart = memo(function SimChart({
   const W = containerW
   const isDesktop = containerW >= 768
   const H = isDesktop ? 260 : 220
-  const PAD = { top: 16, right: 16, bottom: 28, left: 60 }
+  const PAD = CHART_PAD
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
 

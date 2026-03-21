@@ -91,6 +91,7 @@ import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverla
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { PhaseBar } from '@/components/app/horizon/phase-bar'
+import { CHART_PAD } from '@/lib/chart-constants'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { deriveWealthCompositionFromSim, type StackedRow } from '@/lib/wealth-composition'
@@ -2019,7 +2020,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
                       {/* ── Fase-balk (Opbouw / Overgang / Onttrekking) ── */}
                       {simResult && currentAge != null && (
-                        <div className="mt-2">
+                        <div className="mt-2" style={{ marginLeft: CHART_PAD.left, marginRight: CHART_PAD.right }}>
                           <PhaseBar
                             currentAge={currentAge}
                             fireAge={simResult.fireAge}
