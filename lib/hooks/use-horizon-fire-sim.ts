@@ -17,6 +17,7 @@ import {
   type FinancialInput,
   type LifeEvent,
 } from '@/lib/horizon-data'
+import { NL_AOW_AGE } from '@/lib/constants'
 import {
   runSimulation,
   lifeEventsToCashflows,
@@ -32,6 +33,10 @@ export interface HorizonFireSimResult {
   cashflows: SimCashflow[]
   isLoading: boolean
   error: string | null
+  /** Original FIRE age before pensioen override (null when not in pensioen mode) */
+  originalFireAge: number | null
+  /** Original fractional FIRE age before pensioen override */
+  originalFireAgeFractional: number | null
 }
 
 interface HorizonFireSimInput {
@@ -43,13 +48,15 @@ interface HorizonFireSimInput {
   inflation?: number     // default: INFLATION
   /** Upstream error (e.g. from server data loader profile query failure) */
   profileError?: string | null
+  /** AOW age as fractional value (e.g. 67.25). Falls back to NL_AOW_AGE (67) if not provided. */
+  aowAgeFractional?: number
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
-  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
+  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null } | null>(() => {
     if (!horizonInput) return null
 
     const { totalAssets, totalDebts, monthlyContributions, yearlyMustExpenses, dateOfBirth } = horizonInput
@@ -93,8 +100,35 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       withdrawalStrategy,
     )
 
-    return { result, cashflows }
-  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam])
+    // ── Pensioen-modus override ────────────────────────────────────────
+    // When strategy is 'pensioen', override FIRE output with AOW-based values.
+    // runSimulation() ran normally — we post-process the result.
+    if (strategyForSim.strategy === 'pensioen') {
+      const aowAge = aowAgeFractionalParam ?? NL_AOW_AGE
+      const aowAgeInt = Math.floor(aowAge)
+
+      // Save original FIRE values for fallback
+      const originalFireAge = result.fireAge
+      const originalFireAgeFractional = result.fireAgeFractional
+
+      // Find projected portfolio at AOW age from simulation rows
+      const rowAtAow = result.rows.find(r => r.age === aowAgeInt)
+      const projectedPortfolioAtAow = rowAtAow?.endPortfolio ?? result.requiredFirePortfolio
+
+      // Override FIRE fields with pensioen values
+      const pensioenResult: SimResult = {
+        ...result,
+        fireAgeFractional: aowAge,
+        fireAge: aowAgeInt,
+        requiredFirePortfolio: projectedPortfolioAtAow,
+        fireReachable: true, // AOW is altijd bereikbaar qua leeftijd
+      }
+
+      return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional }
+    }
+
+    return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null }
+  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -136,7 +170,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null }
   }
 
   return {
@@ -144,5 +178,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     cashflows: simResult?.cashflows ?? [],
     isLoading: false,
     error: profileError ?? null,
+    originalFireAge: simResult?.originalFireAge ?? null,
+    originalFireAgeFractional: simResult?.originalFireAgeFractional ?? null,
   }
 }

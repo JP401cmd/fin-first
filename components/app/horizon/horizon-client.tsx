@@ -225,9 +225,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [openCatalogGroups, setOpenCatalogGroups] = useState<Set<LifeEventGroup>>(new Set())
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
-  const { result: simResult, cashflows: simCashflows, error: simError } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional } = useHorizonFireSim(
     input
-      ? { horizonInput: input, lifeEvents: events, fireStrategy, withdrawalStrategy: withdrawalStrategyConfig, grossReturn: fireParams.grossReturn, inflation: fireParams.inflationRate, profileError: initialData.profileError }
+      ? { horizonInput: input, lifeEvents: events, fireStrategy, withdrawalStrategy: withdrawalStrategyConfig, grossReturn: fireParams.grossReturn, inflation: fireParams.inflationRate, profileError: initialData.profileError, aowAgeFractional: userAowAge.fractional }
       : null,
   )
 
@@ -1830,6 +1830,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             aowAgeFractional={userAowAge.fractional}
+                            planningMode={simResult.strategy === 'pensioen' ? 'pensioen' : 'fire'}
                           />
                         </div>
 
@@ -1853,6 +1854,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             fireAge={simResult.fireAge}
+                            planningMode={simResult.strategy === 'pensioen' ? 'pensioen' : 'fire'}
+                            aowAgeFractional={userAowAge.fractional}
                           />
                         </div>
                       </div>
@@ -1887,6 +1890,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           endAge={simResult.displayEndAge}
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
+                          fireAge={simResult.fireAge}
+                          planningMode={simResult.strategy === 'pensioen' ? 'pensioen' : 'fire'}
+                          aowAgeFractional={userAowAge.fractional}
                         />
                       </div>
 
