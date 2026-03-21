@@ -640,12 +640,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     ? `${userAowAge.years}j + ${userAowAge.months}m`
     : `${userAowAge.years} jaar`
   const aowAgeInt = Math.floor(userAowAge.fractional)
+  // Use startPortfolio of the first retirement row at AOW age = actual portfolio AT AOW
+  // (not endPortfolio which is after a year of withdrawals). Fallback to firePortfolioAtFire
+  // which is the actual projected portfolio, NOT requiredFirePortfolio (binary-search minimum). (#473)
+  const aowRow = isPensioenMode && simResult
+    ? simResult.rows.find(r => r.age === aowAgeInt && r.phase === 'retirement')
+      ?? simResult.rows.find(r => r.age === aowAgeInt)
+    : null
   const portfolioAtAow = isPensioenMode && simResult
-    ? (simResult.rows.find(r => r.age === aowAgeInt)?.endPortfolio ?? simResult.requiredFirePortfolio)
+    ? (aowRow?.startPortfolio ?? simResult.firePortfolioAtFire)
     : null
-  const monthlyWithdrawalAtAow = isPensioenMode && portfolioAtAow != null
-    ? (fireSwr * portfolioAtAow) / 12
-    : null
+  // Use actual withdrawal from the sim engine (guardrails-aware) instead of simple SWR calc (#473)
+  const monthlyWithdrawalAtAow = isPensioenMode && aowRow != null && aowRow.withdrawal > 0
+    ? aowRow.withdrawal / 12
+    : isPensioenMode && portfolioAtAow != null
+      ? (fireSwr * portfolioAtAow) / 12
+      : null
 
   // ── Overgang (transition phase) berekening ──────────────────────────────────
   const overgangData = (() => {

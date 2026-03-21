@@ -135,12 +135,17 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       const originalFireAge = result.fireAge
       const originalFireAgeFractional = result.fireAgeFractional
 
+      // Override requiredFirePortfolio with the ACTUAL projected portfolio at AOW age
+      // (firePortfolioAtFire), not the binary-search minimum. The binary-search minimum
+      // is the theoretical minimum needed to survive decumulation, but for pensioen mode
+      // users want to see what they'll actually have at AOW age. (#473)
       const pensioenResult: SimResult = {
         ...result,
         strategy: 'pensioen',
         fireAgeFractional: aowAge,
         fireAge: aowAgeInt,
         fireReachable: true, // AOW is altijd bereikbaar qua leeftijd
+        requiredFirePortfolio: result.firePortfolioAtFire,
       }
 
       return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional }
