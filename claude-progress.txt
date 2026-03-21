@@ -1,3 +1,26 @@
+## Session 2026-03-21 - Feature #468
+
+### Feature #468: Regressietests fasebalk + persona-validatie - PASSING
+- Exported `buildSegments` function from `phase-bar.tsx` for testability
+- Added 13 regression tests to `horizon-grafiek.ts`:
+  - Segment count tests: normal (3), unreachable (1), pensioen (2), FIRE=AOW (2), already FIRE'd variants
+  - Proportional width tests: spans sum to total, contiguous segments
+  - Label tests per strategy: deplete, perpetual, legacy, pensioen
+  - Persona tests: all 6 personas (Roos=schuld, Daan=starter, Lisa=legacy, Willem=near-FI, Rashid=no-budget, Marijke=retired)
+  - Edge case: collapsed segment (FIRE >= AOW), FIRE=AOW, pensioen-phases compatibility
+- Created vitest suite `test/phase-bar-regression.test.ts` with 28 tests — all pass
+- Verified: 0 TypeScript errors, 0 new console errors, PhaseBar renders correctly on /horizon
+- Commit: 9530ba85
+
+### Files Modified
+- components/app/horizon/phase-bar.tsx — exported buildSegments function
+- lib/regression-tests/suites/horizon-grafiek.ts — added 13 fasebalk + persona regression tests
+- test/phase-bar-regression.test.ts — new vitest suite (28 tests)
+
+### Current Status
+- 1 feature completed this session (#468)
+- Overall progress: 468/468 passing (100%)
+
 ## Session 2026-03-21 - Feature #462
 
 ### Feature #462: Fix: Eindstrategie pensioenleeftijd opslaan werkt niet - PASSING
