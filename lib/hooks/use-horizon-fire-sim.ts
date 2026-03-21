@@ -81,7 +81,27 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
 
     // Strategy config — determines endAge and convergence target
     const strategyForSim = fireStrategy ?? DEFAULT_FIRE_STRATEGY
-    const simEndAge = strategyForSim.endAge
+
+    // ── Pensioen strategy: force FIRE at AOW age, simulate full horizon ──
+    // Instead of ending at AOW, keep endAge at 90 (or configured) and force the
+    // accumulation→retirement transition at AOW age via forcedFireAge.
+    // After AOW: savings = 0, portfolio growth continues, withdrawals start.
+    const isPensioen = strategyForSim.strategy === 'pensioen'
+    const aowAge = aowAgeFractionalParam ?? NL_AOW_AGE
+    const aowAgeInt = Math.ceil(aowAge)
+
+    // For pensioen: use 'deplete' internally so the engine runs decumulation
+    // from AOW→endAge (portfolio depletes by endAge). Ensure endAge is at
+    // least 90 so the chart extends well past AOW (previous broken impl may
+    // have stored endAge=67 in the DB).
+    const pensioenEndAge = Math.max(strategyForSim.endAge, 90)
+    const effectiveStrategy = isPensioen
+      ? { ...strategyForSim, strategy: 'deplete' as const, endAge: pensioenEndAge }
+      : strategyForSim
+    const simEndAge = effectiveStrategy.endAge
+
+    // forcedFireAge: skip binary-search, force accumulation→retirement at AOW
+    const forcedFireAge = isPensioen ? aowAgeInt : undefined
 
     // Kasstromen
     const cashflows = lifeEventsToCashflows(lifeEvents ?? [])
@@ -96,31 +116,34 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       returnModel,
       inflationParam ?? INFLATION,
       cashflows,
-      strategyForSim,
+      effectiveStrategy,
       withdrawalStrategy,
+      forcedFireAge,
     )
 
-    // ── Pensioen-modus override ────────────────────────────────────────
-    // When strategy is 'pensioen', override FIRE output with AOW-based values.
-    // runSimulation() ran normally — we post-process the result.
-    if (strategyForSim.strategy === 'pensioen') {
-      const aowAge = aowAgeFractionalParam ?? NL_AOW_AGE
-      const aowAgeInt = Math.floor(aowAge)
-
-      // Save original FIRE values for fallback
+    // ── Pensioen post-processing ─────────────────────────────────────
+    // The engine ran as 'deplete' with forcedFireAge at AOW, producing rows
+    // from currentAge → endAge with accumulation (→AOW) + retirement (AOW→90).
+    // For pensioen: trim rows to AOW age so the chart ends at AOW (no withdrawal
+    // phase displayed — the user transitions to state pension at AOW).
+    if (isPensioen) {
       const originalFireAge = result.fireAge
       const originalFireAgeFractional = result.fireAgeFractional
 
-      // Find projected portfolio at AOW age from simulation rows
-      const rowAtAow = result.rows.find(r => r.age === aowAgeInt)
-      const projectedPortfolioAtAow = rowAtAow?.endPortfolio ?? result.requiredFirePortfolio
+      // Trim rows: only show accumulation up to (but not including) AOW age
+      const trimmedRows = result.rows.filter(r => r.age < aowAgeInt)
+      const portfolioAtAow = trimmedRows.length > 0
+        ? trimmedRows[trimmedRows.length - 1].endPortfolio
+        : result.requiredFirePortfolio
 
-      // Override FIRE fields with pensioen values
       const pensioenResult: SimResult = {
         ...result,
+        rows: trimmedRows,
+        strategy: 'pensioen',
+        displayEndAge: aowAgeInt,
         fireAgeFractional: aowAge,
         fireAge: aowAgeInt,
-        requiredFirePortfolio: projectedPortfolioAtAow,
+        requiredFirePortfolio: portfolioAtAow,
         fireReachable: true, // AOW is altijd bereikbaar qua leeftijd
       }
 

@@ -648,7 +648,12 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
   // Handler for end strategy card click — saves immediately
   const handleEndStrategyChange = useCallback((strategy: FireEndStrategy) => {
     setLocalEndStrategy(strategy)
-    saveEndStrategy(strategy, localEndAge, localLegacyAmount)
+    // When switching to pensioen, ensure endAge is at least 90 so the chart
+    // shows the full timeline beyond AOW. Previous implementation may have
+    // stored endAge=67 (equal to AOW age).
+    const age = strategy === 'pensioen' ? String(Math.max(Number(localEndAge) || 90, 90)) : localEndAge
+    if (strategy === 'pensioen' && age !== localEndAge) setLocalEndAge(age)
+    saveEndStrategy(strategy, age, localLegacyAmount)
   }, [saveEndStrategy, localEndAge, localLegacyAmount])
 
   // Handler for end age / legacy amount changes — saves on blur

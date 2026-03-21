@@ -95,6 +95,8 @@ export function runSimulation(
   cashflows: SimCashflow[],
   strategyConfig?: FireStrategyConfig,
   withdrawalStrategy?: WithdrawalStrategyConfig,
+  /** Force FIRE transition at this age (used by pensioen strategy). Skips binary-search detection. */
+  forcedFireAge?: number,
 ): SimResult {
   // Resolve strategy (default = deplete@endAge for backward compat)
   const cfg = strategyConfig ?? DEFAULT_FIRE_STRATEGY
@@ -328,11 +330,19 @@ export function runSimulation(
   let computedFireAge: number | null = null
   const accRows: SimRow[] = []
 
-  for (let age = currentAge; age < effectiveEndAge; age++) {
-    const req = requiredAt(age)
-    if (portfolio >= req) {
-      computedFireAge = age
-      break
+  // Determine the accumulation end: either forcedFireAge or effectiveEndAge (whichever is smaller)
+  const accEndAge = forcedFireAge != null
+    ? Math.min(forcedFireAge, effectiveEndAge)
+    : effectiveEndAge
+
+  for (let age = currentAge; age < accEndAge; age++) {
+    // When forcedFireAge is set, skip binary-search FIRE detection (we force at specific age)
+    if (forcedFireAge == null) {
+      const req = requiredAt(age)
+      if (portfolio >= req) {
+        computedFireAge = age
+        break
+      }
     }
 
     portfolioPreFire = portfolio
@@ -384,6 +394,11 @@ export function runSimulation(
     })
 
     portfolio = endPortfolio
+  }
+
+  // If forcedFireAge is set, always transition at that age (regardless of portfolio level)
+  if (forcedFireAge != null && computedFireAge == null && forcedFireAge <= effectiveEndAge) {
+    computedFireAge = forcedFireAge
   }
 
   if (computedFireAge === null) {
