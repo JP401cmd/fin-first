@@ -18915,3 +18915,39 @@ Current status: 425/431 passing (98.6%)
 - Zero TypeScript errors in modified files
 - Zero console errors in browser
 - Commit: cda4fa2e
+
+## Session 2026-03-21 - Features #463, #464
+
+### Feature #463: PhaseBar component — proportionele fasebalk - PASSING
+- Created `components/app/horizon/phase-bar.tsx` with 3 clickable segments (Opbouw, Overgang, Onttrekking)
+- Segments proportional to age span (not equal widths)
+- Colors: Opbouw=horizon-600 (white text), Overgang=horizon-200 (horizon-800 text), Onttrekking=kern-500 (white text)
+- ResizeObserver with 3 display modes: wide (>120px: name+age), narrow (60-120px: name only), collapsed (<60px: Lucide icon)
+- Min 44px width per active segment, hover brightness, active scale(0.98), focus-visible ring
+- Accessibility: role=group, button elements, aria-haspopup=dialog, aria-label per segment
+- Collapsed segments: aria-hidden + tabIndex={-1}
+- Edge cases: FIRE unreachable (only Opbouw), FIRE=AOW/pensioen (Overgang collapses), already FIRE'd (Opbouw collapses)
+- Placed after ZoomableChartContainer (line ~1960), outside zoom-scope
+- Commit: d89581f8
+
+### Feature #464: PhaseModal Opbouw — vermogensprognose analyse - PASSING
+- Created `components/app/horizon/phase-modal-opbouw.tsx` with BottomSheet modal
+- Title: "Opbouwfase · {currentAge} → {fireAge} jaar"
+- KassabonShell with 5 receipt rows: Huidig vermogen, Verwacht bij FIRE, Jaarlijkse besparing, Verwacht rendement, Geschatte groei
+- Bold total: Doelvermogen
+- Mini SVG accumulation chart (area + line) from SimResult.rows (phase='accumulation')
+- useModalAnimation hook for chart animation (NOT useInViewAnimation)
+- All amounts in font-mono tabular-nums
+- Dynamic import for code splitting
+- activeFaseModal state added to horizon-client.tsx
+- Commit: c823ce74
+
+### Files Created
+- components/app/horizon/phase-bar.tsx
+- components/app/horizon/phase-modal-opbouw.tsx
+
+### Files Modified
+- components/app/horizon/horizon-client.tsx (PhaseBar + PhaseModalOpbouw integration)
+
+### Current Status
+- 2 features completed this session (#463, #464)
