@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import { type FinancialInput, ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
+import { NL_AOW_AGE } from '@/lib/constants'
 import { resolveFireParams } from '@/lib/fire-params'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import {
@@ -856,7 +857,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
         {/* ── Subtitle + active badges ────────────────────────────── */}
         <header className="mb-6">
           <p className="mt-1 font-sans text-sm text-[var(--ink-3)]">
-            Kies je eindstrategie en onttrekkingsmethode. De combinatie bepaalt hoe je portefeuille zich ontwikkelt na FIRE.
+            Kies je planningshorizon, eindstrategie en onttrekkingsmethode. De combinatie bepaalt hoe je portefeuille zich ontwikkelt na FIRE.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
@@ -893,15 +894,17 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                 Wat wil je doen met je vermogen op het einde van de rit?
               </p>
 
-              {/* 3 end strategy cards */}
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+              {/* 4 end strategy cards */}
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                 {(Object.entries(STRATEGY_LABELS) as [FireEndStrategy, typeof STRATEGY_LABELS[FireEndStrategy]][]).map(([key, info]) => {
                   const isSelected = localEndStrategy === key
                   const icon = key === 'deplete'
                     ? <Banknote className="h-4 w-4" />
                     : key === 'legacy'
                       ? <Heart className="h-4 w-4" />
-                      : <InfinityIcon className="h-4 w-4" />
+                      : key === 'pensioen'
+                        ? <Landmark className="h-4 w-4" />
+                        : <InfinityIcon className="h-4 w-4" />
 
                   return (
                     <button
@@ -909,7 +912,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                       type="button"
                       onClick={() => handleEndStrategyChange(key)}
                       disabled={endStrategySaving}
-                      className={`relative rounded-[var(--r)] border-2 p-3 text-left transition-all ${
+                      className={`relative min-h-[44px] rounded-[var(--r)] border-2 p-3 text-left transition-all ${
                         isSelected
                           ? 'border-horizon-500 bg-horizon-50 shadow-sm'
                           : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
@@ -1066,7 +1069,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                 </p>
                 {!isIncompatible && sim && sim.fireReachable && (
                   <p className="mt-2 font-mono text-xs tabular-nums text-[var(--ink-2)]">
-                    FIRE: {sim.fireAge} jr
+                    {localEndStrategy === 'pensioen' ? `AOW: ${NL_AOW_AGE} jr` : `FIRE: ${sim.fireAge} jr`}
                   </p>
                 )}
                 {compat?.status === 'warning' && (
@@ -1280,7 +1283,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                   Samenvatting ({selectedInfo.label})
                 </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  <SummaryRow label="FIRE leeftijd" value={fireAge !== null ? `${fireAge} jaar` : 'Niet bereikbaar'} />
+                  <SummaryRow label={localEndStrategy === 'pensioen' ? 'AOW-leeftijd' : 'FIRE leeftijd'} value={localEndStrategy === 'pensioen' ? `${NL_AOW_AGE} jaar` : fireAge !== null ? `${fireAge} jaar` : 'Niet bereikbaar'} />
                   <SummaryRow label="Doelbedrag" value={formatCurrency(selectedSim.requiredFirePortfolio)} />
                   <SummaryRow label="Onttrekkingspercentage" value={`${(selectedSim.implicitWithdrawalRate * 100).toFixed(1)}%`} />
                   <SummaryRow label="Eindvermogen" value={
