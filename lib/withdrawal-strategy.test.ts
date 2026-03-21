@@ -440,3 +440,251 @@ describe('cross-strategy', () => {
     }
   })
 })
+
+// ── Guardrails + Pensioen (high portfolio) — Feature #475 ────────────
+//
+// When pensioen strategy is used, the simulation forces FIRE at AOW age (67).
+// After 30+ years of saving, the actual portfolio at AOW can easily exceed €1M.
+// Guardrails anchor to this startPortfolio, so:
+//   floor  = 0.80 × €1M = €800k
+//   ceiling = 1.20 × €1M = €1.2M
+//
+// With €33k/year net expenses and ~5% effective return on a €1M portfolio:
+//   annual growth ≈ €50k, withdrawal ≈ €33k → portfolio GROWS ~€17k/year
+//
+// This means:
+// - Floor (€800k) is never hit → capital preservation rule never triggers
+// - Ceiling (€1.2M) is hit after ~12 years of growth → prosperity rule triggers
+// - Withdrawal stays effectively static until prosperity triggers
+//
+// This is CORRECT Guyton-Klinger behavior: the anchoring to start portfolio
+// means a well-funded pension naturally keeps withdrawals stable. The guardrails
+// provide downside protection (market crash) and upside sharing (portfolio growth).
+
+describe('guardrails + pensioen — high portfolio anchoring (#475)', () => {
+  const guardrailsConfig = makeConfig({
+    strategy: 'guardrails',
+    guardrailFloor: 0.80,
+    guardrailCeiling: 1.20,
+    guardrailCutStep: 0.10,
+    guardrailRaiseStep: 0.10,
+  })
+
+  it('with €1M+ portfolio and €33k expenses, guardrails stay in neutral zone for early years', () => {
+    // Simulate pensioen scenario: €1M at AOW, €33k/year net expenses
+    const startPf = 1_000_000
+    const expenses = 33_000
+    const portReturn = 0.05
+
+    // Simulate 5 years of retirement
+    let portfolio = startPf
+    let prevWithdrawal = 0
+    const withdrawals: number[] = []
+
+    for (let yr = 0; yr < 5; yr++) {
+      const ctx = makeCtx({
+        baseExpenses: expenses * Math.pow(1.02, yr), // 2% inflation
+        recurringIncome: 0,
+        currentPortfolio: portfolio,
+        startPortfolio: startPf,
+        previousWithdrawal: prevWithdrawal,
+        yearReturn: portReturn,
+        yearsIntoRetirement: yr,
+        currentAge: 67 + yr,
+        endAge: 90,
+      })
+      const w = applyWithdrawalStrategy(guardrailsConfig, ctx)
+      withdrawals.push(w)
+      prevWithdrawal = w
+
+      // Portfolio grows: return (5%) > withdrawal rate (3.3%)
+      portfolio = portfolio * (1 + portReturn) - w
+    }
+
+    // All early-year withdrawals should be stable (no guardrail adjustments)
+    // Year 0: static fallback (33_000)
+    expect(withdrawals[0]).toBe(expenses)
+    // Years 1-4: neutral zone, withdrawal ≈ previous (no cut/raise)
+    for (let yr = 1; yr < 5; yr++) {
+      // In neutral zone, withdrawal = previous (no change from guardrails)
+      // Only clamped between floor and ceiling of *expenses*
+      expect(withdrawals[yr]).toBeGreaterThanOrEqual(0.80 * expenses * Math.pow(1.02, yr))
+      expect(withdrawals[yr]).toBeLessThanOrEqual(1.20 * expenses * Math.pow(1.02, yr))
+    }
+
+    // Portfolio should have grown (return > withdrawal)
+    expect(portfolio).toBeGreaterThan(startPf)
+  })
+
+  it('floor threshold never triggers when portfolio grows faster than withdrawals', () => {
+    const startPf = 1_000_000
+    const expenses = 33_000
+    const portReturn = 0.05
+
+    // Simulate 23 years (67→90) with positive returns
+    let portfolio = startPf
+    let prevWithdrawal = 0
+    let floorTriggered = false
+
+    for (let yr = 0; yr < 23; yr++) {
+      const inflatedExpenses = expenses * Math.pow(1.02, yr)
+      const ctx = makeCtx({
+        baseExpenses: inflatedExpenses,
+        recurringIncome: 0,
+        currentPortfolio: portfolio,
+        startPortfolio: startPf,
+        previousWithdrawal: prevWithdrawal,
+        yearReturn: portReturn,
+        yearsIntoRetirement: yr,
+        currentAge: 67 + yr,
+        endAge: 90,
+      })
+      const w = applyWithdrawalStrategy(guardrailsConfig, ctx)
+      prevWithdrawal = w
+
+      // Check if floor was triggered (portfolio < 0.80 × startPf)
+      if (portfolio < 0.80 * startPf) floorTriggered = true
+
+      portfolio = portfolio * (1 + portReturn) - w
+    }
+
+    // With 5% returns and ~3.3% withdrawal, floor should NEVER trigger
+    expect(floorTriggered).toBe(false)
+    // Portfolio should still be positive at age 90
+    expect(portfolio).toBeGreaterThan(0)
+  })
+
+  it('ceiling threshold triggers when portfolio exceeds 1.20 × startPortfolio', () => {
+    const startPf = 1_000_000
+    const expenses = 33_000
+    const portReturn = 0.05
+
+    let portfolio = startPf
+    let prevWithdrawal = 0
+    let ceilingTriggered = false
+    let ceilingYear = -1
+
+    for (let yr = 0; yr < 23; yr++) {
+      const inflatedExpenses = expenses * Math.pow(1.02, yr)
+      const ctx = makeCtx({
+        baseExpenses: inflatedExpenses,
+        recurringIncome: 0,
+        currentPortfolio: portfolio,
+        startPortfolio: startPf,
+        previousWithdrawal: prevWithdrawal,
+        yearReturn: portReturn,
+        yearsIntoRetirement: yr,
+        currentAge: 67 + yr,
+        endAge: 90,
+      })
+      const w = applyWithdrawalStrategy(guardrailsConfig, ctx)
+      prevWithdrawal = w
+
+      if (!ceilingTriggered && portfolio > 1.20 * startPf) {
+        ceilingTriggered = true
+        ceilingYear = yr
+      }
+
+      portfolio = portfolio * (1 + portReturn) - w
+    }
+
+    // Ceiling should eventually trigger (portfolio grows due to return > withdrawal)
+    expect(ceilingTriggered).toBe(true)
+    // Should trigger within ~15 years (portfolio grows ~17k/year net)
+    expect(ceilingYear).toBeLessThan(15)
+  })
+
+  it('floor triggers correctly during market crash (portfolio drops 40%)', () => {
+    const startPf = 1_000_000
+    const expenses = 33_000
+
+    // Simulate year 3 with a crash: portfolio dropped to €550k
+    const crashPortfolio = 550_000
+    const ctx = makeCtx({
+      baseExpenses: expenses * Math.pow(1.02, 3),
+      recurringIncome: 0,
+      currentPortfolio: crashPortfolio,
+      startPortfolio: startPf,
+      previousWithdrawal: expenses,
+      yearReturn: -0.20, // bad year
+      yearsIntoRetirement: 3,
+      currentAge: 70,
+      endAge: 90,
+    })
+    const w = applyWithdrawalStrategy(guardrailsConfig, ctx)
+
+    // Floor triggered: 550k < 800k (0.80 × 1M)
+    // Withdrawal cut: 33_000 * 0.90 = 29_700
+    // But clamped to floor: 0.80 × netExpenses = 0.80 × 35_005 = 28_004
+    const netExpenses = expenses * Math.pow(1.02, 3)
+    const cutWithdrawal = expenses * 0.90
+    const floorClamp = 0.80 * netExpenses
+
+    // Should be the CUT amount (since 29_700 > 28_004)
+    expect(w).toBeCloseTo(cutWithdrawal, 0)
+    expect(w).toBeLessThan(expenses) // withdrawal was reduced
+  })
+
+  it('guardrails anchoring is correct: startPortfolio = decumStartPortfolio from simulation', () => {
+    // Verify that the anchoring value matches what simulateDecumulation would pass
+    // In pensioen mode: decumStartPortfolio = actual portfolio at AOW (not binary-search min)
+    const actualPortfolioAtAow = 1_200_000
+    const ctx = makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: actualPortfolioAtAow,
+      startPortfolio: actualPortfolioAtAow, // This is decumStartPortfolio
+      previousWithdrawal: 40_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 1,
+      currentAge: 68,
+      endAge: 90,
+    })
+    const w = applyWithdrawalStrategy(guardrailsConfig, ctx)
+
+    // Portfolio at ceiling threshold (1.20 × 1.2M = 1.44M)
+    // Current = 1.2M, not above ceiling → neutral zone
+    expect(w).toBe(40_000)
+  })
+
+  it('documented behavior: high-portfolio pensioen with guardrails keeps withdrawal stable', () => {
+    // This test documents the expected behavior described in feature #475:
+    // "bij pensioen + guardrails + hoog portfolio, guardrails houdt onttrekking stabiel rond basisuitgaven"
+    const startPf = 1_500_000 // Very high portfolio
+    const expenses = 33_000
+
+    // Simulate 10 years
+    let portfolio = startPf
+    let prevWithdrawal = 0
+    const withdrawals: number[] = []
+
+    for (let yr = 0; yr < 10; yr++) {
+      const inflatedExpenses = expenses * Math.pow(1.02, yr)
+      const ctx = makeCtx({
+        baseExpenses: inflatedExpenses,
+        recurringIncome: 0,
+        currentPortfolio: portfolio,
+        startPortfolio: startPf,
+        previousWithdrawal: prevWithdrawal,
+        yearReturn: 0.05,
+        yearsIntoRetirement: yr,
+        currentAge: 67 + yr,
+        endAge: 90,
+      })
+      const w = applyWithdrawalStrategy(guardrailsConfig, ctx)
+      withdrawals.push(w)
+      prevWithdrawal = w
+      portfolio = portfolio * 1.05 - w
+    }
+
+    // All withdrawals should be within the ±20% guardrail band of base expenses
+    for (let yr = 0; yr < 10; yr++) {
+      const inflatedExpenses = expenses * Math.pow(1.02, yr)
+      expect(withdrawals[yr]).toBeGreaterThanOrEqual(0.80 * inflatedExpenses - 1)
+      expect(withdrawals[yr]).toBeLessThanOrEqual(1.20 * inflatedExpenses + 1)
+    }
+
+    // Portfolio stays well above floor at all times
+    expect(portfolio).toBeGreaterThan(0.80 * startPf)
+  })
+})

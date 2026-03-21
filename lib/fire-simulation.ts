@@ -192,7 +192,12 @@ export function runSimulation(
     const rows: SimRow[] = []
     let portfolio = startPortfolio
     let previousWithdrawal = 0
-    const decumStartPortfolio = startPortfolio // Portfolio at FIRE age, for guardrails ratio
+    // Portfolio at FIRE/AOW age, used as guardrails anchor.
+    // In pensioen mode (forcedFireAge), this is the ACTUAL portfolio at AOW age,
+    // which can be €1M+ after decades of saving. Guardrails floor/ceiling are
+    // computed relative to this value. See withdrawal-strategy.ts applyGuardrails
+    // and feature #475 for documented behavior with high portfolios.
+    const decumStartPortfolio = startPortfolio
 
     // Determine which config to use: dynamic for visualisation, static for binary search
     const activeConfig = useWithdrawalStrategy ? wsConfig : WITHDRAWAL_DEFAULTS
@@ -442,7 +447,12 @@ export function runSimulation(
   // Use withdrawal strategy for visualisation rows — consistent with binary search
   // which now also uses the chosen strategy (since FIRE-leeftijd is strategie-afhankelijk)
   // When forcedFireAge is set (pensioen-modus), start decumulation from actual portfolio
-  // instead of the binary-search minimum to avoid visual discontinuity at AOW age
+  // instead of the binary-search minimum to avoid visual discontinuity at AOW age.
+  //
+  // NOTE (#475): This value becomes the guardrails anchoring point (decumStartPortfolio
+  // inside simulateDecumulation). For pensioen with high portfolios (€1M+), guardrails
+  // will keep withdrawals stable around base expenses — this is correct behavior.
+  // See withdrawal-strategy.ts applyGuardrails docs for full analysis.
   const decStartPortfolio = forcedFireAge != null ? portfolio : requiredFirePortfolioExact
   const { rows: decRows } = simulateDecumulation(decStartPortfolio, computedFireAge, true, displayEndAge, true)
 

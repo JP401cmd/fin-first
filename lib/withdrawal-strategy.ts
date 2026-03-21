@@ -151,6 +151,22 @@ function applyStatic(ctx: WithdrawalContext): number {
  * 3. Capital preservation rule: if portfolio < floor * startPortfolio → cut withdrawal
  * 4. Inflation skip: no inflation adjustment in years with negative returns
  * 5. Clamp final withdrawal between floor*base and ceiling*base
+ *
+ * Anchoring to startPortfolio (= decumStartPortfolio from simulateDecumulation):
+ *
+ * In pensioen mode, startPortfolio = the ACTUAL portfolio at AOW age (not the
+ * binary-search minimum). After 30+ years of saving, this can be €1M+.
+ * With €33k/year net expenses and ~5% return, net growth ≈ +€17k/year,
+ * so the portfolio GROWS in retirement. Consequences:
+ *   - Floor (0.80 × €1M = €800k): never hit under normal returns → no cuts
+ *   - Ceiling (1.20 × €1M = €1.2M): hit after ~12 years → withdrawal raised
+ *   - Withdrawal stays effectively static until ceiling triggers
+ *
+ * This IS correct Guyton-Klinger behavior: anchoring to start-of-retirement
+ * portfolio provides downside crash protection and upside prosperity sharing,
+ * while keeping withdrawals stable at base expenses for well-funded pensions.
+ * No dynamic re-anchoring is needed — the clamp (floor/ceiling of base
+ * expenses) ensures withdrawals never deviate more than ±20% from needs.
  */
 function applyGuardrails(
   config: WithdrawalStrategyConfig,
