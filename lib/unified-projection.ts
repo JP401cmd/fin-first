@@ -111,6 +111,8 @@ export interface UnifiedProjectionRow {
   savings: number
   /** Onttrekking dit jaar (alleen in withdrawal fase) */
   withdrawal: number
+  /** Onttrekking per asset type (waterfall breakdown) — alleen gevuld bij withdrawal > 0 */
+  withdrawalByType: Partial<Record<AssetType, number>>
   /** Netto kasstroom uit life events / extra cashflows */
   cashflowNet: number
   /** Totaal rendement over alle asset types */
@@ -812,15 +814,16 @@ const WATERFALL_ORDER: readonly AssetType[] = [
  *
  * @param runningBuckets - lopende buckets (worden IN-PLACE gewijzigd)
  * @param amount - gewenst onttrekkingsbedrag (positief)
- * @returns daadwerkelijk onttrokken bedrag
+ * @returns object met actualAmount (daadwerkelijk onttrokken) en byType (breakdown per asset type)
  */
 function waterfallWithdraw(
   runningBuckets: RunningBucket[],
   amount: number,
-): number {
-  if (amount <= 0) return 0
+): { actualAmount: number; byType: Partial<Record<AssetType, number>> } {
+  if (amount <= 0) return { actualAmount: 0, byType: {} }
 
   let remaining = amount
+  const byType: Partial<Record<AssetType, number>> = {}
   // Index buckets by asset type for O(1) lookup
   const bucketMap = new Map<AssetType, RunningBucket>()
   for (const b of runningBuckets) bucketMap.set(b.assetType, b)
@@ -833,9 +836,10 @@ function waterfallWithdraw(
     const deduction = Math.min(remaining, bucket.value)
     bucket.value -= deduction
     remaining -= deduction
+    byType[assetType] = (byType[assetType] ?? 0) + deduction
   }
 
-  return amount - remaining
+  return { actualAmount: amount - remaining, byType }
 }
 
 // ── Unified Projection Engine ─────────────────────────────────────────────────
@@ -1192,19 +1196,25 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       cashflowNet += recurringMonthly(cf, age) * 12
     }
 
-    // Effective savings = annual savings + recurring cashflow net
-    const effectiveSavings = annualSavings + cashflowNet
-
     // Reset bucket contributions to their base (monthly_contribution × 12)
     // This is needed because computeYearlyAssetGrowth accumulates surplus into contributions
+    let totalBaseContributions = 0
     for (const b of runningBuckets) {
       // Find original contribution from initRunningBuckets
       const originalAssets = assets.filter(a => a.is_active && a.asset_type === b.assetType)
       b.annualContribution = originalAssets.reduce((s, a) => s + Number(a.monthly_contribution) * 12, 0)
+      totalBaseContributions += b.annualContribution
     }
 
+    // Surplus = extra savings beyond what's already allocated per bucket + recurring cashflows.
+    // annualSavings is the user's total savings capacity (income - expenses).
+    // Per-bucket annualContribution already covers each bucket's monthly_contribution share,
+    // so surplus must only contain the EXCESS (annualSavings - totalBaseContributions)
+    // plus recurring cashflow net. This prevents double-counting of contributions (#518).
+    const surplus = (annualSavings - totalBaseContributions) + cashflowNet
+
     // Compute per-asset growth with surplus allocation
-    const assetBuckets = computeYearlyAssetGrowth(runningBuckets, effectiveSavings, hasPartner)
+    const assetBuckets = computeYearlyAssetGrowth(runningBuckets, surplus, hasPartner)
 
     // Compute debt schedule
     const { debtBalances } = computeYearlyDebtSchedule(runningDebts)
@@ -1236,6 +1246,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       grossIncome: Math.round(annualSavings + yearlyExpenses),
       savings: Math.round(annualSavings),
       withdrawal: 0,
+      withdrawalByType: {},
       cashflowNet: Math.round(cashflowNet + oneTimeNet),
       totalGrowth: Math.round(totalGrowth),
       totalBox3: Math.round(totalBox3),
@@ -1370,7 +1381,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
 
     // Apply withdrawal via waterfall across asset buckets
-    waterfallWithdraw(runningBuckets, withdrawal)
+    const { byType: withdrawalByType } = waterfallWithdraw(runningBuckets, withdrawal)
 
     // No surplus allocation during decumulation (savings = 0)
     const assetBuckets = computeYearlyAssetGrowth(runningBuckets, 0, hasPartner)
@@ -1420,6 +1431,9 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       grossIncome: Math.round(recurringIncome),
       savings: 0,
       withdrawal: Math.round(withdrawal),
+      withdrawalByType: Object.fromEntries(
+        Object.entries(withdrawalByType).map(([k, v]) => [k, Math.round(v)])
+      ) as Partial<Record<AssetType, number>>,
       cashflowNet: Math.round(oneTimeNet + recurringNet),
       totalGrowth: Math.round(totalGrowth),
       totalBox3: Math.round(totalBox3),

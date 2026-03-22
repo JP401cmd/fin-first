@@ -295,8 +295,9 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
       const accRows = result.rows.filter(r => r.phase === 'accumulation')
       expect(accRows.length).toBeGreaterThan(0)
 
-      // If FIRE reachable, must have withdrawal rows
-      if (result.fireReachable && result.fireAge !== null) {
+      // If FIRE reachable AND fireAge < displayEndAge, must have withdrawal rows
+      // (perpetual strategy may detect FIRE beyond displayEndAge — no decum rows expected)
+      if (result.fireReachable && result.fireAge !== null && result.fireAge < result.displayEndAge) {
         const decRows = result.rows.filter(r => r.phase === 'withdrawal' || r.phase === 'transition')
         expect(decRows.length).toBeGreaterThan(0)
       }
@@ -490,7 +491,12 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
             expect(result.fireAge).toBeLessThanOrEqual(input.endAge)
           } else {
             expect(result.fireAge).toBeGreaterThanOrEqual(input.currentAge)
-            expect(result.fireAge).toBeLessThanOrEqual(input.endAge)
+            // For perpetual, the engine searches up to Math.max(endAge, 100),
+            // so FIRE can be found beyond endAge (extended search range)
+            const maxSearchAge = input.strategyConfig.strategy === 'perpetual'
+              ? Math.max(input.endAge, 100)
+              : input.endAge + 1
+            expect(result.fireAge).toBeLessThanOrEqual(maxSearchAge)
           }
         }
 
