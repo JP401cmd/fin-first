@@ -19436,3 +19436,25 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#487)
+
+## Session 2026-03-22 - Features #488, #489
+
+### Feature #488: Fase 0 - Types and unified projection - PASSING
+- Created lib/unified-projection.ts with UnifiedProjectionRow, UnifiedProjectionInput, UnifiedProjectionResult
+- toSimRow() and toSimResult() backwards-compatible mapping functions
+- All SimRow fields derivable from UnifiedProjectionRow
+- Commit: f91ae1f3
+
+### Feature #489: Fase 1a - Per-asset rendement and Box 3 berekening per jaar - PASSING
+- computeYearlyAssetGrowth() with individual asset returns and Box 3 drag
+- computeAssetBox3DragRate(): spaargeld (1.28%) vs beleggingen (6.00%) x 36% tarief
+- applyHeffingsvrij(): proportional deduction (59.357 single / 118.714 partner)
+- Compound drag: running value reduced each year
+- Surplus allocation to investable buckets proportionally
+- initRunningBuckets(): groups assets by type with weighted returns
+- 18 unit tests all passing
+- Commit: 13f06e3a
+
+### Current Status
+- 2 features completed this session (#488, #489)
+- Overall progress: 488/506 passing (96.4%)
