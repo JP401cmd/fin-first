@@ -21,7 +21,7 @@ import {
   linearAmortization,
   interestOnlySchedule,
 } from '@/lib/debt-data'
-import type { SimCashflow, SimRow, SimResult } from '@/lib/fire-simulation'
+import type { SimCashflow, SimRow, SimResult, ReturnModel } from '@/lib/fire-simulation'
 import { type FireEndStrategy, type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import {
   applyWithdrawalStrategy,
@@ -1385,4 +1385,117 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       : 0,
     displayEndAge,
   }
+}
+
+// ── Deprecated wrapper: runSimulationUnified ───────────────────────────────
+
+/**
+ * @deprecated Gebruik `runUnifiedProjection()` in plaats van deze functie.
+ *
+ * Backwards-compatible wrapper die de oude `runSimulation()` handtekening
+ * accepteert en intern `runUnifiedProjection()` aanroept, waarna het
+ * resultaat via `toSimResult()` wordt geconverteerd naar een legacy SimResult.
+ *
+ * Verschil met de originele `runSimulation()` uit fire-simulation.ts:
+ * - Per-asset-type rendement & Box 3 (nauwkeuriger dan flat BOX3_DRAG)
+ * - Per-schuld aflossing (inclusief amortisatie schema's)
+ * - Drie fasen (accumulation → transition → withdrawal)
+ *
+ * @param currentAge - leeftijd van de gebruiker
+ * @param endAge - eindleeftijd van de simulatie
+ * @param currentPortfolio - huidig totaal portefeuille-vermogen
+ * @param yearlyExpenses - jaarlijkse uitgaven
+ * @param annualSavings - jaarlijkse besparingen
+ * @param grossReturn - bruto rendement (decimaal, bijv. 0.07)
+ * @param _returnModel - genegeerd (unified engine gebruikt altijd per-asset Box 3)
+ * @param inflation - inflatie (decimaal, bijv. 0.02)
+ * @param cashflows - externe kasstromen
+ * @param strategyConfig - FIRE eindstrategie configuratie
+ * @param withdrawalStrategy - onttrekkingsstrategie configuratie
+ * @param forcedFireAge - geforceerde FIRE-leeftijd (pensioen-modus)
+ * @returns SimResult (legacy formaat)
+ */
+export function runSimulationUnified(
+  currentAge: number,
+  endAge: number,
+  currentPortfolio: number,
+  yearlyExpenses: number,
+  annualSavings: number,
+  grossReturn: number,
+  _returnModel: ReturnModel,
+  inflation: number,
+  cashflows: SimCashflow[],
+  strategyConfig?: FireStrategyConfig,
+  withdrawalStrategy?: WithdrawalStrategyConfig,
+  forcedFireAge?: number,
+): SimResult {
+  // Bouw een synthetisch asset om de portefeuille te representeren
+  // De unified engine heeft echte assets nodig voor per-type berekening.
+  // In de wrapper mode gebruiken we een enkele investment-bucket als proxy.
+  // NOTE: monthly_contribution = 0 want annualSavings wordt apart meegegeven
+  // als input.annualSavings en door de engine als surplus verdeeld.
+  const syntheticAsset: Asset = {
+    id: 'synthetic-portfolio',
+    user_id: 'wrapper',
+    name: 'Portfolio',
+    asset_type: 'investment',
+    current_value: currentPortfolio,
+    purchase_value: currentPortfolio,
+    purchase_date: null,
+    expected_return: grossReturn * 100, // Convert decimal to percentage
+    monthly_contribution: 0, // Savings handled via annualSavings input
+    institution: null,
+    account_number: null,
+    notes: null,
+    is_active: true,
+    sort_order: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    subtype: null,
+    risk_profile: null,
+    tax_benefit: null,
+    is_liquid: true,
+    lock_end_date: null,
+    ticker_symbol: null,
+    rental_income: null,
+    woz_value: null,
+    retirement_provider_type: null,
+    depreciation_rate: null,
+    address_postcode: null,
+    address_house_number: null,
+    expiry_date: null,
+    beneficiary: null,
+    kvk_number: null,
+    ownership_percentage: null,
+    annual_dividend: null,
+    linked_asset_id: null,
+    ownership: 'personal',
+    household_id: null,
+    net_worth_inclusion_pct: 100,
+    has_budget_tracking: false,
+    has_holdings_tracking: false,
+  }
+
+  const input: UnifiedProjectionInput = {
+    assets: [syntheticAsset],
+    debts: [],
+    currentAge,
+    endAge,
+    yearlyExpenses,
+    annualSavings,
+    monthlySurplus: annualSavings / 12,
+    monthlyIncome: (yearlyExpenses + annualSavings) / 12,
+    incomeGrowthRate: 0,
+    grossReturn,
+    inflationRate: inflation,
+    box3Method: 'forfaitair',
+    cashflows,
+    strategyConfig: strategyConfig ?? { strategy: 'deplete', endAge, legacyAmount: 0 },
+    withdrawalStrategy: withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
+    forcedFireAge,
+    hasPartner: false,
+  }
+
+  const unifiedResult = runUnifiedProjection(input)
+  return toSimResult(unifiedResult)
 }
