@@ -19630,3 +19630,31 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#504)
 - Overall progress: 493/506 passing (97.4%)
+
+## Session 2026-03-22 - Feature #498
+
+### Feature #498: Fase 3a — Gedeelde PhaseDetailTable component - PASSING
+- Created `components/app/horizon/phase-detail-table.tsx` — shared collapsible year-by-year table
+- Props: rows (UnifiedProjectionRow[]), phase ('accumulation'|'transition'|'withdrawal'), inflationRate, showAssetDetail
+- Accumulation columns: Lft, Begin, Rend. spaar, Rend. beleg., Inleg, Events, Box 3, Eind
+- Overgang/Onttrekking columns: Lft, Begin, Rendement, Onttrekking, AOW/Pensioen, Events, Box 3, Eind
+- showAssetDetail=true: replaces Rend.spaar/beleg. with per-asset-type columns (Rend. Cash, Rend. Spaar, Rend. Beleg., etc.)
+- Nominaal/Reëel pill toggle: reuses BucketProjectionTable pattern (rounded-full border bg-[var(--paper)])
+- Collapsible via ChevronRight → ChevronDown with 0.15s transition-transform
+- FinTable compound component: header uppercase tracking, numeric text-right font-mono tabular-nums
+- Color coding: text-[var(--negative)] for costs/withdrawals, text-[var(--positive)] for income/growth
+- Responsive: overflow-x-auto with minWidth='520px'
+- Touch target: min-h-[44px] min-w-[44px] on collapse toggle
+- Row hover: hover:bg-[var(--subtle)]/50 via FinTable.Row default
+- Footer totals row with Σ symbol and bold aggregates
+- Inflation note shown in Reëel mode: "Bedragen gecorrigeerd voor inflatie (X.X% per jaar)"
+- Verified via browser automation: all 4 table variants render correctly (accumulation, accumulation+detail, transition, withdrawal)
+- Zero TypeScript errors, zero console errors from component
+- Commit: 6149591b
+
+### Files Created
+- components/app/horizon/phase-detail-table.tsx
+
+### Current Status
+- 1 feature completed this session (#498)
+- Overall progress: 493/506 passing (97.4%)
