@@ -1,3 +1,25 @@
+## Session 2026-03-22 - Feature #490
+
+### Feature #490: Fase 1b - Schuldaflossing per schuld per jaar - PASSING
+- Integrated debt amortization schedules from debt-data.ts into unified projection engine
+- Library code (initRunningDebts, computeYearlyDebtSchedule, computeWeightedDebtTotal) was already committed in Fase 1a (#489)
+- Added 9 comprehensive unit tests covering all feature steps:
+  1. initRunningDebts: initialises from active debts only, generates monthly schedules
+  2. Annuiteit: 300K @ 4%, 30yr - endBalance after 10yr matches raw amortizationSchedule()
+  3. Annuiteit: startBalance year 2 === endBalance year 1 (compound continuity)
+  4. Aflossingsvrij: balance stays constant, principal = 0, interest = balance x rate
+  5. Lineair: monotonically decreasing balance, consistent annual principal
+  6. Payoff and freed payments: small loan pays off in year 1, freed payments become extra in year 2
+  7. net_worth_inclusion_pct: weighted total correctly applies per-debt inclusion percentage
+  8. Multiple debts: parallel processing of annuiteit + lineair + aflossingsvrij
+- All 27 unified-projection tests pass (18 Fase 1a + 9 Fase 1b)
+- Zero TypeScript errors in library code
+- Commit: a867fad2
+
+### Current Status
+- 1 feature completed this session (#490)
+- Overall progress: 488/506 features passing (96.4%)
+
 ## Session 2026-03-21 - Feature #473
 
 ### Feature #473: Fix: KPI 'Vermogen op AOW' en 'Mnd. Onttrekking' correct bij pensioen - PASSING
