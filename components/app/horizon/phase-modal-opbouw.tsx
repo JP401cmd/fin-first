@@ -9,6 +9,7 @@ import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
 import { ASSET_TYPE_LABELS, type AssetType, type Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,8 @@ interface PhaseModalOpbouwProps {
   rows: UnifiedProjectionRow[]
   /** Assets for type labels in breakdown */
   assets?: Asset[]
+  /** Debts metadata for human-readable labels in detail table */
+  debts?: Debt[]
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -198,6 +201,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   inflationRate,
   rows,
   assets,
+  debts,
 }: PhaseModalOpbouwProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
@@ -343,6 +347,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
             phase="accumulation"
             inflationRate={inflationRate}
             showAssetDetail={activeTypes.length > 1}
+            debts={debts}
           />
         )}
 

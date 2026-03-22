@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/format'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
+import type { Debt } from '@/lib/debt-data'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,8 @@ interface PhaseModalOvergangProps {
   rows: UnifiedProjectionRow[]
   /** Inflation rate for PhaseDetailTable */
   inflationRate: number
+  /** Debts metadata for human-readable labels in detail table */
+  debts?: Debt[]
 }
 
 // ── Mini Chart ───────────────────────────────────────────────────────────────
@@ -186,6 +189,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   portfolioAtTransitionStart,
   rows,
   inflationRate,
+  debts,
 }: PhaseModalOvergangProps) {
   if (transitionScenario === 'none') return null
 
@@ -279,6 +283,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             rows={transitionRows}
             phase="transition"
             inflationRate={inflationRate}
+            debts={debts}
           />
         )}
 

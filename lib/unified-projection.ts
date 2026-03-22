@@ -1308,6 +1308,12 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     fractionalFireAge = (computedFireAge - 1) + Math.max(0, Math.min(1, t))
   }
 
+  // ── Recalculate weighted average return at FIRE age (#521) ────────
+  // After accumulation, the asset mix may have shifted significantly
+  // (e.g., from 50/50 sparen/beleggen to 90/10 beleggen/sparen).
+  // Use actual bucket values at FIRE age for a more accurate decumulation return.
+  const avgNetReturnAtFire = computeAverageNetReturn(runningBuckets)
+
   // ── Phase 2 & 3: Decumulation from fireAge ────────────────────────
   // Generate full rows with per-bucket detail and withdrawal strategy
 
@@ -1372,7 +1378,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       currentPortfolio: portfolioForStrategy,
       startPortfolio: decumStartPortfolio,
       previousWithdrawal,
-      yearReturn: avgNetReturn,
+      yearReturn: avgNetReturnAtFire,
       yearsIntoRetirement: yearsIntoPension,
       currentAge: age,
       endAge: strategy === 'perpetual' ? computedFireAge + 100 : effectiveEndAge,

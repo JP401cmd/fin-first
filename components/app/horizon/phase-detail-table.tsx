@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { FinTable } from '@/components/app/fin-table'
 import { formatCurrency } from '@/lib/format'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
+import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
+import type { Debt } from '@/lib/debt-data'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -20,6 +22,8 @@ export interface PhaseDetailTableProps {
   inflationRate: number
   /** Toon per-asset-type uitsplitsing kolommen */
   showAssetDetail?: boolean
+  /** Schulden metadata voor leesbare labels in expandable rows */
+  debts?: Debt[]
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -57,6 +61,25 @@ const SHORT_ASSET_LABELS: Partial<Record<AssetType, string>> = {
   other: 'Overig',
 }
 
+// ── Debt label helpers ──────────────────────────────────────────────────────
+
+/** Build a lookup map from debt.id → human-readable label */
+function buildDebtLabelMap(debts?: Debt[]): Record<string, string> {
+  if (!debts || debts.length === 0) return {}
+  const map: Record<string, string> = {}
+  for (const debt of debts) {
+    if (debt.name) {
+      map[debt.id] = debt.name
+    } else if (debt.debt_type && DEBT_TYPE_LABELS[debt.debt_type]) {
+      map[debt.id] = DEBT_TYPE_LABELS[debt.debt_type]
+    } else {
+      // Fallback to first 8 chars of UUID
+      map[debt.id] = debt.id.slice(0, 8)
+    }
+  }
+  return map
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function PhaseDetailTable({
@@ -64,9 +87,13 @@ export function PhaseDetailTable({
   phase,
   inflationRate,
   showAssetDetail = false,
+  debts,
 }: PhaseDetailTableProps) {
   const [expanded, setExpanded] = useState(false)
   const [showReal, setShowReal] = useState(false)
+
+  // Build debt label lookup map (memoized)
+  const debtLabelMap = useMemo(() => buildDebtLabelMap(debts), [debts])
 
   if (rows.length === 0) return null
 
@@ -164,6 +191,7 @@ export function PhaseDetailTable({
                 <FinTable.Th align="right">Events</FinTable.Th>
                 <FinTable.Th align="right">Box 3</FinTable.Th>
                 <FinTable.Th align="right">Eind</FinTable.Th>
+                <FinTable.Th align="right">Netto</FinTable.Th>
               </FinTable.Row>
             </FinTable.Header>
 
@@ -241,6 +269,9 @@ export function PhaseDetailTable({
                     </FinTable.Td>
                     <FinTable.Td numeric bold>
                       {formatCurrency(d(row.totalAssets))}
+                    </FinTable.Td>
+                    <FinTable.Td numeric bold color={colorClass(row.netWorth)}>
+                      {formatCurrency(d(row.netWorth))}
                     </FinTable.Td>
                   </FinTable.Row>
                 )
@@ -346,6 +377,9 @@ export function PhaseDetailTable({
                         </FinTable.Td>
                         <FinTable.Td numeric bold>
                           {formatCurrency(deflate(endAssets, rows[rows.length - 1].inflationFactor, showReal))}
+                        </FinTable.Td>
+                        <FinTable.Td numeric bold color={colorClass(rows[rows.length - 1].netWorth)}>
+                          {formatCurrency(deflate(rows[rows.length - 1].netWorth, rows[rows.length - 1].inflationFactor, showReal))}
                         </FinTable.Td>
                       </>
                     )

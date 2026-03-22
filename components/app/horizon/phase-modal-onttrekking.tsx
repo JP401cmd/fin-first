@@ -9,6 +9,7 @@ import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
+import type { Debt } from '@/lib/debt-data'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,8 @@ interface PhaseModalOnttrekkingProps {
   yearlyAowIncome: number
   rows: UnifiedProjectionRow[]   // unified projection rows — we filter to withdrawal
   inflationRate: number          // e.g. 0.02 for 2%
+  /** Debts metadata for human-readable labels in detail table */
+  debts?: Debt[]
 }
 
 // ── Mini Chart ───────────────────────────────────────────────────────────────
@@ -234,6 +237,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   yearlyAowIncome,
   rows,
   inflationRate,
+  debts,
 }: PhaseModalOnttrekkingProps) {
   // Filter to withdrawal phase rows
   const withdrawalRows = useMemo(
@@ -378,6 +382,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
             rows={withdrawalRows}
             phase="withdrawal"
             inflationRate={inflationRate}
+            debts={debts}
           />
         )}
 

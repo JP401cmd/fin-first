@@ -5031,6 +5031,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           inflationRate={fireParams.inflationRate}
           rows={unifiedRows ?? []}
           assets={initialData.assets}
+          debts={debts}
         />
       )}
       {/* Overgang phase modal */}
@@ -5049,6 +5050,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           portfolioAtTransitionStart={overgangData.portfolioAtStart}
           rows={unifiedRows ?? []}
           inflationRate={fireParams.inflationRate}
+          debts={debts}
         />
       )}
       {/* Onttrekking phase modal */}
@@ -5065,6 +5067,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           yearlyAowIncome={onttrekkingData.yearlyAow}
           rows={unifiedRows ?? []}
           inflationRate={fireParams.inflationRate}
+          debts={debts}
         />
       )}
 

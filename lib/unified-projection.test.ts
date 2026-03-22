@@ -303,6 +303,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         grossIncome: 60_000,
         savings: 12_000,
         withdrawal: 0,
+        withdrawalByType: {},
         cashflowNet: 0,
         totalGrowth: 7_600,
         totalBox3: 1_500,
@@ -328,7 +329,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         assetBuckets: { investment: { startValue: 500_000, growth: 35_000, contributions: 0, box3Drag: 8_000, endValue: 527_000 } },
         debtBalances: {},
         totalAssets: 527_000, totalDebts: 0, netWorth: 527_000,
-        grossIncome: 0, savings: 0, withdrawal: 0, cashflowNet: 0,
+        grossIncome: 0, savings: 0, withdrawal: 0, withdrawalByType: {}, cashflowNet: 0,
         totalGrowth: 35_000, totalBox3: 8_000, cumulativeBox3: 50_000,
         inflationFactor: 1.22,
       }
@@ -341,7 +342,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         assetBuckets: { investment: { startValue: 800_000, growth: 56_000, contributions: 0, box3Drag: 12_000, endValue: 812_000 } },
         debtBalances: {},
         totalAssets: 812_000, totalDebts: 0, netWorth: 812_000,
-        grossIncome: 20_000, savings: 0, withdrawal: 32_000, cashflowNet: 0,
+        grossIncome: 20_000, savings: 0, withdrawal: 32_000, withdrawalByType: { investment: 32_000 }, cashflowNet: 0,
         totalGrowth: 56_000, totalBox3: 12_000, cumulativeBox3: 150_000,
         inflationFactor: 1.49,
       }
