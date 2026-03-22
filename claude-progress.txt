@@ -1,3 +1,33 @@
+## Session 2026-03-22 - Feature #522
+
+### Feature #522: Guardrails: annuïteit als basis voor deplete/legacy eindstrategie - PASSING
+- Modified applyGuardrails() in withdrawal-strategy.ts to use annuity as BASE for deplete/legacy
+- Added computeAnnuityBase() helper function:
+  - For deplete: annuity = portfolio × r / (1 − (1+r)^(−n)), recalculated each year (sliding basis)
+  - For legacy: available portfolio = currentPortfolio − indexedLegacyAmount, then same annuity formula
+  - effectiveBase = max(annuityBase, netBaseExpenses) — never withdraw less than living costs
+- Guardrail floor/ceiling clamps now applied around effectiveBase (not just netBaseExpenses)
+- For perpetual/pensioen/undefined endStrategy: no change, classic netBaseExpenses behavior preserved
+- Added legacyAmount optional field to WithdrawalContext interface
+- Updated unified-projection.ts: passes indexed legacyAmount through to withdrawal context
+- 11 new unit tests:
+  - 7 deplete+guardrails: first-year annuity, sliding basis, portfolio depletion to ≈€0, clamp around annuity, perpetual/pensioen/undefined backwards compat
+  - 4 legacy+guardrails: legacy-aware annuity, legacy < deplete, legacyAmount=0 equals deplete, large legacy falls back to netBaseExpenses
+- All 150 related tests pass (1 pre-existing bucket test failure)
+- All 92 unified projection + parity tests pass
+- Horizon page verified in browser: loads correctly with FIRE metrics
+- Zero new console errors
+- Commit: 2f5f6950
+
+### Files Modified
+- lib/withdrawal-strategy.ts — computeAnnuityBase(), applyGuardrails() strategy-aware base, legacyAmount in WithdrawalContext
+- lib/withdrawal-strategy.test.ts — 11 new tests for guardrails + deplete/legacy
+- lib/unified-projection.ts — pass indexedLegacyForCtx to withdrawal context
+
+### Current Status
+- 1 feature completed this session (#522)
+- Overall progress: 521/521 passing (100%)
+
 ## Session 2026-03-22 - Feature #512
 
 ### Feature #512: Perpetual: binary search target moet koopkracht behouden, niet >= 0 - PASSING
