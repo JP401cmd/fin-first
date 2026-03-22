@@ -587,6 +587,71 @@ describe('F. FIRE-detectie', () => {
       expect(row.age).toBeGreaterThanOrEqual(result.fireAge!)
     }
   })
+
+  it('F6: continue fasegrens — firePortfolioAtFire > requiredFirePortfolio when surplus exists (#511)', () => {
+    // When the actual portfolio at FIRE exceeds the minimum required,
+    // the decumulation should start from the ACTUAL value (no artificial drop)
+    const input = makeInput({
+      assets: [makeAsset({ asset_type: 'investment', current_value: 300_000, expected_return: 7 })],
+      annualSavings: 24_000,
+      yearlyExpenses: 36_000,
+      currentAge: 35,
+      endAge: 90,
+      strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    })
+    const result = runUnifiedProjection(input)
+    expect(result.fireReachable).toBe(true)
+    expect(result.fireAge).not.toBeNull()
+
+    // The firePortfolioAtFire should be >= requiredFirePortfolio
+    // (surplus is preserved, not dropped to minimum)
+    expect(result.firePortfolioAtFire).toBeGreaterThanOrEqual(result.requiredFirePortfolio)
+
+    // The last accumulation row's totalAssets should match firePortfolioAtFire
+    const accRows = result.rows.filter(r => r.phase === 'accumulation')
+    const lastAcc = accRows[accRows.length - 1]
+    expect(lastAcc.totalAssets).toBeGreaterThanOrEqual(result.requiredFirePortfolio)
+
+    // First decumulation row should start at a value consistent with
+    // the accumulated portfolio (not the lower requiredFirePortfolio)
+    const decRows = result.rows.filter(r => r.phase === 'transition' || r.phase === 'withdrawal')
+    const firstDec = decRows[0]
+    // The first dec row's totalAssets reflects end-of-year after growth + withdrawal,
+    // but should NOT have dropped down to requiredFirePortfolio level
+    // With 7% return and ~36k withdrawal, the portfolio should be close to lastAcc
+    const ratio = firstDec.totalAssets / lastAcc.totalAssets
+    expect(ratio).toBeGreaterThan(0.9) // Within 10% — no artificial drop
+    expect(ratio).toBeLessThan(1.15) // And not unreasonably higher
+  })
+
+  it('F7: pensioen-modus (forcedFireAge) continuity unchanged (#511)', () => {
+    const input = makeInput({
+      assets: [makeAsset({ asset_type: 'investment', current_value: 500_000, expected_return: 7 })],
+      annualSavings: 20_000,
+      yearlyExpenses: 36_000,
+      currentAge: 35,
+      endAge: 90,
+      forcedFireAge: 67,
+    })
+    const result = runUnifiedProjection(input)
+    expect(result.fireReachable).toBe(true)
+    expect(result.fireAge).toBe(67)
+
+    // Pensioen mode should also use actual portfolio (was already the case before #511)
+    const accRows = result.rows.filter(r => r.phase === 'accumulation')
+    const decRows = result.rows.filter(r => r.phase === 'transition' || r.phase === 'withdrawal')
+    expect(accRows.length).toBeGreaterThan(0)
+    expect(decRows.length).toBeGreaterThan(0)
+
+    const lastAcc = accRows[accRows.length - 1]
+    const firstDec = decRows[0]
+
+    // Pensioen mode: portfolio at 67 is typically much larger than required
+    // First dec row should be consistent with last acc row (within year's growth/withdrawal)
+    const ratio = firstDec.totalAssets / lastAcc.totalAssets
+    expect(ratio).toBeGreaterThan(0.85) // No artificial drop
+    expect(ratio).toBeLessThan(1.15)
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
