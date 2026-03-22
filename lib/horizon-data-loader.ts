@@ -56,6 +56,10 @@ export interface HorizonPageData {
   budgetingActive: boolean
   /** Full assets array for vermogensopbouw stacked chart */
   assets: Asset[]
+  /** Box 3 berekeningsmethode (forfaitair of werkelijk), afgeleid uit fireParams */
+  box3Method: 'forfaitair' | 'werkelijk'
+  /** Of de gebruiker een fiscaal partner heeft (voor heffingsvrij vermogen berekening) */
+  hasPartner: boolean
   /** Error message from profile query, null if successful */
   profileError: string | null
 }
@@ -101,6 +105,7 @@ const PROFILE_DEFAULTS = {
   inflation_rate: null as number | null,
   net_monthly_income: 0,
   estimated_monthly_expenses: 0,
+  household_type: 'solo' as string,
   withdrawal_strategy: 'static' as string,
   guardrail_floor: 0.80,
   guardrail_ceiling: 1.20,
@@ -137,7 +142,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct, asset_type').eq('is_active', true),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type').single(),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
@@ -342,6 +347,11 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   // Cumulative impacts
   const impacts = computeCumulativeImpacts(effectiveInput, loadedEvents)
 
+  // Derive box3Method from fireParams and hasPartner from household_type
+  const box3Method = fireParams.box3Method
+  const householdType = String((profile as Record<string, unknown>).household_type ?? 'solo')
+  const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
+
   return {
     effectiveInput,
     events: loadedEvents,
@@ -359,6 +369,8 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     healthScoreInput,
     budgetingActive,
     assets,
+    box3Method,
+    hasPartner,
     profileError: profileResult.error
       ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`
       : null,
