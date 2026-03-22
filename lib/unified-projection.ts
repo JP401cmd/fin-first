@@ -791,9 +791,11 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
 
 /**
  * Prioriteitsvolgorde voor onttrekking uit asset buckets.
- * Beleggingen worden eerst aangesproken, spaargeld daarna, etc.
+ * Cash (bankrekeningen) wordt als eerste aangesproken (meest liquide),
+ * gevolgd door beleggingen, spaargeld, etc.
  */
 const WATERFALL_ORDER: readonly AssetType[] = [
+  'cash',
   'investment',
   'savings',
   'crypto',
