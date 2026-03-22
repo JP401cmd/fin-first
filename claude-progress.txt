@@ -1,3 +1,20 @@
+## Session 2026-03-22 - Feature #503
+
+### Feature #503: Fase 5 — Gids bijwerken voor unified projection - PASSING
+- Updated section 3 (Opbouwfase in detail): replaced generic "beleggingsrendement" with "Rendement per beleggingstype" — explains per-asset-type returns (spaargeld/beleggingen/pensioen/vastgoed)
+- Updated section 8 (Belasting Box 3): expanded from flat forfaitair to per-type forfaitair rendement (1.28% spaargeld vs 6.04% beleggingen), added heffingsvrij vermogen uitleg (€57k/€114k proportioneel verdeeld)
+- Added new section 9 (Schulden in de prognose): explains annuïteit, lineair, aflossingsvrij amortization schedules in the projection, rentelasten as cashflow, visual impact in Vermogensopbouw
+- Renumbered sections 10-13 (was 9-12) to accommodate new Schulden section
+- Added 2 ConceptFlipCards to concept-flip-cards.tsx: "Per-asset rendement" (BarChart3 icon, horizon color) and "Heffingsvrij vermogen" (ShieldCheck icon, kern color)
+- Reviewed section 1 (Drie fasen) for consistency — no changes needed
+- Verified: all 13 accordion sections open/close correctly on mobile (375px) and desktop (1280px)
+- Zero console errors, 868 tests passing (12 failures in separate perf-optimization worktree, unrelated)
+- Commit: 2d6af393
+
+### Current Status
+- 1 feature completed this session (#503)
+- Overall progress: 493/506 passing (97.4%)
+
 ## Session 2026-03-22 - Feature #490
 
 ### Feature #490: Fase 1b - Schuldaflossing per schuld per jaar - PASSING
