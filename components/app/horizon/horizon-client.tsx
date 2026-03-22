@@ -5018,6 +5018,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           currentNetWorth={(effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)}
           expectedPortfolioAtFire={simResult.firePortfolioAtFire}
           yearlySavings={(fire?.monthlySavings ?? 0) * 12}
+          yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
           expectedReturn={fireParams.grossReturn}
           inflationRate={fireParams.inflationRate}
           rows={unifiedRows ?? []}
