@@ -1,3 +1,33 @@
+## Session 2026-03-22 - Feature #510
+
+### Feature #510: Deplete: binary search en simulatie consistentie - PASSING
+- **Bug found and fixed**: unified projection engine had annualContribution reset to
+  monthly_contribution*12 during decumulation (line 1271-1275), causing portfolio to
+  GROW instead of declining in deplete strategy. Fixed by setting annualContribution=0
+  during decumulation — after FIRE, the person is retired and no longer contributing.
+- Binary search (requiredAt) verified consistent: uses static withdrawal for convergence,
+  finds minimum portfolio where expenses can be sustained until endAge.
+- Visualization correctly uses annuity formula (applyStatic with endStrategy='deplete')
+  to produce smooth declining curve to €0.
+- Binary search convergence verified deterministic (same inputs → same outputs).
+- requiredFirePortfolio verified within PV-annuity analytical ballpark.
+- forcedFireAge (pensioen-modus) with deplete: portfolio correctly declines.
+- Edge cases tested: endAge=currentAge+1, zero return, very low return, negative real return.
+- Cross-engine parity: both old and unified engines produce declining deplete curves.
+- 28 new tests in test/deplete-binary-search-consistency.test.ts, all 207 related tests pass.
+- Verified in browser: horizon page shows correct deplete curve (peak then decline).
+- Zero new console errors.
+- Commit: 1a096774
+
+### Files Modified
+- lib/unified-projection.ts — zero contributions during decumulation (3 lines changed)
+
+### Files Created
+- test/deplete-binary-search-consistency.test.ts — 28 comprehensive tests
+
+### Current Status
+- 1 feature completed this session (#510)
+
 ## Session 2026-03-22 - Feature #511
 
 ### Feature #511: Continue fasegrens: decumulatie starten vanaf werkelijk portfolio - PASSING
