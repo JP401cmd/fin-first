@@ -19503,3 +19503,24 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#491, #492)
 - Overall progress: 491/506 passing (97.0%)
+
+## Session 2026-03-22 - Features #493, #494
+
+### Feature #493: Fase 1e - runUnifiedProjection() orchestratiefunctie - PASSING
+- runUnifiedProjection() already implemented in previous sessions (Fase 1a-1d)
+- Added runSimulationUnified() deprecated wrapper function
+- Created test/unified-projection-parity.test.ts with 30 tests
+- Parity: all 6 personas, toSimResult mapping, performance under 50ms
+- All 94 unified projection tests pass (64 existing + 30 new)
+- Commit: 04be82b5
+
+### Feature #494: Fase 2a - Horizon data loader uitbreiden met assets and box3 - PASSING
+- Added box3Method (forfaitair/werkelijk) to HorizonPageData from fireParams
+- Added hasPartner (boolean) to HorizonPageData from profile.household_type
+- Added household_type to profile Supabase query
+- No new Supabase queries, all derived from existing data
+- Commit: c26e0a5d
+
+### Current Status
+- 2 features completed this session (#493, #494)
+- Overall progress: 493/506 passing (97.4%)
