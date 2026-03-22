@@ -9,7 +9,8 @@ import {
   computeFireProjection, computeFireRange, ageAtDate, runBacktest,
 } from '@/lib/horizon-data'
 import type { FinancialInput } from '@/lib/core-metrics'
-import { runSimulation, type SimCashflow } from '@/lib/fire-simulation'
+import { type SimCashflow } from '@/lib/fire-simulation'
+import { runSimulationUnified as runSimulation } from '@/lib/unified-projection'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams } from '@/lib/fire-params'
 import { BOX3_DRAG, NL_AOW_AGE } from '@/lib/constants'

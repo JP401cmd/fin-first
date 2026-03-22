@@ -5,7 +5,8 @@ import {
   applyWithdrawalStrategy, resolveWithdrawalStrategy, WITHDRAWAL_DEFAULTS,
   type WithdrawalStrategyConfig, type WithdrawalContext,
 } from '@/lib/withdrawal-strategy'
-import { runSimulation, type SimCashflow } from '@/lib/fire-simulation'
+import { type SimCashflow } from '@/lib/fire-simulation'
+import { runSimulationUnified as runSimulation } from '@/lib/unified-projection'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 
 const CAT = 'horizon.onttrekkingsstrategie'

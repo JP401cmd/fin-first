@@ -12,6 +12,9 @@ import { runSimulation, lifeEventsToCashflows, type SimRow, type SimCashflow } f
 import { ageAtDate } from '@/lib/horizon-data'
 import { type FireStrategyConfig } from '@/lib/fire-strategy'
 import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import { runUnifiedProjection, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -419,5 +422,187 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
         assertValidSimRow(row, `empty-cf age=${row.age}`)
       }
     })
+  })
+
+  // ── Step 6: All 6 personas through runUnifiedProjection() (#505) ──
+  describe('Unified Projection Engine — all 6 personas (#505)', () => {
+    // Helper: convert persona assets to Asset[]
+    function personaAssetsToAssets(personaAssets: PersonaData['assets'], bankAccounts: PersonaData['bank_accounts']): Asset[] {
+      const assets: Asset[] = personaAssets.map((pa, i) => ({
+        id: `test-asset-${i}`,
+        user_id: 'test-user',
+        name: pa.name,
+        asset_type: pa.asset_type as Asset['asset_type'],
+        current_value: pa.current_value,
+        purchase_value: pa.purchase_value,
+        purchase_date: pa.purchase_date || null,
+        expected_return: pa.expected_return,
+        monthly_contribution: pa.monthly_contribution,
+        institution: pa.institution || null,
+        account_number: null,
+        notes: null,
+        is_active: true,
+        sort_order: i,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        subtype: pa.subtype || null,
+        risk_profile: (pa.risk_profile as Asset['risk_profile']) || null,
+        tax_benefit: pa.tax_benefit ?? null,
+        is_liquid: pa.is_liquid ?? null,
+        lock_end_date: pa.lock_end_date || null,
+        ticker_symbol: pa.ticker_symbol || null,
+        rental_income: pa.rental_income ?? null,
+        woz_value: pa.woz_value ?? null,
+        retirement_provider_type: (pa.retirement_provider_type as Asset['retirement_provider_type']) || null,
+        depreciation_rate: pa.depreciation_rate ?? null,
+        address_postcode: pa.address_postcode || null,
+        address_house_number: pa.address_house_number || null,
+        expiry_date: null,
+        beneficiary: null,
+        kvk_number: null,
+        ownership_percentage: null,
+        annual_dividend: null,
+        linked_asset_id: null,
+        ownership: 'personal',
+        household_id: null,
+        net_worth_inclusion_pct: 100,
+        has_budget_tracking: false,
+        has_holdings_tracking: pa.has_holdings_tracking ?? false,
+      }))
+
+      // Add bank accounts as savings-type assets
+      for (const ba of bankAccounts) {
+        assets.push({
+          id: `test-bank-${assets.length}`,
+          user_id: 'test-user',
+          name: ba.name,
+          asset_type: 'savings',
+          current_value: ba.balance,
+          purchase_value: ba.balance,
+          purchase_date: null,
+          expected_return: 1,
+          monthly_contribution: 0,
+          institution: ba.bank_name || null,
+          account_number: null,
+          notes: null,
+          is_active: true,
+          sort_order: assets.length,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          subtype: 'spaarrekening',
+          risk_profile: null,
+          tax_benefit: null,
+          is_liquid: true,
+          lock_end_date: null,
+          ticker_symbol: null,
+          rental_income: null,
+          woz_value: null,
+          retirement_provider_type: null,
+          depreciation_rate: null,
+          address_postcode: null,
+          address_house_number: null,
+          expiry_date: null,
+          beneficiary: null,
+          kvk_number: null,
+          ownership_percentage: null,
+          annual_dividend: null,
+          linked_asset_id: null,
+          ownership: 'personal',
+          household_id: null,
+          net_worth_inclusion_pct: 100,
+          has_budget_tracking: false,
+          has_holdings_tracking: false,
+        })
+      }
+
+      return assets
+    }
+
+    function personaDebtsToDebts(personaDebts: PersonaData['debts']): Debt[] {
+      return personaDebts.map((pd, i) => ({
+        id: `test-debt-${i}`,
+        user_id: 'test-user',
+        name: pd.name,
+        debt_type: pd.debt_type as Debt['debt_type'],
+        original_amount: pd.original_amount,
+        current_balance: pd.current_balance,
+        interest_rate: pd.interest_rate,
+        minimum_payment: pd.minimum_payment,
+        monthly_payment: pd.monthly_payment,
+        start_date: pd.start_date,
+        end_date: null,
+        creditor: pd.creditor || null,
+        notes: null,
+        is_active: true,
+        sort_order: i,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        subtype: pd.subtype || null,
+        is_tax_deductible: pd.is_tax_deductible ?? null,
+        fixed_rate_end_date: pd.fixed_rate_end_date || null,
+        nhg: pd.nhg ?? null,
+        linked_asset_id: null,
+        credit_limit: pd.credit_limit ?? null,
+        repayment_type: (pd.repayment_type as Debt['repayment_type']) || null,
+        draagkrachtmeting_date: pd.draagkrachtmeting_date || null,
+        tax_year: null,
+        has_payment_plan: false,
+        has_written_agreement: false,
+        ownership: 'personal',
+        household_id: null,
+        partner_split_pct: null,
+        net_worth_inclusion_pct: 100,
+      }))
+    }
+
+    function buildUnifiedInputForPersona(key: PersonaKey): UnifiedProjectionInput {
+      const p = PERSONAS[key]
+      const profile = p.profile
+      const params = buildSimParams(key) // reuse existing helper
+
+      return {
+        assets: personaAssetsToAssets(p.assets, p.bank_accounts),
+        debts: personaDebtsToDebts(p.debts),
+        currentAge: params.currentAge,
+        endAge: params.endAge,
+        yearlyExpenses: params.yearlyExpenses,
+        annualSavings: params.annualSavings,
+        monthlySurplus: params.annualSavings / 12,
+        monthlyIncome: params.meta?.income ?? (profile.net_monthly_income ?? 0),
+        incomeGrowthRate: 0,
+        grossReturn: params.grossReturn,
+        inflationRate: params.inflation,
+        box3Method: 'forfaitair',
+        cashflows: params.cashflows,
+        strategyConfig: params.strategyConfig,
+        withdrawalStrategy: params.wConfig,
+        forcedFireAge: profile.fire_end_strategy === 'pensioen' ? 67 : undefined,
+        hasPartner: profile.household_type === 'samenwonend' || profile.household_type === 'getrouwd',
+      }
+    }
+
+    for (const key of PERSONA_KEYS) {
+      describe(`Persona: ${PERSONAS[key].meta.name} (${key})`, () => {
+        it('runUnifiedProjection does not throw', () => {
+          expect(() => runUnifiedProjection(buildUnifiedInputForPersona(key))).not.toThrow()
+        })
+
+        it('all rows have valid grossIncome/grossExpenses (finite integers)', () => {
+          const result = runUnifiedProjection(buildUnifiedInputForPersona(key))
+
+          expect(result.rows.length).toBeGreaterThan(0)
+
+          for (const row of result.rows) {
+            expect(row.grossIncome, `${key} age=${row.age}: grossIncome should be finite`)
+              .toSatisfy((v: number) => typeof v === 'number' && Number.isFinite(v))
+            // grossIncome >= 0
+            expect(row.grossIncome, `${key} age=${row.age}: grossIncome >= 0`)
+              .toBeGreaterThanOrEqual(0)
+            // grossIncome should be integer
+            expect(row.grossIncome % 1, `${key} age=${row.age}: grossIncome should be integer`).toBe(0)
+          }
+        })
+      })
+    }
   })
 })

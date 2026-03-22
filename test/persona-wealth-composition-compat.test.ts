@@ -15,10 +15,12 @@ import { describe, it, expect } from 'vitest'
 import { PERSONAS, type PersonaKey, PERSONA_KEYS } from '@/lib/test-personas'
 import {
   projectWealthComposition,
+  unifiedRowsToStackedRows,
   WEALTH_GROUPS,
   type StackedRow,
   type WealthGroup,
 } from '@/lib/wealth-composition'
+import { runUnifiedProjection, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import { ageAtDate } from '@/lib/horizon-data'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -115,6 +117,89 @@ function assertRowValid(row: StackedRow, label: string) {
   for (const field of fields) {
     expect(row[field], `${label}.${field} should not be NaN`).not.toBeNaN()
     expect(row[field], `${label}.${field} should not be undefined`).not.toBeUndefined()
+  }
+}
+
+/** Build UnifiedProjectionInput from a persona for integration testing */
+function buildUnifiedInputFromPersona(key: PersonaKey): UnifiedProjectionInput {
+  const p = PERSONAS[key]
+  const profile = p.profile
+  const currentAge = ageAtDate(p.profile.date_of_birth)
+  const endAge = profile.fire_end_age ?? 90
+
+  // Build assets including bank accounts as savings
+  const assets: Asset[] = [...toAssets(p.assets)]
+  for (const ba of p.bank_accounts) {
+    assets.push({
+      id: `bank-${assets.length}`,
+      user_id: 'test',
+      name: ba.name,
+      asset_type: 'savings' as const,
+      current_value: ba.balance,
+      purchase_value: ba.balance,
+      purchase_date: null,
+      expected_return: 1,
+      monthly_contribution: 0,
+      institution: ba.bank_name,
+      account_number: ba.iban,
+      notes: null,
+      is_active: ba.is_active,
+      sort_order: ba.sort_order,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      subtype: ba.account_type,
+      risk_profile: null,
+      tax_benefit: null,
+      is_liquid: true,
+      lock_end_date: null,
+      ticker_symbol: null,
+      rental_income: null,
+      woz_value: null,
+      retirement_provider_type: null,
+      depreciation_rate: null,
+      address_postcode: null,
+      address_house_number: null,
+      expiry_date: null,
+      beneficiary: null,
+      kvk_number: null,
+      ownership_percentage: null,
+      annual_dividend: null,
+      linked_asset_id: null,
+      ownership: 'personal' as const,
+      household_id: null,
+      net_worth_inclusion_pct: 100,
+      has_budget_tracking: false,
+    })
+  }
+
+  const budgetExpenses = p.budgets?.filter(b => b.budget_type === 'expense').reduce((s, b) => s + b.default_limit, 0) ?? 0
+  const yearlyExpenses = budgetExpenses > 0 ? budgetExpenses * 12 : (profile.estimated_monthly_expenses ?? 0) * 12
+  const budgetIncome = p.budgets?.filter(b => b.budget_type === 'income').reduce((s, b) => s + b.default_limit, 0) ?? 0
+  const monthlyIncome = budgetIncome > 0 ? budgetIncome : (profile.net_monthly_income ?? 0)
+  const annualSavings = (monthlyIncome * 12) - yearlyExpenses
+
+  return {
+    assets,
+    debts: toDebts(p.debts),
+    currentAge,
+    endAge,
+    yearlyExpenses,
+    annualSavings,
+    monthlySurplus: annualSavings / 12,
+    monthlyIncome,
+    incomeGrowthRate: 0,
+    grossReturn: profile.expected_return ?? 0.07,
+    inflationRate: profile.inflation_rate ?? 0.02,
+    box3Method: 'forfaitair' as const,
+    cashflows: [],  // Life events cashflows not needed for wealth composition test
+    strategyConfig: {
+      strategy: (profile.fire_end_strategy as 'perpetual' | 'legacy' | 'deplete' | 'pensioen') ?? 'deplete',
+      endAge,
+      legacyAmount: profile.fire_legacy_amount ?? 0,
+    },
+    withdrawalStrategy: { strategy: 'static', guardrailFloor: 0.8, guardrailCeiling: 1.2, guardrailCutStep: 0.1, guardrailRaiseStep: 0.1 },
+    forcedFireAge: profile.fire_end_strategy === 'pensioen' ? 67 : undefined,
+    hasPartner: profile.household_type === 'samenwonend' || profile.household_type === 'getrouwd',
   }
 }
 
@@ -460,6 +545,51 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
               `${key}: mortgage "${d.name}" has invalid repayment_type "${d.repayment_type}"`,
             ).toBe(true)
           }
+        }
+      }
+    })
+  })
+
+  // ── Feature #505 — Unified engine integration ──────────────
+
+  describe('#505 — unifiedRowsToStackedRows() integration', () => {
+    for (const key of PERSONA_KEYS) {
+      it(`${key}: unifiedRowsToStackedRows produces valid StackedRow[]`, () => {
+        const input = buildUnifiedInputFromPersona(key)
+        const result = runUnifiedProjection(input)
+        const stackedRows = unifiedRowsToStackedRows(result.rows)
+
+        expect(stackedRows.length).toBe(result.rows.length)
+
+        for (const row of stackedRows) {
+          assertRowValid(row, `${key} age=${row.age}`)
+        }
+      })
+
+      it(`${key}: first row has non-zero assets`, () => {
+        const input = buildUnifiedInputFromPersona(key)
+        const result = runUnifiedProjection(input)
+        const stackedRows = unifiedRowsToStackedRows(result.rows)
+
+        expect(stackedRows.length).toBeGreaterThan(0)
+        const firstRow = stackedRows[0]
+        const groupSum = firstRow.spaargeld + firstRow.beleggingen + firstRow.pensioen + firstRow.vastgoed + firstRow.overig
+        expect(groupSum, `${key}: should have non-zero assets in first row`).toBeGreaterThan(0)
+      })
+    }
+
+    it('stacked rows from unified match persona debt direction', () => {
+      // Personas with debts should have negative schulden
+      for (const key of ['roos', 'daan', 'lisa', 'rashid'] as PersonaKey[]) {
+        const p = PERSONAS[key]
+        if (p.debts.length === 0) continue
+
+        const input = buildUnifiedInputFromPersona(key)
+        const result = runUnifiedProjection(input)
+        const stackedRows = unifiedRowsToStackedRows(result.rows)
+
+        if (stackedRows.length > 0) {
+          expect(stackedRows[0].schulden, `${key}: should have negative schulden`).toBeLessThanOrEqual(0)
         }
       }
     })

@@ -6,10 +6,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   deriveWealthCompositionFromSim,
+  unifiedRowsToStackedRows,
+  WEALTH_GROUPS,
   type StackedRow,
 } from '@/lib/wealth-composition'
+import type { UnifiedProjectionRow, AssetBucketDetail, DebtBalanceDetail } from '@/lib/unified-projection'
 import type { SimRow } from '@/lib/fire-simulation'
-import type { Asset } from '@/lib/asset-data'
+import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -727,5 +730,172 @@ describe('deriveWealthCompositionFromSim', () => {
       expect(result[0].beleggingen).toBe(100000)
       expect(result[0].spaargeld).toBe(0)
     })
+  })
+})
+
+// ── Helpers for unifiedRowsToStackedRows tests ──────────────────
+
+function makeUnifiedRow(overrides: Partial<UnifiedProjectionRow> & { age: number }): UnifiedProjectionRow {
+  return {
+    year: overrides.year ?? 0,
+    age: overrides.age,
+    phase: overrides.phase ?? 'accumulation',
+    assetBuckets: overrides.assetBuckets ?? {},
+    debtBalances: overrides.debtBalances ?? {},
+    totalAssets: overrides.totalAssets ?? 0,
+    totalDebts: overrides.totalDebts ?? 0,
+    netWorth: overrides.netWorth ?? 0,
+    grossIncome: overrides.grossIncome ?? 0,
+    savings: overrides.savings ?? 0,
+    withdrawal: overrides.withdrawal ?? 0,
+    cashflowNet: overrides.cashflowNet ?? 0,
+    totalGrowth: overrides.totalGrowth ?? 0,
+    totalBox3: overrides.totalBox3 ?? 0,
+    cumulativeBox3: overrides.cumulativeBox3 ?? 0,
+    inflationFactor: overrides.inflationFactor ?? 1,
+  }
+}
+
+function makeBucket(endValue: number, startValue?: number): AssetBucketDetail {
+  return {
+    startValue: startValue ?? endValue,
+    growth: 0,
+    contributions: 0,
+    box3Drag: 0,
+    endValue,
+  }
+}
+
+function makeDebtBalance(endBalance: number): DebtBalanceDetail {
+  return {
+    startBalance: endBalance + 100,
+    interestPaid: 50,
+    principalPaid: 50,
+    endBalance,
+  }
+}
+
+// ── Feature #505 — unifiedRowsToStackedRows unit tests ──────────
+
+describe('unifiedRowsToStackedRows (#505)', () => {
+  it('returns empty array for empty input', () => {
+    expect(unifiedRowsToStackedRows([])).toEqual([])
+  })
+
+  it('maps investment bucket to beleggingen', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: { investment: makeBucket(100000) },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result).toHaveLength(1)
+    expect(result[0].beleggingen).toBe(100000)
+    expect(result[0].spaargeld).toBe(0)
+  })
+
+  it('maps savings bucket to spaargeld', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: { savings: makeBucket(50000) },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result[0].spaargeld).toBe(50000)
+  })
+
+  it('maps eigen_huis to vastgoed', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: { eigen_huis: makeBucket(350000) },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result[0].vastgoed).toBe(350000)
+  })
+
+  it('maps retirement to pensioen', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: { retirement: makeBucket(80000) },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result[0].pensioen).toBe(80000)
+  })
+
+  it('maps vehicle to overig', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: { vehicle: makeBucket(15000) },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result[0].overig).toBe(15000)
+  })
+
+  it('combines multiple asset types correctly', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: {
+        investment: makeBucket(100000),
+        savings: makeBucket(50000),
+        eigen_huis: makeBucket(300000),
+        retirement: makeBucket(60000),
+        vehicle: makeBucket(10000),
+      },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result[0].beleggingen).toBe(100000)
+    expect(result[0].spaargeld).toBe(50000)
+    expect(result[0].vastgoed).toBe(300000)
+    expect(result[0].pensioen).toBe(60000)
+    expect(result[0].overig).toBe(10000)
+    expect(result[0].schulden).toBe(-0) // no debts
+  })
+
+  it('maps debtBalances to negative schulden', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      debtBalances: {
+        'debt-1': makeDebtBalance(150000),
+        'debt-2': makeDebtBalance(50000),
+      },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result[0].schulden).toBe(-200000)
+  })
+
+  it('rounds all values to integers', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: { investment: makeBucket(100000.7) },
+      debtBalances: { 'd1': makeDebtBalance(50000.3) },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result[0].beleggingen).toBe(100001)
+    expect(result[0].schulden).toBe(-50000)
+  })
+
+  it('preserves age from UnifiedProjectionRow', () => {
+    const rows = [
+      makeUnifiedRow({ age: 30, year: 0 }),
+      makeUnifiedRow({ age: 31, year: 1 }),
+      makeUnifiedRow({ age: 32, year: 2 }),
+    ]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result.map(r => r.age)).toEqual([30, 31, 32])
+  })
+
+  it('has no NaN or undefined in any field', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: {
+        investment: makeBucket(100000),
+        savings: makeBucket(50000),
+      },
+      debtBalances: { 'd1': makeDebtBalance(30000) },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    const fields: (keyof StackedRow)[] = ['age', 'spaargeld', 'beleggingen', 'pensioen', 'vastgoed', 'overig', 'schulden']
+    for (const f of fields) {
+      expect(result[0][f]).not.toBeNaN()
+      expect(result[0][f]).not.toBeUndefined()
+    }
   })
 })
