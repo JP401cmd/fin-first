@@ -1268,10 +1268,10 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     const year = age - currentAge
     const yearsIntoPension = age - computedFireAge
 
-    // Reset bucket contributions to base for this year
+    // During decumulation, no new savings contributions — the person is retired.
+    // Reset all bucket contributions to 0 (not to original monthly_contribution).
     for (const b of runningBuckets) {
-      const originalAssets = assets.filter(a => a.is_active && a.asset_type === b.assetType)
-      b.annualContribution = originalAssets.reduce((s, a) => s + Number(a.monthly_contribution) * 12, 0)
+      b.annualContribution = 0
     }
 
     // One-time cashflows
