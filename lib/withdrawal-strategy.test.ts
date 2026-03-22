@@ -438,7 +438,7 @@ describe('vpw strategy', () => {
 describe('bucket strategy', () => {
   const config = makeConfig({ strategy: 'bucket' })
 
-  it('withdraws from cash bucket', () => {
+  it('withdraws net base expenses (perpetual)', () => {
     const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
     const result = applyWithdrawalStrategy(config, makeCtx({
       baseExpenses: 40_000,
@@ -447,13 +447,38 @@ describe('bucket strategy', () => {
     expect(result).toBe(40_000)
   })
 
-  it('caps withdrawal at available cash', () => {
-    const state: BucketState = { cash: 20_000, bonds: 200_000, stocks: 780_000 }
+  it('withdraws net base expenses for deplete (no annuity)', () => {
+    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
     const result = applyWithdrawalStrategy(config, makeCtx({
       baseExpenses: 40_000,
       recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'deplete',
     }), state)
-    expect(result).toBe(20_000)
+    // Bucket does NOT use annuity — always netBaseExpenses
+    expect(result).toBe(40_000)
+  })
+
+  it('bucket differs from static for deplete (static uses annuity)', () => {
+    const staticConfig = makeConfig({ strategy: 'static' })
+    const bucketConfig = makeConfig({ strategy: 'bucket' })
+    const ctx = makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'deplete',
+    })
+    const staticW = applyWithdrawalStrategy(staticConfig, ctx)
+    const bucketW = applyWithdrawalStrategy(bucketConfig, ctx)
+    // Static uses annuity (~74k), bucket uses netBaseExpenses (40k)
+    expect(staticW).toBeGreaterThan(bucketW)
+    expect(bucketW).toBe(40_000)
   })
 
   it('subtracts recurring income', () => {
@@ -472,6 +497,21 @@ describe('bucket strategy', () => {
       recurringIncome: 30_000,
     }), state)
     expect(result).toBe(0)
+  })
+
+  it('bucket + legacy also uses only netBaseExpenses (no annuity)', () => {
+    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'legacy',
+      legacyAmount: 300_000,
+    }), state)
+    expect(result).toBe(40_000)
   })
 })
 

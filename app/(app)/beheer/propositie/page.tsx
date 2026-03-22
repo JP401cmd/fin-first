@@ -13,9 +13,9 @@ export default function PropositiePage() {
       <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <p className="label-editorial mb-3 text-[var(--ink-4)]">Propositie</p>
         <p className="font-display text-xl font-bold leading-snug text-[var(--ink)]">
-          TriFinity brengt je financiële leven samen op één plek en begeleidt je bij elke stap
-          &mdash; van financieel inzicht naar gepersonaliseerde acties tot financiële
-          onafhankelijkheid. Zonder dat je elke transactie hoeft bij te houden.
+          TriFinity geeft je inzicht, grip en vooruitzicht op je financiële leven &mdash; alles op
+          één plek, in één taal: tijd. Van nettovermogen tot vrijheidsprognose, van dagelijkse
+          inzichten tot toekomstscenario&apos;s. Zonder dat je elke transactie hoeft bij te houden.
         </p>
       </section>
 
@@ -82,6 +82,145 @@ export default function PropositiePage() {
             sturen? De app helpt. Droom je van financiële vrijheid? Je ziet het naderen. In elke
             stap vertaalt TriFinity geld naar iets dat je begrijpt en voelt: <strong>tijd</strong>.
           </p>
+        </div>
+      </section>
+
+      {/* Voor wie? — Persona's */}
+      <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <p className="label-editorial mb-4 text-[var(--ink-4)]">Voor wie?</p>
+
+        {/* Primary persona — full-width, elevated */}
+        <div className="mb-6 rounded-xl border border-[var(--border-ed)] bg-gradient-to-br from-[var(--subtle)] to-[var(--paper)] p-6">
+          <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+            Primaire doelgroep
+          </p>
+          <p className="mb-1 font-display text-lg font-bold text-[var(--ink)]">
+            Voor iedereen
+          </p>
+          <p className="mb-1 font-serif text-sm font-medium text-[var(--ink-2)]">
+            Voor iedereen die meer inzicht, grip en vooruitzicht wil
+          </p>
+          <p className="mb-4 font-serif text-sm leading-relaxed text-[var(--ink-3)]">
+            Je hoeft geen financieel expert te zijn. TriFinity is er voor iedereen die met een beetje
+            inzicht en hulp meer uit z&apos;n geld &mdash; en z&apos;n tijd &mdash; wil halen.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              'Nettovermogen in één oogopslag',
+              'Vrijheidsgetal \u2014 vermogen uitgedrukt in tijd',
+              'Gepersonaliseerd dashboard',
+              'Dagelijkse briefing met AI-inzichten',
+              'Automatische bankimport',
+            ].map((f) => (
+              <span
+                key={f}
+                className="rounded-full bg-[var(--ink)]/8 px-2.5 py-0.5 text-[11px] font-medium text-[var(--ink-2)]"
+              >
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Three persona cards */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          {/* Persona 1 — De pensioenplanner */}
+          <div className="rounded-lg border-l-3 border-horizon-500 bg-horizon-50/50 p-4">
+            <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-horizon-600">
+              Persona
+            </p>
+            <p className="mb-1 font-display text-sm font-semibold text-[var(--ink)]">
+              De pensioenplanner
+            </p>
+            <p className="mb-1 font-serif text-xs font-medium text-[var(--ink-2)]">
+              Geïnteresseerd in pensioen en financiële toekomst
+            </p>
+            <p className="mb-3 font-serif text-xs leading-relaxed text-[var(--ink-3)]">
+              Wil weten of het pensioen genoeg is, wanneer eerder stoppen kan, en wat de impact is
+              van extra inleggen.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                'FIRE-prognose met AOW-integratie',
+                'Pensioen in het vermogensoverzicht',
+                'Levensgebeurtenissen doorrekenen',
+                'What-if scenario\u2019s',
+                'Onttrekkingsstrategie simulatie',
+              ].map((f) => (
+                <span
+                  key={f}
+                  className="rounded-full bg-horizon-500/10 px-2.5 py-0.5 text-[11px] font-medium text-horizon-600"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Persona 2 — De vermogensverdeler */}
+          <div className="rounded-lg border-l-3 border-kern-500 bg-kern-50/50 p-4">
+            <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-kern-600">
+              Persona
+            </p>
+            <p className="mb-1 font-display text-sm font-semibold text-[var(--ink)]">
+              De vermogensverdeler
+            </p>
+            <p className="mb-1 font-serif text-xs font-medium text-[var(--ink-2)]">
+              Op zoek naar overzicht over bezittingen en schulden
+            </p>
+            <p className="mb-3 font-serif text-xs leading-relaxed text-[var(--ink-3)]">
+              Wil alles bij elkaar zien: spaargeld, beleggingen, hypotheek, schulden &mdash; en
+              begrijpen hoe het samenhangt.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                'Nettovermogen: bezittingen vs. schulden',
+                'Beleggingsportefeuille & allocatie',
+                'Hypotheek en schulden tracking',
+                'Box 3 belastingberekening',
+                'Vermogensontwikkeling over tijd',
+              ].map((f) => (
+                <span
+                  key={f}
+                  className="rounded-full bg-kern-500/10 px-2.5 py-0.5 text-[11px] font-medium text-kern-600"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Persona 3 — De budgetteerder */}
+          <div className="rounded-lg border-l-3 border-wil-500 bg-wil-50/50 p-4">
+            <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-wil-600">
+              Persona
+            </p>
+            <p className="mb-1 font-display text-sm font-semibold text-[var(--ink)]">
+              De budgetteerder
+            </p>
+            <p className="mb-1 font-serif text-xs font-medium text-[var(--ink-2)]">
+              Gedreven om grip te krijgen op uitgaven
+            </p>
+            <p className="mb-3 font-serif text-xs leading-relaxed text-[var(--ink-3)]">
+              Wil weten waar het geld naartoe gaat, patronen herkennen, en bewust keuzes maken.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                'Bankimport (MT940/CAMT.053/CSV)',
+                'Automatische categorisatie',
+                'Budgetten per categorie',
+                'Uitgavenpatronen en trends',
+                'Abonnementen-inzicht',
+              ].map((f) => (
+                <span
+                  key={f}
+                  className="rounded-full bg-wil-500/10 px-2.5 py-0.5 text-[11px] font-medium text-wil-600"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -229,7 +368,11 @@ export default function PropositiePage() {
                 ['Filosofie', 'Geld is opgeslagen tijd'],
                 [
                   'Propositie',
-                  'Begeleidt je bij elke stap van financieel inzicht naar financiële onafhankelijkheid — zonder dat je elke transactie hoeft bij te houden',
+                  'Inzicht, grip en vooruitzicht op je financiële leven \u2014 alles op één plek, in één taal: tijd. Zonder dat je elke transactie hoeft bij te houden',
+                ],
+                [
+                  'Doelgroep',
+                  'Iedereen die meer inzicht, grip en vooruitzicht wil \u2014 van pensioenplanner tot budgetteerder',
                 ],
                 [
                   'Emotioneel frame',

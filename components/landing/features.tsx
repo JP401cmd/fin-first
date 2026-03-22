@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ShieldCheck, Lock, Eye, Fingerprint, DatabaseZap, ToggleRight } from 'lucide-react'
+import { ChevronDown, ShieldCheck, Lock, Eye, Fingerprint, DatabaseZap, ToggleRight, Hourglass, BarChart3, ArrowDownToLine, TrendingUp, Sparkles, Lightbulb, GitBranch, Zap, Landmark, ArrowRightLeft, Briefcase, Flame } from 'lucide-react'
 
 // ── Reveal on scroll ─────────────────────────────────────────
 
@@ -206,9 +206,9 @@ export function Features() {
 
           <div className="mx-auto max-w-2xl rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] px-8 py-6 text-center">
             <p className="font-serif text-lg leading-relaxed text-[var(--ink-2)]">
-              TriFinity begeleidt je bij elke stap — van financieel inzicht naar
-              gepersonaliseerde acties tot{' '}
-              <strong className="font-semibold text-[var(--ink)]">financiële onafhankelijkheid</strong>.
+              TriFinity geeft je inzicht, grip en vooruitzicht op je financiële
+              leven &mdash; alles op één plek, in één taal:{' '}
+              <strong className="font-semibold text-[var(--ink)]">tijd</strong>.
             </p>
           </div>
         </Reveal>
@@ -264,7 +264,7 @@ export function Features() {
           <Reveal>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FeatureCard
-                icon="⏱"
+                icon={<Hourglass className="h-4 w-4" />}
                 title="Vrijheidstijdlijn"
                 description="Je totale vermogen vertaald naar jaren en maanden vrijheid — direct zichtbaar wat je hebt opgebouwd."
                 iconClass="bg-kern-50 border-kern-100 text-kern-600"
@@ -285,7 +285,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="📊"
+                icon={<BarChart3 className="h-4 w-4" />}
                 title="Budgetbeheer"
                 description="Stel budgetten in per categorie en zie hoeveel vrijheidsdagen elke euro kost. Vier visualisatiemodi."
                 iconClass="bg-kern-50 border-kern-100 text-kern-600"
@@ -306,7 +306,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="🏦"
+                icon={<ArrowDownToLine className="h-4 w-4" />}
                 title="Transacties & Import"
                 description="Importeer bankbestanden van alle NL-banken. Automatische categorisatie en AI-patroonherkenning."
                 iconClass="bg-kern-50 border-kern-100 text-kern-600"
@@ -327,7 +327,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="📈"
+                icon={<TrendingUp className="h-4 w-4" />}
                 title="Vermogen & Schulden"
                 description="Volledig netto-vermogensoverzicht: beleggingen, spaargeld, vastgoed, pensioenopbouw en schulden."
                 iconClass="bg-kern-50 border-kern-100 text-kern-600"
@@ -390,7 +390,7 @@ export function Features() {
           <Reveal>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FeatureCard
-                icon="✨"
+                icon={<Sparkles className="h-4 w-4" />}
                 title="Persoonlijke AI-coach"
                 description="Will kent je complete situatie en helpt je over alle domeinen heen. Stel vragen in gewoon Nederlands."
                 iconClass="bg-wil-50 border-wil-100 text-wil-600"
@@ -412,7 +412,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="💡"
+                icon={<Lightbulb className="h-4 w-4" />}
                 title="Slimme aanbevelingen"
                 description="AI analyseert je patronen en presenteert kansen — met euro-impact én vrijheidsdagen per aanbeveling."
                 iconClass="bg-wil-50 border-wil-100 text-wil-600"
@@ -435,7 +435,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="📐"
+                icon={<GitBranch className="h-4 w-4" />}
                 title="Scenario-analyse"
                 description="Wat als je eerder stopt? Parttime gaat? Een huis koopt? Will simuleert en vergelijkt scenario's."
                 iconClass="bg-wil-50 border-wil-100 text-wil-600"
@@ -456,7 +456,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="⚡"
+                icon={<Zap className="h-4 w-4" />}
                 title="Schuldversneller"
                 description="Avalanche of snowball — simuleer strategieën en zie hoeveel maanden eerder je schuldenvrij bent."
                 iconClass="bg-wil-50 border-wil-100 text-wil-600"
@@ -514,7 +514,7 @@ export function Features() {
           <Reveal>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FeatureCard
-                icon="🏛"
+                icon={<Landmark className="h-4 w-4" />}
                 title="Box 3 optimalisatie"
                 description="Bereken je belastingdruk op werkelijk vermogen en optimaliseer je vermogensmix voor minimale Box 3 heffing."
                 iconClass="bg-horizon-50 border-horizon-100 text-horizon-600"
@@ -536,7 +536,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="🌉"
+                icon={<ArrowRightLeft className="h-4 w-4" />}
                 title="AOW-bridge calculator"
                 description="Bereken de buffer die je nodig hebt tussen je FIRE-datum en de AOW-leeftijd — inclusief inflatie."
                 iconClass="bg-horizon-50 border-horizon-100 text-horizon-600"
@@ -558,7 +558,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="💼"
+                icon={<Briefcase className="h-4 w-4" />}
                 title="Werkgeverspensioen"
                 description="Voer je UPO in en zie hoe je pensioen bijdraagt aan je totale vrijheidsprojectie en maandinkomen."
                 iconClass="bg-horizon-50 border-horizon-100 text-horizon-600"
@@ -581,7 +581,7 @@ export function Features() {
                 }}
               />
               <FeatureCard
-                icon="∞"
+                icon={<Flame className="h-4 w-4" />}
                 title="FIRE-datum tracker"
                 description="Persoonlijke FIRE-projectie met drie rendementscenario's en een dagcountdown naar financiële onafhankelijkheid."
                 iconClass="bg-horizon-50 border-horizon-100 text-horizon-600"
@@ -735,43 +735,127 @@ export function Features() {
           <p className="mb-3 text-center font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
             Voor wie is TriFinity?
           </p>
-          <h2 className="mb-10 text-center font-display text-[1.8rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2.2rem]">
-            Herken jij jezelf?
+          <h2 className="mb-4 text-center font-display text-[1.8rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2.2rem]">
+            Voor iedereen die meer wil bereiken met z&apos;n geld
           </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {[
-              {
-                emoji: '🔥',
-                title: 'FIRE-strijder',
-                body: 'Je wilt financiële onafhankelijkheid, maar mist een Nederlandse tool die Box 3, AOW en werkgeverspensioen meeneemt in je FIRE-berekening.',
-              },
-              {
-                emoji: '💼',
-                title: 'Bewuste professional',
-                body: 'Goed inkomen, maar geen grip op waar het naartoe gaat. Je wilt slimmer met geld omgaan zonder een tweede baan van spreadsheets.',
-              },
-              {
-                emoji: '🌍',
-                title: 'Expat in Nederland',
-                body: 'Je navigeert het Nederlandse belastingstelsel en mist een tool die lokale regelgeving begrijpt en je totaalbeeld compleet maakt.',
-              },
-              {
-                emoji: '💑',
-                title: 'Samen plannen',
-                body: 'Als koppel jullie financiële toekomst vormgeven. Gezamenlijk overzicht, gedeelde doelen en samen toewerken naar vrijheid.',
-              },
-            ].map((item) => (
-              <div
-                key={item.title}
-                className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all duration-200 hover:shadow-[var(--s1)]"
-              >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-lg">
-                  {item.emoji}
-                </div>
-                <h4 className="mb-2 font-sans font-semibold text-[var(--ink)]">{item.title}</h4>
-                <p className="font-serif text-sm leading-relaxed text-[var(--ink-3)]">{item.body}</p>
+          <p className="mx-auto mb-10 max-w-xl text-center font-serif text-base leading-relaxed text-[var(--ink-3)]">
+            Je hoeft geen financieel expert te zijn. TriFinity is er voor iedereen die met
+            een beetje inzicht en hulp meer uit z&apos;n geld &mdash; en z&apos;n tijd &mdash; wil halen.
+          </p>
+
+          {/* Drie persona-kaarten */}
+          <div className="grid gap-4 md:grid-cols-3">
+            {/* De pensioenplanner */}
+            <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--s1)]">
+              <div className="mb-4 h-1 w-10 bg-horizon-500" />
+              <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-horizon-600">
+                Persona
+              </p>
+              <h4 className="mb-2 font-display text-base font-semibold text-[var(--ink)]">
+                De pensioenplanner
+              </h4>
+              <p className="mb-1 font-serif text-sm font-medium text-[var(--ink-2)]">
+                Geïnteresseerd in pensioen en financiële toekomst
+              </p>
+              <p className="mb-4 font-serif text-sm leading-relaxed text-[var(--ink-3)]">
+                Wil weten of het pensioen genoeg is, wanneer eerder stoppen kan, en wat de
+                impact is van extra inleggen.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'FIRE-prognose',
+                  'AOW-integratie',
+                  'Levensgebeurtenissen',
+                  'What-if scenario\u2019s',
+                  'Onttrekkingsstrategie',
+                ].map((f) => (
+                  <span
+                    key={f}
+                    className="rounded-full bg-horizon-500/10 px-2.5 py-0.5 text-[11px] font-medium text-horizon-700"
+                  >
+                    {f}
+                  </span>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* De vermogensverdeler */}
+            <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--s1)]">
+              <div className="mb-4 h-1 w-10 bg-kern-500" />
+              <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-kern-600">
+                Persona
+              </p>
+              <h4 className="mb-2 font-display text-base font-semibold text-[var(--ink)]">
+                De vermogensverdeler
+              </h4>
+              <p className="mb-1 font-serif text-sm font-medium text-[var(--ink-2)]">
+                Op zoek naar overzicht over bezittingen en schulden
+              </p>
+              <p className="mb-4 font-serif text-sm leading-relaxed text-[var(--ink-3)]">
+                Wil alles bij elkaar zien: spaargeld, beleggingen, hypotheek, schulden &mdash;
+                en begrijpen hoe het samenhangt.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Nettovermogen',
+                  'Portefeuille & allocatie',
+                  'Schulden tracking',
+                  'Box 3 berekening',
+                  'Vermogensontwikkeling',
+                ].map((f) => (
+                  <span
+                    key={f}
+                    className="rounded-full bg-kern-500/10 px-2.5 py-0.5 text-[11px] font-medium text-kern-700"
+                  >
+                    {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* De budgetteerder */}
+            <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--s1)]">
+              <div className="mb-4 h-1 w-10 bg-wil-500" />
+              <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-wil-600">
+                Persona
+              </p>
+              <h4 className="mb-2 font-display text-base font-semibold text-[var(--ink)]">
+                De budgetteerder
+              </h4>
+              <p className="mb-1 font-serif text-sm font-medium text-[var(--ink-2)]">
+                Gedreven om grip te krijgen op uitgaven
+              </p>
+              <p className="mb-4 font-serif text-sm leading-relaxed text-[var(--ink-3)]">
+                Wil weten waar het geld naartoe gaat, patronen herkennen, en bewust keuzes
+                maken.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Bankimport',
+                  'Automatische categorisatie',
+                  'Budgetten',
+                  'Uitgavenpatronen',
+                  'Abonnementen-inzicht',
+                ].map((f) => (
+                  <span
+                    key={f}
+                    className="rounded-full bg-wil-500/10 px-2.5 py-0.5 text-[11px] font-medium text-wil-700"
+                  >
+                    {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Belofte-strip */}
+          <div className="mt-8 border-t border-b border-[var(--border-ed)] bg-[var(--paper)] px-6 py-5 text-center">
+            <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
+              <strong className="font-semibold text-[var(--ink)]">De belofte:</strong>{' '}
+              TriFinity past zich aan jou aan. Wil je alleen overzicht? Dat is genoeg. Wil je
+              actief sturen? De app helpt. Droom je van financiële vrijheid? Je ziet het
+              naderen.
+            </p>
           </div>
         </Reveal>
       </section>

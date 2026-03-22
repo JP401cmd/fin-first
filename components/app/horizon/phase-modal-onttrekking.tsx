@@ -47,7 +47,7 @@ const MiniWithdrawalChart = memo(function MiniWithdrawalChart({
   const chartW = CHART_W - PAD.left - PAD.right
   const chartH = CHART_H - PAD.top - PAD.bottom
 
-  const maxVal = Math.max(...rows.map(r => Math.max(r.totalAssets, rows[0].totalAssets)), 1)
+  const maxVal = Math.max(...rows.map(r => Math.max(r.netWorth, rows[0].totalAssets)), 1)
   const minAge = rows[0].age
   const maxAge = rows[rows.length - 1].age
   const ageSpan = maxAge - minAge || 1
@@ -56,7 +56,7 @@ const MiniWithdrawalChart = memo(function MiniWithdrawalChart({
   const y = (val: number) => PAD.top + chartH - (val / maxVal) * chartH
 
   // Build area path using totalAssets (end of year value)
-  const points = rows.map(r => `${x(r.age)},${y(r.totalAssets)}`)
+  const points = rows.map(r => `${x(r.age)},${y(r.netWorth)}`)
   const linePath = `M${points.join(' L')}`
   const areaPath = `${linePath} L${x(maxAge)},${y(0)} L${x(minAge)},${y(0)} Z`
 
@@ -246,7 +246,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   )
 
   const endPortfolio = withdrawalRows.length > 0
-    ? withdrawalRows[withdrawalRows.length - 1].totalAssets
+    ? withdrawalRows[withdrawalRows.length - 1].netWorth
     : targetEndPortfolio
 
   const strategyLabel = STRATEGY_LABELS[strategy]?.name ?? strategy

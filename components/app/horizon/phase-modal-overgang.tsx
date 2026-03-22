@@ -202,8 +202,9 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   // ── Waterval-kassabon aggregaten van unified rows ──────────────────────
   const hasTransitionRows = transitionRows.length > 0
 
+  // Use startNetWorth (net worth = assets - debts) instead of totalAssets from bucket values
   const startVermogen = hasTransitionRows
-    ? Object.values(transitionRows[0].assetBuckets).reduce((sum, b) => sum + ((b as AssetBucketDetail)?.startValue ?? 0), 0)
+    ? transitionRows[0].startNetWorth
     : portfolioAtTransitionStart
 
   const totalRendement = hasTransitionRows
@@ -227,7 +228,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
     : yearlyAowIncome * durationYears
 
   const eindVermogen = hasTransitionRows
-    ? transitionRows[transitionRows.length - 1].totalAssets
+    ? transitionRows[transitionRows.length - 1].netWorth
     : Math.max(portfolioAtTransitionStart - totalOnttrekking + totalRendement, 0)
 
   return (

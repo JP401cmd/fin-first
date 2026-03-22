@@ -20,6 +20,7 @@ interface PhaseSegment {
 interface PhaseBarProps {
   currentAge: number
   fireAge: number | null       // null when FIRE unreachable
+  fireAgeFractional?: number | null  // fractional FIRE age for precise phase boundaries
   aowAge: number               // usually 67
   endAge: number
   fireReachable: boolean
@@ -40,6 +41,7 @@ const MIN_SEGMENT_PX = 44    // minimum active segment width
 export function PhaseBar({
   currentAge,
   fireAge,
+  fireAgeFractional,
   aowAge,
   endAge,
   fireReachable,
@@ -64,7 +66,7 @@ export function PhaseBar({
 
   // ── Build segments based on edge cases ──────────────────────────────────
 
-  const segments = buildSegments({ currentAge, fireAge, aowAge, endAge, fireReachable, isPensioenMode })
+  const segments = buildSegments({ currentAge, fireAge, fireAgeFractional, aowAge, endAge, fireReachable, isPensioenMode })
 
   // ── Clip segments to visible zoom viewport ──────────────────────────────
 
@@ -135,7 +137,7 @@ export function PhaseBar({
             key={seg.id}
             type="button"
             aria-haspopup="dialog"
-            aria-label={`${seg.label}: leeftijd ${seg.startAge} tot ${seg.endAge}`}
+            aria-label={`${seg.label}: leeftijd ${Math.round(seg.startAge)} tot ${Math.round(seg.endAge)}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => onSegmentClick?.(seg.id)}
             style={{
@@ -152,7 +154,7 @@ export function PhaseBar({
               <>
                 <span className="truncate font-semibold">{seg.label}</span>
                 <span className="shrink-0 text-[10px] opacity-80">
-                  {seg.startAge}&ndash;{seg.endAge}
+                  {Math.round(seg.startAge)}&ndash;{Math.round(seg.endAge)}
                 </span>
               </>
             )}
@@ -176,6 +178,7 @@ export function PhaseBar({
 export function buildSegments({
   currentAge,
   fireAge,
+  fireAgeFractional,
   aowAge,
   endAge,
   fireReachable,
@@ -183,8 +186,12 @@ export function buildSegments({
 }: Omit<PhaseBarProps, 'onSegmentClick' | 'visibleMinAge' | 'visibleMaxAge'>): PhaseSegment[] {
   const segments: PhaseSegment[] = []
 
-  // Normalize ages
-  const effectiveFireAge = fireReachable && fireAge != null ? Math.round(fireAge) : null
+  // Use fractional FIRE age for proportionally correct phase widths.
+  // The phase bar splits at the exact fractional boundary (e.g. 60.5) so it
+  // aligns with the FIRE marker on the chart. Labels are rounded for readability.
+  const effectiveFireAge = fireReachable && (fireAgeFractional ?? fireAge) != null
+    ? (fireAgeFractional ?? fireAge!)
+    : null
   const effectiveAowAge = Math.round(aowAge)
 
   // Edge case: FIRE unreachable → only Opbouw, full width

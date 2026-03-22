@@ -745,6 +745,7 @@ function makeUnifiedRow(overrides: Partial<UnifiedProjectionRow> & { age: number
     totalAssets: overrides.totalAssets ?? 0,
     totalDebts: overrides.totalDebts ?? 0,
     netWorth: overrides.netWorth ?? 0,
+    startNetWorth: overrides.startNetWorth ?? 0,
     grossIncome: overrides.grossIncome ?? 0,
     savings: overrides.savings ?? 0,
     withdrawal: overrides.withdrawal ?? 0,

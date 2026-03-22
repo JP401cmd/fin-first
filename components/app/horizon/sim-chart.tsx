@@ -169,11 +169,13 @@ export const SimChart = memo(function SimChart({
       .join(' ')
   }
 
-  // Build fractional FIRE junction point (interpolated between integer year boundaries)
+  // Build fractional FIRE junction point via linear interpolation.
+  // The engine now prorates savings in the FIRE year, so the data naturally
+  // reflects the correct portfolio value — no snapping to fireTarget needed.
   let fireFractionalPt: [number, number] | null = null
   if (fireAge !== null && fireAgeFractional !== null) {
     if (fireAge > currentAge) {
-      const t = fireAgeFractional - (fireAge - 1)  // 0..1
+      const t = fireAgeFractional - (fireAge - 1)
       const ptBefore = allPts.find(([a]) => a === fireAge - 1)?.[1] ?? 0
       const ptAfter  = allPts.find(([a]) => a === fireAge)?.[1] ?? 0
       fireFractionalPt = [fireAgeFractional, ptBefore + t * (ptAfter - ptBefore)]
@@ -198,8 +200,13 @@ export const SimChart = memo(function SimChart({
     }
   }
 
-  // Determine split point: AOW age in pensioen mode, FIRE age otherwise
-  const splitAge = isPensioenMode ? (aowAgeFractional != null ? Math.ceil(aowAgeFractional) : null) : fireAge
+  // Determine split point: AOW age in pensioen mode, FIRE fractional age otherwise.
+  // Using fireAgeFractional (e.g. 60.2) ensures the gold→brown colour transition
+  // aligns with the FIRE marker, preventing the visual artifact where the gold path
+  // continues past FIRE because the integer fireAge (61) is 1 year later.
+  const splitAge = isPensioenMode
+    ? (aowAgeFractional != null ? Math.ceil(aowAgeFractional) : null)
+    : (fireAgeFractional ?? fireAge)
   const splitFractionalPt = isPensioenMode ? aowFractionalPt : fireFractionalPt
   const splitFractionalAge = isPensioenMode ? aowAgeFractional ?? null : fireAgeFractional
 
@@ -209,8 +216,11 @@ export const SimChart = memo(function SimChart({
     : splitAge !== null
     ? allPts.filter(([age]) => age <= splitAge)
     : allPts
+  // Build decumulation path starting from the FIRE junction point.
+  // The engine prorates savings in the FIRE year, so data naturally reflects
+  // correct values — no clamping needed.
   const decPts: [number, number][] = splitFractionalPt !== null && splitAge !== null
-    ? [splitFractionalPt, ...allPts.filter(([age]) => age > splitAge)]
+    ? [splitFractionalPt, ...allPts.filter(([age]) => age >= Math.ceil(splitAge))]
     : splitAge !== null
     ? allPts.filter(([age]) => age >= splitAge)
     : []

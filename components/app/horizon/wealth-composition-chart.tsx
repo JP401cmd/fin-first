@@ -39,6 +39,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   visibleMinAge,
   visibleMaxAge,
   fireAge,
+  fireAgeFractional,
   forModal,
   planningMode = 'fire',
   aowAgeFractional,
@@ -49,6 +50,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   visibleMinAge?: number
   visibleMaxAge?: number
   fireAge?: number | null
+  fireAgeFractional?: number | null
   forModal?: boolean
   /** Planning mode: 'fire' (default) uses FIRE age as split point, 'pensioen' uses AOW age */
   planningMode?: 'fire' | 'pensioen'
@@ -154,8 +156,10 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
     : fireAge
 
   // FIRE vertical line X position (hidden in pensioen mode)
-  const xFire = !isPensioenMode && fireAge != null && fireAge >= minAge && fireAge <= maxAge
-    ? PAD.left + xScale(fireAge)
+  // Use fireAgeFractional for precise positioning (integer fireAge can be 1 year off)
+  const effectiveFireAge = fireAgeFractional ?? fireAge
+  const xFire = !isPensioenMode && effectiveFireAge != null && effectiveFireAge >= minAge && effectiveFireAge <= maxAge
+    ? PAD.left + xScale(effectiveFireAge)
     : null
 
   // AOW vertical line X position (promoted in pensioen mode)
@@ -324,7 +328,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             fontFamily="var(--font-inter, sans-serif)"
             fontWeight={600}
           >
-            FIRE {fireAge}
+            FIRE {fireAgeFractional != null ? fireAgeFractional.toFixed(1) : fireAge}
           </text>
         )}
 

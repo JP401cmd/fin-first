@@ -683,7 +683,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // ── Overgang (transition phase) berekening ──────────────────────────────────
   const overgangData = (() => {
     if (!simResult || currentAge == null || simResult.fireAge == null || !simResult.fireReachable || isPensioenMode) return null
-    const oFireAge = Math.round(simResult.fireAge)
+    const oFireAge = simResult.fireAge  // integer fire age from unified projection
     const oAowAge = Math.round(userAowAge.fractional)
     const scenario = oFireAge < oAowAge ? 'gap' as const : oFireAge > oAowAge ? 'shortfall' as const : 'none' as const
     if (scenario === 'none') return null
@@ -692,8 +692,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     const yearlyExp = (effectiveInput?.monthlyExpenses ?? 0) * 12
     const baseAow = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
     const yearlyAow = baseAow * 12
-    const pRow = simResult.rows.find(r => r.age === oFireAge)
-    const portfolioAtStart = pRow?.endPortfolio ?? simResult.firePortfolioAtFire
+    const transRows = (unifiedRows ?? []).filter(r => r.phase === 'transition')
+    const portfolioAtStart = transRows.length > 0
+      ? transRows[0].startNetWorth
+      : simResult.firePortfolioAtFire
     const withdrawal = scenario === 'gap' ? yearlyExp : Math.max(yearlyExp - yearlyAow, 0)
     return { scenario, start, end, fireAge: oFireAge, aowAge: oAowAge, yearlyExp, yearlyAow, portfolioAtStart, withdrawal }
   })()
@@ -701,23 +703,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // ── Onttrekking (withdrawal phase) berekening ──────────────────────────────
   const onttrekkingData = (() => {
     if (!simResult || !simResult.fireReachable || simResult.fireAge == null) return null
-    const retirementRows = simResult.rows.filter(r => r.phase === 'retirement')
-    if (retirementRows.length === 0) return null
-    const oStart = retirementRows[0].age
-    const oEnd = simResult.displayEndAge
-    const startRow = retirementRows[0]
-    const startPortfolio = startRow.startPortfolio
+    const wRows = (unifiedRows ?? []).filter(r => r.phase === 'withdrawal')
+    if (wRows.length === 0) return null
     const yearlyExp = (effectiveInput?.monthlyExpenses ?? 0) * 12
     const baseAow = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
     const yearlyAow = baseAow * 12
-    // Yearly withdrawal from sim: average of withdrawal amounts in retirement rows
-    const avgWithdrawal = retirementRows.length > 0
-      ? retirementRows.reduce((s, r) => s + r.withdrawal, 0) / retirementRows.length
-      : yearlyExp
+    const avgWithdrawal = wRows.reduce((s, r) => s + r.withdrawal, 0) / wRows.length
     return {
-      start: oStart,
-      end: oEnd,
-      startPortfolio,
+      start: wRows[0].age,
+      end: simResult.displayEndAge,
+      startPortfolio: wRows[0].startNetWorth,
       strategy: simResult.strategy,
       targetEndPortfolio: simResult.targetEndPortfolio,
       yearlyWithdrawal: avgWithdrawal,
@@ -1982,6 +1977,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             fireAge={simResult.fireAge}
+                            fireAgeFractional={simResult.fireAgeFractional}
                             planningMode={planningMode}
                             aowAgeFractional={userAowAge.fractional}
                           />
@@ -2041,6 +2037,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           <PhaseBar
                             currentAge={currentAge}
                             fireAge={simResult.fireAge}
+                            fireAgeFractional={simResult.fireAgeFractional}
                             aowAge={userAowAge.fractional}
                             endAge={simResult.displayEndAge}
                             fireReachable={simResult.fireReachable}
@@ -5023,7 +5020,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           onClose={() => setActiveFaseModal(null)}
           currentAge={currentAge}
           fireAge={simResult.fireAge}
-          currentNetWorth={(effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)}
+          currentNetWorth={unifiedRows?.[0]?.startNetWorth ?? ((effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0))}
           expectedPortfolioAtFire={simResult.firePortfolioAtFire}
           yearlySavings={(fire?.monthlySavings ?? 0) * 12}
           yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}

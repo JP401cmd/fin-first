@@ -59,7 +59,8 @@
       "Bash(playwright-cli goto:*)",
       "Bash(playwright-cli eval:*)",
       "Bash(playwright-cli resize:*)",
-      "Bash(ls -la '/c/Users/janpa/cd/development/fin/app/\\(app\\)/core/')"
+      "Bash(ls -la '/c/Users/janpa/cd/development/fin/app/\\(app\\)/core/')",
+      "Bash(npx tsc:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -32,12 +32,13 @@ export function Hero() {
           </h1>
 
           <p className="mb-8 max-w-[500px] font-serif text-lg leading-relaxed text-[var(--ink-2)]">
-            TriFinity brengt je financiële leven samen op één plek en begeleidt
-            je bij elke stap — van financieel inzicht naar gepersonaliseerde
-            acties tot{' '}
+            TriFinity geeft je inzicht, grip en vooruitzicht op je financiële
+            leven &mdash; alles op één plek, in één taal:{' '}
             <strong className="font-semibold text-[var(--ink)]">
-              financiële onafhankelijkheid
-            </strong>.
+              tijd
+            </strong>
+            . Van nettovermogen tot vrijheidsprognose, van dagelijkse
+            inzichten tot toekomstscenario&apos;s.
           </p>
 
           <div className="mb-12 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -58,17 +59,20 @@ export function Hero() {
 
           {/* Feature tags */}
           <div className="flex flex-wrap gap-2">
+            <span className="rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)]">
+              Voor iedereen
+            </span>
             <span className="rounded-full border border-kern-200 bg-kern-50 px-3 py-1 font-sans text-[11px] font-medium text-kern-700">
-              Box 3 optimalisatie
+              Vermogen &amp; schulden
             </span>
             <span className="rounded-full border border-wil-200 bg-wil-50 px-3 py-1 font-sans text-[11px] font-medium text-wil-700">
-              AI-coaching (Will)
+              Budget &amp; patronen
             </span>
             <span className="rounded-full border border-horizon-200 bg-horizon-50 px-3 py-1 font-sans text-[11px] font-medium text-horizon-700">
-              FIRE-tracking
+              Pensioen &amp; FIRE
             </span>
             <span className="rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)]">
-              Gebouwd voor NL
+              100% Nederlands
             </span>
           </div>
         </div>

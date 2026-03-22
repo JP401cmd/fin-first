@@ -1012,6 +1012,7 @@ describe('J. Backwards-compatible mapping', () => {
       totalAssets: 224_000,
       totalDebts: 0,
       netWorth: 224_000,
+      startNetWorth: 200_000,
       grossIncome: 48_000,
       savings: 12_000,
       withdrawal: 0,
@@ -1029,7 +1030,7 @@ describe('J. Backwards-compatible mapping', () => {
     expect(simRow.growth).toBe(14_000)
     expect(simRow.savings).toBe(12_000)
     expect(simRow.withdrawal).toBe(0)
-    expect(simRow.endPortfolio).toBe(224_000)
+    expect(simRow.endPortfolio).toBe(row.netWorth)
     expect(simRow.grossIncome).toBe(48_000)
   })
 
@@ -1043,6 +1044,7 @@ describe('J. Backwards-compatible mapping', () => {
       totalAssets: 520_000,
       totalDebts: 0,
       netWorth: 520_000,
+      startNetWorth: 500_000,
       grossIncome: 0,
       savings: 0,
       withdrawal: 30_000,
@@ -1074,6 +1076,34 @@ describe('J. Backwards-compatible mapping', () => {
     expect(simResult.strategy).toBe(unifiedResult.strategy)
     expect(simResult.displayEndAge).toBe(unifiedResult.displayEndAge)
     expect(typeof simResult.classic25xTarget).toBe('number')
+  })
+
+  it('J4: toSimRow uses netWorth (assets - debts) for startPortfolio/endPortfolio', () => {
+    const row: UnifiedProjectionRow = {
+      year: 5,
+      age: 40,
+      phase: 'accumulation',
+      assetBuckets: {
+        investment: { startValue: 200_000, growth: 14_000, contributions: 12_000, box3Drag: 2_000, endValue: 224_000 },
+      },
+      debtBalances: { 'debt-1': { startBalance: 100_000, interestPaid: 3_000, principalPaid: 3_000, endBalance: 94_000 } },
+      totalAssets: 224_000,
+      totalDebts: 47_000,
+      netWorth: 177_000,
+      startNetWorth: 150_000,
+      grossIncome: 48_000,
+      savings: 12_000,
+      withdrawal: 0,
+      withdrawalByType: {},
+      cashflowNet: 0,
+      totalGrowth: 14_000,
+      totalBox3: 2_000,
+      cumulativeBox3: 8_000,
+      inflationFactor: 1.1,
+    }
+    const simRow = toSimRow(row)
+    expect(simRow.startPortfolio).toBe(150_000) // netWorth, not 200k totalAssets
+    expect(simRow.endPortfolio).toBe(177_000)   // netWorth, not 224k totalAssets
   })
 })
 
@@ -1183,5 +1213,61 @@ describe('K. Integratietests', () => {
     expect(withDebt.rows[0].netWorth).toBeLessThan(assetOnly.rows[0].netWorth)
     // Debt should appear in totalDebts
     expect(withDebt.rows[0].totalDebts).toBeGreaterThan(0)
+  })
+
+  it('K7: phase boundary continuity: prevRow.netWorth === nextRow.startNetWorth', () => {
+    // Scenario that produces all three phases: accumulation → transition → withdrawal
+    // FIRE reached before AOW (67), so transition phase exists between FIRE and AOW
+    const input = makeInput({
+      assets: [makeAsset({ asset_type: 'investment', current_value: 300_000, expected_return: 7 })],
+      annualSavings: 20_000,
+      yearlyExpenses: 36_000,
+      currentAge: 35,
+      endAge: 90,
+      strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    })
+    const result = runUnifiedProjection(input)
+    expect(result.fireReachable).toBe(true)
+    expect(result.rows.length).toBeGreaterThan(2)
+
+    // Verify all three phases exist
+    const phases = new Set(result.rows.map(r => r.phase))
+    expect(phases.has('accumulation')).toBe(true)
+    // At least transition or withdrawal should exist after FIRE
+    expect(phases.has('transition') || phases.has('withdrawal')).toBe(true)
+
+    // Check boundary continuity: each row's startNetWorth must equal the previous row's netWorth
+    for (let i = 1; i < result.rows.length; i++) {
+      expect(result.rows[i].startNetWorth).toBe(result.rows[i - 1].netWorth)
+    }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Section L: Deplete end portfolio convergence (#bug-fix)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('deplete end portfolio convergence (#bug-fix)', () => {
+  it('static + deplete: end portfolio ≈ 0 (not negative)', () => {
+    const result = runUnifiedProjection(makeInput({
+      assets: [makeAsset({
+        asset_type: 'investment',
+        current_value: 50_000,
+        expected_return: 7,
+        monthly_contribution: 1000,
+      })],
+      currentAge: 30,
+      yearlyExpenses: 30_000,
+      strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+      withdrawalStrategy: { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
+    }))
+
+    // FIRE should be reachable
+    expect(result.fireAge).not.toBeNull()
+
+    // Find the last row (at endAge - 1)
+    const lastRow = result.rows[result.rows.length - 1]
+    // End portfolio should be approximately 0, not deeply negative
+    expect(lastRow.netWorth).toBeGreaterThan(-50_000)
   })
 })

@@ -300,6 +300,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         totalAssets: 148_100,
         totalDebts: 0,
         netWorth: 148_100,
+        startNetWorth: 130_000,
         grossIncome: 60_000,
         savings: 12_000,
         withdrawal: 0,
@@ -319,7 +320,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
       expect(simRow.savings).toBe(12_000)
       expect(simRow.withdrawal).toBe(0)
       expect(simRow.cashflowNet).toBe(0)
-      expect(simRow.endPortfolio).toBe(148_100) // 117.5K + 30.6K
+      expect(simRow.endPortfolio).toBe(148_100) // netWorth (assets - debts)
       expect(simRow.grossIncome).toBe(60_000)
     })
 
@@ -328,7 +329,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         year: 10, age: 55, phase: 'transition',
         assetBuckets: { investment: { startValue: 500_000, growth: 35_000, contributions: 0, box3Drag: 8_000, endValue: 527_000 } },
         debtBalances: {},
-        totalAssets: 527_000, totalDebts: 0, netWorth: 527_000,
+        totalAssets: 527_000, totalDebts: 0, netWorth: 527_000, startNetWorth: 500_000,
         grossIncome: 0, savings: 0, withdrawal: 0, withdrawalByType: {}, cashflowNet: 0,
         totalGrowth: 35_000, totalBox3: 8_000, cumulativeBox3: 50_000,
         inflationFactor: 1.22,
@@ -341,7 +342,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         year: 20, age: 65, phase: 'withdrawal',
         assetBuckets: { investment: { startValue: 800_000, growth: 56_000, contributions: 0, box3Drag: 12_000, endValue: 812_000 } },
         debtBalances: {},
-        totalAssets: 812_000, totalDebts: 0, netWorth: 812_000,
+        totalAssets: 812_000, totalDebts: 0, netWorth: 812_000, startNetWorth: 800_000,
         grossIncome: 20_000, savings: 0, withdrawal: 32_000, withdrawalByType: { investment: 32_000 }, cashflowNet: 0,
         totalGrowth: 56_000, totalBox3: 12_000, cumulativeBox3: 150_000,
         inflationFactor: 1.49,
@@ -1161,9 +1162,10 @@ describe('Unified Projection — Fase 1d: Life events integratie', () => {
       const nwWithout = resultWithout.rows.find(r => r.age === 50)!.netWorth
       expect(nwWith).toBeLessThan(nwWithout)
 
-      // The difference should be significant (>€15k from lost income + costs)
+      // The difference should be significant (>€14k from lost income + costs)
       // €5500×12 + €5000 = €71K gross, but reduced by different FIRE timing effects
-      expect(nwWithout - nwWith).toBeGreaterThan(15_000)
+      // and heffingsvrij-corrected Box 3 drag
+      expect(nwWithout - nwWith).toBeGreaterThan(14_000)
     })
 
     it('sabbatical effect is tijdelijk — na sabbatical herstelt cashflowNet', () => {

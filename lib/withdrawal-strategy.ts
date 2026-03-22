@@ -174,6 +174,14 @@ function applyStatic(ctx: WithdrawalContext): number {
     return Math.max(annuityWithdrawal, netBaseExpenses)
   }
 
+  // Legacy: deplete the surplus above the indexed legacy target via annuity formula.
+  // computeAnnuityBase already subtracts legacyAmount from availablePortfolio,
+  // so the annuity depletes only the excess to ≈€0 by endAge while preserving the legacy.
+  if (ctx.endStrategy === 'legacy') {
+    const annuity = computeAnnuityBase(ctx)
+    return Math.max(annuity, netBaseExpenses)
+  }
+
   return netBaseExpenses
 }
 
@@ -375,19 +383,14 @@ function applyBucket(
 ): number {
   const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
 
-  // Initialize buckets if not provided
-  const state = bucketState ?? initBucketState(ctx.currentPortfolio, ctx.baseExpenses)
+  // Bucket strategy: withdraw only net living expenses, regardless of end strategy.
+  // Unlike static (which uses annuity for deplete/legacy to force depletion),
+  // bucket manages risk through allocation (cash → bonds → stocks buffer),
+  // not by adjusting withdrawal amounts. In a deterministic model, this means
+  // bucket may end with surplus (deplete) or exceed target (legacy) — this is
+  // intentionally more conservative than static.
+  void bucketState // bucket allocation tracked externally via waterfallWithdraw
 
-  // Bucket strategy determines *which assets* to sell (cash → bonds → stocks),
-  // but the total withdrawal amount equals full net expenses.
-  // In a deterministic simulation (single expected return), the bucket allocation
-  // affects risk/volatility but not expected withdrawal amounts.
-  // For binary search convergence, the portfolio must be allowed to go negative
-  // (same as static), so we do NOT cap at available bucket balance.
-  // The bucket structure matters for stochastic (Monte Carlo) simulations,
-  // where the cash/bonds buffer absorbs volatility — this is a known limitation
-  // of the deterministic model.
-  void state // used in stochastic extensions
   return Math.max(0, netBaseExpenses)
 }
 

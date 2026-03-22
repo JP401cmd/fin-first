@@ -11,7 +11,7 @@ import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementEx
 import { ageAtDate, type LifeEvent } from '@/lib/horizon-data'
 import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
-import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
+import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { resolveWithdrawalStrategy, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Budget } from '@/lib/budget-data'
@@ -31,7 +31,7 @@ import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/
 import { BucketProjectionChart } from '@/components/app/bucket-projection-chart'
 import { BucketProjectionTable } from '@/components/app/bucket-projection-table'
 import { type BucketProjectionResult } from '@/lib/bucket-projection'
-import { runUnifiedProjection, unifiedToBucketResult } from '@/lib/unified-projection'
+import { runUnifiedProjection, unifiedToBucketResult, toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
@@ -897,7 +897,28 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       } catch { /* fallback to profile data */ }
       const simFireParams = resolveFireParams(profileResult.data ?? {})
       const wsConfig = resolveWithdrawalStrategy(profileResult.data ?? {})
-      const simResult = runSimulation(currentAge, fireStrategy.endAge, data.netWorth, yearlyExp, annualSavings, simFireParams.grossReturn, 'nl_box3', simFireParams.inflationRate, cashflows, fireStrategy, wsConfig)
+      // Use runUnifiedProjection with real assets for consistent doelbedrag with horizon page
+      const unifiedInput: UnifiedProjectionInput = {
+        assets: fullAssets ?? [],
+        debts: fullDebts ?? [],
+        currentAge,
+        endAge: fireStrategy.endAge,
+        yearlyExpenses: yearlyExp,
+        annualSavings,
+        monthlySurplus: annualSavings / 12,
+        monthlyIncome: rawFinancials?.monthlyIncome ?? 0,
+        incomeGrowthRate: 0,
+        grossReturn: simFireParams.grossReturn,
+        inflationRate: simFireParams.inflationRate,
+        box3Method: simFireParams.box3Method,
+        cashflows,
+        strategyConfig: fireStrategy,
+        withdrawalStrategy: wsConfig,
+        hasPartner: !!householdOverrides,
+        bankAccountCash: coreUnlinkedCash,
+      }
+      const unifiedResult = runUnifiedProjection(unifiedInput)
+      const simResult = toSimResult(unifiedResult)
       if (simResult.requiredFirePortfolio > 0) setCoreSimTarget(simResult.requiredFirePortfolio)
       // Store strategy options so computeCoreData fallback is also strategy-aware
       const realReturn = (1 + simFireParams.grossReturn) / (1 + simFireParams.inflationRate) - 1

@@ -103,6 +103,8 @@ export interface UnifiedProjectionRow {
   totalDebts: number
   /** Netto vermogen (totalAssets - totalDebts) */
   netWorth: number
+  /** Netto vermogen aan het BEGIN van het jaar (totalAssets - totalDebts vóór mutaties) */
+  startNetWorth: number
 
   // ── Kasstromen ────────────────────────────────────────────
   /** Bruto inkomen dit jaar (salaris + extra inkomsten) */
@@ -709,49 +711,34 @@ export function computeWeightedDebtTotal(
  * Converteer een UnifiedProjectionRow naar een legacy SimRow.
  *
  * Alle bestaande SimRow velden zijn afleidbaar uit de UnifiedProjectionRow:
- * - startPortfolio → totalAssets (begin van jaar)
+ * - startPortfolio → startNetWorth (netto vermogen begin van jaar)
  * - growth → totalGrowth
  * - savings → savings
  * - withdrawal → withdrawal
  * - cashflowNet → cashflowNet
- * - endPortfolio → totalAssets (einde van jaar, na alle mutaties)
+ * - endPortfolio → netWorth (netto vermogen einde van jaar)
  * - grossIncome → grossIncome
  * - grossExpenses → yearlyExpenses afgeleid uit withdrawal + savings context
  * - phase → 'accumulation' | 'retirement' (transition → accumulation voor legacy)
  * - age → age
  */
 export function toSimRow(row: UnifiedProjectionRow): SimRow {
-  // Bereken startPortfolio als som van alle asset bucket startValues
-  const startPortfolio = Object.values(row.assetBuckets).reduce(
-    (sum, bucket) => sum + (bucket?.startValue ?? 0),
-    0,
-  )
-
-  // Bereken endPortfolio als som van alle asset bucket endValues
-  const endPortfolio = Object.values(row.assetBuckets).reduce(
-    (sum, bucket) => sum + (bucket?.endValue ?? 0),
-    0,
-  )
-
-  // Map phase: transition → accumulation voor legacy SimRow (kent alleen 2 fases)
   const legacyPhase: 'accumulation' | 'retirement' =
     row.phase === 'withdrawal' ? 'retirement' : 'accumulation'
 
-  // grossExpenses: in accumulation = 0 (savings al apart), in retirement = withdrawal
-  // Dit matcht het bestaande SimRow patroon waar grossExpenses de jaarlijkse kosten zijn
   const grossExpenses = row.phase === 'withdrawal'
-    ? row.withdrawal + row.savings  // savings is negatief in withdrawal, maar typisch 0
+    ? row.withdrawal + row.savings
     : row.grossIncome - row.savings - row.cashflowNet
 
   return {
     age: row.age,
     phase: legacyPhase,
-    startPortfolio,
+    startPortfolio: row.startNetWorth,
     growth: row.totalGrowth,
     savings: row.savings,
     withdrawal: row.withdrawal,
     cashflowNet: row.cashflowNet,
-    endPortfolio,
+    endPortfolio: row.netWorth,
     grossIncome: row.grossIncome,
     grossExpenses,
   }
@@ -978,13 +965,20 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     if (totalValue <= 0) return grossReturn
 
     let weightedReturn = 0
-    let weightedDrag = 0
     for (const b of buckets) {
       const w = b.value / totalValue
       weightedReturn += w * b.annualReturn
-      weightedDrag += w * b.rawDragRate
     }
-    return weightedReturn - weightedDrag
+
+    // Use effective drag after heffingsvrij correction (not raw rates)
+    const bucketValues = buckets.map(b => b.value)
+    const rawDragRates = buckets.map(b => b.rawDragRate)
+    const categories = buckets.map(b => b.category)
+    const effectiveDragAmounts = applyHeffingsvrij(bucketValues, rawDragRates, categories, hasPartner)
+    const totalDrag = effectiveDragAmounts.reduce((s, d) => s + d, 0)
+    const effectiveDragRate = totalValue > 0 ? totalDrag / totalValue : 0
+
+    return weightedReturn - effectiveDragRate
   }
 
   /**
@@ -1006,6 +1000,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     simEndAge: number,
   ): number {
     let portfolio = startNetWorth
+    let previousWithdrawal = 0
 
     for (let age = startAge; age < simEndAge; age++) {
       // Apply one-time cashflows before growth
@@ -1022,20 +1017,27 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         recurringNet += recurringMonthly(cf, age) * 12
       }
 
-      // Static withdrawal for binary search convergence — no endStrategy
-      // to avoid annuity interference; the simulation horizon handles deplete vs perpetual.
+      // Use the user's actual withdrawal strategy for binary search convergence.
+      // This ensures the FIRE target accounts for strategy-specific withdrawal patterns
+      // (e.g., guardrails ±20%, VPW portfolio-based %). previousWithdrawal is tracked
+      // across years so guardrails can apply prosperity/capital preservation rules.
       const wCtx: WithdrawalContext = {
         baseExpenses: expensesThisYear,
         recurringIncome: recurringNet,
         currentPortfolio: portfolio,
         startPortfolio: startNetWorth,
-        previousWithdrawal: 0,
+        previousWithdrawal,
         yearReturn: portReturn,
         yearsIntoRetirement: yearsIntoPension,
         currentAge: age,
         endAge: simEndAge,
+        endStrategy: strategy,
+        legacyAmount: strategy === 'legacy'
+          ? legacyAmount * Math.pow(1 + inflationRate, simEndAge - currentAge)
+          : undefined,
       }
-      const withdrawal = applyWithdrawalStrategy(WITHDRAWAL_DEFAULTS, wCtx)
+      const withdrawal = applyWithdrawalStrategy(wsConfig, wCtx)
+      previousWithdrawal = withdrawal
 
       const growth = portfolio * portReturn
       portfolio = portfolio + growth - withdrawal
@@ -1072,7 +1074,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
    *
    * Uses static withdrawal and lightweight simulation for convergence.
    */
-  function requiredAt(candidateFireAge: number): number {
+  function requiredAt(candidateFireAge: number, netReturn?: number): number {
     const verifyEndAge = strategy === 'perpetual'
       ? candidateFireAge + 100
       : effectiveEndAge
@@ -1091,7 +1093,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
 
     for (let iter = 0; iter < 80; iter++) {
       const mid = (lo + hi) / 2
-      const ep = simulateDecumulationLightweight(mid, candidateFireAge, avgNetReturn, verifyEndAge)
+      const ep = simulateDecumulationLightweight(mid, candidateFireAge, netReturn ?? avgNetReturn, verifyEndAge)
 
       if (strategy === 'legacy') {
         if (ep >= indexedLegacy) hi = mid; else lo = mid
@@ -1158,7 +1160,8 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
             }])),
             runningDebts,
           )
-      const req = requiredAt(age)
+      const currentNetReturn = computeAverageNetReturn(runningBuckets)
+      const req = requiredAt(age, currentNetReturn)
       if (currentNetWorth >= req) {
         computedFireAge = age
         break
@@ -1226,6 +1229,18 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     // Compute debt schedule
     const { debtBalances } = computeYearlyDebtSchedule(runningDebts)
 
+    // Compute start-of-year net worth from bucket start values and debt start balances
+    let startTotalAssets = 0
+    for (const detail of Object.values(assetBuckets)) {
+      if (detail) startTotalAssets += detail.startValue
+    }
+    let startTotalDebts = 0
+    for (const rd of runningDebts) {
+      const db = debtBalances[rd.debtId]
+      if (db) startTotalDebts += db.startBalance * (rd.netWorthInclusionPct / 100)
+    }
+    const startNetWorth = startTotalAssets - startTotalDebts
+
     // Aggregate totals
     let totalGrowth = 0
     let totalBox3 = 0
@@ -1250,6 +1265,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       totalAssets: Math.round(totalAssets),
       totalDebts: Math.round(totalDebtsValue),
       netWorth: Math.round(netWorth),
+      startNetWorth: Math.round(startNetWorth),
       grossIncome: Math.round(annualSavings + yearlyExpenses),
       savings: Math.round(annualSavings),
       withdrawal: 0,
@@ -1299,14 +1315,22 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         runningDebts,
       )
 
-  const requiredFirePortfolioExact = requiredAt(computedFireAge)
+  // Recalculate weighted average return at FIRE age (#521)
+  // After accumulation, the asset mix may have shifted significantly
+  // (e.g., from 50/50 sparen/beleggen to 90/10 beleggen/sparen).
+  // Use actual bucket values at FIRE age for a more accurate decumulation return.
+  // Computed here (before FIRE year splitting) because proportional scaling
+  // does not change the weighted-average return ratio.
+  const avgNetReturnAtFire = computeAverageNetReturn(runningBuckets)
+
+  const requiredFirePortfolioExact = requiredAt(computedFireAge, avgNetReturnAtFire)
   const requiredFirePortfolio = Math.round(requiredFirePortfolioExact)
 
   let fractionalFireAge: number
   if (computedFireAge === currentAge) {
     fractionalFireAge = currentAge
   } else {
-    const reqStart = requiredAt(computedFireAge - 1)
+    const reqStart = requiredAt(computedFireAge - 1, avgNetReturnAtFire)
     const reqEnd = requiredFirePortfolioExact
     const portDiff = currentNetWorth - netWorthPreFire
     const reqDiff = reqEnd - reqStart
@@ -1315,11 +1339,32 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     fractionalFireAge = (computedFireAge - 1) + Math.max(0, Math.min(1, t))
   }
 
-  // ── Recalculate weighted average return at FIRE age (#521) ────────
-  // After accumulation, the asset mix may have shifted significantly
-  // (e.g., from 50/50 sparen/beleggen to 90/10 beleggen/sparen).
-  // Use actual bucket values at FIRE age for a more accurate decumulation return.
-  const avgNetReturnAtFire = computeAverageNetReturn(runningBuckets)
+  // ── FIRE year splitting: prorate the last accumulation year ──────
+  // The last accumulation year includes full growth + savings for the entire year,
+  // but FIRE occurs partway through (at fraction t). Interpolate to get the
+  // portfolio value at the fractional FIRE point and remove the excess — this
+  // covers both excess savings AND excess growth, not just savings alone.
+  if (computedFireAge > currentAge && accRows.length > 0) {
+    const t = fractionalFireAge - (computedFireAge - 1)
+    // Interpolated portfolio at the fractional FIRE point
+    const firePortfolio = netWorthPreFire + t * (currentNetWorth - netWorthPreFire)
+    const excess = Math.round(currentNetWorth - firePortfolio)
+    if (excess > 0) {
+      const lastRow = accRows[accRows.length - 1]
+      lastRow.savings = Math.round(annualSavings * t)
+      lastRow.totalGrowth = Math.round(lastRow.totalGrowth * t)
+      lastRow.netWorth -= excess
+      lastRow.totalAssets -= excess
+
+      // Scale running buckets proportionally so decumulation starts from correct portfolio
+      const totalBucketValue = sumBucketValues(runningBuckets)
+      if (totalBucketValue > 0) {
+        for (const b of runningBuckets) {
+          b.value -= excess * (Math.max(0, b.value) / totalBucketValue)
+        }
+      }
+    }
+  }
 
   // ── Phase 2 & 3: Decumulation from fireAge ────────────────────────
   // Generate full rows with per-bucket detail and withdrawal strategy
@@ -1339,6 +1384,13 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
   for (let age = computedFireAge; age < displayEndAge; age++) {
     const year = age - currentAge
     const yearsIntoPension = age - computedFireAge
+
+    // Capture true start-of-year net worth BEFORE any activity (cashflows/withdrawals/growth)
+    let trueStartAssets = 0
+    for (const b of runningBuckets) trueStartAssets += Math.max(0, b.value)
+    let trueStartDebts = 0
+    for (const rd of runningDebts) trueStartDebts += rd.balance * (rd.netWorthInclusionPct / 100)
+    const trueStartNetWorth = trueStartAssets - trueStartDebts
 
     // During decumulation, no new savings contributions — the person is retired.
     // Reset all bucket contributions to 0 (not to original monthly_contribution).
@@ -1446,6 +1498,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       totalAssets: Math.round(totalAssets),
       totalDebts: Math.round(totalDebtsValue),
       netWorth: Math.round(netWorth),
+      startNetWorth: Math.round(trueStartNetWorth),
       grossIncome: Math.round(recurringIncome),
       savings: 0,
       withdrawal: Math.round(withdrawal),
@@ -1473,7 +1526,9 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     fireAge: computedFireAge,
     fireAgeFractional: fractionalFireAge,
     fireReachable: true,
-    firePortfolioAtFire: Math.round(currentNetWorth),
+    firePortfolioAtFire: accRows.length > 0
+      ? accRows[accRows.length - 1].netWorth
+      : Math.round(currentNetWorth),
     requiredFirePortfolio,
     implicitWithdrawalRate,
     strategy,

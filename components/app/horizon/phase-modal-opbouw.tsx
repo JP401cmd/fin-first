@@ -214,13 +214,13 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   const totalBox3 = accumulationRows.reduce((sum, r) => sum + r.totalBox3, 0)
   const totalEvents = accumulationRows.reduce((sum, r) => sum + r.cashflowNet, 0)
 
-  // Start value: sum of all bucket startValues from first row
+  // Start value: net worth at beginning of first accumulation year (assets - debts)
   const startVermogen = accumulationRows.length > 0
-    ? Object.values(accumulationRows[0].assetBuckets).reduce((sum, b) => sum + ((b as AssetBucketDetail)?.startValue ?? 0), 0)
+    ? accumulationRows[0].startNetWorth
     : currentNetWorth
-  // End value: totalAssets of last row
+  // End value: net worth at end of last accumulation year (assets - debts)
   const eindVermogen = accumulationRows.length > 0
-    ? accumulationRows[accumulationRows.length - 1].totalAssets
+    ? accumulationRows[accumulationRows.length - 1].netWorth
     : expectedPortfolioAtFire
 
   // ── Rendement per wealthgroup ──────────────────────────────────────────
