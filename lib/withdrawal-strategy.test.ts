@@ -121,6 +121,138 @@ describe('static strategy', () => {
   })
 })
 
+// ── Static + Deplete (Annuity) ───────────────────────────────────────
+
+describe('static strategy with deplete endStrategy', () => {
+  const config = makeConfig({ strategy: 'static' })
+
+  it('uses annuity formula when endStrategy is deplete', () => {
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'deplete',
+    }))
+    // Annuity: 1_000_000 * 0.05 / (1 - (1.05)^(-23)) ≈ 74_137
+    // This is > baseExpenses (40_000), so annuity is used
+    expect(result).toBeGreaterThan(40_000)
+    expect(result).toBeCloseTo(74_137, -2) // within ~100
+  })
+
+  it('annuity covers at least baseExpenses even with small portfolio', () => {
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 200_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'deplete',
+    }))
+    // Annuity: 200_000 * 0.05 / (1 - (1.05)^(-23)) = ~14_683
+    // baseExpenses (40_000) > annuity → use baseExpenses
+    expect(result).toBe(40_000)
+  })
+
+  it('last year withdraws entire portfolio when endStrategy is deplete', () => {
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 500_000,
+      yearReturn: 0.05,
+      currentAge: 89,
+      endAge: 90,
+      endStrategy: 'deplete',
+    }))
+    // n=1, last year: withdraw entire portfolio (500k > 40k)
+    expect(result).toBe(500_000)
+  })
+
+  it('handles zero return correctly in deplete mode', () => {
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 900_000,
+      yearReturn: 0,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'deplete',
+    }))
+    // r≈0: simple division, 900_000 / 23 = ~39_130
+    // baseExpenses (40_000) > annuity → use baseExpenses
+    expect(result).toBe(40_000)
+  })
+
+  it('depletes portfolio to ≈€0 at endAge when simulated over all years', () => {
+    let portfolio = 1_000_000
+    const expenses = 40_000
+    const r = 0.05
+    const startAge = 67
+    const endAge = 90
+
+    for (let age = startAge; age < endAge; age++) {
+      const inflatedExpenses = expenses * Math.pow(1.02, age - startAge)
+      const w = applyWithdrawalStrategy(config, makeCtx({
+        baseExpenses: inflatedExpenses,
+        recurringIncome: 0,
+        currentPortfolio: portfolio,
+        yearReturn: r,
+        currentAge: age,
+        endAge,
+        endStrategy: 'deplete',
+      }))
+      portfolio = portfolio * (1 + r) - w
+    }
+    // Portfolio should be approximately €0 at endAge
+    expect(Math.abs(portfolio)).toBeLessThan(5_000) // within €5k tolerance
+  })
+
+  it('perpetual endStrategy uses classic static (no annuity)', () => {
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'perpetual',
+    }))
+    // No annuity, classic static: max(0, 40_000 - 0) = 40_000
+    expect(result).toBe(40_000)
+  })
+
+  it('undefined endStrategy uses classic static (backwards compatible)', () => {
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      // endStrategy not set
+    }))
+    expect(result).toBe(40_000)
+  })
+
+  it('deplete annuity accounts for recurringIncome correctly', () => {
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 15_000,
+      currentPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'deplete',
+    }))
+    // Annuity: ~73_414 from portfolio, net base = 25_000
+    // max(73_414, 25_000) = 73_414
+    expect(result).toBeGreaterThan(25_000)
+  })
+})
+
 // ── Guardrails Strategy ──────────────────────────────────────────────
 
 describe('guardrails strategy', () => {

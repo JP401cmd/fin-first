@@ -246,6 +246,7 @@ export function runSimulation(
         yearsIntoRetirement: yearsIntoPension,
         currentAge: age,
         endAge: simEndAge,
+        endStrategy: strategy,
       }
       const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
 

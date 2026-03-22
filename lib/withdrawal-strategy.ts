@@ -50,6 +50,8 @@ export interface WithdrawalContext {
   currentAge: number
   /** Eindleeftijd (voor VPW resterende-jaren berekening) */
   endAge: number
+  /** FIRE eindstrategie — bij 'deplete' gebruikt applyStatic annuïteitsonttrekking */
+  endStrategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
 }
 
 /** State for bucket strategy — tracks allocation across 3 buckets */
@@ -134,11 +136,43 @@ export function applyWithdrawalStrategy(
 // ── Static ───────────────────────────────────────────────────────────
 
 /**
- * Static withdrawal: exact replication of current simulateDecumulation logic.
- * withdrawal = max(0, baseExpenses - recurringIncome)
+ * Static withdrawal: base logic = max(0, baseExpenses - recurringIncome).
+ *
+ * When endStrategy === 'deplete', uses annuity formula to ensure the portfolio
+ * depletes to ≈€0 at endAge:
+ *   annuity = portfolio × r / (1 − (1+r)^(−n))
+ * where n = remaining years, r = real return (yearReturn).
+ *
+ * The final withdrawal is max(annuityWithdrawal, baseExpenses - recurringIncome)
+ * so that at minimum the living expenses are covered.
+ *
+ * For perpetual, legacy, pensioen, or when endStrategy is not set,
+ * the classic static withdrawal is used (backwards compatible).
  */
 function applyStatic(ctx: WithdrawalContext): number {
-  return Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
+  const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
+
+  if (ctx.endStrategy === 'deplete') {
+    const n = Math.max(1, ctx.endAge - ctx.currentAge)
+    const r = ctx.yearReturn
+
+    let annuityWithdrawal: number
+    if (n <= 1) {
+      // Last year: withdraw everything
+      annuityWithdrawal = ctx.currentPortfolio
+    } else if (Math.abs(r) < 1e-10) {
+      // Zero return: simple equal division
+      annuityWithdrawal = ctx.currentPortfolio / n
+    } else {
+      // Annuity formula: P × r / (1 − (1+r)^(−n))
+      annuityWithdrawal = ctx.currentPortfolio * r / (1 - Math.pow(1 + r, -n))
+    }
+
+    // Ensure at least the living expenses are covered (net of recurring income)
+    return Math.max(annuityWithdrawal, netBaseExpenses)
+  }
+
+  return netBaseExpenses
 }
 
 // ── Guardrails (Guyton-Klinger) ──────────────────────────────────────

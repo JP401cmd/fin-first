@@ -1013,6 +1013,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         yearsIntoRetirement: yearsIntoPension,
         currentAge: age,
         endAge: simEndAge,
+        endStrategy: strategy,
       }
       const withdrawal = applyWithdrawalStrategy(WITHDRAWAL_DEFAULTS, wCtx)
 
@@ -1323,6 +1324,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       yearsIntoRetirement: yearsIntoPension,
       currentAge: age,
       endAge: strategy === 'perpetual' ? computedFireAge + 100 : effectiveEndAge,
+      endStrategy: strategy,
     }
     const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
 
