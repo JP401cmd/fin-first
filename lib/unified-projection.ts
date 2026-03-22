@@ -1059,9 +1059,12 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
 
       if (strategy === 'legacy') {
         if (ep >= indexedLegacy) hi = mid; else lo = mid
+      } else if (strategy === 'perpetual') {
+        // perpetual: koopkracht behouden — endPortfolio moet geïndexeerd startportfolio dekken
+        const indexedTarget = mid * Math.pow(1 + inflationRate, verifyEndAge - candidateFireAge)
+        if (ep >= indexedTarget) hi = mid; else lo = mid
       } else {
         // deplete: endPortfolio >= 0 at endAge
-        // perpetual: endPortfolio >= 0 at fireAge+100
         if (ep >= 0) hi = mid; else lo = mid
       }
       if (hi - lo < 10) break
@@ -1219,7 +1222,11 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       requiredFirePortfolio: input.skipFireDetection ? 0 : Math.round(requiredAt(effectiveEndAge - 1)),
       implicitWithdrawalRate: 0,
       strategy,
-      targetEndPortfolio: strategy === 'legacy' ? legacyAmount : 0,
+      targetEndPortfolio: strategy === 'legacy'
+        ? legacyAmount
+        : strategy === 'perpetual'
+          ? Math.round(requiredAt(effectiveEndAge - 1) * Math.pow(1 + inflationRate, effectiveEndAge - currentAge))
+          : 0,
       displayEndAge,
     }
   }
@@ -1399,7 +1406,9 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     strategy,
     targetEndPortfolio: strategy === 'legacy'
       ? Math.round(legacyAmount * Math.pow(1 + inflationRate, effectiveEndAge - currentAge))
-      : 0,
+      : strategy === 'perpetual'
+        ? Math.round(requiredFirePortfolioExact * Math.pow(1 + inflationRate, displayEndAge - computedFireAge))
+        : 0,
     displayEndAge,
   }
 }

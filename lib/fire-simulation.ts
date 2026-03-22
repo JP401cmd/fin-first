@@ -325,9 +325,12 @@ export function runSimulation(
 
       if (strategy === 'legacy') {
         if (ep >= indexedLegacy) hi = mid; else lo = mid
+      } else if (strategy === 'perpetual') {
+        // perpetual: koopkracht behouden — endPortfolio moet geïndexeerd startportfolio dekken
+        const indexedTarget = mid * Math.pow(1 + inflation, verifyEndAge - candidateFireAge)
+        if (ep >= indexedTarget) hi = mid; else lo = mid
       } else {
         // deplete: endPortfolio >= 0 at endAge
-        // perpetual: endPortfolio >= 0 at fireAge+100 (effectively perpetual)
         if (ep >= 0) hi = mid; else lo = mid
       }
       if (hi - lo < 10) break
@@ -424,7 +427,11 @@ export function runSimulation(
       implicitWithdrawalRate: 0,
       classic25xTarget,
       strategy,
-      targetEndPortfolio: strategy === 'legacy' ? legacyAmount : 0,
+      targetEndPortfolio: strategy === 'legacy'
+        ? legacyAmount
+        : strategy === 'perpetual'
+          ? Math.round(requiredAt(effectiveEndAge - 1) * Math.pow(1 + inflation, effectiveEndAge - currentAge))
+          : 0,
       displayEndAge,
     }
   }
@@ -478,7 +485,9 @@ export function runSimulation(
     strategy,
     targetEndPortfolio: strategy === 'legacy'
       ? Math.round(legacyAmount * Math.pow(1 + inflation, effectiveEndAge - currentAge))
-      : 0,
+      : strategy === 'perpetual'
+        ? Math.round(requiredFirePortfolioExact * Math.pow(1 + inflation, displayEndAge - computedFireAge))
+        : 0,
     displayEndAge,
   }
 }

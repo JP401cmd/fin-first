@@ -403,8 +403,8 @@ export const SimChart = memo(function SimChart({
           </>
         )}
 
-        {/* Legacy target — horizontal dashed line at target portfolio value (hidden in pensioen mode) */}
-        {!isPensioenMode && strategy === 'legacy' && targetEndPortfolio != null && targetEndPortfolio > 0 && (
+        {/* Legacy/Perpetual target — horizontal dashed line at target portfolio value (hidden in pensioen mode) */}
+        {!isPensioenMode && (strategy === 'legacy' || strategy === 'perpetual') && targetEndPortfolio != null && targetEndPortfolio > 0 && (
           <>
             <line
               x1={PAD.left} x2={PAD.left + innerW}
@@ -416,7 +416,7 @@ export const SimChart = memo(function SimChart({
               fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
               fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
             >
-              erfenis {targetEndPortfolio >= 1_000_000
+              {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'} {targetEndPortfolio >= 1_000_000
                 ? `€${(targetEndPortfolio / 1_000_000).toFixed(1)}M`
                 : `€${Math.round(targetEndPortfolio / 1000)}k`}
             </text>
