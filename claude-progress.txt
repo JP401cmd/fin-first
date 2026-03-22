@@ -20027,3 +20027,34 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#513, #514)
+
+## Session 2026-03-22 - Features #518, #521
+
+### Feature #518: Fix dubbeltelling inleg tijdens opbouwfase - PASSING
+- CRITICAL BUG: During accumulation, investable assets received contributions twice:
+  1. Per-bucket annualContribution from monthly_contribution × 12
+  2. Proportion of annualSavings (= sum of ALL monthly_contributions × 12) via surplus allocation
+- Fix: surplus now = (annualSavings - totalBaseContributions) + cashflowNet
+  - For real assets: surplus = cashflowNet only (base contributions already allocated per bucket)
+  - For backwards-compatible wrapper (monthly_contribution=0): surplus = full annualSavings + cashflowNet
+- Updated parity tests:
+  - Perpetual strategy: fireAge can exceed input.endAge (extended search to Math.max(endAge, 100))
+  - Decumulation rows: only expected when fireAge < displayEndAge
+- All 90 unified projection tests pass (54 unit + 36 parity)
+- Commit: fcd5d28b
+
+### Feature #521: Gewogen gemiddelde return herberekenen op FIRE-leeftijd - PASSING
+- avgNetReturn was computed from initial asset mix, but after decades the mix shifts
+  (e.g., 50/50 sparen/beleggen → 90/10 beleggen/sparen due to surplus allocation)
+- Added avgNetReturnAtFire = computeAverageNetReturn(runningBuckets) after accumulation loop
+- Decumulation withdrawal context now uses avgNetReturnAtFire instead of avgNetReturn
+- Binary search still uses initial avgNetReturn (acceptable approximation for convergence)
+- All 90 tests pass, zero console errors
+- Commit: d675d492
+
+### Files Modified
+- lib/unified-projection.ts — both fixes
+- test/unified-projection-parity.test.ts — adjusted test expectations for perpetual strategy
+
+### Current Status
+- 2 features completed this session (#518, #521)
