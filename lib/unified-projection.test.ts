@@ -1089,3 +1089,361 @@ describe('Unified Projection — Fase 1c: FIRE-detectie & onttrekkingsstrategie�
     })
   })
 })
+
+// ── Fase 1d: Life events integratie in unified engine ────────────────────────
+
+describe('Unified Projection — Fase 1d: Life events integratie', () => {
+
+  describe('lifeEventsToCashflows hergebruik', () => {
+    it('lifeEventsToCashflows produceert geldige SimCashflow[]', () => {
+      // Verify the function from fire-simulation.ts is directly usable
+      const events = [
+        {
+          id: 'ev-1', user_id: 'test', name: 'AOW', event_type: 'aow',
+          target_age: 67, target_date: '2060-01-01', one_time_cost: 0,
+          monthly_cost_change: 0, monthly_income_change: 1350, duration_months: 0,
+          icon: 'Landmark', is_active: true, sort_order: 0, is_indexed: true,
+          metadata: { leefsituatie: 'alleenstaand' },
+          created_at: '', updated_at: '',
+        },
+      ] as any[]
+      const flows = lifeEventsToCashflows(events)
+      expect(flows.length).toBeGreaterThan(0)
+      expect(flows[0].type).toBe('recurring')
+      expect(flows[0].direction).toBe('income')
+    })
+  })
+
+  describe('sabbatical effect (Lisa op leeftijd 50)', () => {
+    it('sabbatical op leeftijd 50 produceert zichtbaar cashflow-effect', () => {
+      // Lisa-achtig: sabbatical at 50 = -€5500/mnd income for 6 months + €5000 one-time cost
+      const sabbaticalCashflows: SimCashflow[] = [
+        {
+          id: 'sabbatical-income-loss',
+          name: 'Sabbatical (inkomensverlies)',
+          type: 'recurring',
+          direction: 'expense',
+          amount: 5500, // monthly lost income
+          fromAge: 50,
+          toAge: 51, // 1 year (roughly 6 months → rounded up to nearest year)
+          indexed: false,
+        },
+        {
+          id: 'sabbatical-extra-cost',
+          name: 'Sabbatical (extra kosten)',
+          type: 'one_time',
+          direction: 'expense',
+          amount: 5000,
+          fromAge: 50,
+          toAge: 50,
+          indexed: false,
+        },
+      ]
+
+      const resultWithSabbatical = runUnifiedProjection(makeLisaInput({
+        currentAge: 44,
+        cashflows: sabbaticalCashflows,
+      }))
+      const resultWithout = runUnifiedProjection(makeLisaInput({
+        currentAge: 44,
+        cashflows: [],
+      }))
+
+      // Row at age 50 should show negative cashflowNet
+      const sabbaticalRow = resultWithSabbatical.rows.find(r => r.age === 50)
+      expect(sabbaticalRow).toBeDefined()
+      expect(sabbaticalRow!.cashflowNet).toBeLessThan(0)
+
+      // Net worth at 50 should be lower with sabbatical
+      const nwWith = resultWithSabbatical.rows.find(r => r.age === 50)!.netWorth
+      const nwWithout = resultWithout.rows.find(r => r.age === 50)!.netWorth
+      expect(nwWith).toBeLessThan(nwWithout)
+
+      // The difference should be significant (>€15k from lost income + costs)
+      // €5500×12 + €5000 = €71K gross, but reduced by different FIRE timing effects
+      expect(nwWithout - nwWith).toBeGreaterThan(15_000)
+    })
+
+    it('sabbatical effect is tijdelijk — na sabbatical herstelt cashflowNet', () => {
+      const sabbaticalCashflows: SimCashflow[] = [
+        {
+          id: 'sabbatical-cost',
+          name: 'Sabbatical',
+          type: 'recurring',
+          direction: 'expense',
+          amount: 5500,
+          fromAge: 50,
+          toAge: 51,
+          indexed: false,
+        },
+      ]
+
+      const result = runUnifiedProjection(makeInput({
+        cashflows: sabbaticalCashflows,
+      }))
+
+      // At age 50: negative cashflowNet
+      const at50 = result.rows.find(r => r.age === 50)
+      expect(at50).toBeDefined()
+      expect(at50!.cashflowNet).toBeLessThan(0)
+
+      // At age 52: cashflowNet should be 0 (no more sabbatical)
+      const at52 = result.rows.find(r => r.age === 52)
+      if (at52) {
+        expect(at52.cashflowNet).toBe(0)
+      }
+    })
+  })
+
+  describe('AOW cashflow — leeftijd en bedrag', () => {
+    it('AOW alleenstaand start op correcte leeftijd met correct maandbedrag', () => {
+      // NL_AOW_MONTHLY (alleenstaand) ≈ €1350/mnd (from horizon-data.ts)
+      const aowCashflow: SimCashflow = {
+        id: 'aow-alleen',
+        name: 'AOW',
+        type: 'recurring',
+        direction: 'income',
+        amount: 1350, // alleenstaand
+        fromAge: 67,
+        toAge: null,
+        indexed: true,
+      }
+
+      const result = runUnifiedProjection(makeInput({
+        cashflows: [aowCashflow],
+      }))
+
+      // Before age 67: no AOW cashflow
+      const at65 = result.rows.find(r => r.age === 65)
+      if (at65) {
+        expect(at65.cashflowNet).toBe(0)
+      }
+
+      // At age 67: AOW starts — €1350 × 12 = €16.200/jaar
+      const at67 = result.rows.find(r => r.age === 67)
+      if (at67) {
+        // cashflowNet should be approximately €16.200 (indexed slightly)
+        expect(at67.cashflowNet).toBeGreaterThan(15_000)
+        expect(at67.cashflowNet).toBeLessThan(20_000)
+      }
+
+      // At age 70: AOW still active, slightly indexed
+      const at70 = result.rows.find(r => r.age === 70)
+      if (at70) {
+        expect(at70.cashflowNet).toBeGreaterThan(15_000)
+      }
+    })
+
+    it('AOW samenwonend heeft lager bedrag dan alleenstaand', () => {
+      const aowAlleen: SimCashflow = {
+        id: 'aow-alleen',
+        name: 'AOW alleenstaand',
+        type: 'recurring',
+        direction: 'income',
+        amount: 1350,
+        fromAge: 67,
+        toAge: null,
+        indexed: true,
+      }
+      const aowSamen: SimCashflow = {
+        id: 'aow-samen',
+        name: 'AOW samenwonend',
+        type: 'recurring',
+        direction: 'income',
+        amount: 940, // samenwonend
+        fromAge: 67,
+        toAge: null,
+        indexed: true,
+      }
+
+      const resultAlleen = runUnifiedProjection(makeInput({ cashflows: [aowAlleen] }))
+      const resultSamen = runUnifiedProjection(makeInput({ cashflows: [aowSamen] }))
+
+      const cfAlleen = resultAlleen.rows.find(r => r.age === 67)?.cashflowNet ?? 0
+      const cfSamen = resultSamen.rows.find(r => r.age === 67)?.cashflowNet ?? 0
+
+      expect(cfAlleen).toBeGreaterThan(cfSamen)
+    })
+
+    it('AOW cashflow in fase 3 (withdrawal) wordt meegenomen in grossIncome', () => {
+      const aowCashflow: SimCashflow = {
+        id: 'aow-test',
+        name: 'AOW',
+        type: 'recurring',
+        direction: 'income',
+        amount: 1350,
+        fromAge: 67,
+        toAge: null,
+        indexed: true,
+      }
+
+      const result = runUnifiedProjection(makeInput({
+        cashflows: [aowCashflow],
+      }))
+
+      // Find withdrawal phase rows after AOW age
+      const withdrawalRows = result.rows.filter(r => r.phase === 'withdrawal' && r.age >= 67)
+      if (withdrawalRows.length > 0) {
+        // grossIncome should include the AOW amount
+        expect(withdrawalRows[0].grossIncome).toBeGreaterThan(0)
+      }
+    })
+
+    it('indexed cashflows groeien met inflatie', () => {
+      const indexedCf: SimCashflow = {
+        id: 'indexed-income',
+        name: 'Pensioen',
+        type: 'recurring',
+        direction: 'income',
+        amount: 1000, // €1000/mnd starting
+        fromAge: 42, // start immediately
+        toAge: null,
+        indexed: true,
+      }
+
+      const result = runUnifiedProjection(makeInput({
+        cashflows: [indexedCf],
+      }))
+
+      // Year 0 (age 42): €1000 × 12 = €12.000
+      const year0 = result.rows.find(r => r.age === 42)
+      expect(year0).toBeDefined()
+      expect(year0!.cashflowNet).toBeCloseTo(12_000, -2) // within €100
+
+      // Year 10 (age 52): €1000 × (1.02^10) × 12 ≈ €14.570
+      const year10 = result.rows.find(r => r.age === 52)
+      if (year10) {
+        const expectedMonthly = 1000 * Math.pow(1.02, 10)
+        expect(year10.cashflowNet).toBeCloseTo(expectedMonthly * 12, -2)
+      }
+    })
+  })
+
+  describe('erfenis — toevoeging aan beleggingen-bucket', () => {
+    it('erfenis na erfbelasting wordt correct toegevoegd aan beleggingen-bucket', () => {
+      // Simulate a €100.000 inheritance at age 55 (post-tax amount)
+      const erfenisCashflow: SimCashflow = {
+        id: 'erfenis-1',
+        name: 'Erfenis oma',
+        type: 'one_time',
+        direction: 'income',
+        amount: 80_000, // netto na erfbelasting
+        fromAge: 55,
+        toAge: 55,
+        indexed: false,
+      }
+
+      const resultWithErf = runUnifiedProjection(makeInput({
+        cashflows: [erfenisCashflow],
+      }))
+      const resultWithout = runUnifiedProjection(makeInput({
+        cashflows: [],
+      }))
+
+      // At age 55, the inheritance should boost netWorth
+      const nwWith = resultWithErf.rows.find(r => r.age === 55)!.netWorth
+      const nwWithout = resultWithout.rows.find(r => r.age === 55)!.netWorth
+      expect(nwWith).toBeGreaterThan(nwWithout)
+
+      // Difference should be approximately €80K (plus some growth)
+      const diff = nwWith - nwWithout
+      expect(diff).toBeGreaterThan(70_000) // At least €70K after drag
+      expect(diff).toBeLessThan(100_000)   // Not more than inheritance + 1 year growth
+
+      // The cashflowNet at age 55 should include the inheritance
+      const row55 = resultWithErf.rows.find(r => r.age === 55)!
+      expect(row55.cashflowNet).toBeGreaterThan(70_000)
+
+      // Investment bucket should have grown (erfenis goes to investable)
+      const investBucket55 = row55.assetBuckets['investment']
+      const investBucket55Without = resultWithout.rows.find(r => r.age === 55)!.assetBuckets['investment']
+      if (investBucket55 && investBucket55Without) {
+        expect(investBucket55.endValue).toBeGreaterThan(investBucket55Without.endValue)
+      }
+    })
+
+    it('begrafeniskosten (expense) worden correct afgetrokken via waterfall', () => {
+      // Use pensioen mode with forcedFireAge to ensure identical phase structure
+      const begrafenisCashflow: SimCashflow = {
+        id: 'begrafenis-1',
+        name: 'Begrafeniskosten',
+        type: 'one_time',
+        direction: 'expense',
+        amount: 12_000,
+        fromAge: 50,
+        toAge: 50,
+        indexed: false,
+      }
+
+      const baseInput = {
+        strategyConfig: { strategy: 'pensioen' as const, endAge: 90, legacyAmount: 0 },
+        forcedFireAge: NL_AOW_AGE,
+      }
+
+      const resultWith = runUnifiedProjection(makeInput({
+        ...baseInput,
+        cashflows: [begrafenisCashflow],
+      }))
+      const resultWithout = runUnifiedProjection(makeInput({
+        ...baseInput,
+        cashflows: [],
+      }))
+
+      // At age 50: expense should reduce netWorth by ~€12K
+      const nwWith = resultWith.rows.find(r => r.age === 50)!.netWorth
+      const nwWithout = resultWithout.rows.find(r => r.age === 50)!.netWorth
+      expect(nwWithout - nwWith).toBeGreaterThan(10_000)
+      expect(nwWithout - nwWith).toBeLessThan(15_000)
+
+      // cashflowNet at 50 should be negative
+      const row50 = resultWith.rows.find(r => r.age === 50)!
+      expect(row50.cashflowNet).toBeLessThan(0)
+    })
+  })
+
+  describe('meerdere life events gecombineerd', () => {
+    it('AOW + erfenis + sabbatical gecombineerd werkt correct', () => {
+      const cashflows: SimCashflow[] = [
+        // AOW from 67
+        {
+          id: 'aow', name: 'AOW', type: 'recurring', direction: 'income',
+          amount: 1350, fromAge: 67, toAge: null, indexed: true,
+        },
+        // Erfenis at 55
+        {
+          id: 'erfenis', name: 'Erfenis', type: 'one_time', direction: 'income',
+          amount: 50_000, fromAge: 55, toAge: 55, indexed: false,
+        },
+        // Sabbatical cost at 48
+        {
+          id: 'sabbatical', name: 'Sabbatical', type: 'recurring', direction: 'expense',
+          amount: 3000, fromAge: 48, toAge: 49, indexed: false,
+        },
+      ]
+
+      const result = runUnifiedProjection(makeInput({ cashflows }))
+
+      // At 48: sabbatical effect — negative cashflowNet
+      const at48 = result.rows.find(r => r.age === 48)
+      expect(at48).toBeDefined()
+      expect(at48!.cashflowNet).toBeLessThan(0)
+
+      // At 55: erfenis — positive cashflowNet
+      const at55 = result.rows.find(r => r.age === 55)
+      expect(at55).toBeDefined()
+      expect(at55!.cashflowNet).toBeGreaterThan(40_000)
+
+      // At 67: AOW — positive cashflowNet
+      const at67 = result.rows.find(r => r.age === 67)
+      if (at67) {
+        expect(at67.cashflowNet).toBeGreaterThan(0)
+      }
+
+      // At 50: no more sabbatical — cashflowNet = 0
+      const at50 = result.rows.find(r => r.age === 50)
+      if (at50) {
+        expect(at50.cashflowNet).toBe(0)
+      }
+    })
+  })
+})
