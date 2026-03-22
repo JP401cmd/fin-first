@@ -119,7 +119,7 @@ export function PhaseDetailTable({
           <button
             type="button"
             onClick={() => setShowReal(!showReal)}
-            className="inline-flex items-center gap-1 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-0.5 text-[10px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] sm:min-h-0 sm:min-w-0 sm:px-2.5 sm:py-0.5 sm:text-[10px]"
           >
             {showReal ? 'Reëel' : 'Nominaal'}
           </button>

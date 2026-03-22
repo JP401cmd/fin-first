@@ -262,6 +262,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
       onClose={onClose}
       title={`Opbouwfase \u00b7 ${Math.round(currentAge)} \u2192 ${Math.round(fireAge)} jaar`}
       size="lg"
+      initialMobileHeight="60vh"
     >
       {/* Accent line */}
       <div className="h-[2px] bg-[var(--color-horizon-600)]" />

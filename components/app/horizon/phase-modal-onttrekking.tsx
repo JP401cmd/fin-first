@@ -280,7 +280,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   const totalLevensonderhoud = aggregates.totalWithdrawal + aggregates.totalAow + aggregates.totalPensioen
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={title}>
+    <BottomSheet open={open} onClose={onClose} title={title} size="lg" initialMobileHeight="60vh">
       {/* Accent line at top — kern-500 */}
       <div className="h-[2px] w-full bg-[var(--color-kern-500,#8b6914)]" />
 

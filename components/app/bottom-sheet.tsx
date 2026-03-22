@@ -12,6 +12,8 @@ type BottomSheetProps = {
   children: ReactNode
   /** Desktop max-width: 'sm' (448px) | 'md' (512px, default) | 'lg' (640px) | 'xl' (768px) | 'full' (1024px) */
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
+  /** Initial mobile height (e.g. '60vh'). Drag up expands to full 92vh. Desktop ignores this. */
+  initialMobileHeight?: string
 }
 
 const sizeClasses = {
@@ -27,8 +29,9 @@ const DISMISS_PERCENT = 0.3    // 30% of sheet height
 const SPRING_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const VELOCITY_SAMPLES = 5
 
-export function BottomSheet({ open, onClose, title, children, size = 'md' }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
+  const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<Element | null>(null)
@@ -194,6 +197,7 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
       exitAnimationInProgress.current = false
       phaseRef.current = 'entering'
       setVisible(true)
+      setExpandedToFull(false)
 
       // Reset leftover inline styles from previous exit/drag
       if (sheetRef.current) {
@@ -338,8 +342,22 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
     // From here: active drag (handle or content-decided drag)
     if (!isDragging.current) return
 
-    // Rubber-banding for upward drag (15% resistance)
+    // Expand-to-full: if initialMobileHeight is set and not yet expanded,
+    // upward drag (negative delta) expands the sheet instead of rubber-banding
     const currentRawDelta = e.touches[0].clientY - dragStartY.current
+    if (currentRawDelta < -30 && initialMobileHeight && !expandedToFull) {
+      setExpandedToFull(true)
+      // Reset drag state so sheet snaps cleanly
+      isDragging.current = false
+      if (sheetRef.current) {
+        sheetRef.current.style.transition = `max-height 350ms ${SPRING_CURVE}`
+        sheetRef.current.style.transform = ''
+        sheetRef.current.style.willChange = ''
+      }
+      return
+    }
+
+    // Rubber-banding for upward drag (15% resistance)
     const deltaY = currentRawDelta < 0 ? currentRawDelta * 0.15 : currentRawDelta
 
     sheetRef.current.style.transform = `translateY(${deltaY}px)`
@@ -361,7 +379,7 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
     }
 
     if (currentRawDelta > 0) e.preventDefault()
-  }, [getSheetHeight])
+  }, [getSheetHeight, initialMobileHeight, expandedToFull])
 
   const handleTouchEnd = useCallback(() => {
     // Content touch that stayed as scroll — just clean up
@@ -418,7 +436,13 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
         aria-labelledby={title ? titleId : undefined}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`flex w-full max-h-[92vh] flex-col bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 ${sizeClasses[size]} md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter`}
+        className={`flex w-full flex-col bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 ${sizeClasses[size]} md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter`}
+        style={{
+          maxHeight: initialMobileHeight && !expandedToFull
+            ? `min(${initialMobileHeight}, 92vh)`
+            : '92vh',
+          transition: expandedToFull ? `max-height 350ms ${SPRING_CURVE}` : undefined,
+        }}
       >
         {/* Drag handle — mobile only (44px touch target) */}
         <div
@@ -449,6 +473,13 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
           className="min-h-0 flex-1 overflow-y-auto"
           style={{ overscrollBehaviorY: 'contain' }}
           onTouchStart={handleContentTouchStart}
+          onScroll={initialMobileHeight && !expandedToFull ? (e) => {
+            const el = e.currentTarget
+            // Expand when user scrolls near bottom of initial height
+            if (el.scrollHeight > el.clientHeight && el.scrollTop + el.clientHeight >= el.scrollHeight - 20) {
+              setExpandedToFull(true)
+            }
+          } : undefined}
         >
           {children}
         </div>

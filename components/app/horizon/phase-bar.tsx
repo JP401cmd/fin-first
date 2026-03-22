@@ -95,7 +95,7 @@ export function PhaseBar({
       role="group"
       aria-label="Levensfasen"
       className="flex w-full"
-      style={{ height: 36, gap: 1 }}
+      style={{ height: 44, gap: 1 }}
     >
       {clippedSegments.map((seg, i) => {
         const widthPx = segmentWidths[i]

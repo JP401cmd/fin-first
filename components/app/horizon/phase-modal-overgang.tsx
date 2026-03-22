@@ -227,7 +227,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
     : Math.max(portfolioAtTransitionStart - totalOnttrekking + totalRendement, 0)
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={title} size="lg">
+    <BottomSheet open={open} onClose={onClose} title={title} size="lg" initialMobileHeight="60vh">
       {/* Accent line */}
       <div className="h-[2px] bg-[var(--color-horizon-200)]" />
 
