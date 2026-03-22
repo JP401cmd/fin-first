@@ -1,3 +1,32 @@
+## Session 2026-03-22 - Feature #512
+
+### Feature #512: Perpetual: binary search target moet koopkracht behouden, niet >= 0 - PASSING
+- **Bug 1 — Binary search target (kern)**: Fixed `requiredAt()` in both `fire-simulation.ts` and `unified-projection.ts`
+  - Perpetual was using same `ep >= 0` check as deplete (effectively super-long deplete)
+  - Now uses `ep >= mid * (1+inflation)^(verifyEndAge - candidateFireAge)` to preserve purchasing power
+  - Ensures minimum portfolio is found where koopkracht after 100 years is maintained
+- **Bug 2 — targetEndPortfolio output**: Fixed in both engines
+  - Success return: `requiredFirePortfolioExact * (1+inflation)^(displayEndAge - computedFireAge)`
+  - Unreachable return: `requiredAt(effectiveEndAge-1) * (1+inflation)^(effectiveEndAge - currentAge)`
+  - Previously returned 0 for perpetual
+- **Chart update**: SimChart now shows "koopkracht" target line for perpetual strategy
+  - Extended condition from `strategy === 'legacy'` to include `strategy === 'perpetual'`
+  - Label: "koopkracht €XM" instead of "erfenis €XM"
+- All 54 unified projection tests pass, all 36 parity tests pass
+- All 47 fire-simulation tests pass (1 pre-existing A2 legacy failure)
+- Zero new console errors (only pre-existing net_worth_snapshots 400)
+- Verified in browser: Horizon page renders correctly with perpetual strategy
+- Commit: 1b486516
+
+### Files Modified
+- lib/fire-simulation.ts — perpetual binary search + targetEndPortfolio
+- lib/unified-projection.ts — same fixes for unified engine
+- components/app/horizon/sim-chart.tsx — koopkracht target line for perpetual
+
+### Current Status
+- 1 feature completed this session (#512)
+- Overall progress: 511/511 passing (100%)
+
 ## Session 2026-03-22 - Feature #510
 
 ### Feature #510: Deplete: binary search en simulatie consistentie - PASSING
