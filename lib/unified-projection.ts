@@ -791,13 +791,18 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
 
 /**
  * Prioriteitsvolgorde voor onttrekking uit asset buckets.
- * Cash (bankrekeningen) wordt als eerste aangesproken (meest liquide),
- * gevolgd door beleggingen, spaargeld, etc.
+ *
+ * Liquiditeitsprincipe: meest liquide buckets worden eerst aangesproken.
+ * Cash → spaargeld → beleggingen → crypto → pensioen → rest.
+ *
+ * Spaargeld staat vóór beleggingen zodat het tijdens decumulatie daadwerkelijk
+ * wordt aangesproken. Zonder dit groeit spaargeld eindeloos door rendement
+ * terwijl alleen beleggingen worden afgebouwd — onrealistisch voor een pensionado.
  */
 const WATERFALL_ORDER: readonly AssetType[] = [
   'cash',
-  'investment',
   'savings',
+  'investment',
   'crypto',
   'retirement',
   'real_estate',

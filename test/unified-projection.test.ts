@@ -786,8 +786,8 @@ describe('G. Life events', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('H. Onttrekking via waterfall', () => {
-  it('H1: withdrawal verdeelt over juiste buckets in waterfall volgorde', () => {
-    // Investment is first in waterfall, then savings
+  it('H1: withdrawal verdeelt over juiste buckets in waterfall volgorde (savings vóór investment)', () => {
+    // Liquiditeitsprincipe: savings is first after cash in waterfall, then investment
     const input = makeInput({
       assets: [
         makeAsset({ asset_type: 'investment', current_value: 100_000, expected_return: 5 }),
@@ -803,11 +803,15 @@ describe('H. Onttrekking via waterfall', () => {
     })
     const result = runUnifiedProjection(input)
 
-    // First withdrawal row: investment should be drawn first
-    if (result.rows.length > 0) {
-      const firstRetirementRow = result.rows.find(r => r.phase === 'withdrawal' || r.phase === 'transition')
-      expect(firstRetirementRow).toBeDefined()
-      expect(firstRetirementRow!.withdrawal).toBeGreaterThan(0)
+    // First withdrawal row: savings should be drawn first (before investment)
+    const firstRetirementRow = result.rows.find(r => r.phase === 'withdrawal' || r.phase === 'transition')
+    expect(firstRetirementRow).toBeDefined()
+    expect(firstRetirementRow!.withdrawal).toBeGreaterThan(0)
+
+    // Savings should decrease (being withdrawn) while investment stays higher initially
+    if (firstRetirementRow!.withdrawalByType) {
+      const savingsWithdrawn = firstRetirementRow!.withdrawalByType['savings'] ?? 0
+      expect(savingsWithdrawn).toBeGreaterThan(0)
     }
   })
 
@@ -822,6 +826,59 @@ describe('H. Onttrekking via waterfall', () => {
     const retirementRows = result.rows.filter(r => r.phase === 'withdrawal' || r.phase === 'transition')
     for (const row of retirementRows) {
       expect(row.savings).toBe(0)
+    }
+  })
+
+  it('H3: spaargeld mag niet eindeloos groeien tijdens decumulatie', () => {
+    // With mixed portfolio: savings should be drawn down first (liquiditeitsprincipe)
+    const input = makeInput({
+      assets: [
+        makeAsset({ asset_type: 'savings', current_value: 200_000, expected_return: 2 }),
+        makeAsset({ asset_type: 'investment', current_value: 300_000, expected_return: 7 }),
+      ],
+      annualSavings: 0,
+      yearlyExpenses: 40_000,
+      currentAge: 55,
+      endAge: 90,
+      forcedFireAge: 55,
+      strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    })
+    const result = runUnifiedProjection(input)
+    const retirementRows = result.rows.filter(r => r.phase === 'withdrawal' || r.phase === 'transition')
+
+    // Savings bucket should decrease over time (being spent first)
+    const firstSavings = retirementRows[0]?.assetBuckets?.savings
+    const midIdx = Math.floor(retirementRows.length / 2)
+    const midSavings = retirementRows[midIdx]?.assetBuckets?.savings
+
+    if (firstSavings && midSavings) {
+      // Savings should decrease (start value > mid value) because it's being drawn first
+      expect(firstSavings.endValue).toBeGreaterThan(midSavings.endValue)
+    }
+  })
+
+  it('H4: spaargeld wordt geleidelijk afgebouwd vóór beleggingen', () => {
+    // Small savings + large investments: savings should deplete early
+    const input = makeInput({
+      assets: [
+        makeAsset({ asset_type: 'savings', current_value: 50_000, expected_return: 1.5 }),
+        makeAsset({ asset_type: 'investment', current_value: 500_000, expected_return: 7 }),
+      ],
+      annualSavings: 0,
+      yearlyExpenses: 30_000,
+      currentAge: 60,
+      endAge: 90,
+      forcedFireAge: 60,
+      strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    })
+    const result = runUnifiedProjection(input)
+    const retirementRows = result.rows.filter(r => r.phase === 'withdrawal' || r.phase === 'transition')
+
+    // After a few years, savings should be fully depleted (50k < annual withdrawal ~30k)
+    const laterRow = retirementRows.find(r => r.age >= 65)
+    if (laterRow?.assetBuckets?.savings) {
+      // Savings should be near zero or zero after ~5 years
+      expect(laterRow.assetBuckets.savings.endValue).toBeLessThan(10_000)
     }
   })
 })
