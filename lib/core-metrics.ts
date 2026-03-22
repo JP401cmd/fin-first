@@ -163,6 +163,11 @@ export type FinancialMetrics = {
 export function computeCoreData(
   input: FinancialInput,
   swrOverride?: number,
+  strategyOptions?: {
+    strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    yearsInRetirement?: number
+    realReturn?: number
+  },
 ): FinancialMetrics {
   const { monthlyIncome, monthlyExpenses, totalAssets, totalDebts, last12MonthsIncome, yearlyMustExpenses } = input
   const swr = swrOverride ?? resolveFireParams({}).effectiveSwr
@@ -172,8 +177,8 @@ export function computeCoreData(
   const monthlySavings = monthlyIncome - monthlyExpenses
   const netWorth = totalAssets - totalDebts
 
-  // FIRE calculations (shared primitives)
-  const fireTarget = computeFireTarget(effectiveYearlyExpenses, swr)
+  // FIRE calculations (shared primitives) — strategy-aware
+  const fireTarget = computeFireTarget(effectiveYearlyExpenses, swr, strategyOptions)
   const freedomPercentage = computeFreedomPercentage(netWorth, fireTarget)
   const { years: freedomYears, months: freedomMonths } = computeFreedomTime(netWorth, effectiveYearlyExpenses)
   const savingsRate = computeSavingsRate(monthlyIncome, monthlyExpenses)

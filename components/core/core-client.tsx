@@ -99,6 +99,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [showBudgetModal, setShowBudgetModal] = useState(false)
   const [heroExpanded, setHeroExpanded] = useState(false)
   const [coreSimTarget, setCoreSimTarget] = useState<number | null>(null)
+  const [coreFireStrategyOpts, setCoreFireStrategyOpts] = useState<{ strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'; yearsInRetirement?: number; realReturn?: number } | undefined>(undefined)
   // Holdings portfolio card state
   const [holdingsPortfolio, setHoldingsPortfolio] = useState<CorePageData['holdingsPortfolio']>(null)
   // Mission Control modal state
@@ -896,6 +897,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       const wsConfig = resolveWithdrawalStrategy(profileResult.data ?? {})
       const simResult = runSimulation(currentAge, fireStrategy.endAge, data.netWorth, yearlyExp, annualSavings, simFireParams.grossReturn, 'nl_box3', simFireParams.inflationRate, cashflows, fireStrategy, wsConfig)
       if (simResult.requiredFirePortfolio > 0) setCoreSimTarget(simResult.requiredFirePortfolio)
+      // Store strategy options so computeCoreData fallback is also strategy-aware
+      const realReturn = (1 + simFireParams.grossReturn) / (1 + simFireParams.inflationRate) - 1
+      const yearsInRetirement = fireStrategy.strategy === 'deplete' ? Math.max(1, fireStrategy.endAge - Math.round(currentAge)) : undefined
+      setCoreFireStrategyOpts({ strategy: fireStrategy.strategy, yearsInRetirement, realReturn })
     }
     runCoreSimulation()
   }, [data])
@@ -912,7 +917,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       dateOfBirth: null,
       last12MonthsIncome: rawFinancials.extrapolatedIncome,
     }
-    const coreData = computeCoreData(coreInput, fireSwr)
+    const coreData = computeCoreData(coreInput, fireSwr, coreFireStrategyOpts)
     setData(coreData)
     const netWorth = rawFinancials.totalAssets - rawFinancials.totalDebts
     const monthlySavings = rawFinancials.monthlyIncome - rawFinancials.monthlyExpenses
@@ -920,7 +925,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       const projResult = computeNetWorthProjection(netWorth, monthlySavings, coreData.fireTarget)
       setNwProjection(projResult)
     }
-  }, [rawFinancials, fireSwr])
+  }, [rawFinancials, fireSwr, coreFireStrategyOpts])
 
   // Compute bucket projection via unified engine (skipFireDetection, 20-year horizon)
   useEffect(() => {

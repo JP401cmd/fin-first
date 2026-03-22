@@ -132,11 +132,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   )
   const fireSwr = fireParams.effectiveSwr
   const [input, setInput] = useState<FinancialInput | null>(initialData.effectiveInput)
+  // Strategy-aware fallback: thread fireStrategy into computeFireProjection/computeFireRange
+  // so fire.fireTarget matches the user's chosen end strategy (deplete/legacy/perpetual)
+  const initStrategyOpts = initialData?.fireStrategy
+    ? { strategy: initialData.fireStrategy.strategy, endAge: initialData.fireStrategy.endAge }
+    : undefined
   const [fire, setFire] = useState<FireProjection | null>(() =>
-    computeFireProjection(initialData.effectiveInput, initialData.fireParams.grossReturn, initialData.fireParams.effectiveSwr)
+    computeFireProjection(initialData.effectiveInput, initialData.fireParams.grossReturn, initialData.fireParams.effectiveSwr, undefined, initStrategyOpts)
   )
   const [range, setRange] = useState<FireRange | null>(() =>
-    computeFireRange(initialData.effectiveInput, initialData.fireParams.effectiveSwr, undefined, initialData.fireParams.grossReturn)
+    computeFireRange(initialData.effectiveInput, initialData.fireParams.effectiveSwr, undefined, initialData.fireParams.grossReturn, initStrategyOpts)
   )
   const [healthScore, setHealthScore] = useState<HealthScore | null>(() => initialData.healthScore)
   const [healthScoreInput, setHealthScoreInput] = useState<HealthScoreInput>(initialData.healthScoreInput)
@@ -590,8 +595,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Recalculate projections when input or FIRE method changes
   useEffect(() => {
     if (!effectiveInput) return
-    setFire(computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr))
-    setRange(computeFireRange(effectiveInput, fireSwr, undefined, fireParams.grossReturn))
+    const stratOpts = fireStrategy ? { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge } : undefined
+    setFire(computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr, undefined, stratOpts))
+    setRange(computeFireRange(effectiveInput, fireSwr, undefined, fireParams.grossReturn, stratOpts))
     // Health score: recompute with updated inputs
     const incomeForHealth = avgIncome6m ?? effectiveInput.monthlyIncome
     const expensesForHealth = avgExpenses6m ?? effectiveInput.monthlyExpenses
@@ -614,7 +620,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       setImpacts(computeCumulativeImpacts(effectiveInput, events))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, fireSwr, fireParams, avgIncome6m, avgExpenses6m])
+  }, [input, fireSwr, fireParams, avgIncome6m, avgExpenses6m, fireStrategy])
 
   // Lazy scenario computation — replay main sim with variant returns
   useEffect(() => {
@@ -635,7 +641,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   }, [mcExpanded, simResult, input])
 
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
-  const baseFire = effectiveInput ? computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr) : null
+  const baseFireStratOpts = fireStrategy ? { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge } : undefined
+  const baseFire = effectiveInput ? computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr, undefined, baseFireStratOpts) : null
   const totalDelayMonths = impacts.reduce((s, i) => s + i.fireDelayMonths, 0)
   const adjustedFireAge = baseFire?.fireAge != null ? baseFire.fireAge + totalDelayMonths / 12 : null
 
@@ -5283,12 +5290,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   ? 'Vermogensprojectie op AOW-leeftijd via simulatie-engine (incl. Box 3, inflatie en levensgebeurtenissen)'
                   : simResult?.requiredFirePortfolio != null
                     ? 'Levenslange simulatie (opbouw + verbruik tot leeftijd 90, incl. Box 3 en inflatie)'
-                    : `Doelbedrag = Jaaruitgaven ÷ SWR = ${formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)} ÷ ${(fireSwr * 100).toFixed(2)}%`}
+                    : fireStrategy?.strategy === 'deplete'
+                      ? `Doelbedrag = PV-annuïteit: uitgaven × (1 − (1+r)⁻ⁿ) / r — vermogen ≈ €0 op leeftijd ${fireStrategy.endAge}`
+                      : fireStrategy?.strategy === 'legacy'
+                        ? `Doelbedrag = Jaaruitgaven ÷ SWR + erfenisbuffer (${formatCurrency(fireStrategy.legacyAmount)})`
+                        : `Doelbedrag = Jaaruitgaven ÷ SWR = ${formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)} ÷ ${(fireSwr * 100).toFixed(2)}%`}
               </p>
             </div>
 
             <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-              {isPensioenMode ? 'Pensioen-modus — geprojecteerd op AOW-leeftijd' : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : 'Klassieke FIRE-berekening'}
+              {isPensioenMode ? 'Pensioen-modus — geprojecteerd op AOW-leeftijd' : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : fireStrategy?.strategy === 'deplete' ? 'Deplete strategie — PV-annuïteitsformule' : fireStrategy?.strategy === 'legacy' ? 'Legacy strategie — erfenis-gebaseerd doelbedrag' : 'Klassieke FIRE-berekening'}
             </p>
           </KassabonShell>
         </div>
