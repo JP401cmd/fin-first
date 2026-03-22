@@ -19862,3 +19862,47 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#507)
+
+## Session 2026-03-22 - Features #508, #509
+
+### Feature #508: Deplete: annuïteitsonttrekking in applyStatic() - PASSING
+- Added `endStrategy` optional field to `WithdrawalContext` interface
+- Modified `applyStatic()` in withdrawal-strategy.ts:
+  - When `endStrategy === 'deplete'`: uses annuity formula `portfolio × r / (1 − (1+r)^(−n))`
+  - When `endStrategy === 'deplete'` and last year (n=1): withdraws entire portfolio
+  - When `endStrategy === 'deplete'` and r≈0: simple equal division (portfolio/n)
+  - Minimum guarantee: `Math.max(annuityWithdrawal, netBaseExpenses)`
+  - All other strategies (perpetual, legacy, pensioen, undefined): classic static withdrawal
+- Wired `endStrategy` through fire-simulation.ts and unified-projection.ts:
+  - Only for visualization rows (useWithdrawalStrategy=true), NOT binary search
+  - Binary search convergence relies on simulation horizon, not annuity formula
+- 8 new unit tests for deplete annuity withdrawal behavior
+- All 47 withdrawal strategy tests pass (1 pre-existing bucket test failure)
+- Commit: eff283b5
+
+### Feature #509: Deplete: FIRE-target met PV-annuïteitsformule - PASSING
+- Created `depleteFireTarget()` in core-metrics.ts:
+  - PV annuity formula: `expenses × (1 − (1+r)^(−n)) / r`
+  - Handles edge cases: zero expenses, zero return, zero years
+- Extended `computeFireTarget()` with optional options parameter:
+  - `{ strategy, yearsInRetirement, realReturn }`
+  - When strategy='deplete' + yearsInRetirement: delegates to depleteFireTarget
+  - All other strategies: classic `expenses / swr` (backwards compatible)
+- Updated `computeFireProjection()` in horizon-data.ts:
+  - New optional `strategyOptions` parameter `{ strategy, endAge }`
+  - Calculates yearsInRetirement from currentAge and endAge
+  - Calculates realReturn from annualReturn and inflationRate
+  - Passes through to computeFireTarget with strategy options
+- Updated `computeFireRange()` to pass strategyOptions to all 3 projections
+- Updated dashboard-data-loader.ts:
+  - Moved fireStrategy + dob resolution earlier (before fireTarget calculation)
+  - Passes strategy options to computeFireTarget, computeFireProjection, computeFireRange
+- Fixed duplicate variable declarations in horizon-data.ts (currentAge, realReturn)
+- 9 new unit tests: depleteFireTarget (5) + computeFireTarget with strategy (4)
+- All 12 fire chart tests pass (deplete < perpetual FIRE target confirmed)
+- All 88 unified projection tests pass, no regressions
+- Commit: 278a34a5
+
+### Current Status
+- 2 features completed this session (#508, #509)
+- Overall progress: 508/509 passing (99.8%)
