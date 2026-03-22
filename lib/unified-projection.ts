@@ -182,6 +182,14 @@ export interface UnifiedProjectionInput {
   /** Heeft de gebruiker een partner (voor Box 3 vrijstelling) */
   hasPartner: boolean
 
+  // ── Bankrekeningen ────────────────────────────────────────
+  /**
+   * Totaal saldo van ontkoppelde bankrekeningen (niet gekoppeld aan assets).
+   * Wordt als cash-bucket geïnjecteerd in de projectie zodat het startportfolio
+   * overeenkomt met het netto vermogen op de kernpagina.
+   */
+  bankAccountCash?: number
+
   // ── Accumulation-only modus (voor Kern vermogensprognose) ───
   /**
    * Als true, wordt de binary search voor FIRE-leeftijd overgeslagen
@@ -338,7 +346,8 @@ function initRunningBuckets(
 
   for (const asset of activeAssets) {
     const type = asset.asset_type as AssetType
-    const value = Number(asset.current_value)
+    const inclPct = (Number(asset.net_worth_inclusion_pct ?? 100) / 100)
+    const value = Number(asset.current_value) * inclPct
     const ret = Number(asset.expected_return) / 100 || fallbackReturn
     const contrib = Number(asset.monthly_contribution) * 12
     const { dragRate, category } = computeAssetBox3DragRate(asset, box3Method)
@@ -1028,6 +1037,22 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
 
   /** Initial running buckets for average return estimation */
   const initialBuckets = initRunningBuckets(assets, grossReturn, box3Method)
+  // Inject disconnected bank account cash as a cash bucket
+  if (input.bankAccountCash && input.bankAccountCash > 0) {
+    const existingCash = initialBuckets.find(b => b.assetType === 'cash')
+    if (existingCash) {
+      existingCash.value += input.bankAccountCash
+    } else {
+      initialBuckets.push({
+        assetType: 'cash' as AssetType,
+        value: input.bankAccountCash,
+        annualReturn: 0,
+        annualContribution: 0,
+        rawDragRate: 0,
+        category: 'spaargeld' as Box3Category,
+      })
+    }
+  }
   const avgNetReturn = computeAverageNetReturn(initialBuckets)
 
   /**
@@ -1076,6 +1101,22 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
   // ── Phase 1: Accumulation + FIRE-age detection ─────────────────────
 
   const runningBuckets = initRunningBuckets(assets, grossReturn, box3Method)
+  // Inject disconnected bank account cash as a cash bucket (same as initialBuckets)
+  if (input.bankAccountCash && input.bankAccountCash > 0) {
+    const existingCash = runningBuckets.find(b => b.assetType === 'cash')
+    if (existingCash) {
+      existingCash.value += input.bankAccountCash
+    } else {
+      runningBuckets.push({
+        assetType: 'cash' as AssetType,
+        value: input.bankAccountCash,
+        annualReturn: 0,
+        annualContribution: 0,
+        rawDragRate: 0,
+        category: 'spaargeld' as Box3Category,
+      })
+    }
+  }
   const runningDebts = initRunningDebts(debts)
 
   let computedFireAge: number | null = null

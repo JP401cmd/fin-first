@@ -71,16 +71,18 @@ interface HorizonFireSimInput {
   box3Method?: Box3Method
   /** Of de gebruiker een fiscaal partner heeft */
   hasPartner?: boolean
+  /** Totaal saldo van ontkoppelde bankrekeningen (niet gekoppeld aan assets) */
+  bankAccountCash?: number
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
   const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[] } | null>(() => {
     if (!horizonInput) return null
 
-    const { totalAssets, totalDebts, monthlyContributions, yearlyMustExpenses, dateOfBirth, monthlyIncome } = horizonInput
+    const { monthlyContributions, yearlyMustExpenses, dateOfBirth, monthlyIncome } = horizonInput
 
     // currentAge
     const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
@@ -137,6 +139,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       withdrawalStrategy: withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
       forcedFireAge,
       hasPartner: hasPartner ?? false,
+      bankAccountCash: bankAccountCash ?? 0,
     }
 
     // ── Run unified projection engine ─────────────────────────────────

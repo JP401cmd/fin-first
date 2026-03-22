@@ -62,6 +62,8 @@ export interface HorizonPageData {
   hasPartner: boolean
   /** Error message from profile query, null if successful */
   profileError: string | null
+  /** Total balance of disconnected bank accounts (not linked to assets) */
+  unlinkedCash: number
 }
 
 /**
@@ -374,5 +376,6 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     profileError: profileResult.error
       ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`
       : null,
+    unlinkedCash,
   }
 }

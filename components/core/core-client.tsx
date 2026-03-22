@@ -83,6 +83,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [bucketProjection, setBucketProjection] = useState<BucketProjectionResult | null>(null)
   const [fullAssets, setFullAssets] = useState<Asset[] | null>(null)
   const [fullDebts, setFullDebts] = useState<Debt[] | null>(null)
+  const [coreUnlinkedCash, setCoreUnlinkedCash] = useState<number>(0)
   const [coreCurrentAge, setCoreCurrentAge] = useState<number | null>(null)
   const [spendingInsights, setSpendingInsights] = useState<SpendingInsight[]>([])
   const [spendingInsightsLoading, setSpendingInsightsLoading] = useState(false)
@@ -414,6 +415,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setRawFinancials({ monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses, yearlyRetirementExpenses })
       setFullAssets(assetsResult.data as unknown as Asset[])
       setFullDebts(debtsResult.data as unknown as Debt[])
+      setCoreUnlinkedCash(unlinkedCash)
 
       const netWorth = totalAssets - totalDebts
       const monthlySavings = effectiveMonthlyIncome - effectiveMonthlyExpenses
@@ -963,6 +965,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       withdrawalStrategy: WITHDRAWAL_DEFAULTS,
       hasPartner: !!householdOverrides,
       skipFireDetection: true, // Accumulation-only modus
+      bankAccountCash: coreUnlinkedCash,
     }
 
     const unifiedResult = runUnifiedProjection(unifiedInput)

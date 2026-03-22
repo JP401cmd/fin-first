@@ -261,6 +261,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           debts,
           box3Method: initialData.box3Method,
           hasPartner: initialData.hasPartner,
+          bankAccountCash: initialData.unlinkedCash,
         }
       : null,
   )
