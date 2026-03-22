@@ -19658,3 +19658,35 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#498)
 - Overall progress: 493/506 passing (97.4%)
+
+## Session 2026-03-22 - Features #495, #496
+
+### Feature #495: Fase 2b — useHorizonFireSim hook migreren naar unified engine - PASSING
+- Replaced `runSimulation()` with `runUnifiedProjection()` in use-horizon-fire-sim.ts
+- Added new parameters to HorizonFireSimInput: `assets: Asset[]`, `debts: Debt[]`, `box3Method`, `hasPartner`
+- Built `UnifiedProjectionInput` from existing hook params + new asset/debt data
+- Used `toSimResult()` wrapper for backwards-compatible SimResult return type
+- Preserved pensioen-mode post-processing (forcedFireAge, strategy override to 'pensioen')
+- Updated horizon-client.tsx to pass `initialData.assets`, `debts`, `initialData.box3Method`, `initialData.hasPartner`
+- Removed old imports: `runSimulation`, `ReturnModel` from fire-simulation
+- Added new imports: `runUnifiedProjection`, `toSimResult`, `UnifiedProjectionInput`, `UnifiedProjectionResult` from unified-projection
+- Zero TypeScript errors in modified files
+- Zero new console errors (only pre-existing net_worth_snapshots 400)
+- Verified in browser: FIRE 49.9, Doelbedrag €4.08M, Opnamerate 1.93%, Aftellen 5.426 dagen
+- All 64 unified projection tests + 30 parity tests pass
+- Commit: 03d2d81e
+
+### Feature #496: Fase 2c — SimChart aanpassen voor unified data - PASSING
+- No code changes needed: SimChart receives SimRow[] via toSimResult() wrapper (from #495)
+- Chart renders identically: y-axis €0-€15.7M, x-axis ages 40-90, FIRE/AOW markers correct
+- All visual layers preserved: grid, cashflow bands, FIRE/AOW lines, scenario overlays
+- Zoom via ZoomableChartContainer still works (verified in browser)
+- All 869 tests pass (11 failures are pre-existing in worktrees/other modules)
+
+### Files Modified
+- lib/hooks/use-horizon-fire-sim.ts — migrated from runSimulation to runUnifiedProjection
+- components/app/horizon/horizon-client.tsx — pass assets/debts/box3Method/hasPartner to hook
+
+### Current Status
+- 2 features completed this session (#495, #496)
+- Overall progress: 495/506 passing (97.8%)
