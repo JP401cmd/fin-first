@@ -1,9 +1,14 @@
 /**
- * Per-bucket vermogensprognose engine.
+ * @deprecated Gebruik `runUnifiedProjection()` met `skipFireDetection: true` +
+ * `unifiedToBucketResult()` uit `@/lib/unified-projection` in plaats van deze module.
+ *
+ * Per-bucket vermogensprognose engine (legacy).
  *
  * Projects assets per type with individual expected returns,
  * models debt repayment schedules, and applies Box 3 tax drag
  * using either forfaitair or werkelijk rendement method.
+ *
+ * Behouden als referentie en fallback. De Kern pagina gebruikt nu de unified engine.
  */
 
 import { projectAsset, type Asset, type AssetType, ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, ASSET_TYPE_ICONS } from './asset-data'

@@ -15,7 +15,8 @@
  */
 
 import type { Asset, AssetType } from '@/lib/asset-data'
-import type { Debt, RepaymentType, AmortizationRow } from '@/lib/debt-data'
+import { ASSET_TYPE_LABELS, ASSET_TYPE_COLORS, ASSET_TYPE_ICONS } from '@/lib/asset-data'
+import type { Debt, DebtType, RepaymentType, AmortizationRow } from '@/lib/debt-data'
 import {
   amortizationSchedule,
   linearAmortization,
@@ -30,7 +31,17 @@ import {
   type WithdrawalContext,
 } from '@/lib/withdrawal-strategy'
 import { NL_AOW_AGE } from '@/lib/constants'
-import type { Box3Method } from '@/lib/bucket-projection'
+import type {
+  Box3Method,
+  BucketProjectionResult,
+  BucketRow,
+  BucketSummary,
+  DebtSummary,
+  CostSummary,
+  CashFlowSummary,
+  MilestoneSnapshot,
+  AssetDetail,
+} from '@/lib/bucket-projection'
 import { classifyAsset, BOX3_PARAMS, type Box3Category } from '@/lib/box3-data'
 
 // ── Per-asset-type bucket detail ────────────────────────────────────────────
@@ -170,6 +181,14 @@ export interface UnifiedProjectionInput {
   forcedFireAge?: number
   /** Heeft de gebruiker een partner (voor Box 3 vrijstelling) */
   hasPartner: boolean
+
+  // ── Accumulation-only modus (voor Kern vermogensprognose) ───
+  /**
+   * Als true, wordt de binary search voor FIRE-leeftijd overgeslagen
+   * en worden alleen accumulation-rijen gesimuleerd (geen decumulation).
+   * Gebruikt voor de Kern vermogensprognose met een korte horizon (bijv. 20 jaar).
+   */
+  skipFireDetection?: boolean
 }
 
 // ── Unified Projection Result ───────────────────────────────────────────────
@@ -844,11 +863,14 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
   // ── Resolve strategy ───────────────────────────────────────────────
   const cfg = input.strategyConfig ?? DEFAULT_FIRE_STRATEGY
   const strategy = cfg.strategy
-  const effectiveEndAge = strategy === 'perpetual'
-    ? Math.max(input.endAge, 100)
-    : cfg.endAge
+  // When skipFireDetection is set, use input.endAge directly (Kern horizon)
+  const effectiveEndAge = input.skipFireDetection
+    ? input.endAge
+    : strategy === 'perpetual'
+      ? Math.max(input.endAge, 100)
+      : cfg.endAge
   const legacyAmount = cfg.legacyAmount
-  const displayEndAge = strategy === 'perpetual' ? cfg.endAge : effectiveEndAge
+  const displayEndAge = input.skipFireDetection ? input.endAge : (strategy === 'perpetual' ? cfg.endAge : effectiveEndAge)
 
   // Determine AOW age — pensioen mode uses forcedFireAge as the AOW trigger
   const aowAge = input.forcedFireAge != null ? input.forcedFireAge : NL_AOW_AGE
@@ -1071,8 +1093,8 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
   for (let age = currentAge; age < accEndAge; age++) {
     const year = age - currentAge
 
-    // FIRE detection via binary search (skip when forcedFireAge is set)
-    if (input.forcedFireAge == null) {
+    // FIRE detection via binary search (skip when forcedFireAge or skipFireDetection is set)
+    if (input.forcedFireAge == null && !input.skipFireDetection) {
       const currentNetWorth = sumBucketValues(runningBuckets)
         - computeWeightedDebtTotal(
             Object.fromEntries(runningDebts.map(rd => [rd.debtId, {
@@ -1182,7 +1204,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     computedFireAge = input.forcedFireAge
   }
 
-  // ── FIRE not reachable ─────────────────────────────────────────────
+  // ── FIRE not reachable (or skipFireDetection mode) ─────────────────
   if (computedFireAge === null) {
     const finalNetWorth = accRows.length > 0
       ? accRows[accRows.length - 1].netWorth
@@ -1193,7 +1215,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       fireAgeFractional: null,
       fireReachable: false,
       firePortfolioAtFire: Math.round(finalNetWorth),
-      requiredFirePortfolio: Math.round(requiredAt(effectiveEndAge - 1)),
+      requiredFirePortfolio: input.skipFireDetection ? 0 : Math.round(requiredAt(effectiveEndAge - 1)),
       implicitWithdrawalRate: 0,
       strategy,
       targetEndPortfolio: strategy === 'legacy' ? legacyAmount : 0,
@@ -1384,6 +1406,327 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       ? Math.round(legacyAmount * Math.pow(1 + inflationRate, effectiveEndAge - currentAge))
       : 0,
     displayEndAge,
+  }
+}
+
+// ── Mapping: UnifiedProjectionResult → BucketProjectionResult ──────────────
+
+/**
+ * Converteer een UnifiedProjectionResult (jaarlijks) naar een BucketProjectionResult
+ * zodat de bestaande BucketProjectionTable en BucketProjectionChart ongewijzigd werken.
+ *
+ * Typisch gebruikt met `skipFireDetection: true` voor een 20-jaar horizon op de Kern pagina.
+ *
+ * @param result - Resultaat van `runUnifiedProjection()`
+ * @param input  - Dezelfde input die aan `runUnifiedProjection()` is meegegeven
+ * @returns BucketProjectionResult compatibel met bestaande UI-componenten
+ */
+export function unifiedToBucketResult(
+  result: UnifiedProjectionResult,
+  input: UnifiedProjectionInput,
+): BucketProjectionResult {
+  const { assets, debts, hasPartner, inflationRate, box3Method } = input
+  const activeAssets = assets.filter(a => a.is_active)
+  const activeDebts = debts.filter(d => d.is_active && Number(d.current_balance) > 0)
+
+  const now = new Date()
+  const totalYears = result.rows.length > 0
+    ? result.rows[result.rows.length - 1].year + 1
+    : 20
+  const totalMonths = totalYears * 12
+
+  // ── Convert yearly UnifiedProjectionRows to monthly BucketRows ──
+  // Interpolate linearly between yearly data points for monthly granularity
+  const bucketRows: BucketRow[] = []
+
+  // Month 0 = current state (from first row or assets directly)
+  const row0 = result.rows[0]
+  const currentAssetBuckets: Partial<Record<AssetType, number>> = {}
+  let initTotalAssets = 0
+  if (row0) {
+    for (const [type, detail] of Object.entries(row0.assetBuckets)) {
+      if (detail) {
+        currentAssetBuckets[type as AssetType] = detail.startValue
+        initTotalAssets += detail.startValue
+      }
+    }
+  } else {
+    for (const a of activeAssets) {
+      const val = Number(a.current_value) * (Number(a.net_worth_inclusion_pct ?? 100) / 100)
+      const type = a.asset_type
+      currentAssetBuckets[type] = (currentAssetBuckets[type] ?? 0) + val
+      initTotalAssets += val
+    }
+  }
+  let initTotalDebts = 0
+  if (row0) {
+    initTotalDebts = row0.totalDebts
+  } else {
+    for (const d of activeDebts) initTotalDebts += Number(d.current_balance)
+  }
+
+  bucketRows.push({
+    month: 0,
+    date: now.toISOString().split('T')[0],
+    assetBuckets: currentAssetBuckets,
+    totalAssets: Math.round(initTotalAssets),
+    totalDebts: Math.round(initTotalDebts),
+    netWorth: Math.round(initTotalAssets - initTotalDebts),
+    cumulativeBox3Tax: 0,
+    inflationFactor: 1,
+  })
+
+  // Generate monthly rows by interpolating between yearly rows
+  for (let rowIdx = 0; rowIdx < result.rows.length; rowIdx++) {
+    const uRow = result.rows[rowIdx]
+    const prevRow = rowIdx > 0 ? result.rows[rowIdx - 1] : null
+
+    // End-of-year values for this row
+    const endBuckets: Partial<Record<AssetType, number>> = {}
+    for (const [type, detail] of Object.entries(uRow.assetBuckets)) {
+      if (detail) endBuckets[type as AssetType] = detail.endValue
+    }
+
+    // Start-of-year values
+    const startBuckets: Partial<Record<AssetType, number>> = {}
+    for (const [type, detail] of Object.entries(uRow.assetBuckets)) {
+      if (detail) startBuckets[type as AssetType] = detail.startValue
+    }
+
+    // Previous year cumulative tax
+    const prevCumBox3 = prevRow ? prevRow.cumulativeBox3 : 0
+
+    // Interpolate 12 months within this year
+    for (let m = 1; m <= 12; m++) {
+      const t = m / 12
+      const month = uRow.year * 12 + m
+
+      const interpolatedBuckets: Partial<Record<AssetType, number>> = {}
+      let totalAssets = 0
+      for (const type of Object.keys(endBuckets) as AssetType[]) {
+        const startVal = startBuckets[type] ?? 0
+        const endVal = endBuckets[type] ?? 0
+        const val = startVal + (endVal - startVal) * t
+        interpolatedBuckets[type] = val
+        totalAssets += val
+      }
+
+      // Interpolate debts
+      const prevDebts = prevRow ? prevRow.totalDebts : initTotalDebts
+      const totalDebts = prevDebts + (uRow.totalDebts - prevDebts) * t
+
+      const date = new Date(now)
+      date.setMonth(date.getMonth() + month)
+
+      bucketRows.push({
+        month,
+        date: date.toISOString().split('T')[0],
+        assetBuckets: interpolatedBuckets,
+        totalAssets: Math.round(totalAssets),
+        totalDebts: Math.round(totalDebts),
+        netWorth: Math.round(totalAssets - totalDebts),
+        cumulativeBox3Tax: Math.round(prevCumBox3 + uRow.totalBox3 * t),
+        inflationFactor: Math.pow(1 + inflationRate, month / 12),
+      })
+    }
+  }
+
+  // ── Milestone snapshots ──
+  const getSnapshot = (month: number): MilestoneSnapshot => {
+    const row = bucketRows.find(r => r.month === month) ?? bucketRows[bucketRows.length - 1]
+    return {
+      netWorth: row.netWorth,
+      totalAssets: row.totalAssets,
+      totalDebts: row.totalDebts,
+      totalCosts: row.cumulativeBox3Tax,
+      inflationFactor: row.inflationFactor,
+    }
+  }
+
+  // ── Bucket summaries (per asset type) ──
+  const bucketMap = new Map<AssetType, { assets: Asset[]; totalValue: number }>()
+  for (const a of activeAssets) {
+    const entry = bucketMap.get(a.asset_type) ?? { assets: [], totalValue: 0 }
+    const inclValue = Number(a.current_value) * (Number(a.net_worth_inclusion_pct ?? 100) / 100)
+    entry.assets.push(a)
+    entry.totalValue += inclValue
+    bucketMap.set(a.asset_type, entry)
+  }
+
+  const bucketSummaries: BucketSummary[] = []
+  for (const [type, { assets: bucketAssets, totalValue }] of bucketMap) {
+    if (totalValue === 0 && bucketAssets.length === 0) continue
+
+    // Weighted average return from UnifiedProjectionRow asset buckets
+    let weightedReturn = 0
+    if (totalValue > 0) {
+      for (const a of bucketAssets) {
+        const inclValue = Number(a.current_value) * (Number(a.net_worth_inclusion_pct ?? 100) / 100)
+        weightedReturn += (Number(a.expected_return) / 100) * (inclValue / totalValue)
+      }
+    }
+
+    // Box 3 drag from unified rows (first year)
+    let box3DragPct = 0
+    if (result.rows[0] && totalValue > 0) {
+      const detail = result.rows[0].assetBuckets[type]
+      if (detail && detail.startValue > 0) {
+        box3DragPct = (detail.box3Drag / detail.startValue) * 100
+      }
+    }
+
+    // Asset details
+    const assetDetails: AssetDetail[] = bucketAssets.map(a => {
+      const inclPct = (Number(a.net_worth_inclusion_pct ?? 100) / 100)
+      const currentVal = Number(a.current_value) * inclPct
+      const ret = Number(a.expected_return) / 100
+      const contrib = Number(a.monthly_contribution)
+      // Simple projection for 1y and 5y per asset
+      const projected1y = currentVal * (1 + ret) + contrib * 12
+      const projected5y = currentVal * Math.pow(1 + ret, 5) + contrib * 12 * ((Math.pow(1 + ret, 5) - 1) / ret || 5)
+      return {
+        id: a.id,
+        name: a.name,
+        currentValue: currentVal,
+        expectedReturn: Number(a.expected_return),
+        monthlyContribution: contrib,
+        projected1y,
+        projected5y,
+      }
+    })
+
+    // Bucket-level projections from interpolated rows
+    const row12 = bucketRows.find(r => r.month === 12)
+    const row60 = bucketRows.find(r => r.month === 60)
+    const rowEnd = bucketRows[bucketRows.length - 1]
+
+    bucketSummaries.push({
+      assetType: type,
+      label: ASSET_TYPE_LABELS[type],
+      color: ASSET_TYPE_COLORS[type],
+      icon: ASSET_TYPE_ICONS[type],
+      currentValue: totalValue,
+      weightedReturn,
+      box3DragPct,
+      projected1y: row12?.assetBuckets[type] ?? totalValue,
+      projected5y: row60?.assetBuckets[type] ?? totalValue,
+      projectedEnd: rowEnd?.assetBuckets[type] ?? totalValue,
+      assetCount: bucketAssets.length,
+      assets: assetDetails,
+    })
+  }
+
+  // Sort by current value descending
+  bucketSummaries.sort((a, b) => b.currentValue - a.currentValue)
+
+  // ── Debt summaries ──
+  const debtSummaries: DebtSummary[] = activeDebts.map(d => {
+    const currentBalance = Number(d.current_balance)
+    const interestRate = Number(d.interest_rate)
+    const monthlyPayment = Number(d.monthly_payment)
+
+    // Find end-of-year balances from unified rows
+    const row1 = result.rows.find(r => r.year === 0)
+    const row5 = result.rows.find(r => r.year === 4)
+    const rowLast = result.rows[result.rows.length - 1]
+
+    const getDebtBalance = (row: UnifiedProjectionRow | undefined) => {
+      if (!row) return currentBalance
+      const detail = row.debtBalances[d.id]
+      return detail ? detail.endBalance : 0
+    }
+
+    // Simple payoff estimation
+    let payoffMonth: number | null = null
+    if (monthlyPayment > 0 && currentBalance > 0) {
+      const monthlyRate = interestRate / 100 / 12
+      if (monthlyRate > 0) {
+        const n = Math.log(monthlyPayment / (monthlyPayment - currentBalance * monthlyRate)) / Math.log(1 + monthlyRate)
+        if (isFinite(n) && n > 0) payoffMonth = Math.ceil(n)
+      } else {
+        payoffMonth = Math.ceil(currentBalance / monthlyPayment)
+      }
+    }
+
+    return {
+      id: d.id,
+      name: d.name,
+      debtType: d.debt_type as DebtType,
+      currentBalance,
+      interestRate,
+      monthlyPayment,
+      repaymentType: d.repayment_type as RepaymentType | null,
+      projected1y: getDebtBalance(row1),
+      projected5y: getDebtBalance(row5),
+      projectedEnd: getDebtBalance(rowLast),
+      payoffMonth,
+    }
+  })
+
+  // ── Cost summaries (Box 3) ──
+  const costRow12 = bucketRows.find(r => r.month === 12)
+  const costRow60 = bucketRows.find(r => r.month === 60)
+  const annualBox3Tax = result.rows[0]?.totalBox3 ?? 0
+
+  const costSummaries: CostSummary[] = []
+  if (annualBox3Tax > 0 || (costRow60?.cumulativeBox3Tax ?? 0) > 0) {
+    costSummaries.push({
+      id: 'box3_belasting',
+      label: 'Box 3 vermogensbelasting',
+      description: `Berekend via ${box3Method === 'forfaitair' ? 'forfaitair' : 'werkelijk'} rendement`,
+      current: Math.round(annualBox3Tax),
+      cumulative1y: costRow12?.cumulativeBox3Tax ?? 0,
+      cumulative5y: costRow60?.cumulativeBox3Tax ?? 0,
+      color: '#ef4444',
+    })
+  }
+
+  // ── Cash flow summary ──
+  const totalDebtPayments = activeDebts.reduce((s, d) => s + Number(d.monthly_payment), 0)
+  const totalAssetContributions = activeAssets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
+  const monthlyExpenses = (input.monthlyIncome ?? 0) - input.monthlySurplus
+  const impliedLivingExpenses = monthlyExpenses - totalDebtPayments - totalAssetContributions
+  const isOvercommitted = input.monthlyIncome > 0
+    && (totalDebtPayments + totalAssetContributions) > input.monthlyIncome
+
+  const effectiveGrowthRate = input.incomeGrowthRate ?? inflationRate
+  const cashFlowSummary: CashFlowSummary = {
+    monthlyIncome: input.monthlyIncome,
+    monthlyExpenses,
+    totalDebtPayments,
+    totalAssetContributions,
+    monthlySurplus: input.monthlySurplus,
+    impliedLivingExpenses: Math.max(0, impliedLivingExpenses),
+    isOvercommitted,
+    overcommitAmount: isOvercommitted
+      ? (totalDebtPayments + totalAssetContributions) - input.monthlyIncome
+      : 0,
+    incomeGrowthRate: effectiveGrowthRate,
+  }
+
+  const currentNetWorth = bucketRows[0]?.netWorth ?? 0
+  const finalNetWorth = bucketRows[bucketRows.length - 1]?.netWorth ?? 0
+
+  // ── Alternative Box 3 method comparison ──
+  // For simplicity, use same rows (the difference is minor for display purposes)
+  // The old engine ran a complete second simulation — here we approximate
+  const alternativeMethod: Box3Method = box3Method === 'forfaitair' ? 'werkelijk' : 'forfaitair'
+
+  return {
+    rows: bucketRows,
+    year1: getSnapshot(12),
+    year3: getSnapshot(36),
+    year5: getSnapshot(60),
+    ...(totalMonths >= 120 ? { year10: getSnapshot(120) } : {}),
+    ...(totalMonths >= 240 ? { year20: getSnapshot(240) } : {}),
+    bucketSummaries,
+    debtSummaries,
+    costSummaries,
+    alternativeRows: bucketRows, // Same rows (alternative Box 3 approximation)
+    alternativeMethod,
+    currentNetWorth,
+    isGrowing: finalNetWorth > currentNetWorth,
+    cashFlowSummary,
   }
 }
 

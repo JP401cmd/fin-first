@@ -18,6 +18,7 @@ import {
   toSimRow,
   toSimResult,
   runUnifiedProjection,
+  unifiedToBucketResult,
   type UnifiedProjectionRow,
   type UnifiedProjectionResult,
   type UnifiedProjectionInput,
@@ -1444,6 +1445,146 @@ describe('Unified Projection — Fase 1d: Life events integratie', () => {
       if (at50) {
         expect(at50.cashflowNet).toBe(0)
       }
+    })
+  })
+
+  // ── Fase 4: skipFireDetection & unifiedToBucketResult ─────────────────
+  describe('Fase 4 — skipFireDetection & unifiedToBucketResult', () => {
+    it('skipFireDetection: alleen accumulatie-rijen, geen FIRE-detectie', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 }) // 20-year horizon
+      const result = runUnifiedProjection(input)
+
+      // Should produce rows but no FIRE detection
+      expect(result.rows.length).toBeGreaterThan(0)
+      expect(result.fireAge).toBeNull()
+      expect(result.fireReachable).toBe(false)
+      expect(result.requiredFirePortfolio).toBe(0) // no binary search
+
+      // All rows should be accumulation phase
+      for (const row of result.rows) {
+        expect(row.phase).toBe('accumulation')
+      }
+
+      // Rows should span 20 years (42 → 62)
+      expect(result.rows[0].age).toBe(42)
+      expect(result.rows[result.rows.length - 1].age).toBe(61) // up to endAge - 1
+    })
+
+    it('skipFireDetection: vermogen groeit over 20 jaar', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 })
+      const result = runUnifiedProjection(input)
+
+      const firstRow = result.rows[0]
+      const lastRow = result.rows[result.rows.length - 1]
+
+      // Net worth should grow significantly over 20 years
+      expect(lastRow.netWorth).toBeGreaterThan(firstRow.netWorth)
+      // With 170k starting + 1300/month savings + 7% return, should be substantial
+      expect(lastRow.netWorth).toBeGreaterThan(500_000)
+    })
+
+    it('skipFireDetection: Box 3 cumulatief correct', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 })
+      const result = runUnifiedProjection(input)
+
+      // Cumulative Box 3 should be monotonically increasing
+      let prevCum = 0
+      for (const row of result.rows) {
+        expect(row.cumulativeBox3).toBeGreaterThanOrEqual(prevCum)
+        prevCum = row.cumulativeBox3
+      }
+    })
+
+    it('unifiedToBucketResult: produceert valide BucketProjectionResult', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 })
+      const result = runUnifiedProjection(input)
+      const bucket = unifiedToBucketResult(result, input)
+
+      // Basic structure
+      expect(bucket.rows.length).toBeGreaterThan(0)
+      expect(bucket.year1).toBeDefined()
+      expect(bucket.year3).toBeDefined()
+      expect(bucket.year5).toBeDefined()
+      expect(bucket.year10).toBeDefined()
+      expect(bucket.bucketSummaries.length).toBeGreaterThan(0)
+      expect(bucket.cashFlowSummary).toBeDefined()
+      expect(bucket.currentNetWorth).toBeGreaterThan(0)
+      expect(bucket.isGrowing).toBe(true)
+    })
+
+    it('unifiedToBucketResult: maandelijkse rijen geinterpoleerd', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 })
+      const result = runUnifiedProjection(input)
+      const bucket = unifiedToBucketResult(result, input)
+
+      // Should have monthly rows: 20 years × 12 months + 1 (month 0) = 241
+      expect(bucket.rows.length).toBe(20 * 12 + 1)
+      expect(bucket.rows[0].month).toBe(0)
+      expect(bucket.rows[12].month).toBe(12)
+      expect(bucket.rows[bucket.rows.length - 1].month).toBe(240)
+    })
+
+    it('unifiedToBucketResult: bucketSummaries per asset type', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 })
+      const result = runUnifiedProjection(input)
+      const bucket = unifiedToBucketResult(result, input)
+
+      // Should have 1 bucket summary (investment)
+      expect(bucket.bucketSummaries.length).toBe(1)
+      const inv = bucket.bucketSummaries[0]
+      expect(inv.assetType).toBe('investment')
+      expect(inv.currentValue).toBe(170_000)
+      expect(inv.projectedEnd).toBeGreaterThan(170_000)
+      expect(inv.assets.length).toBe(1)
+    })
+
+    it('unifiedToBucketResult: milestone snapshots correct', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 })
+      const result = runUnifiedProjection(input)
+      const bucket = unifiedToBucketResult(result, input)
+
+      // Year 1 should show growth
+      expect(bucket.year1.netWorth).toBeGreaterThan(bucket.currentNetWorth)
+      // Year 5 should show more growth
+      expect(bucket.year5.netWorth).toBeGreaterThan(bucket.year1.netWorth)
+      // Year 10 should show even more growth
+      if (bucket.year10) {
+        expect(bucket.year10.netWorth).toBeGreaterThan(bucket.year5.netWorth)
+      }
+    })
+
+    it('unifiedToBucketResult: cashFlowSummary behoudt surplus-berekening', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 })
+      const result = runUnifiedProjection(input)
+      const bucket = unifiedToBucketResult(result, input)
+
+      expect(bucket.cashFlowSummary.monthlyIncome).toBe(5500)
+      expect(bucket.cashFlowSummary.monthlySurplus).toBe(1300)
+    })
+
+    it('unifiedToBucketResult: costSummaries Box 3', () => {
+      const input = makeInput({ skipFireDetection: true, endAge: 62 })
+      const result = runUnifiedProjection(input)
+      const bucket = unifiedToBucketResult(result, input)
+
+      // Should have Box 3 cost summary
+      expect(bucket.costSummaries.length).toBeGreaterThan(0)
+      const box3 = bucket.costSummaries.find(c => c.id === 'box3_belasting')
+      expect(box3).toBeDefined()
+      expect(box3!.current).toBeGreaterThan(0) // €170k should have some Box 3 drag
+    })
+
+    it('unifiedToBucketResult: met schulden — debtSummaries correct', () => {
+      const input = makeLisaInput({ skipFireDetection: true, endAge: 72 })
+      const result = runUnifiedProjection(input)
+      const bucket = unifiedToBucketResult(result, input)
+
+      // Lisa has a mortgage debt
+      expect(bucket.debtSummaries.length).toBeGreaterThan(0)
+      const mortgage = bucket.debtSummaries[0]
+      expect(mortgage.currentBalance).toBe(350_000)
+      expect(mortgage.interestRate).toBe(2.9)
+      expect(mortgage.monthlyPayment).toBe(1100)
     })
   })
 })

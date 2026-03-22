@@ -12,8 +12,8 @@ import { ageAtDate, type LifeEvent } from '@/lib/horizon-data'
 import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
-import { parseFireStrategy } from '@/lib/fire-strategy'
-import { resolveWithdrawalStrategy } from '@/lib/withdrawal-strategy'
+import { parseFireStrategy, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
+import { resolveWithdrawalStrategy, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot, EntityBalanceHistory } from '@/lib/net-worth-data'
 import {
@@ -30,7 +30,8 @@ import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-c
 import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
 import { BucketProjectionChart } from '@/components/app/bucket-projection-chart'
 import { BucketProjectionTable } from '@/components/app/bucket-projection-table'
-import { computeBucketProjection, type BucketProjectionResult } from '@/lib/bucket-projection'
+import { type BucketProjectionResult } from '@/lib/bucket-projection'
+import { runUnifiedProjection, unifiedToBucketResult } from '@/lib/unified-projection'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
@@ -82,6 +83,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [bucketProjection, setBucketProjection] = useState<BucketProjectionResult | null>(null)
   const [fullAssets, setFullAssets] = useState<Asset[] | null>(null)
   const [fullDebts, setFullDebts] = useState<Debt[] | null>(null)
+  const [coreCurrentAge, setCoreCurrentAge] = useState<number | null>(null)
   const [spendingInsights, setSpendingInsights] = useState<SpendingInsight[]>([])
   const [spendingInsightsLoading, setSpendingInsightsLoading] = useState(false)
   const [spendingInsightsDataMonths, setSpendingInsightsDataMonths] = useState(0)
@@ -872,6 +874,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       ])
       if (!profileResult.data?.date_of_birth || !data) return
       const currentAge = ageAtDate(profileResult.data.date_of_birth, new Date())
+      setCoreCurrentAge(currentAge)
       const yearlyExp = data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses : 0
       if (!yearlyExp) return
       const monthlyContributions = (assetsContribResult.data ?? [])
@@ -919,9 +922,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     }
   }, [rawFinancials, fireSwr])
 
-  // Compute bucket projection when full assets/debts are available
+  // Compute bucket projection via unified engine (skipFireDetection, 20-year horizon)
   useEffect(() => {
-    if (!fullAssets || !fullDebts) return
+    if (!fullAssets || !fullDebts || coreCurrentAge == null) return
     // Prefer kern-derived surplus (6-month savings rate × estimated monthly income)
     // over current partial-month transactions which can be wildly skewed
     const kernMonthlyIncome = data?.estimatedYearlyIncome
@@ -934,18 +937,33 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       : rawFinancials
         ? rawFinancials.monthlyIncome - rawFinancials.monthlyExpenses
         : 0
-    const bucketResult = computeBucketProjection({
+    const monthlyIncome = kernMonthlyIncome > 0 ? kernMonthlyIncome : (rawFinancials?.monthlyIncome ?? 0)
+    const yearlyExpenses = data?.yearlyMustExpenses ?? (rawFinancials?.monthlyExpenses ?? 0) * 12
+
+    const unifiedInput = {
       assets: fullAssets,
       debts: fullDebts,
-      hasPartner: !!householdOverrides,
+      currentAge: coreCurrentAge,
+      endAge: coreCurrentAge + 20, // 20-year horizon for Kern
+      yearlyExpenses,
+      annualSavings: surplus * 12,
+      monthlySurplus: surplus,
+      monthlyIncome,
+      incomeGrowthRate: fireParams.inflationRate,
+      grossReturn: fireParams.grossReturn,
       inflationRate: fireParams.inflationRate,
       box3Method: fireParams.box3Method,
-      months: 240,
-      monthlySurplus: surplus,
-      monthlyIncome: kernMonthlyIncome > 0 ? kernMonthlyIncome : rawFinancials?.monthlyIncome,
-    })
+      cashflows: [] as import('@/lib/fire-simulation').SimCashflow[],
+      strategyConfig: DEFAULT_FIRE_STRATEGY,
+      withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+      hasPartner: !!householdOverrides,
+      skipFireDetection: true, // Accumulation-only modus
+    }
+
+    const unifiedResult = runUnifiedProjection(unifiedInput)
+    const bucketResult = unifiedToBucketResult(unifiedResult, unifiedInput)
     setBucketProjection(bucketResult)
-  }, [fullAssets, fullDebts, fireParams, householdOverrides, rawFinancials, data, savingsRate6m])
+  }, [fullAssets, fullDebts, fireParams, householdOverrides, rawFinancials, data, savingsRate6m, coreCurrentAge])
 
   // Load balance history (per-entity snapshots) — non-blocking secondary fetch
   useEffect(() => {
