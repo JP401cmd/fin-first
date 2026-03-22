@@ -820,3 +820,264 @@ describe('guardrails + pensioen — high portfolio anchoring (#475)', () => {
     expect(portfolio).toBeGreaterThan(0.80 * startPf)
   })
 })
+
+// ── Guardrails + Deplete/Legacy — Annuity base (#522) ──────────────
+
+describe('guardrails + deplete — annuity as base (#522)', () => {
+  const guardrailsConfig = makeConfig({
+    strategy: 'guardrails',
+    guardrailFloor: 0.80,
+    guardrailCeiling: 1.20,
+    guardrailCutStep: 0.10,
+    guardrailRaiseStep: 0.10,
+  })
+
+  it('first year uses annuity base instead of netBaseExpenses for deplete', () => {
+    const result = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      startPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 0,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'deplete',
+    }))
+    // Annuity: 1_000_000 * 0.05 / (1 - (1.05)^(-23)) ≈ 74_137
+    // effectiveBase = max(74_137, 40_000) = 74_137
+    expect(result).toBeGreaterThan(40_000)
+    expect(result).toBeCloseTo(74_137, -2)
+  })
+
+  it('annuity base recalculates each year (sliding basis)', () => {
+    // Simulate 3 years of deplete + guardrails
+    let portfolio = 1_000_000
+    const expenses = 40_000
+    const r = 0.05
+    const startPf = 1_000_000
+    let prevWithdrawal = 0
+    const withdrawals: number[] = []
+
+    for (let yr = 0; yr < 3; yr++) {
+      const inflatedExpenses = expenses * Math.pow(1.02, yr)
+      const w = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+        baseExpenses: inflatedExpenses,
+        recurringIncome: 0,
+        currentPortfolio: portfolio,
+        startPortfolio: startPf,
+        previousWithdrawal: prevWithdrawal,
+        yearReturn: r,
+        yearsIntoRetirement: yr,
+        currentAge: 67 + yr,
+        endAge: 90,
+        endStrategy: 'deplete',
+      }))
+      withdrawals.push(w)
+      prevWithdrawal = w
+      portfolio = portfolio * (1 + r) - w
+    }
+
+    // Each year's withdrawal should be within the guardrail band of the annuity base
+    for (const w of withdrawals) {
+      expect(w).toBeGreaterThan(expenses) // annuity > expenses for well-funded portfolio
+    }
+  })
+
+  it('depletes portfolio to ≈€0 at endAge with guardrails', () => {
+    let portfolio = 1_000_000
+    const expenses = 40_000
+    const r = 0.05
+    const startPf = 1_000_000
+    const startAge = 67
+    const endAge = 90
+    let prevWithdrawal = 0
+
+    for (let age = startAge; age < endAge; age++) {
+      const inflatedExpenses = expenses * Math.pow(1.02, age - startAge)
+      const w = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+        baseExpenses: inflatedExpenses,
+        recurringIncome: 0,
+        currentPortfolio: portfolio,
+        startPortfolio: startPf,
+        previousWithdrawal: prevWithdrawal,
+        yearReturn: r,
+        yearsIntoRetirement: age - startAge,
+        currentAge: age,
+        endAge,
+        endStrategy: 'deplete',
+      }))
+      prevWithdrawal = w
+      portfolio = portfolio * (1 + r) - w
+    }
+    // Portfolio should be approximately €0 at endAge (within tolerance)
+    expect(Math.abs(portfolio)).toBeLessThan(50_000)
+  })
+
+  it('guardrails clamp around annuity base (not netBaseExpenses) for deplete', () => {
+    // Annuity base ≈ 74k, so floor = 0.80 * 74k ≈ 59k, ceiling = 0.80 * 74k ≈ 89k
+    const result = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 500_000, // floor triggered (< 0.80 × 1M = 800k)
+      startPortfolio: 1_000_000,
+      previousWithdrawal: 74_000, // previous was annuity-level
+      yearReturn: 0.05,
+      yearsIntoRetirement: 3,
+      currentAge: 70,
+      endAge: 90,
+      endStrategy: 'deplete',
+    }))
+    // Annuity at age 70 with €500k: 500_000 * 0.05 / (1 - 1.05^-20) ≈ 40_122
+    // effectiveBase = max(40_122, 40_000) = 40_122
+    // Floor = 0.80 × 40_122 ≈ 32_098
+    // Capital preservation cut: 74_000 * 0.90 = 66_600
+    // Ceiling = 1.20 × 40_122 ≈ 48_146
+    // Clamp: min(48_146, max(32_098, 66_600)) → 48_146
+    expect(result).toBeCloseTo(48_146, -2)
+  })
+
+  it('perpetual + guardrails still uses netBaseExpenses (no annuity)', () => {
+    const result = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      startPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 0,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'perpetual',
+    }))
+    // Perpetual: classic behavior, first year = netBaseExpenses
+    expect(result).toBe(40_000)
+  })
+
+  it('pensioen + guardrails still uses netBaseExpenses (no annuity)', () => {
+    const result = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      startPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 0,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'pensioen',
+    }))
+    expect(result).toBe(40_000)
+  })
+
+  it('undefined endStrategy + guardrails uses netBaseExpenses (backwards compatible)', () => {
+    const result = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      startPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 0,
+      currentAge: 67,
+      endAge: 90,
+      // no endStrategy
+    }))
+    expect(result).toBe(40_000)
+  })
+})
+
+describe('guardrails + legacy — annuity as base (#522)', () => {
+  const guardrailsConfig = makeConfig({
+    strategy: 'guardrails',
+    guardrailFloor: 0.80,
+    guardrailCeiling: 1.20,
+    guardrailCutStep: 0.10,
+    guardrailRaiseStep: 0.10,
+  })
+
+  it('first year uses legacy-aware annuity (portfolio minus indexed legacy)', () => {
+    const indexedLegacy = 300_000 // indexed legacy amount at endAge
+    const result = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      startPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 0,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'legacy',
+      legacyAmount: indexedLegacy,
+    }))
+    // Available = 1_000_000 - 300_000 = 700_000
+    // Annuity: 700_000 * 0.05 / (1 - 1.05^(-23)) ≈ 51_896
+    // effectiveBase = max(51_896, 40_000) = 51_896
+    expect(result).toBeGreaterThan(40_000)
+    expect(result).toBeCloseTo(51_896, -2)
+  })
+
+  it('legacy: annuity is lower than deplete (some portfolio reserved)', () => {
+    const ctxBase = {
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      startPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 0,
+      currentAge: 67,
+      endAge: 90,
+    }
+    const deplete = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      ...ctxBase,
+      endStrategy: 'deplete',
+    }))
+    const legacy = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      ...ctxBase,
+      endStrategy: 'legacy',
+      legacyAmount: 300_000,
+    }))
+    // Legacy should withdraw less since some portfolio is reserved
+    expect(legacy).toBeLessThan(deplete)
+  })
+
+  it('legacy with legacyAmount=0 behaves like deplete', () => {
+    const ctxBase = {
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 1_000_000,
+      startPortfolio: 1_000_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 0,
+      currentAge: 67,
+      endAge: 90,
+    }
+    const deplete = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      ...ctxBase,
+      endStrategy: 'deplete',
+    }))
+    const legacyZero = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      ...ctxBase,
+      endStrategy: 'legacy',
+      legacyAmount: 0,
+    }))
+    expect(legacyZero).toBeCloseTo(deplete, 0)
+  })
+
+  it('legacy with large legacyAmount falls back to netBaseExpenses', () => {
+    // If legacy amount >= portfolio, available = 0, annuity = 0
+    // effectiveBase = max(0, netBaseExpenses) = netBaseExpenses
+    const result = applyWithdrawalStrategy(guardrailsConfig, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 500_000,
+      startPortfolio: 500_000,
+      yearReturn: 0.05,
+      yearsIntoRetirement: 0,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'legacy',
+      legacyAmount: 600_000, // more than portfolio
+    }))
+    // Available = max(0, 500k - 600k) = 0 → annuity = 0
+    // effectiveBase = max(0, 40_000) = 40_000
+    expect(result).toBe(40_000)
+  })
+})

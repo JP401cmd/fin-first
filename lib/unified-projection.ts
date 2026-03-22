@@ -1379,6 +1379,10 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
 
     // Build withdrawal context and apply strategy
     const portfolioForStrategy = sumBucketValues(runningBuckets)
+    // For legacy: indexed legacy amount at endAge (target to preserve)
+    const indexedLegacyForCtx = strategy === 'legacy'
+      ? legacyAmount * Math.pow(1 + inflationRate, effectiveEndAge - currentAge)
+      : undefined
     const wCtx: WithdrawalContext = {
       baseExpenses: expensesThisYear,
       recurringIncome: recurringNet,
@@ -1390,6 +1394,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       currentAge: age,
       endAge: strategy === 'perpetual' ? computedFireAge + 100 : effectiveEndAge,
       endStrategy: strategy,
+      legacyAmount: indexedLegacyForCtx,
     }
     const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
 

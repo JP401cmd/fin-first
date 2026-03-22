@@ -52,6 +52,8 @@ export interface WithdrawalContext {
   endAge: number
   /** FIRE eindstrategie — bij 'deplete' gebruikt applyStatic annuïteitsonttrekking */
   endStrategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+  /** Geïndexeerd nalatenschapsbedrag (alleen voor legacy strategie) */
+  legacyAmount?: number
 }
 
 /** State for bucket strategy — tracks allocation across 3 buckets */
@@ -178,6 +180,35 @@ function applyStatic(ctx: WithdrawalContext): number {
 // ── Guardrails (Guyton-Klinger) ──────────────────────────────────────
 
 /**
+ * Compute the annuity base for deplete/legacy strategies.
+ *
+ * For deplete: annuity = portfolio × r / (1 − (1+r)^(−n))
+ * For legacy:  annuity = (portfolio − indexedLegacy) × r / (1 − (1+r)^(−n))
+ *   where the available portfolio is reduced by the indexed legacy target.
+ *
+ * The annuity recalculates each year on remaining portfolio and remaining years
+ * (schuivende basis / sliding basis).
+ */
+function computeAnnuityBase(ctx: WithdrawalContext): number {
+  const n = Math.max(1, ctx.endAge - ctx.currentAge)
+  const r = ctx.yearReturn
+
+  // For legacy: only the surplus above the indexed legacy target is available
+  let availablePortfolio = ctx.currentPortfolio
+  if (ctx.endStrategy === 'legacy' && ctx.legacyAmount != null && ctx.legacyAmount > 0) {
+    availablePortfolio = Math.max(0, ctx.currentPortfolio - ctx.legacyAmount)
+  }
+
+  if (n <= 1) {
+    return availablePortfolio
+  }
+  if (Math.abs(r) < 1e-10) {
+    return availablePortfolio / n
+  }
+  return availablePortfolio * r / (1 - Math.pow(1 + r, -n))
+}
+
+/**
  * Guyton-Klinger guardrails strategy:
  *
  * 1. Start with base withdrawal (same as static for first year)
@@ -185,6 +216,14 @@ function applyStatic(ctx: WithdrawalContext): number {
  * 3. Capital preservation rule: if portfolio < floor * startPortfolio → cut withdrawal
  * 4. Inflation skip: no inflation adjustment in years with negative returns
  * 5. Clamp final withdrawal between floor*base and ceiling*base
+ *
+ * Strategy-aware base:
+ * - deplete/legacy: annuity calculation as base (recalculated each year)
+ * - perpetual/pensioen/undefined: netBaseExpenses as base (classic behavior)
+ *
+ * The annuity base ensures that with guardrails, the portfolio actually depletes
+ * to ≈€0 (deplete) or ≈legacyAmount (legacy) at the target end age, while still
+ * providing ±20% flexibility for market conditions.
  *
  * Anchoring to startPortfolio (= decumStartPortfolio from simulateDecumulation):
  *
@@ -208,9 +247,17 @@ function applyGuardrails(
 ): number {
   const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
 
-  // First year of retirement: use static withdrawal
+  // Determine the base withdrawal:
+  // For deplete/legacy: annuity recalculated each year (schuivende basis)
+  // For perpetual/pensioen/undefined: classic netBaseExpenses
+  const useAnnuityBase = ctx.endStrategy === 'deplete' || ctx.endStrategy === 'legacy'
+  const annuityBase = useAnnuityBase ? computeAnnuityBase(ctx) : netBaseExpenses
+  // The effective base is at least netBaseExpenses (never withdraw less than living costs)
+  const effectiveBase = useAnnuityBase ? Math.max(annuityBase, netBaseExpenses) : netBaseExpenses
+
+  // First year of retirement: use the effective base directly
   if (ctx.yearsIntoRetirement === 0 || ctx.previousWithdrawal <= 0) {
-    return netBaseExpenses
+    return effectiveBase
   }
 
   // Start from previous year's withdrawal
@@ -235,9 +282,9 @@ function applyGuardrails(
     withdrawal *= (1 - config.guardrailCutStep)
   }
 
-  // Clamp withdrawal between floor and ceiling of base expenses
-  const minWithdrawal = config.guardrailFloor * netBaseExpenses
-  const maxWithdrawal = config.guardrailCeiling * netBaseExpenses
+  // Clamp withdrawal between floor and ceiling of the effective base
+  const minWithdrawal = config.guardrailFloor * effectiveBase
+  const maxWithdrawal = config.guardrailCeiling * effectiveBase
   withdrawal = Math.max(minWithdrawal, Math.min(maxWithdrawal, withdrawal))
 
   return Math.max(0, withdrawal)
