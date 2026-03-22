@@ -22,8 +22,14 @@ import {
   interestOnlySchedule,
 } from '@/lib/debt-data'
 import type { SimCashflow, SimRow, SimResult } from '@/lib/fire-simulation'
-import type { FireEndStrategy, FireStrategyConfig } from '@/lib/fire-strategy'
-import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import { type FireEndStrategy, type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
+import {
+  applyWithdrawalStrategy,
+  WITHDRAWAL_DEFAULTS,
+  type WithdrawalStrategyConfig,
+  type WithdrawalContext,
+} from '@/lib/withdrawal-strategy'
+import { NL_AOW_AGE } from '@/lib/constants'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { classifyAsset, BOX3_PARAMS, type Box3Category } from '@/lib/box3-data'
 
@@ -748,5 +754,635 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
     strategy: result.strategy,
     targetEndPortfolio: result.targetEndPortfolio,
     displayEndAge: result.displayEndAge,
+  }
+}
+
+// ── Waterfall withdrawal order ────────────────────────────────────────────────
+
+/**
+ * Prioriteitsvolgorde voor onttrekking uit asset buckets.
+ * Beleggingen worden eerst aangesproken, spaargeld daarna, etc.
+ */
+const WATERFALL_ORDER: readonly AssetType[] = [
+  'investment',
+  'savings',
+  'crypto',
+  'retirement',
+  'real_estate',
+  'vehicle',
+  'deelneming',
+  'other',
+  'eigen_huis',
+] as const
+
+/**
+ * Trek een bedrag af van running buckets via waterfall-volgorde.
+ *
+ * Elke bucket wordt maximaal tot 0 afgebouwd; het restant gaat naar de
+ * volgende bucket in de waterfall. Retourneert het daadwerkelijk
+ * onttrokken bedrag (kan lager zijn dan gevraagd als portfolio ontoereikend).
+ *
+ * @param runningBuckets - lopende buckets (worden IN-PLACE gewijzigd)
+ * @param amount - gewenst onttrekkingsbedrag (positief)
+ * @returns daadwerkelijk onttrokken bedrag
+ */
+function waterfallWithdraw(
+  runningBuckets: RunningBucket[],
+  amount: number,
+): number {
+  if (amount <= 0) return 0
+
+  let remaining = amount
+  // Index buckets by asset type for O(1) lookup
+  const bucketMap = new Map<AssetType, RunningBucket>()
+  for (const b of runningBuckets) bucketMap.set(b.assetType, b)
+
+  for (const assetType of WATERFALL_ORDER) {
+    if (remaining <= 0) break
+    const bucket = bucketMap.get(assetType)
+    if (!bucket || bucket.value <= 0) continue
+
+    const deduction = Math.min(remaining, bucket.value)
+    bucket.value -= deduction
+    remaining -= deduction
+  }
+
+  return amount - remaining
+}
+
+// ── Unified Projection Engine ─────────────────────────────────────────────────
+
+/**
+ * Unified projection engine — combineert per-asset-type bucket-groei,
+ * per-schuld aflossing, FIRE-detectie via binary search, en
+ * onttrekkingsstrategieën in één simulatie.
+ *
+ * Port van runSimulation() uit fire-simulation.ts, aangepast voor:
+ * 1. Per-asset-type rendement & Box 3 (via computeYearlyAssetGrowth)
+ * 2. Per-schuld aflossing (via computeYearlyDebtSchedule)
+ * 3. Drie fasen: accumulation → transition → withdrawal
+ * 4. netWorth = totalAssets - totalDebts als target voor binary search
+ *
+ * @param input - UnifiedProjectionInput met alle benodigde data
+ * @returns UnifiedProjectionResult met rows, FIRE-uitkomsten en metadata
+ */
+export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProjectionResult {
+  const {
+    assets,
+    debts,
+    currentAge,
+    yearlyExpenses,
+    annualSavings,
+    grossReturn,
+    inflationRate,
+    box3Method,
+    cashflows,
+    withdrawalStrategy,
+    hasPartner,
+  } = input
+
+  // ── Resolve strategy ───────────────────────────────────────────────
+  const cfg = input.strategyConfig ?? DEFAULT_FIRE_STRATEGY
+  const strategy = cfg.strategy
+  const effectiveEndAge = strategy === 'perpetual'
+    ? Math.max(input.endAge, 100)
+    : cfg.endAge
+  const legacyAmount = cfg.legacyAmount
+  const displayEndAge = strategy === 'perpetual' ? cfg.endAge : effectiveEndAge
+
+  // Determine AOW age — pensioen mode uses forcedFireAge as the AOW trigger
+  const aowAge = input.forcedFireAge != null ? input.forcedFireAge : NL_AOW_AGE
+
+  // ── Early exit: perpetual met negatief reëel rendement ─────────────
+  // Weighted average return across all assets approximates portReturn.
+  // For the perpetual check we use grossReturn as conservative proxy.
+  if (strategy === 'perpetual' && grossReturn <= inflationRate) {
+    return {
+      rows: [],
+      fireAge: null,
+      fireAgeFractional: null,
+      fireReachable: false,
+      firePortfolioAtFire: 0,
+      requiredFirePortfolio: 0,
+      implicitWithdrawalRate: 0,
+      strategy,
+      targetEndPortfolio: 0,
+      displayEndAge,
+    }
+  }
+
+  // ── Resolve withdrawal strategy ────────────────────────────────────
+  const wsConfig = withdrawalStrategy ?? WITHDRAWAL_DEFAULTS
+
+  // VPW + perpetual/legacy incompatibiliteit — VPW onttrekt per definitie
+  // volledig binnen resterende horizon, conflicteert met behoud/nalatenschap
+  if ((strategy === 'perpetual' || strategy === 'legacy') && wsConfig.strategy === 'vpw') {
+    return {
+      rows: [],
+      fireAge: null,
+      fireAgeFractional: null,
+      fireReachable: false,
+      firePortfolioAtFire: 0,
+      requiredFirePortfolio: 0,
+      implicitWithdrawalRate: 0,
+      strategy,
+      targetEndPortfolio: 0,
+      displayEndAge,
+    }
+  }
+
+  // ── Cashflow helpers (ported from fire-simulation.ts) ──────────────
+
+  /** Signed monthly cashflow for a recurring cashflow at a given age */
+  function recurringMonthly(cf: SimCashflow, age: number): number {
+    if (cf.type !== 'recurring') return 0
+    if (age < cf.fromAge) return 0
+    if (cf.toAge !== null && age >= cf.toAge) return 0
+    const yrsActive = age - cf.fromAge
+    const monthly = cf.indexed ? cf.amount * Math.pow(1 + inflationRate, yrsActive) : cf.amount
+    return cf.direction === 'income' ? monthly : -monthly
+  }
+
+  /** Signed one-time amount for a one-time cashflow at a given age */
+  function oneTimeAmount(cf: SimCashflow, age: number): number {
+    if (cf.type !== 'one_time') return 0
+    if (cf.fromAge !== age) return 0
+    const yrsFromNow = age - currentAge
+    const nominal = cf.indexed ? cf.amount * Math.pow(1 + inflationRate, yrsFromNow) : cf.amount
+    return cf.direction === 'income' ? nominal : -nominal
+  }
+
+  // ── Helper: sum all bucket values ──────────────────────────────────
+
+  function sumBucketValues(buckets: RunningBucket[]): number {
+    let total = 0
+    for (const b of buckets) total += b.value
+    return total
+  }
+
+  // ── Lightweight decumulation for binary search ─────────────────────
+  // Mirrors the old engine's simulateDecumulation but operates on total
+  // asset value (sum of buckets) using a simple weighted-average return
+  // and Box 3 drag. This avoids the overhead of full per-bucket simulation
+  // while maintaining convergence-compatible behavior.
+
+  /**
+   * Compute a flat net return (gross return minus approximate Box 3 drag)
+   * used in the binary search. This approximates the per-asset-type
+   * computation for convergence purposes.
+   */
+  function computeAverageNetReturn(buckets: RunningBucket[]): number {
+    const totalValue = sumBucketValues(buckets)
+    if (totalValue <= 0) return grossReturn
+
+    let weightedReturn = 0
+    let weightedDrag = 0
+    for (const b of buckets) {
+      const w = b.value / totalValue
+      weightedReturn += w * b.annualReturn
+      weightedDrag += w * b.rawDragRate
+    }
+    return weightedReturn - weightedDrag
+  }
+
+  /**
+   * Simulate decumulation from a given starting netWorth at startAge.
+   *
+   * Uses static withdrawal for binary search convergence (same as old engine).
+   * Portfolio is NOT clamped to 0 to allow binary search to converge.
+   *
+   * @param startNetWorth - starting net worth (assets only for binary search)
+   * @param startAge - age at which decumulation begins
+   * @param portReturn - net return rate to use
+   * @param simEndAge - end age for the simulation
+   * @returns endNetWorth after simulation
+   */
+  function simulateDecumulationLightweight(
+    startNetWorth: number,
+    startAge: number,
+    portReturn: number,
+    simEndAge: number,
+  ): number {
+    let portfolio = startNetWorth
+
+    for (let age = startAge; age < simEndAge; age++) {
+      // Apply one-time cashflows before growth
+      for (const cf of cashflows) {
+        portfolio += oneTimeAmount(cf, age)
+      }
+
+      const yearsIntoPension = age - startAge
+      const expensesThisYear = yearlyExpenses * Math.pow(1 + inflationRate, yearsIntoPension)
+
+      // Recurring cashflows net
+      let recurringNet = 0
+      for (const cf of cashflows) {
+        recurringNet += recurringMonthly(cf, age) * 12
+      }
+
+      // Static withdrawal for binary search convergence
+      const wCtx: WithdrawalContext = {
+        baseExpenses: expensesThisYear,
+        recurringIncome: recurringNet,
+        currentPortfolio: portfolio,
+        startPortfolio: startNetWorth,
+        previousWithdrawal: 0,
+        yearReturn: portReturn,
+        yearsIntoRetirement: yearsIntoPension,
+        currentAge: age,
+        endAge: simEndAge,
+      }
+      const withdrawal = applyWithdrawalStrategy(WITHDRAWAL_DEFAULTS, wCtx)
+
+      const growth = portfolio * portReturn
+      portfolio = portfolio + growth - withdrawal
+    }
+
+    return portfolio
+  }
+
+  // ── Binary search: requiredAt(candidateFireAge) ────────────────────
+
+  /** Initial running buckets for average return estimation */
+  const initialBuckets = initRunningBuckets(assets, grossReturn, box3Method)
+  const avgNetReturn = computeAverageNetReturn(initialBuckets)
+
+  /**
+   * Binary search: minimum netWorth at candidateFireAge such that
+   * decumulation meets the strategy target.
+   *
+   * Uses static withdrawal and lightweight simulation for convergence.
+   */
+  function requiredAt(candidateFireAge: number): number {
+    const verifyEndAge = strategy === 'perpetual'
+      ? candidateFireAge + 100
+      : effectiveEndAge
+
+    let lo = 0
+    let hi = Math.max(
+      yearlyExpenses * (strategy === 'perpetual' ? 500 : 200),
+      sumBucketValues(initialBuckets) * 10,
+      10_000_000,
+    )
+
+    // Indexed legacy target at endAge
+    const indexedLegacy = strategy === 'legacy'
+      ? legacyAmount * Math.pow(1 + inflationRate, effectiveEndAge - currentAge)
+      : 0
+
+    for (let iter = 0; iter < 80; iter++) {
+      const mid = (lo + hi) / 2
+      const ep = simulateDecumulationLightweight(mid, candidateFireAge, avgNetReturn, verifyEndAge)
+
+      if (strategy === 'legacy') {
+        if (ep >= indexedLegacy) hi = mid; else lo = mid
+      } else {
+        // deplete: endPortfolio >= 0 at endAge
+        // perpetual: endPortfolio >= 0 at fireAge+100
+        if (ep >= 0) hi = mid; else lo = mid
+      }
+      if (hi - lo < 10) break
+    }
+
+    return (lo + hi) / 2
+  }
+
+  // ── Phase 1: Accumulation + FIRE-age detection ─────────────────────
+
+  const runningBuckets = initRunningBuckets(assets, grossReturn, box3Method)
+  const runningDebts = initRunningDebts(debts)
+
+  let computedFireAge: number | null = null
+  let netWorthPreFire = sumBucketValues(runningBuckets)
+    - computeWeightedDebtTotal(
+        Object.fromEntries(runningDebts.map(rd => [rd.debtId, {
+          startBalance: rd.balance, interestPaid: 0, principalPaid: 0, endBalance: rd.balance,
+        }])),
+        runningDebts,
+      )
+  const accRows: UnifiedProjectionRow[] = []
+  let cumulativeBox3 = 0
+
+  // Accumulation end: either forcedFireAge or effectiveEndAge
+  const accEndAge = input.forcedFireAge != null
+    ? Math.min(input.forcedFireAge, effectiveEndAge)
+    : effectiveEndAge
+
+  for (let age = currentAge; age < accEndAge; age++) {
+    const year = age - currentAge
+
+    // FIRE detection via binary search (skip when forcedFireAge is set)
+    if (input.forcedFireAge == null) {
+      const currentNetWorth = sumBucketValues(runningBuckets)
+        - computeWeightedDebtTotal(
+            Object.fromEntries(runningDebts.map(rd => [rd.debtId, {
+              startBalance: rd.balance, interestPaid: 0, principalPaid: 0, endBalance: rd.balance,
+            }])),
+            runningDebts,
+          )
+      const req = requiredAt(age)
+      if (currentNetWorth >= req) {
+        computedFireAge = age
+        break
+      }
+    }
+
+    // Capture pre-FIRE netWorth for fractional calculation
+    netWorthPreFire = sumBucketValues(runningBuckets)
+      - computeWeightedDebtTotal(
+          Object.fromEntries(runningDebts.map(rd => [rd.debtId, {
+            startBalance: rd.balance, interestPaid: 0, principalPaid: 0, endBalance: rd.balance,
+          }])),
+          runningDebts,
+        )
+
+    // One-time cashflows — add to investable buckets proportionally
+    let oneTimeNet = 0
+    for (const cf of cashflows) {
+      const amt = oneTimeAmount(cf, age)
+      if (amt !== 0) {
+        oneTimeNet += amt
+        // Distribute one-time cashflow across investable buckets proportionally
+        if (amt > 0) {
+          // Income: add to investment buckets
+          const investable = runningBuckets.filter(b => INVESTABLE_ASSET_TYPES.has(b.assetType))
+          const totalInv = investable.reduce((s, b) => s + Math.max(0, b.value), 0)
+          if (totalInv > 0) {
+            for (const b of investable) b.value += amt * (Math.max(0, b.value) / totalInv)
+          } else if (investable.length > 0) {
+            for (const b of investable) b.value += amt / investable.length
+          }
+        } else {
+          // Expense: withdraw via waterfall
+          waterfallWithdraw(runningBuckets, Math.abs(amt))
+        }
+      }
+    }
+
+    // Recurring cashflows net
+    let cashflowNet = 0
+    for (const cf of cashflows) {
+      cashflowNet += recurringMonthly(cf, age) * 12
+    }
+
+    // Effective savings = annual savings + recurring cashflow net
+    const effectiveSavings = annualSavings + cashflowNet
+
+    // Reset bucket contributions to their base (monthly_contribution × 12)
+    // This is needed because computeYearlyAssetGrowth accumulates surplus into contributions
+    for (const b of runningBuckets) {
+      // Find original contribution from initRunningBuckets
+      const originalAssets = assets.filter(a => a.is_active && a.asset_type === b.assetType)
+      b.annualContribution = originalAssets.reduce((s, a) => s + Number(a.monthly_contribution) * 12, 0)
+    }
+
+    // Compute per-asset growth with surplus allocation
+    const assetBuckets = computeYearlyAssetGrowth(runningBuckets, effectiveSavings, hasPartner)
+
+    // Compute debt schedule
+    const { debtBalances } = computeYearlyDebtSchedule(runningDebts)
+
+    // Aggregate totals
+    let totalGrowth = 0
+    let totalBox3 = 0
+    for (const detail of Object.values(assetBuckets)) {
+      if (detail) {
+        totalGrowth += detail.growth
+        totalBox3 += detail.box3Drag
+      }
+    }
+    cumulativeBox3 += totalBox3
+
+    const totalAssets = sumBucketValues(runningBuckets)
+    const totalDebtsValue = computeWeightedDebtTotal(debtBalances, runningDebts)
+    const netWorth = totalAssets - totalDebtsValue
+
+    accRows.push({
+      year,
+      age,
+      phase: 'accumulation',
+      assetBuckets,
+      debtBalances,
+      totalAssets: Math.round(totalAssets),
+      totalDebts: Math.round(totalDebtsValue),
+      netWorth: Math.round(netWorth),
+      grossIncome: Math.round(annualSavings + yearlyExpenses),
+      savings: Math.round(annualSavings),
+      withdrawal: 0,
+      cashflowNet: Math.round(cashflowNet + oneTimeNet),
+      totalGrowth: Math.round(totalGrowth),
+      totalBox3: Math.round(totalBox3),
+      cumulativeBox3: Math.round(cumulativeBox3),
+      inflationFactor: Math.pow(1 + inflationRate, year),
+    })
+  }
+
+  // If forcedFireAge is set, always transition at that age
+  if (input.forcedFireAge != null && computedFireAge == null && input.forcedFireAge <= effectiveEndAge) {
+    computedFireAge = input.forcedFireAge
+  }
+
+  // ── FIRE not reachable ─────────────────────────────────────────────
+  if (computedFireAge === null) {
+    const finalNetWorth = accRows.length > 0
+      ? accRows[accRows.length - 1].netWorth
+      : sumBucketValues(runningBuckets)
+    return {
+      rows: accRows,
+      fireAge: null,
+      fireAgeFractional: null,
+      fireReachable: false,
+      firePortfolioAtFire: Math.round(finalNetWorth),
+      requiredFirePortfolio: Math.round(requiredAt(effectiveEndAge - 1)),
+      implicitWithdrawalRate: 0,
+      strategy,
+      targetEndPortfolio: strategy === 'legacy' ? legacyAmount : 0,
+      displayEndAge,
+    }
+  }
+
+  // ── Fractional FIRE age via linear interpolation ───────────────────
+  const currentNetWorth = sumBucketValues(runningBuckets)
+    - computeWeightedDebtTotal(
+        Object.fromEntries(runningDebts.map(rd => [rd.debtId, {
+          startBalance: rd.balance, interestPaid: 0, principalPaid: 0, endBalance: rd.balance,
+        }])),
+        runningDebts,
+      )
+
+  const requiredFirePortfolioExact = requiredAt(computedFireAge)
+  const requiredFirePortfolio = Math.round(requiredFirePortfolioExact)
+
+  let fractionalFireAge: number
+  if (computedFireAge === currentAge) {
+    fractionalFireAge = currentAge
+  } else {
+    const reqStart = requiredAt(computedFireAge - 1)
+    const reqEnd = requiredFirePortfolioExact
+    const portDiff = currentNetWorth - netWorthPreFire
+    const reqDiff = reqEnd - reqStart
+    const denom = portDiff - reqDiff
+    const t = denom !== 0 ? (reqStart - netWorthPreFire) / denom : 0.5
+    fractionalFireAge = (computedFireAge - 1) + Math.max(0, Math.min(1, t))
+  }
+
+  // ── Phase 2 & 3: Decumulation from fireAge ────────────────────────
+  // Generate full rows with per-bucket detail and withdrawal strategy
+
+  const decRows: UnifiedProjectionRow[] = []
+  let previousWithdrawal = 0
+  const decStartNetWorth = input.forcedFireAge != null
+    ? currentNetWorth
+    : requiredFirePortfolioExact
+
+  // If not using forcedFireAge, scale bucket values to match requiredFirePortfolioExact
+  // This prevents visual discontinuity at FIRE age
+  if (input.forcedFireAge == null && currentNetWorth > 0) {
+    const scaleFactor = decStartNetWorth / currentNetWorth
+    for (const b of runningBuckets) {
+      b.value *= scaleFactor
+    }
+  }
+
+  // Determine active withdrawal config (use chosen strategy for display rows)
+  const activeConfig = wsConfig
+  const decumStartPortfolio = sumBucketValues(runningBuckets)
+
+  for (let age = computedFireAge; age < displayEndAge; age++) {
+    const year = age - currentAge
+    const yearsIntoPension = age - computedFireAge
+
+    // Reset bucket contributions to base for this year
+    for (const b of runningBuckets) {
+      const originalAssets = assets.filter(a => a.is_active && a.asset_type === b.assetType)
+      b.annualContribution = originalAssets.reduce((s, a) => s + Number(a.monthly_contribution) * 12, 0)
+    }
+
+    // One-time cashflows
+    let oneTimeNet = 0
+    for (const cf of cashflows) {
+      const amt = oneTimeAmount(cf, age)
+      if (amt !== 0) {
+        oneTimeNet += amt
+        if (amt > 0) {
+          const investable = runningBuckets.filter(b => INVESTABLE_ASSET_TYPES.has(b.assetType))
+          const totalInv = investable.reduce((s, b) => s + Math.max(0, b.value), 0)
+          if (totalInv > 0) {
+            for (const b of investable) b.value += amt * (Math.max(0, b.value) / totalInv)
+          } else if (investable.length > 0) {
+            for (const b of investable) b.value += amt / investable.length
+          }
+        } else {
+          waterfallWithdraw(runningBuckets, Math.abs(amt))
+        }
+      }
+    }
+
+    // Recurring cashflows
+    let recurringNet = 0
+    let recurringIncome = 0
+    for (const cf of cashflows) {
+      const val = recurringMonthly(cf, age) * 12
+      recurringNet += val
+      if (val > 0) recurringIncome += val
+    }
+
+    const expensesThisYear = yearlyExpenses * Math.pow(1 + inflationRate, yearsIntoPension)
+
+    // Build withdrawal context and apply strategy
+    const portfolioForStrategy = sumBucketValues(runningBuckets)
+    const wCtx: WithdrawalContext = {
+      baseExpenses: expensesThisYear,
+      recurringIncome: recurringNet,
+      currentPortfolio: portfolioForStrategy,
+      startPortfolio: decumStartPortfolio,
+      previousWithdrawal,
+      yearReturn: avgNetReturn,
+      yearsIntoRetirement: yearsIntoPension,
+      currentAge: age,
+      endAge: strategy === 'perpetual' ? computedFireAge + 100 : effectiveEndAge,
+    }
+    const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
+
+    // Apply withdrawal via waterfall across asset buckets
+    waterfallWithdraw(runningBuckets, withdrawal)
+
+    // No surplus allocation during decumulation (savings = 0)
+    const assetBuckets = computeYearlyAssetGrowth(runningBuckets, 0, hasPartner)
+
+    // Debt schedule continues during decumulation
+    const { debtBalances } = computeYearlyDebtSchedule(runningDebts)
+
+    // Aggregate totals
+    let totalGrowth = 0
+    let totalBox3 = 0
+    for (const detail of Object.values(assetBuckets)) {
+      if (detail) {
+        totalGrowth += detail.growth
+        totalBox3 += detail.box3Drag
+      }
+    }
+    cumulativeBox3 += totalBox3
+
+    const totalAssets = Math.max(0, sumBucketValues(runningBuckets))
+    const totalDebtsValue = computeWeightedDebtTotal(debtBalances, runningDebts)
+    const netWorth = totalAssets - totalDebtsValue
+
+    // Phase assignment:
+    // - accumulation: age < fireAge (already handled above)
+    // - transition: fireAge ≤ age < aowAge
+    // - withdrawal: age ≥ aowAge
+    // If forcedFireAge is set (pensioen mode), there's no transition phase
+    let phase: 'accumulation' | 'transition' | 'withdrawal'
+    if (input.forcedFireAge != null) {
+      // Pensioen mode: skip transition, go straight to withdrawal
+      phase = 'withdrawal'
+    } else if (age >= aowAge) {
+      phase = 'withdrawal'
+    } else {
+      phase = 'transition'
+    }
+
+    decRows.push({
+      year,
+      age,
+      phase,
+      assetBuckets,
+      debtBalances,
+      totalAssets: Math.round(totalAssets),
+      totalDebts: Math.round(totalDebtsValue),
+      netWorth: Math.round(netWorth),
+      grossIncome: Math.round(recurringIncome),
+      savings: 0,
+      withdrawal: Math.round(withdrawal),
+      cashflowNet: Math.round(oneTimeNet + recurringNet),
+      totalGrowth: Math.round(totalGrowth),
+      totalBox3: Math.round(totalBox3),
+      cumulativeBox3: Math.round(cumulativeBox3),
+      inflationFactor: Math.pow(1 + inflationRate, year),
+    })
+
+    previousWithdrawal = withdrawal
+  }
+
+  // ── Assemble result ────────────────────────────────────────────────
+
+  const implicitWithdrawalRate = requiredFirePortfolio > 0
+    ? yearlyExpenses / requiredFirePortfolio
+    : 0
+
+  return {
+    rows: [...accRows, ...decRows],
+    fireAge: computedFireAge,
+    fireAgeFractional: fractionalFireAge,
+    fireReachable: true,
+    firePortfolioAtFire: Math.round(currentNetWorth),
+    requiredFirePortfolio,
+    implicitWithdrawalRate,
+    strategy,
+    targetEndPortfolio: strategy === 'legacy'
+      ? Math.round(legacyAmount * Math.pow(1 + inflationRate, effectiveEndAge - currentAge))
+      : 0,
+    displayEndAge,
   }
 }

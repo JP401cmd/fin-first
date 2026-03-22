@@ -17,8 +17,10 @@ import {
   applyHeffingsvrij,
   toSimRow,
   toSimResult,
+  runUnifiedProjection,
   type UnifiedProjectionRow,
   type UnifiedProjectionResult,
+  type UnifiedProjectionInput,
   type AssetBucketDetail,
   initRunningBuckets,
   initRunningDebts,
@@ -26,6 +28,10 @@ import {
   computeWeightedDebtTotal,
   type DebtBalanceDetail,
 } from '@/lib/unified-projection'
+import { runSimulation, lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
+import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import { DEFAULT_FIRE_STRATEGY, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { NL_AOW_AGE } from '@/lib/constants'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { amortizationSchedule } from '@/lib/debt-data'
@@ -685,6 +691,401 @@ describe('Unified Projection — Fase 1b: Schuldaflossing per schuld per jaar', 
         debtBalances['studie-1'].endBalance * 1.0 +
         debtBalances['aflvrij-1'].endBalance * 0.5
       expect(weighted).toBeCloseTo(expected, 0)
+    })
+  })
+})
+
+// ── Fase 1c: FIRE-detectie & onttrekkingsstrategieën in unified engine ──────
+
+/**
+ * Helper: build a minimal UnifiedProjectionInput for testing.
+ * Uses Rashid-like persona defaults.
+ */
+function makeInput(overrides: Partial<UnifiedProjectionInput> = {}): UnifiedProjectionInput {
+  return {
+    assets: [
+      makeAsset({ asset_type: 'investment', current_value: 170_000, expected_return: 7, monthly_contribution: 800 }),
+    ],
+    debts: [],
+    currentAge: 42,
+    endAge: 90,
+    yearlyExpenses: 50_400, // €4200/mnd
+    annualSavings: 15_600,  // €1300/mnd
+    monthlySurplus: 1300,
+    monthlyIncome: 5500,
+    incomeGrowthRate: 0.02,
+    grossReturn: 0.07,
+    inflationRate: 0.02,
+    box3Method: 'forfaitair' as const,
+    cashflows: [],
+    strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+    hasPartner: false,
+    ...overrides,
+  }
+}
+
+/**
+ * Helper: build a Lisa-like input (mortgage + higher expenses)
+ */
+function makeLisaInput(overrides: Partial<UnifiedProjectionInput> = {}): UnifiedProjectionInput {
+  return makeInput({
+    assets: [
+      makeAsset({ asset_type: 'investment', current_value: 42_000, expected_return: 7, monthly_contribution: 400 }),
+      makeAsset({ asset_type: 'investment', current_value: 8_000, expected_return: 7, monthly_contribution: 0, name: 'Kinderbelegging' }),
+    ],
+    debts: [
+      makeDebt({
+        current_balance: 350_000,
+        interest_rate: 2.9,
+        monthly_payment: 1100,
+        repayment_type: 'annuiteit',
+      }),
+    ],
+    currentAge: 44,
+    endAge: 90,
+    yearlyExpenses: 48_000, // €4000/mnd
+    annualSavings: 14_400,  // €1200/mnd
+    monthlySurplus: 1200,
+    monthlyIncome: 5200,
+    strategyConfig: { strategy: 'legacy', endAge: 90, legacyAmount: 100_000 },
+    withdrawalStrategy: { strategy: 'bucket', guardrailFloor: 0.8, guardrailCeiling: 1.2, guardrailCutStep: 0.1, guardrailRaiseStep: 0.1 },
+    hasPartner: true,
+    ...overrides,
+  })
+}
+
+describe('Unified Projection — Fase 1c: FIRE-detectie & onttrekkingsstrategieën', () => {
+
+  describe('runUnifiedProjection — basiswerking', () => {
+    it('produceert rijen van currentAge tot displayEndAge', () => {
+      const input = makeInput()
+      const result = runUnifiedProjection(input)
+
+      expect(result.rows.length).toBeGreaterThan(0)
+      expect(result.rows[0].age).toBe(42)
+      // Last row should be displayEndAge - 1
+      const lastRow = result.rows[result.rows.length - 1]
+      expect(lastRow.age).toBeLessThanOrEqual(89) // endAge=90, last row at age 89
+    })
+
+    it('alle rijen hebben monotoon stijgende leeftijden', () => {
+      const result = runUnifiedProjection(makeInput())
+      for (let i = 1; i < result.rows.length; i++) {
+        expect(result.rows[i].age).toBe(result.rows[i - 1].age + 1)
+      }
+    })
+
+    it('accumulatiefase heeft savings > 0, withdrawal = 0', () => {
+      const result = runUnifiedProjection(makeInput())
+      const accRow = result.rows.find(r => r.phase === 'accumulation')
+      if (accRow) {
+        expect(accRow.savings).toBeGreaterThan(0)
+        expect(accRow.withdrawal).toBe(0)
+      }
+    })
+
+    it('onttrekkingsfase heeft withdrawal > 0, savings = 0', () => {
+      const result = runUnifiedProjection(makeInput())
+      const decRow = result.rows.find(r => r.phase === 'withdrawal' || r.phase === 'transition')
+      if (decRow) {
+        expect(decRow.savings).toBe(0)
+        expect(decRow.withdrawal).toBeGreaterThanOrEqual(0)
+      }
+    })
+  })
+
+  describe('FIRE-detectie — binary search', () => {
+    it('Rashid-achtig profiel: FIRE bereikbaar, leeftijd tussen 50-65', () => {
+      const result = runUnifiedProjection(makeInput())
+      expect(result.fireReachable).toBe(true)
+      expect(result.fireAge).not.toBeNull()
+      expect(result.fireAge!).toBeGreaterThanOrEqual(50)
+      expect(result.fireAge!).toBeLessThanOrEqual(65)
+    })
+
+    it('FIRE-leeftijd wijzigt niet significant t.o.v. oude engine voor Rashid-achtig profiel', () => {
+      const input = makeInput()
+      const unifiedResult = runUnifiedProjection(input)
+
+      // Run old engine with same parameters for comparison
+      const totalAssets = 170_000
+      const oldResult = runSimulation(
+        42, 90, totalAssets, 50_400, 15_600,
+        0.07, 'nl_box3', 0.02, [],
+        { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+        WITHDRAWAL_DEFAULTS,
+      )
+
+      expect(unifiedResult.fireReachable).toBe(true)
+      expect(oldResult.fireReachable).toBe(true)
+      // FIRE ages should be within 3 years of each other (Box 3 per-type vs flat drag differs)
+      const diff = Math.abs((unifiedResult.fireAge ?? 0) - (oldResult.fireAge ?? 0))
+      expect(diff).toBeLessThanOrEqual(3)
+    })
+
+    it('Lisa-achtig profiel: FIRE bereikbaar ondanks hypotheek', () => {
+      const result = runUnifiedProjection(makeLisaInput())
+      // Lisa has high mortgage but also investments — FIRE should be reachable
+      expect(result.fireReachable).toBe(true)
+      expect(result.fireAge).not.toBeNull()
+    })
+
+    it('FIRE-leeftijd wijzigt niet significant voor Lisa-achtig profiel', () => {
+      const lisaInput = makeLisaInput()
+      const unifiedResult = runUnifiedProjection(lisaInput)
+
+      // Old engine: just total assets - no per-debt tracking
+      const totalAssets = 42_000 + 8_000 // investments only
+      const oldResult = runSimulation(
+        44, 90, totalAssets, 48_000, 14_400,
+        0.07, 'nl_box3', 0.02, [],
+        { strategy: 'legacy', endAge: 90, legacyAmount: 100_000 },
+        { strategy: 'bucket', guardrailFloor: 0.8, guardrailCeiling: 1.2, guardrailCutStep: 0.1, guardrailRaiseStep: 0.1 },
+      )
+
+      if (unifiedResult.fireReachable && oldResult.fireReachable) {
+        // With debt tracking, FIRE might be different but not radically
+        const diff = Math.abs((unifiedResult.fireAge ?? 0) - (oldResult.fireAge ?? 0))
+        expect(diff).toBeLessThanOrEqual(5)
+      }
+    })
+
+    it('fractionele FIRE-leeftijd is valid (tussen fireAge-1 en fireAge)', () => {
+      const result = runUnifiedProjection(makeInput())
+      if (result.fireReachable && result.fireAge !== null && result.fireAgeFractional !== null) {
+        expect(result.fireAgeFractional).toBeGreaterThanOrEqual(result.fireAge - 1)
+        expect(result.fireAgeFractional).toBeLessThanOrEqual(result.fireAge)
+      }
+    })
+  })
+
+  describe('pensioen-strategie — forcedFireAge', () => {
+    it('pensioen forceert fireAge op AOW-leeftijd', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'pensioen', endAge: 90, legacyAmount: 0 },
+        forcedFireAge: NL_AOW_AGE,
+      }))
+
+      expect(result.fireReachable).toBe(true)
+      expect(result.fireAge).toBe(NL_AOW_AGE)
+    })
+
+    it('pensioen produceert withdrawal-fase rijen na AOW', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'pensioen', endAge: 90, legacyAmount: 0 },
+        forcedFireAge: NL_AOW_AGE,
+      }))
+
+      // All decumulation rows should be 'withdrawal' (no transition in pensioen mode)
+      const decRows = result.rows.filter(r => r.age >= NL_AOW_AGE)
+      for (const row of decRows) {
+        expect(row.phase).toBe('withdrawal')
+      }
+    })
+
+    it('pensioen: accumulatie rijen tot AOW', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'pensioen', endAge: 90, legacyAmount: 0 },
+        forcedFireAge: NL_AOW_AGE,
+      }))
+
+      const accRows = result.rows.filter(r => r.phase === 'accumulation')
+      expect(accRows.length).toBe(NL_AOW_AGE - 42) // currentAge=42, accumulate to 67
+      expect(accRows[accRows.length - 1].age).toBe(NL_AOW_AGE - 1) // last accumulation row
+    })
+  })
+
+  describe('perpetual-strategie', () => {
+    it('perpetual met portReturn ≤ inflation → fireReachable: false', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 },
+        grossReturn: 0.02, // = inflationRate
+      }))
+
+      expect(result.fireReachable).toBe(false)
+      expect(result.fireAge).toBeNull()
+      expect(result.rows).toHaveLength(0)
+    })
+
+    it('perpetual met goed rendement: simuleert voorbij 100 jaar', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 },
+      }))
+
+      // Perpetual should still reach FIRE if returns are good
+      if (result.fireReachable) {
+        expect(result.displayEndAge).toBe(90)
+      }
+    })
+  })
+
+  describe('VPW incompatibiliteit', () => {
+    it('VPW + perpetual → fireReachable: false', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 },
+        withdrawalStrategy: { strategy: 'vpw', guardrailFloor: 0.8, guardrailCeiling: 1.2, guardrailCutStep: 0.1, guardrailRaiseStep: 0.1 },
+      }))
+
+      expect(result.fireReachable).toBe(false)
+      expect(result.rows).toHaveLength(0)
+    })
+
+    it('VPW + legacy → fireReachable: false', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'legacy', endAge: 90, legacyAmount: 50_000 },
+        withdrawalStrategy: { strategy: 'vpw', guardrailFloor: 0.8, guardrailCeiling: 1.2, guardrailCutStep: 0.1, guardrailRaiseStep: 0.1 },
+      }))
+
+      expect(result.fireReachable).toBe(false)
+    })
+
+    it('VPW + deplete → werkt normaal', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+        withdrawalStrategy: { strategy: 'vpw', guardrailFloor: 0.8, guardrailCeiling: 1.2, guardrailCutStep: 0.1, guardrailRaiseStep: 0.1 },
+      }))
+
+      expect(result.rows.length).toBeGreaterThan(0)
+      // VPW + deplete should work fine
+    })
+  })
+
+  describe('fase-toewijzing', () => {
+    it('transition fase: fireAge ≤ age < aowAge', () => {
+      const result = runUnifiedProjection(makeInput())
+      if (result.fireReachable && result.fireAge !== null && result.fireAge < NL_AOW_AGE) {
+        const transitionRows = result.rows.filter(r => r.phase === 'transition')
+        expect(transitionRows.length).toBeGreaterThan(0)
+        // All transition rows should be between fireAge and aowAge
+        for (const row of transitionRows) {
+          expect(row.age).toBeGreaterThanOrEqual(result.fireAge)
+          expect(row.age).toBeLessThan(NL_AOW_AGE)
+        }
+      }
+    })
+
+    it('withdrawal fase begint bij aowAge', () => {
+      const result = runUnifiedProjection(makeInput())
+      if (result.fireReachable) {
+        const withdrawalRows = result.rows.filter(r => r.phase === 'withdrawal')
+        if (withdrawalRows.length > 0) {
+          expect(withdrawalRows[0].age).toBeGreaterThanOrEqual(NL_AOW_AGE)
+        }
+      }
+    })
+
+    it('pensioen mode: geen transition fase', () => {
+      const result = runUnifiedProjection(makeInput({
+        strategyConfig: { strategy: 'pensioen', endAge: 90, legacyAmount: 0 },
+        forcedFireAge: NL_AOW_AGE,
+      }))
+
+      const transitionRows = result.rows.filter(r => r.phase === 'transition')
+      expect(transitionRows).toHaveLength(0)
+    })
+  })
+
+  describe('per-asset-type detail in rijen', () => {
+    it('accumulatierij bevat assetBuckets met correcte asset types', () => {
+      const result = runUnifiedProjection(makeInput())
+      const firstRow = result.rows[0]
+      expect(firstRow.assetBuckets).toBeDefined()
+      expect(firstRow.assetBuckets['investment']).toBeDefined()
+      expect(firstRow.assetBuckets['investment']!.startValue).toBeGreaterThan(0)
+    })
+
+    it('schuldaflossing tracked in debtBalances per rij', () => {
+      const result = runUnifiedProjection(makeLisaInput())
+      const firstRow = result.rows[0]
+      expect(Object.keys(firstRow.debtBalances).length).toBeGreaterThan(0)
+      // Debt should have declining balance
+      const debtIds = Object.keys(firstRow.debtBalances)
+      const detail = firstRow.debtBalances[debtIds[0]]
+      expect(detail.startBalance).toBeGreaterThan(0)
+      expect(detail.interestPaid).toBeGreaterThan(0)
+    })
+
+    it('netWorth = totalAssets - totalDebts', () => {
+      const result = runUnifiedProjection(makeLisaInput())
+      for (const row of result.rows.slice(0, 5)) {
+        expect(row.netWorth).toBeCloseTo(row.totalAssets - row.totalDebts, -1) // within €10
+      }
+    })
+  })
+
+  describe('backwards compatibility via toSimResult', () => {
+    it('toSimResult converteert UnifiedProjectionResult correct', () => {
+      const input = makeInput()
+      const unified = runUnifiedProjection(input)
+      const simResult = toSimResult(unified)
+
+      expect(simResult.fireAge).toBe(unified.fireAge)
+      expect(simResult.fireReachable).toBe(unified.fireReachable)
+      expect(simResult.strategy).toBe(unified.strategy)
+      expect(simResult.displayEndAge).toBe(unified.displayEndAge)
+      expect(simResult.rows.length).toBe(unified.rows.length)
+
+      // SimRows should have valid structure
+      if (simResult.rows.length > 0) {
+        const firstRow = simResult.rows[0]
+        expect(firstRow.age).toBe(42)
+        expect(firstRow.phase).toBe('accumulation')
+        expect(firstRow.startPortfolio).toBeGreaterThan(0)
+      }
+    })
+  })
+
+  describe('cashflows integratie', () => {
+    it('AOW cashflow wordt correct verwerkt', () => {
+      const aowCashflow: SimCashflow = {
+        id: 'test-aow',
+        name: 'AOW',
+        type: 'recurring',
+        direction: 'income',
+        amount: 1350,
+        fromAge: 67,
+        toAge: null,
+        indexed: true,
+      }
+
+      const result = runUnifiedProjection(makeInput({
+        cashflows: [aowCashflow],
+      }))
+
+      expect(result.rows.length).toBeGreaterThan(0)
+      // Rows after 67 should have positive cashflowNet
+      const postAow = result.rows.filter(r => r.age >= 67)
+      if (postAow.length > 0) {
+        expect(postAow[0].cashflowNet).toBeGreaterThan(0)
+      }
+    })
+  })
+
+  describe('Box 3 cumulatief', () => {
+    it('cumulativeBox3 stijgt monotoon', () => {
+      const result = runUnifiedProjection(makeInput({
+        assets: [
+          makeAsset({ asset_type: 'investment', current_value: 200_000, expected_return: 7, monthly_contribution: 800 }),
+        ],
+      }))
+
+      let prevCumBox3 = 0
+      for (const row of result.rows) {
+        expect(row.cumulativeBox3).toBeGreaterThanOrEqual(prevCumBox3)
+        prevCumBox3 = row.cumulativeBox3
+      }
+    })
+  })
+
+  describe('inflationFactor', () => {
+    it('inflationFactor groeit met (1 + inflationRate)^year', () => {
+      const result = runUnifiedProjection(makeInput())
+      for (const row of result.rows.slice(0, 10)) {
+        const year = row.age - 42
+        const expected = Math.pow(1.02, year)
+        expect(row.inflationFactor).toBeCloseTo(expected, 4)
+      }
     })
   })
 })
