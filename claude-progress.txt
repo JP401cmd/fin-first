@@ -1,3 +1,33 @@
+## Session 2026-03-22 - Feature #497
+
+### Feature #497: Fase 2d — Vermogensopbouw grafiek op werkelijke data - PASSING
+- Implemented `unifiedRowsToStackedRows()` in `lib/wealth-composition.ts`
+  - Maps `UnifiedProjectionRow.assetBuckets` → `StackedRow[]` via existing `WEALTH_GROUPS` record
+  - Aggregates `debtBalances` to negative `schulden` value per row
+  - Direct mapping instead of ratio-based approximation
+- Exposed `unifiedRows` from `useHorizonFireSim` hook return value
+  - Added `UnifiedProjectionRow[]` to `HorizonFireSimResult` interface
+  - Stored unified rows alongside SimResult in useMemo
+- Updated `horizon-client.tsx`:
+  - Replaced `deriveWealthCompositionFromSim(simResult.rows, assets, debts, ...)` with `unifiedRowsToStackedRows(unifiedRows)`
+  - Dependency array reduced from `[chartMode, simResult?.rows, simResult?.fireAge, initialData.assets, debts, effectiveInput?.yearlyMustExpenses]` to `[chartMode, unifiedRows]`
+- Marked `deriveWealthCompositionFromSim()` and `projectWealthComposition()` as `@deprecated`
+- Also fixed pre-existing crash: PhaseModalOpbouw was already updated to expect `UnifiedProjectionRow[]` but hook wasn't exposing `unifiedRows` yet — now resolved
+- Verified: stacked bar chart shows correct wealth groups (Spaargeld, Beleggingen, Pensioen, Vastgoed, Overig, Schulden)
+- Verified: chart mode toggle (Pad ↔ Opbouw) works correctly
+- Zero new console errors (only pre-existing net_worth_snapshots 400)
+- All 26 wealth-composition tests pass, all 30 unified-projection parity tests pass
+- Commit: 22aa7f60
+
+### Files Modified
+- lib/wealth-composition.ts — added `unifiedRowsToStackedRows()`, @deprecated annotations, UnifiedProjectionRow import
+- lib/hooks/use-horizon-fire-sim.ts — exposed `unifiedRows` in return interface + useMemo
+- components/app/horizon/horizon-client.tsx — switched to `unifiedRowsToStackedRows()`, reduced deps
+
+### Current Status
+- 1 feature completed this session (#497)
+- Overall progress: 497/506 passing (98.2%)
+
 ## Session 2026-03-22 - Feature #503
 
 ### Feature #503: Fase 5 — Gids bijwerken voor unified projection - PASSING
