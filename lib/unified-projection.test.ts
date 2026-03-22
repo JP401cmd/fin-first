@@ -20,11 +20,15 @@ import {
   type UnifiedProjectionRow,
   type UnifiedProjectionResult,
   type AssetBucketDetail,
+  initRunningBuckets,
+  initRunningDebts,
+  computeYearlyDebtSchedule,
+  computeWeightedDebtTotal,
+  type DebtBalanceDetail,
 } from '@/lib/unified-projection'
-// We need initRunningBuckets — it's exported via the export { } statement
-// @ts-expect-error — initRunningBuckets is exported but TypeScript may not see the named re-export
-import { initRunningBuckets } from '@/lib/unified-projection'
 import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
+import { amortizationSchedule } from '@/lib/debt-data'
 
 // ── Test helpers ────────────────────────────────────────────────────────────
 
@@ -362,6 +366,325 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
       expect(simResult.displayEndAge).toBe(90)
       // classic25xTarget = yearlyExpenses × 25 = (700K × 0.04) × 25 = 700K
       expect(simResult.classic25xTarget).toBe(700_000)
+    })
+  })
+})
+
+// ── Fase 1b: Schuldaflossing per schuld per jaar ────────────────────────────
+
+function makeDebt(overrides: Partial<Debt> & { current_balance: number; interest_rate: number }): Debt {
+  return {
+    id: 'debt-' + Math.random().toString(36).slice(2, 8),
+    user_id: 'test-user',
+    name: 'Test Schuld',
+    debt_type: 'mortgage',
+    original_amount: overrides.original_amount ?? overrides.current_balance,
+    current_balance: overrides.current_balance,
+    interest_rate: overrides.interest_rate,
+    minimum_payment: overrides.minimum_payment ?? 0,
+    monthly_payment: overrides.monthly_payment ?? 1500,
+    start_date: overrides.start_date ?? '2026-01-01',
+    end_date: overrides.end_date ?? null,
+    creditor: null,
+    notes: null,
+    is_active: true,
+    sort_order: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    subtype: overrides.subtype ?? null,
+    is_tax_deductible: overrides.is_tax_deductible ?? null,
+    fixed_rate_end_date: null,
+    nhg: null,
+    linked_asset_id: null,
+    credit_limit: null,
+    repayment_type: overrides.repayment_type ?? 'annuiteit',
+    draagkrachtmeting_date: null,
+    tax_year: null,
+    has_payment_plan: false,
+    has_written_agreement: false,
+    ownership: 'personal',
+    household_id: null,
+    partner_split_pct: null,
+    net_worth_inclusion_pct: overrides.net_worth_inclusion_pct ?? 100,
+    ...overrides,
+  } as Debt
+}
+
+describe('Unified Projection — Fase 1b: Schuldaflossing per schuld per jaar', () => {
+
+  describe('initRunningDebts', () => {
+    it('initialiseert running debts vanuit actieve schulden', () => {
+      const debts = [
+        makeDebt({ current_balance: 300_000, interest_rate: 4, monthly_payment: 1500 }),
+        makeDebt({ current_balance: 0, interest_rate: 3, monthly_payment: 500, is_active: false }),
+      ]
+      const running = initRunningDebts(debts)
+      // Alleen actieve schuld meegenomen
+      expect(running).toHaveLength(1)
+      expect(running[0].balance).toBe(300_000)
+      expect(running[0].paidOff).toBe(false)
+    })
+
+    it('genereert maandelijks schema per schuld', () => {
+      const debts = [
+        makeDebt({ current_balance: 300_000, interest_rate: 4, monthly_payment: 1500, repayment_type: 'annuiteit' }),
+      ]
+      const running = initRunningDebts(debts)
+      // Schema moet maandelijkse rijen bevatten
+      expect(running[0].monthlySchedule.length).toBeGreaterThan(0)
+      // Eerste maand: rente op €300K @ 4% = €1000/maand
+      expect(running[0].monthlySchedule[0].interest).toBeCloseTo(1000, 0)
+    })
+  })
+
+  describe('computeYearlyDebtSchedule — annuïteit', () => {
+    it('annuïteit hypotheek €300k, 4%, 30 jaar — eindsaldo na 10 jaar klopt met amortizationSchedule()', () => {
+      // Annuïteitshypotheek: €300.000, 4%, maandlast ~€1.432,25
+      const balance = 300_000
+      const rate = 4
+      const monthlyPayment = 1432.25
+      const debt = makeDebt({
+        current_balance: balance,
+        interest_rate: rate,
+        monthly_payment: monthlyPayment,
+        repayment_type: 'annuiteit',
+      })
+
+      const running = initRunningDebts([debt])
+
+      // Referentie: directe amortizationSchedule berekening
+      const refSchedule = amortizationSchedule(balance, rate, monthlyPayment)
+
+      // Bereken 10 jaar
+      let totalInterest = 0
+      let totalPrincipal = 0
+      for (let year = 0; year < 10; year++) {
+        const { debtBalances } = computeYearlyDebtSchedule(running)
+        const detail = debtBalances[debt.id]
+        totalInterest += detail.interestPaid
+        totalPrincipal += detail.principalPaid
+      }
+
+      // Vergelijk eindsaldo na 10 jaar (120 maanden) met referentie
+      const refBalanceAfter120 = refSchedule[119]?.balance ?? 0
+      expect(running[0].balance).toBeCloseTo(refBalanceAfter120, 0)
+
+      // Totale rente na 10 jaar moet kloppen
+      const refInterest10y = refSchedule.slice(0, 120).reduce((s, r) => s + r.interest, 0)
+      expect(totalInterest).toBeCloseTo(refInterest10y, 0)
+
+      // Totale aflossing na 10 jaar moet kloppen
+      const refPrincipal10y = refSchedule.slice(0, 120).reduce((s, r) => s + r.principal, 0)
+      expect(totalPrincipal).toBeCloseTo(refPrincipal10y, 0)
+    })
+
+    it('annuïteit: startBalance jaar 2 === endBalance jaar 1', () => {
+      const debt = makeDebt({
+        current_balance: 200_000,
+        interest_rate: 5,
+        monthly_payment: 1200,
+        repayment_type: 'annuiteit',
+      })
+      const running = initRunningDebts([debt])
+
+      const { debtBalances: year1 } = computeYearlyDebtSchedule(running)
+      const endBalanceYear1 = year1[debt.id].endBalance
+
+      const { debtBalances: year2 } = computeYearlyDebtSchedule(running)
+      const startBalanceYear2 = year2[debt.id].startBalance
+
+      expect(startBalanceYear2).toBeCloseTo(endBalanceYear1, 2)
+    })
+  })
+
+  describe('computeYearlyDebtSchedule — aflossingsvrij', () => {
+    it('aflossingsvrij hypotheek: saldo blijft constant tot end_date', () => {
+      const balance = 250_000
+      const rate = 3.5
+      const debt = makeDebt({
+        current_balance: balance,
+        interest_rate: rate,
+        monthly_payment: balance * (rate / 100) / 12, // alleen rente
+        repayment_type: 'aflossingsvrij',
+        end_date: '2056-01-01', // 30 jaar
+      })
+
+      const running = initRunningDebts([debt])
+
+      // Check 5 jaar
+      for (let year = 0; year < 5; year++) {
+        const { debtBalances } = computeYearlyDebtSchedule(running)
+        const detail = debtBalances[debt.id]
+
+        // Saldo blijft constant
+        expect(detail.startBalance).toBeCloseTo(balance, 0)
+        expect(detail.endBalance).toBeCloseTo(balance, 0)
+
+        // Geen aflossing
+        expect(detail.principalPaid).toBe(0)
+
+        // Rente = saldo × rente% per jaar
+        const expectedInterest = balance * (rate / 100)
+        expect(detail.interestPaid).toBeCloseTo(expectedInterest, 0)
+      }
+    })
+  })
+
+  describe('computeYearlyDebtSchedule — lineair', () => {
+    it('lineaire schuld: saldo daalt lineair', () => {
+      const balance = 120_000
+      const rate = 3
+      const termMonths = 240 // 20 jaar
+      const monthlyPrincipal = balance / termMonths // €500/mnd
+      const firstMonthInterest = balance * (rate / 100) / 12
+      const debt = makeDebt({
+        current_balance: balance,
+        interest_rate: rate,
+        monthly_payment: monthlyPrincipal + firstMonthInterest, // approximation
+        repayment_type: 'lineair',
+      })
+
+      const running = initRunningDebts([debt])
+
+      const balances: number[] = [balance]
+      for (let year = 0; year < 5; year++) {
+        const { debtBalances } = computeYearlyDebtSchedule(running)
+        const detail = debtBalances[debt.id]
+        balances.push(detail.endBalance)
+
+        // Aflossing per jaar: lineair = vast bedrag per maand
+        // Exacte waarde hangt af van hoe linearAmortization de termMonths berekent
+        // Bij €120K en ~20 jaar: ~€500-650/mnd × 12 = ~€6000-7800/jaar
+        expect(detail.principalPaid).toBeGreaterThan(5_000)
+        expect(detail.principalPaid).toBeLessThan(8_500)
+      }
+
+      // Saldo daalt monotoon
+      for (let i = 1; i < balances.length; i++) {
+        expect(balances[i]).toBeLessThan(balances[i - 1])
+      }
+
+      // Na 5 jaar: ~€30.000 afgelost van €120.000, resteert ~€90.000
+      expect(balances[5]).toBeGreaterThan(80_000)
+      expect(balances[5]).toBeLessThan(100_000)
+    })
+  })
+
+  describe('computeYearlyDebtSchedule — payoff & surplus', () => {
+    it('schuld die aflopen (balance → 0): markeer payoff-jaar, vrijgevallen maandlasten worden surplus', () => {
+      // Kleine lening die snel aflost
+      const debt = makeDebt({
+        current_balance: 5_000,
+        interest_rate: 5,
+        monthly_payment: 500,
+        repayment_type: 'annuiteit',
+      })
+      const running = initRunningDebts([debt])
+
+      // Jaar 1: schuld zou na ~10-11 maanden afgelost moeten zijn
+      const { debtBalances: year1, freedSurplus: surplus1 } = computeYearlyDebtSchedule(running)
+
+      // Schuld is afgelost in jaar 1
+      expect(year1[debt.id].endBalance).toBeCloseTo(0, 0)
+      expect(running[0].paidOff).toBe(true)
+
+      // Surplus in jaar 1 is 0 (betalingen zijn nog gedaan dit jaar)
+      expect(surplus1).toBe(0)
+
+      // Jaar 2: paidOff → rapporteert 0-rij en geeft surplus
+      const { debtBalances: year2, freedSurplus: surplus2 } = computeYearlyDebtSchedule(running)
+      expect(year2[debt.id].endBalance).toBe(0)
+      expect(year2[debt.id].interestPaid).toBe(0)
+      expect(year2[debt.id].principalPaid).toBe(0)
+      // Surplus: €500/mnd × 12 = €6000/jaar
+      expect(surplus2).toBe(500 * 12)
+    })
+  })
+
+  describe('computeWeightedDebtTotal — net_worth_inclusion_pct', () => {
+    it('respecteert net_worth_inclusion_pct per schuld', () => {
+      const debt100 = makeDebt({
+        current_balance: 200_000,
+        interest_rate: 4,
+        monthly_payment: 1000,
+        net_worth_inclusion_pct: 100,
+      })
+      const debt50 = makeDebt({
+        current_balance: 100_000,
+        interest_rate: 3,
+        monthly_payment: 500,
+        net_worth_inclusion_pct: 50,
+      })
+
+      const running = initRunningDebts([debt100, debt50])
+      const { debtBalances } = computeYearlyDebtSchedule(running)
+
+      const weightedTotal = computeWeightedDebtTotal(debtBalances, running)
+
+      // debt100 endBalance × 100% + debt50 endBalance × 50%
+      const expected = debtBalances[debt100.id].endBalance * 1.0
+        + debtBalances[debt50.id].endBalance * 0.5
+      expect(weightedTotal).toBeCloseTo(expected, 0)
+
+      // Should be less than simply summing both end balances
+      const unweightedTotal = debtBalances[debt100.id].endBalance + debtBalances[debt50.id].endBalance
+      expect(weightedTotal).toBeLessThan(unweightedTotal)
+    })
+  })
+
+  describe('meerdere schulden tegelijk', () => {
+    it('verwerkt meerdere schulden parallel correct', () => {
+      const hypotheek = makeDebt({
+        id: 'hypotheek-1',
+        current_balance: 300_000,
+        interest_rate: 4,
+        monthly_payment: 1500,
+        repayment_type: 'annuiteit',
+        net_worth_inclusion_pct: 100,
+      })
+      const studielening = makeDebt({
+        id: 'studie-1',
+        current_balance: 20_000,
+        interest_rate: 0.46,
+        monthly_payment: 200,
+        repayment_type: 'lineair',
+        debt_type: 'student_loan',
+        net_worth_inclusion_pct: 100,
+      })
+      const aflossingsvrij = makeDebt({
+        id: 'aflvrij-1',
+        current_balance: 150_000,
+        interest_rate: 3,
+        monthly_payment: 375, // alleen rente
+        repayment_type: 'aflossingsvrij',
+        end_date: '2056-01-01',
+        net_worth_inclusion_pct: 50,
+      })
+
+      const running = initRunningDebts([hypotheek, studielening, aflossingsvrij])
+      expect(running).toHaveLength(3)
+
+      // Jaar 1
+      const { debtBalances } = computeYearlyDebtSchedule(running)
+
+      // Hypotheek: annuïteit, saldo daalt
+      expect(debtBalances['hypotheek-1'].endBalance).toBeLessThan(300_000)
+      expect(debtBalances['hypotheek-1'].interestPaid).toBeGreaterThan(0)
+
+      // Studielening: lineair, saldo daalt
+      expect(debtBalances['studie-1'].endBalance).toBeLessThan(20_000)
+
+      // Aflossingsvrij: saldo constant
+      expect(debtBalances['aflvrij-1'].endBalance).toBeCloseTo(150_000, 0)
+      expect(debtBalances['aflvrij-1'].principalPaid).toBe(0)
+
+      // Gewogen totaal: hypotheek 100% + studie 100% + aflossingsvrij 50%
+      const weighted = computeWeightedDebtTotal(debtBalances, running)
+      const expected =
+        debtBalances['hypotheek-1'].endBalance * 1.0 +
+        debtBalances['studie-1'].endBalance * 1.0 +
+        debtBalances['aflvrij-1'].endBalance * 0.5
+      expect(weighted).toBeCloseTo(expected, 0)
     })
   })
 })
