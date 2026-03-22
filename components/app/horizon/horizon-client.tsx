@@ -5039,6 +5039,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           yearlyAowIncome={overgangData.yearlyAow}
           yearlyExpenses={overgangData.yearlyExp}
           portfolioAtTransitionStart={overgangData.portfolioAtStart}
+          rows={unifiedRows ?? []}
+          inflationRate={fireParams.inflationRate}
         />
       )}
       {/* Onttrekking phase modal */}
