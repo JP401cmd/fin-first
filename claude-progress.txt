@@ -20098,3 +20098,27 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#515, #519)
+
+## Session 2026-03-22 - Feature #517
+
+### Feature #517: Debts metadata doorvoeren naar PhaseDetailTable - PASSING
+- Added `debts?: Debt[]` optional prop to PhaseDetailTable interface
+- Built `buildDebtLabelMap()` helper that creates `Record<string, string>` from debt.id → human-readable label
+- Label priority: debt.name → DEBT_TYPE_LABELS[debt.debt_type] → debt.id.slice(0, 8) UUID fragment
+- Memoized lookup map via useMemo
+- Threaded debts prop through all 3 phase modals (opbouw, overgang, onttrekking)
+- Passed debts from horizon-client.tsx state to all 3 modals
+- Implementation converged with feature #515 (commit 3c02fccc) which added same plumbing
+- Verified in browser: all 3 phase modals open correctly, PhaseDetailTable expands with correct columns
+- Zero new console errors (only pre-existing net_worth_snapshots 400)
+- Zero TypeScript errors in modified files
+
+### Files Modified
+- components/app/horizon/phase-detail-table.tsx — debts prop, buildDebtLabelMap, debtLabelMap
+- components/app/horizon/phase-modal-opbouw.tsx — debts prop threaded to PhaseDetailTable
+- components/app/horizon/phase-modal-overgang.tsx — debts prop threaded to PhaseDetailTable
+- components/app/horizon/phase-modal-onttrekking.tsx — debts prop threaded to PhaseDetailTable
+- components/app/horizon/horizon-client.tsx — debts={debts} on all 3 phase modals
+
+### Current Status
+- 1 feature completed this session (#517)
