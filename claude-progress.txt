@@ -20147,3 +20147,31 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#520)
 - Overall progress: 518/520 passing (99.6%)
+
+## Session 2026-03-22 - Feature #516
+
+### Feature #516: Expandable detail rows in fase jaar-op-jaar tabellen - PASSING
+- Added `expandedAge` state to PhaseDetailTable for per-row expand/collapse
+- Each row now has a chevron (ChevronRight/ChevronDown) in first column, cursor-pointer
+- Click row to expand detail panel below it, click again to collapse
+- DetailPanel component renders 4 conditional sections:
+  1. **Vermogensopbouw**: per-asset-type table (Type, Start, Rendement, Inleg, Eind) — only assets with value > 0
+  2. **Onttrekking (waterfall)**: per-asset-type withdrawal amounts — only in decumulation phase
+  3. **Schulden**: per-lening table (Lening, Start, Rente, Aflossing, Eind) — only debts with balance > 0
+  4. **Box 3**: per-asset-type belasting — only types with drag > 0
+- Netto vermogen (assets − schulden) summary line at bottom of expanded panel
+- All amounts use formatCurrency + font-mono tabular-nums
+- Color coding: negative values in var(--negative), positive in var(--positive)
+- Detail panel: dashed border, rounded, bg-subtle/30, smooth CSS transition
+- Added Fragment import for key wrapping with expand row
+- Footer row updated with empty cell for chevron column alignment
+- Mobile (360px): overflow-x-auto on inner tables, fully readable
+- Zero new console errors (only pre-existing net_worth_snapshots 400)
+- All 56 unit + 36 parity tests pass, no regressions
+- Commit: 7f835b59
+
+### Files Modified
+- components/app/horizon/phase-detail-table.tsx — expanded with DetailPanel + expandedAge state
+
+### Current Status
+- 1 feature completed this session (#516)
