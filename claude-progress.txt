@@ -19480,3 +19480,26 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#488, #489)
 - Overall progress: 488/506 passing (96.4%)
+
+## Session 2026-03-22 - Features #491, #492
+
+### Feature #491: Fase 1c - FIRE-detectie en onttrekkingsstrategieen in unified engine - PASSING
+- Added runUnifiedProjection() function to unified-projection.ts (~630 lines)
+- Ports runSimulation() logic from fire-simulation.ts with per-asset-type buckets
+- Key components: waterfallWithdraw, simulateDecumulationLightweight, requiredAt binary search
+- 3-phase assignment: accumulation (< fireAge), transition (fireAge-AOW), withdrawal (>= AOW)
+- Preserved all guards: VPW+perpetual/legacy, perpetual with low returns, pensioen forcedFireAge
+- 27 new unit tests covering all 10 verification steps
+- Commit: f702ee43
+
+### Feature #492: Fase 1d - Life events integratie in unified engine - PASSING
+- lifeEventsToCashflows() from fire-simulation.ts reused unchanged
+- One-time income cashflows (erfenis) go to investable buckets BEFORE yearly growth
+- One-time expense cashflows (begrafenis) deducted via waterfall
+- Recurring cashflows (AOW, pensioen) in cashflowNet and grossIncome
+- 10 new unit tests: sabbatical, AOW, erfenis, begrafenis, combined
+- Commit: cf33158c
+
+### Current Status
+- 2 features completed this session (#491, #492)
+- Overall progress: 491/506 passing (97.0%)
