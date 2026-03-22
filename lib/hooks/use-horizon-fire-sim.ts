@@ -33,6 +33,7 @@ import {
   toSimResult,
   type UnifiedProjectionInput,
   type UnifiedProjectionResult,
+  type UnifiedProjectionRow,
 } from '@/lib/unified-projection'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -47,6 +48,8 @@ export interface HorizonFireSimResult {
   originalFireAge: number | null
   /** Original fractional FIRE age before pensioen override */
   originalFireAgeFractional: number | null
+  /** Unified projection rows with per-asset-type detail (for vermogensopbouw chart) */
+  unifiedRows: UnifiedProjectionRow[] | null
 }
 
 interface HorizonFireSimInput {
@@ -74,7 +77,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
-  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null } | null>(() => {
+  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[] } | null>(() => {
     if (!horizonInput) return null
 
     const { totalAssets, totalDebts, monthlyContributions, yearlyMustExpenses, dateOfBirth, monthlyIncome } = horizonInput
@@ -158,10 +161,10 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
         requiredFirePortfolio: result.firePortfolioAtFire,
       }
 
-      return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional }
+      return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional, unifiedRows: unifiedResult.rows }
     }
 
-    return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null }
+    return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: unifiedResult.rows }
   }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
@@ -204,7 +207,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null }
   }
 
   return {
@@ -214,5 +217,6 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     error: profileError ?? null,
     originalFireAge: simResult?.originalFireAge ?? null,
     originalFireAgeFractional: simResult?.originalFireAgeFractional ?? null,
+    unifiedRows: simResult?.unifiedRows ?? null,
   }
 }

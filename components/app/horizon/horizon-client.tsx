@@ -94,7 +94,7 @@ import { PhaseBar } from '@/components/app/horizon/phase-bar'
 import { CHART_PAD } from '@/lib/chart-constants'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
-import { deriveWealthCompositionFromSim, type StackedRow } from '@/lib/wealth-composition'
+import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
@@ -241,7 +241,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -731,18 +731,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     ? { ...mcData.percentiles, startAge: currentAge }
     : undefined
 
-  // Wealth composition projection for vermogensopbouw chart (SimRow as source of truth)
+  // Wealth composition projection — directe mapping van UnifiedProjectionRow.assetBuckets
+  // Fase 2d (#497): werkelijke per-asset-type data i.p.v. ratio-based deriveWealthCompositionFromSim
   const wealthCompositionRows: StackedRow[] = useMemo(() => {
     if (chartMode !== 'vermogensopbouw') return []
-    if (!simResult?.rows?.length) return []
-    return deriveWealthCompositionFromSim(
-      simResult.rows,
-      initialData.assets ?? [],
-      debts,
-      simResult.fireAge ?? undefined,
-      effectiveInput?.yearlyMustExpenses,
-    )
-  }, [chartMode, simResult?.rows, simResult?.fireAge, initialData.assets, debts, effectiveInput?.yearlyMustExpenses])
+    if (!unifiedRows?.length) return []
+    return unifiedRowsToStackedRows(unifiedRows)
+  }, [chartMode, unifiedRows])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -5024,7 +5019,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           expectedPortfolioAtFire={simResult.firePortfolioAtFire}
           yearlySavings={(fire?.monthlySavings ?? 0) * 12}
           expectedReturn={fireParams.grossReturn}
-          rows={simResult.rows}
+          inflationRate={fireParams.inflationRate}
+          rows={unifiedRows ?? []}
+          assets={initialData.assets}
         />
       )}
       {/* Overgang phase modal */}
@@ -5044,7 +5041,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         />
       )}
       {/* Onttrekking phase modal */}
-      {onttrekkingData && simResult && (
+      {onttrekkingData && (unifiedRows ?? simResult) && (
         <PhaseModalOnttrekking
           open={activeFaseModal === 'onttrekking'}
           onClose={() => setActiveFaseModal(null)}
@@ -5055,7 +5052,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           targetEndPortfolio={onttrekkingData.targetEndPortfolio}
           yearlyWithdrawal={onttrekkingData.yearlyWithdrawal}
           yearlyAowIncome={onttrekkingData.yearlyAow}
-          rows={simResult.rows}
+          rows={unifiedRows ?? []}
+          inflationRate={fireParams.inflationRate}
         />
       )}
 

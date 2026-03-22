@@ -16,6 +16,7 @@ import {
   interestOnlySchedule,
 } from './debt-data'
 import type { SimRow } from './fire-simulation'
+import type { UnifiedProjectionRow } from './unified-projection'
 
 // ── Wealth Groups ───────────────────────────────────────────
 
@@ -204,6 +205,9 @@ export interface ProjectWealthCompositionInput {
  * - Per debt: amortization based on repayment_type
  * - After FIRE age: distribute inflation-adjusted annual expenses over liquid categories
  *   (beleggingen first, then spaargeld)
+ *
+ * @deprecated Gebruik `unifiedRowsToStackedRows()` met UnifiedProjectionRow[] voor
+ * werkelijke per-asset-type data inclusief life events en correcte Box 3 per type.
  */
 export function projectWealthComposition(
   input: ProjectWealthCompositionInput,
@@ -326,6 +330,9 @@ export function projectWealthComposition(
  * 5. Multiplies ratios by SimRow.endPortfolio (single source of truth)
  * 6. Projects debts separately via projectDebtByYear()
  * 7. Returns StackedRow[] as drop-in replacement for projectWealthComposition()
+ *
+ * @deprecated Gebruik `unifiedRowsToStackedRows()` met UnifiedProjectionRow[] voor
+ * werkelijke per-asset-type data inclusief life events en correcte Box 3 per type.
  */
 export function deriveWealthCompositionFromSim(
   simRows: SimRow[],
@@ -520,4 +527,58 @@ export function deriveWealthCompositionFromSim(
   }
 
   return rows
+}
+
+// ── Unified Projection → StackedRow mapping ─────────────────
+
+/**
+ * Map UnifiedProjectionRow[] directe asset bucket data naar StackedRow[].
+ *
+ * In tegenstelling tot `deriveWealthCompositionFromSim()` (ratio-based) gebruikt
+ * deze functie de werkelijke per-asset-type waarden uit `assetBuckets` en de
+ * werkelijke schuldsaldi uit `debtBalances`. Hierdoor zijn life events, correcte
+ * Box 3 per type, en surplus-allocatie automatisch meegenomen.
+ *
+ * @param rows - UnifiedProjectionRow[] uit runUnifiedProjection()
+ * @returns StackedRow[] — drop-in voor WealthCompositionChart
+ */
+export function unifiedRowsToStackedRows(rows: UnifiedProjectionRow[]): StackedRow[] {
+  if (!rows.length) return []
+
+  return rows.map((row) => {
+    // ── Aggregate assetBuckets per WealthGroup ──
+    const groupTotals: Record<WealthGroup, number> = {
+      spaargeld: 0,
+      beleggingen: 0,
+      pensioen: 0,
+      vastgoed: 0,
+      overig: 0,
+    }
+
+    for (const [assetType, bucket] of Object.entries(row.assetBuckets)) {
+      if (!bucket) continue
+      const group = WEALTH_GROUPS[assetType as AssetType]
+      if (group) {
+        groupTotals[group] += bucket.endValue
+      }
+    }
+
+    // ── Aggregate debtBalances to single negative schulden value ──
+    let totalDebtBalance = 0
+    for (const debt of Object.values(row.debtBalances)) {
+      if (debt) {
+        totalDebtBalance += debt.endBalance
+      }
+    }
+
+    return {
+      age: row.age,
+      spaargeld: Math.round(groupTotals.spaargeld),
+      beleggingen: Math.round(groupTotals.beleggingen),
+      pensioen: Math.round(groupTotals.pensioen),
+      vastgoed: Math.round(groupTotals.vastgoed),
+      overig: Math.round(groupTotals.overig),
+      schulden: -Math.round(totalDebtBalance),
+    }
+  })
 }
