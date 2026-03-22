@@ -19524,3 +19524,92 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#493, #494)
 - Overall progress: 493/506 passing (97.4%)
+
+## Session 2026-03-22 - Feature #504
+
+### Feature #504: Fase 6a — Unit tests unified projection engine - PASSING
+- Created `test/unified-projection.test.ts` with 52 comprehensive unit tests across 11 sections:
+
+**Section A — Per-asset rendement (5 tests):**
+- A1: 7% expected_return grows correctly per year
+- A2: Two same-type assets combine to weighted average return
+- A3: Multiple asset types get separate buckets
+- A4: Inactive assets ignored
+- A5: Full projection preserves per-asset growth across years
+
+**Section B — Box 3 per type (6 tests):**
+- B1: Spaargeld gets lower drag than beleggingen (forfaitair)
+- B2: Eigen_huis exempt from Box 3
+- B3: Pensioen with tax_benefit exempt from Box 3
+- B4: Werkelijk rendement method uses actual return
+- B5: Werkelijk with 0% return → 0 drag
+- B6: Spaargeld and beleggingen in same projection show difference
+
+**Section C — Heffingsvrij vermogen (5 tests):**
+- C1: Small portfolio (< €59k) gets no Box 3 drag
+- C2: Partner doubles heffingsvrij (< €118k → no drag)
+- C3: Above heffingsvrij → proportional taxation
+- C4: Non-Box3 assets skipped
+- C5: Full projection: small portfolio has zero box3 in rows
+
+**Section D — Schuldaflossing (5 tests):**
+- D1: Annuïteit produces declining balance per year
+- D2: Lineair produces consistent principal payments
+- D3: Aflossingsvrij — balance stays constant, interest-only
+- D4: Inactive debts ignored
+- D5: computeWeightedDebtTotal respects net_worth_inclusion_pct
+
+**Section E — Surplus-allocatie (4 tests):**
+- E1: Surplus proportionally distributed to investable buckets (not savings)
+- E2: No surplus allocated without investable buckets
+- E3: Equal split when all investable buckets at 0
+- E4: Zero surplus → no extra contributions
+
+**Section F — FIRE-detectie (5 tests):**
+- F1: Binary search finds correct FIRE moment
+- F2: Very high net worth → FIRE at current age
+- F3: Insufficient savings → fireReachable: false
+- F4: requiredFirePortfolio > 0 when reachable
+- F5: Rows have correct phase assignment pre/post FIRE
+
+**Section G — Life events (4 tests):**
+- G1: Erfenis (one-time income) increases investment bucket
+- G2: AOW starts at correct age (67)
+- G3: One-time expense (begrafenis) deducts via waterfall
+- G4: Combined life events produce correct net cashflows
+
+**Section H — Waterfall withdrawal (2 tests):**
+- H1: Withdrawal distributes in correct waterfall order
+- H2: Savings=0 during decumulation
+
+**Section I — Edge cases (7 tests):**
+- I1: Negative net worth (high debts) doesn't crash
+- I2: Perpetual with return < inflation → unreachable
+- I3: Perpetual with return = inflation → unreachable
+- I4: Pensioen strategy forces fireAge at AOW
+- I5: Empty assets array doesn't crash
+- I6: VPW + perpetual → incompatible
+- I7: VPW + legacy → incompatible
+
+**Section J — Backwards compatibility (3 tests):**
+- J1: toSimRow maps all SimRow fields
+- J2: Transition phase maps to accumulation (legacy)
+- J3: toSimResult maps all SimResult fields
+
+**Section K — Integration (6 tests):**
+- K1: Rows monotonically increasing in age
+- K2: cumulativeBox3 monotonically increasing
+- K3: inflationFactor grows exponentially
+- K4: Legacy strategy sets targetEndPortfolio
+- K5: displayEndAge correct per strategy
+- K6: Debts reduce netWorth in projection rows
+
+### Verification
+- All 52 new unit tests pass
+- All 30 existing parity tests pass (no regressions)
+- Zero TypeScript errors
+- Commit: df320bea
+
+### Current Status
+- 1 feature completed this session (#504)
+- Overall progress: 493/506 passing (97.4%)
