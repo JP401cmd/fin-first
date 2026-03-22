@@ -20058,3 +20058,43 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#518, #521)
+
+## Session 2026-03-22 - Features #515, #519
+
+### Feature #515: Waterfall withdrawal tracking per assetgroep - PASSING
+- Modified waterfallWithdraw() in unified-projection.ts to return `{ actualAmount, byType }` instead of just number
+- byType is a Partial<Record<AssetType, number>> tracking how much was withdrawn from each asset bucket
+- Added withdrawalByType field to UnifiedProjectionRow interface
+- Accumulation rows get empty {} (no withdrawals), decumulation rows get rounded per-type breakdown
+- Added Netto column to PhaseDetailTable showing netWorth (assets - debts) alongside Eind (totalAssets)
+- Netto column with color coding via colorClass() and deflation support for real/nominal toggle
+- Footer totals row shows final-year netWorth
+- Added debts prop to PhaseDetailTable and passed through from all 3 phase modals (opbouw, overgang, onttrekking)
+- Updated 3 test files with withdrawalByType in manually constructed UnifiedProjectionRow objects
+- All 171/172 tests pass (1 pre-existing sabbatical flaky test)
+- Verified in browser: Netto column visible in Onttrekking phase detail table
+- Zero new console errors
+- Commit: 3c02fccc
+
+### Feature #519: Cash bucket toevoegen aan WATERFALL_ORDER - PASSING
+- Added 'cash' as first entry in WATERFALL_ORDER array (most liquid, withdraw first)
+- Bank account cash was injected as 'cash' bucket but never withdrawable during decumulation
+- Fix ensures bankrekening-saldo correctly decreases during retirement withdrawal
+- Change was picked up by concurrent agent commit d675d492 (#521)
+- All 127/128 unit tests + 36 parity tests pass
+- Verified: horizon page loads correctly with cash in waterfall order
+- Zero new console errors
+
+### Files Modified
+- lib/unified-projection.ts — withdrawalByType return type, WATERFALL_ORDER with cash, interface update
+- components/app/horizon/phase-detail-table.tsx — Netto column + debts prop
+- components/app/horizon/phase-modal-opbouw.tsx — debts prop passthrough
+- components/app/horizon/phase-modal-overgang.tsx — debts prop passthrough
+- components/app/horizon/phase-modal-onttrekking.tsx — debts prop passthrough
+- components/app/horizon/horizon-client.tsx — debts prop to all phase modals
+- lib/unified-projection.test.ts — withdrawalByType in manual rows
+- lib/derive-wealth-composition.test.ts — withdrawalByType in makeUnifiedRow helper
+- test/unified-projection.test.ts — withdrawalByType in manual rows
+
+### Current Status
+- 2 features completed this session (#515, #519)
