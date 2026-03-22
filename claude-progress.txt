@@ -19789,3 +19789,42 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#495, #496)
 - Overall progress: 495/506 passing (97.8%)
+
+## Session 2026-03-22 - Features #499, #500
+
+### Feature #499: Fase 3b — Opbouw-modal uitbreiden met detail - PASSING
+- Rewrote phase-modal-opbouw.tsx to accept UnifiedProjectionRow[] instead of SimRow[]
+- Waterval kassabon: Startvermogen + Totale inleg + Totaal rendement − Box 3 ± Events = Vermogen bij FIRE
+- Rendement sub-breakdown per wealthgroup (spaargeld, beleggingen, pensioen, vastgoed, etc.)
+- PhaseDetailTable under mini-chart (collapsed by default) with showAssetDetail for multi-type rendement columns
+- Aannames sectie (dashed border, collapsed): inflatie, per-asset-type rendement + Box 3 drag
+- Redactionele noot: "Elke maand bouw je X vrijheidsdagen op" (based on monthly savings / daily expenses)
+- Accent line 2px in var(--color-horizon-600)
+- BottomSheet size="lg" for more space
+- New props: inflationRate, yearlyExpenses, rows (UnifiedProjectionRow[]), assets
+- Mini-chart preserved with useModalAnimation (pathLength={1}, horizon-100 fill, horizon-600 stroke)
+- horizon-client.tsx: pass unifiedRows, inflationRate, yearlyExpenses, assets to PhaseModalOpbouw
+- Zero new console errors
+- Commit: fd94a92b
+
+### Feature #500: Fase 3c — Overgang-modal uitbreiden met detail - PASSING
+- Added portfolio-decline mini-chart (MiniTransitionChart) with horizon-100 fill, horizon-400 stroke
+- Waterval kassabon: Startvermogen (bij FIRE) + Rendement − Onttrekking − Box 3 ± Events = Vermogen bij AOW
+- Both gap and shortfall scenarios updated with waterfall format
+- PhaseDetailTable for transition phase (collapsed by default)
+- Preserved filosofische noot: "X jaar overgang = X jaar eerder verdiende vrijheid"
+- Preserved gap/shortfall scenario logic with coverage indicator
+- Accent line 2px in var(--color-horizon-200)
+- BottomSheet size="lg"
+- New props: rows (UnifiedProjectionRow[]), inflationRate
+- horizon-client.tsx: pass unifiedRows and inflationRate to PhaseModalOvergang
+- Zero new console errors
+- Commit: b85a89f8
+
+### Files Modified
+- components/app/horizon/phase-modal-opbouw.tsx — full rewrite with UnifiedProjectionRow support
+- components/app/horizon/phase-modal-overgang.tsx — full rewrite with mini-chart, waterfall, PhaseDetailTable
+- components/app/horizon/horizon-client.tsx — updated props for both modals
+
+### Current Status
+- 2 features completed this session (#499, #500)
