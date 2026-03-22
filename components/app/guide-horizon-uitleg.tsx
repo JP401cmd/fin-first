@@ -16,6 +16,7 @@ import {
   BarChart3,
   Layers,
   Compass,
+  Wallet,
 } from 'lucide-react'
 
 /* ── Section data ─────────────────────── */
@@ -207,11 +208,13 @@ export default function GuideHorizonUitleg() {
             <strong>spaarquote</strong> (instelbaar in je profiel), hoe sneller het gaat.
           </p>
           <p>
-            <strong>2. Beleggingsrendement</strong> — elk jaar groeit je bestaande vermogen met
-            het verwachte rendement. Dit is instelbaar via{' '}
-            <InLink href="/identity/instellingen">Instellingen → FIRE Instellingen</InLink>. Het
-            standaard bruto rendement is 7%. Na aftrek van Box 3 belasting en inflatie blijft
-            het netto reëel rendement over.
+            <strong>2. Rendement per beleggingstype</strong> — elk bezittingstype groeit met
+            een <strong>eigen verwacht rendement</strong>. Spaargeld groeit met de spaarrente,
+            beleggingen met het beursrendement, pensioen met het pensioenrendement, vastgoed
+            met de verwachte waardestijging. Dit rendement stel je per bezitting in via{' '}
+            <InLink href="/core/assets">De Kern → Bezittingen</InLink>. De simulatie berekent
+            de groei per type apart en telt de resultaten op. Zo krijg je een realistischer
+            beeld dan bij één uniform rendement.
           </p>
           <p>
             <strong>3. Levensgebeurtenissen</strong> — eenmalige of terugkerende cashflows die
@@ -396,18 +399,28 @@ export default function GuideHorizonUitleg() {
         <>
           <p>
             In Nederland betaal je <strong>vermogensrendementsheffing</strong> (Box 3) over je
-            beleggingen. TriFinity rekent dit automatisch mee in de simulatie.
+            vermogen. TriFinity rekent dit automatisch mee in de simulatie — per bezittingstype.
           </p>
           <p>
-            De berekening: de overheid gaat uit van een <strong>forfaitair rendement</strong> op
-            je beleggingen (momenteel ca. 6,04% voor beleggingen). Over dit fictieve rendement
-            betaal je <strong>36% belasting</strong>. Het maakt niet uit wat je werkelijke
-            rendement is — de belasting is altijd gebaseerd op het forfaitaire percentage.
+            <strong>Per type een ander forfaitair rendement:</strong> de overheid maakt
+            onderscheid tussen spaargeld (forfaitair ca. 1,28%) en beleggingen (forfaitair ca.
+            6,04%). Over dit fictieve rendement betaal je <strong>36% belasting</strong>. Het
+            maakt niet uit wat je werkelijke rendement is — de belasting is altijd gebaseerd op
+            het forfaitaire percentage van dat type.
           </p>
           <p>
-            In de simulatie wordt je <strong>netto rendement</strong> berekend als: bruto
-            rendement minus de forfaitaire heffing. Dit verklaart waarom de bekende{' '}
-            <strong>NL_SWR van 2,88%</strong> lager is dan de Amerikaanse 4%-regel. De 2,88%
+            <strong>Heffingsvrij vermogen:</strong> je betaalt niet over alles. De eerste{' '}
+            <strong>€ 57.000</strong> (of € 114.000 met fiscaal partner) is vrijgesteld. Dit{' '}
+            <strong>heffingsvrij vermogen</strong> wordt proportioneel verdeeld over al je
+            bezittingstypes. Heb je €50.000 spaargeld en €100.000 beleggingen? Dan wordt
+            ⅓ van de vrijstelling aan spaargeld toegerekend en ⅔ aan beleggingen.
+          </p>
+          <p>
+            In de simulatie wordt de <strong>effectieve Box 3 drag</strong> elk jaar opnieuw
+            berekend per type: forfaitair rendement × tarief, verminderd met je aandeel in het
+            heffingsvrij vermogen. Spaargeld heeft hierdoor een veel lagere belastingdruk dan
+            beleggingen. Dit verklaart waarom de bekende{' '}
+            <strong>NL_SWR van 2,88%</strong> lager is dan de Amerikaanse 4%-regel — de 2,88%
             is geen instelling maar een <strong>uitkomst</strong> van deze berekening bij
             standaardwaarden (7% bruto rendement, 2% inflatie).
           </p>
@@ -421,8 +434,53 @@ export default function GuideHorizonUitleg() {
       ),
     },
     {
-      id: 'horizon-uitleg-parameters',
+      id: 'horizon-uitleg-schulden',
       number: 9,
+      title: 'Schulden in de prognose',
+      icon: Wallet,
+      content: (
+        <>
+          <p>
+            Schulden zijn niet zomaar een negatief getal — ze hebben een{' '}
+            <strong>eigen aflossingsschema</strong> dat de simulatie jaar voor jaar meeneemt.
+            Elk type schuld wordt anders afgelost:
+          </p>
+          <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 space-y-1.5 mt-1">
+            <p>
+              <strong>Annuïteit</strong> — vaste maandlasten; in het begin betaal je vooral
+              rente, later vooral aflossing. Het resterende saldo daalt exponentieel.
+            </p>
+            <p>
+              <strong>Lineair</strong> — elke maand een gelijk bedrag aan aflossing plus rente
+              over het restant. De maandlasten dalen geleidelijk.
+            </p>
+            <p>
+              <strong>Aflossingsvrij</strong> — je betaalt alleen rente, het saldo blijft
+              constant tot de einddatum. Handig voor sommige hypotheekvormen.
+            </p>
+          </div>
+          <p>
+            De simulatie berekent per schuld, per jaar: hoeveel rente je betaalt, hoeveel je
+            aflost, en wat het resterende saldo is. Deze rentelasten worden meegenomen als{' '}
+            <strong>uitgave</strong> in je jaarlijkse cashflow. Wanneer een schuld volledig is
+            afgelost, valt die uitgave weg — je ziet dat terug als een{' '}
+            <strong>positieve knik</strong> in de grafiek.
+          </p>
+          <p>
+            In de <strong>Vermogensopbouw</strong>-weergave verschijnen schulden als rode
+            laag onder de nullijn. Zo zie je precies wanneer welke schuld is afgelost en hoe
+            dat je netto vermogen beïnvloedt.
+          </p>
+          <p>
+            Beheer je schulden via{' '}
+            <InLink href="/core/debts">De Kern → Schulden</InLink>.
+          </p>
+        </>
+      ),
+    },
+    {
+      id: 'horizon-uitleg-parameters',
+      number: 10,
       title: 'Wat kun je aanpassen?',
       icon: Settings,
       content: (
@@ -490,7 +548,7 @@ export default function GuideHorizonUitleg() {
     },
     {
       id: 'horizon-uitleg-inkomen-uitgaven',
-      number: 10,
+      number: 11,
       title: 'Inkomen & Uitgaven weergave',
       icon: BarChart3,
       content: (
@@ -555,7 +613,7 @@ export default function GuideHorizonUitleg() {
     },
     {
       id: 'horizon-uitleg-vermogensopbouw',
-      number: 11,
+      number: 12,
       title: 'Vermogensopbouw weergave',
       icon: Layers,
       content: (
@@ -684,7 +742,7 @@ export default function GuideHorizonUitleg() {
     },
     {
       id: 'horizon-uitleg-planningshorizon',
-      number: 12,
+      number: 13,
       title: 'Planningshorizon: FIRE vs. Pensioen',
       icon: Compass,
       content: (

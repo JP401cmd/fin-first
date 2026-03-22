@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BookOpen, Hourglass, Receipt, Flame, Shield, MessageSquare, type LucideIcon } from 'lucide-react'
+import { BookOpen, Hourglass, Receipt, Flame, Shield, MessageSquare, BarChart3, ShieldCheck, type LucideIcon } from 'lucide-react'
 
 /* ── Types ──────────────────────── */
 
@@ -103,6 +103,26 @@ const CONCEPTS: ConceptCard[] = [
     explanation:
       'Je persoonlijke financiële assistent. Will kent de context van elke pagina en vertaalt cijfers naar inzichten. Stel hem een vraag via de chatknop rechtsonder.',
     personalDataFn: () => null, // no personal data for Will
+  },
+  {
+    id: 'per-asset-rendement',
+    icon: BarChart3,
+    name: 'Per-asset rendement',
+    color: 'var(--color-horizon-50)',
+    colorAccent: 'var(--color-horizon-400)',
+    explanation:
+      'Elke bezitting groeit met een eigen rendement. Spaargeld met de spaarrente, beleggingen met het beursrendement, pensioen met het pensioenrendement. De simulatie berekent groei per type apart — realistischer dan één uniform percentage.',
+    personalDataFn: () => null,
+  },
+  {
+    id: 'heffingsvrij-vermogen',
+    icon: ShieldCheck,
+    name: 'Heffingsvrij vermogen',
+    color: 'var(--color-kern-50)',
+    colorAccent: 'var(--color-kern-400)',
+    explanation:
+      'De eerste € 57.000 (of € 114.000 met partner) van je vermogen is vrijgesteld van Box 3 belasting. Dit bedrag wordt proportioneel verdeeld over je bezittingstypes. Spaargeld profiteert relatief meer omdat het forfaitair rendement lager is.',
+    personalDataFn: () => null,
   },
 ]
 
