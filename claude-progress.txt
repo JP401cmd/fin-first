@@ -19985,3 +19985,45 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#508, #509)
 - Overall progress: 508/509 passing (99.8%)
+
+## Session 2026-03-22 - Features #513, #514
+
+### Feature #513: Doelbedrag fallback strategie-bewust maken (horizon + core) - PASSING
+- Thread fireStrategy into computeFireProjection()/computeFireRange() at 3 call sites in horizon-client.tsx:
+  - Initial state (line ~136): uses initStrategyOpts from initialData.fireStrategy
+  - useEffect recalculation (line ~598): builds stratOpts from current fireStrategy state
+  - baseFire computation (line ~644): uses baseFireStratOpts from fireStrategy
+- Added fireStrategy to useEffect dependency array
+- Extended computeCoreData() in core-metrics.ts with optional strategyOptions parameter
+- Core-client.tsx: stores coreFireStrategyOpts from simulation, passes to computeCoreData
+- Fixed kassabon formula text: deplete shows PV-annuïteit formula, legacy shows erfenisbuffer
+- Fixed double-€ bug in legacy formula text (was €${formatCurrency(...)})
+- Zero TypeScript errors, zero console errors
+- Commit: 09bfc77b
+
+### Feature #514: Unified projection: startportfolio moet kern net worth gebruiken - PASSING
+- Bug 1: Applied net_worth_inclusion_pct in initRunningBuckets() (line ~341)
+  - `Number(asset.current_value) * inclPct` instead of raw current_value
+  - Weighted return sum also uses weighted value
+- Bug 2: Added bankAccountCash field to UnifiedProjectionInput
+  - Injected as cash bucket (assetType: 'cash', 0% return, spaargeld category)
+  - Both initialBuckets and runningBuckets receive the injection
+  - HorizonPageData extended with unlinkedCash field
+  - use-horizon-fire-sim.ts: passes bankAccountCash from hook params
+  - horizon-client.tsx: passes initialData.unlinkedCash
+  - core-client.tsx: stores unlinkedCash in state, passes to unified engine
+- Bug 3: Removed dead variables (totalAssets, totalDebts) from hook destructure
+- All 54 unit tests + 36 parity tests pass
+- Zero TypeScript errors, zero console errors
+- Commit: 6fc423ab
+
+### Files Modified
+- components/app/horizon/horizon-client.tsx — strategy-aware fallbacks + bankAccountCash
+- components/core/core-client.tsx — coreFireStrategyOpts + coreUnlinkedCash state
+- lib/core-metrics.ts — strategyOptions param on computeCoreData
+- lib/unified-projection.ts — net_worth_inclusion_pct + bankAccountCash injection
+- lib/hooks/use-horizon-fire-sim.ts — bankAccountCash param + removed dead vars
+- lib/horizon-data-loader.ts — unlinkedCash in HorizonPageData interface + return
+
+### Current Status
+- 2 features completed this session (#513, #514)
