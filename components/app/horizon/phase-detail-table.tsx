@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Fragment } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { FinTable } from '@/components/app/fin-table'
 import { formatCurrency } from '@/lib/format'
@@ -80,6 +80,215 @@ function buildDebtLabelMap(debts?: Debt[]): Record<string, string> {
   return map
 }
 
+// ── Expandable Detail Panel ─────────────────────────────────────────────────
+
+interface DetailPanelProps {
+  row: UnifiedProjectionRow
+  d: (v: number) => number
+  debtLabelMap: Record<string, string>
+  colSpan: number
+}
+
+function DetailPanel({ row, d, debtLabelMap, colSpan }: DetailPanelProps) {
+  // Collect asset buckets with value > 0
+  const activeBuckets = Object.entries(row.assetBuckets)
+    .filter(([, b]) => b && (Math.abs(b.startValue) > 0.5 || Math.abs(b.endValue) > 0.5))
+    .sort(([a], [b]) => {
+      const order: AssetType[] = ['cash', 'savings', 'investment', 'retirement', 'eigen_huis', 'real_estate', 'crypto', 'vehicle', 'physical', 'deelneming', 'levensverzekering', 'vordering', 'other']
+      return order.indexOf(a as AssetType) - order.indexOf(b as AssetType)
+    }) as [AssetType, AssetBucketDetail][]
+
+  // Withdrawal by type (only during decumulation)
+  const activeWithdrawals = Object.entries(row.withdrawalByType || {})
+    .filter(([, v]) => v && v > 0.5) as [AssetType, number][]
+
+  // Active debts
+  const activeDebts = Object.entries(row.debtBalances || {})
+    .filter(([, db]) => db && (Math.abs(db.startBalance) > 0.5 || Math.abs(db.endBalance) > 0.5))
+
+  // Box 3 per asset type
+  const activeBox3 = Object.entries(row.assetBuckets)
+    .filter(([, b]) => b && b.box3Drag > 0.5) as [AssetType, AssetBucketDetail][]
+
+  // Net worth summary
+  const netWorth = row.netWorth
+
+  const hasContent = activeBuckets.length > 0 || activeWithdrawals.length > 0 || activeDebts.length > 0 || activeBox3.length > 0
+
+  if (!hasContent) return null
+
+  return (
+    <tr>
+      <td colSpan={colSpan} className="p-0">
+        <div
+          className="overflow-hidden transition-all duration-200 ease-out"
+          style={{ maxHeight: '2000px' }}
+        >
+          <div className="mx-2 mb-3 mt-1 space-y-3 rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3">
+            {/* ── Vermogensopbouw per assetgroep ──────────────────── */}
+            {activeBuckets.length > 0 && (
+              <div>
+                <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                  Vermogensopbouw
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--border-ed)]">
+                        <th className="pb-1 text-left text-[10px] font-medium text-[var(--ink-4)]">Type</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Start</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Rendement</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Inleg</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Eind</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeBuckets.map(([type, bucket]) => (
+                        <tr key={type} className="border-b border-dashed border-[var(--border-ed)] last:border-0">
+                          <td className="py-1 text-[var(--ink-2)]">
+                            {SHORT_ASSET_LABELS[type] ?? ASSET_TYPE_LABELS[type]}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums text-[var(--ink)]">
+                            {formatCurrency(d(bucket.startValue))}
+                          </td>
+                          <td className={cx('py-1 text-right font-mono tabular-nums', colorClass(bucket.growth))}>
+                            {formatCurrency(d(bucket.growth))}
+                          </td>
+                          <td className={cx('py-1 text-right font-mono tabular-nums', colorClass(bucket.contributions))}>
+                            {formatCurrency(d(bucket.contributions))}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums font-medium text-[var(--ink)]">
+                            {formatCurrency(d(bucket.endValue))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── Onttrekking per assetgroep ──────────────────────── */}
+            {activeWithdrawals.length > 0 && (
+              <div>
+                <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                  Onttrekking (waterfall)
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--border-ed)]">
+                        <th className="pb-1 text-left text-[10px] font-medium text-[var(--ink-4)]">Type</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Bedrag</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeWithdrawals.map(([type, amount]) => (
+                        <tr key={type} className="border-b border-dashed border-[var(--border-ed)] last:border-0">
+                          <td className="py-1 text-[var(--ink-2)]">
+                            {SHORT_ASSET_LABELS[type as AssetType] ?? ASSET_TYPE_LABELS[type as AssetType]}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums text-[var(--negative)]">
+                            −{formatCurrency(d(amount)).replace('€', '€ ').trim()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── Schulden per lening ─────────────────────────────── */}
+            {activeDebts.length > 0 && (
+              <div>
+                <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                  Schulden
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--border-ed)]">
+                        <th className="pb-1 text-left text-[10px] font-medium text-[var(--ink-4)]">Lening</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Start</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Rente</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Aflossing</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Eind</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeDebts.map(([debtId, db]) => (
+                        <tr key={debtId} className="border-b border-dashed border-[var(--border-ed)] last:border-0">
+                          <td className="py-1 text-[var(--ink-2)]">
+                            {debtLabelMap[debtId] ?? debtId.slice(0, 8)}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums text-[var(--ink)]">
+                            {formatCurrency(d(db.startBalance))}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums text-[var(--negative)]">
+                            −{formatCurrency(d(db.interestPaid)).replace('€', '€ ').trim()}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums text-[var(--ink)]">
+                            {formatCurrency(d(db.principalPaid))}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums font-medium text-[var(--ink)]">
+                            {formatCurrency(d(db.endBalance))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── Box 3 per assetgroep ────────────────────────────── */}
+            {activeBox3.length > 0 && (
+              <div>
+                <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                  Box 3
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--border-ed)]">
+                        <th className="pb-1 text-left text-[10px] font-medium text-[var(--ink-4)]">Type</th>
+                        <th className="pb-1 text-right text-[10px] font-medium text-[var(--ink-4)]">Belasting</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeBox3.map(([type, bucket]) => (
+                        <tr key={type} className="border-b border-dashed border-[var(--border-ed)] last:border-0">
+                          <td className="py-1 text-[var(--ink-2)]">
+                            {SHORT_ASSET_LABELS[type] ?? ASSET_TYPE_LABELS[type]}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums text-[var(--negative)]">
+                            −{formatCurrency(d(bucket.box3Drag)).replace('€', '€ ').trim()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── Netto vermogen samenvatting ─────────────────────── */}
+            <div className="flex items-center justify-between border-t border-[var(--border-md)] pt-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                Netto vermogen (assets − schulden)
+              </span>
+              <span className={cx('text-xs font-semibold font-mono tabular-nums', colorClass(netWorth))}>
+                {formatCurrency(d(netWorth))}
+              </span>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function PhaseDetailTable({
@@ -91,6 +300,7 @@ export function PhaseDetailTable({
 }: PhaseDetailTableProps) {
   const [expanded, setExpanded] = useState(false)
   const [showReal, setShowReal] = useState(false)
+  const [expandedAge, setExpandedAge] = useState<number | null>(null)
 
   // Build debt label lookup map (memoized)
   const debtLabelMap = useMemo(() => buildDebtLabelMap(debts), [debts])
@@ -118,6 +328,18 @@ export function PhaseDetailTable({
   }
 
   const isAccumulation = phase === 'accumulation'
+
+  // Count total columns for colSpan on detail row
+  // Base: Lft + Begin + Events + Box3 + Eind + Netto = 6
+  // + expand chevron column = 1
+  let colCount = 7
+  if (isAccumulation) {
+    // + rendement columns + inleg
+    colCount += showAssetDetail ? assetTypes.length + 1 : 3 // spaar + beleg + inleg
+  } else {
+    // + rendement + onttrekking + AOW/Pensioen
+    colCount += 3
+  }
 
   // Phase label for the toggle button
   const phaseLabel =
@@ -159,6 +381,8 @@ export function PhaseDetailTable({
           <FinTable minWidth="520px">
             <FinTable.Header>
               <FinTable.Row dashed={false}>
+                {/* Expand chevron column */}
+                <FinTable.Th style={{ width: '24px' }}>&nbsp;</FinTable.Th>
                 <FinTable.Th>Lft</FinTable.Th>
                 <FinTable.Th align="right">Begin</FinTable.Th>
 
@@ -199,6 +423,7 @@ export function PhaseDetailTable({
               {rows.map((row) => {
                 const f = row.inflationFactor
                 const d = (v: number) => deflate(v, f, showReal)
+                const isRowExpanded = expandedAge === row.age
 
                 // Sum startValue from all buckets for "Begin" column
                 let beginValue = 0
@@ -217,63 +442,88 @@ export function PhaseDetailTable({
                 const aowPensioenIncome = row.phase !== 'accumulation' ? row.grossIncome : 0
 
                 return (
-                  <FinTable.Row key={row.year}>
-                    <FinTable.Td>{row.age}</FinTable.Td>
-                    <FinTable.Td numeric>{formatCurrency(d(beginValue))}</FinTable.Td>
+                  <Fragment key={row.year}>
+                    <FinTable.Row
+                      className={cx(
+                        'cursor-pointer select-none',
+                        isRowExpanded ? 'bg-[var(--subtle)]/50' : undefined,
+                      )}
+                      onClick={() => setExpandedAge(isRowExpanded ? null : row.age)}
+                    >
+                      {/* Expand chevron */}
+                      <FinTable.Td className="!px-0 !py-2" style={{ width: '24px' }}>
+                        {isRowExpanded
+                          ? <ChevronDown className="h-3 w-3 text-[var(--ink-3)] transition-transform duration-150" />
+                          : <ChevronRight className="h-3 w-3 text-[var(--ink-4)] transition-transform duration-150" />
+                        }
+                      </FinTable.Td>
+                      <FinTable.Td>{row.age}</FinTable.Td>
+                      <FinTable.Td numeric>{formatCurrency(d(beginValue))}</FinTable.Td>
 
-                    {isAccumulation ? (
-                      <>
-                        {showAssetDetail ? (
-                          assetTypes.map(t => {
-                            const bucket = row.assetBuckets[t]
-                            const growth = bucket?.growth ?? 0
-                            return (
-                              <FinTable.Td key={t} numeric color={colorClass(growth)}>
-                                {formatCurrency(d(growth))}
+                      {isAccumulation ? (
+                        <>
+                          {showAssetDetail ? (
+                            assetTypes.map(t => {
+                              const bucket = row.assetBuckets[t]
+                              const growth = bucket?.growth ?? 0
+                              return (
+                                <FinTable.Td key={t} numeric color={colorClass(growth)}>
+                                  {formatCurrency(d(growth))}
+                                </FinTable.Td>
+                              )
+                            })
+                          ) : (
+                            <>
+                              <FinTable.Td numeric color={colorClass(savingsGrowth)}>
+                                {formatCurrency(d(savingsGrowth))}
                               </FinTable.Td>
-                            )
-                          })
-                        ) : (
-                          <>
-                            <FinTable.Td numeric color={colorClass(savingsGrowth)}>
-                              {formatCurrency(d(savingsGrowth))}
-                            </FinTable.Td>
-                            <FinTable.Td numeric color={colorClass(investmentGrowth)}>
-                              {formatCurrency(d(investmentGrowth))}
-                            </FinTable.Td>
-                          </>
-                        )}
-                        <FinTable.Td numeric color={colorClass(row.savings)}>
-                          {formatCurrency(d(row.savings))}
-                        </FinTable.Td>
-                      </>
-                    ) : (
-                      <>
-                        <FinTable.Td numeric color={colorClass(row.totalGrowth)}>
-                          {formatCurrency(d(row.totalGrowth))}
-                        </FinTable.Td>
-                        <FinTable.Td numeric color={row.withdrawal > 0.5 ? 'text-[var(--negative)]' : undefined}>
-                          {row.withdrawal > 0 ? `−${formatCurrency(d(row.withdrawal)).replace('€', '€ ').trim()}` : formatCurrency(0)}
-                        </FinTable.Td>
-                        <FinTable.Td numeric color={aowPensioenIncome > 0.5 ? 'text-[var(--positive)]' : undefined}>
-                          {formatCurrency(d(aowPensioenIncome))}
-                        </FinTable.Td>
-                      </>
-                    )}
+                              <FinTable.Td numeric color={colorClass(investmentGrowth)}>
+                                {formatCurrency(d(investmentGrowth))}
+                              </FinTable.Td>
+                            </>
+                          )}
+                          <FinTable.Td numeric color={colorClass(row.savings)}>
+                            {formatCurrency(d(row.savings))}
+                          </FinTable.Td>
+                        </>
+                      ) : (
+                        <>
+                          <FinTable.Td numeric color={colorClass(row.totalGrowth)}>
+                            {formatCurrency(d(row.totalGrowth))}
+                          </FinTable.Td>
+                          <FinTable.Td numeric color={row.withdrawal > 0.5 ? 'text-[var(--negative)]' : undefined}>
+                            {row.withdrawal > 0 ? `−${formatCurrency(d(row.withdrawal)).replace('€', '€ ').trim()}` : formatCurrency(0)}
+                          </FinTable.Td>
+                          <FinTable.Td numeric color={aowPensioenIncome > 0.5 ? 'text-[var(--positive)]' : undefined}>
+                            {formatCurrency(d(aowPensioenIncome))}
+                          </FinTable.Td>
+                        </>
+                      )}
 
-                    <FinTable.Td numeric color={colorClass(row.cashflowNet)}>
-                      {formatCurrency(d(row.cashflowNet))}
-                    </FinTable.Td>
-                    <FinTable.Td numeric color={row.totalBox3 > 0.5 ? 'text-[var(--negative)]' : undefined}>
-                      {row.totalBox3 > 0 ? `−${formatCurrency(d(row.totalBox3)).replace('€', '€ ').trim()}` : formatCurrency(0)}
-                    </FinTable.Td>
-                    <FinTable.Td numeric bold>
-                      {formatCurrency(d(row.totalAssets))}
-                    </FinTable.Td>
-                    <FinTable.Td numeric bold color={colorClass(row.netWorth)}>
-                      {formatCurrency(d(row.netWorth))}
-                    </FinTable.Td>
-                  </FinTable.Row>
+                      <FinTable.Td numeric color={colorClass(row.cashflowNet)}>
+                        {formatCurrency(d(row.cashflowNet))}
+                      </FinTable.Td>
+                      <FinTable.Td numeric color={row.totalBox3 > 0.5 ? 'text-[var(--negative)]' : undefined}>
+                        {row.totalBox3 > 0 ? `−${formatCurrency(d(row.totalBox3)).replace('€', '€ ').trim()}` : formatCurrency(0)}
+                      </FinTable.Td>
+                      <FinTable.Td numeric bold>
+                        {formatCurrency(d(row.totalAssets))}
+                      </FinTable.Td>
+                      <FinTable.Td numeric bold color={colorClass(row.netWorth)}>
+                        {formatCurrency(d(row.netWorth))}
+                      </FinTable.Td>
+                    </FinTable.Row>
+
+                    {/* Expandable detail panel */}
+                    {isRowExpanded && (
+                      <DetailPanel
+                        row={row}
+                        d={d}
+                        debtLabelMap={debtLabelMap}
+                        colSpan={colCount}
+                      />
+                    )}
+                  </Fragment>
                 )
               })}
             </FinTable.Body>
@@ -282,6 +532,8 @@ export function PhaseDetailTable({
             {rows.length > 1 && (
               <FinTable.Footer>
                 <FinTable.Row total>
+                  {/* Empty cell for chevron column */}
+                  <FinTable.Td>&nbsp;</FinTable.Td>
                   <FinTable.Td bold>Σ</FinTable.Td>
                   <FinTable.Td numeric>{formatCurrency(deflate(
                     Object.values(rows[0].assetBuckets).reduce((sum, b) => sum + (b?.startValue ?? 0), 0),
