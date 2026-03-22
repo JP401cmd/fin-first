@@ -1,3 +1,23 @@
+## Session 2026-03-22 - Feature #511
+
+### Feature #511: Continue fasegrens: decumulatie starten vanaf werkelijk portfolio - PASSING
+- Fixed visual discontinuity at FIRE age in both engines:
+  - fire-simulation.ts: decStartPortfolio now always uses actual portfolio value
+  - unified-projection.ts: removed scaling of asset values to requiredFirePortfolioExact
+- Added 2 new unit tests (F6: surplus preserved, F7: pensioen-modus continuity)
+- All 153 tests pass (1 pre-existing failure, unrelated)
+- Verified in browser: horizon chart shows continuous line at FIRE age
+- Zero new console errors
+- Commit: fbb52587
+
+### Files Modified
+- lib/fire-simulation.ts
+- lib/unified-projection.ts
+- test/unified-projection.test.ts
+
+### Current Status
+- 1 feature completed this session (#511)
+
 ## Session 2026-03-22 - Feature #502
 
 ### Feature #502: Fase 4 — Kern vermogensprognose migreren naar unified engine - PASSING
