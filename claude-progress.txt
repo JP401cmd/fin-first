@@ -20122,3 +20122,28 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#517)
+
+## Session 2026-03-22 - Feature #520
+
+### Feature #520: Spaargeld correct aanspreken tijdens decumulatie - PASSING
+- Changed WATERFALL_ORDER: savings now comes BEFORE investment (liquidity principle)
+  - Old order: cash → investment → savings → crypto → ...
+  - New order: cash → savings → investment → crypto → ...
+- This prevents savings from growing indefinitely during retirement (unrealistic)
+- Savings (most liquid after cash) are now drawn first before selling investments
+- Updated comment explaining the liquiditeitsprincipe rationale
+- Updated test H1: verifies savings is withdrawn before investment
+- Added test H3: savings must decrease during decumulation (not grow forever)
+- Added test H4: small savings depletes early before investments are touched
+- All 92 tests pass (56 unit + 36 parity), zero regressions
+- Horizon page verified in browser: FIRE 56.5, chart renders correctly
+- Zero new console errors
+- Commit: 28dbc397
+
+### Files Modified
+- lib/unified-projection.ts — WATERFALL_ORDER reordered + enhanced comment
+- test/unified-projection.test.ts — H1 updated, H3 + H4 added
+
+### Current Status
+- 1 feature completed this session (#520)
+- Overall progress: 518/520 passing (99.6%)
