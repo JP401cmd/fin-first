@@ -19828,3 +19828,37 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#499, #500)
+
+## Session 2026-03-22 - Feature #507
+
+### Feature #507: Fase 8 - Mobiele optimalisatie en eindcontrole - PASSING
+- Quality assurance feature verifying all modified components work on 360px+ mobile screens
+- BottomSheet initial height: Added initialMobileHeight prop (string, e.g. 60vh)
+  - Phase modals open at 60vh on mobile, drag up or scroll-to-bottom expands to full 92vh
+  - expandedToFull state resets on each open, transition uses SPRING_CURVE
+  - Applied initialMobileHeight=60vh to phase-modal-opbouw, -overgang, -onttrekking
+- PhaseBar touch targets: Height increased from 36px to 44px (meets 44px requirement)
+- Nominaal/Reeel pill: Added min-h-[44px] min-w-[44px] on mobile with sm: reset for desktop
+- Verified at 360px viewport width:
+  - SimChart renders correctly (220px mobile height, viewBox-based scaling)
+  - WealthCompositionChart renders correctly (180px mobile, barWidth with 0.75 multiplier)
+  - Mini-charts in phase modals scale correctly via viewBox
+  - PhaseBar segments all meet 44px touch target (MIN_SEGMENT_PX=44)
+  - Kassabon receipts readable (FIRE Doelbedrag, Opbouw, Onttrekking): no text overlap
+  - No layout shifts on Pad vs Opbouw toggle
+  - Zoom (pinch/pan/wheel) fully supported via useChartZoom hook
+  - Performance: unified engine under 50ms for all 6 personas (verified by parity tests)
+- Zero new console errors (only pre-existing net_worth_snapshots 400)
+- All 52 unified projection tests pass, no regressions
+- Commit: 1cb064c1
+
+### Files Modified
+- components/app/bottom-sheet.tsx - initialMobileHeight prop, expandedToFull state, drag/scroll expand
+- components/app/horizon/phase-bar.tsx - height 36 to 44px
+- components/app/horizon/phase-detail-table.tsx - nominaal/reeel pill touch target
+- components/app/horizon/phase-modal-opbouw.tsx - initialMobileHeight=60vh
+- components/app/horizon/phase-modal-overgang.tsx - initialMobileHeight=60vh
+- components/app/horizon/phase-modal-onttrekking.tsx - size=lg + initialMobileHeight=60vh
+
+### Current Status
+- 1 feature completed this session (#507)
