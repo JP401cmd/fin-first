@@ -1,3 +1,28 @@
+## Session 2026-03-22 - Feature #501
+
+### Feature #501: Fase 3d — Onttrekking-modal uitbreiden met detail - PASSING
+- Updated PhaseModalOnttrekking props from `SimRow[]` to `UnifiedProjectionRow[]`
+- Extended kassabon with cumulative cashflow analysis:
+  - Startvermogen + Rendement (cumulatief) + AOW (cumulatief) + Pensioen (cumulatief) − Levensonderhoud − Box 3 (cumulatief) = Eindvermogen
+- Added IncomeSourceBar component: stacked mini-bar with AOW/pensioen/portfolio breakdown + legend with percentages
+- Added PhaseDetailTable (imported from phase-detail-table.tsx) with withdrawal columns, default collapsed
+- Preserved STRATEGY_LABELS mapping and strategy label display
+- Added editorial note: "[X] jaar opgebouwde vrijheid, nu geleefd"
+- Added kern-500 accent line (2px) at top of modal content
+- Preserved mini withdrawal chart with kern colors (updated to use totalAssets from UnifiedProjectionRow)
+- ReceiptRow helper enhanced with positive/negative color props
+- Verified in browser: all 8 feature steps confirmed working
+- Zero new JS console errors (only pre-existing net_worth_snapshots 400)
+- 879 vitest tests pass (no regressions)
+- Commit: abd93b75
+
+### Files Modified
+- components/app/horizon/phase-modal-onttrekking.tsx — full rewrite with unified rows, extended kassabon, income sources, PhaseDetailTable
+
+### Current Status
+- 1 feature completed this session (#501)
+- Overall progress: 499/506 passing (98.6%)
+
 ## Session 2026-03-22 - Feature #497
 
 ### Feature #497: Fase 2d — Vermogensopbouw grafiek op werkelijke data - PASSING
