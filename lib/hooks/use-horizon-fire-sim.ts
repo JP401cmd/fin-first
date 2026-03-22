@@ -1,11 +1,14 @@
 'use client'
 
 /**
- * useHorizonFireSim — koppelt app-data aan de runSimulation engine.
+ * useHorizonFireSim — koppelt app-data aan de unified projection engine.
  *
- * Ontvangt al-geladen data (FinancialInput + lifeEvents) van horizon/page.tsx
- * zodat er geen dubbele fetches zijn. Berekent SimResult en schrijft het resultaat weg
- * naar net_worth_snapshots.
+ * Ontvangt al-geladen data (FinancialInput + lifeEvents + assets + debts) van horizon/page.tsx
+ * zodat er geen dubbele fetches zijn. Berekent UnifiedProjectionResult en schrijft het resultaat
+ * weg naar net_worth_snapshots.
+ *
+ * Fase 2b (#495): gemigreerd van runSimulation() naar runUnifiedProjection().
+ * Retourneert SimResult via toSimResult() wrapper voor backwards-compatibiliteit.
  */
 
 import { useMemo, useEffect, useRef } from 'react'
@@ -19,14 +22,21 @@ import {
 } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import {
-  runSimulation,
   lifeEventsToCashflows,
   type SimResult,
   type SimCashflow,
-  type ReturnModel,
 } from '@/lib/fire-simulation'
 import { type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import {
+  runUnifiedProjection,
+  toSimResult,
+  type UnifiedProjectionInput,
+  type UnifiedProjectionResult,
+} from '@/lib/unified-projection'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
+import type { Box3Method } from '@/lib/bucket-projection'
 
 export interface HorizonFireSimResult {
   result: SimResult | null
@@ -50,23 +60,28 @@ interface HorizonFireSimInput {
   profileError?: string | null
   /** AOW age as fractional value (e.g. 67.25). Falls back to NL_AOW_AGE (67) if not provided. */
   aowAgeFractional?: number
+  /** Alle actieve assets van de gebruiker (voor per-asset-type rendement) */
+  assets?: Asset[]
+  /** Alle actieve schulden van de gebruiker (voor per-schuld aflossing) */
+  debts?: Debt[]
+  /** Box 3 berekeningsmethode */
+  box3Method?: Box3Method
+  /** Of de gebruiker een fiscaal partner heeft */
+  hasPartner?: boolean
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
   const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null } | null>(() => {
     if (!horizonInput) return null
 
-    const { totalAssets, totalDebts, monthlyContributions, yearlyMustExpenses, dateOfBirth } = horizonInput
+    const { totalAssets, totalDebts, monthlyContributions, yearlyMustExpenses, dateOfBirth, monthlyIncome } = horizonInput
 
     // currentAge
     const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
     if (currentAge === null) return null
-
-    // currentPortfolio = assets − debts (al gewogen met inclusion pct in FinancialInput)
-    const currentPortfolio = Math.max(0, totalAssets - totalDebts)
 
     // yearlyExpenses = al berekend via computeRetirementExpenses in de pagina
     const yearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : 0
@@ -75,25 +90,19 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     // annualSavings
     const annualSavings = (monthlyContributions ?? 0) * 12
 
-    // returnModel: altijd nl_box3 (Box 3-logica via fire-simulation engine)
-    const returnModel: ReturnModel = 'nl_box3'
     const grossReturn = grossReturnParam ?? DEFAULT_RETURN
+    const inflationRate = inflationParam ?? INFLATION
 
     // Strategy config — determines endAge and convergence target
     const strategyForSim = fireStrategy ?? DEFAULT_FIRE_STRATEGY
 
     // ── Pensioen strategy: force FIRE at AOW age, simulate full horizon ──
-    // Instead of ending at AOW, keep endAge at 90 (or configured) and force the
-    // accumulation→retirement transition at AOW age via forcedFireAge.
-    // After AOW: savings = 0, portfolio growth continues, withdrawals start.
     const isPensioen = strategyForSim.strategy === 'pensioen'
     const aowAge = aowAgeFractionalParam ?? NL_AOW_AGE
     const aowAgeInt = Math.ceil(aowAge)
 
     // For pensioen: use 'deplete' internally so the engine runs decumulation
-    // from AOW→endAge (portfolio depletes by endAge). Ensure endAge is at
-    // least 90 so the chart extends well past AOW (previous broken impl may
-    // have stored endAge=67 in the DB).
+    // from AOW→endAge. Ensure endAge is at least 90.
     const pensioenEndAge = Math.max(strategyForSim.endAge, 90)
     const effectiveStrategy = isPensioen
       ? { ...strategyForSim, strategy: 'deplete' as const, endAge: pensioenEndAge }
@@ -106,39 +115,40 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     // Kasstromen
     const cashflows = lifeEventsToCashflows(lifeEvents ?? [])
 
-    const result = runSimulation(
+    // ── Build UnifiedProjectionInput ──────────────────────────────────
+    const unifiedInput: UnifiedProjectionInput = {
+      assets: assets ?? [],
+      debts: debts ?? [],
       currentAge,
-      simEndAge,
-      currentPortfolio,
+      endAge: simEndAge,
       yearlyExpenses,
       annualSavings,
+      monthlySurplus: (monthlyContributions ?? 0),
+      monthlyIncome: monthlyIncome ?? 0,
+      incomeGrowthRate: 0,  // conservatief: geen inkomensgroei in FIRE simulatie
       grossReturn,
-      returnModel,
-      inflationParam ?? INFLATION,
+      inflationRate,
+      box3Method: box3Method ?? 'forfaitair',
       cashflows,
-      effectiveStrategy,
-      withdrawalStrategy,
+      strategyConfig: effectiveStrategy,
+      withdrawalStrategy: withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
       forcedFireAge,
-    )
+      hasPartner: hasPartner ?? false,
+    }
+
+    // ── Run unified projection engine ─────────────────────────────────
+    const unifiedResult = runUnifiedProjection(unifiedInput)
+
+    // ── Convert to SimResult via toSimResult() for backwards compatibility ──
+    const result = toSimResult(unifiedResult)
 
     // ── Pensioen post-processing (#471) ─────────────────────────────
-    // The engine ran as 'deplete' with forcedFireAge at AOW, producing rows
-    // from currentAge all the way to endAge (90) with both accumulation
-    // (currentAge → AOW) and retirement (AOW → 90) phases.
-    //
-    // IMPORTANT: Do NOT trim rows or override displayEndAge to AOW age.
-    // The chart must show the FULL timeline including the withdrawal phase
-    // after AOW, where portfolio growth continues but savings stop and
-    // withdrawals begin. This lets users see their end-of-life portfolio.
-    // See feature #471 for the specification.
     if (isPensioen) {
       const originalFireAge = result.fireAge
       const originalFireAgeFractional = result.fireAgeFractional
 
       // Override requiredFirePortfolio with the ACTUAL projected portfolio at AOW age
-      // (firePortfolioAtFire), not the binary-search minimum. The binary-search minimum
-      // is the theoretical minimum needed to survive decumulation, but for pensioen mode
-      // users want to see what they'll actually have at AOW age. (#473)
+      // (firePortfolioAtFire), not the binary-search minimum. (#473)
       const pensioenResult: SimResult = {
         ...result,
         strategy: 'pensioen',
@@ -152,7 +162,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     }
 
     return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null }
-  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam])
+  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)

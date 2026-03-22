@@ -240,9 +240,23 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [openCatalogGroups, setOpenCatalogGroups] = useState<Set<LifeEventGroup>>(new Set())
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
+  // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
   const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional } = useHorizonFireSim(
     input
-      ? { horizonInput: input, lifeEvents: events, fireStrategy, withdrawalStrategy: withdrawalStrategyConfig, grossReturn: fireParams.grossReturn, inflation: fireParams.inflationRate, profileError: initialData.profileError, aowAgeFractional: userAowAge.fractional }
+      ? {
+          horizonInput: input,
+          lifeEvents: events,
+          fireStrategy,
+          withdrawalStrategy: withdrawalStrategyConfig,
+          grossReturn: fireParams.grossReturn,
+          inflation: fireParams.inflationRate,
+          profileError: initialData.profileError,
+          aowAgeFractional: userAowAge.fractional,
+          assets: initialData.assets,
+          debts,
+          box3Method: initialData.box3Method,
+          hasPartner: initialData.hasPartner,
+        }
       : null,
   )
 
