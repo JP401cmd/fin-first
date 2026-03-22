@@ -1307,6 +1307,10 @@ export function computeFireProjection(
   annualReturn: number = DEFAULT_RETURN,
   swrOverride?: number,
   inflationOverride?: number,
+  strategyOptions?: {
+    strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    endAge?: number
+  },
 ): FireProjection {
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses, monthlyContributions, yearlyMustExpenses, dateOfBirth } = input
   const swr = swrOverride ?? NL_SWR
@@ -1314,7 +1318,16 @@ export function computeFireProjection(
   const netWorth = totalAssets - totalDebts
   const yearlyExpenses = monthlyExpenses * 12
   const effectiveYearlyExpenses = computeEffectiveExpenses(yearlyMustExpenses, yearlyExpenses)
-  const fireTarget = computeFireTarget(effectiveYearlyExpenses, swr)
+  const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
+  const realReturn = (1 + annualReturn) / (1 + inflationRate) - 1
+  const yearsInRetirement = (strategyOptions?.strategy === 'deplete' && strategyOptions.endAge && currentAge != null)
+    ? Math.max(1, strategyOptions.endAge - Math.round(currentAge))
+    : undefined
+  const fireTarget = computeFireTarget(effectiveYearlyExpenses, swr, {
+    strategy: strategyOptions?.strategy,
+    yearsInRetirement,
+    realReturn,
+  })
   const freedomPercentage = computeFreedomPercentage(netWorth, fireTarget)
   const monthlySavings = monthlyIncome - monthlyExpenses
   const savingsRate = computeSavingsRate(monthlyIncome, monthlyExpenses)
@@ -1324,7 +1337,6 @@ export function computeFireProjection(
   const { years: freedomYears, months: freedomMonths } = computeFreedomTime(netWorth, effectiveYearlyExpenses)
 
   // FIRE date calculation (inflation-adjusted real return)
-  const realReturn = (1 + annualReturn) / (1 + inflationRate) - 1
   const monthlyReturn = realReturn / 12
   let projected = netWorth
   let months = 0
@@ -1333,7 +1345,6 @@ export function computeFireProjection(
   let countdownYears = 0
   let countdownMonths = 0
   let fireAge: number | null = null
-  const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
 
   if (netWorth >= fireTarget && fireTarget > 0) {
     fireDate = 'Bereikt!'
@@ -1420,11 +1431,15 @@ export function computeFireRange(
   swrOverride?: number,
   inflationOverride?: number,
   baseReturn: number = DEFAULT_RETURN,
+  strategyOptions?: {
+    strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    endAge?: number
+  },
 ): FireRange {
   return {
-    optimistic: computeFireProjection(input, Math.min(0.20, baseReturn + 0.02), swrOverride, inflationOverride),
-    expected: computeFireProjection(input, baseReturn, swrOverride, inflationOverride),
-    pessimistic: computeFireProjection(input, Math.max(0.01, baseReturn - 0.03), swrOverride, inflationOverride),
+    optimistic: computeFireProjection(input, Math.min(0.20, baseReturn + 0.02), swrOverride, inflationOverride, strategyOptions),
+    expected: computeFireProjection(input, baseReturn, swrOverride, inflationOverride, strategyOptions),
+    pessimistic: computeFireProjection(input, Math.max(0.01, baseReturn - 0.03), swrOverride, inflationOverride, strategyOptions),
   }
 }
 

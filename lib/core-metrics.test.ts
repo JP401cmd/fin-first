@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computeEffectiveExpenses,
   computeFireTarget,
+  depleteFireTarget,
   computeFreedomPercentage,
   computeFreedomTime,
   computeSavingsRate,
@@ -37,6 +38,73 @@ describe('computeFireTarget', () => {
   it('uses NL SWR correctly', () => {
     const nlSwr = 0.02883
     expect(computeFireTarget(40000, nlSwr)).toBeCloseTo(40000 / nlSwr, 2)
+  })
+})
+
+// ── depleteFireTarget ──────────────────────────────────────
+
+describe('depleteFireTarget', () => {
+  it('PV annuity: lower target than perpetual', () => {
+    const perpetual = 40_000 / 0.05 // 800_000
+    const deplete = depleteFireTarget(40_000, 0.05, 30)
+    expect(deplete).toBeLessThan(perpetual)
+    // PV annuity: 40_000 * (1 - 1.05^(-30)) / 0.05 ≈ 614_886
+    expect(deplete).toBeCloseTo(614_886, -2)
+  })
+
+  it('returns 0 for zero expenses', () => {
+    expect(depleteFireTarget(0, 0.05, 30)).toBe(0)
+  })
+
+  it('handles zero return: simple multiplication', () => {
+    expect(depleteFireTarget(40_000, 0, 30)).toBe(40_000 * 30) // 1_200_000
+  })
+
+  it('approaches perpetual as years increase', () => {
+    const perpetual = 40_000 / 0.05
+    const longTerm = depleteFireTarget(40_000, 0.05, 200)
+    // With 200 years, PV annuity approaches expenses/r
+    expect(longTerm).toBeCloseTo(perpetual, -3)
+  })
+
+  it('short horizon = lower target', () => {
+    const short = depleteFireTarget(40_000, 0.05, 10)
+    const long = depleteFireTarget(40_000, 0.05, 30)
+    expect(short).toBeLessThan(long)
+  })
+})
+
+// ── computeFireTarget with strategy options ─────────────────
+
+describe('computeFireTarget with strategy', () => {
+  it('deplete strategy returns lower target', () => {
+    const perpetualTarget = computeFireTarget(40_000, 0.04)
+    const depleteTarget = computeFireTarget(40_000, 0.04, {
+      strategy: 'deplete',
+      yearsInRetirement: 30,
+      realReturn: 0.05,
+    })
+    expect(depleteTarget).toBeLessThan(perpetualTarget)
+  })
+
+  it('perpetual strategy uses classic formula', () => {
+    const result = computeFireTarget(40_000, 0.04, {
+      strategy: 'perpetual',
+      yearsInRetirement: 30,
+      realReturn: 0.05,
+    })
+    expect(result).toBe(40_000 / 0.04)
+  })
+
+  it('no options = classic formula (backwards compat)', () => {
+    expect(computeFireTarget(40_000, 0.04)).toBe(1_000_000)
+  })
+
+  it('deplete without yearsInRetirement = classic formula', () => {
+    const result = computeFireTarget(40_000, 0.04, {
+      strategy: 'deplete',
+    })
+    expect(result).toBe(1_000_000)
   })
 })
 

@@ -1002,7 +1002,8 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         recurringNet += recurringMonthly(cf, age) * 12
       }
 
-      // Static withdrawal for binary search convergence
+      // Static withdrawal for binary search convergence — no endStrategy
+      // to avoid annuity interference; the simulation horizon handles deplete vs perpetual.
       const wCtx: WithdrawalContext = {
         baseExpenses: expensesThisYear,
         recurringIncome: recurringNet,
@@ -1013,7 +1014,6 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         yearsIntoRetirement: yearsIntoPension,
         currentAge: age,
         endAge: simEndAge,
-        endStrategy: strategy,
       }
       const withdrawal = applyWithdrawalStrategy(WITHDRAWAL_DEFAULTS, wCtx)
 
@@ -1254,18 +1254,11 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
 
   const decRows: UnifiedProjectionRow[] = []
   let previousWithdrawal = 0
-  const decStartNetWorth = input.forcedFireAge != null
-    ? currentNetWorth
-    : requiredFirePortfolioExact
-
-  // If not using forcedFireAge, scale bucket values to match requiredFirePortfolioExact
-  // This prevents visual discontinuity at FIRE age
-  if (input.forcedFireAge == null && currentNetWorth > 0) {
-    const scaleFactor = decStartNetWorth / currentNetWorth
-    for (const b of runningBuckets) {
-      b.value *= scaleFactor
-    }
-  }
+  // Always start decumulation from actual portfolio (currentNetWorth) to ensure
+  // a continuous line at FIRE age — no visual jump. The last accumulation row's
+  // endPortfolio matches the first decumulation row's startPortfolio (#511).
+  // Previously only pensioen-modus (forcedFireAge) used actual portfolio; now all modes do.
+  // No bucket scaling needed — buckets already reflect actual accumulated values.
 
   // Determine active withdrawal config (use chosen strategy for display rows)
   const activeConfig = wsConfig

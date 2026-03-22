@@ -236,6 +236,9 @@ export function runSimulation(
       }
 
       // Build withdrawal context and apply strategy
+      // Only pass endStrategy for visualization rows (useWithdrawalStrategy=true).
+      // Binary search (useWithdrawalStrategy=false) uses pure static withdrawal
+      // to reliably converge — the simulation horizon handles deplete vs perpetual.
       const wCtx: WithdrawalContext = {
         baseExpenses: expensesThisYear,
         recurringIncome: recurringNet,
@@ -246,7 +249,7 @@ export function runSimulation(
         yearsIntoRetirement: yearsIntoPension,
         currentAge: age,
         endAge: simEndAge,
-        endStrategy: strategy,
+        endStrategy: useWithdrawalStrategy ? strategy : undefined,
       }
       const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
 
@@ -447,14 +450,16 @@ export function runSimulation(
 
   // Use withdrawal strategy for visualisation rows — consistent with binary search
   // which now also uses the chosen strategy (since FIRE-leeftijd is strategie-afhankelijk)
-  // When forcedFireAge is set (pensioen-modus), start decumulation from actual portfolio
-  // instead of the binary-search minimum to avoid visual discontinuity at AOW age.
+  // Always start decumulation from actual portfolio (firePortfolioAtFire) to avoid
+  // visual discontinuity at FIRE age. The graph should show a continuous line —
+  // the last accumulation row's endPortfolio must match the first decumulation row's startPortfolio.
+  // Previously only pensioen-modus (forcedFireAge) used actual portfolio; now all modes do (#511).
   //
   // NOTE (#475): This value becomes the guardrails anchoring point (decumStartPortfolio
-  // inside simulateDecumulation). For pensioen with high portfolios (€1M+), guardrails
+  // inside simulateDecumulation). For high portfolios (€1M+), guardrails
   // will keep withdrawals stable around base expenses — this is correct behavior.
   // See withdrawal-strategy.ts applyGuardrails docs for full analysis.
-  const decStartPortfolio = forcedFireAge != null ? portfolio : requiredFirePortfolioExact
+  const decStartPortfolio = portfolio
   const { rows: decRows } = simulateDecumulation(decStartPortfolio, computedFireAge, true, displayEndAge, true)
 
   const implicitWithdrawalRate = requiredFirePortfolio > 0

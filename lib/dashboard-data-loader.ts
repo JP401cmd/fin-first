@@ -462,7 +462,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
 
   const yearlyExpenses = effectiveMonthlyExpenses * 12
-  const fireTarget = computeFireTarget(computeEffectiveExpenses(yearlyRetirementExpenses, yearlyExpenses), fireSwr)
+  const fireStrategy = resolveFireStrategyWithOverride(profileResult.data ?? {})
+  const dob = profileResult.data?.date_of_birth ?? null
+  const currentAge = dob ? ageAtDate(dob) : null
+  const yearsInRetirement = (fireStrategy.strategy === 'deplete' && currentAge != null)
+    ? Math.max(1, fireStrategy.endAge - Math.round(currentAge))
+    : undefined
+  const realReturn = (1 + fireParams.grossReturn) / (1 + fireParams.inflationRate) - 1
+  const fireTarget = computeFireTarget(
+    computeEffectiveExpenses(yearlyRetirementExpenses, yearlyExpenses),
+    fireSwr,
+    { strategy: fireStrategy.strategy, yearsInRetirement, realReturn },
+  )
   const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
 
   // FIRE projection
@@ -471,17 +482,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses,
     dateOfBirth: profileResult.data?.date_of_birth ?? null,
   }
-  const fireProjResult = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr)
+  const strategyOpts = { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge }
+  const fireProjResult = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr, undefined, strategyOpts)
 
   // Horizon extra: scenario range (optimistic / expected / pessimistic)
-  const fireRange = computeFireRange(horizonInput, fireSwr, undefined, fireParams.grossReturn)
+  const fireRange = computeFireRange(horizonInput, fireSwr, undefined, fireParams.grossReturn, strategyOpts)
 
   // Horizon extra: sim rows for vermogenspad chart
-  const dob = profileResult.data?.date_of_birth ?? null
   let simRows: { age: number; endPortfolio: number; phase: string }[] | null = null
   let simRequiredPortfolio: number | null = null
   let simFireAgeFractional: number | null = null
-  const fireStrategy = resolveFireStrategyWithOverride(profileResult.data ?? {})
   if (dob && netWorth > 0) {
     try {
       const currentAge = ageAtDate(dob)

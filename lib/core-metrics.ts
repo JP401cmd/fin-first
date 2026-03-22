@@ -26,12 +26,54 @@ export function computeEffectiveExpenses(
   return yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
 }
 
-/** FIRE target = yearly expenses / SWR. */
+/**
+ * FIRE target = yearly expenses / SWR (perpetuele formule).
+ *
+ * Optioneel: bij deplete strategie wordt depleteFireTarget() gebruikt
+ * als strategy en yearsInRetirement worden meegegeven.
+ */
 export function computeFireTarget(
   effectiveYearlyExpenses: number,
   swr: number,
+  options?: {
+    strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    yearsInRetirement?: number
+    realReturn?: number
+  },
 ): number {
-  return effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swr : 0
+  if (effectiveYearlyExpenses <= 0) return 0
+
+  if (options?.strategy === 'deplete' && options.yearsInRetirement && options.yearsInRetirement > 0) {
+    const r = options.realReturn ?? swr
+    return depleteFireTarget(effectiveYearlyExpenses, r, options.yearsInRetirement)
+  }
+
+  return effectiveYearlyExpenses / swr
+}
+
+/**
+ * FIRE-target voor deplete strategie: contante waarde van een annuïteit.
+ *
+ * target = uitgaven × (1 − (1+r)^(−n)) / r
+ *
+ * Dit geeft het minimale vermogen dat nodig is om n jaar lang
+ * de uitgaven te dekken met een reëel rendement van r per jaar,
+ * waarna het vermogen ≈ €0 is.
+ */
+export function depleteFireTarget(
+  yearlyExpenses: number,
+  realReturn: number,
+  yearsInRetirement: number,
+): number {
+  if (yearlyExpenses <= 0 || yearsInRetirement <= 0) return 0
+
+  if (Math.abs(realReturn) < 1e-10) {
+    // Zero return: simple multiplication
+    return yearlyExpenses * yearsInRetirement
+  }
+
+  // PV annuity formula: PMT × (1 − (1+r)^(−n)) / r
+  return yearlyExpenses * (1 - Math.pow(1 + realReturn, -yearsInRetirement)) / realReturn
 }
 
 /** Freedom percentage: progress toward FIRE (0–100). */
