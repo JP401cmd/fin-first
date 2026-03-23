@@ -838,12 +838,100 @@ export default function GuideHorizonUitleg() {
             met het interpreteren van de uitkomsten of het bedenken van alternatieven.
           </p>
           <p>
-            Elke fase heeft daarnaast specifieke analyses: de opbouwfase toont schulden,
-            schenkingsmogelijkheden en een hypotheek-vs-beleggen vergelijking. De overgangsfase
-            bevat een gap-analyse met strategieopties. De onttrekkingsfase analyseert het
-            sequence-of-returns risico, de optie om je huis te verkopen, en een
-            end-of-life planning.
+            <strong>Aannames</strong> — elke fase-modal toont onderaan een inklapbare{' '}
+            <em>Aannames</em>-sectie met de parameters die de berekening aansturen: inflatie,
+            verwacht rendement, onttrekkingspercentage en meer. Zo kun je altijd controleren
+            waar de cijfers op gebaseerd zijn.
           </p>
+          <p>
+            Daarnaast heeft elke fase <strong>eigen analyses</strong> die passen bij de vragen
+            van die levensfase:
+          </p>
+
+          <p className="mb-1 mt-3 font-semibold" style={{ color: HORIZON_COLOR }}>
+            Opbouwfase
+          </p>
+          <ul className="list-inside list-disc space-y-1 text-sm" style={{ color: 'var(--ink-2)' }}>
+            <li>
+              <strong>Monte Carlo simulatie</strong> — waaiergrafiek met slagingskans en
+              dynamische checkpoint-leeftijden tot je FIRE-moment.
+            </li>
+            <li>
+              <strong>Stresstest</strong> — wat als de markt crasht of inflatie jarenlang hoog
+              blijft? Simuleert extreme scenario's en combinaties.
+            </li>
+            <li>
+              <strong>Schulden samenvatting</strong> — overzicht van je schulden met relatieve
+              extra-aflossingsscenario's (10%, 20%, 30% van je spaarquote) en hun FIRE-impact.
+            </li>
+            <li>
+              <strong>Giften check</strong> — belastingvrij schenken aan kinderen: dynamisch
+              belastingjaar, multi-kind scenario's en FIRE-vertraging per scenario.
+            </li>
+            <li>
+              <strong>Hypotheek vs. beleggen</strong> — vergelijkt extra aflossen met beleggen
+              van hetzelfde bedrag, inclusief belastingvoordeel.
+            </li>
+            <li>
+              <strong>Spaarquote gevoeligheid</strong> — hoe verandert je FIRE-leeftijd als je
+              meer of minder spaart?
+            </li>
+          </ul>
+
+          <p className="mb-1 mt-3 font-semibold" style={{ color: HORIZON_COLOR }}>
+            Overgangsfase
+          </p>
+          <ul className="list-inside list-disc space-y-1 text-sm" style={{ color: 'var(--ink-2)' }}>
+            <li>
+              <strong>Monte Carlo simulatie</strong> — slagingskans, mediaan eindvermogen,
+              pessimistisch scenario en kritische onttrekkingsgrens via binary search.
+            </li>
+            <li>
+              <strong>Stresstest</strong> — crash- en combinatie-scenario's specifiek voor de
+              transitieperiode.
+            </li>
+            <li>
+              <strong>Gap-analyse</strong> — vergelijkt drie overbruggingsstrategieën
+              (interen, deeltijdwerk, combinatie) met overleeft/tekort-badges.
+            </li>
+            <li>
+              <strong>Eerder stoppen</strong> — berekent hoeveel eerder je kunt stoppen met
+              werken bij verschillende extra-inleg of kostenreductie scenario's.
+            </li>
+            <li>
+              <strong>Deeltijdwerk impact</strong> — toont het effect van flex-inkomen op je
+              vermogensverloop tijdens de overgang.
+            </li>
+          </ul>
+
+          <p className="mb-1 mt-3 font-semibold" style={{ color: HORIZON_COLOR }}>
+            Onttrekkingsfase
+          </p>
+          <ul className="list-inside list-disc space-y-1 text-sm" style={{ color: 'var(--ink-2)' }}>
+            <li>
+              <strong>Monte Carlo simulatie</strong> — slagingskans, mediaan eindvermogen,
+              pessimistisch scenario en kritische SWR via iteratieve berekening.
+            </li>
+            <li>
+              <strong>Stresstest</strong> — extreme scenario's voor je onttrekkingsperiode.
+            </li>
+            <li>
+              <strong>SORR-analyse</strong> — sequence-of-returns risico met cash-buffer
+              opties (0 t/m 3 jaar) en gepersonaliseerd advies voor je fragiele decennium.
+            </li>
+            <li>
+              <strong>Huis verkopen</strong> — gevoeligheidsanalyse (2%, 3%, 4% woninggroei)
+              plus opportuniteitskosten van vastgoed vs. beleggen.
+            </li>
+            <li>
+              <strong>Koopkracht-erosie</strong> — toont hoe inflatie je koopkracht aantast
+              tijdens een lange onttrekkingsperiode.
+            </li>
+            <li>
+              <strong>End-of-life planning</strong> — nalatenschap, uitvaartwensen en
+              financiële afsluiting.
+            </li>
+          </ul>
         </>
       ),
     },

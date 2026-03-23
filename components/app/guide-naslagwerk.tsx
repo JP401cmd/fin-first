@@ -210,8 +210,14 @@ const MODULES: NaslagwerkModule[] = [
       {
         icon: BarChart3,
         title: 'Monte Carlo & backtesting',
-        summary: 'Test de robuustheid van je plan tegen historische marktdata en simulaties.',
+        summary: 'Per fase: slagingskans, waaiergrafiek, mediaan eindvermogen, kritische grens/SWR via binary search.',
         anchor: 'guide-reis-4',
+      },
+      {
+        icon: BarChart3,
+        title: 'Fase-analyses',
+        summary: 'Per fase specifieke analyses: schulden, giften, gap-analyse, eerder stoppen, SORR, huis verkopen, koopkracht-erosie en meer.',
+        anchor: 'guide-horizon-grafiek',
       },
       {
         icon: ArrowDownToLine,
