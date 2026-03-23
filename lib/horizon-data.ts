@@ -1278,7 +1278,7 @@ export function normalRandom(mean: number, stddev: number, seed?: number): numbe
 }
 
 // Seeded PRNG class for Monte Carlo
-class SeededRandom {
+export class SeededRandom {
   private state: number
   constructor(seed: number) {
     this.state = seed | 0 || 1

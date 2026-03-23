@@ -5,11 +5,20 @@ import { ChevronRight, ChevronDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { formatCurrency } from '@/lib/format'
-import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
+import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
+import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-events-in-phase'
+import { StressTestSection } from '@/components/app/horizon/phase-analysis/stress-test-section'
+import { MonteCarloOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/monte-carlo-opbouw'
+import { SchuldenSamenvatting } from '@/components/app/horizon/phase-analysis/opbouw/schulden-samenvatting'
+import { GiftenCheck } from '@/components/app/horizon/phase-analysis/opbouw/giften-check'
+import { HypotheekVsBeleggenOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/hypotheek-vs-beleggen-opbouw'
+import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
 import { ASSET_TYPE_LABELS, type AssetType, type Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
+import type { LifeEvent } from '@/lib/horizon-data'
+import type { SimCashflow } from '@/lib/fire-simulation'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +39,20 @@ interface PhaseModalOpbouwProps {
   assets?: Asset[]
   /** Debts metadata for human-readable labels in detail table */
   debts?: Debt[]
+  /** Life events for phase display */
+  events?: LifeEvent[]
+  /** Cashflows for Monte Carlo and hypotheek analysis */
+  cashflows?: SimCashflow[]
+  /** All rows (all phases) for the zoomed chart overlay */
+  allRows?: UnifiedProjectionRow[]
+  /** Monthly income for hypotheek analysis */
+  monthlyIncome?: number
+  /** Monthly expenses for hypotheek analysis */
+  monthlyExpenses?: number
+  /** Portfolio volatility for Monte Carlo (default DEFAULT_VOLATILITY) */
+  volatility?: number
+  /** FIRE target portfolio amount for Monte Carlo success probability */
+  fireTarget?: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -50,142 +73,6 @@ function wealthGroupLabel(type: AssetType): string {
   return WEALTHGROUP_LABELS[type] ?? ASSET_TYPE_LABELS[type] ?? type
 }
 
-// ── Mini Chart ───────────────────────────────────────────────────────────────
-
-const CHART_W = 320
-const CHART_H = 120
-const PAD = { top: 16, right: 16, bottom: 24, left: 56 }
-
-const MiniAccumulationChart = memo(function MiniAccumulationChart({
-  rows,
-  hasEntered,
-}: {
-  rows: UnifiedProjectionRow[]
-  hasEntered: boolean
-}) {
-  if (rows.length < 2) return null
-
-  const chartW = CHART_W - PAD.left - PAD.right
-  const chartH = CHART_H - PAD.top - PAD.bottom
-
-  const maxVal = Math.max(...rows.map(r => r.totalAssets), 1)
-  const minAge = rows[0].age
-  const maxAge = rows[rows.length - 1].age
-  const ageSpan = maxAge - minAge || 1
-
-  const x = (age: number) => PAD.left + ((age - minAge) / ageSpan) * chartW
-  const y = (val: number) => PAD.top + chartH - (val / maxVal) * chartH
-
-  // Build area path
-  const points = rows.map(r => `${x(r.age)},${y(r.totalAssets)}`)
-  const linePath = `M${points.join(' L')}`
-  const areaPath = `${linePath} L${x(maxAge)},${y(0)} L${x(minAge)},${y(0)} Z`
-
-  // Y-axis ticks (3 levels)
-  const yTicks = [0, 0.5, 1.0].map(f => ({
-    val: maxVal * f,
-    yPos: y(maxVal * f),
-  }))
-
-  // X-axis ticks
-  const xStep = ageSpan <= 10 ? 2 : ageSpan <= 20 ? 5 : 10
-  const xTicks: number[] = []
-  for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) {
-    xTicks.push(a)
-  }
-
-  const animProgress = hasEntered ? 1 : 0
-
-  return (
-    <svg
-      viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-      className="w-full"
-      role="img"
-      aria-label="Vermogensgroei tijdens opbouwfase"
-    >
-      {/* Grid lines */}
-      {yTicks.map(t => (
-        <g key={t.val}>
-          <line
-            x1={PAD.left}
-            x2={CHART_W - PAD.right}
-            y1={t.yPos}
-            y2={t.yPos}
-            stroke="var(--border-ed, #e5e5e5)"
-            strokeWidth={0.5}
-          />
-          <text
-            x={PAD.left - 6}
-            y={t.yPos + 3}
-            textAnchor="end"
-            className="fill-[var(--ink-4)]"
-            style={{ fontSize: 8, fontFamily: 'var(--font-mono, monospace)' }}
-          >
-            {t.val >= 1_000_000
-              ? `\u20AC${(t.val / 1_000_000).toFixed(1)}M`
-              : t.val >= 1_000
-              ? `\u20AC${Math.round(t.val / 1_000)}k`
-              : `\u20AC${Math.round(t.val)}`}
-          </text>
-        </g>
-      ))}
-
-      {/* X-axis ticks */}
-      {xTicks.map(age => (
-        <text
-          key={age}
-          x={x(age)}
-          y={CHART_H - 4}
-          textAnchor="middle"
-          className="fill-[var(--ink-4)]"
-          style={{ fontSize: 8, fontFamily: 'var(--font-mono, monospace)' }}
-        >
-          {age}
-        </text>
-      ))}
-
-      {/* Area fill */}
-      <path
-        d={areaPath}
-        fill="var(--color-horizon-100, #e8dcca)"
-        opacity={0.5}
-        style={{
-          transition: 'opacity 700ms ease-out',
-          opacity: animProgress * 0.5,
-        }}
-      />
-
-      {/* Line */}
-      <path
-        d={linePath}
-        fill="none"
-        stroke="var(--color-horizon-600, #a07840)"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        pathLength={1}
-        style={{
-          strokeDasharray: 1,
-          strokeDashoffset: 1 - animProgress,
-          transition: 'stroke-dashoffset 700ms ease-out',
-        }}
-      />
-
-      {/* End dot */}
-      <circle
-        cx={x(maxAge)}
-        cy={y(rows[rows.length - 1].totalAssets)}
-        r={3}
-        fill="var(--color-horizon-600, #a07840)"
-        style={{
-          transition: 'opacity 400ms ease-out 500ms',
-          opacity: animProgress,
-        }}
-      />
-    </svg>
-  )
-})
-
 // ── Modal Component ──────────────────────────────────────────────────────────
 
 export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
@@ -202,6 +89,13 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   rows,
   assets,
   debts,
+  events,
+  cashflows,
+  allRows,
+  monthlyIncome,
+  monthlyExpenses,
+  volatility,
+  fireTarget,
 }: PhaseModalOpbouwProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
@@ -265,14 +159,33 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
       open={open}
       onClose={onClose}
       title={`Opbouwfase \u00b7 ${Math.round(currentAge)} \u2192 ${Math.round(fireAge)} jaar`}
-      size="lg"
+      size="xl"
       initialMobileHeight="60vh"
     >
       {/* Accent line */}
       <div className="h-[2px] bg-[var(--color-horizon-600)]" />
 
-      <div className="p-5">
-        {/* ── Waterval Kassabon ───────────────────────────────────── */}
+      <div className="p-5 space-y-4">
+        {/* 1. Phase Chart Zoom — full trajectory with accumulation phase highlighted */}
+        {allRows && allRows.length > 2 && (
+          <PhaseChartZoom
+            allRows={allRows}
+            phaseFilter="accumulation"
+            accentColor="var(--color-horizon-600)"
+            annotations={[
+              { age: fireAge, label: 'FIRE' },
+            ]}
+          />
+        )}
+
+        {/* 2. Fase-header — compact summary line */}
+        <div className="text-center">
+          <p className="font-sans text-base font-bold text-[var(--ink)]">
+            Opbouw &middot; {formatCurrency(Math.round(startVermogen))} &rarr; {formatCurrency(Math.round(eindVermogen))} &middot; {yearsAccumulation} jaar
+          </p>
+        </div>
+
+        {/* 3. Waterval Kassabon — existing receipt waterfall */}
         <KassabonShell>
           {/* Header */}
           <div className="mb-3 text-center">
@@ -330,17 +243,73 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           </div>
         </KassabonShell>
 
-        {/* ── Mini chart ──────────────────────────────────────────── */}
-        {accumulationRows.length >= 2 && (
-          <div className="mt-4">
-            <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-              Vermogensgroei
-            </p>
-            <MiniChartWrapper rows={accumulationRows} />
-          </div>
+        {/* 4. Life Events — events that fall within the accumulation phase */}
+        {events && events.length > 0 && (
+          <LifeEventsInPhase
+            events={events}
+            phaseStartAge={currentAge}
+            phaseEndAge={fireAge}
+          />
         )}
 
-        {/* ── PhaseDetailTable (collapsed by default) ─────────────── */}
+        {/* 5. Monte Carlo — probabilistic analysis of accumulation outcomes */}
+        <MonteCarloOpbouw
+          currentAge={currentAge}
+          fireAge={fireAge}
+          startPortfolio={currentNetWorth}
+          annualSavings={yearlySavings}
+          expectedReturn={expectedReturn}
+          volatility={volatility ?? DEFAULT_VOLATILITY}
+          inflationRate={inflationRate}
+          cashflows={cashflows}
+          fireTarget={fireTarget}
+        />
+
+        {/* 6. Schulden — debt summary (only when debts exist with positive balances) */}
+        {debts && debts.length > 0 && (
+          <SchuldenSamenvatting
+            debts={debts}
+            annualSavings={yearlySavings}
+          />
+        )}
+
+        {/* 7. Giften — gift tax analysis and opportunity cost */}
+        <GiftenCheck
+          currentPortfolio={currentNetWorth}
+          yearlyExpenses={yearlyExpenses}
+          annualSavings={yearlySavings}
+          expectedReturn={expectedReturn}
+          inflationRate={inflationRate}
+          currentAge={currentAge}
+          fireAge={fireAge}
+        />
+
+        {/* 8. Hypotheek vs Beleggen — mortgage vs investing trade-off */}
+        {debts && debts.length > 0 && (
+          <HypotheekVsBeleggenOpbouw
+            debts={debts}
+            monthlyIncome={monthlyIncome ?? 0}
+            monthlyExpenses={monthlyExpenses ?? 0}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            currentAge={currentAge}
+            currentPortfolio={currentNetWorth}
+            yearlyExpenses={yearlyExpenses}
+            annualSavings={yearlySavings}
+            cashflows={cashflows}
+          />
+        )}
+
+        {/* 9. Stress Test — extreme scenario analysis */}
+        <StressTestSection
+          rows={accumulationRows}
+          expectedReturn={expectedReturn}
+          inflationRate={inflationRate}
+          yearlyExpenses={yearlyExpenses}
+          willContextPrefix="Opbouwfase stresstest"
+        />
+
+        {/* 10. PhaseDetailTable — yearly detail rows (collapsed by default) */}
         {accumulationRows.length > 0 && (
           <PhaseDetailTable
             rows={accumulationRows}
@@ -351,8 +320,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           />
         )}
 
-        {/* ── Aannames sectie (collapsed) ──────────────────────────── */}
-        <div className="mt-4 rounded-[var(--r)] border border-dashed border-[var(--border-ed)]">
+        {/* 11. Aannames sectie (collapsed) */}
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)]">
           <button
             type="button"
             onClick={() => setAssumptionsOpen(!assumptionsOpen)}
@@ -397,9 +366,9 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           )}
         </div>
 
-        {/* ── Redactionele noot ────────────────────────────────────── */}
+        {/* 12. Redactionele noot — freedom days editorial */}
         {freedomDaysBuiltPerMonth != null && freedomDaysBuiltPerMonth > 0 && (
-          <div className="mt-5 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
+          <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
             <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
               Elke maand bouw je {freedomDaysBuiltPerMonth} vrijheidsdagen op
             </p>
@@ -409,12 +378,6 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
     </BottomSheet>
   )
 })
-
-// Wrapper to use useModalAnimation (hooks can't be inside memo directly with conditional)
-function MiniChartWrapper({ rows }: { rows: UnifiedProjectionRow[] }) {
-  const { hasEntered } = useModalAnimation({ delay: 150, duration: 700 })
-  return <MiniAccumulationChart rows={rows} hasEntered={hasEntered} />
-}
 
 // ── Receipt row helper ───────────────────────────────────────────────────────
 

@@ -162,6 +162,10 @@ export default function GuideHorizonUitleg() {
             drie fases proportioneel weergeeft. Klik op een fase om de bijbehorende analyse te
             openen en de details van die periode te bekijken.
           </p>
+          <p>
+            Elke fase-modal bevat nu ook <strong>Monte Carlo simulaties</strong>, <strong>stresstests</strong> en
+            een <strong>Vraag Will</strong> knop voor gepersonaliseerd advies.
+          </p>
         </>
       ),
     },
@@ -801,6 +805,45 @@ export default function GuideHorizonUitleg() {
               strategie-instellingen. Je data blijft bewaard — alleen de weergave verandert.
             </p>
           </div>
+        </>
+      ),
+    },
+    {
+      id: 'horizon-uitleg-fase-analyses',
+      number: 14,
+      title: 'Fase-analyses',
+      icon: BarChart3,
+      content: (
+        <>
+          <p>
+            Elke fase van je financiële reis heeft een <strong>analyse-modal</strong> — klik op
+            een fase in de fasebalk om deze te openen. De analyse bevat meer dan alleen een
+            kassabon: je krijgt inzicht in de haalbaarheid en risico's van die specifieke periode.
+          </p>
+          <p>
+            <strong>Monte Carlo simulatie</strong> — de app draait honderden scenario's met
+            willekeurige marktrendementen om te berekenen hoe groot de kans is dat je plan
+            slaagt. Het resultaat is een <strong>waaiergrafiek</strong> die de bandbreedte van
+            mogelijke uitkomsten toont: van pessimistisch (10e percentiel) tot optimistisch
+            (90e percentiel). Hoe smaller de waaier, hoe zekerder je plan.
+          </p>
+          <p>
+            <strong>Stresstests</strong> — wat als de markt crasht met 40%? Of als de inflatie
+            jarenlang op 5% staat? De stresstest simuleert extreme scenario's en toont het
+            effect op je vermogen. Zo weet je of je plan ook werkt als het tegenzit.
+          </p>
+          <p>
+            <strong>Vraag Will</strong> — bij elke analyse vind je een knop om de resultaten
+            direct met Will te bespreken. Will ziet dezelfde cijfers als jij en kan je helpen
+            met het interpreteren van de uitkomsten of het bedenken van alternatieven.
+          </p>
+          <p>
+            Elke fase heeft daarnaast specifieke analyses: de opbouwfase toont schulden,
+            schenkingsmogelijkheden en een hypotheek-vs-beleggen vergelijking. De overgangsfase
+            bevat een gap-analyse met strategieopties. De onttrekkingsfase analyseert het
+            sequence-of-returns risico, de optie om je huis te verkopen, en een
+            end-of-life planning.
+          </p>
         </>
       ),
     },

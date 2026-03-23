@@ -330,9 +330,9 @@ export function PhaseDetailTable({
   const isAccumulation = phase === 'accumulation'
 
   // Count total columns for colSpan on detail row
-  // Base: Lft + Begin + Events + Box3 + Eind + Netto = 6
+  // Base: Lft + Begin + Events + Box3 + Eind = 5
   // + expand chevron column = 1
-  let colCount = 7
+  let colCount = 6
   if (isAccumulation) {
     // + rendement columns + inleg
     colCount += showAssetDetail ? assetTypes.length + 1 : 3 // spaar + beleg + inleg
@@ -415,7 +415,6 @@ export function PhaseDetailTable({
                 <FinTable.Th align="right">Events</FinTable.Th>
                 <FinTable.Th align="right">Box 3</FinTable.Th>
                 <FinTable.Th align="right">Eind</FinTable.Th>
-                <FinTable.Th align="right">Netto</FinTable.Th>
               </FinTable.Row>
             </FinTable.Header>
 
@@ -425,12 +424,10 @@ export function PhaseDetailTable({
                 const d = (v: number) => deflate(v, f, showReal)
                 const isRowExpanded = expandedAge === row.age
 
-                // Sum startValue from all buckets for "Begin" column
-                let beginValue = 0
+                // Aggregate growth by savings vs investment for rendement columns
                 let savingsGrowth = 0
                 let investmentGrowth = 0
                 for (const [type, bucket] of Object.entries(row.assetBuckets) as [AssetType, AssetBucketDetail][]) {
-                  beginValue += bucket.startValue
                   if (type === 'savings' || type === 'cash') {
                     savingsGrowth += bucket.growth
                   } else {
@@ -458,7 +455,7 @@ export function PhaseDetailTable({
                         }
                       </FinTable.Td>
                       <FinTable.Td>{row.age}</FinTable.Td>
-                      <FinTable.Td numeric>{formatCurrency(d(beginValue))}</FinTable.Td>
+                      <FinTable.Td numeric>{formatCurrency(d(row.startNetWorth))}</FinTable.Td>
 
                       {isAccumulation ? (
                         <>
@@ -506,9 +503,6 @@ export function PhaseDetailTable({
                       <FinTable.Td numeric color={row.totalBox3 > 0.5 ? 'text-[var(--negative)]' : undefined}>
                         {row.totalBox3 > 0 ? `−${formatCurrency(d(row.totalBox3)).replace('€', '€ ').trim()}` : formatCurrency(0)}
                       </FinTable.Td>
-                      <FinTable.Td numeric bold>
-                        {formatCurrency(d(row.totalAssets))}
-                      </FinTable.Td>
                       <FinTable.Td numeric bold color={colorClass(row.netWorth)}>
                         {formatCurrency(d(row.netWorth))}
                       </FinTable.Td>
@@ -536,7 +530,7 @@ export function PhaseDetailTable({
                   <FinTable.Td>&nbsp;</FinTable.Td>
                   <FinTable.Td bold>Σ</FinTable.Td>
                   <FinTable.Td numeric>{formatCurrency(deflate(
-                    Object.values(rows[0].assetBuckets).reduce((sum, b) => sum + (b?.startValue ?? 0), 0),
+                    rows[0].startNetWorth,
                     rows[0].inflationFactor, showReal
                   ))}</FinTable.Td>
 
@@ -618,7 +612,7 @@ export function PhaseDetailTable({
                     const totalEvents = rows.reduce((sum, r) => sum + r.cashflowNet, 0)
                     const totalBox3 = rows.reduce((sum, r) => sum + r.totalBox3, 0)
                     const avgFactor = rows[rows.length - 1].inflationFactor
-                    const endAssets = rows[rows.length - 1].totalAssets
+                    const endNetWorth = rows[rows.length - 1].netWorth
                     return (
                       <>
                         <FinTable.Td numeric bold color={colorClass(totalEvents)}>
@@ -627,11 +621,8 @@ export function PhaseDetailTable({
                         <FinTable.Td numeric bold color={totalBox3 > 0.5 ? 'text-[var(--negative)]' : undefined}>
                           {totalBox3 > 0 ? `−${formatCurrency(deflate(totalBox3, showReal ? avgFactor : 1, showReal)).replace('€', '€ ').trim()}` : formatCurrency(0)}
                         </FinTable.Td>
-                        <FinTable.Td numeric bold>
-                          {formatCurrency(deflate(endAssets, rows[rows.length - 1].inflationFactor, showReal))}
-                        </FinTable.Td>
-                        <FinTable.Td numeric bold color={colorClass(rows[rows.length - 1].netWorth)}>
-                          {formatCurrency(deflate(rows[rows.length - 1].netWorth, rows[rows.length - 1].inflationFactor, showReal))}
+                        <FinTable.Td numeric bold color={colorClass(endNetWorth)}>
+                          {formatCurrency(deflate(endNetWorth, rows[rows.length - 1].inflationFactor, showReal))}
                         </FinTable.Td>
                       </>
                     )

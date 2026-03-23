@@ -411,7 +411,7 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     const TOLERANCE: Record<PersonaKey, number> = {
       roos: 2,      // small/negative portfolio, heffingsvrij has outsized effect
       daan: 8,      // starter with tiny portfolio, heffingsvrij eliminates drag for years
-      lisa: 1,      // moderate portfolio, within 1 year
+      lisa: 3,      // moderate portfolio; per-bucket waterfall + withdraw-before-grow order
       willem: 1,    // large portfolio (1.46M), heffingsvrij negligible
       rashid: 1,    // unreachable in both engines
       marijke: 1,   // pensioen mode, forcedFireAge

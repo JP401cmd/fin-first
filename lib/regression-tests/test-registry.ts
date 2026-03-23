@@ -181,6 +181,7 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/kern-holdings-card').then(m => m.register()).catch(e => { console.warn('[test-registry] kern-holdings-card failed:', e) }),
     import('@/lib/regression-tests/suites/design-system-tokens').then(m => m.register()).catch(e => { console.warn('[test-registry] design-system-tokens failed:', e) }),
     import('@/lib/regression-tests/suites/design-system-typography').then(m => m.register()).catch(e => { console.warn('[test-registry] design-system-typography failed:', e) }),
+    import('@/lib/regression-tests/suites/horizon-fase-analyse').then(m => m.register()).catch(e => { console.warn('[test-registry] horizon-fase-analyse failed:', e) }),
   ])
 
   // Log any rejected promises (shouldn't happen due to .catch, but just in case)

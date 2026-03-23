@@ -375,6 +375,11 @@ export function initBucketState(
  *
  * If no bucketState provided, initializes from currentPortfolio.
  * NOTE: this function mutates nothing — caller must track BucketState externally.
+ *
+ * End-strategy aware:
+ * - deplete: uses annuity formula to ensure portfolio depletes to ≈€0 at endAge
+ * - legacy:  uses annuity on surplus above legacyAmount to preserve the target
+ * - perpetual/pensioen/undefined: withdraws only net living expenses (classic)
  */
 function applyBucket(
   config: WithdrawalStrategyConfig,
@@ -382,14 +387,14 @@ function applyBucket(
   bucketState?: BucketState,
 ): number {
   const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
-
-  // Bucket strategy: withdraw only net living expenses, regardless of end strategy.
-  // Unlike static (which uses annuity for deplete/legacy to force depletion),
-  // bucket manages risk through allocation (cash → bonds → stocks buffer),
-  // not by adjusting withdrawal amounts. In a deterministic model, this means
-  // bucket may end with surplus (deplete) or exceed target (legacy) — this is
-  // intentionally more conservative than static.
   void bucketState // bucket allocation tracked externally via waterfallWithdraw
+
+  // For deplete/legacy, compute annuity-based withdrawal to force depletion
+  // on the same sliding basis as applyStatic and applyGuardrails
+  if (ctx.endStrategy === 'deplete' || ctx.endStrategy === 'legacy') {
+    const annuity = computeAnnuityBase(ctx)
+    return Math.max(annuity, netBaseExpenses)
+  }
 
   return Math.max(0, netBaseExpenses)
 }

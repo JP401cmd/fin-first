@@ -447,7 +447,7 @@ describe('bucket strategy', () => {
     expect(result).toBe(40_000)
   })
 
-  it('withdraws net base expenses for deplete (no annuity)', () => {
+  it('uses annuity withdrawal for deplete end strategy', () => {
     const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
     const result = applyWithdrawalStrategy(config, makeCtx({
       baseExpenses: 40_000,
@@ -458,11 +458,13 @@ describe('bucket strategy', () => {
       endAge: 90,
       endStrategy: 'deplete',
     }), state)
-    // Bucket does NOT use annuity — always netBaseExpenses
-    expect(result).toBe(40_000)
+    // Annuity on €1M at 5% over 23 years ≈ €74k — exceeds netBaseExpenses
+    expect(result).toBeGreaterThan(40_000)
+    // Sanity: annuity = 1_000_000 * 0.05 / (1 - (1.05)^(-23)) ≈ 74_137
+    expect(result).toBeCloseTo(74_137, -2)
   })
 
-  it('bucket differs from static for deplete (static uses annuity)', () => {
+  it('bucket matches static for deplete (both use annuity)', () => {
     const staticConfig = makeConfig({ strategy: 'static' })
     const bucketConfig = makeConfig({ strategy: 'bucket' })
     const ctx = makeCtx({
@@ -476,9 +478,8 @@ describe('bucket strategy', () => {
     })
     const staticW = applyWithdrawalStrategy(staticConfig, ctx)
     const bucketW = applyWithdrawalStrategy(bucketConfig, ctx)
-    // Static uses annuity (~74k), bucket uses netBaseExpenses (40k)
-    expect(staticW).toBeGreaterThan(bucketW)
-    expect(bucketW).toBe(40_000)
+    // Both use the same annuity formula for deplete
+    expect(bucketW).toBe(staticW)
   })
 
   it('subtracts recurring income', () => {
@@ -499,7 +500,7 @@ describe('bucket strategy', () => {
     expect(result).toBe(0)
   })
 
-  it('bucket + legacy also uses only netBaseExpenses (no annuity)', () => {
+  it('bucket + legacy uses annuity on surplus above legacy target', () => {
     const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
     const result = applyWithdrawalStrategy(config, makeCtx({
       baseExpenses: 40_000,
@@ -511,6 +512,25 @@ describe('bucket strategy', () => {
       endStrategy: 'legacy',
       legacyAmount: 300_000,
     }), state)
+    // Annuity on surplus (€1M - €300k = €700k) at 5% over 23 years ≈ €51_896
+    expect(result).toBeGreaterThan(40_000)
+    expect(result).toBeCloseTo(51_896, -2)
+  })
+
+  it('bucket + legacy falls back to netBaseExpenses when surplus annuity is small', () => {
+    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
+    const result = applyWithdrawalStrategy(config, makeCtx({
+      baseExpenses: 40_000,
+      recurringIncome: 0,
+      currentPortfolio: 500_000,
+      yearReturn: 0.05,
+      currentAge: 67,
+      endAge: 90,
+      endStrategy: 'legacy',
+      legacyAmount: 400_000,
+    }), state)
+    // Annuity on surplus (€500k - €400k = €100k) at 5% over 23 years ≈ €7_414
+    // netBaseExpenses = 40_000 > annuity, so netBaseExpenses is used
     expect(result).toBe(40_000)
   })
 })

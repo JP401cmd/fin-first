@@ -950,10 +950,10 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
   }
 
   // ── Lightweight decumulation for binary search ─────────────────────
-  // Mirrors the old engine's simulateDecumulation but operates on total
-  // asset value (sum of buckets) using a simple weighted-average return
-  // and Box 3 drag. This avoids the overhead of full per-bucket simulation
-  // while maintaining convergence-compatible behavior.
+  // Uses per-bucket waterfall withdrawal to match the visualization loop.
+  // Low-return buckets (cash, savings) are drained first, so the effective
+  // portfolio return INCREASES over time as high-return assets dominate.
+  // This prevents the binary search from overestimating the required FIRE target.
 
   /**
    * Compute a flat net return (gross return minus approximate Box 3 drag)
@@ -981,19 +981,213 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     return weightedReturn - effectiveDragRate
   }
 
+  // ── Lightweight bucket tiers for binary search ──────────────────────
+  // Simplified per-bucket model that mirrors the visualization's waterfall
+  // withdrawal order. Each tier has a value, net return, and drain priority
+  // index (lower = drained first). This captures the key effect: withdrawing
+  // from low-return buckets first makes the effective return increase over time.
+
+  /** Lightweight bucket tier for binary search — minimal per-bucket state. */
+  interface LightweightTier {
+    /** Current value in this tier */
+    value: number
+    /** Net return rate (gross return minus Box 3 drag rate) */
+    netReturn: number
+    /** Priority index: lower = drained first (matches WATERFALL_ORDER) */
+    drainPriority: number
+  }
+
+  /**
+   * Build lightweight tier allocation from RunningBuckets.
+   *
+   * Maps each RunningBucket to a LightweightTier with its net return
+   * (annualReturn minus effective Box 3 drag rate) and waterfall drain priority.
+   * Tiers are sorted by drain priority (lowest first) for efficient waterfall.
+   */
+  function buildLightweightTiers(buckets: RunningBucket[]): LightweightTier[] {
+    // Compute effective drag rates with heffingsvrij correction
+    const bucketValues = buckets.map(b => b.value)
+    const rawDragRates = buckets.map(b => b.rawDragRate)
+    const categories = buckets.map(b => b.category)
+    const effectiveDragAmounts = applyHeffingsvrij(bucketValues, rawDragRates, categories, hasPartner)
+
+    const tiers: LightweightTier[] = []
+    for (let i = 0; i < buckets.length; i++) {
+      const b = buckets[i]
+      if (b.value <= 0) continue // Skip empty buckets
+
+      // Net return = gross return minus effective drag rate for this bucket
+      const effectiveDragRate = b.value > 0 ? effectiveDragAmounts[i] / b.value : 0
+      const netReturn = b.annualReturn - effectiveDragRate
+
+      // Drain priority from WATERFALL_ORDER (lower index = drained first)
+      const priority = WATERFALL_ORDER.indexOf(b.assetType)
+      tiers.push({
+        value: b.value,
+        netReturn,
+        drainPriority: priority >= 0 ? priority : WATERFALL_ORDER.length,
+      })
+    }
+
+    // Sort by drain priority so waterfall withdrawal is a simple left-to-right scan
+    tiers.sort((a, b) => a.drainPriority - b.drainPriority)
+    return tiers
+  }
+
+  // referenceTiers and referenceTierTotal are initialized after initialBuckets
+  // is created (see below). Declared here with let so the closures can reference them.
+  let referenceTiers: LightweightTier[] = []
+  let referenceTierTotal = 0
+
   /**
    * Simulate decumulation from a given starting netWorth at startAge.
    *
-   * Uses static withdrawal for binary search convergence (same as old engine).
+   * Uses per-bucket waterfall withdrawal to match the visualization loop:
+   * low-return buckets (cash, savings at ~0%) are drained first, then
+   * higher-return buckets (investments at ~7%). This means the effective
+   * return INCREASES over time as the portfolio shifts toward high-return
+   * assets — matching what the actual visualization computes.
+   *
    * Portfolio is NOT clamped to 0 to allow binary search to converge.
    *
    * @param startNetWorth - starting net worth (assets only for binary search)
    * @param startAge - age at which decumulation begins
-   * @param portReturn - net return rate to use
+   * @param portReturn - fallback net return rate (used when no bucket data)
    * @param simEndAge - end age for the simulation
    * @returns endNetWorth after simulation
    */
   function simulateDecumulationLightweight(
+    startNetWorth: number,
+    startAge: number,
+    portReturn: number,
+    simEndAge: number,
+  ): number {
+    // Fallback to flat return when no bucket data is available
+    if (referenceTiers.length === 0 || referenceTierTotal <= 0) {
+      return simulateDecumulationFlat(startNetWorth, startAge, portReturn, simEndAge)
+    }
+
+    // Scale reference tiers proportionally to match the candidate startNetWorth.
+    // This preserves the asset allocation ratio while adjusting total value.
+    const scale = startNetWorth / referenceTierTotal
+    const tiers: LightweightTier[] = referenceTiers.map(t => ({
+      value: t.value * scale,
+      netReturn: t.netReturn,
+      drainPriority: t.drainPriority,
+    }))
+
+    let previousWithdrawal = 0
+
+    for (let age = startAge; age < simEndAge; age++) {
+      // Apply one-time cashflows — distribute proportionally across tiers
+      for (const cf of cashflows) {
+        const amt = oneTimeAmount(cf, age)
+        if (amt !== 0) {
+          const total = tiers.reduce((s, t) => s + Math.max(0, t.value), 0)
+          if (amt > 0 && total > 0) {
+            // Income: distribute proportionally
+            for (const t of tiers) {
+              t.value += amt * (Math.max(0, t.value) / total)
+            }
+          } else if (amt < 0) {
+            // Expense: waterfall withdraw
+            lightweightWaterfallWithdraw(tiers, Math.abs(amt))
+          }
+        }
+      }
+
+      const yearsIntoPension = age - startAge
+      const expensesThisYear = yearlyExpenses * Math.pow(1 + inflationRate, yearsIntoPension)
+
+      // Recurring cashflows net
+      let recurringNet = 0
+      for (const cf of cashflows) {
+        recurringNet += recurringMonthly(cf, age) * 12
+      }
+
+      // Current total portfolio for withdrawal strategy context
+      const portfolio = tiers.reduce((s, t) => s + t.value, 0)
+
+      // Compute the current weighted-average net return for the withdrawal context.
+      // This reflects the ACTUAL asset mix after waterfall has drained low-return tiers.
+      const totalPositive = tiers.reduce((s, t) => s + Math.max(0, t.value), 0)
+      const currentNetReturn = totalPositive > 0
+        ? tiers.reduce((s, t) => s + Math.max(0, t.value) * t.netReturn, 0) / totalPositive
+        : portReturn
+
+      // Use the user's actual withdrawal strategy for binary search convergence.
+      // This ensures the FIRE target accounts for strategy-specific withdrawal patterns
+      // (e.g., guardrails ±20%, VPW portfolio-based %). previousWithdrawal is tracked
+      // across years so guardrails can apply prosperity/capital preservation rules.
+      const wCtx: WithdrawalContext = {
+        baseExpenses: expensesThisYear,
+        recurringIncome: recurringNet,
+        currentPortfolio: portfolio,
+        startPortfolio: startNetWorth,
+        previousWithdrawal,
+        yearReturn: currentNetReturn,
+        yearsIntoRetirement: yearsIntoPension,
+        currentAge: age,
+        endAge: simEndAge,
+        endStrategy: strategy,
+        legacyAmount: strategy === 'legacy'
+          ? legacyAmount * Math.pow(1 + inflationRate, simEndAge - currentAge)
+          : undefined,
+      }
+      const withdrawal = applyWithdrawalStrategy(wsConfig, wCtx)
+      previousWithdrawal = withdrawal
+
+      // Waterfall withdraw: drain low-return tiers first (cash → savings → investments)
+      lightweightWaterfallWithdraw(tiers, withdrawal)
+
+      // Per-tier growth: each tier grows at its own net return rate
+      for (const t of tiers) {
+        t.value += t.value * t.netReturn
+      }
+    }
+
+    return tiers.reduce((s, t) => s + t.value, 0)
+  }
+
+  /**
+   * Waterfall withdrawal from lightweight tiers.
+   *
+   * Drains tiers in priority order (lowest drainPriority first = cash first).
+   * Each tier is drained down to 0 before moving to the next.
+   * Tiers CAN go negative for the final tier to allow binary search convergence.
+   *
+   * @param tiers - lightweight tiers (mutated in-place)
+   * @param amount - amount to withdraw (positive)
+   */
+  function lightweightWaterfallWithdraw(tiers: LightweightTier[], amount: number): void {
+    if (amount <= 0) return
+    let remaining = amount
+
+    // Tiers are already sorted by drainPriority (lowest first)
+    for (let i = 0; i < tiers.length; i++) {
+      if (remaining <= 0) break
+      if (tiers[i].value <= 0) continue
+
+      const deduction = Math.min(remaining, tiers[i].value)
+      tiers[i].value -= deduction
+      remaining -= deduction
+    }
+
+    // If remaining > 0 after all tiers are drained, subtract from the last
+    // tier with the highest return (allows portfolio to go negative for
+    // binary search convergence — same behavior as the old flat model)
+    if (remaining > 0 && tiers.length > 0) {
+      tiers[tiers.length - 1].value -= remaining
+    }
+  }
+
+  /**
+   * Flat-return fallback: original single-return decumulation simulation.
+   *
+   * Used when no bucket data is available (e.g., no assets defined).
+   * Identical to the previous simulateDecumulationLightweight implementation.
+   */
+  function simulateDecumulationFlat(
     startNetWorth: number,
     startAge: number,
     portReturn: number,
@@ -1017,10 +1211,6 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         recurringNet += recurringMonthly(cf, age) * 12
       }
 
-      // Use the user's actual withdrawal strategy for binary search convergence.
-      // This ensures the FIRE target accounts for strategy-specific withdrawal patterns
-      // (e.g., guardrails ±20%, VPW portfolio-based %). previousWithdrawal is tracked
-      // across years so guardrails can apply prosperity/capital preservation rules.
       const wCtx: WithdrawalContext = {
         baseExpenses: expensesThisYear,
         recurringIncome: recurringNet,
@@ -1067,6 +1257,12 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     }
   }
   const avgNetReturn = computeAverageNetReturn(initialBuckets)
+
+  // Initialize reference tiers now that initialBuckets is ready.
+  // These capture the proportional asset mix for the binary search's
+  // per-bucket waterfall simulation.
+  referenceTiers = buildLightweightTiers(initialBuckets)
+  referenceTierTotal = referenceTiers.reduce((s, t) => s + t.value, 0)
 
   /**
    * Binary search: minimum netWorth at candidateFireAge such that
@@ -1435,13 +1631,24 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     const indexedLegacyForCtx = strategy === 'legacy'
       ? legacyAmount * Math.pow(1 + inflationRate, effectiveEndAge - currentAge)
       : undefined
+
+    // For bucket strategy, compute a dynamic weighted-average net return from the
+    // CURRENT bucket composition (start-of-year, before withdrawal). As low-return
+    // buckets are drained first via waterfall, the effective return shifts upward
+    // over time — matching the binary search's per-year dynamic return calculation.
+    // Non-bucket strategies keep the static avgNetReturnAtFire to preserve their
+    // "fixed return" semantics.
+    const yearReturnForStrategy = activeConfig.strategy === 'bucket'
+      ? computeAverageNetReturn(runningBuckets)
+      : avgNetReturnAtFire
+
     const wCtx: WithdrawalContext = {
       baseExpenses: expensesThisYear,
       recurringIncome: recurringNet,
       currentPortfolio: portfolioForStrategy,
       startPortfolio: decumStartPortfolio,
       previousWithdrawal,
-      yearReturn: avgNetReturnAtFire,
+      yearReturn: yearReturnForStrategy,
       yearsIntoRetirement: yearsIntoPension,
       currentAge: age,
       endAge: strategy === 'perpetual' ? computedFireAge + 100 : effectiveEndAge,

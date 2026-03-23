@@ -4,12 +4,21 @@ import { memo, useMemo } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { formatCurrency } from '@/lib/format'
-import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
+import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
+import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-events-in-phase'
+import { StressTestSection } from '@/components/app/horizon/phase-analysis/stress-test-section'
+import { MonteCarloOnttrekken } from '@/components/app/horizon/phase-analysis/onttrekken/monte-carlo-onttrekken'
+import { HuisVerkopen } from '@/components/app/horizon/phase-analysis/onttrekken/huis-verkopen'
+import { SORRAnalyse } from '@/components/app/horizon/phase-analysis/onttrekken/sorr-analyse'
+import { EndOfLife } from '@/components/app/horizon/phase-analysis/onttrekken/end-of-life'
 import type { Debt } from '@/lib/debt-data'
+import type { Asset } from '@/lib/asset-data'
+import type { LifeEvent } from '@/lib/horizon-data'
+import type { SimCashflow } from '@/lib/fire-simulation'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,143 +36,19 @@ interface PhaseModalOnttrekkingProps {
   inflationRate: number          // e.g. 0.02 for 2%
   /** Debts metadata for human-readable labels in detail table */
   debts?: Debt[]
+  /** Life events for the in-phase display */
+  events?: LifeEvent[]
+  /** Simulation cashflows for MC / SORR engines */
+  cashflows?: SimCashflow[]
+  /** Full unified projection rows (all phases) for PhaseChartZoom */
+  allRows?: UnifiedProjectionRow[]
+  /** User's expected return for MC simulations */
+  expectedReturn?: number
+  /** User's asset list for house-selling analysis */
+  assets?: Asset[]
+  /** User's annual expenses for stress test */
+  yearlyExpenses?: number
 }
-
-// ── Mini Chart ───────────────────────────────────────────────────────────────
-
-const CHART_W = 320
-const CHART_H = 120
-const PAD = { top: 16, right: 16, bottom: 24, left: 56 }
-
-const MiniWithdrawalChart = memo(function MiniWithdrawalChart({
-  rows,
-  hasEntered,
-}: {
-  rows: UnifiedProjectionRow[]
-  hasEntered: boolean
-}) {
-  if (rows.length < 2) return null
-
-  const chartW = CHART_W - PAD.left - PAD.right
-  const chartH = CHART_H - PAD.top - PAD.bottom
-
-  const maxVal = Math.max(...rows.map(r => Math.max(r.netWorth, rows[0].totalAssets)), 1)
-  const minAge = rows[0].age
-  const maxAge = rows[rows.length - 1].age
-  const ageSpan = maxAge - minAge || 1
-
-  const x = (age: number) => PAD.left + ((age - minAge) / ageSpan) * chartW
-  const y = (val: number) => PAD.top + chartH - (val / maxVal) * chartH
-
-  // Build area path using totalAssets (end of year value)
-  const points = rows.map(r => `${x(r.age)},${y(r.netWorth)}`)
-  const linePath = `M${points.join(' L')}`
-  const areaPath = `${linePath} L${x(maxAge)},${y(0)} L${x(minAge)},${y(0)} Z`
-
-  // Y-axis ticks (3 levels)
-  const yTicks = [0, 0.5, 1.0].map(f => ({
-    val: maxVal * f,
-    yPos: y(maxVal * f),
-  }))
-
-  // X-axis ticks
-  const xStep = ageSpan <= 10 ? 2 : ageSpan <= 20 ? 5 : 10
-  const xTicks: number[] = []
-  for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) {
-    xTicks.push(a)
-  }
-
-  const animProgress = hasEntered ? 1 : 0
-
-  return (
-    <svg
-      viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-      className="w-full"
-      role="img"
-      aria-label="Vermogensafname tijdens onttrekkingsfase"
-    >
-      {/* Grid lines */}
-      {yTicks.map(t => (
-        <g key={t.val}>
-          <line
-            x1={PAD.left}
-            x2={CHART_W - PAD.right}
-            y1={t.yPos}
-            y2={t.yPos}
-            stroke="var(--border-ed, #e5e5e5)"
-            strokeWidth={0.5}
-          />
-          <text
-            x={PAD.left - 6}
-            y={t.yPos + 3}
-            textAnchor="end"
-            className="fill-[var(--ink-4)]"
-            style={{ fontSize: 8, fontFamily: 'var(--font-mono, monospace)' }}
-          >
-            {t.val >= 1_000_000
-              ? `\u20AC${(t.val / 1_000_000).toFixed(1)}M`
-              : t.val >= 1_000
-              ? `\u20AC${Math.round(t.val / 1_000)}k`
-              : `\u20AC${Math.round(t.val)}`}
-          </text>
-        </g>
-      ))}
-
-      {/* X-axis ticks */}
-      {xTicks.map(age => (
-        <text
-          key={age}
-          x={x(age)}
-          y={CHART_H - 4}
-          textAnchor="middle"
-          className="fill-[var(--ink-4)]"
-          style={{ fontSize: 8, fontFamily: 'var(--font-mono, monospace)' }}
-        >
-          {age}
-        </text>
-      ))}
-
-      {/* Area fill */}
-      <path
-        d={areaPath}
-        fill="var(--color-kern-100, #f5e6d0)"
-        opacity={0.5}
-        style={{
-          transition: 'opacity 700ms ease-out',
-          opacity: animProgress * 0.5,
-        }}
-      />
-
-      {/* Line */}
-      <path
-        d={linePath}
-        fill="none"
-        stroke="var(--color-kern-500, #8b6914)"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        pathLength={1}
-        style={{
-          strokeDasharray: 1,
-          strokeDashoffset: 1 - animProgress,
-          transition: 'stroke-dashoffset 700ms ease-out',
-        }}
-      />
-
-      {/* End dot */}
-      <circle
-        cx={x(maxAge)}
-        cy={y(rows[rows.length - 1].totalAssets)}
-        r={3}
-        fill="var(--color-kern-500, #8b6914)"
-        style={{
-          transition: 'opacity 400ms ease-out 500ms',
-          opacity: animProgress,
-        }}
-      />
-    </svg>
-  )
-})
 
 // ── Income Source Bar ────────────────────────────────────────────────────────
 
@@ -238,6 +123,12 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   rows,
   inflationRate,
   debts,
+  events,
+  cashflows,
+  allRows,
+  expectedReturn,
+  assets,
+  yearlyExpenses,
 }: PhaseModalOnttrekkingProps) {
   // Filter to withdrawal phase rows
   const withdrawalRows = useMemo(
@@ -284,11 +175,31 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   const totalLevensonderhoud = aggregates.totalWithdrawal + aggregates.totalAow + aggregates.totalPensioen
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={title} size="lg" initialMobileHeight="60vh">
+    <BottomSheet open={open} onClose={onClose} title={title} size="xl" initialMobileHeight="60vh">
       {/* Accent line at top — kern-500 */}
       <div className="h-[2px] w-full bg-[var(--color-kern-500,#8b6914)]" />
 
-      <div className="p-5">
+      <div className="space-y-4 p-5">
+        {/* 1. PhaseChartZoom — full trajectory with withdrawal phase highlighted */}
+        {allRows && allRows.length > 2 && (
+          <PhaseChartZoom
+            allRows={allRows}
+            phaseFilter="withdrawal"
+            accentColor="var(--color-kern-500)"
+            annotations={[
+              { age: startAge, label: 'Start onttrekking' },
+            ]}
+          />
+        )}
+
+        {/* 2. Fase-header */}
+        <div className="text-center">
+          <p className="font-sans text-base font-bold text-[var(--ink)]">
+            Onttrekken &middot; {formatCurrency(Math.round(startPortfolio))} &rarr; {formatCurrency(Math.round(endPortfolio))} &middot; {durationYears} jaar
+          </p>
+        </div>
+
+        {/* 3. Kassabon — cashflow receipt */}
         <KassabonShell>
           {/* Header */}
           <div className="mb-3 text-center">
@@ -359,24 +270,81 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           )}
         </KassabonShell>
 
-        {/* Income source breakdown — stacked bar */}
+        {/* 4. Income source breakdown — stacked bar */}
         <IncomeSourceBar
           aowTotal={aggregates.totalAow}
           pensioenTotal={aggregates.totalPensioen}
           portfolioTotal={aggregates.portfolioWithdrawal}
         />
 
-        {/* Mini withdrawal chart — kern colors preserved */}
-        {withdrawalRows.length >= 2 && (
-          <div className="mt-4">
-            <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-              Vermogensafname
-            </p>
-            <MiniChartWrapper rows={withdrawalRows} />
-          </div>
+        {/* 5. Life Events in this phase */}
+        {events && (
+          <LifeEventsInPhase
+            events={events}
+            phaseStartAge={startAge}
+            phaseEndAge={endAge}
+          />
         )}
 
-        {/* PhaseDetailTable — jaar-op-jaar tabel, standaard collapsed */}
+        {/* 6. Monte Carlo withdrawal simulation */}
+        {expectedReturn != null && (
+          <MonteCarloOnttrekken
+            startPortfolio={startPortfolio}
+            startAge={startAge}
+            endAge={endAge}
+            yearlyWithdrawal={yearlyWithdrawal}
+            yearlyAowIncome={yearlyAowIncome}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            cashflows={cashflows}
+          />
+        )}
+
+        {/* 7. Huis Verkopen — conditional on eigen_huis in assets */}
+        {assets && expectedReturn != null && (
+          <HuisVerkopen
+            assets={assets}
+            debts={debts ?? []}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+          />
+        )}
+
+        {/* 8. SORR analysis */}
+        {expectedReturn != null && (
+          <SORRAnalyse
+            startPortfolio={startPortfolio}
+            startAge={startAge}
+            endAge={endAge}
+            yearlyWithdrawal={yearlyWithdrawal}
+            yearlyAowIncome={yearlyAowIncome}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            cashflows={cashflows}
+          />
+        )}
+
+        {/* 9. End of Life analysis */}
+        <EndOfLife
+          rows={withdrawalRows}
+          strategy={strategy}
+          endAge={endAge}
+          inflationRate={inflationRate}
+          yearlyAowIncome={yearlyAowIncome}
+        />
+
+        {/* 10. Stress Test */}
+        {expectedReturn != null && (
+          <StressTestSection
+            rows={withdrawalRows}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            yearlyExpenses={yearlyExpenses ?? yearlyWithdrawal}
+            willContextPrefix="Onttrekkingsfase stresstest"
+          />
+        )}
+
+        {/* 11. PhaseDetailTable — jaar-op-jaar tabel, standaard collapsed */}
         {withdrawalRows.length > 0 && (
           <PhaseDetailTable
             rows={withdrawalRows}
@@ -386,7 +354,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           />
         )}
 
-        {/* Redactionele noot */}
+        {/* 12. Redactionele noot */}
         <div className="mt-5 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
           <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
             {durationYears} jaar opgebouwde vrijheid, nu geleefd
@@ -396,12 +364,6 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
     </BottomSheet>
   )
 })
-
-// Wrapper to use useModalAnimation
-function MiniChartWrapper({ rows }: { rows: UnifiedProjectionRow[] }) {
-  const { hasEntered } = useModalAnimation({ delay: 150, duration: 700 })
-  return <MiniWithdrawalChart rows={rows} hasEntered={hasEntered} />
-}
 
 // ── Receipt row helper ───────────────────────────────────────────────────────
 

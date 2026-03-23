@@ -5029,6 +5029,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           rows={unifiedRows ?? []}
           assets={initialData.assets}
           debts={debts}
+          events={events}
+          cashflows={simCashflows}
+          allRows={unifiedRows ?? []}
+          monthlyIncome={effectiveInput?.monthlyIncome}
+          monthlyExpenses={effectiveInput?.monthlyExpenses}
+          fireTarget={fire?.fireTarget}
         />
       )}
       {/* Overgang phase modal */}
@@ -5048,6 +5054,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           rows={unifiedRows ?? []}
           inflationRate={fireParams.inflationRate}
           debts={debts}
+          events={events}
+          cashflows={simCashflows}
+          allRows={unifiedRows ?? []}
+          expectedReturn={fireParams.grossReturn}
+          currentAge={currentAge ?? overgangData.fireAge}
+          annualSavings={(fire?.monthlySavings ?? 0) * 12}
+          fireStrategy={fireStrategy}
+          currentPortfolio={(effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)}
         />
       )}
       {/* Onttrekking phase modal */}
@@ -5065,6 +5079,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           rows={unifiedRows ?? []}
           inflationRate={fireParams.inflationRate}
           debts={debts}
+          events={events}
+          cashflows={simCashflows}
+          allRows={unifiedRows ?? []}
+          expectedReturn={fireParams.grossReturn}
+          assets={initialData.assets}
+          yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
         />
       )}
 

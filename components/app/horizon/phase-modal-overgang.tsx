@@ -4,10 +4,18 @@ import { memo } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { formatCurrency } from '@/lib/format'
-import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
-import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
+import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
+import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-events-in-phase'
+import { StressTestSection } from '@/components/app/horizon/phase-analysis/stress-test-section'
+import { MonteCarloOvergang } from '@/components/app/horizon/phase-analysis/overgang/monte-carlo-overgang'
+import { GapAnalyse } from '@/components/app/horizon/phase-analysis/overgang/gap-analyse'
+import { EerderStoppen } from '@/components/app/horizon/phase-analysis/overgang/eerder-stoppen'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { Debt } from '@/lib/debt-data'
+import type { LifeEvent } from '@/lib/horizon-data'
+import type { SimCashflow } from '@/lib/fire-simulation'
+import type { FireStrategyConfig } from '@/lib/fire-strategy'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,143 +43,23 @@ interface PhaseModalOvergangProps {
   inflationRate: number
   /** Debts metadata for human-readable labels in detail table */
   debts?: Debt[]
+  /** Life events for displaying in-phase events */
+  events?: LifeEvent[]
+  /** Life event cashflows for MC and eerder-stoppen calculations */
+  cashflows?: SimCashflow[]
+  /** Full projection rows for PhaseChartZoom (all phases, not just transition) */
+  allRows?: UnifiedProjectionRow[]
+  /** Expected return for analysis components */
+  expectedReturn?: number
+  /** User's current age for eerder-stoppen calculation */
+  currentAge?: number
+  /** Annual savings for eerder-stoppen calculation */
+  annualSavings?: number
+  /** FIRE end strategy configuration */
+  fireStrategy?: FireStrategyConfig
+  /** Current portfolio value (may differ from portfolioAtTransitionStart) */
+  currentPortfolio?: number
 }
-
-// ── Mini Chart ───────────────────────────────────────────────────────────────
-
-const CHART_W = 320
-const CHART_H = 120
-const PAD = { top: 16, right: 16, bottom: 24, left: 56 }
-
-const MiniTransitionChart = memo(function MiniTransitionChart({
-  rows,
-  hasEntered,
-}: {
-  rows: UnifiedProjectionRow[]
-  hasEntered: boolean
-}) {
-  if (rows.length < 2) return null
-
-  const chartW = CHART_W - PAD.left - PAD.right
-  const chartH = CHART_H - PAD.top - PAD.bottom
-
-  const maxVal = Math.max(...rows.map(r => r.totalAssets), 1)
-  const minAge = rows[0].age
-  const maxAge = rows[rows.length - 1].age
-  const ageSpan = maxAge - minAge || 1
-
-  const x = (age: number) => PAD.left + ((age - minAge) / ageSpan) * chartW
-  const y = (val: number) => PAD.top + chartH - (val / maxVal) * chartH
-
-  // Build area path
-  const points = rows.map(r => `${x(r.age)},${y(r.totalAssets)}`)
-  const linePath = `M${points.join(' L')}`
-  const areaPath = `${linePath} L${x(maxAge)},${y(0)} L${x(minAge)},${y(0)} Z`
-
-  // Y-axis ticks (3 levels)
-  const yTicks = [0, 0.5, 1.0].map(f => ({
-    val: maxVal * f,
-    yPos: y(maxVal * f),
-  }))
-
-  // X-axis ticks
-  const xStep = ageSpan <= 10 ? 2 : ageSpan <= 20 ? 5 : 10
-  const xTicks: number[] = []
-  for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) {
-    xTicks.push(a)
-  }
-
-  const animProgress = hasEntered ? 1 : 0
-
-  return (
-    <svg
-      viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-      className="w-full"
-      role="img"
-      aria-label="Vermogensverloop tijdens overgangsfase"
-    >
-      {/* Grid lines */}
-      {yTicks.map(t => (
-        <g key={t.val}>
-          <line
-            x1={PAD.left}
-            x2={CHART_W - PAD.right}
-            y1={t.yPos}
-            y2={t.yPos}
-            stroke="var(--border-ed, #e5e5e5)"
-            strokeWidth={0.5}
-          />
-          <text
-            x={PAD.left - 6}
-            y={t.yPos + 3}
-            textAnchor="end"
-            className="fill-[var(--ink-4)]"
-            style={{ fontSize: 8, fontFamily: 'var(--font-mono, monospace)' }}
-          >
-            {t.val >= 1_000_000
-              ? `\u20AC${(t.val / 1_000_000).toFixed(1)}M`
-              : t.val >= 1_000
-              ? `\u20AC${Math.round(t.val / 1_000)}k`
-              : `\u20AC${Math.round(t.val)}`}
-          </text>
-        </g>
-      ))}
-
-      {/* X-axis ticks */}
-      {xTicks.map(age => (
-        <text
-          key={age}
-          x={x(age)}
-          y={CHART_H - 4}
-          textAnchor="middle"
-          className="fill-[var(--ink-4)]"
-          style={{ fontSize: 8, fontFamily: 'var(--font-mono, monospace)' }}
-        >
-          {age}
-        </text>
-      ))}
-
-      {/* Area fill */}
-      <path
-        d={areaPath}
-        fill="var(--color-horizon-100, #e8dcca)"
-        opacity={0.5}
-        style={{
-          transition: 'opacity 700ms ease-out',
-          opacity: animProgress * 0.5,
-        }}
-      />
-
-      {/* Line */}
-      <path
-        d={linePath}
-        fill="none"
-        stroke="var(--color-horizon-400, #c0a060)"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        pathLength={1}
-        style={{
-          strokeDasharray: 1,
-          strokeDashoffset: 1 - animProgress,
-          transition: 'stroke-dashoffset 700ms ease-out',
-        }}
-      />
-
-      {/* End dot */}
-      <circle
-        cx={x(maxAge)}
-        cy={y(rows[rows.length - 1].totalAssets)}
-        r={3}
-        fill="var(--color-horizon-400, #c0a060)"
-        style={{
-          transition: 'opacity 400ms ease-out 500ms',
-          opacity: animProgress,
-        }}
-      />
-    </svg>
-  )
-})
 
 // ── Modal Component ──────────────────────────────────────────────────────────
 
@@ -190,6 +78,14 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   rows,
   inflationRate,
   debts,
+  events,
+  cashflows,
+  allRows,
+  expectedReturn,
+  currentAge,
+  annualSavings,
+  fireStrategy,
+  currentPortfolio,
 }: PhaseModalOvergangProps) {
   if (transitionScenario === 'none') return null
 
@@ -232,13 +128,34 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
     : Math.max(portfolioAtTransitionStart - totalOnttrekking + totalRendement, 0)
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={title} size="lg" initialMobileHeight="60vh">
+    <BottomSheet open={open} onClose={onClose} title={title} size="xl" initialMobileHeight="60vh">
       {/* Accent line */}
       <div className="h-[2px] bg-[var(--color-horizon-200)]" />
 
-      <div className="p-5">
+      <div className="space-y-4 p-5">
+        {/* 1. PhaseChartZoom — full trajectory with transition phase highlighted */}
+        {allRows && allRows.length > 2 && (
+          <PhaseChartZoom
+            allRows={allRows}
+            phaseFilter="transition"
+            accentColor="var(--color-horizon-400)"
+            annotations={[
+              { age: fireAge, label: 'FIRE' },
+              { age: aowAge, label: 'AOW' },
+            ]}
+          />
+        )}
+
+        {/* 2. Fase-header — compact summary line */}
+        <div className="text-center">
+          <p className="font-sans text-base font-bold text-[var(--ink)]">
+            Overgang &middot; {formatCurrency(Math.round(startVermogen))} &rarr; {formatCurrency(Math.round(eindVermogen))} &middot; {durationYears} jaar
+          </p>
+        </div>
+
+        {/* 3. Kassabon — existing GapAnalysis / ShortfallAnalysis */}
         {transitionScenario === 'gap' ? (
-          <GapAnalysis
+          <GapAnalysisKassabon
             durationYears={durationYears}
             fireAge={fireAge}
             aowAge={aowAge}
@@ -268,17 +185,68 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
           />
         )}
 
-        {/* Mini chart */}
-        {transitionRows.length >= 2 && (
-          <div className="mt-4">
-            <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-              Vermogensverloop
-            </p>
-            <MiniChartWrapper rows={transitionRows} />
-          </div>
+        {/* 4. Life Events in this phase */}
+        {events && events.length > 0 && (
+          <LifeEventsInPhase
+            events={events}
+            phaseStartAge={startAge}
+            phaseEndAge={endAge}
+          />
         )}
 
-        {/* PhaseDetailTable (collapsed by default) */}
+        {/* 5. Monte Carlo simulation */}
+        {expectedReturn != null && (
+          <MonteCarloOvergang
+            startPortfolio={portfolioAtTransitionStart}
+            startAge={startAge}
+            endAge={endAge}
+            yearlyWithdrawal={yearlyWithdrawal > 0 ? yearlyWithdrawal : yearlyExpenses}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            cashflows={cashflows}
+          />
+        )}
+
+        {/* 6. Gap Analyse with strategy comparison */}
+        {expectedReturn != null && (
+          <GapAnalyse
+            startPortfolio={portfolioAtTransitionStart}
+            startAge={startAge}
+            endAge={endAge}
+            yearlyExpenses={yearlyExpenses}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            debts={debts}
+          />
+        )}
+
+        {/* 7. Eerder Stoppen — only for shortfall scenario (FIRE after AOW) */}
+        {transitionScenario === 'shortfall' && currentAge != null && expectedReturn != null && (
+          <EerderStoppen
+            currentAge={currentAge}
+            currentFireAge={fireAge}
+            currentPortfolio={currentPortfolio ?? portfolioAtTransitionStart}
+            yearlyExpenses={yearlyExpenses}
+            annualSavings={annualSavings ?? 0}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            cashflows={cashflows}
+            fireStrategy={fireStrategy}
+          />
+        )}
+
+        {/* 8. Stress Test */}
+        {expectedReturn != null && transitionRows.length > 0 && (
+          <StressTestSection
+            rows={transitionRows}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            yearlyExpenses={yearlyExpenses}
+            willContextPrefix="Overgangsfase stresstest"
+          />
+        )}
+
+        {/* 9. PhaseDetailTable (collapsed by default) */}
         {transitionRows.length > 0 && (
           <PhaseDetailTable
             rows={transitionRows}
@@ -288,8 +256,8 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
           />
         )}
 
-        {/* Filosofische noot */}
-        <div className="mt-5 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
+        {/* 10. Filosofische noot */}
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
           <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
             {durationYears} jaar overgang = {durationYears} jaar eerder verdiende vrijheid die je nu overbrugt
           </p>
@@ -299,15 +267,9 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   )
 })
 
-// Wrapper to use useModalAnimation
-function MiniChartWrapper({ rows }: { rows: UnifiedProjectionRow[] }) {
-  const { hasEntered } = useModalAnimation({ delay: 150, duration: 700 })
-  return <MiniTransitionChart rows={rows} hasEntered={hasEntered} />
-}
-
 // ── Scenario A: Gap (FIRE < AOW) ────────────────────────────────────────────
 
-function GapAnalysis({
+function GapAnalysisKassabon({
   durationYears,
   fireAge,
   aowAge,
