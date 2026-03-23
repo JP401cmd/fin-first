@@ -1,6 +1,7 @@
 'use client'
 
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState } from 'react'
+import { ChevronRight, ChevronDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { formatCurrency } from '@/lib/format'
@@ -131,6 +132,8 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   assets,
   yearlyExpenses,
 }: PhaseModalOnttrekkingProps) {
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false)
+
   // Filter to withdrawal phase rows
   const withdrawalRows = useMemo(
     () => rows.filter(r => r.phase === 'withdrawal'),
@@ -355,7 +358,57 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           />
         )}
 
-        {/* 12. Redactionele noot — data-driven freedom days */}
+        {/* 12. Aannames sectie (collapsed) */}
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)]">
+          <button
+            type="button"
+            onClick={() => setAssumptionsOpen(!assumptionsOpen)}
+            className="inline-flex min-h-[44px] w-full items-center gap-1.5 px-3 py-2 text-xs font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+            aria-expanded={assumptionsOpen}
+          >
+            {assumptionsOpen
+              ? <ChevronDown className="h-3.5 w-3.5 transition-transform duration-150" />
+              : <ChevronRight className="h-3.5 w-3.5 transition-transform duration-150" />
+            }
+            Aannames
+          </button>
+
+          {assumptionsOpen && (
+            <div className="border-t border-dashed border-[var(--border-ed)] px-3 pb-3 pt-2">
+              <div className="space-y-1">
+                <AssumptionRow label="Inflatie" value={`${(inflationRate * 100).toFixed(1)}%`} />
+                {expectedReturn != null && (
+                  <AssumptionRow label="Verwacht rendement" value={`${(expectedReturn * 100).toFixed(1)}%`} />
+                )}
+                {yearlyWithdrawal > 0 && durationYears > 0 && (
+                  <AssumptionRow
+                    label="SWR (impliciet)"
+                    value={`${((yearlyWithdrawal / startPortfolio) * 100).toFixed(2)}%`}
+                  />
+                )}
+                <AssumptionRow
+                  label="Jaarlijkse onttrekking"
+                  value={formatCurrency(Math.round(yearlyWithdrawal))}
+                />
+                {yearlyAowIncome > 0 && (
+                  <AssumptionRow
+                    label="AOW-inkomen/jaar"
+                    value={formatCurrency(Math.round(yearlyAowIncome))}
+                  />
+                )}
+                {aggregates.totalPensioen > 0 && durationYears > 0 && (
+                  <AssumptionRow
+                    label="Pensioen-inkomen/jaar"
+                    value={formatCurrency(Math.round(aggregates.totalPensioen / durationYears))}
+                  />
+                )}
+                <AssumptionRow label="Strategie" value={strategyLabel} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 13. Redactionele noot — data-driven freedom days */}
         {(() => {
           const dailyExpenseRate = (yearlyExpenses ?? yearlyWithdrawal) > 0 ? (yearlyExpenses ?? yearlyWithdrawal) / 365 : 0
           // Average freedom days per year = (yearly withdrawal + yearly AOW income) / daily expense rate
@@ -376,5 +429,16 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
     </BottomSheet>
   )
 })
+
+// ── Assumption row helper ────────────────────────────────────────────────────
+
+function AssumptionRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between py-0.5">
+      <span className="font-sans text-xs text-[var(--ink-3)]">{label}</span>
+      <span className="font-mono text-xs tabular-nums text-[var(--ink-2)]">{value}</span>
+    </div>
+  )
+}
 
 // ── Receipt row helper removed — using shared ReceiptRow from phase-analysis/receipt-row.tsx
