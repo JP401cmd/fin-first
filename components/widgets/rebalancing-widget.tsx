@@ -175,9 +175,75 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
     )
   }
 
-  // ── Half size: horizontal bars per category with current vs target % ──
   const isBalanced = overallSeverity === 'green'
-  const displayDrifts = sortedDrifts.slice(0, 5)
+
+  // ── Half size: horizontal bars per category with current vs target % ──
+  if (size === 'half') {
+    const displayDrifts = sortedDrifts.slice(0, 5)
+
+    return (
+      <WidgetShell module="kern" size={size} kicker="Rebalancing" href={href}>
+        <div ref={inViewRef}>
+          {/* Status header */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`inline-block h-2.5 w-2.5 rounded-full ${SEVERITY_COLORS[overallSeverity].dot}`} />
+            <span className={`text-sm font-medium ${isBalanced ? 'text-emerald-600' : SEVERITY_COLORS[overallSeverity].text}`}>
+              {isBalanced ? 'Portfolio in balans ✓' : 'Portfolio drift gedetecteerd'}
+            </span>
+          </div>
+
+          {/* Drift bars */}
+          <div className="space-y-1.5">
+            {displayDrifts.map((drift) => {
+              const severity = getDriftSeverity(drift.drift_pct)
+              const maxPct = Math.max(...displayDrifts.map(d => Math.max(d.current_pct, d.target_pct)), 1)
+
+              return (
+                <div key={drift.category}>
+                  {/* Label row */}
+                  <div className="flex items-baseline justify-between text-[11px] mb-0.5">
+                    <span className="text-[var(--ink-2)] truncate max-w-[55%]">{drift.label}</span>
+                    <span className={`font-mono tabular-nums ${SEVERITY_COLORS[severity].text}`}>
+                      {drift.current_pct.toFixed(1)}% / {drift.target_pct.toFixed(1)}%
+                    </span>
+                  </div>
+                  {/* Bar */}
+                  <div className="relative h-[6px] w-full rounded-full bg-[var(--subtle)] overflow-hidden">
+                    {/* Target marker */}
+                    <div
+                      className="absolute top-0 h-full w-[2px] bg-[var(--ink-4)] opacity-40 z-10"
+                      style={{ left: `${(drift.target_pct / maxPct) * 100}%` }}
+                    />
+                    {/* Current bar */}
+                    <div
+                      className={`h-full rounded-full ${SEVERITY_COLORS[severity].bar} transition-all duration-700 ease-[cubic-bezier(.22,1,.36,1)]`}
+                      style={{
+                        width: hasEntered ? `${(drift.current_pct / maxPct) * 100}%` : '0%',
+                        transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
+                      }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Unclassified warning */}
+          {unclassifiedCount > 0 && (
+            <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+              <span>{unclassifiedCount} holding{unclassifiedCount > 1 ? 's' : ''} niet geclassificeerd</span>
+            </p>
+          )}
+        </div>
+      </WidgetShell>
+    )
+  }
+
+  // ── Full size: complete overview with allocatie grid and suggestions ──
+  const displayDrifts = sortedDrifts.slice(0, 8)
+  const maxPct = Math.max(...displayDrifts.map(d => Math.max(d.current_pct, d.target_pct)), 1)
+  const needsRebalance = !isBalanced && sortedDrifts.some(d => Math.abs(d.drift_pct) >= 5)
 
   return (
     <WidgetShell module="kern" size={size} kicker="Rebalancing" href={href}>
@@ -191,30 +257,31 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
         </div>
 
         {/* Drift bars */}
-        <div className="space-y-1.5">
-          {displayDrifts.map((drift) => {
+        <div className="space-y-1 mb-2">
+          {displayDrifts.map((drift, i) => {
             const severity = getDriftSeverity(drift.drift_pct)
-            const maxPct = Math.max(...displayDrifts.map(d => Math.max(d.current_pct, d.target_pct)), 1)
-
             return (
-              <div key={drift.category}>
-                {/* Label row */}
+              <div
+                key={drift.category}
+                style={{
+                  opacity: hasEntered ? 1 : 0,
+                  transform: hasEntered ? 'translateY(0)' : 'translateY(4px)',
+                  transition: `opacity 400ms ${100 + i * 60}ms ease, transform 400ms ${100 + i * 60}ms ease`,
+                }}
+              >
                 <div className="flex items-baseline justify-between text-[11px] mb-0.5">
                   <span className="text-[var(--ink-2)] truncate max-w-[55%]">{drift.label}</span>
                   <span className={`font-mono tabular-nums ${SEVERITY_COLORS[severity].text}`}>
                     {drift.current_pct.toFixed(1)}% / {drift.target_pct.toFixed(1)}%
                   </span>
                 </div>
-                {/* Bar */}
-                <div className="relative h-[6px] w-full rounded-full bg-[var(--subtle)] overflow-hidden">
-                  {/* Target marker */}
+                <div className="relative h-[5px] w-full rounded-full bg-[var(--subtle)] overflow-hidden">
                   <div
                     className="absolute top-0 h-full w-[2px] bg-[var(--ink-4)] opacity-40 z-10"
                     style={{ left: `${(drift.target_pct / maxPct) * 100}%` }}
                   />
-                  {/* Current bar */}
                   <div
-                    className={`h-full rounded-full ${SEVERITY_COLORS[severity].bar} transition-all duration-700 ease-[cubic-bezier(.22,1,.36,1)]`}
+                    className={`h-full rounded-full ${SEVERITY_COLORS[severity].bar}`}
                     style={{
                       width: hasEntered ? `${(drift.current_pct / maxPct) * 100}%` : '0%',
                       transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
@@ -226,12 +293,64 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
           })}
         </div>
 
+        {/* Target vs actual allocatie grid */}
+        <div
+          className="border border-[var(--border-ed)] rounded-md overflow-hidden mb-2"
+          style={{
+            opacity: hasEntered ? 1 : 0,
+            transition: 'opacity 400ms 600ms ease',
+          }}
+        >
+          {/* Table header */}
+          <div className="grid grid-cols-4 gap-0 text-[10px] uppercase tracking-wider font-medium text-[var(--ink-3)] bg-[var(--subtle)] px-2 py-1 border-b border-[var(--border-ed)]">
+            <span>Categorie</span>
+            <span className="text-right">Huidig</span>
+            <span className="text-right">Target</span>
+            <span className="text-right">Drift</span>
+          </div>
+          {/* Table rows */}
+          {displayDrifts.map((drift) => {
+            const severity = getDriftSeverity(drift.drift_pct)
+            return (
+              <div
+                key={drift.category + '-row'}
+                className="grid grid-cols-4 gap-0 text-[11px] px-2 py-0.5 border-b border-[var(--border-ed)] last:border-b-0"
+              >
+                <span className="text-[var(--ink-2)] truncate">{drift.label}</span>
+                <span className="text-right font-mono tabular-nums text-[var(--ink)]">
+                  {drift.current_pct.toFixed(1)}%
+                </span>
+                <span className="text-right font-mono tabular-nums text-[var(--ink-3)]">
+                  {drift.target_pct.toFixed(1)}%
+                </span>
+                <span className={`text-right font-mono tabular-nums ${SEVERITY_COLORS[severity].text}`}>
+                  {drift.drift_pct > 0 ? '+' : ''}{drift.drift_pct.toFixed(1)}%
+                </span>
+              </div>
+            )
+          })}
+        </div>
+
         {/* Unclassified warning */}
         {unclassifiedCount > 0 && (
-          <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+          <p className="text-[11px] text-amber-600 mb-1.5 flex items-center gap-1">
             <AlertTriangle className="h-3 w-3 flex-shrink-0" />
             <span>{unclassifiedCount} holding{unclassifiedCount > 1 ? 's' : ''} niet geclassificeerd</span>
           </p>
+        )}
+
+        {/* Herbalanceer-suggestie CTA */}
+        {needsRebalance && (
+          <div
+            className="flex items-center gap-1.5 text-[11px] text-kern-600 font-medium"
+            style={{
+              opacity: hasEntered ? 1 : 0,
+              transition: 'opacity 400ms 700ms ease',
+            }}
+          >
+            <ArrowRight className="h-3 w-3" />
+            <span>Bekijk herbalanceer-suggesties</span>
+          </div>
         )}
       </div>
     </WidgetShell>
