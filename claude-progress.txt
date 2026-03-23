@@ -20500,3 +20500,64 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#543, #544)
+
+## Session 2026-03-23 - Features #541, #542
+
+### Feature #541: MC Onttrekken: p90 eindvermogen en longevity mini-chart - PASSING
+- Added p90EndPortfolio (Optimistisch) stat card to the key statistics grid
+- Changed grid from grid-cols-1 sm:grid-cols-3 to grid-cols-2 sm:grid-cols-4
+- Replaced longevity text rows with horizontal bar chart (Baseline, +5j, +10j)
+- Bars show success rate percentage with successColor text and successBgColor background
+- Bar width proportional to successRate (min 4% for visibility)
+- Min-height 24px on all bars for mobile touch targets
+- NOTE: Changes were already committed by concurrent agent in commit 96c704db
+- Verified in browser: all 4 stat cards and 3 longevity bars render correctly
+- Zero new console errors
+
+### Feature #542: Huis Verkopen: hardcoded aannames zichtbaar maken - PASSING
+- Added collapsible Aannames section inside Huis Verkopen analysis section
+- Uses dashed border + chevron toggle pattern (matching phase modals)
+- Displays 7 assumption rows:
+  1. Woningwaardestijging: 3% per jaar
+  2. Woonlasten (OZB/VvE/onderhoud): €200/mnd
+  3. Verwachte huur: €1.200/mnd
+  4. Verkoopkosten: 4% van woningwaarde
+  5. Horizon: 20 jaar
+  6. Verwacht beleggingsrendement: 7.0% per jaar
+  7. Inflatie: 2.0% per jaar
+- Enhanced disclaimer text to reference aannames
+- Reuses AssumptionRow helper pattern from phase modals
+- Min-h-[44px] on toggle button for mobile touch targets
+- Zero new console errors
+- Commit: 8500c48c
+
+### Files Modified
+- components/app/horizon/phase-analysis/onttrekken/monte-carlo-onttrekken.tsx (already done by concurrent agent)
+- components/app/horizon/phase-analysis/onttrekken/huis-verkopen.tsx — Aannames section + AssumptionRow helper
+
+### Current Status
+- 2 features completed this session (#541, #542)
+
+## Session 2026-03-23 - Features #549, #550
+
+### Feature #549: Deeltijdwerk Flex Impact - PASSING
+- Created overgang/deeltijdwerk-impact.tsx
+- 4 scenarios: 0,1,2,3 werkdagen/week with forward cascade simulation
+- Table with Werkdagen, Inkomen, Eindvermogen, Verschil
+- Keerzijde block showing freedom days lost per scenario
+- AnalysisSection with Briefcase icon, lazy compute
+- Positioned after GapAnalyse, before EerderStoppen
+- Commit: d10af4b5
+
+### Feature #550: Koopkrachterosie Onttrekking - PASSING
+- Created onttrekken/koopkracht-erosie-onttrekken.tsx
+- Real value per 5th year table: Leeftijd, Nominaal, Reeel, Erosie pct
+- Summary stat card with total erosion percentage
+- Future lifestyle cost projection in nominal euros
+- Zero inflation shows clean no-erosion message
+- AnalysisSection with ArrowDownRight icon, lazy compute
+- Positioned after EndOfLife, before StressTest
+- Commit: 83d78edc
+
+### Current Status
+- 2 features completed this session (#549, #550)
