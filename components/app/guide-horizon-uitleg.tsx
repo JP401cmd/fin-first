@@ -566,35 +566,35 @@ export default function GuideHorizonUitleg() {
             <strong>Wat telt als inkomen?</strong> Dat hangt af van de fase:
           </p>
           <p>
-            <strong>Opbouwfase</strong> — je netto jaarinkomen (salaris), positieve
-            levensgebeurtenissen (erfenis, bonus, huurinkomsten) en het beleggingsrendement op je
+            <strong>Opbouwfase</strong> — je netto jaarinkomen (salaris), vrijheid-opbouwende
+            gebeurtenissen (erfenis, bonus, huurinkomsten) en het beleggingsrendement op je
             portfolio. Samen vormen deze drie bronnen je totale bruto inkomen.
           </p>
           <p>
             <strong>Overgangsfase</strong> — je hebt geen salaris meer, maar nog geen AOW. Inkomen
-            bestaat uit beleggingsrendement op je portfolio en eventuele positieve
-            levensgebeurtenissen (huurinkomsten, parttime werk).
+            bestaat uit beleggingsrendement op je portfolio en eventuele vrijheid-opbouwende
+            gebeurtenissen (huurinkomsten, parttime werk).
           </p>
           <p>
             <strong>Onttrekkingsfase</strong> — inkomen bestaat uit beleggingsrendement op je
-            portfolio, AOW-uitkering, eventueel pensioen en overige positieve
-            levensgebeurtenissen.
+            portfolio, AOW-uitkering, eventueel pensioen en overige vrijheid-opbouwende
+            gebeurtenissen.
           </p>
           <p>
             <strong>Wat telt als uitgaven?</strong>
           </p>
           <p>
-            <strong>Opbouwfase</strong> — je jaarlijkse levenskosten plus negatieve
-            levensgebeurtenissen (huis kopen, auto, bruiloft, kinderopvang).
+            <strong>Opbouwfase</strong> — je jaarlijkse levenskosten plus bewuste keuzes waar je
+            vrijheid in investeert (huis kopen, auto, bruiloft, kinderopvang).
           </p>
           <p>
             <strong>Overgangsfase</strong> — je jaarlijkse onttrekking uit je portfolio plus
-            negatieve levensgebeurtenissen. Geen salaris meer, maar ook nog geen AOW — je leeft
+            vrijheid-investerende gebeurtenissen. Geen salaris meer, maar ook nog geen AOW — je leeft
             volledig van je vermogen.
           </p>
           <p>
             <strong>Onttrekkingsfase</strong> — je jaarlijkse onttrekking uit je portfolio plus
-            negatieve levensgebeurtenissen, verminderd met AOW- en pensioeninkomsten.
+            vrijheid-investerende gebeurtenissen, verminderd met AOW- en pensioeninkomsten.
           </p>
           <p>
             <strong>De gap tussen de lijnen</strong> is je netto vermogensmutatie per jaar. Waar

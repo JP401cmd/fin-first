@@ -1087,7 +1087,7 @@ export default function GidsPage() {
                 "Bekijk direct het effect op je FIRE-datum en vermogenspad",
                 "Versleep events in de tijd of schakel ze uit om scenario\u2019s te vergelijken",
               ],
-              tip: "Voeg ook positieve events toe \u2014 een salarisverhoging, een erfenis of een zijproject. Het gaat niet alleen om kosten.",
+              tip: "Voeg ook vrijheid-opbouwende events toe \u2014 een salarisverhoging, een erfenis of een zijproject. Het gaat niet alleen om vrijheid investeren.",
             }}
           />
 
