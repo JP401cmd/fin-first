@@ -195,12 +195,30 @@ function isWidgetAccessible(widgetId: string, features: FeatureAccessMap): boole
   return isFeatureAccessible(features, featureId)
 }
 
+/** Check if a widget should be visible: accessible + budget/holding data present */
+function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: DashboardData): boolean {
+  if (!isWidgetAccessible(pref.id, features)) return false
+  // Budget widgets: hidden when budgeting is off
+  if (!data.budgetingActive && (BUDGET_WIDGETS.has(pref.id) || pref.id.startsWith('budget_fav:'))) return false
+  // Stale holding favorites: holding no longer exists
+  if (pref.id.startsWith('holding_fav:')) {
+    const holdingId = pref.id.slice('holding_fav:'.length)
+    if (!data.favoriteHoldings.find(h => h.id === holdingId)) return false
+  }
+  // Stale budget favorites: budget no longer exists
+  if (pref.id.startsWith('budget_fav:')) {
+    const budgetId = pref.id.slice('budget_fav:'.length)
+    if (!data.favoriteBudgets.find(b => b.id === budgetId)) return false
+  }
+  return true
+}
+
 export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle }: DraggableWidgetGridProps) {
   const router = useRouter()
   const { features } = useFeatureAccess()
 
-  // Filter out widgets that are not accessible based on feature-phase gating
-  const accessibleInitialPrefs = initialPrefs.filter(p => isWidgetAccessible(p.id, features))
+  // Filter out inaccessible, budget-gated, and stale-favorite widgets
+  const accessibleInitialPrefs = initialPrefs.filter(p => isWidgetVisible(p, features, data))
 
   const [activeWidgets, setActiveWidgets] = useState<WidgetPref[]>(accessibleInitialPrefs)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -359,18 +377,20 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   }, [scheduleSave])
 
   const handleAutoApply = useCallback(async (newPrefs: WidgetPref[]) => {
-    const reordered = reassignOrders(newPrefs)
+    const reordered = reassignOrders(newPrefs.filter(p => isWidgetVisible(p, features, data)))
     setActiveWidgets(reordered)
     await performSave(reordered)
     setIsEditMode(false)
     setShowAddPicker(false)
     // Refresh server data so newly-favorited budgets appear in data.favoriteBudgets
     router.refresh()
-  }, [performSave, router])
+  }, [performSave, router, features, data])
 
   const handlePresetApply = useCallback(async (preset: WidgetPreset) => {
     if (!preset.widgets || preset.widgets.length === 0) return
-    const reordered = reassignOrders(preset.widgets.map(w => ({ ...w, enabled: true })))
+    const reordered = reassignOrders(
+      preset.widgets.map(w => ({ ...w, enabled: true })).filter(p => isWidgetVisible(p, features, data))
+    )
     setActiveWidgets(reordered)
     setSelectedPreset(null)
     // Immediate save (not debounced) — same pattern as handleAutoApply
@@ -380,7 +400,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     setIsEditMode(false)
     setShowAddPicker(false)
     router.refresh()
-  }, [performSave, router])
+  }, [performSave, router, features, data])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string)
