@@ -31,6 +31,7 @@ import {
   ageAtDate,
   deriveCountdown,
   NL_SWR,
+  computeLifeEventNetImpact,
   type FinancialInput,
   type LifeEvent,
 } from '@/lib/horizon-data'
@@ -761,16 +762,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const topLifeEvents: TopLifeEvent[] = allLifeEvents
     .slice(0, 5)
     .map(e => {
-      const netImpact = (Number(e.one_time_cost) || 0) + (Number(e.monthly_cost_change) || 0) * (Number(e.duration_months) || 0)
-      const incomeImpact = (Number(e.monthly_income_change) || 0) * (Number(e.duration_months) || 0)
-      const totalImpact = netImpact - incomeImpact
+      const netImpact = computeLifeEventNetImpact(e)
       return {
         id: e.id,
         name: e.name,
         year: e.target_date ? new Date(e.target_date).getFullYear() : (e.target_age != null ? null : null),
         targetAge: e.target_age ?? null,
-        impactType: (totalImpact > 0 ? 'negative' : 'positive') as 'positive' | 'negative',
-        estimatedImpact: totalImpact !== 0 ? Math.abs(totalImpact) : null,
+        impactType: (netImpact > 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+        estimatedImpact: netImpact !== 0 ? Math.abs(netImpact) : null,
       }
     })
 

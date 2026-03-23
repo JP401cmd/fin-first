@@ -198,12 +198,53 @@ const tests: TestCase[] = [
     },
   },
 
-  // Test 8: computeLifeEventNetImpact retourneert correct netto bedrag
+  // Test 8: permanent events (duration_months=0) classificeren correct
+  {
+    id: 'classify-permanent-income-opbouwen',
+    name: 'Permanent inkomen (duration_months=0, monthly_income>0) → opbouwen',
+    category: CAT,
+    description: 'AOW/pensioen met duration_months=0 (permanent) classificeert als opbouwen, niet investeren',
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    async fn() {
+      // AOW like Rashid: monthly_income_change: 1350, duration_months: 0
+      const aow = makeTestEvent({ name: 'AOW', monthly_income_change: 1350, duration_months: 0 })
+      assertEqual(classifyLifeEvent(aow), 'opbouwen', 'AOW (permanent) moet opbouwen zijn')
+      assert(computeLifeEventNetImpact(aow) > 0, 'AOW permanent net impact moet positief zijn')
+
+      // Freelance tarief omhoog: monthly_income_change: 500, duration_months: 0
+      const freelance = makeTestEvent({ name: 'Freelance tarief omhoog', monthly_income_change: 500, duration_months: 0 })
+      assertEqual(classifyLifeEvent(freelance), 'opbouwen', 'Freelance tarief omhoog (permanent) moet opbouwen zijn')
+      assert(computeLifeEventNetImpact(freelance) > 0, 'Freelance permanent net impact moet positief zijn')
+
+      // Hypotheek afgelost (permanent cost reduction): monthly_cost_change: -1200, duration_months: 0
+      const hypotheek = makeTestEvent({ name: 'Hypotheek afgelost', monthly_cost_change: -1200, duration_months: 0 })
+      assertEqual(classifyLifeEvent(hypotheek), 'opbouwen', 'Hypotheek afgelost (permanent) moet opbouwen zijn')
+    },
+  },
+
+  // Test 9: permanent events met negatief inkomen → investeren
+  {
+    id: 'classify-permanent-income-loss-investeren',
+    name: 'Permanent inkomensverlies (duration_months=0, income<0) → investeren',
+    category: CAT,
+    description: 'Vervroegd pensioen met inkomensverlies classificeert als investeren',
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    async fn() {
+      // Vervroegd pensioen: income loss, duration_months: 0
+      const pensioen = makeTestEvent({ name: 'Vervroegd pensioen', monthly_income_change: -5500, duration_months: 0 })
+      assertEqual(classifyLifeEvent(pensioen), 'investeren', 'Vervroegd pensioen (permanent) moet investeren zijn')
+      assert(computeLifeEventNetImpact(pensioen) < 0, 'Pensioen permanent net impact moet negatief zijn')
+    },
+  },
+
+  // Test 10: computeLifeEventNetImpact retourneert correct netto bedrag
   {
     id: 'compute-net-impact-correct',
     name: 'computeLifeEventNetImpact berekent correct netto bedrag',
     category: CAT,
-    description: 'Net impact = one_time_cost + (income * duration) - (cost * duration)',
+    description: 'Net impact = one_time_cost + (income * effectiveDuration) - (cost * effectiveDuration)',
     priority: 'critical',
     estimatedDurationMs: 50,
     async fn() {
@@ -238,7 +279,7 @@ export function register() {
   registerCategory({
     id: CAT,
     label: 'Levensgebeurtenissen Classificatie',
-    description: 'Regressietests voor classifyLifeEvent, splitLifeEvents en computeLifeEventNetImpact',
+    description: 'Regressietests voor classifyLifeEvent, splitLifeEvents en computeLifeEventNetImpact (incl. permanent events)',
     testCount: tests.length,
   })
   registerTests(tests)

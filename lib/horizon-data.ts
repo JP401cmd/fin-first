@@ -547,12 +547,16 @@ export type LifeEventClassification = 'opbouwen' | 'investeren'
  * Compute the net financial impact of a life event.
  * Positive = net gain (freedom-building), negative/zero = net cost (freedom-investing).
  *
- * Formula: one_time_cost + (monthly_income_change × duration_months) - (monthly_cost_change × duration_months)
+ * When duration_months > 0: one_time_cost + (monthly_income_change - monthly_cost_change) × duration_months
+ * When duration_months = 0 (permanent/indefinite): one_time_cost + (monthly_income_change - monthly_cost_change) × 240
+ *   240 months (20 years) is used as a reasonable proxy for permanent changes, consistent with AOW duration conventions.
  * Note: one_time_cost is negative for costs, positive for income.
  */
 export function computeLifeEventNetImpact(event: LifeEvent): number {
   const { one_time_cost, monthly_income_change, monthly_cost_change, duration_months } = event
-  return one_time_cost + (monthly_income_change * duration_months) - (monthly_cost_change * duration_months)
+  // duration_months === 0 means permanent/indefinite (see lifeEventsToCashflows); use 240 months as proxy
+  const effectiveDuration = duration_months > 0 ? duration_months : 240
+  return one_time_cost + (monthly_income_change * effectiveDuration) - (monthly_cost_change * effectiveDuration)
 }
 
 /**
