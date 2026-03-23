@@ -19,6 +19,8 @@ export interface GapAnalyseProps {
   debts?: Debt[]
   /** Monthly part-time income during transition. Defaults to ~50% of monthly expenses. */
   deeltijdInkomen?: number
+  /** Current age of the user, used for accurate debt-in-transition detection */
+  currentAge?: number
 }
 
 /**
@@ -50,29 +52,33 @@ function computeTotalBridge(
 
 /**
  * Check if any debts have end dates that fall during the transition period.
- * We approximate the debt's payoff age from its end_date and estimate if it
- * falls in [startAge, endAge].
+ * Uses currentAge to compute the payoff age for each debt and filters on
+ * whether that payoff age falls within [startAge, endAge].
  */
 function debtsInTransition(
   debts: Debt[],
   startAge: number,
   endAge: number,
+  currentAge?: number,
 ): Debt[] {
   if (debts.length === 0) return []
 
-  // We don't know the exact birth date, so we look at end_date relative
-  // to current year and estimate whether it falls in the transition window.
-  // This is a rough heuristic: debts ending in the next (endAge - startAge)
-  // years from today could overlap.
   const now = new Date()
   const currentYear = now.getFullYear()
-  const transitionDuration = endAge - startAge
 
   return debts.filter((d) => {
     if (!d.is_active || !d.end_date) return false
     const endYear = new Date(d.end_date).getFullYear()
     const yearsUntilEnd = endYear - currentYear
-    // If debt ends within the transition duration window, flag it
+
+    if (currentAge != null) {
+      // Accurate: convert debt end_date to a payoff age
+      const payoffAge = currentAge + yearsUntilEnd
+      return payoffAge >= startAge && payoffAge <= endAge
+    }
+
+    // Fallback: rough heuristic if currentAge unknown
+    const transitionDuration = endAge - startAge
     return yearsUntilEnd >= 0 && yearsUntilEnd <= transitionDuration
   })
 }
@@ -98,6 +104,7 @@ export const GapAnalyse = memo(function GapAnalyse({
   inflationRate,
   debts = [],
   deeltijdInkomen,
+  currentAge,
 }: GapAnalyseProps) {
   // Default: 50% of monthly expenses as part-time income
   const effectiveDeeltijdInkomen = deeltijdInkomen ?? Math.round((yearlyExpenses / 12) * 0.5)
@@ -132,7 +139,7 @@ export const GapAnalyse = memo(function GapAnalyse({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startPortfolio, startAge, endAge, yearlyExpenses, expectedReturn, inflationRate, effectiveDeeltijdInkomen])
 
-  const transitionDebts = debtsInTransition(debts, startAge, endAge)
+  const transitionDebts = debtsInTransition(debts, startAge, endAge, currentAge)
   const loading = state === null
 
   return (
