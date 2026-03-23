@@ -88,12 +88,12 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
         )}
 
         {/* Comparison table: alleenstaand vs samenwonend */}
-        <div className="mt-3">
-          <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)] mb-1.5">
+        <div className="mt-2">
+          <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)] mb-1">
             AOW-bedragen (netto, 2026)
           </p>
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-between text-[11px]">
               <span className="text-[var(--ink-3)]">Alleenstaand</span>
               <span className="font-mono tabular-nums text-[var(--ink)]">
                 {formatCurrency(NL_AOW_MONTHLY)}/mnd
@@ -102,7 +102,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
                 {formatCurrency(NL_AOW_MONTHLY * 12)}/jaar
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-[11px]">
               <span className="text-[var(--ink-3)]">Samenwonend</span>
               <span className="font-mono tabular-nums text-[var(--ink)]">
                 {formatCurrency(NL_AOW_MONTHLY_SAMENWONEND)}/mnd
@@ -115,52 +115,52 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
         </div>
 
         {/* AOW coverage section */}
-        <div className="mt-3">
-          <p className="text-xs text-[var(--ink-3)]">
+        <div className="mt-2">
+          <p className="text-[11px] text-[var(--ink-3)]">
             AOW dekt {Math.round(aowCoveragePct)}% van je maandelijkse uitgaven
           </p>
           {/* Progress bar */}
-          <div className="mt-1.5 h-2 w-full rounded-full bg-[var(--subtle)]">
+          <div className="mt-1 h-1.5 w-full rounded-full bg-[var(--subtle)]">
             <div
               className="h-full rounded-full bg-horizon-500 transition-all"
               style={{ width: `${Math.min(100, aowCoveragePct)}%` }}
             />
           </div>
           {selfSupplementMonthly > 0 && (
-            <p className="mt-1 text-xs text-[var(--ink-3)]">
-              Je moet zelf nog {formatCurrency(selfSupplementMonthly)}/maand aanvullen
+            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
+              Zelf aanvullen: {formatCurrency(selfSupplementMonthly)}/mnd
             </p>
           )}
         </div>
 
         {/* FIRE impact section */}
-        <div className="mt-3">
-          <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)] mb-1.5">
+        <div className="mt-2">
+          <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)] mb-1">
             Impact op FIRE
           </p>
-          <div className="space-y-1 text-xs">
+          <div className="space-y-0.5 text-[11px]">
             <div className="flex justify-between">
-              <span className="text-[var(--ink-3)]">AOW-vermogensequivalent</span>
-              <span className="font-mono tabular-nums text-[var(--ink)]">
+              <span className="text-[var(--ink-3)] truncate mr-2">AOW-vermogensequivalent</span>
+              <span className="font-mono tabular-nums text-[var(--ink)] shrink-0">
                 {formatCurrency(aowFireReduction)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--ink-3)]">Benodigde FIRE-pot v&oacute;&oacute;r AOW</span>
-              <span className="font-mono tabular-nums text-[var(--ink)]">
+              <span className="text-[var(--ink-3)] truncate mr-2">FIRE-pot v&oacute;&oacute;r AOW</span>
+              <span className="font-mono tabular-nums text-[var(--ink)] shrink-0">
                 {formatCurrency(data.fireTarget)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--ink-3)]">Benodigde FIRE-pot na AOW</span>
-              <span className="font-mono tabular-nums text-[var(--ink)]">
+              <span className="text-[var(--ink-3)] truncate mr-2">FIRE-pot na AOW</span>
+              <span className="font-mono tabular-nums text-[var(--ink)] shrink-0">
                 {formatCurrency(postAowTarget)}
               </span>
             </div>
           </div>
         </div>
 
-        <p className="mt-3 pt-2 border-t border-[var(--border-ed)] font-serif italic text-[11px] text-[var(--ink-3)]">
+        <p className="mt-2 pt-1.5 border-t border-[var(--border-ed)] font-serif italic text-[10px] text-[var(--ink-4)]">
           Bedragen in 2026. AOW stijgt mee met minimumloon.
         </p>
       </WidgetShell>

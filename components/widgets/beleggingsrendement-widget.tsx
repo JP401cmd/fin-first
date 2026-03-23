@@ -147,7 +147,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
             Rendement per type
           </p>
           <div className="space-y-1">
-            {investmentAssets.map(asset => {
+            {investmentAssets.slice(0, 3).map(asset => {
               const gain = asset.value - asset.purchaseValue
               const pct = asset.purchaseValue > 0
                 ? ((gain) / asset.purchaseValue) * 100

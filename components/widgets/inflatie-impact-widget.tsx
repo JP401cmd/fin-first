@@ -79,7 +79,7 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
     const points = buildPurchasingPowerPoints(inflationRate, maxYears)
     const { pathD, fillD } = buildSvgPath(points, svgWidth, svgHeight, maxYears)
 
-    const tableYears = [5, 10, 15, 20, 25, 30]
+    const tableYears = [5, 10, 20, 30]
     const fireTarget = data.fireTarget
 
     return (
