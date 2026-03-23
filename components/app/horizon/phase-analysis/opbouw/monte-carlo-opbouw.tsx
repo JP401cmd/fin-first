@@ -41,7 +41,7 @@ interface MCComputedState {
 /** Build a dynamic set of checkpoint ages for the "kans per leeftijd" table.
  *  Generates ~5 evenly spaced checkpoints between currentAge+5 and fireAge+5,
  *  always including the FIRE age itself. */
-function buildCheckpointAges(
+export function buildCheckpointAges(
   currentAge: number,
   fireAge: number | null,
 ): number[] {
