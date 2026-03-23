@@ -1,3 +1,33 @@
+## Session 2026-03-23 - Feature #612
+
+### Feature #612: Bugfix: dashboard widgets laden niet volledig — diagnose en fix rendering failures - PASSING
+- Root cause: No error boundary around widget rendering; dynamic imports had no loading fallbacks
+  - If a widget threw during render, it crashed silently (no visual feedback)
+  - Dynamic imports had no loading indicator while chunks loaded
+- Fix 1: Added WidgetErrorBoundary class component (React Error Boundary)
+  - Catches render errors per widget, shows "Kan niet laden" fallback with AlertTriangle icon
+  - console.error logging with widget ID and componentStack for debugging
+  - Exported from widget-renderer.tsx for potential reuse
+- Fix 2: Added WidgetLoadingFallback spinner to all 50+ dynamic imports
+  - Spinner animation while chunk loads
+- Fix 3: Refactored WidgetRenderer to wrap all widgets in error boundary
+  - Extracted renderWidgetById() helper function
+  - Budget_fav: and holding_fav: dynamic widgets also wrapped
+- Verification:
+  - All 4 persona presets tested (Pensioenplanner, Vermogensverdeler, Budgetteerder, FIRE Strijder)
+  - All 28 unique widget IDs across presets render correctly with full content
+  - Zero console errors across all presets
+  - Core page and Horizon page also verified (0 errors)
+  - TypeScript compiles clean (no new errors)
+- Commit: 86e717f5
+
+### Files Modified
+- components/widgets/widget-renderer.tsx — WidgetErrorBoundary, WidgetLoadingFallback, all dynamic imports updated
+
+### Current Status
+- 1 feature completed this session (#612)
+- Overall progress: 611/611 passing (100%)
+
 ## Session 2026-03-23 - Feature #611
 
 ### Feature #611: Bugfix: levensgebeurtenissen classificatie sign-conventie — AOW en inkomen-events als opbouwen - PASSING
