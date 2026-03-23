@@ -92,8 +92,8 @@ export const SORRAnalyse = memo(function SORRAnalyse({
       // SORR scenario analysis
       const scenarios = runSORRAnalysis(mcInput, SORR_SCENARIOS)
 
-      // Cash buffer analysis
-      const cashBuffers = runCashBufferAnalysis(mcInput, [0, 2, 3])
+      // Cash buffer analysis (0, 1, 2, 3 years)
+      const cashBuffers = runCashBufferAnalysis(mcInput, [0, 1, 2, 3])
 
       // Recommended buffer: pick the smallest buffer that improves success rate
       // by at least 3 percentage points, or default to 2 years
@@ -151,8 +151,15 @@ export const SORRAnalyse = memo(function SORRAnalyse({
         <div className="space-y-4">
           {/* -- 1. Fragile decade explainer -------------------------------- */}
           <p className="text-xs leading-relaxed text-[var(--ink-3)]">
-            De eerste 10 jaar na pensioen zijn het kwetsbaarst voor slechte
-            rendementen. Een crash vroeg in de onttrekkingsfase heeft meer
+            Jouw fragiele decennium loopt van{' '}
+            <span className="font-semibold text-[var(--ink-2)]">
+              leeftijd {Math.round(startAge)} tot {Math.round(startAge) + 10}
+            </span>
+            . In die periode onttrek je circa{' '}
+            <span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">
+              {formatCurrency(Math.round(yearlyWithdrawal * Math.min(10, yearsInPhase)))}
+            </span>{' '}
+            aan levensonderhoud. Een crash vroeg in deze fase heeft meer
             impact dan later, omdat je tegelijk onttrekkingen doet uit een
             kleiner wordend portfolio.
           </p>
