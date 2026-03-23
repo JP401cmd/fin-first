@@ -37,14 +37,33 @@ interface MCComputedState {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Build a filtered set of checkpoint ages for the "kans per leeftijd" table. */
+/** Build a dynamic set of checkpoint ages for the "kans per leeftijd" table.
+ *  Generates ~5 evenly spaced checkpoints between currentAge+5 and fireAge+5,
+ *  always including the FIRE age itself. */
 function buildCheckpointAges(
   currentAge: number,
   fireAge: number | null,
 ): number[] {
-  const candidates = [55, 58, 60, 62, 65]
-  const maxAge = (fireAge ?? currentAge + 30) + 10
-  return candidates.filter((a) => a > currentAge && a <= maxAge)
+  const effectiveFireAge = fireAge ?? currentAge + 30
+  const startAge = Math.ceil(currentAge + 5)
+  const endAge = Math.ceil(effectiveFireAge + 5)
+
+  if (endAge <= startAge) return [Math.round(effectiveFireAge)]
+
+  // Generate ~5 evenly spaced checkpoints (rounded to whole years)
+  const count = 5
+  const step = (endAge - startAge) / (count - 1)
+  const candidates = new Set<number>()
+  for (let i = 0; i < count; i++) {
+    candidates.add(Math.round(startAge + i * step))
+  }
+  // Always include FIRE age
+  candidates.add(Math.round(effectiveFireAge))
+
+  // Filter: must be after current age, sort ascending
+  return Array.from(candidates)
+    .filter((a) => a > currentAge)
+    .sort((a, b) => a - b)
 }
 
 /** Color class for a success-rate percentage value. */
@@ -154,32 +173,8 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
           />
 
           {/* ── Key statistics ────────────────────────────────── */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {/* Median FIRE age */}
-            <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                Mediaan FIRE-datum
-              </p>
-              <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {p50FireAge != null
-                  ? `${p50FireAge} jaar`
-                  : 'Niet bereikt'}
-              </p>
-            </div>
-
-            {/* Pessimistic (p10) FIRE age */}
-            <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                Pessimistisch scenario
-              </p>
-              <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {p10FireAge != null
-                  ? `${p10FireAge} jaar (10e percentiel)`
-                  : 'Niet bereikt'}
-              </p>
-            </div>
-
-            {/* Overall success probability */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {/* 1. Overall success probability */}
             <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
                 Slagingskans
@@ -191,6 +186,40 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
                 <span className="ml-1 text-[11px] text-[var(--ink-4)]">
                   bij doelleeftijd
                 </span>
+              </p>
+            </div>
+
+            {/* 2. Median end portfolio */}
+            <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Mediaan eindvermogen
+              </p>
+              <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
+                {formatCurrency(state.main.medianEndPortfolio)}
+              </p>
+            </div>
+
+            {/* 3. Median FIRE age */}
+            <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Mediaan FIRE-datum
+              </p>
+              <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
+                {p50FireAge != null
+                  ? `${p50FireAge} jaar`
+                  : 'Niet bereikt'}
+              </p>
+            </div>
+
+            {/* 4. Pessimistic (p10) FIRE age */}
+            <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Pessimistisch scenario
+              </p>
+              <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
+                {p10FireAge != null
+                  ? `${p10FireAge} jaar (10e percentiel)`
+                  : 'Niet bereikt'}
               </p>
             </div>
           </div>
@@ -210,21 +239,30 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
                     </tr>
                   </thead>
                   <tbody>
-                    {state.byAge.map(({ age, successRate }) => (
-                      <tr
-                        key={age}
-                        className="border-b border-dashed border-[var(--border-ed)] last:border-b-0"
-                      >
-                        <td className="px-1 py-1.5 font-mono tabular-nums text-[var(--ink-2)]">
-                          {age} jaar
-                        </td>
-                        <td
-                          className={`px-1 py-1.5 text-right font-mono tabular-nums ${successColor(successRate)}`}
+                    {state.byAge.map(({ age, successRate }) => {
+                      const isFireAge = fireAge != null && age === Math.round(fireAge)
+                      return (
+                        <tr
+                          key={age}
+                          className={`border-b border-dashed border-[var(--border-ed)] last:border-b-0 ${
+                            isFireAge ? 'border-l-2 border-l-[var(--color-horizon-600)] bg-[var(--subtle)]/30' : ''
+                          }`}
                         >
-                          {Math.round(successRate * 100)}%
-                        </td>
-                      </tr>
-                    ))}
+                          <td className={`px-1 py-1.5 font-mono tabular-nums ${
+                            isFireAge ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-2)]'
+                          }`}>
+                            {age} jaar{isFireAge ? ' (FIRE)' : ''}
+                          </td>
+                          <td
+                            className={`px-1 py-1.5 text-right font-mono tabular-nums ${
+                              isFireAge ? 'font-semibold ' : ''
+                            }${successColor(successRate)}`}
+                          >
+                            {Math.round(successRate * 100)}%
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
