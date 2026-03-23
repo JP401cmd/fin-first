@@ -214,7 +214,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
 
         {/* 2. Fase-header */}
         <div className="text-center">
-          <p className="font-sans text-base font-bold text-[var(--ink)]">
+          <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Onttrekken &middot; {formatCurrency(Math.round(startPortfolio))} &rarr; {formatCurrency(Math.round(endPortfolio))} &middot; {durationYears} jaar
           </p>
         </div>
@@ -447,7 +447,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
             : null
           return (
             <div className="mt-5 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
-              <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
+              <p className="font-serif text-xs italic leading-relaxed text-[var(--ink-3)] sm:text-sm">
                 {avgFreedomDaysPerYear != null
                   ? `${durationYears} jaar vrijheid geleefd \u2014 gemiddeld ${avgFreedomDaysPerYear.toLocaleString('nl-NL')} vrijheidsdagen per jaar`
                   : `${durationYears} jaar opgebouwde vrijheid, nu geleefd`}

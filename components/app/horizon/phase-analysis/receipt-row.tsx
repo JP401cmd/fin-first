@@ -25,11 +25,11 @@ export function ReceiptRow({
   subtle?: boolean
 }) {
   return (
-    <div className={`flex justify-between py-0.5 ${subtle ? 'opacity-70' : ''}`}>
-      <span className={`font-sans ${subtle ? 'text-xs' : 'text-sm'} text-[var(--ink-2)]`}>
+    <div className={`flex items-baseline justify-between gap-2 py-0.5 ${subtle ? 'opacity-70' : ''}`}>
+      <span className={`min-w-0 shrink font-sans ${subtle ? 'text-xs' : 'text-xs sm:text-sm'} text-[var(--ink-2)]`}>
         {positive && !negative ? '+ ' : ''}{negative ? '\u2212 ' : ''}{label}
       </span>
-      <span className={`font-mono tabular-nums ${subtle ? 'text-xs' : ''} ${
+      <span className={`shrink-0 font-mono text-xs tabular-nums ${
         positive ? 'text-[var(--positive)]' :
         negative ? 'text-[var(--negative)]' :
         'text-[var(--ink)]'

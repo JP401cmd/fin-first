@@ -189,7 +189,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
 
         {/* 2. Fase-header — compact summary line */}
         <div className="text-center">
-          <p className="font-sans text-base font-bold text-[var(--ink)]">
+          <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Opbouw &middot; {formatCurrency(Math.round(startVermogen))} &rarr; {formatCurrency(Math.round(eindVermogen))} &middot; {yearsAccumulation} jaar
           </p>
         </div>
@@ -400,7 +400,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
         {/* 12. Redactionele noot — freedom days editorial */}
         {freedomDaysBuiltPerMonth != null && freedomDaysBuiltPerMonth > 0 && (
           <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
-            <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
+            <p className="font-serif text-xs italic leading-relaxed text-[var(--ink-3)] sm:text-sm">
               Elke maand bouw je {freedomDaysBuiltPerMonth} vrijheidsdagen op
             </p>
           </div>

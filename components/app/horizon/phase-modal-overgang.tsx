@@ -153,7 +153,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
 
         {/* 2. Fase-header — compact summary line */}
         <div className="text-center">
-          <p className="font-sans text-base font-bold text-[var(--ink)]">
+          <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Overgang &middot; {formatCurrency(Math.round(startVermogen))} &rarr; {formatCurrency(Math.round(eindVermogen))} &middot; {durationYears} jaar
           </p>
         </div>
@@ -334,7 +334,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             : null
           return (
             <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
-              <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
+              <p className="font-serif text-xs italic leading-relaxed text-[var(--ink-3)] sm:text-sm">
                 {freedomDays != null
                   ? `${durationYears} jaar overgang \u2014 je leeft van ${freedomDays.toLocaleString('nl-NL')} eerder opgebouwde vrijheidsdagen`
                   : `${durationYears} jaar overgang = ${durationYears} jaar eerder verdiende vrijheid die je nu overbrugt`}

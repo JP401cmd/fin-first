@@ -4,7 +4,7 @@ export const KassabonShell = memo(function KassabonShell({ children, className }
   return (
     <div
       className={[
-        'rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm',
+        'rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 px-3 py-3 font-mono text-xs sm:px-4 sm:py-4 sm:text-sm',
         className,
       ]
         .filter(Boolean)
