@@ -13,6 +13,7 @@ import { MonteCarloOpbouw } from '@/components/app/horizon/phase-analysis/opbouw
 import { SchuldenSamenvatting } from '@/components/app/horizon/phase-analysis/opbouw/schulden-samenvatting'
 import { GiftenCheck } from '@/components/app/horizon/phase-analysis/opbouw/giften-check'
 import { SpaarquoteGevoeligheid } from '@/components/app/horizon/phase-analysis/opbouw/spaarquote-gevoeligheid'
+import { KoopkrachtErosie } from '@/components/app/horizon/phase-analysis/opbouw/koopkracht-erosie'
 import { HypotheekVsBeleggenOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/hypotheek-vs-beleggen-opbouw'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
@@ -322,7 +323,15 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           />
         )}
 
-        {/* 10. Stress Test — extreme scenario analysis */}
+        {/* 10. Koopkrachterosie — inflation erosion analysis */}
+        <KoopkrachtErosie
+          rows={accumulationRows}
+          inflationRate={inflationRate}
+          startVermogen={startVermogen}
+          eindVermogen={eindVermogen}
+        />
+
+        {/* 11. Stress Test — extreme scenario analysis */}
         <StressTestSection
           rows={accumulationRows}
           expectedReturn={expectedReturn}
