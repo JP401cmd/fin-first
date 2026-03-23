@@ -207,7 +207,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
 
     return (
       <WidgetShell module="horizon" size={size} kicker="Levensgebeurtenissen" href={href}>
-        <div ref={ref} className="grid grid-cols-2 gap-2">
+        <div ref={ref} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {/* Opbouwen column */}
           <div>
             <div className="flex items-center gap-1 mb-1.5">
@@ -217,10 +217,10 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
             {opSlice.length > 0 ? (
               <div className="space-y-1">
                 {opSlice.map(evt => (
-                  <div key={evt.id} className="flex items-baseline justify-between gap-1">
+                  <div key={evt.id} className="flex items-baseline justify-between gap-1 min-h-[44px] sm:min-h-0">
                     <span className="text-[11px] text-[var(--ink-2)] truncate">{evt.name}</span>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <span className="shrink-0 font-mono text-[10px] tabular-nums text-emerald-600">
+                      <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-emerald-600">
                         +{fmtCompact(evt.estimatedImpact)}
                       </span>
                     )}
@@ -228,7 +228,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                 ))}
                 {opTotal > 0 && (
                   <div className="pt-1 border-t border-emerald-200/40">
-                    <span className="font-mono text-[10px] tabular-nums font-semibold text-emerald-600">
+                    <span className="font-mono text-[11px] sm:text-xs tabular-nums font-semibold text-emerald-600">
                       +{fmtCompact(opTotal)}
                     </span>
                   </div>
@@ -247,10 +247,10 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
             {invSlice.length > 0 ? (
               <div className="space-y-1">
                 {invSlice.map(evt => (
-                  <div key={evt.id} className="flex items-baseline justify-between gap-1">
+                  <div key={evt.id} className="flex items-baseline justify-between gap-1 min-h-[44px] sm:min-h-0">
                     <span className="text-[11px] text-[var(--ink-2)] truncate">{evt.name}</span>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <span className="shrink-0 font-mono text-[10px] tabular-nums text-red-500">
+                      <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-red-500">
                         −{fmtCompact(evt.estimatedImpact)}
                       </span>
                     )}
@@ -258,7 +258,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                 ))}
                 {invTotal > 0 && (
                   <div className="pt-1 border-t border-red-200/40">
-                    <span className="font-mono text-[10px] tabular-nums font-semibold text-red-500">
+                    <span className="font-mono text-[11px] sm:text-xs tabular-nums font-semibold text-red-500">
                       −{fmtCompact(invTotal)}
                     </span>
                   </div>
@@ -281,7 +281,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Levensgebeurtenissen" href={href}>
-      <div ref={ref} className="grid grid-cols-2 gap-3">
+      <div ref={ref} className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Opbouwen column */}
         <div>
           <div className="flex items-center gap-1.5 mb-2">
@@ -296,17 +296,17 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
           {opSliceFull.length > 0 ? (
             <div className="space-y-1.5">
               {opSliceFull.map(evt => (
-                <div key={evt.id} className="flex items-start gap-1.5">
+                <div key={evt.id} className="flex items-start gap-1.5 min-h-[44px] md:min-h-0">
                   <div className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-1">
-                      <span className="text-[11px] text-[var(--ink-2)] font-medium truncate">{evt.name}</span>
+                      <span className="text-[11px] sm:text-xs text-[var(--ink-2)] font-medium truncate">{evt.name}</span>
                       {evt.targetAge != null && (
-                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">{evt.targetAge}j</span>
+                        <span className="shrink-0 font-mono text-[10px] sm:text-[11px] tabular-nums text-[var(--ink-4)]">{evt.targetAge}j</span>
                       )}
                     </div>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <p className="font-mono text-[10px] tabular-nums text-emerald-600">
+                      <p className="font-mono text-[11px] sm:text-xs tabular-nums text-emerald-600">
                         +{fmtCompact(evt.estimatedImpact)}
                       </p>
                     )}
@@ -339,17 +339,17 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
           {invSliceFull.length > 0 ? (
             <div className="space-y-1.5">
               {invSliceFull.map(evt => (
-                <div key={evt.id} className="flex items-start gap-1.5">
+                <div key={evt.id} className="flex items-start gap-1.5 min-h-[44px] md:min-h-0">
                   <div className="mt-1 h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-1">
-                      <span className="text-[11px] text-[var(--ink-2)] font-medium truncate">{evt.name}</span>
+                      <span className="text-[11px] sm:text-xs text-[var(--ink-2)] font-medium truncate">{evt.name}</span>
                       {evt.targetAge != null && (
-                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">{evt.targetAge}j</span>
+                        <span className="shrink-0 font-mono text-[10px] sm:text-[11px] tabular-nums text-[var(--ink-4)]">{evt.targetAge}j</span>
                       )}
                     </div>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <p className="font-mono text-[10px] tabular-nums text-red-500">
+                      <p className="font-mono text-[11px] sm:text-xs tabular-nums text-red-500">
                         −{fmtCompact(evt.estimatedImpact)}
                       </p>
                     )}
@@ -431,7 +431,7 @@ function TextFallback({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="flex flex-col items-center rounded-md border border-dashed border-emerald-300/40 bg-emerald-50/15 py-3 px-2 text-center">
               <TrendingUp className="h-4 w-4 text-emerald-500/40 mb-1" />
               <p className="text-[10px] text-emerald-600/60 leading-tight">Geen opbouw-events</p>
@@ -498,7 +498,7 @@ function TextFallback({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="flex flex-col items-center rounded-lg border border-dashed border-emerald-300/40 bg-emerald-50/15 py-4 px-3 text-center">
             <TrendingUp className="h-5 w-5 text-emerald-500/40 mb-1.5" />
             <p className="text-xs text-emerald-600/60">Geen opbouw-events gepland</p>

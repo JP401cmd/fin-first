@@ -2218,14 +2218,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <button
                   key={ev.id}
                   onClick={() => { setSelectedEventId(ev.id); setViewModalMode('view') }}
-                  className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-left transition hover:border-horizon-300 hover:bg-horizon-50/30"
+                  className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-left transition hover:border-horizon-300 hover:bg-horizon-50/30 min-h-[44px]"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
+                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
                     {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[evCatalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[var(--ink)]">{ev.name}</p>
-                    <p className="text-xs text-[var(--ink-3)]">
+                    <p className="text-xs sm:text-sm font-medium text-[var(--ink)] truncate">{ev.name}</p>
+                    <p className="text-[11px] sm:text-xs text-[var(--ink-3)]">
                       {ev.target_age != null ? `Leeftijd ${ev.target_age}` : 'Geen leeftijd'}
                       {evImpact && evImpact.fireDelayMonths !== 0 && (
                         <span className={evImpact.fireDelayMonths > 0 ? ' text-negative' : ' text-positive'}>
@@ -2244,12 +2244,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Vrijheid opbouwen */}
-                <div className="rounded-xl bg-emerald-50/30 border border-emerald-100 border-l-3 border-l-emerald-500 p-4">
+                <div className="rounded-xl bg-emerald-50/30 border border-emerald-100 border-l-3 border-l-emerald-500 p-3 sm:p-4">
                   <div className="mb-3 pb-3 border-b border-dashed border-emerald-300/40">
-                    <p className="font-display text-base font-semibold text-emerald-700">Vrijheid opbouwen</p>
-                    <p className="text-xs text-emerald-600/70">Gebeurtenissen die je vrijheid vergroten</p>
+                    <p className="font-display text-sm sm:text-base font-semibold text-emerald-700">Vrijheid opbouwen</p>
+                    <p className="hidden sm:block text-xs text-emerald-600/70">Gebeurtenissen die je vrijheid vergroten</p>
                     {opbouwen.length > 0 && (
-                      <p className="mt-1 text-lg font-mono tabular-nums text-emerald-600">+{formatCurrency(totalOpbouwen)}</p>
+                      <p className="mt-1 text-base sm:text-lg font-mono tabular-nums text-emerald-600">+{formatCurrency(totalOpbouwen)}</p>
                     )}
                   </div>
                   {opbouwenSorted.length > 0 ? (
@@ -2257,10 +2257,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       {opbouwenSorted.map(renderEventCard)}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-emerald-300/50 bg-emerald-50/20 py-6 px-4 text-center">
-                      <TrendingUp className="h-6 w-6 text-emerald-500/40 mb-2" />
-                      <p className="text-sm text-emerald-600/60">Nog geen opbouw-gebeurtenissen gepland</p>
-                      <p className="text-xs text-[var(--ink-4)] mt-1">Denk aan: erfenis, AOW, pensioenuitkering, verkoop woning</p>
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-emerald-300/50 bg-emerald-50/20 py-4 px-3 sm:py-6 sm:px-4 text-center">
+                      <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-500/40 mb-2" />
+                      <p className="text-xs sm:text-sm text-emerald-600/60">Nog geen opbouw-gebeurtenissen gepland</p>
+                      <p className="text-[11px] sm:text-xs text-[var(--ink-4)] mt-1">Denk aan: erfenis, AOW, pensioenuitkering, verkoop woning</p>
                       <button
                         onClick={() => setShowAddEventModal(true)}
                         className="mt-3 flex items-center gap-1 rounded-full border border-emerald-300/60 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600 transition hover:bg-emerald-100"
@@ -2272,12 +2272,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   )}
                 </div>
                 {/* Vrijheid investeren */}
-                <div className="rounded-xl bg-red-50/20 border border-red-100 border-l-3 border-l-red-400 p-4">
+                <div className="rounded-xl bg-red-50/20 border border-red-100 border-l-3 border-l-red-400 p-3 sm:p-4">
                   <div className="mb-3 pb-3 border-b border-dashed border-red-300/40">
-                    <p className="font-display text-base font-semibold text-red-600">Vrijheid investeren</p>
-                    <p className="text-xs text-red-500/70">Bewuste keuzes waar je vrijheid in investeert</p>
+                    <p className="font-display text-sm sm:text-base font-semibold text-red-600">Vrijheid investeren</p>
+                    <p className="hidden sm:block text-xs text-red-500/70">Bewuste keuzes waar je vrijheid in investeert</p>
                     {investeren.length > 0 && (
-                      <p className="mt-1 text-lg font-mono tabular-nums text-red-500">{formatCurrency(Math.abs(totalInvesteren))}</p>
+                      <p className="mt-1 text-base sm:text-lg font-mono tabular-nums text-red-500">{formatCurrency(Math.abs(totalInvesteren))}</p>
                     )}
                   </div>
                   {investerenSorted.length > 0 ? (
@@ -2285,10 +2285,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       {investerenSorted.map(renderEventCard)}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-red-300/50 bg-red-50/20 py-6 px-4 text-center">
-                      <Heart className="h-6 w-6 text-red-400/40 mb-2" />
-                      <p className="text-sm text-red-500/60">Nog geen investeringen gepland</p>
-                      <p className="text-xs text-[var(--ink-4)] mt-1">Denk aan: kinderen, verbouwing, wereldreis, studie</p>
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-red-300/50 bg-red-50/20 py-4 px-3 sm:py-6 sm:px-4 text-center">
+                      <Heart className="h-5 w-5 sm:h-6 sm:w-6 text-red-400/40 mb-2" />
+                      <p className="text-xs sm:text-sm text-red-500/60">Nog geen investeringen gepland</p>
+                      <p className="text-[11px] sm:text-xs text-[var(--ink-4)] mt-1">Denk aan: kinderen, verbouwing, wereldreis, studie</p>
                       <button
                         onClick={() => setShowAddEventModal(true)}
                         className="mt-3 flex items-center gap-1 rounded-full border border-red-300/60 bg-red-50 px-3 py-1 text-xs font-medium text-red-500 transition hover:bg-red-100"
