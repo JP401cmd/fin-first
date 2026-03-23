@@ -1,7 +1,7 @@
 'use client'
 
-import { memo, useMemo } from 'react'
-import { Home } from 'lucide-react'
+import { memo, useMemo, useState } from 'react'
+import { Home, ChevronRight, ChevronDown } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import {
@@ -429,11 +429,109 @@ export const HuisVerkopen = memo(function HuisVerkopen({
           </p>
         </div>
 
+        {/* -- Aannames (collapsible) --------------------------------------- */}
+        <AannameSectie
+          woningWaardeGroei={baseInput.woningWaardeGroei}
+          maandlastOverig={baseInput.maandlastOverig}
+          verwachteHuur={baseInput.verwachteHuur}
+          verkoopkostenPct={baseInput.verkoopkostenPct}
+          horizonJaren={baseInput.horizonJaren}
+          expectedReturn={expectedReturn}
+          inflationRate={inflationRate}
+        />
+
         {/* -- Disclaimer -------------------------------------------------- */}
         <p className="text-[10px] italic leading-relaxed text-[var(--ink-4)]">
-          Dit is een indicatieve berekening. Raadpleeg een financieel adviseur.
+          Dit is een indicatieve berekening op basis van bovenstaande aannames.
+          Werkelijke uitkomsten kunnen afwijken. Raadpleeg een financieel adviseur
+          voor persoonlijk advies.
         </p>
       </div>
     </AnalysisSection>
   )
 })
+
+// ── Assumption row helper ────────────────────────────────────────────────────
+
+function AssumptionRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between py-0.5">
+      <span className="font-sans text-xs text-[var(--ink-3)]">{label}</span>
+      <span className="font-mono text-xs tabular-nums text-[var(--ink-2)]">{value}</span>
+    </div>
+  )
+}
+
+// ── Collapsible Aannames section ─────────────────────────────────────────────
+
+function AannameSectie({
+  woningWaardeGroei,
+  maandlastOverig,
+  verwachteHuur,
+  verkoopkostenPct,
+  horizonJaren,
+  expectedReturn,
+  inflationRate,
+}: {
+  woningWaardeGroei: number
+  maandlastOverig: number
+  verwachteHuur: number
+  verkoopkostenPct: number
+  horizonJaren: number
+  expectedReturn: number
+  inflationRate: number
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)]">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="inline-flex min-h-[44px] w-full items-center gap-1.5 px-3 py-2 text-xs font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+        aria-expanded={open}
+      >
+        {open
+          ? <ChevronDown className="h-3.5 w-3.5 transition-transform duration-150" />
+          : <ChevronRight className="h-3.5 w-3.5 transition-transform duration-150" />
+        }
+        Aannames
+      </button>
+
+      {open && (
+        <div className="border-t border-dashed border-[var(--border-ed)] px-3 pb-3 pt-2">
+          <div className="space-y-1">
+            <AssumptionRow
+              label="Woningwaardestijging"
+              value={`${(woningWaardeGroei * 100).toFixed(0)}% per jaar`}
+            />
+            <AssumptionRow
+              label="Woonlasten (OZB/VvE/onderhoud)"
+              value={formatCurrency(maandlastOverig) + '/mnd'}
+            />
+            <AssumptionRow
+              label="Verwachte huur"
+              value={formatCurrency(verwachteHuur) + '/mnd'}
+            />
+            <AssumptionRow
+              label="Verkoopkosten"
+              value={`${(verkoopkostenPct * 100).toFixed(0)}% van woningwaarde`}
+            />
+            <AssumptionRow
+              label="Horizon"
+              value={`${horizonJaren} jaar`}
+            />
+            <AssumptionRow
+              label="Verwacht beleggingsrendement"
+              value={`${(expectedReturn * 100).toFixed(1)}% per jaar`}
+            />
+            <AssumptionRow
+              label="Inflatie"
+              value={`${(inflationRate * 100).toFixed(1)}% per jaar`}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
