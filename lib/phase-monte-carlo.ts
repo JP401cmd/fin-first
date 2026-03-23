@@ -333,7 +333,7 @@ export function findCriticalWithdrawal(
     const mid = (low + high) / 2
 
     const result = runPhaseMonteCarlo(
-      { ...baseInput, yearlyCashflow: -mid },
+      { ...baseInput, yearlyCashflow: -mid, targetMinPortfolio: 1 },
       BINARY_SEARCH_SIMS,
     )
 
@@ -743,6 +743,7 @@ export function findCriticalSWR(input: FindCriticalSWRInput): number {
       inflationRate,
       cashflows,
       currentAge,
+      targetMinPortfolio: 1, // detect depleted portfolios (clamped to 0)
     }, MC_SIMS)
 
     if (result.successRate >= targetSuccess) {
