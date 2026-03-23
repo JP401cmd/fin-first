@@ -1,3 +1,42 @@
+## Session 2026-03-23 - Features #594, #595
+
+### Feature #594: Full-size verrijken Wil- en Cross-widgets - PASSING
+- acties: reduced to 3 items, added freedom days highlight banner with +Xd potentieel
+- doelen: limited to 3 goals vertical list, added closest deadline indicator
+- voorstellen: reduced to 3 items, made impact badges more prominent
+- jouw_pad: added 2nd upcoming unlock preview ("Daarna: +N — levelName → unlock")
+- weekoverzicht: added "WEEK HIGHLIGHTS" label before top categories
+- vrijheidsvoortgang: replaced linear progress bar with SVG donut/ring chart (120px, gradient)
+- ai_inzicht: single prominent insight card + action suggestion + remaining count
+- All changes within 336px height constraint
+- Zero TypeScript errors, zero console errors
+- Commit: (concurrent agents committed as b3be9cd4 + c4b4d29a)
+
+### Feature #595: Netto vermogen half-size verrijken - PASSING
+- Separated half-size into its own layout (was sharing full-size code path)
+- Big amount in text-xl font-bold (slightly smaller than full-size text-2xl)
+- Freedom time subtitle (≈ Xj Ym vrijheid)
+- 12-maanden sparkline SVG (44px) with value labels + axis labels
+- Mini stacked breakdown bar (4px) — bezittingen green vs schulden red proportie
+- MoM delta row: ▲/▼ +€X.XXX (+Y.Z%) in green/red
+- Handles negative net worth correctly (Math.abs for freedom time)
+- Household/partner perspective labels preserved
+- Zero console errors
+- Commit: 330a8e31
+
+### Files Modified
+- components/widgets/acties-widget.tsx — top 3 + freedom highlight
+- components/widgets/doelen-widget.tsx — 3 goals + deadline indicator
+- components/widgets/voorstellen-widget.tsx — top 3 items
+- components/widgets/jouw-pad-widget-wrapper.tsx — 2nd unlock preview
+- components/widgets/weekoverzicht-widget.tsx — WEEK HIGHLIGHTS label
+- components/widgets/vrijheidsvoortgang-widget.tsx — SVG donut ring chart
+- components/widgets/ai-inzicht-widget.tsx — single insight + action suggestion
+- components/widgets/netto-vermogen-widget.tsx — enriched half-size layout
+
+### Current Status
+- 2 features completed this session (#594, #595)
+
 ## Session 2026-03-23 - Features #590, #591
 
 ### Feature #590: Mini-size toevoegen aan alle Horizon-module widgets - PASSING
@@ -21090,3 +21129,120 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#565, #578)
+
+## Session 2026-03-23 - Features #596, #597
+
+### Feature #596: Rebalancing, fee_analyzer en hypotheek_vs_beleggen: full-size toevoegen - PASSING
+- Rebalancing full: all drifts (max 8) + target vs actual allocatie grid (4-col table) + herbalanceer CTA
+- Fee analyzer full: TER + annual costs + FIRE impact + all holdings (max 6) + TER coverage warning + CTA
+- Hypotheek vs beleggen full: advies + restschuld/rente grid + breakeven card + 10-year scenario comparison (beleggen vs aflossen) + tax deductibility note
+- Updated hypotheek mini: now shows advies label (Aflossen/Beleggen/Gelijk) with icon instead of breakeven %
+- Wrapped existing half-size returns in explicit `if (size === 'half')` checks for all 3 widgets
+- Commit: b5ee5980
+
+### Feature #597: Full-size overflow preventie: content limiting en max items per widget - PASSING
+- inflatie_impact: reduced tableYears from [5,10,15,20,25,30] to [5,10,20,30] (4 entries)
+- beleggingsrendement: added .slice(0, 3) to investmentAssets.map in full-size
+- pensioen_aow: compacted full-size layout (mt-3→mt-2, space-y-1→space-y-0.5, text-xs→text-[11px], shorter labels with truncate)
+- cash_flow, budgetten, assets, holdings: already properly constrained (fixed arrays or existing .slice)
+- Zero console errors, TypeScript compiles clean
+- Commit: f13bfc3f
+
+### Files Modified
+- components/widgets/rebalancing-widget.tsx — full-size case added
+- components/widgets/fee-analyzer-widget.tsx — full-size case added
+- components/widgets/hypotheek-vs-beleggen-widget.tsx — mini updated + full-size case added
+- components/widgets/inflatie-impact-widget.tsx — table years reduced to 4
+- components/widgets/beleggingsrendement-widget.tsx — per-type breakdown limited to 3
+- components/widgets/pensioen-aow-widget.tsx — compacter full-size layout
+
+### Current Status
+- 2 features completed this session (#596, #597)
+
+## Session 2026-03-23 - Features #592, #593
+
+### Feature #592: Full-size verrijken Kern-widgets - PASSING
+- netto_vermogen: MoM delta in prominent rounded pill with bg-subtle
+- cash_flow: Tighter spacing between category rows and comparison section
+- budgetten: Trend arrows (↑/↓) per budget type from budgetTypeHistory, compact gap-1 spacing
+- assets: Top 3 asset types + "Overig" aggregation row, text-[11px] detail labels
+- schulden: Compact space-y-1 spacing, text-[11px] for all detail text
+- holdings: Top 3 investment types + "Overig" row, allocatie mini-bars h-[3px]
+- spaarquote: Extended sparkline from 6m to 12m, year-over-year comparison
+- All full widgets: space-y-1 compact spacing, text-[11px] for detail text
+- Zero TypeScript errors, zero console errors
+- Commit: 73c3a6ac
+
+### Feature #593: Full-size verrijken Horizon-widgets - PASSING
+- fire_prognose: AOW-integratie label + scenario name + sparkline H reduced to 48px
+- monte_carlo: Mini fan chart SVG (60px) with P10/P50/P90 bands + labels, crisis badges max 4
+- vrijheidsscenarios: Return scenario labels (5%/7%/9%) in compact 3-col grid
+- sim_vermogenspad: SVG reduced to 80px max + eindvermogen display + risico badge
+- passief_inkomen: Yearly amount prominent + compact breakdown grid + freedom days
+- box3_drag: Fictief vs werkelijk rendement breakdown + optimalisatie hint when werkelijk < fictief
+- backtesting_score: Benchmark comparison bars (plan vs 85%) as horizontal bars
+- swr_monitor: Tighter space-y-2 spacing for 336px constraint
+- vrijheidsmijlpalen: Progress bars per milestone (horizon gradient) + compact spacing
+- All SVGs max 80px height, lists max 4 items
+- Zero TypeScript errors, zero new console errors (only pre-existing net_worth_snapshots 400)
+- Commit: b3be9cd4
+
+### Files Modified (Feature #592)
+- components/widgets/netto-vermogen-widget.tsx — prominent MoM pill
+- components/widgets/cash-flow-widget.tsx — tighter spacing
+- components/widgets/budgetten-widget.tsx — trend arrows + budgetTypeHistory
+- components/widgets/assets-widget.tsx — top 3 + overig
+- components/widgets/schulden-widget.tsx — compact spacing
+- components/widgets/holdings-widget.tsx — top 3 + overig
+- components/widgets/spaarquote-widget.tsx — 12m sparkline + YoY
+
+### Files Modified (Feature #593)
+- components/widgets/fire-prognose-widget.tsx — AOW + scenario labels
+- components/widgets/monte-carlo-widget.tsx — fan chart SVG + P10/P50/P90
+- components/widgets/vrijheidsscenario-widget.tsx — return scenario grid
+- components/widgets/sim-vermogenspad-widget.tsx — 80px SVG + risico badge
+- components/widgets/passief-inkomen-widget.tsx — yearly amount + compact breakdown
+- components/widgets/box3-drag-widget.tsx — fictief vs werkelijk + hint
+- components/widgets/backtesting-score-widget.tsx — benchmark bars
+- components/widgets/swr-monitor-widget.tsx — compact spacing
+- components/widgets/vrijheidsmijlpalen-widget.tsx — progress bars
+
+### Current Status
+- 2 features completed this session (#592, #593)
+
+## Session 2026-03-23 - Features #598, #599
+
+### Feature #598: Levensgebeurtenissen netto-impact berekening en classificatie helper - PASSING
+- Added computeLifeEventNetImpact, classifyLifeEvent, splitLifeEvents to horizon-data.ts
+- LifeEventClassification type exported
+
+### Feature #599: Levensgebeurtenissen Horizon-pagina twee-kolommen layout - PASSING
+- Replaced single event list with grid grid-cols-1 md:grid-cols-2 layout
+- Left: Vrijheid opbouwen, Right: Vrijheid investeren
+- Events sorted by target_age, column totals displayed
+- Zero new console errors
+- Commit: eaa4c3d5
+
+### Current Status
+- 2 features completed this session (#598, #599)
+
+## Session 2026-03-23 - Features #573, #574
+
+### Feature #573: Widget preset: De Budgetteerder — uitgaven, grip, patronen - PASSING
+- Populated budgetteerder preset in lib/widget-presets.ts
+- 7 widgets: cash_flow(full), spaarquote(half), acties(half), netto_vermogen(quarter), jouw_pad(quarter), vrijheidsvoortgang(quarter), fire_prognose(quarter)
+- All widget IDs verified in widget-catalog.ts
+- All enabled: true, orders 1-7
+
+### Feature #574: Widget preset: De Financiële Onafhankelijkheidsstrijder — FIRE, simulaties, optimalisatie - PASSING
+- Populated fire-strijder preset in lib/widget-presets.ts
+- 7 widgets: fire_prognose(full), vrijheidsscenarios(half), sim_vermogenspad(half), backtesting_score(quarter), spaarquote(quarter), vrijheidsmijlpalen(quarter), passief_inkomen(quarter)
+- All widget IDs verified in widget-catalog.ts
+- All enabled: true, orders 1-7
+
+### Files Modified
+- lib/widget-presets.ts — budgetteerder + fire-strijder preset widgets populated
+
+### Current Status
+- 2 features completed this session (#573, #574)
+- Commit: 2ae52be4
