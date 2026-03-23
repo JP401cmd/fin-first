@@ -369,7 +369,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   }, [performSave, router])
 
   const handlePresetApply = useCallback(async (preset: WidgetPreset) => {
-    if (preset.widgets.length === 0) return
+    if (!preset.widgets || preset.widgets.length === 0) return
     const reordered = reassignOrders(preset.widgets.map(w => ({ ...w, enabled: true })))
     setActiveWidgets(reordered)
     setSelectedPreset(null)
@@ -685,7 +685,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                 </button>
                 <button
                   type="button"
-                  onClick={() => handlePresetApply(selectedPreset)}
+                  onClick={() => { if (selectedPreset) handlePresetApply(selectedPreset) }}
                   className="rounded-[var(--r-sm)] bg-[var(--ink)] text-[var(--paper)] px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity"
                 >
                   Toepassen

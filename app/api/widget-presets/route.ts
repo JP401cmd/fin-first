@@ -34,7 +34,17 @@ export async function GET() {
     try {
       const parsed = JSON.parse(row.value)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        presets = parsed
+        // Merge stored presets with hardcoded defaults:
+        // Use stored name/description/icon but fall back to hardcoded widgets
+        // if stored widgets array is empty (admin may have only edited metadata)
+        const hardcodedMap = new Map(WIDGET_PRESETS.map(p => [p.id, p]))
+        presets = parsed.map((stored: WidgetPreset) => {
+          const hardcoded = hardcodedMap.get(stored.id)
+          if (hardcoded && (!stored.widgets || stored.widgets.length === 0)) {
+            return { ...stored, widgets: hardcoded.widgets }
+          }
+          return stored
+        })
       }
     } catch {
       // use hardcoded defaults on parse error
