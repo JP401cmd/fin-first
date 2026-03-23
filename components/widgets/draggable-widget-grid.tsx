@@ -211,6 +211,21 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const [showAutoWizard, setShowAutoWizard] = useState(false)
   const [selectedPreset, setSelectedPreset] = useState<WidgetPreset | null>(null)
 
+  // ── API-loaded presets (fallback to hardcoded) ──────────────
+  const [apiPresets, setApiPresets] = useState<WidgetPreset[]>(WIDGET_PRESETS)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/widget-presets')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!cancelled && data?.presets && Array.isArray(data.presets) && data.presets.length > 0) {
+          setApiPresets(data.presets)
+        }
+      })
+      .catch(() => { /* fallback to hardcoded WIDGET_PRESETS */ })
+    return () => { cancelled = true }
+  }, [])
+
   // Dashboard type toggle (only active when showDashboardTypeToggle is true)
   const { dashboardType, setDashboardType } = useDashboardType()
   const [briefingPrefs, setBriefingPrefs] = useState<BriefingContentPrefs>({ showNextSteps: true, showDiscover: true })
@@ -350,6 +365,20 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     setIsEditMode(false)
     setShowAddPicker(false)
     // Refresh server data so newly-favorited budgets appear in data.favoriteBudgets
+    router.refresh()
+  }, [performSave, router])
+
+  const handlePresetApply = useCallback(async (preset: WidgetPreset) => {
+    if (preset.widgets.length === 0) return
+    const reordered = reassignOrders(preset.widgets.map(w => ({ ...w, enabled: true })))
+    setActiveWidgets(reordered)
+    setSelectedPreset(null)
+    // Immediate save (not debounced) — same pattern as handleAutoApply
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    pendingWidgets.current = null
+    await performSave(reordered)
+    setIsEditMode(false)
+    setShowAddPicker(false)
     router.refresh()
   }, [performSave, router])
 
@@ -609,6 +638,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
             onAdd={handleAdd}
             onClose={() => setShowAddPicker(false)}
             onPresetSelect={setSelectedPreset}
+            presets={apiPresets}
           />
           <button
             type="button"
@@ -655,14 +685,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    // Apply preset widgets (next feature will implement full logic)
-                    if (selectedPreset.widgets.length > 0) {
-                      setActiveWidgets(selectedPreset.widgets)
-                      scheduleSave(selectedPreset.widgets)
-                    }
-                    setSelectedPreset(null)
-                  }}
+                  onClick={() => handlePresetApply(selectedPreset)}
                   className="rounded-[var(--r-sm)] bg-[var(--ink)] text-[var(--paper)] px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity"
                 >
                   Toepassen
@@ -705,9 +728,10 @@ interface WidgetAddPickerProps {
   onAdd: (id: string) => void
   onClose: () => void
   onPresetSelect: (preset: WidgetPreset) => void
+  presets: WidgetPreset[]
 }
 
-function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker, onToggle, onAdd, onClose, onPresetSelect }: WidgetAddPickerProps) {
+function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker, onToggle, onAdd, onClose, onPresetSelect, presets }: WidgetAddPickerProps) {
   const [openModules, setOpenModules] = useState<Set<WidgetModule>>(new Set())
 
   const availableWidgets = WIDGET_CATALOG.filter(
@@ -817,7 +841,7 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
                   Persona presets
                 </span>
               </div>
-              {WIDGET_PRESETS.map(preset => {
+              {presets.map(preset => {
                 const isHorizon = preset.module === 'horizon'
                 const isKern = preset.module === 'kern'
                 const borderColor = isHorizon ? 'border-horizon-500' : isKern ? 'border-kern-500' : 'border-wil-500'

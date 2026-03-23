@@ -17,8 +17,10 @@ const VALID_WIDGET_IDS = new Set(WIDGET_CATALOG.map(w => w.id))
 export async function GET() {
   const supabase = await createClient()
 
-  if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Any authenticated user can read presets (used by dashboard dropdown)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { data: row } = await supabase
