@@ -63,10 +63,17 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
                 {cd.countdownYears}j {cd.countdownMonths}m
               </p>
               {fireAgeFractional != null && (
-                <p className="mt-0.5 text-xs text-horizon-600">
+                <p className="mt-0.5 text-[11px] text-horizon-600">
                   Leeftijd {fireAgeFractional.toFixed(1)}
                 </p>
               )}
+              {/* Mini progress bar */}
+              <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600"
+                  style={{ width: `${Math.min(freedomPct, 100)}%` }}
+                />
+              </div>
             </>
           )}
         </div>

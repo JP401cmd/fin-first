@@ -69,7 +69,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
     )
   }
 
-  // ── Quarter-size: compact amount + positions + freedom time ────
+  // ── Quarter-size: compact amount + positions + freedom time + return ────
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Beleggingen" href={href}>
@@ -85,6 +85,11 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
           {ftStr && (
             <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
               ≈ {ftStr} vrijheid
+            </p>
+          )}
+          {weightedReturn != null && weightedReturn > 0 && (
+            <p className="mt-1 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">
+              Verwacht {(weightedReturn * 100).toFixed(1)}%/j
             </p>
           )}
         </div>

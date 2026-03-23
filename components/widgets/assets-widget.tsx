@@ -75,7 +75,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
         )}
         {/* Compact stacked bar */}
         {assetsByType.length > 0 && totalAssets > 0 && (
-          <div className="mt-2 h-[4px] w-full flex overflow-hidden rounded-full bg-[var(--border-ed)]">
+          <div className="mt-1.5 h-[4px] w-full flex overflow-hidden rounded-full bg-[var(--border-ed)]">
             {assetsByType.map(a => (
               <div
                 key={a.type}

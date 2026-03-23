@@ -29,7 +29,10 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
-  // ── Quarter-size: compact amount + freedom time ────
+  // Schuldratio: debt as proportion of total assets
+  const schuldRatio = totalAssets > 0 ? Math.min((totalDebts / totalAssets) * 100, 100) : (totalDebts > 0 ? 100 : 0)
+
+  // ── Quarter-size: compact amount + freedom time + ratio bar ────
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
@@ -46,13 +49,19 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
               Schuldenvrij!
             </p>
           ) : null}
+          {totalDebts > 0 && (
+            <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+              <div
+                className="h-full rounded-full bg-red-500/70"
+                style={{ width: `${schuldRatio}%` }}
+              />
+            </div>
+          )}
         </div>
       </WidgetShell>
     )
   }
 
-  // Schuldratio: debt as proportion of total assets
-  const schuldRatio = totalAssets > 0 ? Math.min((totalDebts / totalAssets) * 100, 100) : (totalDebts > 0 ? 100 : 0)
   const monthlyRepayment = budgetTotals.debt.spent
 
   // ── Half-size: horizontal layout — left metric, right ratio bar ────

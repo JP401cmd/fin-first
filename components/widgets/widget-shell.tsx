@@ -160,9 +160,9 @@ export const WidgetShell = memo(function WidgetShell({ module, size, kicker, hre
       {/* 3px top accent bar */}
       <div className={`h-[3px] w-full ${accent}`} />
 
-      <div className={`${isQuarter ? 'p-3' : 'p-4'} flex flex-col h-full overflow-hidden`}>
+      <div className={`${isQuarter || size === 'half' ? 'p-3' : 'p-4'} flex flex-col h-full overflow-hidden`}>
         {/* Kicker */}
-        <p className={`label-editorial ${kickerColor} ${isQuarter ? 'mb-1' : 'mb-2'}`}>{kicker}</p>
+        <p className={`label-editorial ${kickerColor} ${isQuarter ? 'mb-0.5 !text-[9px]' : size === 'half' ? 'mb-1' : 'mb-2'}`}>{kicker}</p>
 
         {/* Widget content */}
         {size === 'full' ? (

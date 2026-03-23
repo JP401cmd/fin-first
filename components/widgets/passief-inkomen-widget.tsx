@@ -33,7 +33,7 @@ export const PassiefInkomenWidget = memo(function PassiefInkomenWidget({ size, d
     )
   }
 
-  // ── Quarter-size: compact bedrag + /mnd + percentage ──
+  // ── Quarter-size: compact bedrag + /mnd + percentage + bar ──
   if (size === 'quarter') {
     return (
       <WidgetShell module="horizon" size={size} kicker="Passief Inkomen" href={href}>
@@ -43,9 +43,15 @@ export const PassiefInkomenWidget = memo(function PassiefInkomenWidget({ size, d
           </p>
           <span className="text-[10px] text-[var(--ink-3)]">/mnd</span>
         </div>
-        <p className="mt-1 text-[10px] text-[var(--ink-3)] font-mono tabular-nums">
+        <p className="mt-0.5 text-[10px] text-[var(--ink-3)] font-mono tabular-nums">
           {pct.toFixed(0)}% van FIRE doel
         </p>
+        <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
       </WidgetShell>
     )
   }
