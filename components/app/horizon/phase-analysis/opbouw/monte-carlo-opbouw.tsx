@@ -5,6 +5,7 @@ import { BarChart3 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
+import { successColor } from '../phase-analysis-utils'
 import {
   runPhaseMonteCarlo,
   runMonteCarloAtAges,
@@ -64,13 +65,6 @@ function buildCheckpointAges(
   return Array.from(candidates)
     .filter((a) => a > currentAge)
     .sort((a, b) => a - b)
-}
-
-/** Color class for a success-rate percentage value. */
-function successColor(rate: number): string {
-  if (rate >= 0.85) return 'text-[var(--positive)]'
-  if (rate >= 0.65) return 'text-amber-600'
-  return 'text-[var(--negative)]'
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
