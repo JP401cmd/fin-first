@@ -239,11 +239,11 @@ export default function PropositiePage() {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {[
-                'FIRE-datum versnellen',
-                'Spaarquote maximaliseren',
                 'Monte Carlo simulaties',
-                'Scenario-analyse & what-if',
-                'Vrijheidsmijlpalen volgen',
+                'Coast FIRE berekening',
+                'Vrijheidsscenario\u2019s',
+                'Backtesting',
+                'Spaarquote-optimalisatie',
               ].map((f) => (
                 <span
                   key={f}
