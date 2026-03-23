@@ -20723,3 +20723,94 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#557, #558)
 - Commit: 6592408b
+
+## Session 2026-03-23 - Feature #559
+
+### Feature #559: Regressietest: combined crisis stress test scenario - PASSING
+- Added `phase-stress-combined-crisis-worse` test to horizon-fase-analyse.ts
+- Imported `applyStressScenario` for individual scenario execution
+- All 5 feature steps verified:
+  1. market_crash delta A = -149897
+  2. prolonged_inflation delta B = +143701
+  3. combined_crisis delta C = -177115
+  4. |C| (177115) >= max(|A| 149897, |B| 143701) PASS
+  5. combined successRate (0) <= min(crash 0, inflation 0.1) PASS
+- Verified via temporary API endpoint + browser automation
+- Zero console errors
+- Commit: b8e059f0
+
+### Files Modified
+- lib/regression-tests/suites/horizon-fase-analyse.ts — combined crisis test + applyStressScenario import
+
+### Current Status
+- 1 feature completed this session (#559)
+- Overall progress: 554/560 passing (98.9%)
+
+## Session 2026-03-23 - Features #555, #556
+
+### Feature #555: Regressietest: kritische SWR iteratieve berekening - PASSING
+- Created test/critical-swr-iterative.test.ts with 6 test cases
+- Discovered and fixed bug: targetMinPortfolio=0 in findCriticalSWR/findCriticalWithdrawal
+  - Portfolio clamped to Math.max(0, portfolio) then checked < 0 → always false
+  - Fixed by passing targetMinPortfolio: 1 to detect depleted portfolios
+- Tests cover: realistic SWR range (2-6%), period sensitivity, return sensitivity, edge cases, consistency
+- All 6 tests pass, no regressions in existing 1077 tests
+- Commit: 73acf68b
+
+### Feature #556: Regressietest: spaarquote gevoeligheidsanalyse - PASSING
+- Created test/spaarquote-gevoeligheid.test.ts with 5 test cases
+- Tests computeFireAgeForSavings pure function (inlined from component)
+- Step 1: +20% savings → lower FIRE age
+- Step 2: -20% savings → higher FIRE age
+- Step 3: Monotonicity check across 5 scenarios
+- Step 4: annualSavings=0 edge case
+- Step 5: End portfolio at age 90 increases with savings rate (unreachable FIRE target trick)
+- All 5 tests pass, no regressions
+- Commit: f91aa307
+
+### Files Modified
+- lib/phase-monte-carlo.ts — targetMinPortfolio: 1 fix in findCriticalSWR + findCriticalWithdrawal
+- test/critical-swr-iterative.test.ts — new: 6 regression tests for critical SWR
+- test/spaarquote-gevoeligheid.test.ts — new: 5 regression tests for savings rate sensitivity
+
+### Current Status
+- 2 features completed this session (#555, #556)
+
+## Session 2026-03-23 - Features #560, #561
+
+### Feature #560: Mobiel: fase-modal analyse-secties responsive - PASSING
+- MC stat card grids: changed grid-cols-2 sm:grid-cols-4 → grid-cols-1 sm:grid-cols-2 md:grid-cols-4
+  - monte-carlo-opbouw.tsx, monte-carlo-overgang.tsx, monte-carlo-onttrekken.tsx
+- Koopkrachterosie: changed grid-cols-2 → grid-cols-1 sm:grid-cols-2
+- All tables already had overflow-x-auto (verified all 15 tables)
+- AnalysisSection toggle already had min-h-[44px]
+- All 3 Aannames buttons already had min-h-[44px]
+- SVGs (fan-chart, phase-chart-zoom) already responsive via viewBox + w-full
+- Verified at 320px mobile viewport in browser
+- Zero new console errors
+- Commit: a344893d
+
+### Feature #561: Mobiel: kassabon en redactionele noten leesbaarheid - PASSING
+- ReceiptRow: added gap-2, items-baseline, min-w-0 shrink on label, shrink-0 on value
+- ReceiptRow labels: text-xs sm:text-sm (was text-sm), values: text-xs always (min readable)
+- KassabonShell: px-3 py-3 sm:px-4 sm:py-4, text-xs sm:text-sm (tighter on mobile)
+- Phase headers (all 3 modals): text-sm sm:text-base for long summary lines
+- Editorial notes (all 3 modals): text-xs sm:text-sm italic
+- Sub-breakdowns already had proper indentation (ml-4 pl-3)
+- Zero new console errors
+- Commit: 2fd99fb0
+
+### Files Modified
+- components/app/horizon/phase-analysis/opbouw/monte-carlo-opbouw.tsx
+- components/app/horizon/phase-analysis/overgang/monte-carlo-overgang.tsx
+- components/app/horizon/phase-analysis/onttrekken/monte-carlo-onttrekken.tsx
+- components/app/horizon/phase-analysis/opbouw/koopkracht-erosie.tsx
+- components/app/horizon/phase-analysis/receipt-row.tsx
+- components/app/kassabon-shell.tsx
+- components/app/horizon/phase-modal-opbouw.tsx
+- components/app/horizon/phase-modal-overgang.tsx
+- components/app/horizon/phase-modal-onttrekking.tsx
+
+### Current Status
+- 2 features completed this session (#560, #561)
+- Overall progress: 557/560 passing (99.5%)
