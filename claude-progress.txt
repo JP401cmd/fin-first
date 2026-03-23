@@ -20623,3 +20623,51 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#553, #554)
 - Overall progress: 548/560 passing (97.9%)
+
+## Session 2026-03-23 - Features #545, #546
+
+### Feature #545: End of Life: erfgenamen en partner-data uit profiel - PASSING
+- Added `number_of_children` to horizon-data-loader profile query and HorizonPageData interface
+- Built erfgenamen array from hasPartner + numberOfChildren in horizon-client.tsx (useMemo)
+  - Partner + children: equal shares (1/(n+1) each, Dutch default inheritance)
+  - Partner only: 100% to partner
+  - Children only: equal split among children
+  - No partner/children: engine defaults (1 kind 100%)
+- Passed partnerAowBedrag (NL_AOW_MONTHLY for partners) through modal chain
+- Passed nabestaandenPensioen from pensionParseResult (monthly, from UPO PDF parse)
+- New props on EndOfLife: erfgenamen, partnerAowBedrag, nabestaandenPensioen
+- New props on PhaseModalOnttrekking: erfgenamen, partnerAowBedrag, nabestaandenPensioen, hasPartner
+- Hint display when data not available:
+  - No partner, no erfgenamen: "Vul je huishoudprofiel aan in Identiteit → Profiel"
+  - Partner, no erfgenamen: "Vul het aantal kinderen aan"
+  - Erfgenamen available, partner without partner data: "Upload je UPO voor nabestaandenpensioen"
+- Verified in browser: hint displays correctly for test user
+- Zero new console errors (only pre-existing net_worth_snapshots 400)
+- Commit: ab44e54b
+
+### Feature #546: End of Life: inflatie-gevoeligheid toevoegen - PASSING
+- Added computeInflatieGevoeligheid() function in phase-analysis.ts
+- Formula: reëelVermogen = nominaalVermogen / (1 + scenarioInflatie)^yearsUntilEnd
+- 3 scenarios: base -0.5%, base (basis), base +0.5%
+- inflatieGevoeligheid field added to EndOfLifeAnalysis interface
+- EndOfLifeInput extended with inflationRate and currentAge
+- New inflation sensitivity table in end-of-life.tsx:
+  - Columns: Scenario, Reëel eindvermogen, Verschil
+  - Basis row highlighted with bg-subtle/30 and font-semibold
+  - Color coding: positive verschil in var(--positive), negative in var(--negative)
+  - Footnote: "Reële bedragen in koopkracht van vandaag"
+- currentAge passed through: horizon-client → PhaseModalOnttrekking → EndOfLife
+- Verified values: Inflatie 1.5% = €5.49M (+€1.30M), 2.0% = €4.19M, 2.5% = €3.20M (-€988K)
+- Higher inflation = lower real end portfolio ✓ (correct direction)
+- Zero new console errors
+- Commit: f747671e
+
+### Files Modified
+- lib/horizon-data-loader.ts — numberOfChildren in profile query + HorizonPageData
+- lib/phase-analysis.ts — EndOfLifeInput + EndOfLifeAnalysis + computeInflatieGevoeligheid
+- components/app/horizon/phase-analysis/onttrekken/end-of-life.tsx — new props + inflation table + hint
+- components/app/horizon/phase-modal-onttrekking.tsx — new props threaded through
+- components/app/horizon/horizon-client.tsx — erfgenamen derivation + partner/pension data passthrough
+
+### Current Status
+- 2 features completed this session (#545, #546)
