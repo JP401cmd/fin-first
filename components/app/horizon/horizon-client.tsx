@@ -2244,7 +2244,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Vrijheid opbouwen */}
-                <div>
+                <div className="rounded-xl bg-emerald-50/30 border border-emerald-100 border-l-3 border-l-emerald-500 p-4">
                   <div className="mb-3 pb-3 border-b border-dashed border-emerald-300/40">
                     <p className="font-display text-base font-semibold text-emerald-700">Vrijheid opbouwen</p>
                     <p className="text-xs text-emerald-600/70">Gebeurtenissen die je vrijheid vergroten</p>
@@ -2272,7 +2272,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   )}
                 </div>
                 {/* Vrijheid investeren */}
-                <div>
+                <div className="rounded-xl bg-red-50/20 border border-red-100 border-l-3 border-l-red-400 p-4">
                   <div className="mb-3 pb-3 border-b border-dashed border-red-300/40">
                     <p className="font-display text-base font-semibold text-red-600">Vrijheid investeren</p>
                     <p className="text-xs text-red-500/70">Bewuste keuzes waar je vrijheid in investeert</p>
