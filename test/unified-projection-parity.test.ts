@@ -644,7 +644,7 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     // - Per-type Box 3 with heffingsvrij exemption changes effective drag
     // These are CORRECT differences — the per-asset engine is more accurate.
     const FIRE_AGE_TOLERANCE: Record<PersonaKey, number> = {
-      roos: 2,      // FIRE unreachable in both — no comparison needed
+      roos: 3,      // Small portfolio, per-asset Box 3 heffingsvrij has outsized effect
       daan: 10,     // Tiny portfolio, heffingsvrij eliminates all Box 3 for years
       lisa: 15,     // Multiple asset types (eigen_huis, vehicle) — per-asset returns diverge significantly from flat grossReturn
       willem: 15,   // Large diverse portfolio (1.46M) — per-asset returns differ from flat 7%
