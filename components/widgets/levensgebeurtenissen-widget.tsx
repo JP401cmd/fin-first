@@ -6,7 +6,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopLifeEvent } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatCurrency } from '@/lib/format'
-import { Calendar } from 'lucide-react'
+import { Calendar, TrendingUp, Heart, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
 interface Props {
   size: WidgetSize
@@ -203,139 +203,78 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
     )
   }
 
-  // ── Shared setup for half + full ────────────────────────
-  const rawMax = Math.max(...allPts.map(([, v]) => v), 1)
-  const maxVal = rawMax * 1.08
+  // ── Split events by impact type for two-column layouts ──
+  const opbouwEvents = topLifeEvents.filter(e => e.impactType === 'positive')
+  const investerenEvents = topLifeEvents.filter(e => e.impactType === 'negative')
 
-  // ── Half: compact chart that fits vertically ───────────
+  // ── Half: two-column opbouwen/investeren ──────────────
   if (size === 'half') {
-    const W = 280
-    const H = 110
-    const PAD = { top: 6, right: 6, bottom: 13, left: 30 }
-    const innerW = W - PAD.left - PAD.right
-    const innerH = H - PAD.top - PAD.bottom
-
-    const toX = (age: number) => PAD.left + ((age - minAge) / ageSpan) * innerW
-    const toY = (val: number) => PAD.top + innerH - (val / maxVal) * innerH
-
-    // Y-axis ticks (3 ticks for compact view)
-    const yTicks = [0, 0.5, 1.0].map(f => ({ val: maxVal * f, y: toY(maxVal * f) }))
-    // X-axis age ticks
-    const xStep = ageSpan <= 40 ? 10 : 20
-    const xTicks: number[] = []
-    for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) xTicks.push(a)
-
-    const fireX = fireAgeFractional != null ? toX(fireAgeFractional) : null
-
-    // Row-stacking for event labels
-    const MIN_X_GAP = 22
-    const ROW_H = 7
-    const evtXs = events.map(e => toX(e.targetAge!))
-    const rows: number[] = []
-    for (let i = 0; i < events.length; i++) {
-      let row = 0
-      for (let j = 0; j < i; j++) {
-        if (rows[j] === row && Math.abs(evtXs[i] - evtXs[j]) < MIN_X_GAP) { row++; j = -1 }
-      }
-      rows.push(row)
-    }
+    const opSlice = opbouwEvents.slice(0, 3)
+    const invSlice = investerenEvents.slice(0, 3)
+    const opTotal = opSlice.reduce((s, e) => s + (e.estimatedImpact ?? 0), 0)
+    const invTotal = invSlice.reduce((s, e) => s + (e.estimatedImpact ?? 0), 0)
 
     return (
       <WidgetShell module="horizon" size={size} kicker="Levensgebeurtenissen" href={href}>
-        <div ref={ref} className="mt-0.5">
-          <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible" aria-label="Levensgebeurtenissen vermogenspad">
-            {/* Grid */}
-            {yTicks.map(({ val, y }) => (
-              <line key={val} x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y}
-                stroke="var(--border-ed)" strokeWidth="0.5" strokeDasharray="3 3" />
-            ))}
-            {/* Y-axis labels */}
-            {yTicks.filter(t => t.val > 0).map(({ val, y }) => (
-              <text key={val} x={PAD.left - 2} y={y + 2.5} textAnchor="end" fontSize="5"
-                fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
-                {fmtCompact(val)}
-              </text>
-            ))}
-            {/* X-axis labels */}
-            {xTicks.map(age => (
-              <text key={age} x={toX(age)} y={H - 2} textAnchor="middle" fontSize="5"
-                fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
-                {age}
-              </text>
-            ))}
-            {/* Zero baseline */}
-            <line x1={PAD.left} x2={PAD.left + innerW} y1={toY(0)} y2={toY(0)}
-              stroke="var(--border-md)" strokeWidth="1" />
-
-            {/* Accumulation path */}
-            {accPts.length > 1 && (
-              <path d={pointsToPath(accPts, toX, toY)} fill="none"
-                stroke={COLOR_OPBOUW} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
-                style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1)' : 'none' }}
-              />
+        <div ref={ref} className="grid grid-cols-2 gap-2">
+          {/* Opbouwen column */}
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <ArrowUpRight className="h-3 w-3 text-emerald-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Opbouwen</span>
+            </div>
+            {opSlice.length > 0 ? (
+              <div className="space-y-1">
+                {opSlice.map(evt => (
+                  <div key={evt.id} className="flex items-baseline justify-between gap-1">
+                    <span className="text-[11px] text-[var(--ink-2)] truncate">{evt.name}</span>
+                    {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
+                      <span className="shrink-0 font-mono text-[10px] tabular-nums text-emerald-600">
+                        +{fmtCompact(evt.estimatedImpact)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {opTotal > 0 && (
+                  <div className="pt-1 border-t border-emerald-200/40">
+                    <span className="font-mono text-[10px] tabular-nums font-semibold text-emerald-600">
+                      +{fmtCompact(opTotal)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-[10px] text-[var(--ink-4)] italic">Geen events</p>
             )}
-            {/* Decumulation path */}
-            {decPts.length > 1 && (
-              <path d={pointsToPath(decPts, toX, toY)} fill="none"
-                stroke={COLOR_AFBOUW} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
-                style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1) 0.1s' : 'none' }}
-              />
-            )}
-            {/* No FIRE: grey single line */}
-            {fireIdx === -1 && allPts.length > 1 && (
-              <path d={pointsToPath(allPts, toX, toY)} fill="none"
-                stroke="var(--ink-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
-                style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1)' : 'none' }}
-              />
-            )}
-
-            {/* FIRE vertical + dot */}
-            {fireX != null && fireAgeFractional != null && (
-              <>
-                <line x1={fireX} y1={PAD.top} x2={fireX} y2={PAD.top + innerH}
-                  stroke={COLOR_OPBOUW} strokeWidth="1" strokeDasharray="2.5 2"
-                  style={{ opacity: hasEntered ? 0.7 : 0, transition: 'opacity 300ms ease 700ms' }}
-                />
-                <circle cx={fireX} cy={toY(interpAt(simRows, fireAgeFractional) ?? 0)}
-                  r="3" fill={COLOR_OPBOUW} stroke="white" strokeWidth="0.8"
-                  style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 750ms' }}
-                />
-              </>
-            )}
-
-            {/* Event markers */}
-            {events.map((evt, i) => {
-              const portfolio = interpAt(simRows, evt.targetAge!)
-              if (portfolio == null) return null
-              const cx = toX(evt.targetAge!)
-              const cy = toY(portfolio)
-              const row = rows[i] ?? 0
-              const name = evt.name.length > 8 ? evt.name.slice(0, 7) + '…' : evt.name
-              return (
-                <g key={evt.id} style={{
-                  opacity: hasEntered ? 1 : 0,
-                  transition: `opacity 200ms ease ${700 + i * 80}ms`,
-                }}>
-                  <circle cx={cx} cy={cy} r="3" fill="white" />
-                  <circle cx={cx} cy={cy} r="2.4"
-                    fill={evt.impactType === 'positive' ? COLOR_POS : COLOR_NEG} />
-                  <text x={cx} y={cy + 7 + row * ROW_H} textAnchor="middle" fontSize="5"
-                    fontWeight="500" fill="var(--ink-3)" fontFamily="var(--font-inter, sans-serif)">
-                    {name}
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
-          <div className="flex items-center justify-between">
-            <p className="text-[9px] text-[var(--ink-4)] font-mono">{minAge}j — {maxAge}j</p>
-            {fireAgeFractional != null && (
-              <p className="text-[9px] font-mono font-semibold" style={{ color: COLOR_OPBOUW }}>
-                FIRE {Math.round(fireAgeFractional)}j
-              </p>
+          </div>
+          {/* Investeren column */}
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <ArrowDownRight className="h-3 w-3 text-red-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-red-500">Investeren</span>
+            </div>
+            {invSlice.length > 0 ? (
+              <div className="space-y-1">
+                {invSlice.map(evt => (
+                  <div key={evt.id} className="flex items-baseline justify-between gap-1">
+                    <span className="text-[11px] text-[var(--ink-2)] truncate">{evt.name}</span>
+                    {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
+                      <span className="shrink-0 font-mono text-[10px] tabular-nums text-red-500">
+                        −{fmtCompact(evt.estimatedImpact)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {invTotal > 0 && (
+                  <div className="pt-1 border-t border-red-200/40">
+                    <span className="font-mono text-[10px] tabular-nums font-semibold text-red-500">
+                      −{fmtCompact(invTotal)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-[10px] text-[var(--ink-4)] italic">Geen events</p>
             )}
           </div>
         </div>
@@ -343,169 +282,101 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
     )
   }
 
-  // ── Full: detailed chart matching SimChart style ─────────
-  const W = 280
-  const H = 130
-  const PAD = { top: 10, right: 8, bottom: 16, left: 34 }
-  const innerW = W - PAD.left - PAD.right
-  const innerH = H - PAD.top - PAD.bottom
-
-  const toX = (age: number) => PAD.left + ((age - minAge) / ageSpan) * innerW
-  const toY = (val: number) => PAD.top + innerH - (val / maxVal) * innerH
-
-  // Y-axis (4 ticks like SimChart)
-  const yTicks = [0, 0.33, 0.66, 1.0].map(f => ({ val: maxVal * f, y: toY(maxVal * f) }))
-  // X-axis
-  const xStep = ageSpan <= 40 ? 10 : 20
-  const xTicks: number[] = []
-  for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) xTicks.push(a)
-
-  const fireX = fireAgeFractional != null ? toX(fireAgeFractional) : null
-
-  // Row-stacking for event labels (above markers)
-  const MIN_X_GAP = 32
-  const ROW_H = 10
-  const evtXs = events.map(e => toX(e.targetAge!))
-  const rows: number[] = []
-  for (let i = 0; i < events.length; i++) {
-    let row = 0
-    for (let j = 0; j < i; j++) {
-      if (rows[j] === row && Math.abs(evtXs[i] - evtXs[j]) < MIN_X_GAP) { row++; j = -1 }
-    }
-    rows.push(row)
-  }
-
-  // Cumulative impact
-  const cumulativeImpact = topLifeEvents.reduce((sum, evt) => {
-    if (evt.estimatedImpact == null) return sum
-    return sum + (evt.impactType === 'positive' ? evt.estimatedImpact : -evt.estimatedImpact)
-  }, 0)
+  // ── Full: rich two-column opbouwen/investeren ──────────
+  const opSliceFull = opbouwEvents.slice(0, 4)
+  const invSliceFull = investerenEvents.slice(0, 4)
+  const opTotalFull = opbouwEvents.reduce((s, e) => s + (e.estimatedImpact ?? 0), 0)
+  const invTotalFull = investerenEvents.reduce((s, e) => s + (e.estimatedImpact ?? 0), 0)
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Levensgebeurtenissen" href={href}>
-      <div ref={ref} className="mt-1">
-        <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible"
-          aria-label="Levensgebeurtenissen op vermogenspad">
-          {/* Grid (dashed, matching SimChart) */}
-          {yTicks.map(({ val, y }) => (
-            <line key={val} x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y}
-              stroke="var(--border-ed)" strokeWidth="0.5" strokeDasharray="3 3" />
-          ))}
-          {/* Y-axis labels */}
-          {yTicks.filter(t => t.val > 0).map(({ val, y }) => (
-            <text key={val} x={PAD.left - 3} y={y + 3} textAnchor="end" fontSize="6"
-              fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
-              {fmtCompact(val)}
-            </text>
-          ))}
-          {/* X-axis labels */}
-          {xTicks.map(age => (
-            <text key={age} x={toX(age)} y={H - 2} textAnchor="middle" fontSize="6"
-              fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
-              {age}
-            </text>
-          ))}
-          {/* Zero baseline */}
-          <line x1={PAD.left} x2={PAD.left + innerW} y1={toY(0)} y2={toY(0)}
-            stroke="var(--border-md)" strokeWidth="1" />
-
-          {/* Accumulation path */}
-          {accPts.length > 1 && (
-            <path d={pointsToPath(accPts, toX, toY)} fill="none"
-              stroke={COLOR_OPBOUW} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-              pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
-              style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1)' : 'none' }}
-            />
-          )}
-          {/* Decumulation path */}
-          {decPts.length > 1 && (
-            <path d={pointsToPath(decPts, toX, toY)} fill="none"
-              stroke={COLOR_AFBOUW} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-              pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
-              style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1) 0.1s' : 'none' }}
-            />
-          )}
-          {/* No FIRE: grey single line */}
-          {fireIdx === -1 && allPts.length > 1 && (
-            <path d={pointsToPath(allPts, toX, toY)} fill="none"
-              stroke="var(--ink-3)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-              pathLength={1} strokeDasharray="1" strokeDashoffset={hasEntered ? 0 : 1}
-              style={{ transition: hasEntered ? 'stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1)' : 'none' }}
-            />
-          )}
-
-          {/* FIRE dashed vertical + dot + label */}
-          {fireX != null && fireAgeFractional != null && (
-            <>
-              <line x1={fireX} y1={PAD.top} x2={fireX} y2={PAD.top + innerH}
-                stroke={COLOR_OPBOUW} strokeWidth="1" strokeDasharray="2.5 2"
-                style={{ opacity: hasEntered ? 0.75 : 0, transition: 'opacity 300ms ease 700ms' }}
-              />
-              <circle cx={fireX} cy={toY(interpAt(simRows, fireAgeFractional) ?? 0)}
-                r="4" fill={COLOR_OPBOUW} stroke="white" strokeWidth="1.2"
-                style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 750ms' }}
-              />
-              <text x={fireX + 3} y={PAD.top + 10} fontSize="6" fontWeight="600"
-                fill={COLOR_OPBOUW} fontFamily="var(--font-inter, sans-serif)"
-                style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 800ms' }}>
-                FIRE {fireAgeFractional.toFixed(1)}
-              </text>
-            </>
-          )}
-
-          {/* Event markers on path */}
-          {events.map((evt, i) => {
-            const portfolio = interpAt(simRows, evt.targetAge!)
-            if (portfolio == null) return null
-            const cx = toX(evt.targetAge!)
-            const cy = toY(portfolio)
-            const row = rows[i] ?? 0
-            const isPos = evt.impactType === 'positive'
-            const name = evt.name.length > 10 ? evt.name.slice(0, 9) + '…' : evt.name
-            const impactLabel = evt.estimatedImpact != null && evt.estimatedImpact > 0
-              ? `${isPos ? '+' : '−'}${fmtCompact(evt.estimatedImpact)}`
-              : null
-
-            return (
-              <g key={evt.id} style={{
-                opacity: hasEntered ? 1 : 0,
-                transition: `opacity 200ms ease ${750 + i * 80}ms`,
-              }}>
-                {/* White border dot */}
-                <circle cx={cx} cy={cy} r="4" fill="white" />
-                <circle cx={cx} cy={cy} r="3.2"
-                  fill={isPos ? COLOR_POS : COLOR_NEG} />
-                {/* Name label above */}
-                <text x={cx} y={cy - 8 - row * ROW_H} textAnchor="middle" fontSize="5.5"
-                  fontWeight="500" fill="var(--ink-2)" fontFamily="var(--font-inter, sans-serif)">
-                  {name}
-                </text>
-                {/* Impact amount above name */}
-                {impactLabel && (
-                  <text x={cx} y={cy - 15 - row * ROW_H} textAnchor="middle" fontSize="5"
-                    fontWeight="600" fill={isPos ? COLOR_POS : COLOR_NEG}
-                    fontFamily="var(--font-dm-mono, monospace)">
-                    {impactLabel}
-                  </text>
-                )}
-              </g>
-            )
-          })}
-        </svg>
-
-        {/* Cumulative impact summary */}
-        {topLifeEvents.length > 0 && cumulativeImpact !== 0 && (
-          <div className="mt-1.5 pt-1.5 border-t border-[var(--border-ed)] flex items-baseline justify-between">
-            <p className="text-[11px] text-[var(--ink-3)]">Cumulatieve impact</p>
-            <p className={`font-mono text-xs font-semibold tabular-nums ${cumulativeImpact > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-              {cumulativeImpact > 0 ? '+' : '−'}{formatCurrency(Math.abs(cumulativeImpact))}
-            </p>
+      <div ref={ref} className="grid grid-cols-2 gap-3">
+        {/* Opbouwen column */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-2">
+            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Vrijheid opbouwen</span>
           </div>
-        )}
-
-        {events.length === 0 && topLifeEvents.length === 0 && (
-          <p className="mt-1.5 text-xs text-[var(--ink-3)]">Geen life events gepland</p>
-        )}
+          {opTotalFull > 0 && (
+            <p className="font-mono text-sm font-semibold tabular-nums text-emerald-600 mb-2">
+              +{formatCurrency(opTotalFull)}
+            </p>
+          )}
+          {opSliceFull.length > 0 ? (
+            <div className="space-y-1.5">
+              {opSliceFull.map(evt => (
+                <div key={evt.id} className="flex items-start gap-1.5">
+                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-1">
+                      <span className="text-[11px] text-[var(--ink-2)] font-medium truncate">{evt.name}</span>
+                      {evt.targetAge != null && (
+                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">{evt.targetAge}j</span>
+                      )}
+                    </div>
+                    {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
+                      <p className="font-mono text-[10px] tabular-nums text-emerald-600">
+                        +{fmtCompact(evt.estimatedImpact)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {opbouwEvents.length > 4 && (
+                <p className="text-[10px] text-[var(--ink-4)] pl-3">+{opbouwEvents.length - 4} meer</p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center rounded-md border border-dashed border-emerald-300/40 bg-emerald-50/15 py-3 px-2 text-center">
+              <TrendingUp className="h-4 w-4 text-emerald-500/40 mb-1" />
+              <p className="text-[10px] text-emerald-600/60">Geen opbouw-events</p>
+              <p className="text-[8px] text-[var(--ink-4)] mt-0.5">erfenis, AOW, pensioen</p>
+            </div>
+          )}
+        </div>
+        {/* Investeren column */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-2">
+            <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-red-500">Vrijheid investeren</span>
+          </div>
+          {invTotalFull > 0 && (
+            <p className="font-mono text-sm font-semibold tabular-nums text-red-500 mb-2">
+              −{formatCurrency(invTotalFull)}
+            </p>
+          )}
+          {invSliceFull.length > 0 ? (
+            <div className="space-y-1.5">
+              {invSliceFull.map(evt => (
+                <div key={evt.id} className="flex items-start gap-1.5">
+                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-1">
+                      <span className="text-[11px] text-[var(--ink-2)] font-medium truncate">{evt.name}</span>
+                      {evt.targetAge != null && (
+                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">{evt.targetAge}j</span>
+                      )}
+                    </div>
+                    {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
+                      <p className="font-mono text-[10px] tabular-nums text-red-500">
+                        −{fmtCompact(evt.estimatedImpact)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {investerenEvents.length > 4 && (
+                <p className="text-[10px] text-[var(--ink-4)] pl-3">+{investerenEvents.length - 4} meer</p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center rounded-md border border-dashed border-red-300/40 bg-red-50/15 py-3 px-2 text-center">
+              <Heart className="h-4 w-4 text-red-400/40 mb-1" />
+              <p className="text-[10px] text-red-500/60">Geen investeringen</p>
+              <p className="text-[8px] text-[var(--ink-4)] mt-0.5">kinderen, verbouwing, reis</p>
+            </div>
+          )}
+        </div>
       </div>
     </WidgetShell>
   )
@@ -569,7 +440,18 @@ function TextFallback({
             </div>
           </div>
         ) : (
-          <p className="text-xs text-[var(--ink-3)]">Geen life events gepland</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col items-center rounded-md border border-dashed border-emerald-300/40 bg-emerald-50/15 py-3 px-2 text-center">
+              <TrendingUp className="h-4 w-4 text-emerald-500/40 mb-1" />
+              <p className="text-[10px] text-emerald-600/60 leading-tight">Geen opbouw-events</p>
+              <p className="text-[8px] text-[var(--ink-4)] mt-0.5">erfenis, AOW, pensioen</p>
+            </div>
+            <div className="flex flex-col items-center rounded-md border border-dashed border-red-300/40 bg-red-50/15 py-3 px-2 text-center">
+              <Heart className="h-4 w-4 text-red-400/40 mb-1" />
+              <p className="text-[10px] text-red-500/60 leading-tight">Geen investeringen</p>
+              <p className="text-[8px] text-[var(--ink-4)] mt-0.5">kinderen, verbouwing, reis</p>
+            </div>
+          </div>
         )}
         <p className="mt-1 text-[10px] text-[var(--ink-3)]">
           {lifeEvents} {lifeEvents === 1 ? 'life event' : 'life events'} totaal
@@ -625,7 +507,18 @@ function TextFallback({
           </div>
         </div>
       ) : (
-        <p className="text-sm text-[var(--ink-3)]">Geen life events gepland</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col items-center rounded-lg border border-dashed border-emerald-300/40 bg-emerald-50/15 py-4 px-3 text-center">
+            <TrendingUp className="h-5 w-5 text-emerald-500/40 mb-1.5" />
+            <p className="text-xs text-emerald-600/60">Geen opbouw-events gepland</p>
+            <p className="text-[10px] text-[var(--ink-4)] mt-1">erfenis, AOW, pensioenuitkering, verkoop woning</p>
+          </div>
+          <div className="flex flex-col items-center rounded-lg border border-dashed border-red-300/40 bg-red-50/15 py-4 px-3 text-center">
+            <Heart className="h-5 w-5 text-red-400/40 mb-1.5" />
+            <p className="text-xs text-red-500/60">Geen investeringen gepland</p>
+            <p className="text-[10px] text-[var(--ink-4)] mt-1">kinderen, verbouwing, wereldreis, studie</p>
+          </div>
+        </div>
       )}
       {allEvents.length > 0 && cumulativeImpact !== 0 && (
         <div className="mt-3 pt-2 border-t border-[var(--border-ed)]">

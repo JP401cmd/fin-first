@@ -2245,14 +2245,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Vrijheid opbouwen */}
                 <div>
-                  <div className="mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-positive">Vrijheid opbouwen</p>
-                    <p className="text-[11px] text-[var(--ink-4)]">
-                      Events met positieve netto impact
-                      {opbouwen.length > 0 && (
-                        <span className="ml-1 font-mono tabular-nums text-positive">+{formatCurrency(totalOpbouwen)}</span>
-                      )}
-                    </p>
+                  <div className="mb-3 pb-3 border-b border-dashed border-emerald-300/40">
+                    <p className="font-display text-base font-semibold text-emerald-700">Vrijheid opbouwen</p>
+                    <p className="text-xs text-emerald-600/70">Gebeurtenissen die je vrijheid vergroten</p>
+                    {opbouwen.length > 0 && (
+                      <p className="mt-1 text-lg font-mono tabular-nums text-emerald-600">+{formatCurrency(totalOpbouwen)}</p>
+                    )}
                   </div>
                   {opbouwenSorted.length > 0 ? (
                     <div className="space-y-2">
@@ -2275,14 +2273,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 </div>
                 {/* Vrijheid investeren */}
                 <div>
-                  <div className="mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-negative">Vrijheid investeren</p>
-                    <p className="text-[11px] text-[var(--ink-4)]">
-                      Events met negatieve netto impact
-                      {investeren.length > 0 && (
-                        <span className="ml-1 font-mono tabular-nums text-negative">{formatCurrency(totalInvesteren)}</span>
-                      )}
-                    </p>
+                  <div className="mb-3 pb-3 border-b border-dashed border-red-300/40">
+                    <p className="font-display text-base font-semibold text-red-600">Vrijheid investeren</p>
+                    <p className="text-xs text-red-500/70">Bewuste keuzes waar je vrijheid in investeert</p>
+                    {investeren.length > 0 && (
+                      <p className="mt-1 text-lg font-mono tabular-nums text-red-500">{formatCurrency(Math.abs(totalInvesteren))}</p>
+                    )}
                   </div>
                   {investerenSorted.length > 0 ? (
                     <div className="space-y-2">
