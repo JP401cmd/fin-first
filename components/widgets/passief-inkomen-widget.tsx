@@ -22,12 +22,12 @@ export const PassiefInkomenWidget = memo(function PassiefInkomenWidget({ size, d
   const dailyExp = monthlyExpenses > 0 ? monthlyExpenses / 30 : target / 30
   const freedomDays = dailyExp > 0 ? current / dailyExp : 0
 
-  // ── Mini-size: passive income amount ──────────────────
+  // ── Mini-size: yearly passive income ──────────────────
   if (size === 'mini') {
     return (
       <WidgetShell module="horizon" size="mini" kicker="Passief Inkomen" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {formatCurrency(current)}
+          {formatCurrency(current * 12)}/j
         </p>
       </WidgetShell>
     )
@@ -83,9 +83,14 @@ export const PassiefInkomenWidget = memo(function PassiefInkomenWidget({ size, d
           </div>
         </div>
 
+        {/* Yearly amount */}
+        <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+          = <span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">{formatCurrency(current * 12)}</span>/jaar
+        </p>
+
         {/* Progress bar with horizon gradient */}
-        <div className="mt-3">
-          <div className="h-[6px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+        <div className="mt-2">
+          <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
             <div
               className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 transition-all duration-700"
               style={{ width: `${pct}%` }}
@@ -93,40 +98,31 @@ export const PassiefInkomenWidget = memo(function PassiefInkomenWidget({ size, d
           </div>
         </div>
 
-        {/* Nog nodig voor FIRE */}
-        {remaining > 0 && (
-          <p className="mt-3 text-sm text-[var(--ink-2)]">
-            Nog <span className="font-mono font-semibold tabular-nums">{formatCurrency(remaining)}</span>/mnd nodig voor FIRE
+        {/* Nog nodig / bereikt */}
+        {remaining > 0 ? (
+          <p className="mt-1.5 text-[11px] text-[var(--ink-2)]">
+            Nog <span className="font-mono font-semibold tabular-nums">{formatCurrency(remaining)}</span>/mnd nodig
           </p>
-        )}
-        {remaining === 0 && current > 0 && (
-          <p className="mt-3 text-sm text-emerald-600 font-medium">
-            FIRE-doel bereikt!
-          </p>
-        )}
+        ) : current > 0 ? (
+          <p className="mt-1.5 text-[11px] text-emerald-600 font-medium">FIRE-doel bereikt!</p>
+        ) : null}
 
         {/* Freedom framing */}
-        <p className="mt-1.5 font-serif italic text-[12px] text-[var(--ink-3)]">
-          Huidig passief inkomen dekt {freedomDays.toFixed(1)} dagen per maand
+        <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
+          Dekt {freedomDays.toFixed(1)} vrijheidsdagen per maand
         </p>
 
-        {/* Breakdown: inkomen vs uitgaven */}
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <div className="rounded-md bg-[var(--subtle)] p-2">
-            <p className="text-[10px] text-[var(--ink-4)] uppercase tracking-wide">Passief inkomen</p>
-            <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(current)}</p>
+        {/* Breakdown: compact grid */}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="rounded-md bg-[var(--subtle)] px-2 py-1.5">
+            <p className="text-[10px] text-[var(--ink-4)] uppercase tracking-wide">Passief</p>
+            <p className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(current)}</p>
           </div>
-          <div className="rounded-md bg-[var(--subtle)] p-2">
+          <div className="rounded-md bg-[var(--subtle)] px-2 py-1.5">
             <p className="text-[10px] text-[var(--ink-4)] uppercase tracking-wide">FIRE-doel</p>
-            <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(target)}</p>
+            <p className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(target)}</p>
           </div>
         </div>
-
-        {freedomStr && (
-          <p className="mt-2 text-[11px] text-[var(--ink-3)]">
-            = {freedomStr} vrijheid per maand
-          </p>
-        )}
       </WidgetShell>
     )
   }

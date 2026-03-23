@@ -20,12 +20,12 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
 
   const pctOfAssets = totalAssets > 0 ? (annualDrag / totalAssets) * 100 : 0
 
-  // ── Mini-size: box3 drag amount in red ────────────────
+  // ── Mini-size: effective tax drag percentage ────────────────
   if (size === 'mini') {
     return (
       <WidgetShell module="horizon" size="mini" kicker="Box 3 Drag" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-red-600 leading-none truncate">
-          {formatCurrency(annualDrag)}
+          {pctOfAssets.toFixed(2)}%
         </p>
       </WidgetShell>
     )
@@ -131,7 +131,26 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
           </div>
         </div>
 
-        <p className="mt-2 font-serif italic text-[11px] text-[var(--ink-3)]">
+        {/* Fictief vs werkelijk breakdown */}
+        <div className="mt-2 space-y-0.5">
+          <div className="flex justify-between text-[11px]">
+            <span className="text-[var(--ink-3)]">Fictief rendement (Box 3)</span>
+            <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(totalAssets * 0.0643)}</span>
+          </div>
+          <div className="flex justify-between text-[11px]">
+            <span className="text-[var(--ink-3)]">Werkelijk rendement (geschat)</span>
+            <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(totalAssets * annualGrowthRate)}</span>
+          </div>
+        </div>
+
+        {/* Optimalisatie hint */}
+        {annualGrowthRate < 0.0643 && totalAssets > 50000 && (
+          <p className="mt-1.5 text-[11px] text-amber-600 font-medium">
+            💡 Werkelijk rendement lager dan fictief — overweeg asset-mix optimalisatie
+          </p>
+        )}
+
+        <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
           Geschat bij {(annualGrowthRate * 100).toFixed(1)}% jaarlijkse vermogensgroei
         </p>
       </WidgetShell>

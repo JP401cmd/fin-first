@@ -31,12 +31,18 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
   const optAge = fireRange.optimistic.fireAge
   const bandwidth = pesAge && optAge ? Math.abs(Math.round(pesAge - optAge)) : null
 
-  // ── Mini-size: expected FIRE year ──────────────────
+  // ── Mini-size: scenario range (e.g. '48-54j') ─────────────
   if (size === 'mini') {
+    const hasRange = optAge != null && pesAge != null
+    const miniLabel = hasRange
+      ? `${Math.round(optAge)}-${Math.round(pesAge)}j`
+      : expAge != null
+        ? `${Math.round(expAge)}j`
+        : '—'
     return (
       <WidgetShell module="horizon" size="mini" kicker="Scenario's" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {expAge != null ? Math.round(expAge) : '—'}
+          {miniLabel}
         </p>
       </WidgetShell>
     )
@@ -88,8 +94,14 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
           {pesAge != null && expAge != null && optAge != null && (
             <ScenarioAxis pesAge={Math.round(pesAge)} expAge={Math.round(expAge)} optAge={Math.round(optAge)} />
           )}
-          <p className="mt-2 font-serif italic text-[11px] text-[var(--ink-3)] text-center">
-            5% pessimistisch &middot; 7% verwacht &middot; 9% optimistisch rendement
+          {/* Return scenario labels in compact grid */}
+          <div className="mt-1.5 grid grid-cols-3 gap-1 text-center text-[10px]">
+            <span className="text-red-500 font-mono">5%</span>
+            <span className="text-horizon-600 font-mono font-semibold">7%</span>
+            <span className="text-emerald-600 font-mono">9%</span>
+          </div>
+          <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)] text-center">
+            rendement per scenario
           </p>
         </>
       )}

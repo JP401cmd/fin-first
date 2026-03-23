@@ -49,13 +49,13 @@ export const AiInzichtWidget = memo(function AiInzichtWidget({ size, data, href 
   const latest = aiInsights[0]
   const colors = MODULE_COLORS[latest.module] ?? { bg: 'bg-gray-50', text: 'text-gray-600', dot: 'bg-gray-400' }
 
-  // ── Mini: insights count ──
+  // ── Mini: 'Nieuw' badge or latest insight module ──
   if (size === 'mini') {
     return (
       <WidgetShell module="cross" size="mini" kicker="AI Inzicht" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {aiInsights.length} {aiInsights.length === 1 ? 'inzicht' : 'inzichten'}
-        </p>
+        <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${colors.bg} ${colors.text}`}>
+          Nieuw inzicht
+        </span>
       </WidgetShell>
     )
   }
@@ -108,47 +108,53 @@ export const AiInzichtWidget = memo(function AiInzichtWidget({ size, data, href 
     )
   }
 
-  // Full: 2-3 recent insights as cards + per insight: text + module badge + link
-  const shown = aiInsights.slice(0, 3)
+  // Full: latest insight prominently + action suggestion + remaining count
+  const remainingCount = aiInsights.length - 1
+  const moduleHref = MODULE_HREFS[latest.module]
+  const actionLabel = latest.module === 'kern'
+    ? 'financiële basis'
+    : latest.module === 'wil'
+      ? 'acties en doelen'
+      : 'toekomstplan'
 
   return (
     <WidgetShell module="cross" size={size} kicker="AI Inzicht" href={href}>
-      <div className="space-y-3">
+      <div className="flex flex-col h-full">
         <div className="flex justify-end -mt-1 -mb-1">
           <AiPrivacyIndicator size={13} />
         </div>
-        {shown.map(insight => {
-          const ic = MODULE_COLORS[insight.module] ?? { bg: 'bg-gray-50', text: 'text-gray-600', dot: 'bg-gray-400' }
-          const moduleHref = MODULE_HREFS[insight.module]
-          return (
-            <div
-              key={insight.id}
-              className={`rounded-lg p-3 ${ic.bg} space-y-2`}
-            >
-              <div className="flex items-start gap-2">
-                <Lightbulb className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${ic.text}`} />
-                <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-                  {insight.text}
-                </p>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${ic.text} bg-white/60 dark:bg-black/20`}>
-                  {insight.module}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-[var(--ink-4)]">
-                    {formatDate(insight.createdAt)}
-                  </span>
-                  {moduleHref && (
-                    <span className={`text-[10px] font-medium ${ic.text}`}>
-                      Bekijk &rarr;
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })}
+
+        {/* Latest insight — prominent card */}
+        <div className={`rounded-lg p-3.5 ${colors.bg} space-y-2.5 mt-1`}>
+          <div className="flex items-start gap-2">
+            <Lightbulb className={`h-4 w-4 shrink-0 mt-0.5 ${colors.text}`} />
+            <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+              {latest.text}
+            </p>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${colors.text} bg-white/60 dark:bg-black/20`}>
+              {latest.module}
+            </span>
+            <span className="text-[10px] text-[var(--ink-4)]">
+              {formatDate(latest.createdAt)}
+            </span>
+          </div>
+        </div>
+
+        {/* Action suggestion */}
+        {moduleHref && (
+          <p className={`mt-2.5 text-[11px] font-medium ${colors.text}`}>
+            Bekijk je {actionLabel} &rarr;
+          </p>
+        )}
+
+        {/* Remaining insights count */}
+        {remainingCount > 0 && (
+          <p className="mt-auto pt-2 text-[11px] text-[var(--ink-4)] font-mono tabular-nums">
+            Nog {remainingCount} {remainingCount === 1 ? 'inzicht' : 'inzichten'}
+          </p>
+        )}
       </div>
     </WidgetShell>
   )

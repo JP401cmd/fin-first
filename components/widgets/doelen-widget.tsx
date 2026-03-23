@@ -5,7 +5,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopGoal } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { getGoalColorClasses, formatGoalValue, type GoalType } from '@/lib/goal-data'
+import { getGoalColorClasses } from '@/lib/goal-data'
 import { Target } from 'lucide-react'
 
 interface Props {
@@ -85,68 +85,6 @@ function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: nu
   )
 }
 
-// ── Full-size: kaart per doel ─────────────────────────────────
-
-function GoalCard({ goal, index, hasEntered }: { goal: TopGoal; index: number; hasEntered: boolean }) {
-  const colors = getGoalColorClasses(goal.color)
-  const pct = goalPct(goal)
-  const overdue = isOverdue(goal)
-  const eta = etaLabel(goal)
-  const nearlyDone = pct >= 90 && pct < 100
-
-  return (
-    <div
-      className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-2.5 py-2"
-      style={{
-        animation: hasEntered ? `fadeUp 0.4s ease-out ${index * 60}ms both` : 'none',
-        opacity: hasEntered ? undefined : 0,
-      }}
-    >
-      {/* Naam + tag + percentage */}
-      <div className="flex items-start justify-between gap-1.5 mb-1.5">
-        <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--ink)] leading-tight">
-          {goal.name}
-        </span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {nearlyDone && (
-            <span className="text-[9px] font-bold uppercase tracking-[0.05em] rounded-[var(--r-sm)] px-1.5 py-px bg-wil-50 border border-wil-200 text-wil-700">
-              Bijna!
-            </span>
-          )}
-          <span className={`font-mono text-sm tabular-nums font-semibold ${overdue ? 'text-red-600' : 'text-[var(--ink)]'}`}>
-            {pct}%
-          </span>
-        </div>
-      </div>
-
-      {/* Voortgangsbalk */}
-      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] mb-1.5">
-        <div
-          className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
-          style={{
-            width: hasEntered ? `${pct}%` : '0%',
-            transition: hasEntered
-              ? `width ${500 + index * 80}ms cubic-bezier(.22,1,.36,1) ${index * 80}ms`
-              : 'none',
-          }}
-        />
-      </div>
-
-      {/* Bedrag + deadline */}
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-[10px] tabular-nums text-[var(--ink-3)] truncate">
-          {formatGoalValue(goal.current_value, goal.goal_type as GoalType, goal.custom_unit)} / {formatGoalValue(goal.target_value, goal.goal_type as GoalType, goal.custom_unit)}
-        </p>
-        {eta && (
-          <p className={`shrink-0 font-mono text-[10px] tabular-nums ${overdue ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
-            {eta}
-          </p>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Lege staat ────────────────────────────────────────────────
 
 function EmptyState({ full }: { full?: boolean }) {
@@ -173,13 +111,12 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
   const { ref: containerRef, hasEntered } = useInViewAnimation({ duration: 800 })
   const footerLabel = goals === 1 ? '1 actief doel' : `${goals} actieve doelen`
 
-  // ── Mini-size: achieved/total ────
+  // ── Mini-size: active goals count ────
   if (size === 'mini') {
-    const achieved = topGoals.filter(g => goalPct(g) >= 100).length
     return (
       <WidgetShell module="wil" size="mini" kicker="Doelen" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {achieved}/{goals} bereikt
+          {goals} actief
         </p>
       </WidgetShell>
     )
@@ -286,11 +223,19 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
     )
   }
 
-  // ── Full-size: summary + goal cards grid (336px height) ────
+  // ── Full-size: summary + vertical goal list (336px height) ────
   const completedGoals = topGoals.filter(g => goalPct(g) >= 100).length
   const avgPct = topGoals.length > 0
     ? Math.round(topGoals.reduce((sum, g) => sum + goalPct(g), 0) / topGoals.length)
     : 0
+
+  // Find the goal with the nearest future deadline
+  const now = new Date()
+  const closestDeadlineGoal = topGoals
+    .filter(g => g.target_date && new Date(g.target_date) > now && goalPct(g) < 100)
+    .sort((a, b) => new Date(a.target_date!).getTime() - new Date(b.target_date!).getTime())[0] ?? null
+
+  const fullGoals = topGoals.slice(0, 3)
 
   return (
     <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
@@ -315,9 +260,21 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {topGoals.map((goal, i) => (
-                <GoalCard key={goal.id} goal={goal} index={i} hasEntered={hasEntered} />
+            {/* Closest deadline indicator */}
+            {closestDeadlineGoal && (
+              <div className="flex items-center gap-1.5 rounded-[var(--r)] bg-wil-50 border border-wil-200 px-2.5 py-1.5 mb-2">
+                <Target className="h-3 w-3 text-wil-600 shrink-0" />
+                <span className="text-[11px] text-wil-700 font-medium truncate">{closestDeadlineGoal.name}</span>
+                <span className="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-wil-600">
+                  {new Date(closestDeadlineGoal.target_date!).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+            )}
+
+            {/* Vertical goal list — max 3 */}
+            <div>
+              {fullGoals.map((goal, i) => (
+                <GoalProgressRow key={goal.id} goal={goal} index={i} hasEntered={hasEntered} />
               ))}
             </div>
           </>

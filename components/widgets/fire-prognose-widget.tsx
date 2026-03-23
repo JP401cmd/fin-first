@@ -18,13 +18,16 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
   const isReached = cd.fireDate === 'Bereikt!'
   const isNotFeasible = cd.fireDate === 'Niet haalbaar'
 
-  // ── Mini-size: single FIRE year or status ───────────────────
+  // ── Mini-size: FIRE age number or status badge ──────────────
   if (size === 'mini') {
+    const fireAge = fireAgeFractional != null ? Math.round(fireAgeFractional) : null
     const miniLabel = isReached
       ? 'Bereikt!'
       : isNotFeasible
         ? '—'
-        : cd.fireDate
+        : fireAge != null
+          ? `${fireAge}j`
+          : cd.fireDate
     return (
       <WidgetShell module="horizon" size="mini" kicker="FIRE Prognose" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
@@ -105,13 +108,27 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
         </div>
       </div>
 
+      {/* AOW-integratie label + scenario (full-size only) */}
+      {size === 'full' && !isReached && !isNotFeasible && (
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-[var(--ink-3)]">Scenario</span>
+            <span className="font-mono tabular-nums text-[var(--ink-2)]">Verwacht rendement</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-[var(--ink-3)]">AOW-integratie</span>
+            <span className="font-mono tabular-nums text-[var(--ink-2)]">Inbegrepen bij 67j</span>
+          </div>
+        </div>
+      )}
+
       {/* Mini vermogenspad for full-size */}
       {size === 'full' && data.simRows && data.simRows.length > 1 && (() => {
         const rows = data.simRows!
         const accRows = rows.filter(r => r.phase === 'accumulation')
         if (accRows.length < 2) return null
         const W = 240
-        const H = 60
+        const H = 48 // compact: max 80px when rendered
         const pad = 4
         const maxVal = Math.max(...accRows.map(r => r.endPortfolio), 1)
         const minAge = accRows[0].age
@@ -174,19 +191,19 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
 
       {/* Progress bar for full-size */}
       {size === 'full' && (
-        <div className="mt-4">
-          <div className="flex justify-between text-[10px] text-[var(--ink-3)] mb-1">
+        <div className="mt-2">
+          <div className="flex justify-between text-[10px] text-[var(--ink-3)] mb-0.5">
             <span>Voortgang FIRE</span>
             <span className="font-mono tabular-nums">{freedomPct.toFixed(1)}%</span>
           </div>
-          <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+          <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
             <div
               className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 transition-all duration-700"
               style={{ width: `${Math.min(freedomPct, 100)}%` }}
             />
           </div>
-          <p className="mt-3 font-serif italic text-[12px] text-[var(--ink-3)]">
-            Gebaseerd op NL FIRE-model ({(NL_SWR * 100).toFixed(2)}% opnameregel) — klik voor details
+          <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
+            NL FIRE-model ({(NL_SWR * 100).toFixed(2)}% opnameregel)
           </p>
         </div>
       )}

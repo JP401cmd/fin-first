@@ -48,13 +48,13 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   const nextMilestone = activeMilestoneIdx >= 0 ? MILESTONES[activeMilestoneIdx] : null
   const nextDate = nextMilestone ? getMilestoneDate(nextMilestone.pct) : null
 
-  // ── Mini-size: achieved/total milestones ────────────────
+  // ── Mini-size: next milestone label or 'Bereikt!' ──────────
   if (size === 'mini') {
-    const achieved = MILESTONES.filter(m => effectivePct >= m.pct).length
+    const miniLabel = nextMilestone ? nextMilestone.label : 'Bereikt!'
     return (
       <WidgetShell module="horizon" size="mini" kicker="Vrijheidsmijlpalen" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {achieved}/{MILESTONES.length} bereikt
+        <p className="text-[13px] font-semibold text-[var(--ink)] leading-none truncate">
+          {miniLabel}
         </p>
       </WidgetShell>
     )
@@ -83,46 +83,60 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Vrijheidsmijlpalen" href={href}>
-      <div className={`${size === 'half' ? 'space-y-1' : 'mt-1 space-y-2'}`}>
+      <div className={`${size === 'half' ? 'space-y-1' : 'mt-1 space-y-1.5'}`}>
         {MILESTONES.map((m, i) => {
           const reached = effectivePct >= m.pct
           const isActive = i === activeMilestoneIdx
           const date = reached ? null : getMilestoneDate(m.pct)
+          // Progress towards this milestone
+          const milestonePct = Math.min((effectivePct / m.pct) * 100, 100)
 
           return (
             <div
               key={m.pct}
-              className={`flex items-center gap-2 ${isActive ? 'opacity-100' : reached ? 'opacity-60' : 'opacity-40'}`}
+              className={`${isActive ? 'opacity-100' : reached ? 'opacity-60' : 'opacity-40'}`}
             >
-              {/* Icon */}
-              <div className="shrink-0">
-                {reached ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-horizon-600" />
-                ) : (
-                  <Circle className={`h-3.5 w-3.5 ${isActive ? 'text-horizon-500' : 'text-[var(--border-md)]'}`} />
-                )}
+              <div className="flex items-center gap-2">
+                {/* Icon */}
+                <div className="shrink-0">
+                  {reached ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-horizon-600" />
+                  ) : (
+                    <Circle className={`h-3.5 w-3.5 ${isActive ? 'text-horizon-500' : 'text-[var(--border-md)]'}`} />
+                  )}
+                </div>
+
+                {/* Label + date */}
+                <div className="min-w-0 flex-1">
+                  <p className={`text-[11px] font-medium leading-tight ${isActive ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'}`}>
+                    {m.label}
+                  </p>
+                  {size === 'full' && (
+                    <p className="text-[10px] text-[var(--ink-4)] leading-tight">{m.desc}</p>
+                  )}
+                </div>
+
+                {/* Right: percentage or date */}
+                <div className="shrink-0 text-right">
+                  {reached ? (
+                    <span className="text-[10px] font-semibold text-horizon-600 uppercase tracking-wide">Bereikt</span>
+                  ) : date ? (
+                    <span className="font-mono text-[10px] text-[var(--ink-3)]">{date}</span>
+                  ) : (
+                    <span className="font-mono text-[10px] text-[var(--ink-4)]">{m.pct}%</span>
+                  )}
+                </div>
               </div>
 
-              {/* Label + date */}
-              <div className="min-w-0 flex-1">
-                <p className={`text-xs font-medium leading-tight ${isActive ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'}`}>
-                  {m.label}
-                </p>
-                {size === 'full' && (
-                  <p className="text-[10px] text-[var(--ink-4)] leading-tight">{m.desc}</p>
-                )}
-              </div>
-
-              {/* Right: percentage or date */}
-              <div className="shrink-0 text-right">
-                {reached ? (
-                  <span className="text-[10px] font-semibold text-horizon-600 uppercase tracking-wide">Bereikt</span>
-                ) : date ? (
-                  <span className="font-mono text-[10px] text-[var(--ink-3)]">{date}</span>
-                ) : (
-                  <span className="font-mono text-[10px] text-[var(--ink-4)]">{m.pct}%</span>
-                )}
-              </div>
+              {/* Progress bar (full-size only) */}
+              {size === 'full' && (
+                <div className="ml-5.5 mt-0.5 h-[3px] w-[calc(100%-22px)] overflow-hidden rounded-full bg-[var(--subtle)]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 transition-all duration-500"
+                    style={{ width: `${reached ? 100 : milestonePct}%` }}
+                  />
+                </div>
+              )}
             </div>
           )
         })}
