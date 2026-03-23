@@ -5035,6 +5035,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           monthlyIncome={effectiveInput?.monthlyIncome}
           monthlyExpenses={effectiveInput?.monthlyExpenses}
           fireTarget={fire?.fireTarget}
+          hasPartner={initialData.hasPartner}
+          marginaalTarief={fireParams.marginaalTarief}
         />
       )}
       {/* Overgang phase modal */}

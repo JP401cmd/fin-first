@@ -25,6 +25,10 @@ interface HypotheekVsBeleggenOpbouwProps {
   yearlyExpenses?: number
   annualSavings?: number
   cashflows?: SimCashflow[]
+  /** Has partner — affects Box 3 heffingsvrij and marginaalTarief */
+  hasPartner?: boolean
+  /** Marginaal IB-tarief (e.g. 0.3697 or 0.4950), overrides default */
+  marginaalTarief?: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -121,6 +125,8 @@ export const HypotheekVsBeleggenOpbouw = memo(
     yearlyExpenses,
     annualSavings,
     cashflows,
+    hasPartner = false,
+    marginaalTarief,
   }: HypotheekVsBeleggenOpbouwProps) {
     // Find the first active mortgage debt
     const mortgage = useMemo(
@@ -144,10 +150,10 @@ export const HypotheekVsBeleggenOpbouw = memo(
         repaymentType: mapRepaymentType(mortgage.repayment_type),
         restLooptijd: estimateRestLooptijd(mortgage),
         isTaxDeductible: mortgage.is_tax_deductible ?? true,
-        marginaalTarief: DEFAULT_MARGINAAL_TARIEF,
+        marginaalTarief: marginaalTarief ?? DEFAULT_MARGINAAL_TARIEF,
         verwachtRendement: expectedReturn,
         inflatie: inflationRate,
-        hasPartner: false,
+        hasPartner,
         horizonJaren: HORIZON_JAREN,
         // Optional fields for FIRE-impact calculation
         currentAge,
@@ -167,6 +173,8 @@ export const HypotheekVsBeleggenOpbouw = memo(
       yearlyExpenses,
       annualSavings,
       cashflows,
+      hasPartner,
+      marginaalTarief,
     ])
 
     // No mortgage or no result — render nothing
@@ -179,7 +187,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
       <AnalysisSection
         title="Hypotheek vs. beleggen"
         icon={Scale}
-        willContext={`Hypotheek vs. beleggen: ${formatCurrency(DEFAULT_EXTRA_BEDRAG)}/mnd extra. Aanbeveling: ${result.aanbeveling}. Verschil: ${formatCurrency(result.verschil)}. Breakeven: ${(result.breakevenRendement * 100).toFixed(1)}%.`}
+        willContext={`Hypotheek vs. beleggen: ${formatCurrency(DEFAULT_EXTRA_BEDRAG)}/mnd extra. Aanbeveling: ${result.aanbeveling}. Verschil: ${formatCurrency(result.verschil)}. Breakeven: ${(result.breakevenRendement * 100).toFixed(1)}%.${result.fireImpactMaanden != null ? ` FIRE-impact: ${result.fireImpactMaanden > 0 ? '+' : ''}${result.fireImpactMaanden} maanden.` : ''}`}
       >
         <div className="space-y-3">
           {/* ── Scenario cards ────────────────────────────────── */}
@@ -222,6 +230,29 @@ export const HypotheekVsBeleggenOpbouw = memo(
                 {(result.breakevenRendement * 100).toFixed(1)}% bruto rendement
               </span>
             </div>
+            {/* ── FIRE-impact row ─────────────────────────────── */}
+            {result.fireImpactMaanden != null && (
+              <div className="mt-2 flex items-baseline justify-between border-t border-[var(--border-ed)] pt-2">
+                <span className="text-xs text-[var(--ink-3)]">FIRE-impact</span>
+                <span className={`font-mono text-xs font-semibold tabular-nums ${
+                  result.fireImpactMaanden > 0
+                    ? 'text-[var(--positive)]'
+                    : result.fireImpactMaanden < 0
+                      ? 'text-[var(--negative)]'
+                      : 'text-[var(--ink-3)]'
+                }`}>
+                  {result.fireImpactMaanden > 0 ? '+' : ''}
+                  {result.fireImpactMaanden} maanden
+                </span>
+              </div>
+            )}
+            {result.fireImpactMaanden != null && result.fireImpactMaanden !== 0 && (
+              <p className="mt-1 text-[10px] leading-snug text-[var(--ink-4)]">
+                {result.fireImpactMaanden > 0
+                  ? `Beleggen brengt je FIRE-datum ${Math.abs(result.fireImpactMaanden)} maanden dichterbij`
+                  : `Extra aflossen brengt je FIRE-datum ${Math.abs(result.fireImpactMaanden)} maanden dichterbij`}
+              </p>
+            )}
             <p className="mt-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
               {result.aanbeveling === 'beleggen' && (
                 <>

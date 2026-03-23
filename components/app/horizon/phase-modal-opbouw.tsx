@@ -54,6 +54,10 @@ interface PhaseModalOpbouwProps {
   volatility?: number
   /** FIRE target portfolio amount for Monte Carlo success probability */
   fireTarget?: number
+  /** Has partner — affects Box 3 heffingsvrij and marginaalTarief */
+  hasPartner?: boolean
+  /** Marginaal IB-tarief (e.g. 0.3697 or 0.4950) */
+  marginaalTarief?: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,6 +101,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   monthlyExpenses,
   volatility,
   fireTarget,
+  hasPartner,
+  marginaalTarief,
 }: PhaseModalOpbouwProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
@@ -298,6 +304,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
             yearlyExpenses={yearlyExpenses}
             annualSavings={yearlySavings}
             cashflows={cashflows}
+            hasPartner={hasPartner}
+            marginaalTarief={marginaalTarief}
           />
         )}
 
