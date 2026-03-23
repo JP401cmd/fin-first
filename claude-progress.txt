@@ -1,3 +1,48 @@
+## Session 2026-03-23 - Feature #611
+
+### Feature #611: Bugfix: levensgebeurtenissen classificatie sign-conventie — AOW en inkomen-events als opbouwen - PASSING
+- Root cause: computeLifeEventNetImpact multiplied monthly_income_change by duration_months, but permanent events have duration_months=0
+- For AOW (monthly_income_change: 1350, duration_months: 0): old formula gave 0 → classified as 'investeren' instead of 'opbouwen'
+- Same bug for 'Freelance tarief omhoog' (monthly_income_change: 500, duration_months: 0)
+- Fix: when duration_months=0 (permanent/indefinite), use 240 months (20 years) as proxy — consistent with AOW duration conventions
+- Also fixed dashboard-data-loader.ts: replaced inline formula (which had reversed signs) with shared computeLifeEventNetImpact
+- Added 2 new regression tests (tests 8-9) for permanent event classification
+- All 14 levensgebeurtenissen tests + 36 parity tests pass
+- Zero new console errors
+- Commit: 48891301
+
+### Files Modified
+- lib/horizon-data.ts — computeLifeEventNetImpact: effectiveDuration = duration_months > 0 ? duration_months : 240
+- lib/dashboard-data-loader.ts — import and use computeLifeEventNetImpact, fix impactType sign
+- lib/regression-tests/suites/levensgebeurtenissen-classificatie.ts — 2 new tests for permanent events
+
+### Current Status
+- 1 feature completed this session (#611)
+- Overall progress: 609/610 passing (99.8%)
+
+## Session 2026-03-23 - Feature #607
+
+### Feature #607: Persona seeds: elke persona minstens 1 event in opbouwen en 1 in investeren kolom - PASSING
+- Analyzed all 6 personas' active life events using computeLifeEventNetImpact formula
+- Formula: net = one_time_cost + (monthly_income_change * duration_months) - (monthly_cost_change * duration_months)
+- Positive net → opbouwen, zero/negative → investeren
+- Found 4 personas missing opbouwen events: Roos, Willem, Rashid, Marijke
+- Roos: added 'Schuldhulp afgerond' (monthly_cost_change: -250, 24m → net +6000 = opbouwen)
+- Willem: added 'Bedrijfspensioen ABP' (monthly_income_change: 2200, 72m → net +158400 = opbouwen)
+- Rashid: added 'Belastingteruggave ZZP' (one_time_cost: 3500 → net +3500 = opbouwen)
+- Marijke: added 'Lijfrente-uitkering' (monthly_income_change: 400, 180m → net +72000 = opbouwen) + 'Verbouwing badkamer' (one_time_cost: -8500 → investeren)
+- Daan and Lisa already had both opbouwen and investeren events
+- All 152 persona-related tests pass (36 seeds verification + 116 compat)
+- Zero new TypeScript errors, zero console errors
+- Commit: a7593d42
+
+### Files Modified
+- lib/test-personas.ts — added opbouwen life events for 4 personas
+
+### Current Status
+- 1 feature completed this session (#607)
+- Overall progress: 600/608 passing (98.7%)
+
 ## Session 2026-03-23 - Features #602, #580
 
 ### Feature #602: Levensgebeurtenissen widget: twee-kolommen in half en full formaat - PASSING
@@ -21458,3 +21503,102 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#606)
+
+## Session 2026-03-23 - Feature #493 (verification)
+
+### Feature #493: Fase 1e — runUnifiedProjection() orchestratiefunctie - ALREADY PASSING
+- Verified all implementation exists and tests pass:
+  - runUnifiedProjection() fully implemented with orchestration (init → cashflows → accumulatie → FIRE-check → decumulatie → aggregaten)
+  - runSimulationUnified() deprecated wrapper builds UnifiedProjectionInput from old params
+  - toSimResult() maps all 11 SimResult fields correctly
+  - computeFireProjection/computeFireRange unchanged (not imported in unified-projection)
+  - Parity: all 6 personas pass (FIRE age within tolerance)
+  - Performance: all personas under 50ms
+- 36 parity tests pass, 74 unit tests pass
+- Zero console errors in browser
+- Feature was already marked as passing
+
+### Current Status
+- Feature #493 verified passing, no code changes needed
+
+## Session 2026-03-23 - Features #608, #609
+
+### Feature #608: Mobiel: widget levensgebeurtenissen responsive breakpoints en touch targets - PASSING
+- Half-size: grid-cols-2 → grid-cols-1 sm:grid-cols-2 gap-2
+- Full-size: grid-cols-2 → grid-cols-1 md:grid-cols-2 gap-3
+- Event items: min-h-[44px] sm:min-h-0 (half) / min-h-[44px] md:min-h-0 (full) for WCAG 2.5.5 touch targets
+- Amounts: text-[10px] → text-[11px] sm:text-xs for scalability
+- Event names in full: text-[11px] → text-[11px] sm:text-xs
+- Age labels: text-[10px] → text-[10px] sm:text-[11px]
+- Text fallback empty states: same responsive grid breakpoints applied
+- All event names already had truncate class
+- Zero TypeScript errors, zero new console errors
+
+### Feature #609: Mobiel: horizon-pagina twee-kolommen levensgebeurtenissen touch-friendly afwerking - PASSING
+- Column headers: text-base → text-sm sm:text-base, subtitles hidden sm:block
+- Event cards: min-h-[44px] touch targets, icon h-8 w-8 sm:h-9 sm:w-9
+- Event names: text-sm → text-xs sm:text-sm with truncate
+- Subtitle text: text-xs → text-[11px] sm:text-xs
+- Total amounts: text-lg → text-base sm:text-lg font-mono tabular-nums
+- Column padding: p-4 → p-3 sm:p-4
+- Empty states: py-6 px-4 → py-4 px-3 sm:py-6 sm:px-4
+- Empty state icons: h-6 w-6 → h-5 w-5 sm:h-6 sm:w-6
+- Zero TypeScript errors, zero new console errors
+
+### Files Modified
+- components/widgets/levensgebeurtenissen-widget.tsx — responsive breakpoints + touch targets
+- components/app/horizon/horizon-client.tsx — compact mobile headers, scalable icons, touch targets
+
+### Current Status
+- 2 features completed this session (#608, #609)
+- Commit: 4b7f10e3
+
+## Session 2026-03-23 - Feature #610
+
+### Feature #610: Horizon grafiek: scroll-event doorlaten naar pagina bij maximaal uitgezoomd - PASSING
+- Found wheel handler in lib/hooks/use-chart-zoom.ts (useEffect with native event listener)
+- Issue: e.preventDefault() called unconditionally, trapping scroll when fully zoomed out
+- Fix: Added fullSpanRef to track full age span in native handler
+- Before preventDefault(), check: if curSpan >= fullSpan - 0.01 AND deltaY > 0, return early
+- This lets scroll-down events bubble to page when chart is fully zoomed out
+- Scroll-up (zoom in) always handled by chart even when fully zoomed out
+- Partial zoom: both directions handled by chart (existing behavior preserved)
+- Pinch-to-zoom unaffected (separate pointer event handlers)
+- TypeScript compiles clean, no new console errors
+- Verified Horizon page loads correctly with chart visible
+- Commit: afe0d9f0
+
+### Files Modified
+- lib/hooks/use-chart-zoom.ts — fullSpanRef + scroll-through check in wheel handler
+
+### Current Status
+- 1 feature completed this session (#610)
+- Overall progress: 606/609 passing (99.5%)
+
+## Session 2026-03-23 - Feature #577
+
+### Feature #577: Preset toepassen: vervang dashboard widgets en sla op - PASSING
+- Root cause found: API-loaded presets from app_settings had empty widgets arrays
+  (admin had edited preset names/descriptions via beheer page before widget arrays were populated)
+- Fix 1: GET /api/widget-presets now merges stored presets with hardcoded WIDGET_PRESETS
+  - If stored preset has empty widgets array, falls back to hardcoded widgets
+  - Preserves admin-edited name/description/icon metadata
+- Fix 2: handlePresetApply confirmation dialog refactored to use extracted function
+  - Added null safety check for preset.widgets
+  - Added null guard for selectedPreset in onClick handler
+- Verified end-to-end:
+  - FIRE Strijder preset: all 7 correct widgets (fire_prognose full, vrijheidsscenarios half, sim_vermogenspad half, backtesting_score quarter, spaarquote quarter, vrijheidsmijlpalen quarter, passief_inkomen quarter)
+  - Budgetteerder preset: all 7 correct widgets (cash_flow full, spaarquote half, acties half, netto_vermogen quarter, jouw_pad quarter, vrijheidsvoortgang quarter, fire_prognose quarter)
+  - Widget state persists after page refresh
+  - Edit mode exits after applying preset
+  - Save feedback works (saving/saved state)
+  - Zero console errors
+- Commit: 19829e98
+
+### Files Modified
+- app/api/widget-presets/route.ts — merge stored presets with hardcoded widget arrays
+- components/widgets/draggable-widget-grid.tsx — refactored dialog onClick + null safety
+
+### Current Status
+- 1 feature completed this session (#577)
+- Overall progress: 604/608 passing (99.3%)
