@@ -864,11 +864,11 @@ export function Features() {
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  'FIRE-countdown',
-                  'Spaarquote tracking',
-                  'Rendement optimalisatie',
-                  'Monte Carlo simulatie',
-                  'Eerder stoppen analyse',
+                  'Monte Carlo',
+                  'Coast FIRE',
+                  'Spaarquote',
+                  'Backtesting',
+                  'Vrijheidsscenario\u2019s',
                 ].map((f) => (
                   <span
                     key={f}
