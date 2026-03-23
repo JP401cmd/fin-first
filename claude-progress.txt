@@ -20401,3 +20401,102 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#537, #538)
+
+## Session 2026-03-23 - Features #535, #536
+
+### Feature #535: MC Overgang: kritische grens via binary search - PASSING
+- Added `findCriticalWithdrawal()` helper to `lib/phase-monte-carlo.ts`
+- Binary search: low=0, high=withdrawal×1.5, finds max withdrawal with >= 90% success
+- Max 8 iterations × 200 sims each (1600 total sims max) for fast convergence
+- Performance guard: returns yearlyWithdrawal when yearsInPhase <= 0
+- Short-circuit: if currentSuccessRate >= 0.9, returns current withdrawal immediately
+- Replaced linear scaling formula in monte-carlo-overgang.tsx with binary search call
+- Cached result in MCComputedState.kritischeGrens (existing field)
+- Verified in browser: € 48.814/jaar (90% kans) — correct convergence
+- Zero new console errors
+- Commit: 5ca65e0d
+
+### Feature #536: MC Overgang: mediaan eindvermogen stat card toevoegen - PASSING
+- Added 4th stat card: "Mediaan eindvermogen" with medianEndPortfolio (p50) value
+- Grid changed from grid-cols-1 sm:grid-cols-3 → grid-cols-2 sm:grid-cols-4
+- Card order: Slagingskans, Mediaan eindvermogen, Pessimistisch (p10), Kritische grens
+- Sublabel: "bij AOW" (consistent with Pessimistisch card)
+- Added median to willContext string for AI awareness
+- Verified in browser: € 7.065.450 bij AOW — consistent with Onttrekking MC layout
+- Zero new console errors
+- Commit: d86dc633
+
+### Files Modified
+- lib/phase-monte-carlo.ts — findCriticalWithdrawal() binary search helper
+- components/app/horizon/phase-analysis/overgang/monte-carlo-overgang.tsx — binary search + 4th stat card
+
+### Current Status
+- 2 features completed this session (#535, #536)
+
+## Session 2026-03-23 - Features #539, #540
+
+### Feature #539: Eerder Stoppen: ook beschikbaar voor gap-scenario - PASSING
+- Removed shortfall-only condition from EerderStoppen in phase-modal-overgang.tsx
+- Now shows for both gap and shortfall transition scenarios
+- Added scenario prop to EerderStoppen component for title adjustment
+- Gap title: "Nog eerder met pensioen" (vs "Eerder stoppen met werken" for shortfall)
+- Inlined TransitionScenario type to avoid circular import
+- berekenEerderStoppen() math already correct for both scenarios (reduces FIRE age by N years)
+- Verified in browser: gap scenario shows EerderStoppen with correct title and calculations
+- Zero new console errors
+- Commit: 8fef23f0
+
+### Feature #540: MC Onttrekken: kritische SWR via iteratieve berekening - PASSING
+- Added findCriticalSWR() in lib/phase-monte-carlo.ts
+- Binary search: low=0, high=baseSwr*1.5, converges to SWR where MC success >= 95%
+- 6 iterations × 200 sims = 1200 total simulations per search
+- Fallback: returns 0 when startPortfolio <= 0 or yearsInPhase <= 0
+- Replaced crude linear approximation (baseSwr × successRate/0.95) in monte-carlo-onttrekken.tsx
+- Verified: 3.7% critical SWR for test user — realistic for NL (2.5-4.5% range)
+- Display: "3.7% bij 95% slagingskans"
+- Zero new console errors
+- Commit: 96c704db
+
+### Files Modified
+- components/app/horizon/phase-modal-overgang.tsx — removed shortfall condition for EerderStoppen
+- components/app/horizon/phase-analysis/overgang/eerder-stoppen.tsx — scenario prop + dynamic title
+- lib/phase-monte-carlo.ts — findCriticalSWR() with iterative MC binary search
+- components/app/horizon/phase-analysis/onttrekken/monte-carlo-onttrekken.tsx — use findCriticalSWR
+
+### Current Status
+- 2 features completed this session (#539, #540)
+
+## Session 2026-03-23 - Features #543, #544
+
+### Feature #543: Huis Verkopen: gevoeligheidsanalyse en opportuniteitskosten - PASSING
+- Added sensitivity analysis table: 3 rows with woningWaardeGroei 2%, 3%, 4%
+- Each row runs analyzeHuisVerkopen with different growth rate, shows Behouden/Verkopen/Verschil/Advies
+- Color-coded verschil (positive=green, negative=red), advies badges per scenario
+- 3% row highlighted as "(basis)" with subtle background
+- Added Opportuniteitskosten vastgoed block as separate section:
+  - Huidige overwaarde (net equity)
+  - FV of equity invested at expectedReturn over horizon
+  - House equity value after horizon
+  - Opportunity cost = FV invested - house equity (positive = keeping house costs money)
+- Negative opportunity cost handled: green text when house growth outperforms investment return
+- Explanatory text adapts based on positive/negative opportunity cost
+- Verified in browser: sensitivity table renders 3 rows, opportunity cost shows +EUR 526.091
+- Zero new console errors
+- Commit: 3482e2ef
+
+### Feature #544: SORR Analyse: 1-jaar buffer en gepersonaliseerd advies - PASSING
+- Changed cash buffer array from [0, 2, 3] to [0, 1, 2, 3] — adds 1-year buffer option
+- Personalized fragile decade text: "Jouw fragiele decennium loopt van leeftijd X tot X+10"
+- Added total withdrawal amount during fragile decade: "In die periode onttrek je circa EUR X"
+- Recommended buffer logic unchanged (still finds smallest buffer with 3pp improvement)
+- Verified in browser: 4 rows in cash buffer table (Geen buffer, 1 jaar, 2 jaar, 3 jaar)
+- Test user: leeftijd 67 tot 77, onttrekking EUR 1.666.680, buffer recommended EUR 295.944
+- Zero new console errors
+- Commit: ac32dbbd
+
+### Files Modified
+- components/app/horizon/phase-analysis/onttrekken/huis-verkopen.tsx — sensitivity + opportunity cost
+- components/app/horizon/phase-analysis/onttrekken/sorr-analyse.tsx — 1yr buffer + personalized text
+
+### Current Status
+- 2 features completed this session (#543, #544)
