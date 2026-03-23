@@ -1,3 +1,53 @@
+## Session 2026-03-23 - Features #523, #524
+
+### Feature #523: Shared ReceiptRow component extractie - PASSING
+- Created components/app/horizon/phase-analysis/receipt-row.tsx with unified props: label, value, positive?, negative?, subtle?
+- Styling: flex justify-between py-0.5, font-sans text-sm for label, font-mono tabular-nums for value
+- positive=text-[var(--positive)] + "+" prefix, negative=text-[var(--negative)] + "−" prefix
+- subtle: reduced opacity (opacity-70) + smaller text (text-xs)
+- Removed local ReceiptRow from all 3 phase modals (opbouw, overgang, onttrekking)
+- Renamed props: plus→positive, minus→negative across opbouw and overgang
+- Verified all 3 modals render correctly (desktop) via browser automation
+- Note: another agent also committed this extraction as part of #527
+- Commit: (merged with existing commits)
+
+### Feature #524: Shared successColor helper extractie - PASSING
+- Created components/app/horizon/phase-analysis/phase-analysis-utils.ts
+- Exported successColor(rate): text-[var(--positive)]|text-amber-600|text-[var(--negative)] at 85%/65% thresholds
+- Exported successBgColor(rate): bg-[var(--positive)]/10|bg-amber-600/10|bg-[var(--negative)]/10
+- Removed local duplicates from: monte-carlo-opbouw, monte-carlo-overgang, monte-carlo-onttrekken, sorr-analyse
+- All 4 components now import from shared util
+- Verified Monte Carlo + SORR sections render correctly in browser
+- Zero TypeScript errors, zero new console errors
+- Commit: e06c3189
+
+### Current Status
+- 2 features completed this session (#523, #524)
+
+## Session 2026-03-23 - Features #529, #530
+
+### Feature #529: MC Opbouw: mediaan eindvermogen stat card toevoegen - PASSING
+- Added 4th stat card "Mediaan eindvermogen" to MonteCarloOpbouw component
+- Changed grid from grid-cols-1 sm:grid-cols-3 to grid-cols-2 sm:grid-cols-4
+- Reordered: Slagingskans → Mediaan eindvermogen → Mediaan FIRE-datum → Pessimistisch
+- Mobile: grid-cols-2 ensures proper 2×2 stacking
+- Verified in browser: all 4 stat cards visible and correct
+- Commit: 3140bc9a
+
+### Feature #530: Schulden Samenvatting: rente-bewust versnellingsmodel - PASSING
+- Created estimatePayoff() using annuity formula: n = -ln(1 - r·PV/PMT) / ln(1+r)
+- Created estimatePortfolioPayoff() that sums across all payable debts (excl. aflossingsvrij/mortgage)
+- Replaced simulatePayoff-based calculation with analytical annuity formula
+- Added "Totale rentelast" row showing total interest at current pace
+- Added "Totale rentebesparing" footer in scenario table showing max potential savings
+- Handles edge cases: zero-interest debts, payment < interest, infinite payoff
+- Verified in browser: Schuldenanalyse shows rentelast row with correct values
+- Commit: 3140bc9a
+
+### Current Status
+- 2 features completed this session (#529, #530)
+- Overall progress: 523/560 passing (93.4%)
+
 ## Session 2026-03-22 - Feature #522
 
 ### Feature #522: Guardrails: annuïteit als basis voor deplete/legacy eindstrategie - PASSING
