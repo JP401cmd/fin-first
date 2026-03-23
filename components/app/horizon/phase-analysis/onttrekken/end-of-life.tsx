@@ -18,6 +18,12 @@ interface EndOfLifeProps {
   inflationRate: number
   yearlyAowIncome: number
   hasPartner?: boolean
+  /** Erfgenamen (heirs) with relation and fraction of inheritance */
+  erfgenamen?: { relatie: 'kind' | 'partner' | 'overig'; fractie: number }[]
+  /** Partner AOW monthly benefit */
+  partnerAowBedrag?: number
+  /** Nabestaandenpensioen monthly amount */
+  nabestaandenPensioen?: number
 }
 
 // -- Component ----------------------------------------------------------------
@@ -41,8 +47,15 @@ export const EndOfLife = memo(function EndOfLife({
   endAge,
   // inflationRate and yearlyAowIncome accepted for future use
   hasPartner = false,
+  erfgenamen,
+  partnerAowBedrag,
+  nabestaandenPensioen,
 }: EndOfLifeProps) {
   const [analysis, setAnalysis] = useState<EndOfLifeAnalysis | null>(null)
+
+  // Whether real heir/partner data was provided (vs. engine defaults)
+  const hasRealErfgenamen = erfgenamen != null && erfgenamen.length > 0
+  const hasRealPartnerData = partnerAowBedrag != null || (nabestaandenPensioen != null && nabestaandenPensioen > 0)
 
   // Lazy compute: defer past first paint
   useEffect(() => {
@@ -54,13 +67,15 @@ export const EndOfLife = memo(function EndOfLife({
         strategy,
         endAge,
         hasPartner,
-        // partnerAowBedrag and nabestaandenPensioen use defaults in the engine
+        ...(erfgenamen && erfgenamen.length > 0 ? { erfgenamen } : {}),
+        ...(partnerAowBedrag != null ? { partnerAowBedrag } : {}),
+        ...(nabestaandenPensioen != null ? { nabestaandenPensioen } : {}),
       })
       setAnalysis(result)
     }, 30)
 
     return () => clearTimeout(timer)
-  }, [rows, strategy, endAge, hasPartner])
+  }, [rows, strategy, endAge, hasPartner, erfgenamen, partnerAowBedrag, nabestaandenPensioen])
 
   const strategyLabel = STRATEGY_LABELS[strategy]?.name ?? strategy
   const loading = analysis === null
@@ -222,7 +237,24 @@ export const EndOfLife = memo(function EndOfLife({
             </div>
           )}
 
-          {/* -- 5. Disclaimer --------------------------------------------- */}
+          {/* -- 5. Data availability hints --------------------------------- */}
+          {(!hasRealErfgenamen || (hasPartner && !hasRealPartnerData)) && (
+            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-2.5">
+              <p className="text-[10px] font-medium text-[var(--ink-3)]">
+                {!hasRealErfgenamen && !hasPartner && (
+                  <>Erfgenamen zijn geschat op basis van standaardverdeling. Vul je huishoudprofiel aan in <span className="font-semibold">Identiteit → Profiel</span> voor een nauwkeurigere berekening.</>
+                )}
+                {!hasRealErfgenamen && hasPartner && (
+                  <>Erfgenamen zijn geschat op basis van standaardverdeling. Vul het aantal kinderen aan in <span className="font-semibold">Identiteit → Profiel</span> voor een nauwkeurigere berekening.</>
+                )}
+                {hasRealErfgenamen && hasPartner && !hasRealPartnerData && (
+                  <>Partner-inkomen na overlijden is geschat. Upload je pensioenoverzicht (UPO) voor nabestaandenpensioen-gegevens.</>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* -- 6. Disclaimer --------------------------------------------- */}
           <p className="text-[10px] italic leading-relaxed text-[var(--ink-4)]">
             Informatief, geen fiscaal advies
           </p>

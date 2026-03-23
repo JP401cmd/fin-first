@@ -720,6 +720,40 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
   })()
 
+  // ── Erfgenamen (heirs) derivation for End-of-Life analysis ───────────────
+  const erfgenamen = useMemo(() => {
+    const heirs: { relatie: 'kind' | 'partner' | 'overig'; fractie: number }[] = []
+    const numChildren = initialData.numberOfChildren ?? 0
+    const partner = initialData.hasPartner
+
+    if (partner && numChildren > 0) {
+      // Dutch default: partner gets child's share (1 / (numChildren + 1))
+      const totalShares = numChildren + 1
+      heirs.push({ relatie: 'partner', fractie: 1 / totalShares })
+      for (let i = 0; i < numChildren; i++) {
+        heirs.push({ relatie: 'kind', fractie: 1 / totalShares })
+      }
+    } else if (partner) {
+      // No children: partner inherits everything
+      heirs.push({ relatie: 'partner', fractie: 1.0 })
+    } else if (numChildren > 0) {
+      // No partner: children split equally
+      for (let i = 0; i < numChildren; i++) {
+        heirs.push({ relatie: 'kind', fractie: 1 / numChildren })
+      }
+    }
+    // If no partner and no children: return empty → engine uses default [kind: 100%]
+    return heirs.length > 0 ? heirs : undefined
+  }, [initialData.hasPartner, initialData.numberOfChildren])
+
+  // Partner AOW bedrag for end-of-life partner continuation analysis
+  const partnerAowBedrag = initialData.hasPartner ? NL_AOW_MONTHLY : undefined
+
+  // Nabestaandenpensioen from pension parse (monthly amount, if available)
+  const nabestaandenPensioenBedrag = pensionParseResult?.nabestaandenpensioen != null
+    ? pensionParseResult.nabestaandenpensioen
+    : undefined
+
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const effectiveCountdown = simResult?.fireAgeFractional != null && currentAge != null
     ? deriveCountdown(simResult.fireAgeFractional, currentAge)
@@ -5087,6 +5121,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           expectedReturn={fireParams.grossReturn}
           assets={initialData.assets}
           yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
+          hasPartner={initialData.hasPartner}
+          erfgenamen={erfgenamen}
+          partnerAowBedrag={partnerAowBedrag}
+          nabestaandenPensioen={nabestaandenPensioenBedrag}
         />
       )}
 
