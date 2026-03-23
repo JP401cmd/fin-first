@@ -1,3 +1,62 @@
+## Session 2026-03-23 - Features #602, #580
+
+### Feature #602: Levensgebeurtenissen widget: twee-kolommen in half en full formaat - PASSING
+- Replaced SVG chart views in half and full sizes with two-column opbouwen/investeren layout
+- Half: grid-cols-2 gap-2, 'Opbouwen' + 'Investeren' headers with ArrowUpRight/ArrowDownRight icons
+- Half: max 3 events per column with name + bedrag, column totals, emerald/red colors
+- Full: grid-cols-2 gap-3, 'Vrijheid opbouwen' + 'Vrijheid investeren' headers
+- Full: max 4 events per column with name + leeftijd + bedrag, overall totals, +meer indicator
+- Mini and quarter sizes preserved unchanged (event count and sparkline respectively)
+- Cleaned up unused fireIdx/accPts/decPts variables
+- Zero TypeScript errors, zero console errors
+- Commit: df68f607
+
+### Feature #580: Beheer widget presets: widgets toevoegen en verwijderen per preset - PASSING
+- Added WidgetAddDropdown component with WIDGET_CATALOG dropdown grouped by module
+- Module-colored sticky headers (kern=amber, wil=teal, horizon=purple, cross=neutral)
+- Widget name + description in dropdown items, Plus icon per item
+- New widgets added with default size 'quarter' and next order number
+- Added X remove button per widget in SortableWidgetItem
+- Remove recomputes orders (1, 2, 3, ...) after removal
+- Outside-click handler closes dropdown
+- All changes saved via existing PUT /api/widget-presets endpoint
+- Admin-only page (superadmin gated via beheer layout)
+- Zero TypeScript errors
+- Commit: 6e664dd6
+
+### Files Modified
+- components/widgets/levensgebeurtenissen-widget.tsx — two-column layout for half/full
+- app/(app)/beheer/widget-presets/page.tsx — add/remove widget functionality
+
+### Current Status
+- 2 features completed this session (#602, #580)
+
+## Session 2026-03-23 - Features #581, #582
+
+### Feature #581: Beheer widget presets: widget formaat aanpassen per preset - PASSING
+- Added S/M/L size selector buttons per widget in preset admin page
+- Active size: filled bg-[var(--ink)] text-white; inactive: ghost text-[var(--ink-4)]
+- Respects widget.allowedSizes from widget-catalog (disabled + opacity-30 for non-allowed)
+- updateWidgetSize callback updates state + saves via PUT /api/widget-presets
+- Visual feedback: "Opslaan…" indicator during save
+- Consistent with dashboard edit mode size selector pattern
+
+### Feature #582: Beheer widget presets: drag-reorder widgets binnen preset - PASSING
+- Added @dnd-kit/sortable with verticalListSortingStrategy per preset
+- GripVertical drag handle per widget item with cursor-grab/cursor-grabbing
+- PointerSensor (distance: 5) + KeyboardSensor for accessibility
+- After each drag: arrayMove + order reassignment (1, 2, 3, ...)
+- Visual feedback: isDragging → opacity-50 + border-[var(--ink-3)] + shadow
+- Order badge (#1, #2, etc.) shown per widget for admin clarity
+- Disabled widgets preserved separately during reorder
+
+### Files Modified
+- app/(app)/beheer/widget-presets/page.tsx — SortableWidgetItem component + DnD context + size selector
+
+### Current Status
+- 2 features completed this session (#581, #582)
+- Commit: f2fd6e81
+
 ## Session 2026-03-23 - Features #594, #595
 
 ### Feature #594: Full-size verrijken Wil- en Cross-widgets - PASSING
@@ -21246,3 +21305,156 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#573, #574)
 - Commit: 2ae52be4
+
+## Session 2026-03-23 - Features #571, #572
+
+### Feature #571: Widget preset: De Pensioenplanner — pensioen, AOW, pensioengat - PASSING
+- Populated pensioenplanner preset in lib/widget-presets.ts with 7 widgets
+- fire_prognose: size 'full', order 1 (central FIRE projection)
+- netto_vermogen: size 'half', order 2 (current net worth)
+- sim_vermogenspad: size 'half', order 3 (wealth path simulation)
+- passief_inkomen: size 'quarter', order 4 (passive/pension income)
+- vrijheidsmijlpalen: size 'quarter', order 5 (freedom milestones)
+- levensgebeurtenissen: size 'quarter', order 6 (life events impact)
+- cash_flow: size 'quarter', order 7 (monthly cash flow)
+- All widget IDs verified in widget-catalog.ts
+- Tested in browser: preset applies correctly, all sizes match spec
+- Zero console errors
+
+### Feature #572: Widget preset: De Vermogensverdeler — bezittingen, schulden, allocatie - PASSING
+- Populated vermogensverdeler preset in lib/widget-presets.ts with 7 widgets
+- netto_vermogen: size 'full', order 1 (central wealth overview)
+- box3_drag: size 'half', order 2 (tax position)
+- schulden: size 'half', order 3 (debts overview)
+- spaarquote: size 'quarter', order 4 (savings rate)
+- cash_flow: size 'quarter', order 5 (cash flow)
+- vrijheidsvoortgang: size 'quarter', order 6 (freedom progress)
+- jouw_pad: size 'quarter', order 7 (sovereignty level)
+- Note: feature spec said 'schulden_overzicht' but correct widget-catalog ID is 'schulden'
+- Tested in browser: preset applies correctly, all sizes match spec
+- Zero console errors
+
+### Files Modified
+- lib/widget-presets.ts — pensioenplanner + vermogensverdeler preset widgets populated
+
+### Current Status
+- 2 features completed this session (#571, #572)
+- Commit: 62a03b2a
+
+## Session 2026-03-23 - Features #603, #567
+
+### Feature #603: Levensgebeurtenissen: lege-staat per kolom - PASSING
+- Added friendly empty states for both columns in the two-column life events layout
+- Left column (opbouwen): emerald TrendingUp icon, "Nog geen opbouw-gebeurtenissen gepland" text
+  - Hint: "Denk aan: erfenis, AOW, pensioenuitkering, verkoop woning"
+  - "+ Toevoegen" button opens add event modal
+- Right column (investeren): red Heart icon, "Nog geen investeringen gepland" text
+  - Hint: "Denk aan: kinderen, verbouwing, wereldreis, studie"
+  - "+ Toevoegen" button opens add event modal
+- Dashed border, subtle background colors, centered layout — inviting not empty
+- Also added compact empty state versions in levensgebeurtenissen-widget.tsx (half/full sizes)
+- Zero new console errors
+- Commit: d234aa94
+
+### Feature #567: Landingspagina: feature-tags voor FIRE-strijder persona - PASSING
+- Updated FIRE-strijder persona tags from generic to specific FIRE features
+- New tags: Monte Carlo, Coast FIRE, Spaarquote, Backtesting, Vrijheidsscenario's
+- Styling consistent with other persona tags: rounded-full bg-horizon-500/10 text-horizon-700
+- Commit: 640961ab
+
+### Files Modified
+- components/app/horizon/horizon-client.tsx — empty state columns + Heart import
+- components/widgets/levensgebeurtenissen-widget.tsx — compact empty state + TrendingUp/Heart imports
+- components/landing/features.tsx — FIRE-strijder persona tags
+
+### Current Status
+- 2 features completed this session (#603, #567)
+
+## Session 2026-03-23 - Features #583, #585
+
+### Feature #583: Beheer widget presets: preset naam en beschrijving bewerken - PASSING
+- Converted beheer/widget-presets page from server to client component
+- Added InlineEditableText component with click-to-edit behavior
+- Name field: text input on click, commit on blur/Enter, cancel on Escape
+- Description field: textarea on click, same commit/cancel behavior
+- Pencil icon shows on hover (opacity-0 → opacity-100 transition)
+- Fetches presets from GET /api/widget-presets on mount
+- Saves changes via PUT /api/widget-presets on commit
+- "Opslaan…" indicator shown during save
+- Zero TypeScript errors
+
+### Feature #585: Widget preset dropdown laadt admin-aangepaste presets - PASSING
+- Added apiPresets state in DraggableWidgetGrid, initialized with WIDGET_PRESETS
+- useEffect fetches GET /api/widget-presets on mount
+- Passed apiPresets as prop to WidgetAddPicker (replaces hardcoded WIDGET_PRESETS)
+- Updated GET /api/widget-presets to allow any authenticated user (was superadmin-only)
+- PUT /api/widget-presets remains superadmin-only
+- Fallback: if API fails or returns empty, uses hardcoded WIDGET_PRESETS
+- Zero console errors after fix (previously had 403 errors)
+- Commit: 000dd854
+
+### Files Modified
+- app/(app)/beheer/widget-presets/page.tsx — client component with inline editing
+- app/api/widget-presets/route.ts — GET now allows authenticated users
+- components/widgets/draggable-widget-grid.tsx — API-loaded presets + presets prop
+
+### Current Status
+- 2 features completed this session (#583, #585)
+
+## Session 2026-03-23 - Features #604, #605
+
+### Feature #604: Gids bijwerken: levensgebeurtenissen framing naar Vrijheid opbouwen/investeren - PASSING
+- Replaced 3 instances of "positieve levensgebeurtenissen" with "vrijheid-opbouwende gebeurtenissen" in guide-horizon-uitleg.tsx
+- Replaced 3 instances of "negatieve levensgebeurtenissen" with "vrijheid-investerende gebeurtenissen" / "bewuste keuzes waar je vrijheid in investeert"
+- Updated gids tip text from "positieve events" to "vrijheid-opbouwende events"
+- All text reads naturally in Dutch
+- Zero console errors
+
+### Feature #605: Regressietest: classifyLifeEvent en splitLifeEvents classificatie-logica - PASSING
+- Created lib/regression-tests/suites/levensgebeurtenissen-classificatie.ts with 8 test cases
+- Test 1: erfenis (one_time_cost: 50000) → 'opbouwen'
+- Test 2: kind (monthly_cost: 500, 216m) → 'investeren'
+- Test 3: AOW (monthly_income: 1380, 240m) → 'opbouwen'
+- Test 4: sabbatical (cost: -5000, income: -5500, 6m) → 'investeren'
+- Test 5: hypotheek afgelost (monthly_cost: -1200, 360m) → 'opbouwen'
+- Test 6: neutraal event (alle 0) → 'investeren' (conservatief)
+- Test 7: splitLifeEvents correct partitioning
+- Test 8: computeLifeEventNetImpact formula verification (6 sub-cases)
+- Registered in test-registry.ts
+- Commit: 4537e0d5
+
+### Files Modified
+- components/app/guide-horizon-uitleg.tsx — 6 terminology replacements
+- app/(app)/identity/gids/page.tsx — tip text updated
+- lib/regression-tests/suites/levensgebeurtenissen-classificatie.ts — new: 8 regression tests
+- lib/regression-tests/test-registry.ts — registered new suite
+
+### Current Status
+- 2 features completed this session (#604, #605)
+
+## Session 2026-03-23 - Feature #606
+
+### Feature #606: Regressietest: twee-kolommen rendering en lege-staat levensgebeurtenissen - PASSING
+- Created lib/regression-tests/suites/levensgebeurtenissen-ui.ts with 9 regression tests
+- Created test/levensgebeurtenissen-ui.test.ts as vitest wrapper (all 9 pass)
+- Registered suite in test-registry.ts as 'levensgebeurtenissen.ui'
+- Tests cover:
+  1. Mixed events fill both columns (opbouwen + investeren)
+  2. Only opbouwen events → investeren column empty
+  3. Only investeren events → opbouwen column empty
+  4. No events → both columns empty
+  5. Column header classification keys match UI labels
+  6. Column totals = sum of computeLifeEventNetImpact per column
+  7. Events sorted chronologically by target_age within columns
+  8. Null target_age events sort last (fallback 999)
+  9. Zero-impact events classify as investeren (conservative)
+- Suite verified loading in API (categories endpoint shows testCount: 9)
+- Zero new console errors
+- Commit: 07dc38c6
+
+### Files Created
+- lib/regression-tests/suites/levensgebeurtenissen-ui.ts — 9 regression tests
+- test/levensgebeurtenissen-ui.test.ts — vitest wrapper
+
+### Current Status
+- 1 feature completed this session (#606)
