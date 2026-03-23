@@ -1,22 +1,33 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { WIDGET_CATALOG, type WidgetModule, type WidgetSize, getWidgetDef } from '@/lib/widget-catalog'
 import type { WidgetPreset } from '@/lib/widget-presets'
-import { Pencil } from 'lucide-react'
+import type { WidgetPref } from '@/lib/widget-catalog'
+import { Pencil, GripVertical } from 'lucide-react'
 
 const MODULE_COLORS: Record<WidgetModule, { border: string; bg: string; text: string }> = {
   kern:    { border: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-700' },
   wil:     { border: 'border-teal-300',  bg: 'bg-teal-50',  text: 'text-teal-700' },
   horizon: { border: 'border-purple-300', bg: 'bg-purple-50', text: 'text-purple-700' },
   cross:   { border: 'border-neutral-300', bg: 'bg-neutral-50', text: 'text-neutral-600' },
-}
-
-const SIZE_LABELS: Record<string, string> = {
-  mini: 'S',
-  quarter: 'M',
-  half: 'L',
-  full: 'XL',
 }
 
 // Build a lookup for widget names
@@ -113,11 +124,114 @@ function InlineEditableText({
   )
 }
 
+// ── Sortable Widget Item ────────────────────────────────────────
+function SortableWidgetItem({
+  widget,
+  presetId,
+  onSizeChange,
+}: {
+  widget: WidgetPref
+  presetId: string
+  onSizeChange: (presetId: string, widgetId: string, size: WidgetSize) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: widget.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  const def = getWidgetDef(widget.id)
+  const allowed = def?.sizes ?? (['quarter', 'half', 'full'] as WidgetSize[])
+  const sizeOptions: { key: WidgetSize; label: string }[] = [
+    { key: 'quarter', label: 'S' },
+    { key: 'half', label: 'M' },
+    { key: 'full', label: 'L' },
+  ]
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 rounded-md border bg-[var(--subtle)] px-2.5 py-1.5 text-xs text-[var(--ink-2)] transition-all ${
+        isDragging
+          ? 'opacity-50 border-[var(--ink-3)] shadow-[var(--s1)] z-10'
+          : 'border-[var(--border-ed)]'
+      }`}
+    >
+      {/* Drag handle */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label={`Versleep ${widgetNames.get(widget.id) ?? widget.id}`}
+        className="flex shrink-0 items-center justify-center rounded p-0.5 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-3)] cursor-grab active:cursor-grabbing"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+
+      {/* Widget name */}
+      <span className="min-w-0 flex-1 truncate">
+        {widgetNames.get(widget.id) ?? widget.id}
+      </span>
+
+      {/* Order badge */}
+      <span className="shrink-0 font-mono text-[10px] text-[var(--ink-4)]">
+        #{widget.order}
+      </span>
+
+      {/* Size selector */}
+      <div className="flex shrink-0 overflow-hidden rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)]">
+        {sizeOptions.map((s) => {
+          const isActive = widget.size === s.key
+          const isAllowed = allowed.includes(s.key)
+          return (
+            <button
+              key={s.key}
+              type="button"
+              disabled={!isAllowed}
+              onClick={() => {
+                if (isAllowed && !isActive) {
+                  onSizeChange(presetId, widget.id, s.key)
+                }
+              }}
+              aria-label={`${widgetNames.get(widget.id) ?? widget.id} formaat ${s.label}`}
+              aria-pressed={isActive}
+              title={`${s.label} (${s.key})`}
+              className={`flex h-7 w-7 items-center justify-center text-[10px] font-semibold transition-colors ${
+                isActive
+                  ? 'bg-[var(--ink)] text-white'
+                  : isAllowed
+                    ? 'text-[var(--ink-4)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+                    : 'text-[var(--ink-4)]/30 cursor-not-allowed opacity-30'
+              }`}
+            >
+              {s.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Page ─────────────────────────────────────────────────────────
 export default function WidgetPresetsPage() {
   const [presets, setPresets] = useState<WidgetPreset[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   // Fetch presets from API
   useEffect(() => {
@@ -182,6 +296,46 @@ export default function WidgetPresetsPage() {
     [savePresets]
   )
 
+  const handleDragEnd = useCallback(
+    (presetId: string, event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+
+      setPresets((prev) => {
+        const updated = prev.map((p) => {
+          if (p.id !== presetId) return p
+
+          const enabledWidgets = p.widgets
+            .filter(w => w.enabled)
+            .sort((a, b) => a.order - b.order)
+
+          const oldIndex = enabledWidgets.findIndex(w => w.id === active.id)
+          const newIndex = enabledWidgets.findIndex(w => w.id === over.id)
+          if (oldIndex === -1 || newIndex === -1) return p
+
+          const reordered = arrayMove(enabledWidgets, oldIndex, newIndex)
+
+          // Reassign order values 1, 2, 3, ...
+          const reorderedWithOrder = reordered.map((w, i) => ({
+            ...w,
+            order: i + 1,
+          }))
+
+          // Merge back with any disabled widgets
+          const disabledWidgets = p.widgets.filter(w => !w.enabled)
+          return {
+            ...p,
+            widgets: [...reorderedWithOrder, ...disabledWidgets],
+          }
+        })
+
+        savePresets(updated)
+        return updated
+      })
+    },
+    [savePresets]
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -198,6 +352,7 @@ export default function WidgetPresetsPage() {
             <h2 className="text-lg font-semibold text-[var(--ink)]">Widget Presets</h2>
             <p className="mt-1 text-sm text-[var(--ink-3)]">
               Persona-presets voor het dashboard. Klik op een naam of beschrijving om te bewerken.
+              Versleep widgets om de volgorde aan te passen.
             </p>
           </div>
           {saving && (
@@ -209,6 +364,11 @@ export default function WidgetPresetsPage() {
       <div className="space-y-4">
         {presets.map((preset) => {
           const colors = MODULE_COLORS[preset.module]
+          const sortedWidgets = preset.widgets
+            .filter(w => w.enabled)
+            .sort((a, b) => a.order - b.order)
+          const widgetIds = sortedWidgets.map(w => w.id)
+
           return (
             <div
               key={preset.id}
@@ -258,60 +418,27 @@ export default function WidgetPresetsPage() {
                     Nog geen widgets geconfigureerd &mdash; wordt in volgende features ingevuld.
                   </p>
                 ) : (
-                  <div className="space-y-1.5">
-                    {preset.widgets
-                      .filter(w => w.enabled)
-                      .sort((a, b) => a.order - b.order)
-                      .map((w) => {
-                        const def = getWidgetDef(w.id)
-                        const allowed = def?.sizes ?? (['quarter', 'half', 'full'] as WidgetSize[])
-                        const sizeOptions: { key: WidgetSize; label: string }[] = [
-                          { key: 'quarter', label: 'S' },
-                          { key: 'half', label: 'M' },
-                          { key: 'full', label: 'L' },
-                        ]
-                        return (
-                          <div
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(event) => handleDragEnd(preset.id, event)}
+                  >
+                    <SortableContext
+                      items={widgetIds}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-1.5">
+                        {sortedWidgets.map((w) => (
+                          <SortableWidgetItem
                             key={w.id}
-                            className="flex items-center gap-2 rounded-md border border-[var(--border-ed)] bg-[var(--subtle)] px-2.5 py-1.5 text-xs text-[var(--ink-2)]"
-                          >
-                            <span className="min-w-0 flex-1 truncate">
-                              {widgetNames.get(w.id) ?? w.id}
-                            </span>
-                            <div className="flex shrink-0 overflow-hidden rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)]">
-                              {sizeOptions.map((s) => {
-                                const isActive = w.size === s.key
-                                const isAllowed = allowed.includes(s.key)
-                                return (
-                                  <button
-                                    key={s.key}
-                                    type="button"
-                                    disabled={!isAllowed}
-                                    onClick={() => {
-                                      if (isAllowed && !isActive) {
-                                        updateWidgetSize(preset.id, w.id, s.key)
-                                      }
-                                    }}
-                                    aria-label={`${widgetNames.get(w.id) ?? w.id} formaat ${s.label}`}
-                                    aria-pressed={isActive}
-                                    title={`${s.label} (${s.key})`}
-                                    className={`flex h-7 w-7 items-center justify-center text-[10px] font-semibold transition-colors ${
-                                      isActive
-                                        ? 'bg-[var(--ink)] text-white'
-                                        : isAllowed
-                                          ? 'text-[var(--ink-4)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
-                                          : 'text-[var(--ink-4)]/30 cursor-not-allowed opacity-30'
-                                    }`}
-                                  >
-                                    {s.label}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
-                  </div>
+                            widget={w}
+                            presetId={preset.id}
+                            onSizeChange={updateWidgetSize}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
               </div>
             </div>
