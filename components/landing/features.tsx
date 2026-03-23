@@ -743,8 +743,8 @@ export function Features() {
             een beetje inzicht en hulp meer uit z&apos;n geld &mdash; en z&apos;n tijd &mdash; wil halen.
           </p>
 
-          {/* Drie persona-kaarten */}
-          <div className="grid gap-4 md:grid-cols-3">
+          {/* Vier persona-kaarten */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* De pensioenplanner */}
             <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--s1)]">
               <div className="mb-4 h-1 w-10 bg-horizon-500" />
@@ -840,6 +840,39 @@ export function Features() {
                   <span
                     key={f}
                     className="rounded-full bg-wil-500/10 px-2.5 py-0.5 text-[11px] font-medium text-wil-700"
+                  >
+                    {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {/* De financiële onafhankelijkheidsstrijder */}
+            <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--s1)]">
+              <div className="mb-4 h-1 w-10 bg-horizon-500" />
+              <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-horizon-600">
+                Persona
+              </p>
+              <h4 className="mb-2 font-display text-base font-semibold text-[var(--ink)]">
+                De financi&euml;le onafhankelijkheidsstrijder
+              </h4>
+              <p className="mb-1 font-serif text-sm font-medium text-[var(--ink-2)]">
+                Actief op weg naar financi&euml;le vrijheid en eerder stoppen
+              </p>
+              <p className="mb-4 font-serif text-sm leading-relaxed text-[var(--ink-3)]">
+                Maximaliseert de spaarquote, optimaliseert rendement en wil zo snel mogelijk de
+                FIRE-datum bereiken.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'FIRE-countdown',
+                  'Spaarquote tracking',
+                  'Rendement optimalisatie',
+                  'Monte Carlo simulatie',
+                  'Eerder stoppen analyse',
+                ].map((f) => (
+                  <span
+                    key={f}
+                    className="rounded-full bg-horizon-500/10 px-2.5 py-0.5 text-[11px] font-medium text-horizon-700"
                   >
                     {f}
                   </span>
