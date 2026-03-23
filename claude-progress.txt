@@ -1,3 +1,59 @@
+## Session 2026-03-23 - Features #588, #589
+
+### Feature #588: budget_heatmap: fix overflow-visible naar overflow-hidden - PASSING
+- Changed overflow-visible to overflow-hidden on wrapper div in budget-heatmap-widget.tsx
+- BudgetHeatmap component already accepts size prop and renders size-aware per format
+- SVG uses viewBox with w-full + h-auto for proper scaling within container
+- Verified on test-heatmap-formats page: all 4 sizes render correctly, all tests pass
+- Zero console errors
+- Commit: edd7ca08
+
+### Feature #589: Mini-size toevoegen aan alle Kern-module widgets - PASSING
+- Audited all 26 kern-module widgets for mini-size support
+- Found only 2 widgets missing mini-size:
+  1. budget-heatmap-widget.tsx — added mini showing "X categorieën" count
+  2. hypotheek-vs-beleggen-widget.tsx — added mini showing breakeven rendement percentage
+- All other kern widgets (24) already had proper mini-size implementations
+- Used consistent pattern: text-sm font-mono tabular-nums font-semibold
+- Zero console errors on test-kern-widgets page (153 logs, 0 errors)
+- Commit: edd7ca08
+
+### Files Modified
+- components/widgets/budget-heatmap-widget.tsx — overflow-hidden fix + mini-size rendering
+- components/widgets/hypotheek-vs-beleggen-widget.tsx — mini-size rendering
+
+### Current Status
+- 2 features completed this session (#588, #589)
+
+## Session 2026-03-23 - Feature #584
+
+### Feature #584: API endpoint voor opslaan widget presets door admin - PASSING
+- Created app/api/widget-presets/route.ts
+- GET handler: reads presets from app_settings (key: 'widget_presets'), falls back to WIDGET_PRESETS
+- PUT handler: validates superadmin role via isSuperAdmin()
+- PUT handler: validates request body as array of WidgetPreset objects (id, name, description, module, icon, widgets)
+- PUT handler: validates all widget IDs exist in WIDGET_CATALOG (+ allows budget_fav:/holding_fav: dynamic IDs)
+- PUT handler: validates module is one of kern/wil/horizon/cross
+- Saves to app_settings via upsert with updated_at and updated_by
+- Returns saved presets as JSON response
+- Verified with temporary test endpoint (8/8 tests passing):
+  - Non-admin access returns 403
+  - GET returns 200 with 4 presets (fallback)
+  - PUT saves valid presets (200)
+  - GET reads back saved presets with widgets
+  - PUT rejects unknown widget IDs (400)
+  - PUT rejects empty presets array (400)
+  - PUT rejects invalid module (400)
+  - Widget catalog has 50 IDs for validation
+- Zero console errors
+- Commit: 051eff65
+
+### Files Created
+- app/api/widget-presets/route.ts — GET/PUT handlers with superadmin auth + validation
+
+### Current Status
+- 1 feature completed this session (#584)
+
 ## Session 2026-03-23 - Features #570, #579
 
 ### Feature #570: Widget preset datamodel en type definitie - PASSING
@@ -20917,3 +20973,55 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#562, #563)
+
+## Session 2026-03-23 - Features #586, #587
+
+### Feature #586: Widget catalog: allowedSizes uitbreiden naar alle 4 formaten - PASSING
+- Updated all 50 widgets in WIDGET_CATALOG to have sizes: ['mini', 'quarter', 'half', 'full']
+- Previously most had ['quarter', 'half', 'full'], some had ['half', 'full'], ['mini', 'quarter', 'half'], or ['quarter', 'half']
+- All defaultSize values preserved unchanged
+- No other code depended on restricted sizes (all usage is .sizes.includes() checks)
+- TypeScript compiles without new errors
+- Zero new console errors on dashboard/will/identity pages
+- Commit: 5ad19e2d
+
+### Feature #587: WidgetShell: overflow safety en scroll fallback voor full-size content - PASSING
+- Added ScrollableContent helper component with ResizeObserver-based scroll detection
+- Full-size widgets get overflow-y-auto content area with scrollbar-thin
+- Subtle fade-out gradient (h-6, from paper to transparent) shown when content overflows
+- Mini/quarter/half widgets retain overflow-hidden (no visual change)
+- Added 'use client' directive to widget-shell.tsx for hook compatibility
+- Both kickerPosition='top' and kickerPosition='left' layouts updated
+- Verified on /will page: all widget sizes render correctly, zero console errors
+- Commit: 5ad19e2d
+
+### Files Modified
+- lib/widget-catalog.ts — all 50 widgets now have all 4 sizes
+- components/widgets/widget-shell.tsx — ScrollableContent + overflow safety
+
+### Current Status
+- 2 features completed this session (#586, #587)
+
+## Session 2026-03-23 - Features #575, #576
+
+### Feature #575: Widget preset dropdown sectie in WidgetAddPicker - PASSING
+- Added WIDGET_PRESETS import from lib/widget-presets.ts
+- Added Presets section below existing widget groups with border-t divider
+- Layers icon + Presets uppercase label header
+- 4 preset items with colored accent dots, name, description
+- onClick passes preset to parent via onPresetSelect callback
+- Zero console errors
+
+### Feature #576: Bevestigingsdialoog bij preset toepassen - PASSING
+- Added selectedPreset state to DraggableWidgetGrid
+- Confirmation modal with preset name, warning text, Annuleren and Toepassen buttons
+- Backdrop overlay dismisses dialog
+- Toepassen applies preset widgets via setActiveWidgets + scheduleSave
+- Tested with multiple presets, both cancel and apply flows
+- Commit: 64ce8533
+
+### Files Modified
+- components/widgets/draggable-widget-grid.tsx
+
+### Current Status
+- 2 features completed this session (#575, #576)
