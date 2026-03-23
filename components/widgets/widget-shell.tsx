@@ -1,4 +1,6 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Lock, ArrowRight } from 'lucide-react'
 import type { WidgetModule, WidgetSize } from '@/lib/widget-catalog'
@@ -33,6 +35,33 @@ const SIZE_HEIGHT: Record<WidgetSize, string> = {
   quarter: 'h-[140px] sm:h-[160px]',
   half:    'h-[140px] sm:h-[160px]',
   full:    'h-[296px] sm:h-[336px]',
+}
+
+// ── Scroll-fade wrapper for full-size content ─────────────────
+function ScrollableContent({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [canScroll, setCanScroll] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const check = () => setCanScroll(el.scrollHeight > el.clientHeight + 2)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div className={`relative flex-1 min-w-0 ${className}`}>
+      <div ref={ref} className="overflow-y-auto h-full min-w-0 scrollbar-thin">
+        {children}
+      </div>
+      {canScroll && (
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[var(--paper)] to-transparent" />
+      )}
+    </div>
+  )
 }
 
 // ── WidgetShell ───────────────────────────────────────────────
@@ -112,10 +141,12 @@ export const WidgetShell = memo(function WidgetShell({ module, size, kicker, hre
         </div>
 
         {/* Content area */}
-        <div className="flex-1 flex flex-col p-3 min-w-0">
-          <div className="flex-1 min-w-0">
-            {children}
-          </div>
+        <div className="flex-1 flex flex-col p-3 min-w-0 overflow-hidden">
+          {size === 'full' ? (
+            <ScrollableContent>{children}</ScrollableContent>
+          ) : (
+            <div className="flex-1 min-w-0 overflow-hidden">{children}</div>
+          )}
           {isInteractive && !isQuarter && (
             <div className="mt-1 flex justify-end">
               <ArrowRight className="h-3.5 w-3.5 text-[var(--ink-4)] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -129,14 +160,16 @@ export const WidgetShell = memo(function WidgetShell({ module, size, kicker, hre
       {/* 3px top accent bar */}
       <div className={`h-[3px] w-full ${accent}`} />
 
-      <div className={`${isQuarter ? 'p-3' : 'p-4'} flex flex-col h-full`}>
+      <div className={`${isQuarter ? 'p-3' : 'p-4'} flex flex-col h-full overflow-hidden`}>
         {/* Kicker */}
         <p className={`label-editorial ${kickerColor} ${isQuarter ? 'mb-1' : 'mb-2'}`}>{kicker}</p>
 
         {/* Widget content */}
-        <div className="flex-1 min-w-0">
-          {children}
-        </div>
+        {size === 'full' ? (
+          <ScrollableContent>{children}</ScrollableContent>
+        ) : (
+          <div className="flex-1 min-w-0 overflow-hidden">{children}</div>
+        )}
 
         {/* Hover arrow — hidden on quarter (too compact) */}
         {isInteractive && !isQuarter && (
