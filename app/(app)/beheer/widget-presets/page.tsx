@@ -21,7 +21,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { WIDGET_CATALOG, type WidgetModule, type WidgetSize, getWidgetDef } from '@/lib/widget-catalog'
 import type { WidgetPreset } from '@/lib/widget-presets'
 import type { WidgetPref } from '@/lib/widget-catalog'
-import { Pencil, GripVertical } from 'lucide-react'
+import { Pencil, GripVertical, X, Plus, ChevronDown } from 'lucide-react'
 
 const MODULE_COLORS: Record<WidgetModule, { border: string; bg: string; text: string }> = {
   kern:    { border: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-700' },
@@ -129,10 +129,12 @@ function SortableWidgetItem({
   widget,
   presetId,
   onSizeChange,
+  onRemove,
 }: {
   widget: WidgetPref
   presetId: string
   onSizeChange: (presetId: string, widgetId: string, size: WidgetSize) => void
+  onRemove: (presetId: string, widgetId: string) => void
 }) {
   const {
     attributes,
@@ -218,6 +220,16 @@ function SortableWidgetItem({
           )
         })}
       </div>
+
+      {/* Remove button */}
+      <button
+        type="button"
+        onClick={() => onRemove(presetId, widget.id)}
+        aria-label={`Verwijder ${widgetNames.get(widget.id) ?? widget.id}`}
+        className="flex shrink-0 items-center justify-center rounded p-0.5 text-[var(--ink-4)] transition-colors hover:text-red-500 hover:bg-red-50"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
     </div>
   )
 }
@@ -336,6 +348,48 @@ export default function WidgetPresetsPage() {
     [savePresets]
   )
 
+  const addWidget = useCallback(
+    (presetId: string, widgetId: string) => {
+      setPresets((prev) => {
+        const updated = prev.map((p) => {
+          if (p.id !== presetId) return p
+          // Don't add duplicates
+          if (p.widgets.some(w => w.id === widgetId)) return p
+          const maxOrder = p.widgets.reduce((max, w) => Math.max(max, w.order), 0)
+          return {
+            ...p,
+            widgets: [
+              ...p.widgets,
+              { id: widgetId, size: 'quarter' as WidgetSize, order: maxOrder + 1, enabled: true },
+            ],
+          }
+        })
+        savePresets(updated)
+        return updated
+      })
+    },
+    [savePresets]
+  )
+
+  const removeWidget = useCallback(
+    (presetId: string, widgetId: string) => {
+      setPresets((prev) => {
+        const updated = prev.map((p) => {
+          if (p.id !== presetId) return p
+          const filtered = p.widgets.filter(w => w.id !== widgetId)
+          // Recompute orders
+          const reordered = filtered
+            .sort((a, b) => a.order - b.order)
+            .map((w, i) => ({ ...w, order: i + 1 }))
+          return { ...p, widgets: reordered }
+        })
+        savePresets(updated)
+        return updated
+      })
+    },
+    [savePresets]
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -434,17 +488,114 @@ export default function WidgetPresetsPage() {
                             widget={w}
                             presetId={preset.id}
                             onSizeChange={updateWidgetSize}
+                            onRemove={removeWidget}
                           />
                         ))}
                       </div>
                     </SortableContext>
                   </DndContext>
                 )}
+
+                {/* Widget toevoegen dropdown */}
+                <WidgetAddDropdown
+                  presetId={preset.id}
+                  existingWidgetIds={preset.widgets.map(w => w.id)}
+                  onAdd={addWidget}
+                />
               </div>
             </div>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ── Widget Add Dropdown ──────────────────────────────────────────
+function WidgetAddDropdown({
+  presetId,
+  existingWidgetIds,
+  onAdd,
+}: {
+  presetId: string
+  existingWidgetIds: string[]
+  onAdd: (presetId: string, widgetId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const existingSet = new Set(existingWidgetIds)
+  const available = WIDGET_CATALOG.filter(w => !existingSet.has(w.id))
+
+  // Group by module
+  const grouped = available.reduce<Record<string, typeof available>>((acc, w) => {
+    const mod = w.module
+    if (!acc[mod]) acc[mod] = []
+    acc[mod].push(w)
+    return acc
+  }, {})
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div ref={containerRef} className="relative mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 rounded-md border border-dashed border-[var(--border-md)] px-3 py-1.5 text-xs text-[var(--ink-3)] transition-colors hover:border-[var(--ink-4)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+      >
+        <Plus className="h-3 w-3" />
+        Widget toevoegen
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && available.length > 0 && (
+        <div className="absolute left-0 top-full z-20 mt-1 max-h-64 w-72 overflow-y-auto rounded-lg border border-[var(--border-md)] bg-[var(--paper)] shadow-lg">
+          {Object.entries(grouped).map(([mod, widgets]) => {
+            const colors = MODULE_COLORS[mod as WidgetModule] ?? MODULE_COLORS.cross
+            return (
+              <div key={mod}>
+                <div className={`sticky top-0 z-10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide ${colors.bg} ${colors.text}`}>
+                  {mod}
+                </div>
+                {widgets.map(w => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => {
+                      onAdd(presetId, w.id)
+                      setOpen(false)
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-[var(--subtle)]"
+                  >
+                    <Plus className="h-3 w-3 shrink-0 text-[var(--ink-4)]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-[var(--ink-2)]">{w.name}</span>
+                      <span className="ml-1 text-[var(--ink-4)]">— {w.description}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {open && available.length === 0 && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 shadow-lg">
+          <p className="text-xs text-[var(--ink-4)] italic">Alle widgets zijn al toegevoegd.</p>
+        </div>
+      )}
     </div>
   )
 }
