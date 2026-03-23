@@ -40,7 +40,15 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
     description: 'Focus op vermogensopbouw, beleggingen en allocatie',
     module: 'kern',
     icon: 'PieChart',
-    widgets: [],
+    widgets: [
+      { id: 'netto_vermogen',      enabled: true, size: 'full',    order: 1 },
+      { id: 'box3_drag',           enabled: true, size: 'half',    order: 2 },
+      { id: 'schulden',            enabled: true, size: 'half',    order: 3 },
+      { id: 'spaarquote',          enabled: true, size: 'quarter', order: 4 },
+      { id: 'cash_flow',           enabled: true, size: 'quarter', order: 5 },
+      { id: 'vrijheidsvoortgang',  enabled: true, size: 'quarter', order: 6 },
+      { id: 'jouw_pad',            enabled: true, size: 'quarter', order: 7 },
+    ],
   },
   {
     id: 'budgetteerder',
