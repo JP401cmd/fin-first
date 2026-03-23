@@ -1,3 +1,37 @@
+## Session 2026-03-23 - Features #547, #548
+
+### Feature #547: Nieuwe analyse Opbouw: Spaarquote Gevoeligheid - PASSING
+- Created spaarquote-gevoeligheid.tsx in opbouw analysis folder
+- 5 scenarios: -20%, -10%, huidig, +10%, +20% savings rate variations
+- Forward cascade FIRE age computation per scenario (with cashflow support)
+- Table columns: Spaarquote | Maandelijks | FIRE-leeftijd | Verschil | Eindvermogen
+- Current row highlighted with horizon-100 bg + font-semibold + dot indicator
+- Green/red verschilkleuren for earlier/later FIRE ages
+- Handles negative savings gracefully (absolute step amounts instead of percentages)
+- Insight note: "Het verschil tussen 20% meer en 20% minder sparen is X jaar"
+- AnalysisSection with TrendingUp icon, lazy compute via setTimeout
+- Integrated after GiftenCheck, before HypotheekVsBeleggen in phase-modal-opbouw
+- Commit: 0ebfeb5c
+
+### Feature #548: Nieuwe analyse Opbouw: Koopkrachterosie - PASSING
+- Created koopkracht-erosie.tsx in opbouw analysis folder
+- Shows nominal vs real (inflation-adjusted) portfolio value over accumulation phase
+- Two-column layout: Nominaal (€5.5M) vs Reëel/koopkracht (€3.4M) with growth figures
+- Erosie door inflatie: −€2.1M with progress bar showing 50.2% of wealth growth lost
+- Editorial insight: "Inflatie vreet X% van je vermogensgroei"
+- Handles 0% inflation: returns null (no render)
+- AnalysisSection with ArrowDownRight icon
+- Integrated after SpaarquoteGevoeligheid, before StressTest in phase-modal-opbouw
+- Commit: 45ffeed5
+
+### Files Modified
+- components/app/horizon/phase-analysis/opbouw/spaarquote-gevoeligheid.tsx — new component
+- components/app/horizon/phase-analysis/opbouw/koopkracht-erosie.tsx — new component
+- components/app/horizon/phase-modal-opbouw.tsx — integrated both new analysis sections
+
+### Current Status
+- 2 features completed this session (#547, #548)
+
 ## Session 2026-03-23 - Features #533, #534
 
 ### Feature #533: Hypotheek vs Beleggen: FIRE-impact en partner-awareness - PASSING
@@ -20561,3 +20595,31 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#549, #550)
+
+## Session 2026-03-23 - Features #553, #554
+
+### Feature #553: Regressietest: MC checkpoint-leeftijden dynamisch - PASSING
+- Exported buildCheckpointAges() from monte-carlo-opbouw.tsx for testability
+- 6 tests covering:
+  - buildCheckpointAges(30, 50) returns ~5 checkpoints
+  - fireAge always included in checkpoints
+  - currentAge === fireAge edge case
+  - Young user (20, 40) scenario
+  - No duplicate ages across multiple combos
+  - Null fireAge defaults to currentAge + 30
+- All 6 tests pass
+- Commit: 60d80199
+
+### Feature #554: Regressietest: kritische grens binary search convergentie - PASSING
+- 5 tests for findCriticalWithdrawal() binary search:
+  - 500K, 5j, 30K: grens between 0 and upper bound
+  - 2M, 20K: grens >= withdrawal (short-circuit for high success)
+  - 50K, 80K: grens within search range bounds
+  - startPortfolio = 0: converges within search range
+  - Performance: converges within 5 seconds (max 8 iterations × 200 sims)
+- All 5 tests pass
+- Commit: 60d80199
+
+### Current Status
+- 2 features completed this session (#553, #554)
+- Overall progress: 548/560 passing (97.9%)
