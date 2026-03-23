@@ -197,6 +197,87 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
     )
   }
 
+  // ── Half-size: enriched layout with sparkline + breakdown + delta ────
+  if (size === 'half') {
+    return (
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
+        <div ref={ref}>
+          {(isHouseholdView || isPartnerView) && (
+            <div className="mb-1 flex items-center gap-1 text-[10px] text-kern-600">
+              {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+              {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+            </div>
+          )}
+          <div className="flex items-baseline gap-2">
+            <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+              {formatCurrency(netWorth)}
+            </p>
+            {momDelta && !isHouseholdView && !isPartnerView && (
+              <span className={`font-mono text-xs tabular-nums font-medium ${
+                momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
+              }`}>
+                {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}
+              </span>
+            )}
+          </div>
+          {freedomStr && (
+            <p className="font-serif italic text-xs text-[var(--ink-3)]">
+              ≈ {freedomStr} vrijheid
+            </p>
+          )}
+
+          {/* Compact sparkline — 12m historisch + 6m prognose */}
+          {sparkline && (
+            <div className="mt-1.5">
+              <svg
+                width="100%"
+                viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+                preserveAspectRatio="none"
+                style={{ display: 'block' }}
+                aria-hidden="true"
+              >
+                <path d={sparkline.histFill} fill="var(--kern-t)" fillOpacity={hasEntered ? 0.08 : 0} style={{ transition: hasEntered ? 'fill-opacity 200ms ease-out 325ms' : 'none' }} />
+                <path d={sparkline.histPath} fill="none" stroke="var(--kern-t)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" pathLength={1} strokeDasharray={1} strokeDashoffset={hasEntered ? undefined : 1} style={{ animation: hasEntered ? 'drawPath 500ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
+                <line x1={sparkline.currentX} y1={sparkline.pad.top} x2={sparkline.currentX} y2={sparkline.pad.top + sparkline.chartH} stroke="var(--border-md)" strokeWidth={1} strokeDasharray="2 2" strokeOpacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'stroke-opacity 80ms ease-out 455ms' : 'none' }} />
+                <path d={sparkline.forecastPath} fill="none" stroke="var(--hor-t)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 3" strokeOpacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'stroke-opacity 400ms ease-out 550ms' : 'none' }} />
+                <circle cx={sparkline.currentDotX} cy={sparkline.currentDotY} r={3} fill="var(--kern-t)" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 80ms ease-out 500ms' : 'none' }} />
+                <text x={sparkline.pad.left + 1} y={Math.max(sparkline.startY - 4, sparkline.pad.top + 6)} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none' }}>{formatCurrency(sparkline.startValue)}</text>
+                <text x={sparkline.currentDotX} y={Math.max(sparkline.endY - 5, sparkline.pad.top + 6)} fill="var(--kern-t)" fontSize="7.5" fontFamily="var(--font-mono), ui-monospace, monospace" fontWeight="600" textAnchor="middle" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none' }}>{formatCurrency(sparkline.endValue)}</text>
+                <text x={sparkline.forecastEndX - 1} y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)} fill="var(--hor-t)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" textAnchor="end" opacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none' }}>{formatCurrency(sparkline.forecastEndValue)}</text>
+              </svg>
+              <div className="flex justify-between mt-0.5">
+                <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>12m geleden</span>
+                <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--hor-t)' }}>+6m prognose</span>
+              </div>
+            </div>
+          )}
+
+          {/* Mini breakdown bar: bezittingen vs schulden (4px) */}
+          {assetDebtBar && (
+            <div className="mt-1.5">
+              <div className="flex h-1 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                <div className="h-full rounded-l-full bg-emerald-500/80" style={{ width: `${assetDebtBar.assetPct}%` }} />
+                <div className="h-full rounded-r-full bg-red-500/70" style={{ width: `${assetDebtBar.debtPct}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* MoM delta row */}
+          {momDelta && !isHouseholdView && !isPartnerView && (
+            <div className="mt-1 flex items-center gap-1">
+              <span className={`font-mono text-[11px] tabular-nums font-semibold ${momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {momDelta.delta >= 0 ? '▲' : '▼'}{' '}
+                {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}{' '}
+                ({momDelta.delta >= 0 ? '+' : ''}{momDelta.pct.toFixed(1)}%)
+              </span>
+            </div>
+          )}
+        </div>
+      </WidgetShell>
+    )
+  }
+
+  // ── Full-size ────
   return (
     <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
       <div ref={ref}>
