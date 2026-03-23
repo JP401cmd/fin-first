@@ -4,6 +4,7 @@ import { memo, useState, useEffect } from 'react'
 import { ShieldAlert } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
+import { successColor, successBgColor } from '../phase-analysis-utils'
 import {
   runSORRAnalysis,
   runCashBufferAnalysis,
@@ -37,22 +38,6 @@ interface SORRState {
   scenarios: SORRResult[]
   cashBuffers: CashBufferResult[]
   recommendedBuffer: { amount: number; months: number }
-}
-
-// -- Helpers ------------------------------------------------------------------
-
-/** Color class for a success-rate percentage value. */
-function successColor(rate: number): string {
-  if (rate >= 0.85) return 'text-[var(--positive)]'
-  if (rate >= 0.65) return 'text-amber-600'
-  return 'text-[var(--negative)]'
-}
-
-/** Color class for a success-rate used as table cell background. */
-function successBgColor(rate: number): string {
-  if (rate >= 0.85) return 'bg-[var(--positive)]/10'
-  if (rate >= 0.65) return 'bg-amber-600/10'
-  return 'bg-[var(--negative)]/10'
 }
 
 // -- Component ----------------------------------------------------------------

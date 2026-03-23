@@ -5,6 +5,7 @@ import { BarChart3 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
+import { successColor } from '../phase-analysis-utils'
 import {
   runPhaseMonteCarlo,
   type MonteCarloPhaseResult,
@@ -34,15 +35,6 @@ interface MCComputedState {
   kritischeGrens: number
   /** Buffer sensitivity: success rates at different minimum portfolio thresholds */
   bufferGevoeligheid: { buffer: number; label: string; successRate: number }[]
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Color class for a success-rate percentage value. */
-function successColor(rate: number): string {
-  if (rate >= 0.85) return 'text-[var(--positive)]'
-  if (rate >= 0.65) return 'text-amber-600'
-  return 'text-[var(--negative)]'
 }
 
 // ── Buffer thresholds for sensitivity analysis ───────────────────────────────
