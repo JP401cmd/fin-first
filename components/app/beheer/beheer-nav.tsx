@@ -17,6 +17,7 @@ const tabs = [
   { label: 'Nieuws', href: '/beheer/nieuws' },
   { label: 'AI Features', href: '/beheer/ai-features' },
   { label: 'Widgets', href: '/beheer/widgets-test' },
+  { label: 'Widget Presets', href: '/beheer/widget-presets' },
   { label: 'Propositie', href: '/beheer/propositie' },
   { label: 'AOW-leeftijd', href: '/beheer/aow-leeftijd' },
   { label: 'Will Avatar', href: '/beheer/will-avatar' },
