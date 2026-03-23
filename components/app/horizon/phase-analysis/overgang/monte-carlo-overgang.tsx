@@ -154,7 +154,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
           />
 
           {/* ── Key statistics ────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
             {/* Success probability */}
             <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
