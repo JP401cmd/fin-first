@@ -7,6 +7,7 @@ import { AnalysisSection } from '../analysis-section'
 import {
   analyzeSchenkingPlan,
   NL_SCHENKING_VRIJSTELLING,
+  type SchenkingAnalysis,
 } from '@/lib/phase-analysis'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -21,49 +22,55 @@ interface GiftenCheckProps {
   fireAge: number | null
 }
 
+interface ScenarioRow {
+  label: string
+  totaalGeschonken: number
+  fireImpactMaanden: number
+  box3Besparing: number
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const CURRENT_YEAR = new Date().getFullYear()
+const TAX_YEAR_LABEL = `${CURRENT_YEAR}/${CURRENT_YEAR + 1}`
+
+function buildContext(props: GiftenCheckProps) {
+  return {
+    currentPortfolio: props.currentPortfolio,
+    yearlyExpenses: props.yearlyExpenses,
+    annualSavings: props.annualSavings,
+    expectedReturn: props.expectedReturn,
+    inflationRate: props.inflationRate,
+    currentAge: props.currentAge,
+    fireAge: props.fireAge,
+  }
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 /**
  * Gift tax (schenking) analysis for the accumulation phase.
  *
- * Displays the current NL gift-tax exemptions, a "safe gifting amount"
- * based on the user's savings rate, and the estimated FIRE-impact of
- * making use of the standard annual child exemption over 5 years.
+ * Displays the current NL gift-tax exemptions (dynamic year), a "safe gifting
+ * amount" based on savings rate, and a comparison table with three scenarios:
+ * 1. Standard: 1 kind × 5 jaar
+ * 2. Multi-kind: 2 kinderen × 5 jaar
+ * 3. Eenmalig verhoogd: 1 kind × 1 jaar (€31.813)
  *
- * All amounts come from `NL_SCHENKING_VRIJSTELLING` constants and the
- * `analyzeSchenkingPlan` pure function so this component has zero
- * server/database dependency.
+ * Each scenario shows totaal geschonken, FIRE-vertraging, and Box 3 besparing.
  */
-export const GiftenCheck = memo(function GiftenCheck({
-  currentPortfolio,
-  yearlyExpenses,
-  annualSavings,
-  expectedReturn,
-  inflationRate,
-  currentAge,
-  fireAge,
-}: GiftenCheckProps) {
-  // Run the default schenking plan analysis: 1 child, annual exemption, 5 years
-  const analysis = useMemo(() => {
-    return analyzeSchenkingPlan(
-      {
-        relatieOntvanger: 'kind',
-        bedragPerJaar: NL_SCHENKING_VRIJSTELLING.jaarlijksKind,
-        aantalOntvangers: 1,
-        aantalJaren: 5,
-        startAge: currentAge,
-      },
-      {
-        currentPortfolio,
-        yearlyExpenses,
-        annualSavings,
-        expectedReturn,
-        inflationRate,
-        currentAge,
-        fireAge,
-      },
-    )
-  }, [
+export const GiftenCheck = memo(function GiftenCheck(props: GiftenCheckProps) {
+  const {
+    currentPortfolio,
+    yearlyExpenses,
+    annualSavings,
+    expectedReturn,
+    inflationRate,
+    currentAge,
+    fireAge,
+  } = props
+
+  const context = useMemo(() => buildContext(props), [
     currentPortfolio,
     yearlyExpenses,
     annualSavings,
@@ -73,17 +80,91 @@ export const GiftenCheck = memo(function GiftenCheck({
     fireAge,
   ])
 
+  // Scenario 1: 1 kind × 5 jaar (standard — jaarlijkse vrijstelling)
+  const scenario1Kind = useMemo(
+    () =>
+      analyzeSchenkingPlan(
+        {
+          relatieOntvanger: 'kind',
+          bedragPerJaar: NL_SCHENKING_VRIJSTELLING.jaarlijksKind,
+          aantalOntvangers: 1,
+          aantalJaren: 5,
+          startAge: currentAge,
+        },
+        context,
+      ),
+    [context, currentAge],
+  )
+
+  // Scenario 2: 2 kinderen × 5 jaar
+  const scenario2Kinderen = useMemo(
+    () =>
+      analyzeSchenkingPlan(
+        {
+          relatieOntvanger: 'kind',
+          bedragPerJaar: NL_SCHENKING_VRIJSTELLING.jaarlijksKind,
+          aantalOntvangers: 2,
+          aantalJaren: 5,
+          startAge: currentAge,
+        },
+        context,
+      ),
+    [context, currentAge],
+  )
+
+  // Scenario 3: eenmalig verhoogd (1 kind, 1 jaar)
+  const scenarioEenmalig = useMemo(
+    () =>
+      analyzeSchenkingPlan(
+        {
+          relatieOntvanger: 'kind',
+          bedragPerJaar: NL_SCHENKING_VRIJSTELLING.eenmaligVerhoogd,
+          aantalOntvangers: 1,
+          aantalJaren: 1,
+          startAge: currentAge,
+          gebruikEenmaligVerhoogd: true,
+        },
+        context,
+      ),
+    [context, currentAge],
+  )
+
+  // Build comparison rows
+  const scenarios: ScenarioRow[] = useMemo(
+    () => [
+      {
+        label: '1 kind × 5 jr',
+        totaalGeschonken: scenario1Kind.totaalGeschonken,
+        fireImpactMaanden: scenario1Kind.fireImpactMaanden,
+        box3Besparing: scenario1Kind.box3Besparing,
+      },
+      {
+        label: '2 kinderen × 5 jr',
+        totaalGeschonken: scenario2Kinderen.totaalGeschonken,
+        fireImpactMaanden: scenario2Kinderen.fireImpactMaanden,
+        box3Besparing: scenario2Kinderen.box3Besparing,
+      },
+      {
+        label: 'Eenmalig verhoogd',
+        totaalGeschonken: scenarioEenmalig.totaalGeschonken,
+        fireImpactMaanden: scenarioEenmalig.fireImpactMaanden,
+        box3Besparing: scenarioEenmalig.box3Besparing,
+      },
+    ],
+    [scenario1Kind, scenario2Kinderen, scenarioEenmalig],
+  )
+
   return (
     <AnalysisSection
       title="Schenkingscheck"
       icon={Gift}
-      willContext={`Schenkingscheck opbouwfase: veilig bedrag ${formatCurrency(analysis.veiligBedrag)}, FIRE-impact ${analysis.fireImpactMaanden} maanden.`}
+      willContext={`Schenkingscheck opbouwfase: veilig bedrag ${formatCurrency(scenario1Kind.veiligBedrag)}, FIRE-impact ${scenario1Kind.fireImpactMaanden} maanden.`}
     >
       <div className="space-y-4">
-        {/* ── Current NL exemptions ──────────────────────────── */}
+        {/* ── Current NL exemptions (dynamic year) ──────────── */}
         <div>
           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-            Vrijstellingen 2025/2026
+            Vrijstellingen {TAX_YEAR_LABEL}
           </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <ExemptionCard
@@ -107,7 +188,7 @@ export const GiftenCheck = memo(function GiftenCheck({
             Veilig schenkingsbedrag
           </p>
           <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-            {formatCurrency(analysis.veiligBedrag)}
+            {formatCurrency(scenario1Kind.veiligBedrag)}
             <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
               per ontvanger per jaar
             </span>
@@ -118,34 +199,59 @@ export const GiftenCheck = memo(function GiftenCheck({
           </p>
         </div>
 
-        {/* ── FIRE impact ────────────────────────────────────── */}
-        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-            FIRE-impact bij jaarlijkse vrijstelling (5 jaar, 1 kind)
+        {/* ── Scenario comparison table ─────────────────────── */}
+        <div>
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+            Scenario-vergelijking
           </p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-xs text-[var(--ink-3)]">
-              Totaal geschonken
-            </span>
-            <span className="font-mono text-xs tabular-nums text-[var(--ink-2)]">
-              {formatCurrency(analysis.totaalGeschonken)}
-            </span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xs text-[var(--ink-3)]">
-              Vertraging FIRE
-            </span>
-            <span className="font-mono text-xs tabular-nums text-[var(--ink-2)]">
-              {analysis.fireImpactMaanden} maanden
-            </span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xs text-[var(--ink-3)]">
-              Box 3 besparing/jaar
-            </span>
-            <span className="font-mono text-xs tabular-nums text-[var(--positive)]">
-              {formatCurrency(analysis.box3Besparing)}
-            </span>
+          <div className="overflow-x-auto rounded-md border border-[var(--border-ed)]">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]/50">
+                  <th className="px-2 py-1.5 text-left font-medium text-[var(--ink-3)]">
+                    Scenario
+                  </th>
+                  <th className="px-2 py-1.5 text-right font-medium text-[var(--ink-3)]">
+                    Totaal
+                  </th>
+                  <th className="px-2 py-1.5 text-right font-medium text-[var(--ink-3)]">
+                    FIRE-vertraging
+                  </th>
+                  <th className="px-2 py-1.5 text-right font-medium text-[var(--ink-3)]">
+                    Box 3 besp.
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {scenarios.map((s, idx) => (
+                  <tr
+                    key={s.label}
+                    className={
+                      idx === 0
+                        ? 'bg-[var(--positive)]/8'
+                        : 'hover:bg-[var(--subtle)]/50'
+                    }
+                  >
+                    <td className="px-2 py-1.5 text-[var(--ink-2)]">
+                      {s.label}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                      {formatCurrency(s.totaalGeschonken)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                      {s.fireImpactMaanden > 0
+                        ? `${s.fireImpactMaanden} mnd`
+                        : '–'}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[var(--positive)]">
+                      {s.box3Besparing > 0
+                        ? `${formatCurrency(s.box3Besparing)}/jr`
+                        : '–'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
