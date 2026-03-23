@@ -24,7 +24,15 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
     description: 'Focus op pensioen, AOW en langetermijnprojecties',
     module: 'horizon',
     icon: 'CalendarClock',
-    widgets: [],
+    widgets: [
+      { id: 'fire_prognose',       enabled: true, size: 'full',    order: 1 },
+      { id: 'netto_vermogen',      enabled: true, size: 'half',    order: 2 },
+      { id: 'sim_vermogenspad',    enabled: true, size: 'half',    order: 3 },
+      { id: 'passief_inkomen',     enabled: true, size: 'quarter', order: 4 },
+      { id: 'vrijheidsmijlpalen', enabled: true, size: 'quarter', order: 5 },
+      { id: 'levensgebeurtenissen',enabled: true, size: 'quarter', order: 6 },
+      { id: 'cash_flow',           enabled: true, size: 'quarter', order: 7 },
+    ],
   },
   {
     id: 'vermogensverdeler',
@@ -40,7 +48,15 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
     description: 'Focus op budgetten, uitgaven en cashflow',
     module: 'kern',
     icon: 'Wallet',
-    widgets: [],
+    widgets: [
+      { id: 'cash_flow',            enabled: true, size: 'full',    order: 1 },
+      { id: 'spaarquote',           enabled: true, size: 'half',    order: 2 },
+      { id: 'acties',               enabled: true, size: 'half',    order: 3 },
+      { id: 'netto_vermogen',       enabled: true, size: 'quarter', order: 4 },
+      { id: 'jouw_pad',             enabled: true, size: 'quarter', order: 5 },
+      { id: 'vrijheidsvoortgang',   enabled: true, size: 'quarter', order: 6 },
+      { id: 'fire_prognose',        enabled: true, size: 'quarter', order: 7 },
+    ],
   },
   {
     id: 'fire-strijder',
@@ -48,7 +64,15 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
     description: 'Focus op financiele onafhankelijkheid en early retirement',
     module: 'horizon',
     icon: 'Flame',
-    widgets: [],
+    widgets: [
+      { id: 'fire_prognose',        enabled: true, size: 'full',    order: 1 },
+      { id: 'vrijheidsscenarios',   enabled: true, size: 'half',    order: 2 },
+      { id: 'sim_vermogenspad',     enabled: true, size: 'half',    order: 3 },
+      { id: 'backtesting_score',    enabled: true, size: 'quarter', order: 4 },
+      { id: 'spaarquote',           enabled: true, size: 'quarter', order: 5 },
+      { id: 'vrijheidsmijlpalen',   enabled: true, size: 'quarter', order: 6 },
+      { id: 'passief_inkomen',      enabled: true, size: 'quarter', order: 7 },
+    ],
   },
 ]
 
