@@ -62,8 +62,10 @@ export function useChartZoom({
   // Refs for native event listeners (can't rely on closure state)
   const visibleMinRef = useRef(visibleMin)
   const visibleMaxRef = useRef(visibleMax)
+  const fullSpanRef = useRef(fullSpan)
   visibleMinRef.current = visibleMin
   visibleMaxRef.current = visibleMax
+  fullSpanRef.current = fullSpan
 
   // --- Clamp helper ---
   const clamp = useCallback(
@@ -303,6 +305,13 @@ export function useChartZoom({
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
       // Skip tiny deltas (accidental)
       if (Math.abs(e.deltaY) < 2) return
+
+      // When fully zoomed out and scrolling in zoom-out direction (deltaY > 0),
+      // let the event pass through to the page so the user can scroll normally
+      const curSpan = visibleMaxRef.current - visibleMinRef.current
+      const isFullyZoomedOut = curSpan >= fullSpanRef.current - 0.01
+      if (isFullyZoomedOut && e.deltaY > 0) return
+
       e.preventDefault()
       const factor = e.deltaY < 0 ? 1.15 : 0.87
       const rect = el.getBoundingClientRect()
@@ -314,7 +323,6 @@ export function useChartZoom({
       // Read current values from refs
       const curMin = visibleMinRef.current
       const curMax = visibleMaxRef.current
-      const curSpan = curMax - curMin
       const centerAge = curMin + ratio * curSpan
       const newSpan = curSpan / factor
       const newMin = centerAge - (newSpan * (centerAge - curMin) / curSpan)
