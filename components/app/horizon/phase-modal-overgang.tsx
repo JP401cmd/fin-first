@@ -1,6 +1,7 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useState } from 'react'
+import { ChevronRight, ChevronDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { formatCurrency } from '@/lib/format'
@@ -16,6 +17,7 @@ import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +89,8 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   fireStrategy,
   currentPortfolio,
 }: PhaseModalOvergangProps) {
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false)
+
   if (transitionScenario === 'none') return null
 
   const durationYears = Math.max(Math.round(endAge - startAge), 1)
@@ -256,12 +260,71 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
           />
         )}
 
-        {/* 10. Filosofische noot */}
-        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
-          <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
-            {durationYears} jaar overgang = {durationYears} jaar eerder verdiende vrijheid die je nu overbrugt
-          </p>
+        {/* 10. Aannames sectie (collapsed) */}
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)]">
+          <button
+            type="button"
+            onClick={() => setAssumptionsOpen(!assumptionsOpen)}
+            className="inline-flex min-h-[44px] w-full items-center gap-1.5 px-3 py-2 text-xs font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+            aria-expanded={assumptionsOpen}
+          >
+            {assumptionsOpen
+              ? <ChevronDown className="h-3.5 w-3.5 transition-transform duration-150" />
+              : <ChevronRight className="h-3.5 w-3.5 transition-transform duration-150" />
+            }
+            Aannames
+          </button>
+
+          {assumptionsOpen && (
+            <div className="border-t border-dashed border-[var(--border-ed)] px-3 pb-3 pt-2">
+              <div className="space-y-1">
+                <AssumptionRow label="Inflatie" value={`${(inflationRate * 100).toFixed(1)}%`} />
+                {expectedReturn != null && (
+                  <AssumptionRow label="Verwacht rendement" value={`${(expectedReturn * 100).toFixed(1)}%`} />
+                )}
+                <AssumptionRow
+                  label="Jaarlijkse onttrekking"
+                  value={formatCurrency(Math.round(yearlyWithdrawal > 0 ? yearlyWithdrawal : yearlyExpenses))}
+                />
+                <AssumptionRow
+                  label="Jaarlijkse uitgaven"
+                  value={formatCurrency(Math.round(yearlyExpenses))}
+                />
+                {transitionScenario === 'shortfall' && yearlyAowIncome > 0 && (
+                  <>
+                    <AssumptionRow
+                      label="AOW-inkomen/jaar"
+                      value={formatCurrency(Math.round(yearlyAowIncome))}
+                    />
+                    {yearlyExpenses > yearlyAowIncome && (
+                      <AssumptionRow
+                        label="Netto tekort/jaar"
+                        value={formatCurrency(Math.round(yearlyExpenses - yearlyAowIncome))}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* 11. Redactionele noot — data-driven freedom days */}
+        {(() => {
+          const dailyExpenseRate = yearlyExpenses > 0 ? yearlyExpenses / 365 : 0
+          const freedomDays = dailyExpenseRate > 0
+            ? Math.round(portfolioAtTransitionStart / dailyExpenseRate)
+            : null
+          return (
+            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
+              <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
+                {freedomDays != null
+                  ? `${durationYears} jaar overgang \u2014 je leeft van ${freedomDays.toLocaleString('nl-NL')} eerder opgebouwde vrijheidsdagen`
+                  : `${durationYears} jaar overgang = ${durationYears} jaar eerder verdiende vrijheid die je nu overbrugt`}
+              </p>
+            </div>
+          )
+        })()}
       </div>
     </BottomSheet>
   )
@@ -314,17 +377,17 @@ function GapAnalysisKassabon({
         <ReceiptRow
           label="Rendement"
           value={formatCurrency(Math.round(totalRendement))}
-          plus={totalRendement > 0}
+          positive={totalRendement > 0}
         />
         <ReceiptRow
           label="Onttrekking"
           value={totalOnttrekking > 0 ? `\u2212${formatCurrency(Math.round(totalOnttrekking)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
-          minus={totalOnttrekking > 0}
+          negative={totalOnttrekking > 0}
         />
         <ReceiptRow
           label="Box 3 belasting"
           value={totalBox3 > 0 ? `\u2212${formatCurrency(Math.round(totalBox3)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
-          minus={totalBox3 > 0}
+          negative={totalBox3 > 0}
         />
         {Math.abs(totalEvents) > 0.5 && (
           <ReceiptRow
@@ -332,8 +395,8 @@ function GapAnalysisKassabon({
             value={totalEvents >= 0
               ? formatCurrency(Math.round(totalEvents))
               : `\u2212${formatCurrency(Math.round(Math.abs(totalEvents))).replace('\u20AC', '\u20AC ')}`}
-            plus={totalEvents > 0}
-            minus={totalEvents < 0}
+            positive={totalEvents > 0}
+            negative={totalEvents < 0}
           />
         )}
       </div>
@@ -411,24 +474,24 @@ function ShortfallAnalysis({
         <ReceiptRow
           label="Rendement"
           value={formatCurrency(Math.round(totalRendement))}
-          plus={totalRendement > 0}
+          positive={totalRendement > 0}
         />
         {totalIncome > 0 && (
           <ReceiptRow
             label="AOW/Pensioen inkomen"
             value={formatCurrency(Math.round(totalIncome))}
-            plus
+            positive
           />
         )}
         <ReceiptRow
           label="Onttrekking"
           value={totalOnttrekking > 0 ? `\u2212${formatCurrency(Math.round(totalOnttrekking)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
-          minus={totalOnttrekking > 0}
+          negative={totalOnttrekking > 0}
         />
         <ReceiptRow
           label="Box 3 belasting"
           value={totalBox3 > 0 ? `\u2212${formatCurrency(Math.round(totalBox3)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
-          minus={totalBox3 > 0}
+          negative={totalBox3 > 0}
         />
         {Math.abs(totalEvents) > 0.5 && (
           <ReceiptRow
@@ -436,8 +499,8 @@ function ShortfallAnalysis({
             value={totalEvents >= 0
               ? formatCurrency(Math.round(totalEvents))
               : `\u2212${formatCurrency(Math.round(Math.abs(totalEvents))).replace('\u20AC', '\u20AC ')}`}
-            plus={totalEvents > 0}
-            minus={totalEvents < 0}
+            positive={totalEvents > 0}
+            negative={totalEvents < 0}
           />
         )}
       </div>
@@ -462,31 +525,13 @@ function ShortfallAnalysis({
   )
 }
 
-// ── Receipt row helper ───────────────────────────────────────────────────────
+// ── Assumption row helper ────────────────────────────────────────────────────
 
-function ReceiptRow({
-  label,
-  value,
-  plus,
-  minus,
-}: {
-  label: string
-  value: string
-  plus?: boolean
-  minus?: boolean
-}) {
+function AssumptionRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between py-0.5">
-      <span className="font-sans text-sm text-[var(--ink-2)]">
-        {plus && !minus ? '+ ' : ''}{minus ? '\u2212 ' : ''}{label}
-      </span>
-      <span className={`font-mono tabular-nums ${
-        plus ? 'text-[var(--positive)]' :
-        minus ? 'text-[var(--negative)]' :
-        'text-[var(--ink)]'
-      }`}>
-        {value}
-      </span>
+      <span className="font-sans text-xs text-[var(--ink-3)]">{label}</span>
+      <span className="font-mono text-xs tabular-nums text-[var(--ink-2)]">{value}</span>
     </div>
   )
 }

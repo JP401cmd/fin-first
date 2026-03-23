@@ -13,6 +13,7 @@ import { MonteCarloOpbouw } from '@/components/app/horizon/phase-analysis/opbouw
 import { SchuldenSamenvatting } from '@/components/app/horizon/phase-analysis/opbouw/schulden-samenvatting'
 import { GiftenCheck } from '@/components/app/horizon/phase-analysis/opbouw/giften-check'
 import { HypotheekVsBeleggenOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/hypotheek-vs-beleggen-opbouw'
+import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
 import { ASSET_TYPE_LABELS, type AssetType, type Asset } from '@/lib/asset-data'
@@ -200,8 +201,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           {/* Waterval receipt rows */}
           <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <ReceiptRow label="Startvermogen" value={formatCurrency(Math.round(startVermogen))} />
-            <ReceiptRow label="Totale inleg" value={formatCurrency(Math.round(totalInleg))} plus />
-            <ReceiptRow label="Totaal rendement" value={formatCurrency(Math.round(totalRendement))} plus />
+            <ReceiptRow label="Totale inleg" value={formatCurrency(Math.round(totalInleg))} positive />
+            <ReceiptRow label="Totaal rendement" value={formatCurrency(Math.round(totalRendement))} positive />
 
             {/* Rendement sub-breakdown per wealthgroup */}
             {activeTypes.length > 1 && (
@@ -220,7 +221,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
             <ReceiptRow
               label="Box 3 belasting"
               value={totalBox3 > 0 ? `\u2212${formatCurrency(Math.round(totalBox3)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
-              minus={totalBox3 > 0}
+              negative={totalBox3 > 0}
             />
             {Math.abs(totalEvents) > 0.5 && (
               <ReceiptRow
@@ -228,8 +229,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
                 value={totalEvents >= 0
                   ? formatCurrency(Math.round(totalEvents))
                   : `\u2212${formatCurrency(Math.round(Math.abs(totalEvents))).replace('\u20AC', '\u20AC ')}`}
-                plus={totalEvents > 0}
-                minus={totalEvents < 0}
+                positive={totalEvents > 0}
+                negative={totalEvents < 0}
               />
             )}
           </div>
@@ -378,37 +379,6 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
     </BottomSheet>
   )
 })
-
-// ── Receipt row helper ───────────────────────────────────────────────────────
-
-function ReceiptRow({
-  label,
-  value,
-  plus,
-  minus,
-  subtle,
-}: {
-  label: string
-  value: string
-  plus?: boolean
-  minus?: boolean
-  subtle?: boolean
-}) {
-  return (
-    <div className={`flex justify-between py-0.5 ${subtle ? 'opacity-70' : ''}`}>
-      <span className={`font-sans ${subtle ? 'text-xs' : 'text-sm'} text-[var(--ink-2)]`}>
-        {plus && !minus ? '+ ' : ''}{minus ? '\u2212 ' : ''}{label}
-      </span>
-      <span className={`font-mono tabular-nums ${subtle ? 'text-xs' : ''} ${
-        plus ? 'text-[var(--positive)]' :
-        minus ? 'text-[var(--negative)]' :
-        'text-[var(--ink)]'
-      }`}>
-        {value}
-      </span>
-    </div>
-  )
-}
 
 // ── Assumption row helper ────────────────────────────────────────────────────
 

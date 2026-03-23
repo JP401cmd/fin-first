@@ -15,6 +15,7 @@ import { MonteCarloOnttrekken } from '@/components/app/horizon/phase-analysis/on
 import { HuisVerkopen } from '@/components/app/horizon/phase-analysis/onttrekken/huis-verkopen'
 import { SORRAnalyse } from '@/components/app/horizon/phase-analysis/onttrekken/sorr-analyse'
 import { EndOfLife } from '@/components/app/horizon/phase-analysis/onttrekken/end-of-life'
+import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import type { Debt } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import type { LifeEvent } from '@/lib/horizon-data'
@@ -354,42 +355,26 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           />
         )}
 
-        {/* 12. Redactionele noot */}
-        <div className="mt-5 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
-          <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
-            {durationYears} jaar opgebouwde vrijheid, nu geleefd
-          </p>
-        </div>
+        {/* 12. Redactionele noot — data-driven freedom days */}
+        {(() => {
+          const dailyExpenseRate = (yearlyExpenses ?? yearlyWithdrawal) > 0 ? (yearlyExpenses ?? yearlyWithdrawal) / 365 : 0
+          // Average freedom days per year = (yearly withdrawal + yearly AOW income) / daily expense rate
+          const avgFreedomDaysPerYear = dailyExpenseRate > 0
+            ? Math.round((yearlyWithdrawal + yearlyAowIncome) / dailyExpenseRate)
+            : null
+          return (
+            <div className="mt-5 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
+              <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
+                {avgFreedomDaysPerYear != null
+                  ? `${durationYears} jaar vrijheid geleefd \u2014 gemiddeld ${avgFreedomDaysPerYear.toLocaleString('nl-NL')} vrijheidsdagen per jaar`
+                  : `${durationYears} jaar opgebouwde vrijheid, nu geleefd`}
+              </p>
+            </div>
+          )
+        })()}
       </div>
     </BottomSheet>
   )
 })
 
-// ── Receipt row helper ───────────────────────────────────────────────────────
-
-function ReceiptRow({
-  label,
-  value,
-  positive,
-  negative,
-}: {
-  label: string
-  value: string
-  positive?: boolean
-  negative?: boolean
-}) {
-  return (
-    <div className="flex justify-between py-0.5">
-      <span className="font-sans text-sm text-[var(--ink-2)]">{label}</span>
-      <span
-        className={`font-mono tabular-nums ${
-          positive ? 'text-[var(--positive)]' :
-          negative ? 'text-[var(--negative)]' :
-          'text-[var(--ink)]'
-        }`}
-      >
-        {value}
-      </span>
-    </div>
-  )
-}
+// ── Receipt row helper removed — using shared ReceiptRow from phase-analysis/receipt-row.tsx
