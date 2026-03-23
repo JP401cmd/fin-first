@@ -112,15 +112,6 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
   const maxAge = simRows[simRows.length - 1].age
   const ageSpan = maxAge - minAge || 1
 
-  // Find FIRE age boundary row index for split
-  const fireIdx = fireAgeFractional != null
-    ? simRows.findIndex(r => r.age >= fireAgeFractional)
-    : -1
-
-  // Split points at FIRE for two-color rendering
-  const accPts = fireIdx > 0 ? allPts.slice(0, fireIdx + 1) : (fireIdx === -1 ? allPts : allPts)
-  const decPts = fireIdx > 0 ? allPts.slice(fireIdx) : []
-
   // ── Quarter: mini sparkline ─────────────────────────────
   if (size === 'quarter') {
     const W = 120
