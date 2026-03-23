@@ -8,6 +8,7 @@ import { FanChart } from '../fan-chart'
 import { successColor } from '../phase-analysis-utils'
 import {
   runPhaseMonteCarlo,
+  findCriticalWithdrawal,
   type MonteCarloPhaseResult,
 } from '@/lib/phase-monte-carlo'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
@@ -91,13 +92,10 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
       // Primary MC run with default €50k minimum buffer
       const main = runPhaseMonteCarlo(baseInput)
 
-      // Critical withdrawal boundary: simplified estimate.
-      // If success rate is below 90%, scale the withdrawal down proportionally.
-      // Otherwise the current withdrawal is already safe.
-      const kritischeGrens =
-        main.successRate < 0.9
-          ? Math.round(yearlyWithdrawal * (main.successRate / 0.9))
-          : yearlyWithdrawal
+      // Critical withdrawal boundary via binary search.
+      // Finds max yearly withdrawal with >= 90% success rate.
+      // Max 8 iterations × 200 sims each for fast convergence.
+      const kritischeGrens = findCriticalWithdrawal(baseInput, main.successRate)
 
       // Buffer sensitivity: run MC at each threshold to see how the
       // minimum portfolio floor affects the success rate

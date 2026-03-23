@@ -295,6 +295,61 @@ export function runPhaseMonteCarlo(
   return result
 }
 
+// ── Binary search: kritische onttrekkingsgrens ──────────────────────────────
+
+/** Number of sims per binary search iteration (lightweight for speed) */
+const BINARY_SEARCH_SIMS = 200
+
+/** Max binary search iterations */
+const BINARY_SEARCH_MAX_ITER = 8
+
+/**
+ * Zoekt via binary search de maximale jaarlijkse onttrekking met ≥ 90% slagingskans.
+ *
+ * Draait max 8 iteraties met 200 sims elk. De search-range is [0, yearlyWithdrawal × 1.5].
+ * Als de huidige onttrekking al ≥ 90% slagingskans heeft, wordt die als resultaat teruggegeven.
+ *
+ * @param baseInput - MC-invoer met de originele yearlyCashflow (negatief = onttrekking)
+ * @param currentSuccessRate - Slagingskans van de hoofdsimulatie (0-1)
+ * @returns Maximale jaarlijkse onttrekking met ≥ 90% kans
+ */
+export function findCriticalWithdrawal(
+  baseInput: MonteCarloPhaseInput,
+  currentSuccessRate: number,
+): number {
+  const yearlyWithdrawal = Math.abs(baseInput.yearlyCashflow)
+
+  // Als de huidige onttrekking al veilig is (≥ 90%), dan is dat de grens
+  if (currentSuccessRate >= 0.9) return yearlyWithdrawal
+
+  // Performance guard: geen fase = geen zinvolle grens
+  if (baseInput.yearsInPhase <= 0) return yearlyWithdrawal
+
+  let low = 0
+  let high = yearlyWithdrawal * 1.5
+  let best = 0
+
+  for (let i = 0; i < BINARY_SEARCH_MAX_ITER; i++) {
+    const mid = (low + high) / 2
+
+    const result = runPhaseMonteCarlo(
+      { ...baseInput, yearlyCashflow: -mid },
+      BINARY_SEARCH_SIMS,
+    )
+
+    if (result.successRate >= 0.9) {
+      // mid is veilig, probeer hoger
+      best = mid
+      low = mid
+    } else {
+      // mid is te hoog, probeer lager
+      high = mid
+    }
+  }
+
+  return Math.round(best)
+}
+
 // ── SORR-analyse ────────────────────────────────────────────────────────────
 
 /**
