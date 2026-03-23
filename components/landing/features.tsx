@@ -755,11 +755,11 @@ export function Features() {
                 De pensioenplanner
               </h4>
               <p className="mb-1 font-serif text-sm font-medium text-[var(--ink-2)]">
-                Geïnteresseerd in pensioen en financiële toekomst
+                Wil weten of het pensioen straks genoeg is
               </p>
               <p className="mb-4 font-serif text-sm leading-relaxed text-[var(--ink-3)]">
-                Wil weten of het pensioen genoeg is, wanneer eerder stoppen kan, en wat de
-                impact is van extra inleggen.
+                Wil het pensioengat in kaart brengen, weten of de AOW en werkgeverspensioen
+                samen genoeg zijn, en wat extra inleggen oplevert.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {[

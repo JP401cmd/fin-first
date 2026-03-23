@@ -123,7 +123,7 @@ export default function PropositiePage() {
         </div>
 
         {/* Three persona cards */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Persona 1 — De pensioenplanner */}
           <div className="rounded-lg border-l-3 border-horizon-500 bg-horizon-50/50 p-4">
             <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-horizon-600">
@@ -133,11 +133,11 @@ export default function PropositiePage() {
               De pensioenplanner
             </p>
             <p className="mb-1 font-serif text-xs font-medium text-[var(--ink-2)]">
-              Geïnteresseerd in pensioen en financiële toekomst
+              Wil weten of het pensioen straks genoeg is
             </p>
             <p className="mb-3 font-serif text-xs leading-relaxed text-[var(--ink-3)]">
-              Wil weten of het pensioen genoeg is, wanneer eerder stoppen kan, en wat de impact is
-              van extra inleggen.
+              Wil het pensioengat in kaart brengen, weten of de AOW en werkgeverspensioen samen
+              genoeg zijn, en wat extra inleggen oplevert.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {[
@@ -215,6 +215,39 @@ export default function PropositiePage() {
                 <span
                   key={f}
                   className="rounded-full bg-wil-500/10 px-2.5 py-0.5 text-[11px] font-medium text-wil-600"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Persona 4 — De financiële onafhankelijkheidsstrijder */}
+          <div className="rounded-lg border-l-3 border-horizon-500 bg-horizon-50/50 p-4">
+            <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-horizon-600">
+              Persona
+            </p>
+            <p className="mb-1 font-display text-sm font-semibold text-[var(--ink)]">
+              De financiële onafhankelijkheidsstrijder
+            </p>
+            <p className="mb-1 font-serif text-xs font-medium text-[var(--ink-2)]">
+              Actief op weg naar financiële vrijheid en eerder stoppen
+            </p>
+            <p className="mb-3 font-serif text-xs leading-relaxed text-[var(--ink-3)]">
+              Maximaliseert de spaarquote, optimaliseert rendement en wil zo snel mogelijk de
+              FIRE-datum bereiken.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                'FIRE-datum versnellen',
+                'Spaarquote maximaliseren',
+                'Monte Carlo simulaties',
+                'Scenario-analyse & what-if',
+                'Vrijheidsmijlpalen volgen',
+              ].map((f) => (
+                <span
+                  key={f}
+                  className="rounded-full bg-horizon-500/10 px-2.5 py-0.5 text-[11px] font-medium text-horizon-600"
                 >
                   {f}
                 </span>
