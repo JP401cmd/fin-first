@@ -21,7 +21,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, Layers } from 'lucide-react'
+import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, Layers, CalendarClock, PieChart, Wallet, Flame } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
 import { AutoDashboardWizard } from './auto-dashboard-wizard'
@@ -809,27 +809,35 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
               })
             )}
 
-            {/* ── Presets section ─────────────────────────── */}
-            <div className="border-t border-[var(--border-md)]">
-              <div className="flex items-center gap-1.5 px-3 py-1.5">
-                <Layers className="h-3 w-3 text-[var(--ink-4)]" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-                  Presets
+            {/* ── Persona presets section ──────────────────── */}
+            <div className="border-t border-[var(--border-md)] bg-[var(--subtle)]/40">
+              <div className="flex items-center gap-1.5 px-3 py-2">
+                <Layers className="h-3 w-3 text-[var(--ink-3)]" />
+                <span className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                  Persona presets
                 </span>
               </div>
               {WIDGET_PRESETS.map(preset => {
-                const dotColor = preset.module === 'horizon' ? 'bg-horizon-500' : preset.module === 'kern' ? 'bg-kern-500' : 'bg-wil-500'
+                const isHorizon = preset.module === 'horizon'
+                const isKern = preset.module === 'kern'
+                const borderColor = isHorizon ? 'border-horizon-500' : isKern ? 'border-kern-500' : 'border-wil-500'
+                const hoverBg = isHorizon ? 'hover:bg-horizon-50/50' : isKern ? 'hover:bg-kern-50/50' : 'hover:bg-wil-50/50'
+                const iconColor = isHorizon ? 'text-horizon-500' : isKern ? 'text-kern-500' : 'text-wil-500'
+                const PresetIcon = preset.id === 'pensioenplanner' ? CalendarClock
+                  : preset.id === 'vermogensverdeler' ? PieChart
+                  : preset.id === 'budgetteerder' ? Wallet
+                  : Flame
                 return (
                   <button
                     key={preset.id}
                     type="button"
                     onClick={() => { onPresetSelect(preset); onClose() }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--subtle)] flex items-center gap-2 transition-colors cursor-pointer"
+                    className={`w-full text-left px-3 py-2.5 text-xs flex items-center gap-2.5 transition-colors cursor-pointer border-l-3 ${borderColor} ${hoverBg}`}
                   >
-                    <span className={`h-2 w-2 rounded-full shrink-0 ${dotColor}`} />
+                    <PresetIcon className={`h-4 w-4 shrink-0 ${iconColor}`} />
                     <div className="min-w-0">
-                      <div className="font-semibold text-[var(--ink-2)] truncate">{preset.name}</div>
-                      <div className="text-[var(--ink-3)] truncate">{preset.description}</div>
+                      <div className="font-semibold text-[var(--ink)] truncate">{preset.name}</div>
+                      <div className="text-[11px] text-[var(--ink-3)] truncate">{preset.description}</div>
                     </div>
                   </button>
                 )

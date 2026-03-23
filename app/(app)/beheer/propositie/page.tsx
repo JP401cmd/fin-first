@@ -405,7 +405,7 @@ export default function PropositiePage() {
                 ],
                 [
                   'Doelgroep',
-                  'Iedereen die meer inzicht, grip en vooruitzicht wil \u2014 van pensioenplanner tot budgetteerder',
+                  'Iedereen die meer inzicht, grip en vooruitzicht wil \u2014 van pensioenplanner tot FIRE-strijder tot budgetteerder',
                 ],
                 [
                   'Emotioneel frame',
