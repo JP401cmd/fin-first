@@ -12,6 +12,7 @@ import { StressTestSection } from '@/components/app/horizon/phase-analysis/stres
 import { MonteCarloOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/monte-carlo-opbouw'
 import { SchuldenSamenvatting } from '@/components/app/horizon/phase-analysis/opbouw/schulden-samenvatting'
 import { GiftenCheck } from '@/components/app/horizon/phase-analysis/opbouw/giften-check'
+import { SpaarquoteGevoeligheid } from '@/components/app/horizon/phase-analysis/opbouw/spaarquote-gevoeligheid'
 import { HypotheekVsBeleggenOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/hypotheek-vs-beleggen-opbouw'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
@@ -291,7 +292,19 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           fireAge={fireAge}
         />
 
-        {/* 8. Hypotheek vs Beleggen — mortgage vs investing trade-off */}
+        {/* 8. Spaarquote Gevoeligheid — savings rate sensitivity analysis */}
+        <SpaarquoteGevoeligheid
+          annualSavings={yearlySavings}
+          currentAge={currentAge}
+          fireAge={fireAge}
+          currentPortfolio={currentNetWorth}
+          expectedReturn={expectedReturn}
+          inflationRate={inflationRate}
+          yearlyExpenses={yearlyExpenses}
+          cashflows={cashflows}
+        />
+
+        {/* 9. Hypotheek vs Beleggen — mortgage vs investing trade-off */}
         {debts && debts.length > 0 && (
           <HypotheekVsBeleggenOpbouw
             debts={debts}
@@ -309,7 +322,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           />
         )}
 
-        {/* 9. Stress Test — extreme scenario analysis */}
+        {/* 10. Stress Test — extreme scenario analysis */}
         <StressTestSection
           rows={accumulationRows}
           expectedReturn={expectedReturn}
