@@ -640,6 +640,7 @@ const roosData: PersonaData = {
     { name: 'Scheiding afgerond', event_type: 'custom', target_age: 38, target_date: '2024-03-15', one_time_cost: 3500, monthly_cost_change: 400, monthly_income_change: 0, duration_months: 0, icon: 'HeartCrack', is_active: false, sort_order: 0 },
     { name: 'Schuldhulpverlening overwegen', event_type: 'custom', target_age: null, target_date: monthsAgo(-6), one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 12, icon: 'LifeBuoy', is_active: true, sort_order: 1, metadata: { maandelijksBedrag: 200 } },
     { name: 'AOW', event_type: 'aow', target_age: 69, target_date: '2055-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1380, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'alleenstaand' } },
+    { name: 'Schuldhulp afgerond', event_type: 'custom', target_age: 40, target_date: '2026-03-15', one_time_cost: 0, monthly_cost_change: -250, monthly_income_change: 0, duration_months: 24, icon: 'ShieldCheck', is_active: true, sort_order: 3, metadata: { reden: 'Na afronding schuldhulptraject vallen maandlasten weg' } },
   ],
   recommendations: [
     {
@@ -1393,6 +1394,7 @@ const willemData: PersonaData = {
     { name: 'Hypotheek afgelost', event_type: 'custom', target_age: 56, target_date: '2024-06-01', one_time_cost: 0, monthly_cost_change: -1200, monthly_income_change: 0, duration_months: 0, icon: 'PartyPopper', is_active: false, sort_order: 0 },
     { name: 'Vervroegd pensioen', event_type: 'early_retirement', target_age: 60, target_date: '2028-11-30', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: -5500, duration_months: 0, icon: 'Sunset', is_active: true, sort_order: 1, metadata: { gewensteMaandinkomen: 3000, pensioenUitkering: 0 } },
     { name: 'AOW', event_type: 'aow', target_age: 68, target_date: '2036-05-30', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 940, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
+    { name: 'Bedrijfspensioen ABP', event_type: 'custom', target_age: 62, target_date: '2030-11-30', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 2200, duration_months: 72, icon: 'Building2', is_active: true, sort_order: 3, metadata: { reden: 'Aanvullend pensioen via werkgever tot AOW-leeftijd' } },
   ],
   recommendations: [
     {
@@ -1647,6 +1649,7 @@ const rashidData: PersonaData = {
     { name: 'Sabbatical (6 mnd reizen)', event_type: 'sabbatical', target_age: 45, target_date: '2028-09-14', one_time_cost: 5000, monthly_cost_change: 2000, monthly_income_change: -5500, duration_months: 6, icon: 'Plane', is_active: true, sort_order: 0, metadata: { nettoInkomen: 5500, doorbetalingsPct: 0, extraKosten: 8000 } },
     { name: 'Freelance tarief omhoog', event_type: 'career_change', target_age: 47, target_date: '2030-09-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 500, duration_months: 0, icon: 'TrendingUp', is_active: true, sort_order: 1 },
     { name: 'AOW', event_type: 'aow', target_age: 69, target_date: '2052-06-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1350, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'alleenstaand' } },
+    { name: 'Belastingteruggave ZZP', event_type: 'custom', target_age: 44, target_date: '2027-04-01', one_time_cost: 3500, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Receipt', is_active: true, sort_order: 3, metadata: { reden: 'Zelfstandigenaftrek + MKB-winstvrijstelling over vorig boekjaar' } },
   ],
   recommendations: [
     {
@@ -1900,6 +1903,8 @@ const marijkeData: PersonaData = {
     { name: 'Pensioen', event_type: 'early_retirement', target_age: 65, target_date: '2022-06-20', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Sunset', is_active: false, sort_order: 0, metadata: { gewensteMaandinkomen: 3400, pensioenUitkering: 1800 } },
     { name: 'Stacaravan verkopen', event_type: 'custom', target_age: 73, target_date: '2030-06-20', one_time_cost: 0, monthly_cost_change: -100, monthly_income_change: 0, duration_months: 0, icon: 'Home', is_active: true, sort_order: 1, metadata: { verkoopprijs: 20000, reden: 'Te oud om te onderhouden' } },
     { name: 'AOW partner Henk', event_type: 'aow', target_age: null, target_date: '2025-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
+    { name: 'Lijfrente-uitkering', event_type: 'custom', target_age: 70, target_date: '2027-06-20', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 400, duration_months: 180, icon: 'Banknote', is_active: true, sort_order: 3, metadata: { reden: 'Opgebouwde lijfrente komt tot uitkering, 15 jaar looptijd' } },
+    { name: 'Verbouwing badkamer', event_type: 'custom', target_age: 69, target_date: '2026-09-01', one_time_cost: -8500, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Wrench', is_active: true, sort_order: 4, metadata: { reden: 'Senioren-aanpassing badkamer met inloopdouche' } },
   ],
   recommendations: [
     {
