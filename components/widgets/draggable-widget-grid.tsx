@@ -21,13 +21,14 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, Plus, Lock, Wand2, ChevronRight } from 'lucide-react'
+import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, Layers } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
 import { AutoDashboardWizard } from './auto-dashboard-wizard'
 import { useDisplaySize } from '@/lib/hooks/use-display-size'
 import type { WidgetPref, WidgetSize, WidgetModule } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef } from '@/lib/widget-catalog'
+import { WIDGET_PRESETS, type WidgetPreset } from '@/lib/widget-presets'
 import { isFeatureAccessible, type FeatureAccessMap } from '@/lib/compute-feature-access'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
@@ -208,6 +209,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showAddPicker, setShowAddPicker] = useState(false)
   const [showAutoWizard, setShowAutoWizard] = useState(false)
+  const [selectedPreset, setSelectedPreset] = useState<WidgetPreset | null>(null)
 
   // Dashboard type toggle (only active when showDashboardTypeToggle is true)
   const { dashboardType, setDashboardType } = useDashboardType()
@@ -606,6 +608,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
             onToggle={() => setShowAddPicker(p => !p)}
             onAdd={handleAdd}
             onClose={() => setShowAddPicker(false)}
+            onPresetSelect={setSelectedPreset}
           />
           <button
             type="button"
@@ -629,6 +632,46 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         features={features}
         allBudgets={data.allBudgets}
       />
+
+      {/* ── Preset confirmation dialog ───────────────────────── */}
+      {selectedPreset && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSelectedPreset(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-sm rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)] p-5">
+              <h3 className="text-sm font-semibold text-[var(--ink)]">
+                Preset toepassen
+              </h3>
+              <p className="mt-2 text-xs text-[var(--ink-3)] leading-relaxed">
+                Dit vervangt je huidige dashboard met het <span className="font-semibold text-[var(--ink-2)]">{selectedPreset.name}</span>-preset. Je huidige widgetindeling gaat verloren. Doorgaan?
+              </p>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPreset(null)}
+                  className="rounded-[var(--r-sm)] px-3 py-1.5 text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+                >
+                  Annuleren
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Apply preset widgets (next feature will implement full logic)
+                    if (selectedPreset.widgets.length > 0) {
+                      setActiveWidgets(selectedPreset.widgets)
+                      scheduleSave(selectedPreset.widgets)
+                    }
+                    setSelectedPreset(null)
+                  }}
+                  className="rounded-[var(--r-sm)] bg-[var(--ink)] text-[var(--paper)] px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity"
+                >
+                  Toepassen
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 
@@ -661,9 +704,10 @@ interface WidgetAddPickerProps {
   onToggle: () => void
   onAdd: (id: string) => void
   onClose: () => void
+  onPresetSelect: (preset: WidgetPreset) => void
 }
 
-function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker, onToggle, onAdd, onClose }: WidgetAddPickerProps) {
+function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker, onToggle, onAdd, onClose, onPresetSelect }: WidgetAddPickerProps) {
   const [openModules, setOpenModules] = useState<Set<WidgetModule>>(new Set())
 
   const availableWidgets = WIDGET_CATALOG.filter(
@@ -764,6 +808,33 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
                 )
               })
             )}
+
+            {/* ── Presets section ─────────────────────────── */}
+            <div className="border-t border-[var(--border-md)]">
+              <div className="flex items-center gap-1.5 px-3 py-1.5">
+                <Layers className="h-3 w-3 text-[var(--ink-4)]" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                  Presets
+                </span>
+              </div>
+              {WIDGET_PRESETS.map(preset => {
+                const dotColor = preset.module === 'horizon' ? 'bg-horizon-500' : preset.module === 'kern' ? 'bg-kern-500' : 'bg-wil-500'
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => { onPresetSelect(preset); onClose() }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--subtle)] flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${dotColor}`} />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[var(--ink-2)] truncate">{preset.name}</div>
+                      <div className="text-[var(--ink-3)] truncate">{preset.description}</div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </>
       )}
