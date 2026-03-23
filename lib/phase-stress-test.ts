@@ -17,6 +17,7 @@ export type StressScenarioType =
   | 'prolonged_inflation'
   | 'longer_life'
   | 'wealth_loss'
+  | 'combined_crisis'
 
 export interface StressScenario {
   type: StressScenarioType
@@ -28,7 +29,7 @@ export interface StressScenario {
   durationYears?: number
   /**
    * Magnitude — betekenis hangt af van type:
-   * - market_crash: rendement-override (bijv. -0.40 = -40%)
+   * - market_crash: rendement-override (bijv. -0.30 = -30%)
    * - prolonged_inflation: inflatie percentage (bijv. 0.05 = 5%)
    * - longer_life: extra jaren (bijv. 10)
    * - wealth_loss: euro-bedrag (bijv. -50000)
@@ -41,10 +42,10 @@ export interface StressScenario {
 export const PRESET_STRESS_SCENARIOS: StressScenario[] = [
   {
     type: 'market_crash',
-    label: 'Marktcrash (−40%)',
-    description: 'Een crash van 40% in jaar 3 van deze fase',
-    triggerYearOffset: 3,
-    magnitude: -0.40,
+    label: 'Marktcrash (−30%)',
+    description: 'Een crash van 30% in jaar 2 van deze fase',
+    triggerYearOffset: 2,
+    magnitude: -0.30,
   },
   {
     type: 'prolonged_inflation',
@@ -65,6 +66,14 @@ export const PRESET_STRESS_SCENARIOS: StressScenario[] = [
     description: 'Eenmalig verlies door scheiding of onverwachte kosten',
     triggerYearOffset: 1,
     magnitude: -50_000,
+  },
+  {
+    type: 'combined_crisis',
+    label: 'Gecombineerde crisis',
+    description: 'Crash van 30% in jaar 2, plus 5% inflatie gedurende 5 jaar',
+    triggerYearOffset: 2,
+    durationYears: 5,
+    magnitude: -0.30, // crash magnitude; inflatie is hardcoded op 0.05
   },
 ]
 
@@ -166,7 +175,7 @@ function applyMarketCrash(
     ? baseRows[triggerIndex - 1].netWorth
     : baseRows[0].startNetWorth
 
-  // Pas crash toe: magnitude is negatief (bijv. -0.40 = -40% van vermogen)
+  // Pas crash toe: magnitude is negatief (bijv. -0.30 = -30% van vermogen)
   const crashLoss = preCrashNw * Math.abs(scenario.magnitude)
   const postCrashNw = preCrashNw - crashLoss
 
@@ -361,6 +370,69 @@ function applyWealthLoss(
   }
 }
 
+// ── Combined Crisis (Crash + Inflation) ────────────────────────────────────
+
+function applyCombinedCrisis(
+  baseRows: UnifiedProjectionRow[],
+  scenario: StressScenario,
+  params: { expectedReturn: number; inflationRate: number },
+): { endPortfolio: number; survives: boolean; depletionAge: number | null } {
+  if (baseRows.length === 0) {
+    return { endPortfolio: 0, survives: true, depletionAge: null }
+  }
+
+  const triggerOffset = scenario.triggerYearOffset ?? 2
+  const triggerIndex = Math.min(triggerOffset, baseRows.length - 1)
+  const durationYears = scenario.durationYears ?? 5
+  const crashMagnitude = Math.abs(scenario.magnitude) // e.g. 0.30
+  const stressInflation = 0.05 // 5% inflatie tijdens crisis
+  const inflationDelta = stressInflation - params.inflationRate
+
+  const avgBox3DragRate = baseRows.reduce((sum, r) => sum + deriveBox3DragRate(r), 0) / baseRows.length
+
+  // Vermogen vlak voor de crash
+  const preCrashNw = triggerIndex > 0
+    ? baseRows[triggerIndex - 1].netWorth
+    : baseRows[0].startNetWorth
+
+  // Pas crash toe
+  const postCrashNw = preCrashNw * (1 - crashMagnitude)
+
+  // Forward-cascade met crash + inflatie-schok
+  const remainingYears = baseRows.length - triggerIndex
+  const { netWorthByYear, depletionYearIndex } = forwardCascade(
+    postCrashNw,
+    remainingYears,
+    {
+      expectedReturn: params.expectedReturn,
+      box3DragRate: avgBox3DragRate,
+      getSavings: (y) => baseRows[triggerIndex + y]?.savings ?? 0,
+      getWithdrawal: (y) => baseRows[triggerIndex + y]?.withdrawal ?? 0,
+      getCashflowNet: (y) => baseRows[triggerIndex + y]?.cashflowNet ?? 0,
+      getInflationDelta: (y) => {
+        // Inflatieschok geldt alleen gedurende durationYears na de crash
+        if (y >= durationYears) return 0
+        const baseWithdrawal = baseRows[triggerIndex + y]?.withdrawal ?? 0
+        return baseWithdrawal * inflationDelta * (y + 1)
+      },
+    },
+  )
+
+  const endPortfolio = netWorthByYear.length > 0
+    ? netWorthByYear[netWorthByYear.length - 1]
+    : postCrashNw
+
+  const depletionAge = depletionYearIndex !== null
+    ? baseRows[triggerIndex + depletionYearIndex].age
+    : null
+
+  return {
+    endPortfolio: Math.round(endPortfolio),
+    survives: depletionYearIndex === null,
+    depletionAge,
+  }
+}
+
 // ── Impact Summary Generators ───────────────────────────────────────────────
 
 function generateImpactSummary(
@@ -385,6 +457,9 @@ function generateImpactSummary(
 
     case 'wealth_loss':
       return `Eenmalig verlies verlaagt eindsaldo met ${formatCurrency(absDelta)}`
+
+    case 'combined_crisis':
+      return `Crash + hoge inflatie kost ${formatCurrency(absDelta)}, eindsaldo ${formatCurrency(absDelta)} lager`
 
     default:
       return `Impact: ${formatCurrency(absDelta)}`
@@ -428,6 +503,9 @@ export function applyStressScenario(
       break
     case 'wealth_loss':
       result = applyWealthLoss(baseRows, scenario, params)
+      break
+    case 'combined_crisis':
+      result = applyCombinedCrisis(baseRows, scenario, params)
       break
     default: {
       // Onbekend scenario — geen impact
