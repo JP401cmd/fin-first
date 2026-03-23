@@ -122,55 +122,65 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
         </p>
       )}
 
-      {/* Full-size: per-type rows + weighted return */}
-      {size === 'full' && investmentAssets.length > 0 && (
-        <div className="mt-4 space-y-3 border-t border-dashed border-[var(--border-ed)] pt-4">
-          {investmentAssets.map(a => {
-            const pct = totalInvestments > 0 ? (a.value / totalInvestments) * 100 : 0
-            const color = ASSET_COLORS[a.type] ?? '#71717a'
-            return (
-              <div key={a.type}>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full shrink-0"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="text-[var(--ink-2)] truncate">
-                      {ASSET_LABELS[a.type] ?? a.type}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono tabular-nums text-[var(--ink)]">
-                      {formatCurrency(a.value)}
-                    </span>
-                    <span className="w-8 text-right text-[var(--ink-4)]">
-                      {Math.round(pct)}%
-                    </span>
-                  </div>
-                </div>
-                {/* Mini bar */}
-                <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${pct}%`, backgroundColor: color }}
-                  />
-                </div>
-              </div>
-            )
-          })}
+      {/* Full-size: top 3 per-type rows + overig + weighted return */}
+      {size === 'full' && investmentAssets.length > 0 && (() => {
+        const sorted = [...investmentAssets].sort((a, b) => b.value - a.value)
+        const top3 = sorted.slice(0, 3)
+        const rest = sorted.slice(3)
+        const overigValue = rest.reduce((s, a) => s + a.value, 0)
+        const displayRows = overigValue > 0
+          ? [...top3, { type: 'overig' as string, value: overigValue, expectedReturn: undefined }]
+          : top3
 
-          {/* Weighted expected return */}
-          {weightedReturn != null && weightedReturn > 0 && (
-            <div className="mt-2 flex items-baseline justify-between border-t border-dashed border-[var(--border-ed)] pt-3 text-xs">
-              <span className="text-[var(--ink-3)]">Verwacht rendement</span>
-              <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                {(weightedReturn * 100).toFixed(1)}% p.j.
-              </span>
-            </div>
-          )}
-        </div>
-      )}
+        return (
+          <div className="mt-3 space-y-1 border-t border-dashed border-[var(--border-ed)] pt-3">
+            {displayRows.map(a => {
+              const pct = totalInvestments > 0 ? (a.value / totalInvestments) * 100 : 0
+              const color = ASSET_COLORS[a.type] ?? '#71717a'
+              return (
+                <div key={a.type}>
+                  <div className="flex items-center justify-between text-[11px] mb-0.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-[var(--ink-2)] truncate">
+                        {ASSET_LABELS[a.type] ?? (a.type === 'overig' ? 'Overig' : a.type)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-mono tabular-nums text-[var(--ink)]">
+                        {formatCurrency(a.value)}
+                      </span>
+                      <span className="w-8 text-right text-[var(--ink-4)]">
+                        {Math.round(pct)}%
+                      </span>
+                    </div>
+                  </div>
+                  {/* Allocatie mini bar */}
+                  <div className="h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, backgroundColor: color }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Weighted expected return */}
+            {weightedReturn != null && weightedReturn > 0 && (
+              <div className="mt-1 flex items-baseline justify-between border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px]">
+                <span className="text-[var(--ink-3)]">Verwacht rendement</span>
+                <span className="font-mono tabular-nums text-[var(--ink-2)]">
+                  {(weightedReturn * 100).toFixed(1)}% p.j.
+                </span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </WidgetShell>
   )
 })

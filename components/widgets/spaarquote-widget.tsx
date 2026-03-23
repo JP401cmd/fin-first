@@ -85,8 +85,8 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     // Append current rate
     estimatedRates.push(rate)
 
-    // Take last 6 months for sparkline
-    const sparkData = estimatedRates.slice(-6)
+    // Take last 12 months for sparkline (showcase full year)
+    const sparkData = estimatedRates.slice(-12)
     const avg3m = estimatedRates.length >= 3
       ? estimatedRates.slice(-3).reduce((a, b) => a + b, 0) / 3
       : null
@@ -179,16 +179,27 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
           </div>
         )}
 
-        {/* Gemiddelden + benchmark */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
+        {/* Gemiddelden + benchmark + year comparison */}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
           {avg3m !== null && (
-            <span>3m gem: {avg3m.toFixed(1)}%</span>
+            <span>3m: {avg3m.toFixed(1)}%</span>
           )}
           {avg6m !== null && (
-            <span>· 6m gem: {avg6m.toFixed(1)}%</span>
+            <span>· 6m: {avg6m.toFixed(1)}%</span>
           )}
-          <span className="text-[var(--ink-4)]">· FIRE-optimaal: {fireBenchmark}%+</span>
+          <span className="text-[var(--ink-4)]">· FIRE: {fireBenchmark}%+</span>
         </div>
+        {/* Year-over-year comparison */}
+        {estimatedRates.length >= 12 && (() => {
+          const thisYear = estimatedRates.slice(-6).reduce((a, b) => a + b, 0) / 6
+          const lastYear = estimatedRates.slice(-12, -6).reduce((a, b) => a + b, 0) / 6
+          const yoyDelta = thisYear - lastYear
+          return (
+            <p className={`mt-0.5 text-[11px] font-mono tabular-nums ${yoyDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              {yoyDelta >= 0 ? '↑' : '↓'} {Math.abs(yoyDelta).toFixed(1)}% t.o.v. vorig halfjaar
+            </p>
+          )
+        })()}
       </WidgetShell>
     )
   }

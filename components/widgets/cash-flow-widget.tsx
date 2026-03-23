@@ -276,8 +276,8 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
         </div>
 
         {/* ── 4 budget categories with mini progress bars ── */}
-        <div className="mt-4 border-t border-dashed border-[var(--border-ed)]" />
-        <div className="mt-3 flex flex-col gap-1.5">
+        <div className="mt-3 border-t border-dashed border-[var(--border-ed)]" />
+        <div className="mt-2 flex flex-col gap-1">
           {CATEGORIES.map((config) => {
             const typeData = budgetTotals[config.key]
             return (
@@ -308,8 +308,8 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
         {/* ── Previous month comparison barchart ── */}
         {hasPrevMonth && (
           <>
-            <div className="mt-4 border-t border-dashed border-[var(--border-ed)]" />
-            <div className="mt-3">
+            <div className="mt-3 border-t border-dashed border-[var(--border-ed)]" />
+            <div className="mt-2">
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-2">
                 Vergelijking vorige maand
               </p>

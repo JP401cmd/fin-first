@@ -134,64 +134,74 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
         </p>
       )}
 
-      {/* Full-size: extra breakdown rows */}
-      {size === 'full' && assetsByType.length > 0 && (
-        <div className="mt-4 space-y-3 border-t border-dashed border-[var(--border-ed)] pt-4">
-          {/* Ongerealiseerde winst */}
-          {unrealizedGain != null && (
-            <div className="mb-3 flex items-baseline justify-between text-xs">
-              <span className="text-[var(--ink-3)]">Ongerealiseerde winst</span>
-              <span
-                className={`font-mono font-semibold tabular-nums ${unrealizedGain >= 0 ? 'text-emerald-700' : 'text-red-600'}`}
-              >
-                {unrealizedGain >= 0 ? '+' : ''}
-                {formatCurrency(unrealizedGain)}
-                {unrealizedPct != null && (
-                  <span className="ml-1 font-normal text-[var(--ink-3)]">
-                    ({unrealizedPct >= 0 ? '+' : ''}{unrealizedPct.toFixed(1)}%)
-                  </span>
-                )}
-              </span>
-            </div>
-          )}
+      {/* Full-size: extra breakdown rows — top 3 + overig */}
+      {size === 'full' && assetsByType.length > 0 && (() => {
+        const sorted = [...assetsByType].sort((a, b) => b.value - a.value)
+        const top3 = sorted.slice(0, 3)
+        const rest = sorted.slice(3)
+        const overigValue = rest.reduce((s, a) => s + a.value, 0)
+        const displayRows = overigValue > 0
+          ? [...top3, { type: 'overig' as string, value: overigValue, expectedReturn: undefined }]
+          : top3
 
-          {/* Per-type rows */}
-          {assetsByType.map(a => {
-            const pct = totalAssets > 0 ? (a.value / totalAssets) * 100 : 0
-            const color = ASSET_COLORS[a.type] ?? '#71717a'
-            return (
-              <div key={a.type}>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full shrink-0"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="text-[var(--ink-2)] truncate">
-                      {ASSET_LABELS[a.type] ?? a.type}
+        return (
+          <div className="mt-3 space-y-1 border-t border-dashed border-[var(--border-ed)] pt-3">
+            {/* Ongerealiseerde winst */}
+            {unrealizedGain != null && (
+              <div className="mb-1 flex items-baseline justify-between text-[11px]">
+                <span className="text-[var(--ink-3)]">Ongerealiseerde winst</span>
+                <span
+                  className={`font-mono font-semibold tabular-nums ${unrealizedGain >= 0 ? 'text-emerald-700' : 'text-red-600'}`}
+                >
+                  {unrealizedGain >= 0 ? '+' : ''}
+                  {formatCurrency(unrealizedGain)}
+                  {unrealizedPct != null && (
+                    <span className="ml-1 font-normal text-[var(--ink-3)]">
+                      ({unrealizedPct >= 0 ? '+' : ''}{unrealizedPct.toFixed(1)}%)
                     </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono tabular-nums text-[var(--ink)]">
-                      {formatCurrency(a.value)}
-                    </span>
-                    <span className="w-8 text-right text-[var(--ink-4)]">
-                      {Math.round(pct)}%
-                    </span>
-                  </div>
-                </div>
-                {/* Mini bar */}
-                <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${pct}%`, backgroundColor: color }}
-                  />
-                </div>
+                  )}
+                </span>
               </div>
-            )
-          })}
-        </div>
-      )}
+            )}
+
+            {/* Per-type rows — max 3 + overig */}
+            {displayRows.map(a => {
+              const pct = totalAssets > 0 ? (a.value / totalAssets) * 100 : 0
+              const color = ASSET_COLORS[a.type] ?? '#71717a'
+              return (
+                <div key={a.type}>
+                  <div className="flex items-center justify-between text-[11px] mb-0.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-[var(--ink-2)] truncate">
+                        {ASSET_LABELS[a.type] ?? (a.type === 'overig' ? 'Overig' : a.type)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-mono tabular-nums text-[var(--ink)]">
+                        {formatCurrency(a.value)}
+                      </span>
+                      <span className="w-8 text-right text-[var(--ink-4)]">
+                        {Math.round(pct)}%
+                      </span>
+                    </div>
+                  </div>
+                  {/* Mini bar */}
+                  <div className="h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, backgroundColor: color }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
     </WidgetShell>
   )
 })

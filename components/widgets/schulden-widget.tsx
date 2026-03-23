@@ -114,14 +114,14 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
       )}
 
       {totalDebts > 0 ? (
-        <div className="mt-3 space-y-3">
+        <div className="mt-2 space-y-1">
           {/* Schuldratio progress bar */}
           <div>
-            <div className="flex justify-between text-[11px] mb-1">
+            <div className="flex justify-between text-[11px] mb-0.5">
               <span className="text-[var(--ink-3)]">Schuldratio</span>
               <span className="font-mono tabular-nums text-red-600">{schuldRatio.toFixed(0)}%</span>
             </div>
-            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-red-500/70 transition-all duration-500"
                 style={{ width: `${schuldRatio}%` }}
@@ -131,7 +131,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
 
           {/* Monthly repayment section */}
           {monthlyRepayment > 0 && (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <div className="flex justify-between text-[11px]">
                 <span className="text-[var(--ink-3)]">Maandelijkse aflossing</span>
                 <span className="font-mono tabular-nums font-medium text-[var(--ink)]">
@@ -155,7 +155,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
             </span>
           </div>
 
-          <p className="text-xs text-[var(--ink-3)]">
+          <p className="text-[11px] text-[var(--ink-3)]">
             Vrijheid die je terugkoopt
           </p>
         </div>

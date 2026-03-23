@@ -366,9 +366,9 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
 
         {/* Full-size: vermogensopbouw breakdown */}
         {size === 'full' && assetDebtBar && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-2 space-y-1">
             {/* Stacked bar: assets (green) vs debts (red) */}
-            <div className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-l-full bg-emerald-500/80 transition-all duration-500"
                 style={{ width: `${assetDebtBar.assetPct}%` }}
@@ -387,12 +387,12 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                 Schulden {formatCurrency(totalDebts)}
               </span>
             </div>
-            {/* MoM delta row */}
+            {/* MoM delta row — prominent */}
             {momDelta && (
-              <div className="flex items-center gap-1.5 text-[11px]">
-                <span className="text-[var(--ink-3)]">&Delta; deze maand:</span>
+              <div className="flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2 py-1">
+                <span className="text-[11px] text-[var(--ink-3)]">Δ deze maand</span>
                 <span
-                  className={`font-mono tabular-nums font-medium ${
+                  className={`font-mono tabular-nums text-[11px] font-semibold ${
                     momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
                   }`}
                 >

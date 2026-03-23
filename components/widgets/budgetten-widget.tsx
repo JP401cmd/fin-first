@@ -91,9 +91,10 @@ interface BudgetRowProps {
   limit:      number
   spent:      number
   hasEntered: boolean
+  trend?:     'up' | 'down' | 'flat' | null
 }
 
-function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
+function BudgetRow({ config, limit, spent, hasEntered, trend }: BudgetRowProps) {
   const { icon: Icon, label, iconBg, iconText, labelText, barFillVar, barWarnVar } = config
   const hasData    = limit > 0
   const pct        = progressPct(spent, limit)
@@ -115,9 +116,20 @@ function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
             {label}
           </span>
         </div>
-        <span className={`font-mono tabular-nums text-[10px] ${overBudget ? (overPositive ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
-          {hasData ? `${formatCurrency(spent)} / ${formatCurrency(limit)}` : '—'}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {trend && trend !== 'flat' && (
+            <span className={`text-[10px] font-semibold ${
+              config.key === 'expense' || config.key === 'debt'
+                ? (trend === 'up' ? 'text-red-500' : 'text-emerald-600')
+                : (trend === 'up' ? 'text-emerald-600' : 'text-red-500')
+            }`}>
+              {trend === 'up' ? '↑' : '↓'}
+            </span>
+          )}
+          <span className={`font-mono tabular-nums text-[10px] ${overBudget ? (overPositive ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
+            {hasData ? `${formatCurrency(spent)} / ${formatCurrency(limit)}` : '—'}
+          </span>
+        </div>
       </div>
 
       {/* Laag 2: voortgangsbalk — compact */}
@@ -175,7 +187,7 @@ function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
 
 export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href }: Props) {
   const isFullSize       = size === 'full'
-  const { budgetTotals, monthlyExpenses } = data
+  const { budgetTotals, monthlyExpenses, budgetTypeHistory } = data
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
   const hasAnyBudget = BUDGET_TYPE_CONFIGS.some(c => budgetTotals[c.key].limit > 0)
@@ -331,11 +343,26 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
     )
   }
 
+  // Compute trend per budget type: compare current spent with last month's history
+  const trendPerType = BUDGET_TYPE_CONFIGS.reduce((acc, config) => {
+    const hist = budgetTypeHistory?.[config.key]
+    if (hist && hist.length >= 1) {
+      const prevSpent = hist[hist.length - 1].value
+      const currentSpent = budgetTotals[config.key].spent
+      const delta = currentSpent - prevSpent
+      const threshold = prevSpent * 0.05 // 5% threshold for flat
+      acc[config.key] = Math.abs(delta) < threshold ? 'flat' : delta > 0 ? 'up' : 'down'
+    } else {
+      acc[config.key] = null
+    }
+    return acc
+  }, {} as Record<string, 'up' | 'down' | 'flat' | null>)
+
   return (
     <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
 
       {/* ── Vier budget-rijen ── */}
-      <div ref={inViewRef} className="flex flex-col gap-2">
+      <div ref={inViewRef} className={`flex flex-col ${isFullSize ? 'gap-1' : 'gap-2'}`}>
         {BUDGET_TYPE_CONFIGS.map((config) => {
           const typeData = budgetTotals[config.key]
           return (
@@ -345,6 +372,7 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
               limit={typeData.limit}
               spent={typeData.spent}
               hasEntered={hasEntered}
+              trend={isFullSize ? trendPerType[config.key] : undefined}
             />
           )
         })}
