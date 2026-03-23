@@ -1,3 +1,43 @@
+## Session 2026-03-23 - Features #590, #591
+
+### Feature #590: Mini-size toevoegen aan alle Horizon-module widgets - PASSING
+- All 13 Horizon widgets already had mini-size support, but several needed improvements:
+- fire_prognose: changed from showing cd.fireDate (string) to FIRE age number (e.g. "52j")
+- vrijheidsscenarios: changed from single expected age to optimistic-pessimistic range (e.g. "48-54j")
+- passief_inkomen: changed from monthly to yearly amount with "/j" suffix
+- box3_drag: changed from EUR amount to effective tax percentage (e.g. "0.32%")
+- backtesting_score: added successColor class to mini percentage (green/amber/red)
+- vrijheidsmijlpalen: changed from "X/4 bereikt" to next milestone label (e.g. "Halverwege")
+- All widgets use font-mono tabular-nums for numbers, 64px height via WidgetShell
+- Zero TypeScript errors
+- Commit: c4b4d29a
+
+### Feature #591: Mini-size toevoegen aan alle Wil- en Cross-module widgets - PASSING
+- All 14 Wil/Cross widgets already had mini-size support, but two needed improvements:
+- doelen: changed from "X/Y bereikt" to "X actief" (active goals count)
+- ai_inzicht: changed from "X inzichten" count to styled "Nieuw inzicht" badge with module colors
+- All other Wil/Cross widgets already had proper mini rendering:
+  - acties: "X open", voorstellen: "X actief", beslissingspatronen: "+Xd"
+  - vrijheidsdagen_maand: "Xd", wilskracht: "score — label"
+  - vrijheidsvoortgang: "X.X%", jouw_pad: "level name"
+  - meldingen: "X nieuw", berichten: "X nieuw", volgende_stap: title
+  - maandoverzicht: delta amount, agenda: "X events"
+- Zero TypeScript errors
+- Commit: c4b4d29a
+
+### Files Modified
+- components/widgets/fire-prognose-widget.tsx — mini shows FIRE age number
+- components/widgets/vrijheidsscenario-widget.tsx — mini shows scenario range
+- components/widgets/passief-inkomen-widget.tsx — mini shows yearly amount
+- components/widgets/box3-drag-widget.tsx — mini shows tax percentage
+- components/widgets/backtesting-score-widget.tsx — mini adds color coding
+- components/widgets/vrijheidsmijlpalen-widget.tsx — mini shows next milestone label
+- components/widgets/doelen-widget.tsx — mini shows active count
+- components/widgets/ai-inzicht-widget.tsx — mini shows Nieuw inzicht badge
+
+### Current Status
+- 2 features completed this session (#590, #591)
+
 ## Session 2026-03-23 - Features #588, #589
 
 ### Feature #588: budget_heatmap: fix overflow-visible naar overflow-hidden - PASSING
@@ -21025,3 +21065,28 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#575, #576)
+
+## Session 2026-03-23 - Features #565, #578
+
+### Feature #565: Beheer propositie: persona-grid naar 4 kolommen en samenvattingstabel bijwerken - PASSING
+- Grid already had sm:grid-cols-2 lg:grid-cols-4 (done by concurrent agent in #562)
+- Updated summary table doelgroep text from "van pensioenplanner tot budgetteerder" to "van pensioenplanner tot FIRE-strijder tot budgetteerder"
+- Admin-only page (requires superadmin), changes verified via code review
+- Zero console errors
+
+### Feature #578: Visuele styling preset-items in dropdown met persona-kleuren - PASSING
+- Added colored left borders per preset: border-l-3 with horizon-500/kern-500/wil-500
+- Added hover backgrounds: hover:bg-{module}-50/50 per module
+- Added Lucide icons: CalendarClock (pensioen), PieChart (vermogen), Wallet (budget), Flame (FIRE)
+- Subtle background on preset section: bg-[var(--subtle)]/40
+- Label changed to "Persona presets" in editorial uppercase style
+- Verified in browser: all 4 presets render with icons, borders, correct names/descriptions
+- Zero console errors (only Fast Refresh logs)
+- Commit: e3283e80
+
+### Files Modified
+- app/(app)/beheer/propositie/page.tsx — summary table doelgroep text
+- components/widgets/draggable-widget-grid.tsx — preset styling with borders, icons, hover states
+
+### Current Status
+- 2 features completed this session (#565, #578)
