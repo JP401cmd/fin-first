@@ -1,3 +1,24 @@
+## Session 2026-03-23 - Features #533, #534
+
+### Feature #533: Hypotheek vs Beleggen: FIRE-impact en partner-awareness - PASSING
+- Added FIRE-impact row in conclusion section of HypotheekVsBeleggenOpbouw
+  - Shows "+X maanden" with color coding (green=beleggen faster, red=aflossen faster)
+  - Explanatory text: "Beleggen brengt je FIRE-datum X maanden dichterbij"
+- Accept hasPartner and marginaalTarief as props (no longer hardcoded)
+- Thread hasPartner/marginaalTarief from horizon-client → PhaseModalOpbouw → HypotheekVsBeleggenOpbouw
+- Verified in browser: FIRE-impact shows "+14 maanden" for regression-test user
+- Commit: 9466c8c1
+
+### Feature #534: Stress Test: crash-scenario afstemmen en combinatie-scenario - PASSING
+- Changed market_crash preset: -40% year 3 → -30% year 2
+- Added combined_crisis scenario type + applyCombinedCrisis() function
+- Preset: "Gecombineerde crisis" — crash 30% + 5% inflation for 5 years
+- Verified in browser: all 5 scenarios visible in stress test table
+- Commit: 267edc2e
+
+### Current Status
+- 2 features completed this session (#533, #534)
+
 ## Session 2026-03-23 - Features #523, #524
 
 ### Feature #523: Shared ReceiptRow component extractie - PASSING
@@ -20289,3 +20310,67 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#527, #528)
+
+## Session 2026-03-23 - Features #525, #526
+
+### Feature #525: Aannames-sectie toevoegen aan Overgang-modal - PASSING
+- Added useState for assumptionsOpen + ChevronRight/ChevronDown imports
+- Collapsible Aannames section after PhaseDetailTable, before redactionele noot
+- Shows: Inflatie, Verwacht rendement, Jaarlijkse onttrekking, Jaarlijkse uitgaven
+- Shortfall scenario: also shows AOW-inkomen/jaar and Netto tekort/jaar
+- Identical visual pattern to Opbouw: dashed border, chevron toggle, min-h-[44px]
+- AssumptionRow helper component for consistent formatting
+- Verified in browser: gap scenario with 8 jaar overgang, all values correct
+
+### Feature #526: Aannames-sectie toevoegen aan Onttrekking-modal - PASSING
+- Added useState for assumptionsOpen + ChevronRight/ChevronDown imports
+- Collapsible Aannames section after PhaseDetailTable, before redactionele noot
+- Shows: Inflatie, Verwacht rendement, SWR (impliciet), Jaarlijkse onttrekking, AOW-inkomen/jaar, Pensioen-inkomen/jaar, Strategie
+- SWR calculated as yearlyWithdrawal / startPortfolio
+- Pensioen-inkomen derived from aggregates.totalPensioen / durationYears
+- Identical visual pattern to Opbouw and Overgang
+- Verified in browser: all 7 assumption rows display correctly
+- Commit: da839a21
+
+### Files Modified
+- components/app/horizon/phase-modal-overgang.tsx — Aannames section (already committed by concurrent agent)
+- components/app/horizon/phase-modal-onttrekking.tsx — Aannames section + AssumptionRow helper
+
+### Current Status
+- 2 features completed this session (#525, #526)
+
+## Session 2026-03-23 - Features #531, #532
+
+### Feature #531: Schulden Samenvatting: relatieve scenario's en FIRE-impact - PASSING
+- Replaced hardcoded +€200/mnd extra aflossing with 3 relative scenarios (10%, 20%, 30% of monthly savings)
+- Added scenario comparison table: Extra/mnd | Eerder klaar | Rentebesparing | FIRE-impact
+- FIRE impact uses Future Value annuity formula (freed monthly payment compounds after payoff)
+- Green highlight on first row (10% = most achievable scenario)
+- Excluded mortgages and aflossingsvrij debts from scenario calculations (separate dynamics)
+- Added estimatePayoff() with annuity formula: n = -ln(1 - r*PV/PMT) / ln(1+r)
+- Added estimatePortfolioPayoff() distributing extra proportionally across payable debts
+- Graceful fallback: no scenarios when annualSavings <= 0 (e.g. regression test user with -€37k savings)
+- Baseline "Totale rentelast" row shows total interest cost (added by linter)
+- Link to /core/debts preserved
+- Commit: merged into 3140bc9a by concurrent agent
+
+### Feature #532: Giften Check: dynamisch belastingjaar en multi-kind scenario's - PASSING
+- Replaced hardcoded "Vrijstellingen 2025/2026" with dynamic year via new Date().getFullYear()
+- Now shows "Vrijstellingen 2026/2027" (adjusts automatically each calendar year)
+- Added 3 scenario comparison table:
+  - 1 kind × 5 jr: standard annual child exemption
+  - 2 kinderen × 5 jr: double the recipients
+  - Eenmalig verhoogd: one-time enhanced exemption (€31.813)
+- Per scenario: totaal geschonken, FIRE-vertraging, Box 3 besparing/jaar
+- Compact table with green highlight on first (most common) scenario
+- Works with low portfolios: FIRE-vertraging shows "–" when savings negative
+- Tested with regression test user: all 3 scenarios render correctly
+- Zero new console errors
+- Commit: fa84af9a
+
+### Files Modified
+- components/app/horizon/phase-analysis/opbouw/schulden-samenvatting.tsx — relative scenarios + annuity formula
+- components/app/horizon/phase-analysis/opbouw/giften-check.tsx — dynamic year + multi-scenario table
+
+### Current Status
+- 2 features completed this session (#531, #532)
