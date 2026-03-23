@@ -6,7 +6,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 import { runPhaseMonteCarlo, runSORRAnalysis, runCashBufferAnalysis, SORR_SCENARIOS } from '@/lib/phase-monte-carlo'
-import { runPhaseStressTests, PRESET_STRESS_SCENARIOS } from '@/lib/phase-stress-test'
+import { runPhaseStressTests, PRESET_STRESS_SCENARIOS, applyStressScenario } from '@/lib/phase-stress-test'
 import {
   analyzeSchenkingPlan, analyzeHuisVerkopen, analyzeEndOfLife,
   compareOvergangStrategieen, berekenEerderStoppen, NL_SCHENKING_VRIJSTELLING,
@@ -242,6 +242,59 @@ const tests: TestCase[] = [
         longerLife.endPortfolio,
         longerLife.baseEndPortfolio,
         'langer leven verlaagt eindvermogen',
+      )
+    },
+  },
+
+  // ── Combined crisis regression test ────────────────────────────────────────
+  {
+    id: 'phase-stress-combined-crisis-worse',
+    name: 'Stress: combined crisis erger dan elk apart',
+    category: CAT,
+    description: 'Combinatie crash+inflatie geeft grotere delta en lagere successRate dan market_crash of prolonged_inflation alleen',
+    priority: 'critical',
+    estimatedDurationMs: 300,
+    fn() {
+      const rows = makeStressRows()
+      const stressParams = {
+        expectedReturn: 0.07,
+        inflationRate: 0.02,
+        yearlyExpenses: 30_000,
+      }
+
+      // Stap 1: Run market_crash, noteer delta A
+      const crashScenario = PRESET_STRESS_SCENARIOS.find(s => s.type === 'market_crash')!
+      const crashResult = applyStressScenario(rows, crashScenario, stressParams)
+      const deltaA = crashResult.endPortfolioDelta
+      assertFinite(deltaA, 'market_crash delta is een eindig getal')
+
+      // Stap 2: Run prolonged_inflation, noteer delta B
+      const inflationScenario = PRESET_STRESS_SCENARIOS.find(s => s.type === 'prolonged_inflation')!
+      const inflationResult = applyStressScenario(rows, inflationScenario, stressParams)
+      const deltaB = inflationResult.endPortfolioDelta
+      assertFinite(deltaB, 'prolonged_inflation delta is een eindig getal')
+
+      // Stap 3: Run combined_crisis, noteer delta C
+      const combinedScenario = PRESET_STRESS_SCENARIOS.find(s => s.type === 'combined_crisis')!
+      const combinedResult = applyStressScenario(rows, combinedScenario, stressParams)
+      const deltaC = combinedResult.endPortfolioDelta
+      assertFinite(deltaC, 'combined_crisis delta is een eindig getal')
+
+      // Stap 4: |C| >= max(|A|, |B|) — combined impact is at least as bad as worst individual
+      const absDeltaA = Math.abs(deltaA)
+      const absDeltaB = Math.abs(deltaB)
+      const absDeltaC = Math.abs(deltaC)
+      assertGreaterThanOrEqual(
+        absDeltaC,
+        Math.max(absDeltaA, absDeltaB),
+        `|combined delta| (${absDeltaC}) >= max(|crash| ${absDeltaA}, |inflation| ${absDeltaB})`,
+      )
+
+      // Stap 5: successRate combined <= min(successRate crash, successRate inflation)
+      assertLessThanOrEqual(
+        combinedResult.estimatedSuccessRate,
+        Math.min(crashResult.estimatedSuccessRate, inflationResult.estimatedSuccessRate),
+        `combined successRate (${combinedResult.estimatedSuccessRate}) <= min(crash ${crashResult.estimatedSuccessRate}, inflation ${inflationResult.estimatedSuccessRate})`,
       )
     },
   },
