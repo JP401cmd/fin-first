@@ -12,6 +12,7 @@ import { StressTestSection } from '@/components/app/horizon/phase-analysis/stres
 import { MonteCarloOvergang } from '@/components/app/horizon/phase-analysis/overgang/monte-carlo-overgang'
 import { GapAnalyse } from '@/components/app/horizon/phase-analysis/overgang/gap-analyse'
 import { EerderStoppen } from '@/components/app/horizon/phase-analysis/overgang/eerder-stoppen'
+import { DeeltijdwerkImpact } from '@/components/app/horizon/phase-analysis/overgang/deeltijdwerk-impact'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
@@ -225,7 +226,21 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
           />
         )}
 
-        {/* 7. Eerder Stoppen — for both gap and shortfall scenarios */}
+        {/* 7. Deeltijdwerk Flex Impact — part-time work scenarios */}
+        {expectedReturn != null && (
+          <DeeltijdwerkImpact
+            startPortfolio={portfolioAtTransitionStart}
+            startAge={startAge}
+            endAge={endAge}
+            yearlyExpenses={yearlyExpenses}
+            expectedReturn={expectedReturn}
+            inflationRate={inflationRate}
+            transitionScenario={transitionScenario}
+            cashflows={cashflows}
+          />
+        )}
+
+        {/* 8. Eerder Stoppen — for both gap and shortfall scenarios */}
         {currentAge != null && expectedReturn != null && (
           <EerderStoppen
             currentAge={currentAge}
