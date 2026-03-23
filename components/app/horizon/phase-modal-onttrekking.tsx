@@ -16,6 +16,7 @@ import { MonteCarloOnttrekken } from '@/components/app/horizon/phase-analysis/on
 import { HuisVerkopen } from '@/components/app/horizon/phase-analysis/onttrekken/huis-verkopen'
 import { SORRAnalyse } from '@/components/app/horizon/phase-analysis/onttrekken/sorr-analyse'
 import { EndOfLife } from '@/components/app/horizon/phase-analysis/onttrekken/end-of-life'
+import { KoopkrachtErosieOnttrekken } from '@/components/app/horizon/phase-analysis/onttrekken/koopkracht-erosie-onttrekken'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import type { Debt } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
@@ -50,6 +51,14 @@ interface PhaseModalOnttrekkingProps {
   assets?: Asset[]
   /** User's annual expenses for stress test */
   yearlyExpenses?: number
+  /** Erfgenamen (heirs) with relation type and inheritance fraction */
+  erfgenamen?: { relatie: 'kind' | 'partner' | 'overig'; fractie: number }[]
+  /** Partner AOW monthly benefit for partner continuation analysis */
+  partnerAowBedrag?: number
+  /** Nabestaandenpensioen monthly amount for partner continuation analysis */
+  nabestaandenPensioen?: number
+  /** Whether user has a partner (for partner continuation section) */
+  hasPartner?: boolean
 }
 
 // ── Income Source Bar ────────────────────────────────────────────────────────
@@ -131,6 +140,10 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   expectedReturn,
   assets,
   yearlyExpenses,
+  erfgenamen,
+  partnerAowBedrag,
+  nabestaandenPensioen,
+  hasPartner,
 }: PhaseModalOnttrekkingProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
@@ -335,9 +348,22 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           endAge={endAge}
           inflationRate={inflationRate}
           yearlyAowIncome={yearlyAowIncome}
+          hasPartner={hasPartner}
+          erfgenamen={erfgenamen}
+          partnerAowBedrag={partnerAowBedrag}
+          nabestaandenPensioen={nabestaandenPensioen}
         />
 
-        {/* 10. Stress Test */}
+        {/* 10. Koopkrachterosie — purchasing power erosion over time */}
+        <KoopkrachtErosieOnttrekken
+          yearlyWithdrawal={yearlyWithdrawal}
+          inflationRate={inflationRate}
+          startAge={startAge}
+          endAge={endAge}
+          yearlyAowIncome={yearlyAowIncome}
+        />
+
+        {/* 11. Stress Test */}
         {expectedReturn != null && (
           <StressTestSection
             rows={withdrawalRows}
