@@ -150,6 +150,88 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
     ? [40, 50, 60, 70, 80].filter(a => a >= minAge && a <= maxAge)
     : []
 
+  // ── Half-size: horizontal layout — left labels, right SVG chart ──
+  if (size === 'half') {
+    return (
+      <WidgetShell module="horizon" size={size} kicker="Vermogenspad" href={href}>
+        <div ref={ref} className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            {fireAgeFractional != null && (
+              <p className="text-[10px] text-horizon-600 font-mono font-semibold mb-0.5">
+                FIRE {fireAgeFractional.toFixed(1)}j
+              </p>
+            )}
+            <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(endRow?.endPortfolio ?? 0)}
+            </p>
+            <p className="text-[10px] text-[var(--ink-3)]">eindvermogen</p>
+            {(() => {
+              const endVal = endRow?.endPortfolio ?? 0
+              const peakVal = peakRow?.endPortfolio ?? 1
+              const drawdown = peakVal > 0 ? ((peakVal - endVal) / peakVal) * 100 : 0
+              const riskLabel = drawdown < 20 ? 'Laag risico' : drawdown < 50 ? 'Matig' : 'Hoog'
+              const riskColor = drawdown < 20 ? 'bg-emerald-50 text-emerald-700' : drawdown < 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+              return (
+                <span className={`mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full w-fit ${riskColor}`}>
+                  {riskLabel}
+                </span>
+              )
+            })()}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <svg
+              width="100%"
+              viewBox={`0 0 ${W} ${H}`}
+              className="overflow-visible"
+              aria-label="Gesimuleerd vermogenspad"
+            >
+              {accumulationRows.length > 1 && (
+                <path
+                  d={buildPath(accumulationRows)}
+                  fill="none"
+                  stroke="var(--horizon-500, #c4a06b)"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  pathLength={1}
+                  style={{
+                    strokeDasharray: '1',
+                    strokeDashoffset: hasEntered ? '0' : '1',
+                    transition: hasEntered ? 'stroke-dashoffset 500ms cubic-bezier(.22,1,.36,1)' : 'none',
+                  }}
+                />
+              )}
+              {retirementRows.length > 1 && (
+                <path
+                  d={buildPath(retirementRows)}
+                  fill="none"
+                  stroke="var(--ink-4)"
+                  strokeWidth="1.2"
+                  strokeDasharray="3 2"
+                  strokeLinecap="round"
+                  style={{ opacity: hasEntered ? 1 : 0, transition: hasEntered ? 'opacity 300ms ease 500ms' : 'none' }}
+                />
+              )}
+              {fireX != null && (
+                <circle
+                  cx={fireX}
+                  cy={toY(accumulationRows.at(-1)?.endPortfolio ?? 0)}
+                  r="3"
+                  fill="var(--horizon-600, #a07840)"
+                  style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 650ms' }}
+                />
+              )}
+            </svg>
+            <div className="flex items-center justify-between mt-0.5">
+              <p className="text-[9px] text-[var(--ink-4)] font-mono">{minAge}j</p>
+              <p className="text-[9px] text-[var(--ink-4)] font-mono">90j</p>
+            </div>
+          </div>
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="horizon" size={size} kicker="Vermogenspad" href={href}>
       <div ref={ref} className="mt-2">

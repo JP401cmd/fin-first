@@ -204,37 +204,37 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     )
   }
 
-  // ── Half-size: percentage + bar + bedrag + vergelijking + freedom ──
+  // ── Half-size: horizontal layout — left percentage, right details ──
   return (
     <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
-      <p className={`font-mono text-2xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
-        {rate.toFixed(1)}%
-      </p>
-
-      {/* Mini bar */}
-      <div className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-        <div
-          className={`h-full rounded-full transition-all ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`}
-          style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
-        />
+      <div className="flex gap-3 h-full">
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
+            {rate.toFixed(1)}%
+          </p>
+          <div className="mt-1.5 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+            <div
+              className={`h-full rounded-full transition-all ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`}
+              style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
+            />
+          </div>
+          <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">
+            {formatCurrency(Math.max(savings, 0))}/mnd
+          </p>
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+          {hasPrevData && (
+            <p className={`text-[11px] font-mono tabular-nums ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}% t.o.v. vorige mnd
+            </p>
+          )}
+          {freedomStr && (
+            <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+              +{freedomStr} vrijheid/mnd
+            </p>
+          )}
+        </div>
       </div>
-
-      <p className="mt-2 text-xs text-[var(--ink-3)]">
-        {formatCurrency(Math.max(savings, 0))} gespaard per maand
-      </p>
-
-      {/* Vorige maand vergelijking */}
-      {hasPrevData && (
-        <p className={`mt-1 text-xs font-mono tabular-nums ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-          {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}% t.o.v. vorige maand
-        </p>
-      )}
-
-      {freedomStr && (
-        <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
-          +{freedomStr} vrijheid per maand
-        </p>
-      )}
     </WidgetShell>
   )
 })

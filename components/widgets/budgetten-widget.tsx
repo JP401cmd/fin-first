@@ -299,45 +299,52 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
-  // ── Half-size: compact 4-category inline rows ──
+  // ── Half-size: horizontal layout — left 2 categories, right 2 categories ──
   if (size === 'half') {
+    const halfConfigs = [BUDGET_TYPE_CONFIGS.slice(0, 2), BUDGET_TYPE_CONFIGS.slice(2)]
     return (
       <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
-        <div ref={inViewRef} className="flex flex-col gap-1">
-          {BUDGET_TYPE_CONFIGS.map((config) => {
-            const typeData = budgetTotals[config.key]
-            const { icon: Icon, label, iconBg, iconText, labelText, barFillVar, barWarnVar } = config
-            const hasData = typeData.limit > 0
-            const pct = progressPct(typeData.spent, typeData.limit)
-            const overBudget = hasData && typeData.spent > typeData.limit
-            const overPos = isOverPositive(config.key as 'income' | 'expense' | 'savings' | 'debt')
-            const isAboveThreshold = pct >= 80
-            const fillColor = overBudget ? (overPos ? 'var(--color-emerald-500, #10b981)' : 'var(--color-red-500, #ef4444)') : isAboveThreshold ? barWarnVar : barFillVar
+        <div ref={inViewRef} className="flex gap-3 h-full">
+          {halfConfigs.map((group, gi) => (
+            <div key={gi} className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+              {group.map((config) => {
+                const typeData = budgetTotals[config.key]
+                const { icon: Icon, label, iconBg, iconText, labelText, barFillVar, barWarnVar } = config
+                const hasData = typeData.limit > 0
+                const pct = progressPct(typeData.spent, typeData.limit)
+                const overBudget = hasData && typeData.spent > typeData.limit
+                const overPos = isOverPositive(config.key as 'income' | 'expense' | 'savings' | 'debt')
+                const isAboveThreshold = pct >= 80
+                const fillColor = overBudget ? (overPos ? 'var(--color-emerald-500, #10b981)' : 'var(--color-red-500, #ef4444)') : isAboveThreshold ? barWarnVar : barFillVar
 
-            return (
-              <div key={config.key} className="flex items-center gap-2">
-                <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[var(--r-sm)] ${iconBg}`}>
-                  <Icon className={iconText} size={8} strokeWidth={2} />
-                </div>
-                <span className={`text-[9px] font-bold uppercase tracking-[0.08em] w-16 shrink-0 ${hasData ? labelText : 'text-[var(--ink-3)]'}`}>
-                  {label}
-                </span>
-                <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-[var(--border-ed)]">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: hasEntered ? `${pct}%` : '0%',
-                      backgroundColor: hasData ? fillColor : 'transparent',
-                      transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
-                    }}
-                  />
-                </div>
-                <span className={`font-mono tabular-nums text-[10px] w-10 text-right ${overBudget ? (overPos ? 'text-emerald-600' : 'text-red-500') : 'text-[var(--ink-3)]'}`}>
-                  {hasData ? `${Math.round(pct)}%` : '—'}
-                </span>
-              </div>
-            )
-          })}
+                return (
+                  <div key={config.key}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[var(--r-sm)] ${iconBg}`}>
+                        <Icon className={iconText} size={8} strokeWidth={2} />
+                      </div>
+                      <span className={`text-[9px] font-bold uppercase tracking-[0.08em] ${hasData ? labelText : 'text-[var(--ink-3)]'}`}>
+                        {label}
+                      </span>
+                      <span className={`ml-auto font-mono tabular-nums text-[10px] ${overBudget ? (overPos ? 'text-emerald-600' : 'text-red-500') : 'text-[var(--ink-3)]'}`}>
+                        {hasData ? `${Math.round(pct)}%` : '—'}
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border-ed)]">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: hasEntered ? `${pct}%` : '0%',
+                          backgroundColor: hasData ? fillColor : 'transparent',
+                          transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
         </div>
       </WidgetShell>
     )

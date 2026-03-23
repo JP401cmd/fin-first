@@ -181,7 +181,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
     )
   }
 
-  // ── Half (default): sparkline + expected vs actual comparison ─
+  // ── Half: horizontal layout — left metric, right sparkline ─
   const svgWidth = 200
   const svgHeight = 60
   const history = data.netWorthHistory ?? []
@@ -201,41 +201,41 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
 
   return (
     <WidgetShell module="kern" size={size} kicker="Beleggingsrendement" href={href}>
-      {/* Main stat: return % + absolute amount */}
-      <div className="flex items-baseline gap-1.5">
-        <p className={`font-mono text-xl font-semibold tabular-nums ${returnColor}`}>
-          {signPrefix}{sinceInceptionReturn.toFixed(1)}%
-        </p>
-      </div>
-      <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-        totaalrendement &middot; {formatCurrency(sinceInceptionAbsolute)}
-      </p>
-
-      {/* Sparkline SVG from netWorthHistory */}
-      {sparkline && (
-        <div className="mt-2">
-          <svg
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            width="100%"
-            className="overflow-visible"
-            aria-hidden="true"
-          >
-            <path d={sparkline.fillD} fill={sparklineStroke} opacity={0.2} />
-            <path d={sparkline.lineD} fill="none" stroke={sparklineStroke} strokeWidth={2} />
-          </svg>
-        </div>
-      )}
-
-      {/* Expected vs actual comparison */}
-      <div className="mt-2 space-y-0.5">
-        <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
-          Verwacht: {expectedReturn.toFixed(1)}%/jaar
-        </p>
-        {estimatedActualReturn != null && (
-          <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
-            Werkelijk: ~{estimatedActualReturn.toFixed(1)}%
+      <div className="flex gap-3 h-full">
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <p className={`font-mono text-xl font-semibold tabular-nums ${returnColor}`}>
+            {signPrefix}{sinceInceptionReturn.toFixed(1)}%
           </p>
-        )}
+          <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
+            totaalrendement
+          </p>
+          <p className={`mt-0.5 font-mono text-[11px] tabular-nums ${returnColor}`}>
+            {formatCurrency(sinceInceptionAbsolute)}
+          </p>
+          <div className="mt-1.5 space-y-0.5">
+            <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+              Verwacht: {expectedReturn.toFixed(1)}%/jr
+            </p>
+            {estimatedActualReturn != null && (
+              <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+                Werkelijk: ~{estimatedActualReturn.toFixed(1)}%
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          {sparkline && (
+            <svg
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              width="100%"
+              className="overflow-visible"
+              aria-hidden="true"
+            >
+              <path d={sparkline.fillD} fill={sparklineStroke} opacity={0.2} />
+              <path d={sparkline.lineD} fill="none" stroke={sparklineStroke} strokeWidth={2} />
+            </svg>
+          )}
+        </div>
       </div>
     </WidgetShell>
   )

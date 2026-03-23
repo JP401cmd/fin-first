@@ -89,30 +89,32 @@ export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Pro
     )
   }
 
-  // ── Half-size: compact for 1-row 160px height ────
+  // ── Half-size: horizontal layout — left stats, right action list ────
   if (size === 'half') {
     const halfTop = topOpenActions.slice(0, 2)
     return (
       <WidgetShell module="wil" size={size} kicker="Acties" href={href}>
-        <div ref={containerRef}>
-          <div className="flex items-center gap-3 mb-1.5">
-            <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">{openActions}</span>
-            <span className="text-xs text-[var(--ink-3)]">open</span>
+        <div ref={containerRef} className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{openActions}</span>
+            <span className="text-[11px] text-[var(--ink-3)]">open acties</span>
             {roundedDays > 0 && (
-              <span className="font-mono text-xs tabular-nums text-wil-700 bg-wil-50 rounded-full px-2 py-px">
-                +{roundedDays}d
+              <span className="mt-1.5 font-mono text-xs tabular-nums text-wil-700 bg-wil-50 rounded-full px-2 py-px w-fit">
+                +{roundedDays}d vrijheid
               </span>
             )}
           </div>
-          {halfTop.length === 0 ? (
-            <p className="text-sm text-[var(--ink-3)]">Geen openstaande acties</p>
-          ) : (
-            <div className="space-y-0">
-              {halfTop.map((action, i) => (
-                <ActionRow key={action.id} action={action} index={i} hasEntered={hasEntered} />
-              ))}
-            </div>
-          )}
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            {halfTop.length === 0 ? (
+              <p className="text-[11px] text-[var(--ink-3)]">Geen openstaande acties</p>
+            ) : (
+              <div className="space-y-0">
+                {halfTop.map((action, i) => (
+                  <ActionRow key={action.id} action={action} index={i} hasEntered={hasEntered} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </WidgetShell>
     )

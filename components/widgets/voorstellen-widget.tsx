@@ -102,27 +102,29 @@ export const VoorstellenWidget = memo(function VoorstellenWidget({ size, data, h
     )
   }
 
-  // ── Half-size: compact for 1-row 160px height ────
+  // ── Half-size: horizontal layout — left stats, right suggestion list ────
   if (size === 'half') {
     const top2 = (topRecommendations ?? []).slice(0, 2)
 
     return (
       <WidgetShell module="wil" size={size} kicker="Voorstellen" href={href}>
-        <div>
-          <div className="flex items-center gap-3 mb-1.5">
-            <Lightbulb className="h-4 w-4 text-wil-500 shrink-0" />
-            <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">{recommendations}</span>
-            <span className="text-xs text-[var(--ink-3)]">{recommendations === 1 ? 'aanbeveling' : 'aanbevelingen'}</span>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <Lightbulb className="h-5 w-5 text-wil-500 mb-1" />
+            <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{recommendations}</span>
+            <span className="text-[11px] text-[var(--ink-3)]">{recommendations === 1 ? 'aanbeveling' : 'aanbevelingen'}</span>
           </div>
-          {top2.length === 0 ? (
-            <p className="text-sm text-[var(--ink-3)]">Geen aanbevelingen</p>
-          ) : (
-            <div className="space-y-0">
-              {top2.map((rec, i) => (
-                <RecommendationRow key={rec.id} rec={rec} index={i} />
-              ))}
-            </div>
-          )}
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            {top2.length === 0 ? (
+              <p className="text-[11px] text-[var(--ink-3)]">Geen aanbevelingen</p>
+            ) : (
+              <div className="space-y-0">
+                {top2.map((rec, i) => (
+                  <RecommendationRow key={rec.id} rec={rec} index={i} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </WidgetShell>
     )

@@ -224,26 +224,36 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
     )
   }
 
-  // ── Half-size: income/expense breakdown ──
+  // ── Half-size: horizontal layout — left cashflow, right breakdown ──
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
-        <p className={`font-mono text-2xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
-          {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
-        </p>
-        {freedomStr && (
-          <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
-            {isPositive ? `+${freedomStr} vrijheid opgebouwd` : `${freedomStr} vrijheid ingeleverd`}
-          </p>
-        )}
-        <div className="mt-2 space-y-1">
-          <div className="flex justify-between text-xs text-[var(--ink-3)]">
-            <span>Inkomsten</span>
-            <span className="font-mono tabular-nums text-emerald-700">+{formatCurrency(monthlyIncome)}</span>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
+              {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+            </p>
+            {freedomStr && (
+              <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+                {isPositive ? `+${freedomStr} vrijheid` : `${freedomStr} ingeleverd`}
+              </p>
+            )}
           </div>
-          <div className="flex justify-between text-xs text-[var(--ink-3)]">
-            <span>Uitgaven</span>
-            <span className="font-mono tabular-nums text-red-600">-{formatCurrency(monthlyExpenses)}</span>
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            <div className="flex justify-between text-[11px] text-[var(--ink-3)]">
+              <span>Inkomsten</span>
+              <span className="font-mono tabular-nums text-emerald-700">+{formatCurrency(monthlyIncome)}</span>
+            </div>
+            <div className="flex justify-between text-[11px] text-[var(--ink-3)]">
+              <span>Uitgaven</span>
+              <span className="font-mono tabular-nums text-red-600">-{formatCurrency(monthlyExpenses)}</span>
+            </div>
+            <div className="border-t border-dashed border-[var(--border-ed)] pt-1 flex justify-between text-[11px]">
+              <span className="text-[var(--ink-3)]">Netto</span>
+              <span className={`font-mono tabular-nums font-medium ${isPositive ? 'text-emerald-700' : 'text-red-600'}`}>
+                {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+              </span>
+            </div>
           </div>
         </div>
       </WidgetShell>

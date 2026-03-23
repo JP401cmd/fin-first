@@ -77,37 +77,42 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
     )
   }
 
-  // ── Half-size (2col × 1row = 160px landscape) ────
+  // ── Half-size: horizontal layout — left percentage, right progress + amounts ────
   if (size === 'half') {
     return (
       <WidgetShell module="cross" size={size} kicker="Vrijheidsvoortgang" href={href}>
-        <div ref={inViewRef}>
-          <div className="flex items-center gap-2 mb-1">
-            <Compass className="h-3.5 w-3.5 text-horizon-600 shrink-0" />
-            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-              {effectivePct.toFixed(1)}%
-            </p>
+        <div ref={inViewRef} className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Compass className="h-3.5 w-3.5 text-horizon-600 shrink-0" />
+              <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
+                {effectivePct.toFixed(1)}%
+              </p>
+            </div>
             {pctDelta !== null && (
-              <span className={`text-xs font-mono tabular-nums ${pctDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}%
+              <span className={`text-[11px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}% deze mnd
               </span>
             )}
           </div>
-
-          {/* Progress bar */}
-          <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] mb-1.5">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600"
-              style={{
-                width: hasEntered ? `${Math.min(effectivePct, 100)}%` : '0%',
-                transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
-              }}
-            />
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            {/* Progress bar */}
+            <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600"
+                style={{
+                  width: hasEntered ? `${Math.min(effectivePct, 100)}%` : '0%',
+                  transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
+                }}
+              />
+            </div>
+            <p className="text-[10px] text-[var(--ink-3)] font-mono tabular-nums">
+              {formatCurrency(netWorth)} / {formatCurrency(effectiveFire)}
+            </p>
+            <p className="text-[10px] text-[var(--ink-4)]">
+              {fireStatusLabel}
+            </p>
           </div>
-
-          <p className="text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
-            {formatCurrency(netWorth)} / {formatCurrency(effectiveFire)}{simRequiredPortfolio ? ' (sim)' : ''}
-          </p>
         </div>
       </WidgetShell>
     )

@@ -97,6 +97,66 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
     ? (unrealizedGain / totalPurchaseValue) * 100
     : null
 
+  // ── Half-size: horizontal layout — left metric, right breakdown ──
+  if (size === 'half') {
+    const sorted = [...assetsByType].sort((a, b) => b.value - a.value)
+    const top2 = sorted.slice(0, 2)
+    return (
+      <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(totalAssets)}
+            </p>
+            {ftStr && (
+              <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+                ≈ {ftStr} vrijheid
+              </p>
+            )}
+            <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">
+              Totaal actief vermogen
+            </p>
+            {monthlyContributions > 0 && (
+              <p className="font-mono text-xs text-emerald-700 tabular-nums">
+                +{formatCurrency(monthlyContributions)}/mnd
+              </p>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            {/* Stacked bar */}
+            {assetsByType.length > 0 && totalAssets > 0 && (
+              <div className="h-[5px] w-full flex overflow-hidden rounded-full border border-[var(--border-ed)] bg-[var(--subtle)]">
+                {assetsByType.map(a => (
+                  <div
+                    key={a.type}
+                    style={{
+                      width: `${(a.value / totalAssets) * 100}%`,
+                      backgroundColor: ASSET_COLORS[a.type] ?? '#71717a',
+                    }}
+                    title={`${ASSET_LABELS[a.type] ?? a.type}: ${formatCurrency(a.value)}`}
+                  />
+                ))}
+              </div>
+            )}
+            {/* Top 2 asset types */}
+            {top2.map(a => {
+              const pct = totalAssets > 0 ? (a.value / totalAssets) * 100 : 0
+              return (
+                <div key={a.type} className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: ASSET_COLORS[a.type] ?? '#71717a' }} />
+                    <span className="text-[var(--ink-2)] truncate">{ASSET_LABELS[a.type] ?? a.type}</span>
+                  </div>
+                  <span className="font-mono tabular-nums text-[var(--ink-3)] shrink-0 ml-1">{Math.round(pct)}%</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
       {/* Primary value */}

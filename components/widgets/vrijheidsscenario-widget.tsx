@@ -65,6 +65,44 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
     )
   }
 
+  // ── Half-size: horizontal layout — left expected age, right scenario grid ──
+  if (size === 'half') {
+    return (
+      <WidgetShell module="horizon" size={size} kicker="Vrijheidsscenario's" href={href}>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)] mb-0.5">Verwacht</p>
+            <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
+              {expAge != null ? Math.round(expAge) : '—'}
+            </p>
+            {bandwidth != null && (
+              <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+                &plusmn;{bandwidth}j bandbreedte
+              </p>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="grid grid-cols-3 gap-1">
+              {scenarios.map(({ label, proj, dotColor }) => (
+                <div key={label} className="text-center">
+                  <div className={`mx-auto mb-0.5 h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                  {proj.fireAge != null ? (
+                    <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                      {Math.round(proj.fireAge)}
+                    </p>
+                  ) : (
+                    <p className="font-mono text-sm text-[var(--ink-3)]">—</p>
+                  )}
+                  <p className="text-[8px] uppercase tracking-wider text-[var(--ink-4)]">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="horizon" size={size} kicker="Vrijheidsscenario's" href={href}>
       <div className="grid grid-cols-3 gap-2">
@@ -83,7 +121,7 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
         ))}
       </div>
       {bandwidth != null && (
-        <p className={`${size === 'half' ? 'mt-1.5' : 'mt-3'} text-center text-xs text-[var(--ink-3)]`}>
+        <p className="mt-3 text-center text-xs text-[var(--ink-3)]">
           Bandbreedte:{' '}
           <span className="font-mono font-semibold text-[var(--ink)]">{bandwidth} jaar</span>
         </p>

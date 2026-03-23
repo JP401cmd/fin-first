@@ -92,6 +92,58 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
     )
   }
 
+  // ── Half-size: horizontal layout — left metric, right breakdown ──
+  if (size === 'half') {
+    const sorted = [...investmentAssets].sort((a, b) => b.value - a.value)
+    const top2 = sorted.slice(0, 2)
+    return (
+      <WidgetShell module="kern" size={size} kicker="Beleggingen" href={href}>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(totalInvestments)}
+            </p>
+            {ftStr && (
+              <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+                ≈ {ftStr} vrijheid
+              </p>
+            )}
+            <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">
+              {positionCount > 0
+                ? `${positionCount} ${positionCount === 1 ? 'positie' : 'posities'}`
+                : 'Geen beleggingsactiva'}
+            </p>
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            {top2.map(a => {
+              const pct = totalInvestments > 0 ? (a.value / totalInvestments) * 100 : 0
+              const color = ASSET_COLORS[a.type] ?? '#71717a'
+              return (
+                <div key={a.type} className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-[var(--ink-2)] truncate">{ASSET_LABELS[a.type] ?? a.type}</span>
+                  </div>
+                  <span className="font-mono tabular-nums text-[var(--ink-3)] shrink-0 ml-1">{Math.round(pct)}%</span>
+                </div>
+              )
+            })}
+            {weightedReturn != null && weightedReturn > 0 && (
+              <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                Rendement: {(weightedReturn * 100).toFixed(1)}% p.j.
+              </p>
+            )}
+            {investmentContributions > 0 && (
+              <p className="font-mono text-[11px] text-emerald-700 tabular-nums">
+                +{formatCurrency(investmentContributions)}/mnd
+              </p>
+            )}
+          </div>
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="kern" size={size} kicker="Beleggingen" href={href}>
       {/* Primary value */}
@@ -112,13 +164,6 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
       {investmentContributions > 0 && (
         <p className="font-mono text-sm text-emerald-700 tabular-nums">
           +{formatCurrency(investmentContributions)} / maand
-        </p>
-      )}
-
-      {/* Half-size: weighted return summary */}
-      {size === 'half' && weightedReturn != null && weightedReturn > 0 && (
-        <p className="mt-1 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-          Verwacht rendement: {(weightedReturn * 100).toFixed(1)}% p.j.
         </p>
       )}
 

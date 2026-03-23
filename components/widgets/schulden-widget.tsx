@@ -55,43 +55,51 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
   const schuldRatio = totalAssets > 0 ? Math.min((totalDebts / totalAssets) * 100, 100) : (totalDebts > 0 ? 100 : 0)
   const monthlyRepayment = budgetTotals.debt.spent
 
-  // ── Half-size: compact for 1-row — progress bar, ratio, repayment ────
+  // ── Half-size: horizontal layout — left metric, right ratio bar ────
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
-        <p className={`font-mono text-2xl font-semibold tabular-nums ${totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-          {totalDebts > 0 ? '-' : ''}{formatCurrency(totalDebts)}
-        </p>
-        {freedomStr && (
-          <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-            {freedomStr} vrijheid terug te winnen
-          </p>
-        )}
-
-        {totalDebts > 0 && (
-          <div className="mt-2 space-y-1.5">
-            {/* Schuldratio progress bar */}
-            <div>
-              <div className="flex justify-between text-[11px] mb-0.5">
-                <span className="text-[var(--ink-3)]">Schuldratio</span>
-                <span className="font-mono tabular-nums text-red-600">{schuldRatio.toFixed(0)}%</span>
-              </div>
-              <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                <div
-                  className="h-full rounded-full bg-red-500/70 transition-all duration-500"
-                  style={{ width: `${schuldRatio}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Monthly repayment */}
-            {monthlyRepayment > 0 && (
-              <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-                Aflossing: {formatCurrency(monthlyRepayment)}/mnd
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <p className={`font-mono text-xl font-semibold tabular-nums ${totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              {totalDebts > 0 ? '-' : ''}{formatCurrency(totalDebts)}
+            </p>
+            {totalDebts > 0 && freedomStr ? (
+              <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+                {freedomStr} terug te winnen
               </p>
+            ) : totalDebts === 0 ? (
+              <p className="mt-0.5 text-[11px] font-medium text-emerald-600">
+                Schuldenvrij!
+              </p>
+            ) : null}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            {totalDebts > 0 && (
+              <>
+                {/* Schuldratio progress bar */}
+                <div>
+                  <div className="flex justify-between text-[11px] mb-0.5">
+                    <span className="text-[var(--ink-3)]">Schuldratio</span>
+                    <span className="font-mono tabular-nums text-red-600">{schuldRatio.toFixed(0)}%</span>
+                  </div>
+                  <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                    <div
+                      className="h-full rounded-full bg-red-500/70 transition-all duration-500"
+                      style={{ width: `${schuldRatio}%` }}
+                    />
+                  </div>
+                </div>
+                {/* Monthly repayment */}
+                {monthlyRepayment > 0 && (
+                  <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                    Aflossing: {formatCurrency(monthlyRepayment)}/mnd
+                  </p>
+                )}
+              </>
             )}
           </div>
-        )}
+        </div>
       </WidgetShell>
     )
   }

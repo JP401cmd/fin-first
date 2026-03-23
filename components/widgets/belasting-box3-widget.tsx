@@ -58,29 +58,35 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
     )
   }
 
-  // ── Half-size: compact for 1-row height ──────────────────
+  // ── Half-size: horizontal layout — left tax amount, right details ──
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker="Box 3 Belasting" href={href}>
-        <div className="flex items-center gap-2">
-          <Receipt className="h-4 w-4 text-kern-500 shrink-0" />
-          <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(estimatedTax)}
-          </p>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-kern-500 shrink-0" />
+              <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
+                {formatCurrency(estimatedTax)}
+              </p>
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+              Vermogensbelasting
+            </p>
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+            {effectiefTarief > 0 && (
+              <p className="text-[11px] text-[var(--ink-2)]">
+                Tarief: <span className="font-mono tabular-nums font-medium">{effectiefTarief.toFixed(2)}%</span>
+              </p>
+            )}
+            {vrijheidsdagen > 0 && (
+              <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+                = {vrijheidsdagen} {vrijheidsdagen === 1 ? 'dag' : 'dagen'}/jaar
+              </p>
+            )}
+          </div>
         </div>
-        <p className="mt-1 text-xs text-[var(--ink-3)]">
-          Schatting vermogensbelasting
-        </p>
-        {effectiefTarief > 0 && (
-          <p className="mt-1 text-[11px] text-[var(--ink-2)]">
-            Effectief tarief: <span className="font-mono tabular-nums font-medium">{effectiefTarief.toFixed(2)}%</span>
-          </p>
-        )}
-        {vrijheidsdagen > 0 && (
-          <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-            = {vrijheidsdagen} {vrijheidsdagen === 1 ? 'dag' : 'dagen'} vrijheid per jaar
-          </p>
-        )}
       </WidgetShell>
     )
   }

@@ -169,55 +169,56 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
     )
   }
 
-  // ── Half-size: compact for 1-row 160px height ────
+  // ── Half-size: horizontal layout — left stats, right goal bars ────
   if (size === 'half') {
     const halfGoals = topGoals.slice(0, 2)
+    const avgPctHalf = topGoals.length > 0
+      ? Math.round(topGoals.reduce((sum, g) => sum + goalPct(g), 0) / topGoals.length)
+      : 0
     return (
       <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
-        <div ref={containerRef}>
-          {halfGoals.length === 0 ? (
-            <div className="flex items-center gap-2 py-2">
-              <Target className="h-5 w-5 text-wil-200 shrink-0" />
-              <p className="text-sm text-[var(--ink-3)]">Nog geen doelen</p>
-            </div>
-          ) : (
-            <div>
-              {halfGoals.map((goal, i) => {
-                const colors = getGoalColorClasses(goal.color)
-                const pct = goalPct(goal)
-                const overdue = isOverdue(goal)
-                return (
-                  <div
-                    key={goal.id}
-                    className="py-1 border-b border-[var(--border-ed)] last:border-0"
-                    style={{
-                      animation: hasEntered ? `fadeUp 0.4s ease-out ${i * 60}ms both` : 'none',
-                      opacity: hasEntered ? undefined : 0,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="flex-1 min-w-0 text-sm text-[var(--ink)] truncate">{goal.name}</span>
-                      <span className={`shrink-0 font-mono text-xs tabular-nums ${overdue ? 'text-red-600' : 'text-[var(--ink)]'}`}>
-                        {pct}%
-                      </span>
+        <div ref={containerRef} className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{goals}</span>
+            <span className="text-[11px] text-[var(--ink-3)]">{goals === 1 ? 'doel' : 'doelen'}</span>
+            {avgPctHalf > 0 && (
+              <p className="mt-1.5 font-mono text-xs tabular-nums text-wil-700">
+                Gem. {avgPctHalf}%
+              </p>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            {halfGoals.length === 0 ? (
+              <p className="text-[11px] text-[var(--ink-3)]">Nog geen doelen</p>
+            ) : (
+              <div className="space-y-1.5">
+                {halfGoals.map((goal, i) => {
+                  const colors = getGoalColorClasses(goal.color)
+                  const pct = goalPct(goal)
+                  const overdue = isOverdue(goal)
+                  return (
+                    <div key={goal.id}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="flex-1 min-w-0 text-[11px] text-[var(--ink)] truncate">{goal.name}</span>
+                        <span className={`shrink-0 font-mono text-[10px] tabular-nums ${overdue ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
+                          {pct}%
+                        </span>
+                      </div>
+                      <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                        <div
+                          className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
+                          style={{
+                            width: hasEntered ? `${pct}%` : '0%',
+                            transition: hasEntered ? `width ${500 + i * 80}ms cubic-bezier(.22,1,.36,1) ${i * 80}ms` : 'none',
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-                      <div
-                        className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
-                        style={{
-                          width: hasEntered ? `${pct}%` : '0%',
-                          transition: hasEntered ? `width ${500 + i * 80}ms cubic-bezier(.22,1,.36,1) ${i * 80}ms` : 'none',
-                        }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          {goals > halfGoals.length && (
-            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">{footerLabel}</p>
-          )}
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </WidgetShell>
     )

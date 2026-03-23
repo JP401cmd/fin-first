@@ -85,64 +85,50 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
     )
   }
 
-  // Half: daily bar chart (Mon-Sun) with budget line
+  // Half: horizontal layout — left total + delta, right bar chart
   if (size === 'half') {
-    const BAR_W = 20
-    const GAP = 6
+    const BAR_W = 14
+    const GAP = 3
     const CHART_W = dailyExpenses.length * (BAR_W + GAP) - GAP
-    const CHART_H = 64
+    const CHART_H = 56
     const budgetLineY = weekBudget > 0 ? CHART_H - (((weekBudget / 7) / maxDaily) * CHART_H) : -1
 
     return (
       <WidgetShell module="kern" size={size} kicker="Weekoverzicht" href={href}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <p className={`font-mono text-base font-semibold tabular-nums ${overBudget ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <p className={`font-mono text-xl font-semibold tabular-nums ${overBudget ? 'text-red-600' : 'text-[var(--ink)]'}`}>
               {formatCurrency(weekExpenses)}
             </p>
             <DeltaIndicator current={weekExpenses} previous={prevWeekExpenses} compact />
+            {weekBudget > 0 && (
+              <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">
+                Budget: <span className="font-mono tabular-nums">{formatCurrency(weekBudget)}</span>
+              </p>
+            )}
           </div>
-          {weekBudget > 0 && (
-            <p className="text-[10px] text-[var(--ink-3)]">
-              budget <span className="font-mono tabular-nums">{formatCurrency(weekBudget)}</span>
-            </p>
-          )}
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <svg width="100%" height={CHART_H + 14} viewBox={`0 0 ${CHART_W} ${CHART_H + 14}`} preserveAspectRatio="xMidYMid meet" className="w-full">
+              {budgetLineY >= 0 && (
+                <line x1={0} y1={budgetLineY} x2={CHART_W} y2={budgetLineY} stroke="var(--border-md)" strokeWidth={1} strokeDasharray="3 2" />
+              )}
+              {dailyExpenses.map((d, i) => {
+                const barH = maxDaily > 0 ? (d.amount / maxDaily) * CHART_H : 0
+                const x = i * (BAR_W + GAP)
+                const isToday = d.day === new Date().toISOString().split('T')[0]
+                const barColor = d.amount > (weekBudget / 7) ? 'var(--kern-500)' : 'var(--kern-300)'
+                return (
+                  <g key={d.day}>
+                    <rect x={x} y={CHART_H - barH} width={BAR_W} height={Math.max(barH, 1)} rx={2} fill={barColor} opacity={isToday ? 1 : 0.7} />
+                    <text x={x + BAR_W / 2} y={CHART_H + 10} textAnchor="middle" fontSize={7} fill={isToday ? 'var(--ink)' : 'var(--ink-4)'} fontWeight={isToday ? 600 : 400}>
+                      {d.label}
+                    </text>
+                  </g>
+                )
+              })}
+            </svg>
+          </div>
         </div>
-        <svg width="100%" height={CHART_H + 18} viewBox={`0 0 ${CHART_W} ${CHART_H + 18}`} preserveAspectRatio="xMidYMid meet" className="w-full">
-          {/* Budget reference line */}
-          {budgetLineY >= 0 && (
-            <line x1={0} y1={budgetLineY} x2={CHART_W} y2={budgetLineY} stroke="var(--border-md)" strokeWidth={1} strokeDasharray="4 3" />
-          )}
-          {dailyExpenses.map((d, i) => {
-            const barH = maxDaily > 0 ? (d.amount / maxDaily) * CHART_H : 0
-            const x = i * (BAR_W + GAP)
-            const isToday = d.day === new Date().toISOString().split('T')[0]
-            const barColor = d.amount > (weekBudget / 7) ? 'var(--kern-500)' : 'var(--kern-300)'
-            return (
-              <g key={d.day}>
-                <rect
-                  x={x}
-                  y={CHART_H - barH}
-                  width={BAR_W}
-                  height={Math.max(barH, 1)}
-                  rx={3}
-                  fill={barColor}
-                  opacity={isToday ? 1 : 0.7}
-                />
-                <text
-                  x={x + BAR_W / 2}
-                  y={CHART_H + 12}
-                  textAnchor="middle"
-                  fontSize={9}
-                  fill={isToday ? 'var(--ink)' : 'var(--ink-4)'}
-                  fontWeight={isToday ? 600 : 400}
-                >
-                  {d.label}
-                </text>
-              </g>
-            )
-          })}
-        </svg>
       </WidgetShell>
     )
   }

@@ -74,6 +74,57 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
     )
   }
 
+  // ── Half-size: horizontal layout — left countdown, right progress ──
+  if (size === 'half') {
+    return (
+      <WidgetShell module="horizon" size={size} kicker="FIRE Prognose" href={href}>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-horizon-50">
+                <Compass className="h-3.5 w-3.5 text-horizon-600" />
+              </div>
+              {isReached ? (
+                <p className="font-mono text-lg font-semibold text-horizon-600">Bereikt! 🎉</p>
+              ) : isNotFeasible ? (
+                <p className="font-mono text-lg font-semibold text-[var(--ink-3)]">—</p>
+              ) : (
+                <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+                  {cd.countdownYears}j {cd.countdownMonths}m
+                </p>
+              )}
+            </div>
+            {!isReached && !isNotFeasible && fireAgeFractional != null && (
+              <p className="text-[11px] text-[var(--ink-3)]">
+                Leeftijd <span className="font-mono font-semibold text-horizon-600">{fireAgeFractional.toFixed(1)}</span>
+              </p>
+            )}
+            {isNotFeasible && (
+              <p className="text-[11px] text-[var(--ink-3)]">Verhoog spaarcapaciteit</p>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            <div>
+              <div className="flex justify-between text-[10px] text-[var(--ink-3)] mb-0.5">
+                <span>Voortgang FIRE</span>
+                <span className="font-mono tabular-nums">{freedomPct.toFixed(1)}%</span>
+              </div>
+              <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 transition-all duration-700"
+                  style={{ width: `${Math.min(freedomPct, 100)}%` }}
+                />
+              </div>
+            </div>
+            <p className="font-serif italic text-[10px] text-[var(--ink-3)]">
+              NL FIRE-model ({(NL_SWR * 100).toFixed(2)}%)
+            </p>
+          </div>
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="horizon" size={size} kicker="FIRE Prognose" href={href}>
       <div className="flex items-start gap-3">

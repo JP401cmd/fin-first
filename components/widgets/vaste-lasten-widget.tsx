@@ -109,35 +109,39 @@ export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, h
     )
   }
 
-  // ── Half-size: total + top 4 items (mixed) + freedom time ────
+  // ── Half-size: horizontal layout — left total, right top items ────
   if (size === 'half') {
-    const top4 = topRecurringTransactions.slice(0, 4)
+    const top3 = topRecurringTransactions.slice(0, 3)
     return (
       <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
-        <div className="flex items-center gap-2">
-          <RefreshCcw className="h-4 w-4 text-kern-500 shrink-0" />
-          <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(totalRecurringAmount)} <span className="text-sm font-normal text-[var(--ink-3)]">per maand</span>
-          </p>
+        <div className="flex gap-3 h-full">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(totalRecurringAmount)}
+            </p>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">per maand</p>
+            {freedomStr && (
+              <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
+                = {freedomDays} dagen/mnd
+              </p>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            {top3.length > 0 && (
+              <ul className="space-y-1">
+                {top3.map((t) => (
+                  <li key={t.id} className="flex items-center justify-between text-[11px] text-[var(--ink-2)]">
+                    <div className="flex items-center gap-1 min-w-0">
+                      {getCategoryIcon(t.category)}
+                      <span className="truncate">{t.name}</span>
+                    </div>
+                    <span className="font-mono tabular-nums shrink-0 ml-1">{formatCurrency(t.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-        {top4.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {top4.map((t) => (
-              <li key={t.id} className="flex items-center justify-between text-xs text-[var(--ink-2)]">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  {getCategoryIcon(t.category)}
-                  <span className="truncate">{t.name}</span>
-                </div>
-                <span className="font-mono tabular-nums shrink-0">{formatCurrency(t.amount)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {freedomStr && (
-          <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-            = {freedomDays} vrijheidsdagen per maand
-          </p>
-        )}
       </WidgetShell>
     )
   }

@@ -127,29 +127,37 @@ export const PassiefInkomenWidget = memo(function PassiefInkomenWidget({ size, d
     )
   }
 
-  // ── Half-size (2col × 1row = 160px landscape) ──
+  // ── Half-size: horizontal layout — left amount, right progress ──
   return (
     <WidgetShell module="horizon" size={size} kicker="Passief Inkomen" href={href}>
-      <div className="flex items-baseline gap-1.5">
-        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(current)}
-        </p>
-        <span className="text-[10px] text-[var(--ink-3)]">/mnd</span>
-        <span className="text-[10px] text-[var(--ink-3)] ml-auto font-mono tabular-nums">{pct.toFixed(1)}%</span>
-      </div>
-
-      <div className="mt-1.5">
-        <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 transition-all duration-700"
-            style={{ width: `${pct}%` }}
-          />
+      <div className="flex gap-3 h-full">
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-baseline gap-1">
+            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(current)}
+            </p>
+            <span className="text-[10px] text-[var(--ink-3)]">/mnd</span>
+          </div>
+          <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+            Dekt {freedomDays.toFixed(1)} dagen/mnd
+          </p>
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+          <div className="flex justify-between text-[11px] mb-0.5">
+            <span className="text-[var(--ink-3)]">FIRE-doel</span>
+            <span className="font-mono tabular-nums text-[var(--ink-2)]">{pct.toFixed(1)}%</span>
+          </div>
+          <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 transition-all duration-700"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-[var(--ink-3)]">
+            {formatCurrency(target)}/mnd nodig
+          </p>
         </div>
       </div>
-
-      <p className="mt-1 text-[11px] text-[var(--ink-3)]">
-        van {formatCurrency(target)} nodig voor FIRE
-      </p>
     </WidgetShell>
   )
 })
