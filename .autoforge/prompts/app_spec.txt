@@ -1,0 +1,976 @@
+<project_specification>
+  <project_name>TriFinity</project_name>
+
+  <overview>
+    TriFinity is an existing Dutch-language personal finance application built around the philosophy "Geld is opgeslagen tijd" (Money is stored time). It translates financial metrics into freedom time — days, months, and years of financial independence. This specification covers improvements, refinements, and new features to mature the application's UX, deepen its philosophical consistency, add gamification, and create a unified historical insight and prediction layer across all modules.
+
+    IMPORTANT: This is an EXISTING application with a full codebase. The coding agent must work within the established architecture (Next.js 16, Supabase, React 19, Tailwind CSS v4). All changes are improvements to existing functionality or additions that integrate with current patterns.
+  </overview>
+
+  <philosophy>
+    CORE PRINCIPLE: "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd."
+
+    This philosophy MUST be expressed consistently throughout every UI surface:
+    - Every EUR amount over €100 should also show its freedom-time equivalent
+    - Labels should prefer time/freedom framing over generic financial terms
+    - The app should feel like ONE coherent philosophy, not "financial data + philosophical AI coaching"
+
+    Key translations:
+    - "Netto vermogen" → also show "X jaar en Y maanden vrijheid"
+    - "Budget uitgaven" → also show "X dagen deze maand"
+    - "Schulden" → frame as "vrijheid die je terugkoopt"
+    - "Sparen" → frame as "vrijheid opbouwen"
+    - "Transacties" → show freedom-day cost/benefit
+    - "FIRE target" → frame as "volledige vrijheid"
+  </philosophy>
+
+  <technology_stack>
+    <frontend>
+      <framework>Next.js 16 (App Router, TypeScript, React 19)</framework>
+      <styling>Tailwind CSS v4 (PostCSS)</styling>
+      <icons>Lucide React</icons>
+      <state>React hooks (useState, useEffect, useCallback, useContext)</state>
+    </frontend>
+    <backend>
+      <runtime>Node.js (Next.js API routes)</runtime>
+      <database>Supabase (PostgreSQL 17)</database>
+      <auth>Supabase Auth (email/password, JWT)</auth>
+      <edge_functions>Supabase Edge Functions (Deno)</edge_functions>
+    </backend>
+    <ai>
+      <primary>Anthropic Claude (claude-sonnet-4-5-20250929)</primary>
+      <secondary>OpenAI GPT-4o (configurable)</secondary>
+      <sdk>Vercel AI SDK</sdk>
+    </ai>
+    <communication>
+      <api>REST (Next.js route handlers)</api>
+      <realtime>Supabase Realtime (subscriptions)</realtime>
+    </communication>
+  </technology_stack>
+
+  <prerequisites>
+    <environment_setup>
+      Existing Next.js 16 project with Supabase backend.
+      All dependencies are already configured in package.json.
+      Database schema exists in Supabase with migrations.
+      Run: npm install && npm run dev
+    </environment_setup>
+  </prerequisites>
+
+  <feature_count>265</feature_count>
+
+  <existing_architecture>
+    <modules>
+      The app has three core modules, each with a color theme:
+      - DE KERN (The Core) — amber — Financial foundation: assets, budgets, debts, cash
+      - DE WIL (The Will) — teal — Actions and impact: recommendations, actions, goals
+      - DE HORIZON (The Horizon) — purple — Future projections: FIRE, scenarios, simulations
+    </modules>
+    <pages>
+      - /dashboard — Module hub with preview metrics per module
+      - /core — De Kern overview (hero + KPIs + quick links + charts)
+      - /core/budgets — Budget management (4 visualization modes)
+      - /core/cash — Transactions and bank accounts
+      - /core/cash/import — Bank file import (MT940/CSV/OFX)
+      - /core/assets — Asset portfolio tracking
+      - /core/debts — Debt management and payoff strategies
+      - /core/belasting — Box 3 tax calculations
+      - /will — De Wil overview (recommendations, actions, goals, patterns)
+      - /horizon — De Horizon overview (FIRE, scenarios, simulations, timeline)
+      - /identity — User profile and sovereignty level
+      - /beheer — Admin panel (AI settings, feature flags)
+      - /onboarding — Multi-step onboarding flow
+      - / — Landing page
+    </pages>
+    <feature_gating>
+      Features are gated by sovereignty level (computed from financial data):
+      - Recovery (levels -2, -1, 0)
+      - Stability (levels 1, 2)
+      - Momentum (levels 3, 4)
+      - Mastery (levels 5, 6)
+
+      Currently uses FeatureGate component with fallback='hidden' (features completely invisible).
+    </feature_gating>
+    <key_patterns>
+      - Hero sections with gradient backgrounds per module color
+      - KPI stat cards (4-column grids) with info tooltips
+      - FeatureGate component for progressive disclosure
+      - BottomSheet modals for deep-dive analysis
+      - formatCurrency() for EUR formatting (nl-NL locale)
+      - Supabase client for all data operations
+      - Three AI personality modules (kern, wil, horizon)
+    </key_patterns>
+  </existing_architecture>
+
+  <security_and_access_control>
+    <user_roles>
+      <role name="user">
+        <permissions>
+          - Full access to own financial data
+          - Access to features within their sovereignty phase
+          - Can manage own profile and settings
+        </permissions>
+      </role>
+      <role name="superadmin">
+        <permissions>
+          - All user permissions
+          - Access to /beheer admin panel
+          - Can configure AI providers and API keys
+          - Can manage feature-phase matrix
+        </permissions>
+      </role>
+    </user_roles>
+    <authentication>
+      <method>email/password via Supabase Auth</method>
+      <session_timeout>1 hour JWT with refresh token rotation</session_timeout>
+    </authentication>
+  </security_and_access_control>
+
+  <core_features>
+
+    <A_philosophy_consistency>
+      THEME: Make "Geld is opgeslagen tijd" visible in every UI surface
+
+      A1. Create formatWithFreedom() utility function
+          - Input: EUR amount + daily expenses
+          - Output: formatted string with freedom time (e.g., "€450.000 (12 jaar en 3 maanden)")
+          - Handle edge cases: 0 expenses, negative amounts, very large amounts
+          - Support short format: "12j 3m" and long format: "12 jaar en 3 maanden"
+
+      A2. Add freedom-time subtitles to Dashboard module cards
+          - De Kern card: net worth → show as freedom time
+          - De Wil card: freedom days potential → already good, enhance
+          - De Horizon card: countdown → enhance with "X jaar naar volledige vrijheid"
+
+      A3. Add freedom-time to De Kern overview hero
+          - Net worth metric: add "dat is X jaar en Y maanden vrijheid" subtitle
+          - Remove "Verwachte FIRE" from Kern (belongs to Horizon only)
+          - Add unique Kern metric: "Vrijheidstijd opgebouwd" (replaces FIRE display)
+
+      A4. Add freedom-time to budget displays
+          - Budget bars: show remaining as days ("nog 2,4 dagen deze maand")
+          - Budget alerts: "€32 over — 1,1 dagen ingeleverd"
+          - Budget detail modal: spending translated to freedom days
+
+      A5. Add freedom-time to transaction rows
+          - Each transaction shows parenthetical freedom cost: "-€85 (2,9 dagen)"
+          - Income transactions: "+€2.800 (96 dagen vrijheid verdiend)"
+          - Monthly summary cards: totals in freedom days
+
+      A6. Add freedom-time to asset cards and detail
+          - Asset value: "€145.000 — 3 jaar en 11 maanden vrijheid"
+          - Asset return: "+€12.000 — 134 vrijheidsdagen gewonnen"
+          - Portfolio total: show as freedom years
+
+      A7. Add freedom-time to debt displays
+          - Debt balance: "€89.000 — je koopt deze tijd terug in 7 jaar"
+          - Monthly payment framing: "€650/mnd → je wint 22 dagen per maand terug"
+          - Payoff timeline: "Schuldenvrij in 2031 — dan verdien je 100% voor jezelf"
+
+      A8. Add freedom-time to Box 3 tax displays
+          - Tax amount: show as freedom days lost
+          - Optimization savings: show as freedom days recovered
+          - Already partially done — extend to all tax metric cards
+
+      A9. Consistent philosophical labels throughout app
+          - Review all section headers and labels
+          - Replace generic financial terms where appropriate
+          - Ensure Dutch language consistency
+          - Do NOT replace all terms — keep familiar labels but ADD freedom context
+    </A_philosophy_consistency>
+
+    <B_deduplicate_metrics>
+      THEME: Each page has its own "lens" — no duplicate KPIs across pages
+
+      B1. Dashboard as pure navigation hub
+          - Module cards show PREVIEW metrics only (teaser, not full KPI)
+          - Preview metrics must differ from the module's own hero metrics
+          - De Kern preview: "Vermogensgroei deze maand: +€X (+Y dagen)"
+          - De Wil preview: "X acties open — Y dagen te winnen"
+          - De Horizon preview: "Countdown: X jaar, Y maanden"
+
+      B2. De Kern — Financial foundation lens
+          - Hero: Freedom time built (unique to Kern)
+          - Remove: "Verwachte FIRE" (Horizon's domain)
+          - Remove: duplicate "Vrijheidspercentage" KPI card (keep on Dashboard + Horizon)
+          - Keep: Net worth, savings rate, free days/year, autonomy score
+          - Add: "Vermogensgroei" (net worth growth trend) as unique Kern KPI
+
+      B3. De Horizon — Timeline and future lens
+          - Hero: FIRE age (unique primary home for this metric)
+          - Keep: Countdown, freedom %, resilience
+          - This is the ONLY place FIRE age appears as primary metric
+
+      B4. De Wil — Action and impact lens
+          - Hero: Freedom days won (unique to Wil)
+          - Keep: Completed actions, open potential, decision speed, willpower
+          - This is the ONLY place action-based freedom days appear
+
+      B5. Freedom days disambiguation
+          - "Gewonnen" (won) — exclusively De Wil (from completed actions)
+          - "Per jaar" (per year) — exclusively De Kern (from passive income)
+          - "Open potentieel" — exclusively De Wil (from open actions/recommendations)
+          - Each term clearly defined with info tooltips
+    </B_deduplicate_metrics>
+
+    <C_progressive_disclosure>
+      THEME: Mature the feature gating from "hidden" to "anticipation-building"
+
+      C1. Switch FeatureGate default from 'hidden' to 'locked' for key features
+          - Locked card shows: feature name, 1-line description, unlock phase
+          - Mini progress bar showing how close to unlock
+          - Subtle styling: dashed border, muted colors, lock icon
+          - NOT all features — only significant ones worth teasing
+
+      C2. Phase transition celebration modal
+          - Full-screen celebration when sovereignty level increases
+          - "Gefeliciteerd! Je bent nu in de [Phase]-fase"
+          - List of newly unlocked features with mini descriptions
+          - "Ontdek je nieuwe mogelijkheden" CTA
+          - Themed animation matching target phase color
+
+      C3. New feature spotlight after phase transition
+          - First visit to a page after phase-up: pulse/glow animation on new sections
+          - Tooltip: "Nieuw! [Feature name] is nu beschikbaar"
+          - Mark seen in localStorage, show only once
+
+      C4. "Jouw Pad" (Your Path) progress widget on Dashboard
+          - Current phase + level visual indicator
+          - Progress toward next level (criteria checklist)
+          - Next unlock preview: "Volgend niveau → [feature name]"
+          - Connects Identity's Chronology Scale to actual app experience
+          - Compact card format, not intrusive
+
+      C5. "Meer functies beschikbaar" footer on gated pages
+          - When a page has hidden features, show subtle footer
+          - "X meer functies beschikbaar op niveau Y"
+          - Clickable → opens summary of locked features
+          - Does NOT show on pages where all features are already visible
+
+      C6. Feature roadmap view on Identity page
+          - Enhance existing Chronology Scale section
+          - Per level: show which features unlock
+          - Visual: feature icons along the level timeline
+          - Helps users understand the value of progressing
+    </C_progressive_disclosure>
+
+    <D_overview_pages_ux>
+      THEME: Make overview pages intuitive — users know exactly where to go
+
+      D1. Smart "Volgende Stap" (Next Step) engine
+          - Algorithm determines most impactful next action based on data state:
+            * No transactions? → "Importeer je eerste bankafschrift"
+            * No assets? → "Voeg je vermogen toe"
+            * Budget alerts? → "3 budgetten hebben aandacht nodig"
+            * No goals? → "Stel je eerste doel in"
+            * FIRE unreachable? → "Bekijk scenario's"
+          - Display as prominent card below hero on each overview page
+          - Maximum 1-2 suggestions per page (focused, not overwhelming)
+          - Dismiss/complete removes suggestion
+          - Persisted per user (track which steps completed)
+
+      D2. Mission control card layout for De Kern
+          - Quick links section redesigned as status-aware cards:
+            * Cash: income/expenses + status (✅ healthy / ⚠️ needs attention)
+            * Budgetten: over-budget count + status indicator
+            * Assets: total + growth direction
+            * Schulden: total + payoff progress
+          - Each card: 1 key metric + status icon + clear CTA
+          - Replace current simple link cards with richer information
+
+      D3. Collapsible deep-dive sections
+          - Advanced/detailed sections collapsed by default with 1-line preview
+          - Click to expand — keeps page scannable
+          - Collapse state persisted in localStorage
+          - Applies to: Vermogensverloop, Snapshot Vergelijking, Beslissingspatronen
+          - Section header shows mini-summary even when collapsed
+
+      D4. "Ontdek" (Discover) feature carousel
+          - Horizontal scrollable row at bottom of overview pages
+          - Shows features user hasn't explored yet
+          - "Wist je dat je Monte Carlo simulaties kunt draaien?"
+          - Tracks which features user has visited (localStorage)
+          - Only shows relevant features for user's current phase
+          - Fades out explored features, highlights undiscovered
+
+      D5. Consistent section ordering across modules
+          - Every overview page follows: Hero → KPIs → Alerts → Primary Content → Deep Dives → Discover
+          - Visual hierarchy consistent: gradient hero, white cards, subtle borders
+          - Spacing rhythm consistent (mt-8, mt-10 matching current patterns)
+    </D_overview_pages_ux>
+
+    <E_gamification>
+      THEME: Badges, streaks, and engagement loops around freedom days
+
+      E1. Badge system database schema
+          - badges table: id, slug, name, description, icon, color, category, criteria_type, criteria_value
+          - user_badges table: user_id, badge_id, earned_at, notified
+          - Badge categories: onboarding, consistency, financial_health, fire_milestones, actions, budget, exploration, sovereignty
+
+      E2. Badge definitions (30+ badges across categories)
+          Onboarding:
+          - "Eerste Stap" — complete onboarding
+          - "Data Detective" — import first bank file
+          - "Budgetbouwer" — set up all budget categories
+
+          Consistency:
+          - "Weekstreak ×4" — 4 weeks consecutive login
+          - "Maandmeester" — track finances for 12 consecutive months
+          - "Dagelijkse Discipline" — log in 30 days in a row
+
+          Financial Health:
+          - "Noodfonds Bereikt" — 6-month emergency fund established
+          - "Schuldenvrij" — all debts paid off
+          - "Positief Vermogen" — net worth crosses from negative to positive
+          - "Eerste €10K" — net worth reaches €10.000
+          - "€100K Club" — net worth reaches €100.000
+
+          FIRE Milestones:
+          - "10% Vrij" — 10% freedom reached
+          - "Halftime" — 50% FIRE target reached
+          - "Coast FIRE" — could stop saving and still reach FIRE
+          - "FIRE Bereikt!" — 100% financial independence
+
+          Actions & Decisions:
+          - "Eerste Actie" — complete first action
+          - "Actieheld ×10" — complete 10 actions
+          - "Vrijheidsjager" — earn 100+ freedom days from actions
+          - "Beslisser" — make decisions on all pending recommendations
+
+          Budget Mastery:
+          - "Onder Budget" — all budgets under limit for a full month
+          - "Zuinig Kwartaal" — 3 months all budgets under limit
+          - "Spaarkampioen" — savings rate above 30% for 3 months
+
+          Exploration:
+          - "Ontdekker" — visit all 3 modules
+          - "Analist" — use Monte Carlo simulations
+          - "Strateeg" — try all 4 withdrawal strategies
+          - "Fiscaal Slim" — use Box 3 optimization
+
+          Sovereignty:
+          - One badge per sovereignty level reached (9 total)
+
+      E3. Badge evaluation engine
+          - Background check after key actions (login, action complete, import, month close)
+          - Compare user state against badge criteria
+          - Award new badges when criteria met
+          - Store earned_at timestamp
+
+      E4. Badge notification system
+          - Toast notification on badge earn: "🏆 Badge verdiend: [name]!"
+          - Animation: badge icon flies to profile
+          - Queue multiple badges if earned simultaneously
+          - Mark as notified to prevent repeat notifications
+
+      E5. Badge showcase on Identity page
+          - Replace current placeholder badges
+          - Grid of earned badges (full color) + locked badges (grayed, "?" overlay)
+          - Click badge for detail: name, description, date earned
+          - Show total badges: "12 van 30 verdiend"
+          - Progress indicators for partially-met criteria
+
+      E6. Freedom days animation loop
+          - Central gamification metric: "+X vrijheidsdagen"
+          - Animated counter on action completion: "+3.2 dagen" floats up
+          - Running total visible in De Wil hero
+          - Weekly email/notification: "Deze week: +8.4 vrijheidsdagen gewonnen"
+
+      E7. Streak tracking system
+          - Track consecutive weeks of:
+            * App usage (login/review)
+            * Budget compliance (all under limit)
+            * Action completion (≥1 per week)
+          - Streak counter with fire emoji 🔥 next to count
+          - Streak break warning: "Je streak van 8 weken staat op het spel!"
+          - Longest streak record on Identity page
+          - Streak badges at milestones (4, 12, 26, 52 weeks)
+
+      E8. Level-up celebration animations
+          - Sovereignty level increase: themed full-screen animation
+          - Phase transition (e.g., Recovery→Stability): phase-colored celebration
+          - Micro-animations: progress bars filling, badges unlocking with shimmer
+          - Sound effects optional (user preference)
+    </E_gamification>
+
+    <F_historical_insight>
+      THEME: Consistent "Verleden ← Nu → Toekomst" pattern across all data
+
+      F1. Automatic monthly snapshots
+          - Cron/trigger on 1st of each month (or Supabase scheduled function)
+          - Auto-capture: net worth, total assets, total debts, freedom %, FIRE age
+          - Store in enhanced net_worth_snapshots table
+          - Add fields: freedom_percentage, fire_age, sovereignty_level, savings_rate
+          - No user action needed — happens automatically
+          - Keep unlimited history (no 24-record cap)
+
+      F2. 12-month budget spending trend
+          - Per budget category: sparkline showing 12-month spend history
+          - Show on budget detail modal (replace or complement current transaction list)
+          - Show on De Kern overview: "Boodschappen: €380 → €420 → €390 → ..."
+          - Color coding: trend up (red for expenses), trend down (green for expenses)
+          - Calculate from transaction history (already available, just not visualized)
+
+      F3. Asset valuation trend charts
+          - Per asset: line chart showing value over time from valuations table
+          - Show on asset detail modal
+          - Mini sparkline on asset card (compact view)
+          - Remove 20-record limit — show full history
+          - Auto-track: when user updates asset value, create valuation entry automatically
+
+      F4. Debt balance trajectory visualization
+          - Per debt: line chart showing balance declining over time
+          - Overlay: projected payoff trajectory (from existing debtProjection())
+          - Show actual vs projected comparison
+          - Mini sparkline on debt card
+          - Auto-track balance changes via valuations table
+
+      F5. FIRE-age history tracking
+          - Store monthly calculated FIRE age in snapshots
+          - New chart: "Je FIRE-leeftijd over tijd"
+          - Shows: "In januari was je FIRE-leeftijd 54, nu 52 — je ligt 2 jaar voor!"
+          - Visualize on De Horizon overview
+          - Powerful motivational metric: seeing FIRE age decrease over time
+
+      F6. Freedom days monthly trend (De Wil)
+          - Track freedom days won per month (from completed actions)
+          - Bar chart: 12-month trend of days won
+          - Show on De Wil overview
+          - "Deze maand: +8.4 dagen | Gemiddeld: +6.2 dagen | Beste maand: +14.1 dagen"
+
+      F7. Goal progress timeline
+          - Per goal: track current_value changes over time
+          - Line chart showing progress toward target
+          - Overlay: deadline marker with on-track indicator
+          - "Op dit tempo bereik je je doel X maanden eerder/later"
+
+      F8. Net worth milestone markers
+          - On net worth chart: highlight milestone crossings (€10K, €50K, €100K, etc.)
+          - Marker with date: "€100K bereikt op 15 maart 2025"
+          - Connects to badge system (milestone badges)
+
+      F9. Resilience score history
+          - Store monthly resilience scores
+          - Trend chart on De Horizon
+          - "Je veerkracht is gestegen van 45 naar 68 in 6 maanden"
+    </F_historical_insight>
+
+    <G_predictions_forecasting>
+      THEME: Forward-looking predictions consistent with historical views
+
+      G1. Budget forecast (next month prediction)
+          - Based on 3-6 month spending average per category
+          - Show on budget detail: "Verwachte uitgaven volgende maand: €X"
+          - Confidence indicator based on spending variance
+          - Alert if predicted spend exceeds budget limit
+          - "Op basis van je patroon geef je volgende maand €420 uit aan boodschappen"
+
+      G2. Cash flow forecast (3-6 months)
+          - Predict next 3-6 months bank balance trajectory
+          - Based on: recurring transactions + budget limits + known events
+          - Area chart showing projected balance
+          - Alert: "Let op: in maart zakt je saldo onder €500"
+          - Show on De Kern overview (feature-gated to Stability+)
+
+      G3. Asset portfolio projection in UI
+          - Activate existing projectPortfolio() code — currently unused in UI
+          - Show 5/10/20/30 year projection on assets page
+          - Area chart with growth trajectory
+          - Include monthly contributions in projection
+          - "Met je huidige inleg groeit je portfolio naar €X in Y jaar"
+
+      G4. Debt payoff trajectory chart in UI
+          - Activate existing debtProjection() visualization
+          - Show per debt: projected balance decline over time
+          - Compare strategies visually (snowball vs avalanche overlay)
+          - "Bij avalanche-strategie ben je 14 maanden eerder schuldenvrij"
+
+      G5. Net worth growth projection
+          - Based on current trajectory (income - expenses + returns)
+          - Show on De Kern: "Op dit tempo bereik je €X over 5 jaar"
+          - Compare with FIRE target line
+          - Merge with existing FIRE projection but show on Kern for short-term view
+
+      G6. Freedom percentage forecast
+          - Project when user will reach 25%, 50%, 75%, 100% freedom
+          - Milestone timeline with estimated dates
+          - Show on Dashboard "Jouw Pad" widget
+          - "Je bereikt 50% vrijheid rond september 2027"
+
+      G7. Spending pattern predictions with AI
+          - Monthly AI analysis of spending trends
+          - Detect seasonal patterns: "Je geeft in december altijd 30% meer uit"
+          - Surface as insight cards on De Kern
+          - Connected to existing AI context builders
+    </G_predictions_forecasting>
+
+    <H_portfolio_tracker>
+      THEME: Dedicated investment tracking that compounds into existing asset values
+
+      H1. Holdings management
+          - Per investment asset: add individual holdings (positions)
+          - Fields: ticker/ISIN, name, units held, average purchase price, purchase date
+          - CRUD operations on holdings
+          - Aggregate holdings → total portfolio value syncs to asset current_value
+
+      H2. Transaction log per holding
+          - Buy, sell, dividend events
+          - Each event updates units held and cost basis
+          - Running P&L per holding
+          - Transaction history per holding
+
+      H3. Price feed integration
+          - Integration with free API (Yahoo Finance or similar)
+          - Daily price updates for holdings with tickers
+          - Last price + daily change shown per holding
+          - Manual override for unlisted assets
+
+      H4. Portfolio allocation visualization
+          - Donut chart: allocation by sector, geography, asset class
+          - Current vs target allocation comparison
+          - Rebalancing suggestions
+
+      H5. Benchmark comparison
+          - Compare portfolio returns vs benchmarks (AEX, MSCI World, S&P 500)
+          - Time-weighted return calculation
+          - Show alpha (outperformance/underperformance)
+
+      H6. Dividend tracker
+          - Track dividend income per holding
+          - Projected annual dividend income
+          - Feeds into passive income calculations in FIRE projections
+          - "Je dividendinkomsten dekken X dagen vrijheid per jaar"
+
+      H7. Auto-sync to asset values
+          - Total portfolio value from holdings → updates asset current_value
+          - Ensures portfolio tracker and asset module stay in sync
+          - Conflict resolution: portfolio tracker is source of truth when active
+    </H_portfolio_tracker>
+
+    <I_share_social>
+      THEME: Share progress and celebrate financial freedom milestones
+
+      I1. Freedom card generator
+          - Generate beautiful visual card showing:
+            * Freedom percentage + progress bar
+            * Days won this month
+            * FIRE countdown
+            * TriFinity branding
+          - NO sensitive EUR amounts — only percentages and timeframes
+          - Download as image (PNG/JPG)
+
+      I2. Privacy levels for sharing
+          - Anonymous: just percentages, no name
+          - Named: with name, no amounts
+          - Full: percentages + amounts (opt-in)
+          - User selects privacy level before generating card
+
+      I3. Share targets
+          - Copy shareable link
+          - Download image
+          - Direct share: WhatsApp, Twitter/X (via Web Share API)
+
+      I4. Year-in-Review (Jaaroverzicht)
+          - Annual financial summary (generated in December/January)
+          - Sections: freedom days won, net worth growth, badges earned, best/worst months
+          - FIRE progress (start of year vs end of year)
+          - Beautiful multi-page scrollable report
+          - Shareable as image or link
+
+      I5. Badge showcase sharing
+          - Share individual badges on social media
+          - "Ik heb de Schuldenvrij badge verdiend op TriFinity!"
+          - Badge image with branding
+    </I_share_social>
+
+    <J_household_mode>
+      PHASE: FINAL — Implement last, after all other features are stable
+
+      NOTE: Full specification exists in docs/plan-household-support.md
+      This is a large feature that touches nearly every page and calculation.
+      Include in feature count but implement in the final phase.
+
+      J1. Household database foundation
+          - households table, household_members, household_invitations
+          - Ownership field on assets, debts, budgets (personal/shared)
+
+      J2. Partner invitation and management
+          - Invite partner by email
+          - Accept/decline flow
+          - Leave household option
+
+      J3. Perspective switcher
+          - Toggle between: Household, Partner 1, Partner 2
+          - All calculations recalculate per perspective
+          - Persistent preference per user
+
+      J4. Shared vs personal data
+          - Each asset, debt, budget marked as personal or shared
+          - Cost splitting: 50/50, income-ratio, custom %, one-pays-all
+          - Combined and individual views
+
+      J5. Household FIRE projections
+          - Combined income, combined expenses
+          - Shared FIRE target and individual FIRE targets
+          - Partner comparison view
+    </J_household_mode>
+
+  </core_features>
+
+  <database_schema>
+    <tables>
+      <existing_tables_note>
+        The following tables already exist in Supabase. New tables and alterations are marked.
+      </existing_tables_note>
+
+      <badges_NEW>
+        - id (UUID, PK)
+        - slug (text, unique)
+        - name (text)
+        - description (text)
+        - icon (text)
+        - color (text)
+        - category (text: onboarding, consistency, financial_health, fire_milestones, actions, budget, exploration, sovereignty)
+        - criteria_type (text: threshold, count, streak, milestone, manual)
+        - criteria_value (jsonb: flexible criteria definition)
+        - sort_order (int)
+        - created_at (timestamptz)
+      </badges_NEW>
+
+      <user_badges_NEW>
+        - id (UUID, PK)
+        - user_id (UUID, FK → auth.users)
+        - badge_id (UUID, FK → badges)
+        - earned_at (timestamptz)
+        - notified (boolean, default false)
+        - UNIQUE(user_id, badge_id)
+      </user_badges_NEW>
+
+      <user_streaks_NEW>
+        - id (UUID, PK)
+        - user_id (UUID, FK → auth.users)
+        - streak_type (text: login, budget_compliance, action_completion)
+        - current_count (int, default 0)
+        - longest_count (int, default 0)
+        - last_activity_date (date)
+        - started_at (timestamptz)
+        - updated_at (timestamptz)
+      </user_streaks_NEW>
+
+      <user_feature_visits_NEW>
+        - id (UUID, PK)
+        - user_id (UUID, FK → auth.users)
+        - feature_slug (text)
+        - first_visited_at (timestamptz)
+        - visit_count (int, default 1)
+        - UNIQUE(user_id, feature_slug)
+      </user_feature_visits_NEW>
+
+      <holdings_NEW>
+        - id (UUID, PK)
+        - user_id (UUID, FK → auth.users)
+        - asset_id (UUID, FK → assets)
+        - ticker (text)
+        - isin (text, nullable)
+        - name (text)
+        - units (numeric)
+        - avg_purchase_price (numeric)
+        - current_price (numeric, nullable)
+        - last_price_update (timestamptz, nullable)
+        - purchase_date (date, nullable)
+        - notes (text, nullable)
+        - is_active (boolean, default true)
+        - created_at (timestamptz)
+        - updated_at (timestamptz)
+      </holdings_NEW>
+
+      <holding_transactions_NEW>
+        - id (UUID, PK)
+        - holding_id (UUID, FK → holdings)
+        - user_id (UUID, FK → auth.users)
+        - type (text: buy, sell, dividend)
+        - units (numeric)
+        - price_per_unit (numeric)
+        - total_amount (numeric)
+        - date (date)
+        - notes (text, nullable)
+        - created_at (timestamptz)
+      </holding_transactions_NEW>
+
+      <net_worth_snapshots_ALTER>
+        ADD COLUMNS:
+        - freedom_percentage (numeric, nullable)
+        - fire_age (numeric, nullable)
+        - sovereignty_level (int, nullable)
+        - savings_rate (numeric, nullable)
+        - resilience_score (int, nullable)
+      </net_worth_snapshots_ALTER>
+
+      <next_step_completions_NEW>
+        - id (UUID, PK)
+        - user_id (UUID, FK → auth.users)
+        - step_key (text)
+        - completed_at (timestamptz)
+        - dismissed (boolean, default false)
+        - UNIQUE(user_id, step_key)
+      </next_step_completions_NEW>
+
+      <households_NEW_PHASE_FINAL>
+        See docs/plan-household-support.md for full schema
+      </households_NEW_PHASE_FINAL>
+    </tables>
+  </database_schema>
+
+  <api_endpoints_summary>
+    <new_endpoints>
+      - GET /api/badges — List all badges with user's earned status
+      - POST /api/badges/evaluate — Trigger badge evaluation for current user
+      - GET /api/streaks — Get user's current streaks
+      - POST /api/streaks/checkin — Record activity for streak tracking
+      - GET /api/next-steps — Get personalized next step suggestions
+      - POST /api/next-steps/dismiss — Dismiss a suggestion
+      - POST /api/next-steps/complete — Mark a suggestion as completed
+      - GET /api/snapshots/auto — Trigger automatic monthly snapshot
+      - GET /api/holdings — List holdings for an asset
+      - POST /api/holdings — Create holding
+      - PUT /api/holdings/:id — Update holding
+      - DELETE /api/holdings/:id — Delete holding
+      - GET /api/holdings/:id/transactions — Holding transaction history
+      - POST /api/holdings/:id/transactions — Record buy/sell/dividend
+      - GET /api/prices/:ticker — Fetch current price for ticker
+      - GET /api/share/freedom-card — Generate freedom card image data
+      - GET /api/feature-visits — Track feature discovery
+      - POST /api/feature-visits — Record feature visit
+    </new_endpoints>
+    <existing_endpoints>
+      - POST /api/ai/chat — AI streaming chat (3 domains)
+      - POST /api/ai/recommendations — Generate AI recommendations
+      - POST /api/onboarding/seed — Seed persona data
+      - POST /api/onboarding/save-own-data — Save manual onboarding data
+      - POST /api/onboarding/suggest-budgets — AI budget suggestion
+      - POST /api/onboarding/reset — Reset all user data
+      - POST /api/activate — Activate user (compute initial phase)
+      - GET /api/export — CSV export (6 types)
+      - GET /api/nibud — NIBUD benchmark data
+    </existing_endpoints>
+  </api_endpoints_summary>
+
+  <ui_layout>
+    <main_structure>
+      Existing layout preserved: App header (desktop nav) + Bottom nav (mobile) + Full-width content area.
+      No sidebar. Module-level navigation via tabs.
+    </main_structure>
+    <overview_page_structure>
+      Standardized across all three modules:
+      1. Gradient Hero Section (module color theme)
+      2. KPI Stat Cards (4-column grid)
+      3. Alert Banners (conditional)
+      4. Smart "Volgende Stap" card (new)
+      5. Primary Content (module-specific)
+      6. Collapsible Deep-Dive Sections (new pattern)
+      7. "Ontdek" Feature Carousel (new)
+    </overview_page_structure>
+    <new_components>
+      - FreedomTimeLabel: reusable component showing EUR + freedom time
+      - LockedFeatureCard: teaser card for locked features
+      - PhaseTransitionModal: celebration modal on level-up
+      - NextStepCard: smart suggestion card
+      - BadgeGrid: badge showcase grid
+      - BadgeToast: notification toast for earned badges
+      - StreakIndicator: fire emoji + streak count
+      - DiscoverCarousel: horizontal feature discovery
+      - CollapsibleSection: expandable section with summary
+      - HoldingsList: portfolio tracker holdings view
+      - FreedomCard: shareable visual card generator
+      - SparklineChart: mini trend line for historical data
+      - TrendChart: consistent historical + projection chart
+    </new_components>
+  </ui_layout>
+
+  <design_system>
+    <color_palette>
+      Existing module colors preserved:
+      - De Kern: Amber (#f59e0b) — amber-50 through amber-950
+      - De Wil: Teal (#14b8a6) — teal-50 through teal-950
+      - De Horizon: Purple (#a855f7) — purple-50 through purple-950
+      - Neutral: Zinc (#71717a) — zinc-50 through zinc-950
+
+      New accent colors for gamification:
+      - Badge gold: #fbbf24 (amber-400)
+      - Streak fire: #ef4444 (red-500)
+      - Success: #10b981 (emerald-500)
+    </color_palette>
+    <typography>
+      Existing: System font stack via Tailwind defaults
+      Sizes: text-xs through text-7xl (existing hierarchy preserved)
+      Freedom time labels: text-sm, italic, text-zinc-500 (subtle but visible)
+    </typography>
+    <philosophy_in_design>
+      Freedom time labels should feel like natural annotations, not intrusive additions.
+      Use lighter weight (font-normal), smaller size (text-sm), and muted color (zinc-500)
+      to complement rather than compete with primary EUR values.
+    </philosophy_in_design>
+  </design_system>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Foundation: Philosophy Utility & Database Schema</title>
+      <tasks>
+        - Create formatWithFreedom() utility and variants
+        - Create new database tables (badges, user_badges, user_streaks, holdings, etc.)
+        - Alter net_worth_snapshots with new columns
+        - Set up badge seed data (30+ badge definitions)
+        - Create API routes for badges, streaks, next-steps, holdings
+      </tasks>
+    </step>
+
+    <step number="2">
+      <title>Philosophy Consistency — UI Layer</title>
+      <tasks>
+        - Add FreedomTimeLabel component
+        - Integrate freedom time across Dashboard, Core, Will, Horizon
+        - Add freedom-time to budgets, transactions, assets, debts, tax
+        - Deduplicate metrics across pages (each page gets its own lens)
+        - Review and update section labels for philosophical consistency
+      </tasks>
+    </step>
+
+    <step number="3">
+      <title>Progressive Disclosure Maturation</title>
+      <tasks>
+        - Update FeatureGate to support 'locked' fallback as default for key features
+        - Build LockedFeatureCard component
+        - Build PhaseTransitionModal celebration
+        - Build new feature spotlight (pulse animation after phase-up)
+        - Build "Jouw Pad" widget for Dashboard
+        - Build "Meer functies beschikbaar" footer
+        - Enhance Identity page Chronology Scale with feature unlock preview
+      </tasks>
+    </step>
+
+    <step number="4">
+      <title>Overview Pages UX Improvements</title>
+      <tasks>
+        - Build NextStepCard component and engine (algorithm + API)
+        - Redesign De Kern quick links as mission control cards
+        - Build CollapsibleSection component
+        - Apply collapsible pattern to deep-dive sections
+        - Build DiscoverCarousel component
+        - Standardize overview page section ordering
+      </tasks>
+    </step>
+
+    <step number="5">
+      <title>Gamification System</title>
+      <tasks>
+        - Build badge evaluation engine (background check logic)
+        - Build BadgeToast notification component
+        - Build BadgeGrid showcase on Identity page
+        - Build StreakIndicator and tracking logic
+        - Add freedom days animation (counter, floating "+X dagen")
+        - Build level-up celebration animations
+      </tasks>
+    </step>
+
+    <step number="6">
+      <title>Historical Insight Layer</title>
+      <tasks>
+        - Implement automatic monthly snapshots (Supabase function or API cron)
+        - Build 12-month budget spending trend sparklines
+        - Enhance asset valuation charts (remove caps, auto-track)
+        - Build debt balance trajectory visualization
+        - Build FIRE-age history tracking and chart
+        - Build freedom days monthly trend chart (De Wil)
+        - Build goal progress timeline charts
+        - Add net worth milestone markers
+        - Build resilience score history
+      </tasks>
+    </step>
+
+    <step number="7">
+      <title>Predictions & Forecasting</title>
+      <tasks>
+        - Build budget forecast (next month prediction from 3-6 month average)
+        - Build cash flow forecast (3-6 month projection)
+        - Activate portfolio projection in UI (existing code)
+        - Activate debt payoff trajectory chart (existing code)
+        - Build net worth growth projection
+        - Build freedom percentage milestone forecast
+        - Build AI-powered spending pattern predictions
+      </tasks>
+    </step>
+
+    <step number="8">
+      <title>Portfolio Tracker</title>
+      <tasks>
+        - Build holdings CRUD (list, create, edit, delete)
+        - Build holding transaction log (buy, sell, dividend)
+        - Integrate price feed API
+        - Build portfolio allocation visualization
+        - Build benchmark comparison
+        - Build dividend tracker
+        - Implement auto-sync to asset values
+      </tasks>
+    </step>
+
+    <step number="9">
+      <title>Share & Social Features</title>
+      <tasks>
+        - Build freedom card generator (visual card with metrics)
+        - Implement privacy levels for sharing
+        - Add Web Share API integration
+        - Build Year-in-Review report generator
+        - Build badge sharing functionality
+      </tasks>
+    </step>
+
+    <step number="10">
+      <title>Household Mode (Final Phase)</title>
+      <tasks>
+        - Implement household database schema from docs/plan-household-support.md
+        - Build partner invitation flow
+        - Build perspective switcher
+        - Add ownership toggles to assets, debts, budgets
+        - Implement household-aware calculations
+        - Test all existing features with household context
+      </tasks>
+    </step>
+  </implementation_steps>
+
+  <success_criteria>
+    <functionality>
+      - All 265 features pass automated testing
+      - Freedom time displayed alongside every significant EUR amount
+      - No duplicate KPIs across pages — each page has clear unique lens
+      - Progressive disclosure shows locked features with unlock criteria
+      - Smart next steps guide users intuitively through the app
+      - Badge system awards and displays badges correctly
+      - Historical data shows consistent "Past ← Now → Future" pattern
+      - Predictions provide actionable forward-looking insights
+      - Portfolio tracker syncs holdings to asset values
+      - Share functionality generates beautiful privacy-respecting cards
+    </functionality>
+    <user_experience>
+      - Overview pages are scannable (no overwhelming scroll)
+      - Users know exactly where to go from any overview page
+      - Phase transitions feel celebratory and motivating
+      - Locked features create anticipation, not frustration
+      - Freedom time framing feels natural and empowering, not intrusive
+      - The app tells a consistent story of "Geld is opgeslagen tijd" from every angle
+    </user_experience>
+    <technical_quality>
+      - No regressions in existing functionality
+      - Consistent code patterns (existing architecture respected)
+      - Responsive design maintained (mobile + desktop)
+      - Performance: pages load within 2 seconds
+      - All Supabase queries use proper indexes
+    </technical_quality>
+    <design_polish>
+      - Freedom time labels are subtle annotations (not visual noise)
+      - Gamification elements are satisfying but not distracting
+      - Charts and visualizations are consistent across all modules
+      - Animations are smooth and purposeful
+      - Color coding remains consistent (amber/teal/purple per module)
+    </design_polish>
+  </success_criteria>
+</project_specification>

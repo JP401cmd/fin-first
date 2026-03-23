@@ -60,7 +60,11 @@
       "Bash(playwright-cli eval:*)",
       "Bash(playwright-cli resize:*)",
       "Bash(ls -la '/c/Users/janpa/cd/development/fin/app/\\(app\\)/core/')",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find C:Usersjanpacddevelopmentfin -type f \\\\\\(-name *asset* -o -name *debt* -o -name *mortgage* \\\\\\))",
+      "Bash(autoforge --version)",
+      "Bash(cat \"/c/Users/janpa/cd/development/fin/app/\\(app\\)/horizon/page.tsx\")",
+      "Bash(netstat -ano)"
     ]
   },
   "enableAllProjectMcpServers": true,
