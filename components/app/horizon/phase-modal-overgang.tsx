@@ -224,8 +224,8 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
           />
         )}
 
-        {/* 7. Eerder Stoppen — only for shortfall scenario (FIRE after AOW) */}
-        {transitionScenario === 'shortfall' && currentAge != null && expectedReturn != null && (
+        {/* 7. Eerder Stoppen — for both gap and shortfall scenarios */}
+        {currentAge != null && expectedReturn != null && (
           <EerderStoppen
             currentAge={currentAge}
             currentFireAge={fireAge}
@@ -236,6 +236,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             inflationRate={inflationRate}
             cashflows={cashflows}
             fireStrategy={fireStrategy}
+            scenario={transitionScenario}
           />
         )}
 

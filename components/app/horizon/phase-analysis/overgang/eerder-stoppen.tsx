@@ -21,6 +21,8 @@ export interface EerderStoppenProps {
   inflationRate: number
   cashflows?: SimCashflow[]
   fireStrategy?: FireStrategyConfig
+  /** Which transition scenario is active — adjusts title text */
+  scenario?: 'gap' | 'shortfall' | 'none'
 }
 
 /**
@@ -57,15 +59,14 @@ function feasibilityLevel(
 // ── Component ────────────────────────────────────────────────────────────────
 
 /**
- * "Stop earlier" analysis for the shortfall scenario (FIRE > AOW).
+ * "Stop earlier" analysis for both gap and shortfall scenarios.
  *
  * Displays a motivational table showing how many extra euros per month
  * the user would need to save to reach FIRE 1, 2, 3, or 5 years earlier.
  * Each row is color-coded: green (haalbaar), amber (krap), red (niet-haalbaar).
  *
- * Only shown when transitionScenario === 'shortfall', meaning the user's
- * FIRE date is after AOW age. This gives them a concrete roadmap to close
- * that gap.
+ * - Gap scenario (FIRE < AOW): title = "Nog eerder met pensioen"
+ * - Shortfall scenario (FIRE > AOW): title = "Eerder stoppen met werken"
  *
  * The computation runs lazily via setTimeout to not block modal animation.
  */
@@ -79,6 +80,7 @@ export const EerderStoppen = memo(function EerderStoppen({
   inflationRate,
   cashflows = [],
   fireStrategy,
+  scenario = 'shortfall',
 }: EerderStoppenProps) {
   const [state, setState] = useState<EerderStoppenState | null>(null)
 
@@ -116,9 +118,13 @@ export const EerderStoppen = memo(function EerderStoppen({
 
   const loading = state === null
 
+  const sectionTitle = scenario === 'gap'
+    ? 'Nog eerder met pensioen'
+    : 'Eerder stoppen met werken'
+
   return (
     <AnalysisSection
-      title="Eerder stoppen met werken"
+      title={sectionTitle}
       icon={TrendingDown}
       loading={loading}
       willContext={
