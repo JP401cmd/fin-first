@@ -102,9 +102,21 @@ export const BudgetHeatmapWidget = memo(function BudgetHeatmapWidget({ size, dat
     )
   }
 
+  // ── Mini: show number of budget groups ──────────────────
+  if (size === 'mini') {
+    const groupCount = sections[0].groups.length
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Uitgaven Heatmap" href={href}>
+        <p className="text-sm font-mono tabular-nums font-semibold text-[var(--ink)] leading-none truncate">
+          {groupCount} {groupCount === 1 ? 'categorie' : 'categorieën'}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="kern" size={size} kicker="Uitgaven Heatmap" href={href}>
-      <div className="h-full overflow-visible">
+      <div className="h-full overflow-hidden">
         <BudgetHeatmap
           sections={sections}
           spending={data.heatmapSpending ?? {}}

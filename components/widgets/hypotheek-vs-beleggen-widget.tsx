@@ -47,6 +47,17 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
 
   const AdviesIcon = aanbeveling === 'beleggen' ? TrendingUp : aanbeveling === 'aflossen' ? Home : Scale
 
+  // ── Mini: breakeven rendement ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Hyp. vs Beleggen" href={href}>
+        <p className="text-sm font-mono tabular-nums font-semibold text-[var(--ink)] leading-none truncate">
+          {breakevenPctStr}%
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter: compact summary ──
   if (size === 'quarter') {
     return (
