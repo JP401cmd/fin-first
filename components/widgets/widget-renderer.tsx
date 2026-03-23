@@ -1,151 +1,260 @@
 import dynamic from 'next/dynamic'
+import { Component, type ReactNode, type ErrorInfo } from 'react'
+import { AlertTriangle } from 'lucide-react'
 
-const NettoVermogenWidget = dynamic(() =>
-  import('./netto-vermogen-widget').then(m => ({ default: m.NettoVermogenWidget }))
+// ── Widget Error Boundary ─────────────────────────────────────
+// Catches rendering errors in individual widgets so one broken widget
+// doesn't crash the entire dashboard.  Shows a subtle "Kan niet laden"
+// fallback instead of silently disappearing.
+
+interface ErrorBoundaryProps {
+  widgetId: string
+  children: ReactNode
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+}
+
+export class WidgetErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error(
+      `[WidgetErrorBoundary] Widget "${this.props.widgetId}" failed to render:`,
+      error,
+      errorInfo.componentStack
+    )
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-1.5 rounded-[var(--r-lg)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3 text-center">
+          <AlertTriangle className="h-4 w-4 text-[var(--ink-4)]" />
+          <p className="text-[11px] font-medium text-[var(--ink-3)]">Kan niet laden</p>
+          <p className="text-[10px] text-[var(--ink-4)] max-w-[180px] truncate">
+            {this.props.widgetId}
+          </p>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+// ── Loading fallback for dynamic imports ──────────────────────
+function WidgetLoadingFallback() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-[var(--ink-4)]" />
+    </div>
+  )
+}
+
+const NettoVermogenWidget = dynamic(
+  () => import('./netto-vermogen-widget').then(m => ({ default: m.NettoVermogenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const CashFlowWidget = dynamic(() =>
-  import('./cash-flow-widget').then(m => ({ default: m.CashFlowWidget }))
+const CashFlowWidget = dynamic(
+  () => import('./cash-flow-widget').then(m => ({ default: m.CashFlowWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BudgettenWidget = dynamic(() =>
-  import('./budgetten-widget').then(m => ({ default: m.BudgettenWidget }))
+const BudgettenWidget = dynamic(
+  () => import('./budgetten-widget').then(m => ({ default: m.BudgettenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const AssetsWidget = dynamic(() =>
-  import('./assets-widget').then(m => ({ default: m.AssetsWidget }))
+const AssetsWidget = dynamic(
+  () => import('./assets-widget').then(m => ({ default: m.AssetsWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const SchuldenWidget = dynamic(() =>
-  import('./schulden-widget').then(m => ({ default: m.SchuldenWidget }))
+const SchuldenWidget = dynamic(
+  () => import('./schulden-widget').then(m => ({ default: m.SchuldenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const HoldingsWidget = dynamic(() =>
-  import('./holdings-widget').then(m => ({ default: m.HoldingsWidget }))
+const HoldingsWidget = dynamic(
+  () => import('./holdings-widget').then(m => ({ default: m.HoldingsWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const VoorstellenWidget = dynamic(() =>
-  import('./voorstellen-widget').then(m => ({ default: m.VoorstellenWidget }))
+const VoorstellenWidget = dynamic(
+  () => import('./voorstellen-widget').then(m => ({ default: m.VoorstellenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const ActiesWidget = dynamic(() =>
-  import('./acties-widget').then(m => ({ default: m.ActiesWidget }))
+const ActiesWidget = dynamic(
+  () => import('./acties-widget').then(m => ({ default: m.ActiesWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const DoelenWidget = dynamic(() =>
-  import('./doelen-widget').then(m => ({ default: m.DoelenWidget }))
+const DoelenWidget = dynamic(
+  () => import('./doelen-widget').then(m => ({ default: m.DoelenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const FirePrognoseWidget = dynamic(() =>
-  import('./fire-prognose-widget').then(m => ({ default: m.FirePrognoseWidget }))
+const FirePrognoseWidget = dynamic(
+  () => import('./fire-prognose-widget').then(m => ({ default: m.FirePrognoseWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const MonteCarloWidget = dynamic(() =>
-  import('./monte-carlo-widget').then(m => ({ default: m.MonteCarloWidget }))
+const MonteCarloWidget = dynamic(
+  () => import('./monte-carlo-widget').then(m => ({ default: m.MonteCarloWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const LevensgebeurtenissenWidget = dynamic(() =>
-  import('./levensgebeurtenissen-widget').then(m => ({ default: m.LevensgebeurtenissenWidget }))
+const LevensgebeurtenissenWidget = dynamic(
+  () => import('./levensgebeurtenissen-widget').then(m => ({ default: m.LevensgebeurtenissenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const SpaarquoteWidget = dynamic(() =>
-  import('./spaarquote-widget').then(m => ({ default: m.SpaarquoteWidget }))
+const SpaarquoteWidget = dynamic(
+  () => import('./spaarquote-widget').then(m => ({ default: m.SpaarquoteWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const VrijheidsvoortgangWidget = dynamic(() =>
-  import('./vrijheidsvoortgang-widget').then(m => ({ default: m.VrijheidsvoortgangWidget }))
+const VrijheidsvoortgangWidget = dynamic(
+  () => import('./vrijheidsvoortgang-widget').then(m => ({ default: m.VrijheidsvoortgangWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const VasteLastenWidget = dynamic(() =>
-  import('./vaste-lasten-widget').then(m => ({ default: m.VasteLastenWidget }))
+const VasteLastenWidget = dynamic(
+  () => import('./vaste-lasten-widget').then(m => ({ default: m.VasteLastenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const JouwPadWidgetWrapper = dynamic(() =>
-  import('./jouw-pad-widget-wrapper').then(m => ({ default: m.JouwPadWidgetWrapper }))
+const JouwPadWidgetWrapper = dynamic(
+  () => import('./jouw-pad-widget-wrapper').then(m => ({ default: m.JouwPadWidgetWrapper })),
+  { loading: WidgetLoadingFallback }
 )
-const GezondheidScoreWidget = dynamic(() =>
-  import('./gezondheids-score-widget').then(m => ({ default: m.GezondheidScoreWidget }))
+const GezondheidScoreWidget = dynamic(
+  () => import('./gezondheids-score-widget').then(m => ({ default: m.GezondheidScoreWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BelastingBox3Widget = dynamic(() =>
-  import('./belasting-box3-widget').then(m => ({ default: m.BelastingBox3Widget }))
+const BelastingBox3Widget = dynamic(
+  () => import('./belasting-box3-widget').then(m => ({ default: m.BelastingBox3Widget })),
+  { loading: WidgetLoadingFallback }
 )
-const NibudBenchmarkWidget = dynamic(() =>
-  import('./nibud-benchmark-widget').then(m => ({ default: m.NibudBenchmarkWidget }))
+const NibudBenchmarkWidget = dynamic(
+  () => import('./nibud-benchmark-widget').then(m => ({ default: m.NibudBenchmarkWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const VrijheidsScenarioWidget = dynamic(() =>
-  import('./vrijheidsscenario-widget').then(m => ({ default: m.VrijheidsScenarioWidget }))
+const VrijheidsScenarioWidget = dynamic(
+  () => import('./vrijheidsscenario-widget').then(m => ({ default: m.VrijheidsScenarioWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const SimVermogenspadWidget = dynamic(() =>
-  import('./sim-vermogenspad-widget').then(m => ({ default: m.SimVermogenspadWidget }))
+const SimVermogenspadWidget = dynamic(
+  () => import('./sim-vermogenspad-widget').then(m => ({ default: m.SimVermogenspadWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const PassiefInkomenWidget = dynamic(() =>
-  import('./passief-inkomen-widget').then(m => ({ default: m.PassiefInkomenWidget }))
+const PassiefInkomenWidget = dynamic(
+  () => import('./passief-inkomen-widget').then(m => ({ default: m.PassiefInkomenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const Box3DragWidget = dynamic(() =>
-  import('./box3-drag-widget').then(m => ({ default: m.Box3DragWidget }))
+const Box3DragWidget = dynamic(
+  () => import('./box3-drag-widget').then(m => ({ default: m.Box3DragWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const VrijheidsMijlpalenWidget = dynamic(() =>
-  import('./vrijheidsmijlpalen-widget').then(m => ({ default: m.VrijheidsMijlpalenWidget }))
+const VrijheidsMijlpalenWidget = dynamic(
+  () => import('./vrijheidsmijlpalen-widget').then(m => ({ default: m.VrijheidsMijlpalenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BacktestingScoreWidget = dynamic(() =>
-  import('./backtesting-score-widget').then(m => ({ default: m.BacktestingScoreWidget }))
+const BacktestingScoreWidget = dynamic(
+  () => import('./backtesting-score-widget').then(m => ({ default: m.BacktestingScoreWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const InflatieImpactWidget = dynamic(() =>
-  import('./inflatie-impact-widget').then(m => ({ default: m.InflatieImpactWidget }))
+const InflatieImpactWidget = dynamic(
+  () => import('./inflatie-impact-widget').then(m => ({ default: m.InflatieImpactWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BeleggingsrendementWidget = dynamic(() =>
-  import('./beleggingsrendement-widget').then(m => ({ default: m.BeleggingsrendementWidget }))
+const BeleggingsrendementWidget = dynamic(
+  () => import('./beleggingsrendement-widget').then(m => ({ default: m.BeleggingsrendementWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const PensioenAowWidget = dynamic(() =>
-  import('./pensioen-aow-widget').then(m => ({ default: m.PensioenAowWidget }))
+const PensioenAowWidget = dynamic(
+  () => import('./pensioen-aow-widget').then(m => ({ default: m.PensioenAowWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BudgetFavWidget = dynamic(() =>
-  import('./budget-fav-widget').then(m => ({ default: m.BudgetFavWidget }))
+const BudgetFavWidget = dynamic(
+  () => import('./budget-fav-widget').then(m => ({ default: m.BudgetFavWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const HoldingFavWidget = dynamic(() =>
-  import('./holding-fav-widget').then(m => ({ default: m.HoldingFavWidget }))
+const HoldingFavWidget = dynamic(
+  () => import('./holding-fav-widget').then(m => ({ default: m.HoldingFavWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const MeldingenWidget = dynamic(() =>
-  import('./meldingen-widget').then(m => ({ default: m.MeldingenWidget }))
+const MeldingenWidget = dynamic(
+  () => import('./meldingen-widget').then(m => ({ default: m.MeldingenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const AiInzichtWidget = dynamic(() =>
-  import('./ai-inzicht-widget').then(m => ({ default: m.AiInzichtWidget }))
+const AiInzichtWidget = dynamic(
+  () => import('./ai-inzicht-widget').then(m => ({ default: m.AiInzichtWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const VolgendeStapWidget = dynamic(() =>
-  import('./volgende-stap-widget').then(m => ({ default: m.VolgendeStapWidget }))
+const VolgendeStapWidget = dynamic(
+  () => import('./volgende-stap-widget').then(m => ({ default: m.VolgendeStapWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const MaandoverzichtWidget = dynamic(() =>
-  import('./maandoverzicht-widget').then(m => ({ default: m.MaandoverzichtWidget }))
+const MaandoverzichtWidget = dynamic(
+  () => import('./maandoverzicht-widget').then(m => ({ default: m.MaandoverzichtWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const AgendaWidget = dynamic(() =>
-  import('./agenda-widget').then(m => ({ default: m.AgendaWidget }))
+const AgendaWidget = dynamic(
+  () => import('./agenda-widget').then(m => ({ default: m.AgendaWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const NoodfondsWidget = dynamic(() =>
-  import('./noodfonds-widget').then(m => ({ default: m.NoodfondsWidget }))
+const NoodfondsWidget = dynamic(
+  () => import('./noodfonds-widget').then(m => ({ default: m.NoodfondsWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const HuishoudenVergelijkingWidget = dynamic(() =>
-  import('./huishouden-vergelijking-widget').then(m => ({ default: m.HuishoudenVergelijkingWidget }))
+const HuishoudenVergelijkingWidget = dynamic(
+  () => import('./huishouden-vergelijking-widget').then(m => ({ default: m.HuishoudenVergelijkingWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const HuishoudenActiviteitWidget = dynamic(() =>
-  import('./huishouden-activiteit-widget').then(m => ({ default: m.HuishoudenActiviteitWidget }))
+const HuishoudenActiviteitWidget = dynamic(
+  () => import('./huishouden-activiteit-widget').then(m => ({ default: m.HuishoudenActiviteitWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BeslissingspatronenWidget = dynamic(() =>
-  import('./beslissingspatronen-widget').then(m => ({ default: m.BeslissingspatronenWidget }))
+const BeslissingspatronenWidget = dynamic(
+  () => import('./beslissingspatronen-widget').then(m => ({ default: m.BeslissingspatronenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const VrijheidsdagenMaandWidget = dynamic(() =>
-  import('./vrijheidsdagen-maand-widget').then(m => ({ default: m.VrijheidsdagenMaandWidget }))
+const VrijheidsdagenMaandWidget = dynamic(
+  () => import('./vrijheidsdagen-maand-widget').then(m => ({ default: m.VrijheidsdagenMaandWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const WilskrachtWidget = dynamic(() =>
-  import('./wilskracht-widget').then(m => ({ default: m.WilskrachtWidget }))
+const WilskrachtWidget = dynamic(
+  () => import('./wilskracht-widget').then(m => ({ default: m.WilskrachtWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BerichtenWidget = dynamic(() =>
-  import('./berichten-widget').then(m => ({ default: m.BerichtenWidget }))
+const BerichtenWidget = dynamic(
+  () => import('./berichten-widget').then(m => ({ default: m.BerichtenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const SwrMonitorWidget = dynamic(() =>
-  import('./swr-monitor-widget').then(m => ({ default: m.SwrMonitorWidget }))
+const SwrMonitorWidget = dynamic(
+  () => import('./swr-monitor-widget').then(m => ({ default: m.SwrMonitorWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const WeekoverzichtWidget = dynamic(() =>
-  import('./weekoverzicht-widget').then(m => ({ default: m.WeekoverzichtWidget }))
+const WeekoverzichtWidget = dynamic(
+  () => import('./weekoverzicht-widget').then(m => ({ default: m.WeekoverzichtWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BudgetTrendWidget = dynamic(() =>
-  import('./budget-trend-widget').then(m => ({ default: m.BudgetTrendWidget }))
+const BudgetTrendWidget = dynamic(
+  () => import('./budget-trend-widget').then(m => ({ default: m.BudgetTrendWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const RebalancingWidget = dynamic(() =>
-  import('./rebalancing-widget').then(m => ({ default: m.RebalancingWidget }))
+const RebalancingWidget = dynamic(
+  () => import('./rebalancing-widget').then(m => ({ default: m.RebalancingWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const FeeAnalyzerWidget = dynamic(() =>
-  import('./fee-analyzer-widget').then(m => ({ default: m.FeeAnalyzerWidget }))
+const FeeAnalyzerWidget = dynamic(
+  () => import('./fee-analyzer-widget').then(m => ({ default: m.FeeAnalyzerWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const HypotheekVsBeleggenWidget = dynamic(() =>
-  import('./hypotheek-vs-beleggen-widget').then(m => ({ default: m.HypotheekVsBeleggenWidget }))
+const HypotheekVsBeleggenWidget = dynamic(
+  () => import('./hypotheek-vs-beleggen-widget').then(m => ({ default: m.HypotheekVsBeleggenWidget })),
+  { loading: WidgetLoadingFallback }
 )
-const BudgetHeatmapWidget = dynamic(() =>
-  import('./budget-heatmap-widget').then(m => ({ default: m.BudgetHeatmapWidget }))
+const BudgetHeatmapWidget = dynamic(
+  () => import('./budget-heatmap-widget').then(m => ({ default: m.BudgetHeatmapWidget })),
+  { loading: WidgetLoadingFallback }
 )
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
@@ -510,7 +619,11 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
     const budgetId = id.slice('budget_fav:'.length)
     const fav = data.favoriteBudgets.find(b => b.id === budgetId)
     if (!fav) return null
-    return <BudgetFavWidget size={size} budget={fav} />
+    return (
+      <WidgetErrorBoundary widgetId={id}>
+        <BudgetFavWidget size={size} budget={fav} />
+      </WidgetErrorBoundary>
+    )
   }
 
   // Handle dynamic favorite holding widgets
@@ -518,7 +631,11 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
     const holdingId = id.slice('holding_fav:'.length)
     const holding = data.favoriteHoldings.find(h => h.id === holdingId)
     if (!holding) return null
-    return <HoldingFavWidget size={size} holding={holding} />
+    return (
+      <WidgetErrorBoundary widgetId={id}>
+        <HoldingFavWidget size={size} holding={holding} />
+      </WidgetErrorBoundary>
+    )
   }
 
   const def = getWidgetDef(id)
@@ -530,6 +647,21 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
 
   const href = WIDGET_HREFS[id]
 
+  // Wrap every widget in an error boundary so a single broken widget
+  // doesn't crash the entire dashboard — shows "Kan niet laden" fallback.
+  const widget = renderWidgetById(id, size, data, href, features)
+  if (!widget) return null
+  return <WidgetErrorBoundary widgetId={id}>{widget}</WidgetErrorBoundary>
+}
+
+/** Inner render logic — maps widget id to the correct component. */
+function renderWidgetById(
+  id: string,
+  size: WidgetSize,
+  data: DashboardData,
+  href: string | undefined,
+  features: FeatureAccessMap,
+): React.ReactNode {
   switch (id) {
     case 'netto_vermogen':
       return <NettoVermogenWidget size={size} data={data} href={href} />
