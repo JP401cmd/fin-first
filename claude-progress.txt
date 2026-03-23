@@ -20374,3 +20374,30 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#531, #532)
+
+## Session 2026-03-23 - Features #537, #538
+
+### Feature #537: Gap Analyse: deeltijdwerk-inkomen doorgeven - PASSING
+- Added deeltijdInkomen optional prop to GapAnalyseProps (default: 50% of monthly expenses)
+- Passed effectiveDeeltijdInkomen as 7th argument to compareOvergangStrategieen
+- Added Deeltijdinkomen display line in deeltijdwerk strategy card (EUR X/mnd format)
+- Verified: EUR 2.034/mnd shown for test user (50% of EUR 48.814/yr / 12)
+- All three strategies show correct Overleeft/Tekort badges
+- Zero new console errors
+- Commit: 6fc665e3
+
+### Feature #538: Gap Analyse: schulden-in-transitie heuristiek verbeteren - PASSING
+- Added currentAge optional prop to GapAnalyseProps
+- Updated debtsInTransition() to accept currentAge parameter
+- When currentAge available: computes debt payoff age accurately using currentAge + yearsUntilEnd
+- When currentAge unavailable: fallback to original year-based heuristic
+- Passed currentAge from PhaseModalOvergang to GapAnalyse component
+- Zero TypeScript errors, zero new console errors
+- Commit: 534292db
+
+### Files Modified
+- components/app/horizon/phase-analysis/overgang/gap-analyse.tsx - deeltijdInkomen + currentAge improvements
+- components/app/horizon/phase-modal-overgang.tsx - pass currentAge to GapAnalyse
+
+### Current Status
+- 2 features completed this session (#537, #538)
