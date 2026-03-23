@@ -1575,7 +1575,14 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
 
   // Determine active withdrawal config (use chosen strategy for display rows)
   const activeConfig = wsConfig
-  const decumStartPortfolio = sumBucketValues(runningBuckets)
+  // Use NET WORTH (assets − debts) as the reference portfolio for withdrawal
+  // strategies. The binary search already operates on net worth (candidate values
+  // are compared against currentNetWorth), so the actual simulation must match.
+  // Without this, the annuity formula (P×r/(1−(1+r)^(−n))) would use gross assets
+  // as P, causing ~33% higher withdrawals when significant debts exist. Assets
+  // would deplete to €0 while debts remain, resulting in negative net worth. (#523)
+  const decumStartNetWorth = sumBucketValues(runningBuckets)
+    - runningDebts.reduce((s, rd) => s + rd.balance * (rd.netWorthInclusionPct / 100), 0)
 
   for (let age = computedFireAge; age < displayEndAge; age++) {
     const year = age - currentAge
@@ -1625,8 +1632,13 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
 
     const expensesThisYear = yearlyExpenses * Math.pow(1 + inflationRate, yearsIntoPension)
 
-    // Build withdrawal context and apply strategy
-    const portfolioForStrategy = sumBucketValues(runningBuckets)
+    // Build withdrawal context and apply strategy — use net worth (assets − debts)
+    // so withdrawal strategies see the same portfolio as the binary search (#523)
+    const totalAssetsForStrategy = sumBucketValues(runningBuckets)
+    const totalDebtsForStrategy = runningDebts.reduce(
+      (s, rd) => s + rd.balance * (rd.netWorthInclusionPct / 100), 0,
+    )
+    const portfolioForStrategy = totalAssetsForStrategy - totalDebtsForStrategy
     // For legacy: indexed legacy amount at endAge (target to preserve)
     const indexedLegacyForCtx = strategy === 'legacy'
       ? legacyAmount * Math.pow(1 + inflationRate, effectiveEndAge - currentAge)
@@ -1646,7 +1658,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       baseExpenses: expensesThisYear,
       recurringIncome: recurringNet,
       currentPortfolio: portfolioForStrategy,
-      startPortfolio: decumStartPortfolio,
+      startPortfolio: decumStartNetWorth,
       previousWithdrawal,
       yearReturn: yearReturnForStrategy,
       yearsIntoRetirement: yearsIntoPension,
