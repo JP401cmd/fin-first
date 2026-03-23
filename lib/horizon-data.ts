@@ -539,6 +539,47 @@ export interface LifeEventImpact {
   freedomDaysLost: number
 }
 
+// ── Life Event Classification ────────────────────────────────
+
+export type LifeEventClassification = 'opbouwen' | 'investeren'
+
+/**
+ * Compute the net financial impact of a life event.
+ * Positive = net gain (freedom-building), negative/zero = net cost (freedom-investing).
+ *
+ * Formula: one_time_cost + (monthly_income_change × duration_months) - (monthly_cost_change × duration_months)
+ * Note: one_time_cost is negative for costs, positive for income.
+ */
+export function computeLifeEventNetImpact(event: LifeEvent): number {
+  const { one_time_cost, monthly_income_change, monthly_cost_change, duration_months } = event
+  return one_time_cost + (monthly_income_change * duration_months) - (monthly_cost_change * duration_months)
+}
+
+/**
+ * Classify a life event based on its net financial impact.
+ * Positive net impact → 'opbouwen' (building freedom)
+ * Zero or negative net impact → 'investeren' (investing in freedom, conservative default)
+ */
+export function classifyLifeEvent(event: LifeEvent): LifeEventClassification {
+  return computeLifeEventNetImpact(event) > 0 ? 'opbouwen' : 'investeren'
+}
+
+/**
+ * Split an array of life events into two groups based on classification.
+ */
+export function splitLifeEvents(events: LifeEvent[]): { opbouwen: LifeEvent[]; investeren: LifeEvent[] } {
+  const opbouwen: LifeEvent[] = []
+  const investeren: LifeEvent[] = []
+  for (const event of events) {
+    if (classifyLifeEvent(event) === 'opbouwen') {
+      opbouwen.push(event)
+    } else {
+      investeren.push(event)
+    }
+  }
+  return { opbouwen, investeren }
+}
+
 export interface ResilienceBreakdown {
   emergency: number // 0-25
   diversification: number // 0-25

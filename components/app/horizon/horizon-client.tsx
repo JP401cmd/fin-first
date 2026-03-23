@@ -19,7 +19,7 @@ import {
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth,
-  type LifeEvent, type LifeEventImpact,
+  type LifeEvent, type LifeEventImpact, splitLifeEvents, computeLifeEventNetImpact,
   type MonteCarloResult, type CatalogField,
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
@@ -39,7 +39,7 @@ import {
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Heart,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -2201,41 +2201,111 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </button>
           </div>
 
-          {/* Ingeplande events lijst */}
-          {events.length > 0 ? (
-            <div className="space-y-2">
-              {events.map((ev) => {
-                const evCatalog = LIFE_EVENT_CATALOG[ev.event_type]
-                const evImpactIdx = events.findIndex(e => e.id === ev.id)
-                const evImpact = evImpactIdx >= 0 ? impacts[evImpactIdx] : null
-                return (
-                  <button
-                    key={ev.id}
-                    onClick={() => { setSelectedEventId(ev.id); setViewModalMode('view') }}
-                    className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-left transition hover:border-horizon-300 hover:bg-horizon-50/30"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
-                      {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[evCatalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
+          {/* Ingeplande events lijst — twee kolommen */}
+          {events.length > 0 ? (() => {
+            const { opbouwen, investeren } = splitLifeEvents(events)
+            const sortByAge = (a: LifeEvent, b: LifeEvent) => (a.target_age ?? 999) - (b.target_age ?? 999)
+            const opbouwenSorted = [...opbouwen].sort(sortByAge)
+            const investerenSorted = [...investeren].sort(sortByAge)
+            const totalOpbouwen = opbouwen.reduce((sum, ev) => sum + computeLifeEventNetImpact(ev), 0)
+            const totalInvesteren = investeren.reduce((sum, ev) => sum + computeLifeEventNetImpact(ev), 0)
+
+            const renderEventCard = (ev: LifeEvent) => {
+              const evCatalog = LIFE_EVENT_CATALOG[ev.event_type]
+              const evImpactIdx = events.findIndex(e => e.id === ev.id)
+              const evImpact = evImpactIdx >= 0 ? impacts[evImpactIdx] : null
+              return (
+                <button
+                  key={ev.id}
+                  onClick={() => { setSelectedEventId(ev.id); setViewModalMode('view') }}
+                  className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-left transition hover:border-horizon-300 hover:bg-horizon-50/30"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
+                    {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[evCatalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-[var(--ink)]">{ev.name}</p>
+                    <p className="text-xs text-[var(--ink-3)]">
+                      {ev.target_age != null ? `Leeftijd ${ev.target_age}` : 'Geen leeftijd'}
+                      {evImpact && evImpact.fireDelayMonths !== 0 && (
+                        <span className={evImpact.fireDelayMonths > 0 ? ' text-negative' : ' text-positive'}>
+                          {' · '}{evImpact.fireDelayMonths > 0 ? '+' : ''}{evImpact.fireDelayMonths} mnd
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {ev.target_age != null && (
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-4)]">{ev.target_age}j</span>
+                  )}
+                </button>
+              )
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Vrijheid opbouwen */}
+                <div>
+                  <div className="mb-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-positive">Vrijheid opbouwen</p>
+                    <p className="text-[11px] text-[var(--ink-4)]">
+                      Events met positieve netto impact
+                      {opbouwen.length > 0 && (
+                        <span className="ml-1 font-mono tabular-nums text-positive">+{formatCurrency(totalOpbouwen)}</span>
+                      )}
+                    </p>
+                  </div>
+                  {opbouwenSorted.length > 0 ? (
+                    <div className="space-y-2">
+                      {opbouwenSorted.map(renderEventCard)}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[var(--ink)]">{ev.name}</p>
-                      <p className="text-xs text-[var(--ink-3)]">
-                        {ev.target_age != null ? `Leeftijd ${ev.target_age}` : 'Geen leeftijd'}
-                        {evImpact && evImpact.fireDelayMonths !== 0 && (
-                          <span className={evImpact.fireDelayMonths > 0 ? ' text-negative' : ' text-positive'}>
-                            {' · '}{evImpact.fireDelayMonths > 0 ? '+' : ''}{evImpact.fireDelayMonths} mnd
-                          </span>
-                        )}
-                      </p>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-emerald-300/50 bg-emerald-50/20 py-6 px-4 text-center">
+                      <TrendingUp className="h-6 w-6 text-emerald-500/40 mb-2" />
+                      <p className="text-sm text-emerald-600/60">Nog geen opbouw-gebeurtenissen gepland</p>
+                      <p className="text-xs text-[var(--ink-4)] mt-1">Denk aan: erfenis, AOW, pensioenuitkering, verkoop woning</p>
+                      <button
+                        onClick={() => setShowAddEventModal(true)}
+                        className="mt-3 flex items-center gap-1 rounded-full border border-emerald-300/60 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600 transition hover:bg-emerald-100"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Toevoegen
+                      </button>
                     </div>
-                    {ev.target_age != null && (
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-4)]">{ev.target_age}j</span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
+                  )}
+                </div>
+                {/* Vrijheid investeren */}
+                <div>
+                  <div className="mb-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-negative">Vrijheid investeren</p>
+                    <p className="text-[11px] text-[var(--ink-4)]">
+                      Events met negatieve netto impact
+                      {investeren.length > 0 && (
+                        <span className="ml-1 font-mono tabular-nums text-negative">{formatCurrency(totalInvesteren)}</span>
+                      )}
+                    </p>
+                  </div>
+                  {investerenSorted.length > 0 ? (
+                    <div className="space-y-2">
+                      {investerenSorted.map(renderEventCard)}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-red-300/50 bg-red-50/20 py-6 px-4 text-center">
+                      <Heart className="h-6 w-6 text-red-400/40 mb-2" />
+                      <p className="text-sm text-red-500/60">Nog geen investeringen gepland</p>
+                      <p className="text-xs text-[var(--ink-4)] mt-1">Denk aan: kinderen, verbouwing, wereldreis, studie</p>
+                      <button
+                        onClick={() => setShowAddEventModal(true)}
+                        className="mt-3 flex items-center gap-1 rounded-full border border-red-300/60 bg-red-50 px-3 py-1 text-xs font-medium text-red-500 transition hover:bg-red-100"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Toevoegen
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })() : (
             <p className="text-sm text-[var(--ink-3)]">
               Nog geen levensgebeurtenissen gepland. Voeg er een toe om de impact op je vrijheid te zien.
             </p>
