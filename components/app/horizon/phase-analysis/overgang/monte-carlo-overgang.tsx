@@ -136,6 +136,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
       willContext={
         state
           ? `Monte Carlo overgangsfase: slagingskans ${Math.round(state.main.successRate * 100)}%, ` +
+            `mediaan eindvermogen ${formatCurrency(state.main.medianEndPortfolio)}, ` +
             `pessimistisch eindvermogen ${formatCurrency(state.main.p10EndPortfolio)}, ` +
             `kritische onttrekkingsgrens ${formatCurrency(state.kritischeGrens)}/jaar.`
           : 'Monte Carlo simulatie (laden...)'
@@ -153,7 +154,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
           />
 
           {/* ── Key statistics ────────────────────────────────── */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {/* Success probability */}
             <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
@@ -165,6 +166,19 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
                 {Math.round(state.main.successRate * 100)}%
                 <span className="ml-1 text-[11px] text-[var(--ink-4)]">
                   portfolio &gt; \u20AC50k tot AOW
+                </span>
+              </p>
+            </div>
+
+            {/* Median (p50) end portfolio */}
+            <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Mediaan eindvermogen
+              </p>
+              <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
+                {formatCurrency(state.main.medianEndPortfolio)}
+                <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
+                  bij AOW
                 </span>
               </p>
             </div>
