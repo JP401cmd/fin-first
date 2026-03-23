@@ -5125,6 +5125,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           erfgenamen={erfgenamen}
           partnerAowBedrag={partnerAowBedrag}
           nabestaandenPensioen={nabestaandenPensioenBedrag}
+          currentAge={currentAge ?? undefined}
         />
       )}
 

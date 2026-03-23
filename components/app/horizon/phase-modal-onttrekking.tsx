@@ -59,6 +59,8 @@ interface PhaseModalOnttrekkingProps {
   nabestaandenPensioen?: number
   /** Whether user has a partner (for partner continuation section) */
   hasPartner?: boolean
+  /** User's current age for inflation sensitivity analysis */
+  currentAge?: number
 }
 
 // ── Income Source Bar ────────────────────────────────────────────────────────
@@ -144,6 +146,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   partnerAowBedrag,
   nabestaandenPensioen,
   hasPartner,
+  currentAge,
 }: PhaseModalOnttrekkingProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
@@ -352,6 +355,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           erfgenamen={erfgenamen}
           partnerAowBedrag={partnerAowBedrag}
           nabestaandenPensioen={nabestaandenPensioen}
+          currentAge={currentAge}
         />
 
         {/* 10. Koopkrachterosie — purchasing power erosion over time */}

@@ -364,6 +364,10 @@ export interface EndOfLifeInput {
   hasPartner?: boolean
   partnerAowBedrag?: number
   nabestaandenPensioen?: number
+  /** Base inflation rate (e.g. 0.02 for 2%) for inflation sensitivity analysis */
+  inflationRate?: number
+  /** Current age (for inflation sensitivity: years until endAge) */
+  currentAge?: number
 }
 
 export interface EndOfLifeAnalysis {
@@ -393,6 +397,13 @@ export interface EndOfLifeAnalysis {
     toereikend: boolean
     tekort: number
   } | null
+  /** Inflation sensitivity: how different inflation rates affect real end portfolio */
+  inflatieGevoeligheid: {
+    label: string
+    inflatie: number // e.g. 0.015, 0.02, 0.025
+    reëelEindVermogen: number
+    verschil: number // difference from base scenario
+  }[] | null
 }
 
 /**
@@ -407,6 +418,8 @@ export function analyzeEndOfLife(input: EndOfLifeInput): EndOfLifeAnalysis {
     hasPartner = false,
     partnerAowBedrag,
     nabestaandenPensioen = 0,
+    inflationRate,
+    currentAge,
   } = input
 
   // Find the row closest to endAge
@@ -424,11 +437,17 @@ export function analyzeEndOfLife(input: EndOfLifeInput): EndOfLifeAnalysis {
     ? computePartnerVoortzetting(partnerAowBedrag, nabestaandenPensioen, rows, endAge)
     : null
 
+  // Inflatie-gevoeligheid: effect van ±0.5% inflatie op reëel eindvermogen
+  const inflatieGevoeligheid = inflationRate != null && currentAge != null
+    ? computeInflatieGevoeligheid(eindVermogen, inflationRate, currentAge, endAge)
+    : null
+
   return {
     eindVermogen,
     gevoeligheid,
     erfenisIndicatie,
     partnerVoortzetting,
+    inflatieGevoeligheid,
   }
 }
 
@@ -510,6 +529,47 @@ function computeGevoeligheid(
       eindVermogen: vermogen,
       erfbelastingTotaal: Math.round(erfbelastingTotaal),
       nettoNalatenschap: Math.round(vermogen - erfbelastingTotaal),
+    }
+  })
+}
+
+/**
+ * Inflatie-gevoeligheidsanalyse: wat als de inflatie 0.5% hoger/lager is?
+ *
+ * Het nominale eindvermogen uit de simulatie is berekend met de basis-inflatie.
+ * Bij een andere inflatie zou de reële koopkracht van datzelfde nominale bedrag
+ * anders zijn. We berekenen het reële eindvermogen door de koopkracht-erosie
+ * aan te passen over de jaren tot endAge.
+ *
+ * Formule: reëelVermogen = nominaalVermogen × (1 + baseInflatie)^n / (1 + scenarioInflatie)^n
+ * Dit geeft de koopkracht in huidige euro's onder het scenario-inflatietarief.
+ */
+function computeInflatieGevoeligheid(
+  nominaalEindVermogen: number,
+  baseInflation: number,
+  currentAge: number,
+  endAge: number,
+): EndOfLifeAnalysis['inflatieGevoeligheid'] {
+  const yearsUntilEnd = Math.max(0, endAge - currentAge)
+  if (yearsUntilEnd === 0) return null
+
+  const DELTA = 0.005 // ±0.5%
+  const scenarios = [
+    { label: `Inflatie ${((baseInflation - DELTA) * 100).toFixed(1)}%`, inflatie: baseInflation - DELTA },
+    { label: `Inflatie ${(baseInflation * 100).toFixed(1)}% (basis)`, inflatie: baseInflation },
+    { label: `Inflatie ${((baseInflation + DELTA) * 100).toFixed(1)}%`, inflatie: baseInflation + DELTA },
+  ]
+
+  // Reëel eindvermogen bij basis-inflatie (reference point)
+  const baseReëel = Math.round(nominaalEindVermogen / Math.pow(1 + baseInflation, yearsUntilEnd))
+
+  return scenarios.map(({ label, inflatie }) => {
+    const reëelEindVermogen = Math.round(nominaalEindVermogen / Math.pow(1 + inflatie, yearsUntilEnd))
+    return {
+      label,
+      inflatie,
+      reëelEindVermogen,
+      verschil: reëelEindVermogen - baseReëel,
     }
   })
 }

@@ -24,6 +24,8 @@ interface EndOfLifeProps {
   partnerAowBedrag?: number
   /** Nabestaandenpensioen monthly amount */
   nabestaandenPensioen?: number
+  /** Current age for inflation sensitivity calculation */
+  currentAge?: number
 }
 
 // -- Component ----------------------------------------------------------------
@@ -45,11 +47,12 @@ export const EndOfLife = memo(function EndOfLife({
   rows,
   strategy,
   endAge,
-  // inflationRate and yearlyAowIncome accepted for future use
+  inflationRate,
   hasPartner = false,
   erfgenamen,
   partnerAowBedrag,
   nabestaandenPensioen,
+  currentAge,
 }: EndOfLifeProps) {
   const [analysis, setAnalysis] = useState<EndOfLifeAnalysis | null>(null)
 
@@ -67,6 +70,8 @@ export const EndOfLife = memo(function EndOfLife({
         strategy,
         endAge,
         hasPartner,
+        inflationRate,
+        currentAge,
         ...(erfgenamen && erfgenamen.length > 0 ? { erfgenamen } : {}),
         ...(partnerAowBedrag != null ? { partnerAowBedrag } : {}),
         ...(nabestaandenPensioen != null ? { nabestaandenPensioen } : {}),
@@ -75,7 +80,7 @@ export const EndOfLife = memo(function EndOfLife({
     }, 30)
 
     return () => clearTimeout(timer)
-  }, [rows, strategy, endAge, hasPartner, erfgenamen, partnerAowBedrag, nabestaandenPensioen])
+  }, [rows, strategy, endAge, hasPartner, erfgenamen, partnerAowBedrag, nabestaandenPensioen, inflationRate, currentAge])
 
   const strategyLabel = STRATEGY_LABELS[strategy]?.name ?? strategy
   const loading = analysis === null
@@ -153,6 +158,57 @@ export const EndOfLife = memo(function EndOfLife({
               </table>
             </div>
           </div>
+
+          {/* -- 2b. Inflation sensitivity table ----------------------------- */}
+          {analysis.inflatieGevoeligheid && analysis.inflatieGevoeligheid.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Inflatie-gevoeligheid
+              </p>
+              <div className="-mx-1 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--border-ed)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                      <th className="px-1 pb-2">Scenario</th>
+                      <th className="px-1 pb-2 text-right">Re&euml;el eindvermogen</th>
+                      <th className="px-1 pb-2 text-right">Verschil</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analysis.inflatieGevoeligheid.map((ig) => {
+                      const isBasis = ig.verschil === 0
+                      const colorClass = ig.verschil > 0
+                        ? 'text-[var(--positive)]'
+                        : ig.verschil < 0
+                          ? 'text-[var(--negative)]'
+                          : 'text-[var(--ink-2)]'
+                      return (
+                        <tr
+                          key={ig.inflatie}
+                          className={`border-b border-dashed border-[var(--border-ed)] last:border-b-0 ${isBasis ? 'bg-[var(--subtle)]/30' : ''}`}
+                        >
+                          <td className={`px-1 py-1.5 ${isBasis ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
+                            {ig.label}
+                          </td>
+                          <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink)]">
+                            {formatCurrency(ig.reëelEindVermogen)}
+                          </td>
+                          <td className={`px-1 py-1.5 text-right font-mono tabular-nums ${colorClass}`}>
+                            {ig.verschil === 0
+                              ? '\u2013'
+                              : `${ig.verschil > 0 ? '+' : '\u2212'} ${formatCurrency(Math.abs(ig.verschil))}`}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-1 text-[10px] italic text-[var(--ink-4)]">
+                Re&euml;le bedragen in koopkracht van vandaag
+              </p>
+            </div>
+          )}
 
           {/* -- 3. Inheritance indication ---------------------------------- */}
           <div>
