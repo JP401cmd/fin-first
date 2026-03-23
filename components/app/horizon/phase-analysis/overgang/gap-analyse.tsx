@@ -17,6 +17,8 @@ export interface GapAnalyseProps {
   expectedReturn: number
   inflationRate: number
   debts?: Debt[]
+  /** Monthly part-time income during transition. Defaults to ~50% of monthly expenses. */
+  deeltijdInkomen?: number
 }
 
 /**
@@ -95,7 +97,10 @@ export const GapAnalyse = memo(function GapAnalyse({
   expectedReturn,
   inflationRate,
   debts = [],
+  deeltijdInkomen,
 }: GapAnalyseProps) {
+  // Default: 50% of monthly expenses as part-time income
+  const effectiveDeeltijdInkomen = deeltijdInkomen ?? Math.round((yearlyExpenses / 12) * 0.5)
   const [state, setState] = useState<StrategieState | null>(null)
 
   const years = Math.max(Math.round(endAge - startAge), 1)
@@ -112,6 +117,7 @@ export const GapAnalyse = memo(function GapAnalyse({
         yearlyExpenses,
         expectedReturn,
         inflationRate,
+        effectiveDeeltijdInkomen,
       )
 
       const totalBridge = computeTotalBridge(yearlyExpenses, years, inflationRate)
@@ -124,7 +130,7 @@ export const GapAnalyse = memo(function GapAnalyse({
 
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startPortfolio, startAge, endAge, yearlyExpenses, expectedReturn, inflationRate])
+  }, [startPortfolio, startAge, endAge, yearlyExpenses, expectedReturn, inflationRate, effectiveDeeltijdInkomen])
 
   const transitionDebts = debtsInTransition(debts, startAge, endAge)
   const loading = state === null
@@ -220,8 +226,20 @@ export const GapAnalyse = memo(function GapAnalyse({
                     </span>
                   </div>
 
+                  {/* Part-time income (only for deeltijdwerk strategy) */}
+                  {s.strategie === 'deeltijdwerk' && (
+                    <div className="mt-2 flex items-baseline justify-between border-t border-dashed border-[var(--border-ed)] pt-2">
+                      <span className="text-xs text-[var(--ink-3)]">
+                        Deeltijdinkomen
+                      </span>
+                      <span className="font-mono text-xs tabular-nums text-[var(--positive)]">
+                        {formatCurrency(effectiveDeeltijdInkomen)}/mnd
+                      </span>
+                    </div>
+                  )}
+
                   {/* End balance at AOW */}
-                  <div className="mt-2 flex items-baseline justify-between border-t border-dashed border-[var(--border-ed)] pt-2">
+                  <div className={`flex items-baseline justify-between ${s.strategie === 'deeltijdwerk' ? 'mt-1.5' : 'mt-2 border-t border-dashed border-[var(--border-ed)]'} pt-2`}>
                     <span className="text-xs text-[var(--ink-3)]">
                       Eindsaldo bij AOW
                     </span>
