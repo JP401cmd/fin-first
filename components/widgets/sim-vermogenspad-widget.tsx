@@ -122,7 +122,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
   }
 
   const W = 240
-  const H = size === 'full' ? 100 : 72
+  const H = size === 'full' ? 80 : 72 // max 80px for full-size SVG constraint
   const pad = 4
   const maxVal = Math.max(...simRows.map(r => r.endPortfolio), 1)
   const minAge = simRows[0].age
@@ -295,6 +295,30 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           )}
           <p className="text-[10px] text-[var(--ink-4)] font-mono">90j</p>
         </div>
+
+        {/* Full-size: eindvermogen + risico badge */}
+        {size === 'full' && (
+          <div className="mt-2 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] text-[var(--ink-3)]">Eindvermogen (90j)</p>
+              <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                {formatCurrency(endRow?.endPortfolio ?? 0)}
+              </p>
+            </div>
+            {(() => {
+              const endVal = endRow?.endPortfolio ?? 0
+              const peakVal = peakRow?.endPortfolio ?? 1
+              const drawdown = peakVal > 0 ? ((peakVal - endVal) / peakVal) * 100 : 0
+              const riskLabel = drawdown < 20 ? 'Laag risico' : drawdown < 50 ? 'Matig risico' : 'Hoog risico'
+              const riskColor = drawdown < 20 ? 'bg-emerald-50 text-emerald-700' : drawdown < 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+              return (
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${riskColor}`}>
+                  {riskLabel}
+                </span>
+              )
+            })()}
+          </div>
+        )}
       </div>
     </WidgetShell>
   )

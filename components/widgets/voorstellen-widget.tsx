@@ -55,7 +55,7 @@ function FullRecommendationRow({ rec, index }: { rec: TopRecommendation; index: 
         )}
       </div>
       {days !== null && (
-        <span className="shrink-0 font-mono text-xs tabular-nums text-wil-700 bg-wil-50 rounded-full px-2 py-px">
+        <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-wil-700 bg-wil-50 border border-wil-200 rounded-full px-2.5 py-0.5">
           +{days}d
         </span>
       )}
@@ -128,8 +128,8 @@ export const VoorstellenWidget = memo(function VoorstellenWidget({ size, data, h
     )
   }
 
-  // ── Full-size: stats row + top-6 with category badges (336px height) ────
-  const top5 = (topRecommendations ?? []).slice(0, 6)
+  // ── Full-size: stats row + top-3 with category badges (336px height) ────
+  const top5 = (topRecommendations ?? []).slice(0, 3)
   const totalDaysFull = Math.round(
     (topRecommendations ?? []).reduce((sum, r) => sum + (r.freedomDaysImpact > 0 ? r.freedomDaysImpact : 0), 0)
   )

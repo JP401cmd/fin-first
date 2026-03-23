@@ -37,7 +37,9 @@ function ActionRow({ action, index, hasEntered }: { action: TopAction; index: nu
       <span className="font-mono text-[10px] text-[var(--ink-4)] w-4 shrink-0 tabular-nums">
         {index + 1}
       </span>
-      <span className={`h-2 w-2 rounded-full shrink-0 ${priorityDotClass(action.priority_score)}`} />
+      <span className={`shrink-0 font-mono text-[10px] tabular-nums font-bold ${priorityDotClass(action.priority_score).replace('bg-', 'text-')}`}>
+        ★{action.priority_score ?? 0}
+      </span>
       <span className="flex-1 min-w-0 text-sm text-[var(--ink)] truncate">
         {action.title}
       </span>
@@ -54,7 +56,7 @@ export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Pro
   const { openActions, totalFreedomDaysOpen, completedActionsThisMonth, topOpenActions, recentCompletedActions } = data
   const { ref: containerRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
-  const top = size === 'full' ? topOpenActions.slice(0, 6) : topOpenActions.slice(0, 3)
+  const top = topOpenActions.slice(0, 3)
   const roundedDays = Math.round(totalFreedomDaysOpen)
 
   // ── Mini-size: open actions count ────
@@ -136,8 +138,16 @@ export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Pro
           </div>
         </div>
 
+        {/* Freedom days potential highlight */}
+        {roundedDays > 0 && (
+          <div className="mt-2 flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-wil-50 border border-wil-200 px-3 py-1.5">
+            <span className="font-mono text-lg font-bold tabular-nums text-wil-700">+{roundedDays}d</span>
+            <span className="text-[11px] text-wil-600">vrijheid te winnen</span>
+          </div>
+        )}
+
         {/* Actielijst */}
-        <p className="label-editorial text-[var(--ink-3)] mt-3 mb-1.5">TOP ACTIES</p>
+        <p className="label-editorial text-[var(--ink-3)] mt-2 mb-1.5">TOP ACTIES</p>
 
         {top.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 text-center">

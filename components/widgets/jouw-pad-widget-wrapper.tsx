@@ -354,6 +354,13 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
               Ontgrendelt:{' '}
               <span className="font-medium text-[var(--ink-2)]">{nextUnlock}</span>
             </p>
+            {/* 2nd upcoming unlock preview */}
+            {LEVEL_NAMES[sovereigntyLevel + 2] && NEXT_LEVEL_UNLOCKS[sovereigntyLevel + 1] && (
+              <p className="mt-1.5 text-[9px] text-[var(--ink-4)]">
+                Daarna: {sovereigntyLevel + 2 < 0 ? sovereigntyLevel + 2 : `+${sovereigntyLevel + 2}`}
+                {' — '}{LEVEL_NAMES[sovereigntyLevel + 2]} → {NEXT_LEVEL_UNLOCKS[sovereigntyLevel + 1]}
+              </p>
+            )}
           </div>
         </div>
       )}

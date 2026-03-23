@@ -140,59 +140,95 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
     return date.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
   }
 
+  // SVG donut ring dimensions
+  const RING_SIZE = 120
+  const RING_STROKE = 10
+  const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2
+  const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+  const fillLength = (Math.min(effectivePct, 100) / 100) * RING_CIRCUMFERENCE
+
   return (
     <WidgetShell module="cross" size={size} kicker="Vrijheidsvoortgang" href={href}>
       <div ref={inViewRef}>
-        <div className="flex items-center gap-2 mb-2">
-          <Compass className="h-3.5 w-3.5 text-horizon-600 shrink-0" />
-          <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-            {effectivePct.toFixed(1)}%
-          </p>
-          {pctDelta !== null && (
-            <span className={`text-xs font-mono tabular-nums ${pctDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}%
-            </span>
-          )}
-        </div>
-
-        {/* Progress bar with milestone markers */}
-        <div className="relative mb-3">
-          <div className="h-[6px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600"
-              style={{
-                width: hasEntered ? `${Math.min(effectivePct, 100)}%` : '0%',
-                transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
-              }}
-            />
-          </div>
-          {/* Milestone markers */}
-          {milestones.map(m => (
-            <div
-              key={m}
-              className="absolute top-0 flex flex-col items-center"
-              style={{ left: `${m}%`, transform: 'translateX(-50%)' }}
-            >
-              <div className={`w-[2px] h-[6px] ${effectivePct >= m ? 'bg-horizon-700' : 'bg-[var(--ink-4)]'}`} />
-              <span className={`text-[9px] mt-0.5 tabular-nums ${effectivePct >= m ? 'text-horizon-600 font-medium' : 'text-[var(--ink-4)]'}`}>
-                {m}%
+        {/* Donut ring chart with percentage in center */}
+        <div className="flex items-start gap-4">
+          <div className="relative shrink-0" style={{ width: RING_SIZE, height: RING_SIZE }}>
+            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+              <defs>
+                <linearGradient id="freedom-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--horizon-400)" />
+                  <stop offset="100%" stopColor="var(--horizon-600)" />
+                </linearGradient>
+              </defs>
+              {/* Background track */}
+              <circle
+                cx={RING_SIZE / 2}
+                cy={RING_SIZE / 2}
+                r={RING_RADIUS}
+                fill="none"
+                stroke="var(--subtle)"
+                strokeWidth={RING_STROKE}
+              />
+              {/* Progress arc */}
+              <circle
+                cx={RING_SIZE / 2}
+                cy={RING_SIZE / 2}
+                r={RING_RADIUS}
+                fill="none"
+                stroke="url(#freedom-ring-grad)"
+                strokeWidth={RING_STROKE}
+                strokeLinecap="round"
+                strokeDasharray={`${RING_CIRCUMFERENCE}`}
+                strokeDashoffset={hasEntered ? RING_CIRCUMFERENCE - fillLength : RING_CIRCUMFERENCE}
+                transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+                style={{ transition: hasEntered ? 'stroke-dashoffset 700ms cubic-bezier(.22,1,.36,1)' : 'none' }}
+              />
+              {/* Milestone dots on the ring */}
+              {milestones.map(m => {
+                const angle = ((m / 100) * 360) - 90
+                const rad = (angle * Math.PI) / 180
+                const dotX = RING_SIZE / 2 + RING_RADIUS * Math.cos(rad)
+                const dotY = RING_SIZE / 2 + RING_RADIUS * Math.sin(rad)
+                return (
+                  <circle
+                    key={m}
+                    cx={dotX}
+                    cy={dotY}
+                    r={3}
+                    fill={effectivePct >= m ? 'var(--horizon-700)' : 'var(--ink-4)'}
+                  />
+                )
+              })}
+            </svg>
+            {/* Center percentage */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+                {effectivePct.toFixed(1)}%
               </span>
+              {pctDelta !== null && (
+                <span className={`text-[10px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}%
+                </span>
+              )}
             </div>
-          ))}
+          </div>
+
+          {/* Right column: wealth + growth */}
+          <div className="flex-1 min-w-0 pt-1">
+            <p className="text-[11px] text-[var(--ink-3)] font-mono tabular-nums truncate">
+              {formatCurrency(netWorth)}
+            </p>
+            <p className="text-[10px] text-[var(--ink-4)] font-mono tabular-nums truncate">
+              / {formatCurrency(effectiveFire)}{simRequiredPortfolio ? ' (sim)' : ''}
+            </p>
+            {monthlyGrowthRate !== null && (
+              <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">
+                <span className="text-[var(--ink-2)] font-medium">Groei</span>{' '}
+                <span className="font-mono tabular-nums">{formatCurrency(monthlyGrowthRate)}/mnd</span>
+              </p>
+            )}
+          </div>
         </div>
-
-        {/* Wealth vs Goal */}
-        <p className="text-xs text-[var(--ink-3)] font-mono tabular-nums">
-          Vermogen {formatCurrency(netWorth)} / Doel {formatCurrency(effectiveFire)}{simRequiredPortfolio ? ' (sim)' : ''}
-        </p>
-
-        {/* Monthly growth rate */}
-        {monthlyGrowthRate !== null && (
-          <p className="mt-1 text-xs text-[var(--ink-3)]">
-            <span className="text-[var(--ink-2)] font-medium">Groeisnelheid:</span>{' '}
-            <span className="font-mono tabular-nums">{formatCurrency(monthlyGrowthRate)}/mnd</span>
-          </p>
-        )}
 
         {/* Milestone estimated dates */}
         <div className="mt-2 space-y-0.5">
@@ -213,7 +249,7 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
           })}
         </div>
 
-        <p className="mt-2 font-serif italic text-[11px] text-[var(--ink-3)]">
+        <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
           {(() => {
             const cd = data.simFireCountdown ?? fireProjResult
             return cd.fireDate === 'Bereikt!'

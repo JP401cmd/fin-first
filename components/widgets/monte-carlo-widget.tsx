@@ -146,13 +146,30 @@ export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, hre
         </div>
       </div>
 
-      {/* Crisis badges (reused pattern from backtesting-score-widget) */}
+      {/* Mini fan chart SVG (max 80px) + P10/P50/P90 */}
+      <div className="mt-2">
+        <svg width="100%" height="60" viewBox="0 0 200 60" preserveAspectRatio="none" aria-label="Monte Carlo fan chart">
+          {/* P10-P90 band */}
+          <path d="M0,50 C40,48 80,40 120,30 160,20 200,15 200,15 L200,55 C160,52 120,50 80,50 40,52 0,55 0,55 Z" fill="var(--horizon-500, #c4a06b)" fillOpacity="0.12" />
+          {/* P25-P75 band */}
+          <path d="M0,48 C40,44 80,36 120,28 160,22 200,18 200,18 L200,50 C160,48 120,46 80,46 40,48 0,52 0,52 Z" fill="var(--horizon-500, #c4a06b)" fillOpacity="0.15" />
+          {/* P50 median line */}
+          <path d="M0,48 C40,44 80,38 120,30 160,24 200,20" fill="none" stroke="var(--horizon-600, #a07840)" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+        <div className="flex justify-between text-[10px] text-[var(--ink-4)] font-mono tabular-nums -mt-0.5">
+          <span>P10</span>
+          <span className="font-semibold text-horizon-600">P50</span>
+          <span>P90</span>
+        </div>
+      </div>
+
+      {/* Crisis badges — max 4 items */}
       {namedPaths && namedPaths.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {namedPaths.map(p => (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {namedPaths.slice(0, 4).map(p => (
             <span
               key={p.label}
-              className={`inline-flex items-center gap-1 rounded-[var(--r-sm)] border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide
+              className={`inline-flex items-center gap-0.5 rounded-[var(--r-sm)] border px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide
                 ${p.success
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                   : 'border-red-200 bg-red-50 text-red-700'
@@ -164,16 +181,12 @@ export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, hre
         </div>
       )}
 
-      {/* Model description */}
-      <p className="mt-3 text-xs text-[var(--ink-3)]">
-        Monte Carlo simuleert duizenden mogelijke rendementsscenario&apos;s om de kans op financieel succes te berekenen.
-        {total > 0 && ` ${successes} van ${total} historische crises overleefd.`}
-      </p>
-
-      {/* CTA */}
-      <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
-        Open volledige simulatie &rarr;
-      </p>
+      {/* Summary */}
+      {total > 0 && (
+        <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+          {successes} van {total} historische crises overleefd
+        </p>
+      )}
     </WidgetShell>
   )
 })

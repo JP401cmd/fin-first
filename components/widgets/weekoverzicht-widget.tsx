@@ -209,6 +209,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
         {/* Top categories with previous week comparison */}
         {topCategories.length > 0 && (
           <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)] mb-1">WEEK HIGHLIGHTS</p>
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Top categorieën</p>
               <p className="text-[9px] text-[var(--ink-4)]">vs. vorige week</p>

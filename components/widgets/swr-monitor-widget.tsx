@@ -144,7 +144,7 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
 
   return (
     <WidgetShell module="horizon" size={size} kicker="SWR Monitor" href={href}>
-      <div className="space-y-3">
+      <div className="space-y-2">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
