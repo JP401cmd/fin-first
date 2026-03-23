@@ -5,9 +5,10 @@ import { BarChart3 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
-import { successColor } from '../phase-analysis-utils'
+import { successColor, successBgColor } from '../phase-analysis-utils'
 import {
   runPhaseMonteCarlo,
+  findCriticalSWR,
   type MonteCarloPhaseResult,
 } from '@/lib/phase-monte-carlo'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
@@ -91,18 +92,26 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
       const plus5 = runPhaseMonteCarlo({ ...mcInput, yearsInPhase: yearsInPhase + 5 })
       const plus10 = runPhaseMonteCarlo({ ...mcInput, yearsInPhase: yearsInPhase + 10 })
 
-      // Critical SWR approximation: the max withdrawal rate that still achieves
-      // ~95% success. Scaled from the base success rate as a rough indicator.
+      // Critical SWR: iterative MC binary search for the max withdrawal rate
+      // that still achieves ~95% success (6 iterations × 200 sims each).
       const baseSwr = startPortfolio > 0 ? yearlyWithdrawal / startPortfolio : 0
-      const criticalSwr = main.successRate > 0
-        ? baseSwr * (main.successRate / 0.95)
-        : 0
+      const criticalSwr = findCriticalSWR({
+        startPortfolio,
+        yearsInPhase,
+        yearlyAowIncome,
+        expectedReturn,
+        volatility: DEFAULT_VOLATILITY,
+        inflationRate,
+        cashflows,
+        currentAge: startAge,
+        baseSwr,
+      })
 
       setState({
         main,
         successPlus5: plus5.successRate,
         successPlus10: plus10.successRate,
-        criticalSwr: Math.min(criticalSwr, baseSwr), // cannot exceed actual SWR
+        criticalSwr,
       })
     }, 50)
 
@@ -146,7 +155,7 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
           />
 
           {/* -- Key statistics ---------------------------------------------- */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {/* Slagingskans */}
             <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
@@ -157,13 +166,23 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
               </p>
             </div>
 
-            {/* Mediaan eindvermogen */}
+            {/* Mediaan eindvermogen (p50) */}
             <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
                 Mediaan eindvermogen
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
                 {formatCurrency(state.main.medianEndPortfolio)}
+              </p>
+            </div>
+
+            {/* p90 eindvermogen (optimistisch) */}
+            <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Optimistisch (p90)
+              </p>
+              <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
+                {formatCurrency(state.main.p90EndPortfolio)}
               </p>
             </div>
 
@@ -175,34 +194,39 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
                 {(state.criticalSwr * 100).toFixed(1)}%
                 <span className="ml-1 text-[11px] text-[var(--ink-4)]">
-                  bij 95% slagingskans
+                  bij 95%
                 </span>
               </p>
             </div>
           </div>
 
-          {/* -- Longevity sensitivity --------------------------------------- */}
+          {/* -- Longevity sensitivity (horizontal bar chart) --------------- */}
           <div>
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
               Levensverwachting-gevoeligheid
             </p>
-            <div className="space-y-1">
-              <div className="flex items-baseline justify-between rounded-[var(--r)] border border-dashed border-[var(--border-ed)] px-2.5 py-1.5">
-                <span className="text-xs text-[var(--ink-2)]">
-                  +5 jaar ({Math.round(endAge + 5)} jaar)
-                </span>
-                <span className={`font-mono text-xs tabular-nums ${successColor(state.successPlus5)}`}>
-                  slagingskans {Math.round(state.successPlus5 * 100)}%
-                </span>
-              </div>
-              <div className="flex items-baseline justify-between rounded-[var(--r)] border border-dashed border-[var(--border-ed)] px-2.5 py-1.5">
-                <span className="text-xs text-[var(--ink-2)]">
-                  +10 jaar ({Math.round(endAge + 10)} jaar)
-                </span>
-                <span className={`font-mono text-xs tabular-nums ${successColor(state.successPlus10)}`}>
-                  slagingskans {Math.round(state.successPlus10 * 100)}%
-                </span>
-              </div>
+            <div className="space-y-1.5">
+              {[
+                { label: `Baseline (${Math.round(endAge)} jaar)`, rate: state.main.successRate },
+                { label: `+5 jaar (${Math.round(endAge + 5)} jaar)`, rate: state.successPlus5 },
+                { label: `+10 jaar (${Math.round(endAge + 10)} jaar)`, rate: state.successPlus10 },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center gap-2">
+                  <span className="w-[120px] shrink-0 text-xs text-[var(--ink-2)]">
+                    {row.label}
+                  </span>
+                  <div className="relative flex-1 overflow-hidden rounded-[var(--r)] bg-[var(--subtle)]" style={{ minHeight: 24 }}>
+                    <div
+                      className={`flex min-h-[24px] items-center rounded-[var(--r)] transition-all duration-500 ${successBgColor(row.rate)}`}
+                      style={{ width: `${Math.max(Math.round(row.rate * 100), 4)}%` }}
+                    >
+                      <span className={`px-2 font-mono text-xs tabular-nums whitespace-nowrap ${successColor(row.rate)}`}>
+                        {Math.round(row.rate * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

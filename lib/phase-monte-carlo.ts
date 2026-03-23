@@ -676,3 +676,84 @@ export function runMonteCarloAtAges(
     }
   })
 }
+
+// ── Kritische SWR via iteratieve MC binary search ───────────────────────────
+
+export interface FindCriticalSWRInput {
+  startPortfolio: number
+  yearsInPhase: number
+  yearlyAowIncome: number
+  expectedReturn: number
+  volatility: number
+  inflationRate: number
+  cashflows?: SimCashflow[]
+  currentAge: number
+  /** Target success rate (default 0.95 = 95%) */
+  targetSuccess?: number
+  /** Base SWR for upper bound (default: yearlyWithdrawal / startPortfolio) */
+  baseSwr?: number
+}
+
+/**
+ * Find the critical SWR (Safe Withdrawal Rate) via iterative Monte Carlo
+ * binary search. Returns the maximum withdrawal rate that still achieves
+ * the target success rate (default 95%).
+ *
+ * Uses max 6 iterations with 200 sims each for a balance between accuracy
+ * and performance (~1200 total simulations).
+ *
+ * @returns Critical SWR as a decimal (e.g. 0.032 = 3.2%)
+ */
+export function findCriticalSWR(input: FindCriticalSWRInput): number {
+  const {
+    startPortfolio,
+    yearsInPhase,
+    yearlyAowIncome,
+    expectedReturn,
+    volatility,
+    inflationRate,
+    cashflows,
+    currentAge,
+    targetSuccess = 0.95,
+    baseSwr,
+  } = input
+
+  // Guard: no portfolio means no withdrawal possible
+  if (startPortfolio <= 0 || yearsInPhase <= 0) return 0
+
+  // Search range: 0% to 150% of base SWR (or 10% if no baseSwr given)
+  const upperBound = baseSwr != null ? baseSwr * 1.5 : 0.10
+  let low = 0
+  let high = upperBound
+
+  const MC_SIMS = 200
+  const MAX_ITERATIONS = 6
+
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const mid = (low + high) / 2
+    const yearlyWithdrawal = mid * startPortfolio
+    const yearlyCashflow = -(yearlyWithdrawal - yearlyAowIncome)
+
+    const result = runPhaseMonteCarlo({
+      startPortfolio,
+      yearsInPhase,
+      yearlyCashflow,
+      expectedReturn,
+      volatility,
+      inflationRate,
+      cashflows,
+      currentAge,
+    }, MC_SIMS)
+
+    if (result.successRate >= targetSuccess) {
+      // Can withdraw more — move lower bound up
+      low = mid
+    } else {
+      // Too aggressive — reduce upper bound
+      high = mid
+    }
+  }
+
+  // Return the conservative bound (low) — the highest SWR that still passes
+  return low
+}
