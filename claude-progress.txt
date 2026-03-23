@@ -20671,3 +20671,55 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#545, #546)
+
+## Session 2026-03-23 - Features #551, #552
+
+### Feature #551: Gids: fase-analyses sectie uitbreiden met nieuwe analyses - PASSING
+- Expanded section 14 in guide-horizon-uitleg.tsx with per-phase bullet lists
+- Added Aannames section explanation
+- Opbouwfase: 6 analyses (MC, Stresstest, Schulden, Giften, Hypotheek vs beleggen, Spaarquote)
+- Overgangsfase: 5 analyses (MC, Stresstest, Gap-analyse, Eerder stoppen, Deeltijdwerk)
+- Onttrekkingsfase: 6 analyses (MC, Stresstest, SORR, Huis verkopen, Koopkracht-erosie, End-of-life)
+- Zero console errors, verified in browser
+
+### Feature #552: Gids naslagwerk: horizon fase-analyses entry updaten - PASSING
+- Updated Monte Carlo entry summary to reflect per-phase capabilities
+- Added new Fase-analyses entry to Horizon module in naslagwerk
+- Horizon topic count updated from 7 to 8
+- Zero console errors, verified in browser
+- Commit: 0f41b0c6
+
+### Files Modified
+- components/app/guide-horizon-uitleg.tsx - expanded section 14 with per-phase bullet lists
+- components/app/guide-naslagwerk.tsx - updated MC summary + added Fase-analyses entry
+
+### Current Status
+- 2 features completed this session (#551, #552)
+
+## Session 2026-03-23 - Features #557, #558
+
+### Feature #557: Regressietest: koopkrachterosie berekening - PASSING
+- 14 tests covering both opbouw (accumulation) and onttrekking (withdrawal) erosion logic
+- Stap 1: 2% inflatie, 20j → reeel ≈ 67% van nominaal (deflator 1/(1.02^20))
+- Stap 2: 0% inflatie → reeel === nominaal, zero erosion
+- Stap 3: 5% inflatie, 20j → reeel ≈ 38% van nominaal
+- Stap 4: erosie percentage formule verified (erosie / nominaleGroei * 100)
+- Stap 5: works for both opbouw and onttrekking phases
+- Additional: negative growth guard, monotonic inflation effect, AOW inclusion, 5-year interval rows
+
+### Feature #558: Regressietest: deeltijdwerk impact berekening - PASSING
+- 12 tests covering gap and shortfall scenarios
+- Stap 1: 0,1,2,3 werkdagen → eindvermogen monotoon stijgend
+- Stap 2: 0 dagen = basis-scenario (verschil = 0, no income)
+- Stap 3: inkomen per werkdag correct (fraction of 5-day week: 1/5, 2/5, 3/5)
+- Stap 4: gap scenario → eindvermogen stijgt with more workdays
+- Stap 5: shortfall scenario → higher end portfolio with more income
+- Additional: default monthlyIncome fallback, cashflow handling, short transition edge case
+
+### Files Created
+- test/koopkracht-erosie.test.ts — 14 regression tests
+- test/deeltijdwerk-impact.test.ts — 12 regression tests
+
+### Current Status
+- 2 features completed this session (#557, #558)
+- Commit: 6592408b
