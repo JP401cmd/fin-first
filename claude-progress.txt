@@ -1,3 +1,35 @@
+## Session 2026-03-23 - Features #570, #579
+
+### Feature #570: Widget preset datamodel en type definitie - PASSING
+- Created lib/widget-presets.ts with WidgetPreset interface
+- WidgetPreset type: { id, name, description, module, icon, widgets: WidgetPref[] }
+- 4 persona stubs: pensioenplanner, vermogensverdeler, budgetteerder, fire-strijder
+- Exported getWidgetPreset(id) helper function
+- Imported WidgetPref type from widget-catalog.ts
+- Zero TypeScript compilation errors
+
+### Feature #579: Beheer pagina: Widget Presets beheerscherm - PASSING
+- Created app/(app)/beheer/widget-presets/page.tsx (server component)
+- Added 'Widget Presets' nav entry to BeheerNav
+- Per preset: card with name, description, module color accent (amber/teal/purple/neutral)
+- Widget list as tags/chips with name + size label (S/M/L/XL)
+- Empty state: italic message for presets without widgets yet
+- Uses beheer styling: rounded-xl border, var(--paper), var(--ink) hierarchy
+- Page reachable at /beheer/widget-presets (auth-gated for superadmins)
+- Zero console errors
+- Commit: f4f35fa6
+
+### Files Created
+- lib/widget-presets.ts — WidgetPreset type + 4 persona presets + getWidgetPreset helper
+- app/(app)/beheer/widget-presets/page.tsx — Admin page for viewing presets
+
+### Files Modified
+- components/app/beheer/beheer-nav.tsx — Added Widget Presets nav link
+
+### Current Status
+- 2 features completed this session (#570, #579)
+- Overall progress: 562/596 passing (94.3%)
+
 ## Session 2026-03-23 - Features #547, #548
 
 ### Feature #547: Nieuwe analyse Opbouw: Spaarquote Gevoeligheid - PASSING
@@ -20814,3 +20846,50 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#560, #561)
 - Overall progress: 557/560 passing (99.5%)
+
+## Session 2026-03-23 - Features #566, #568
+
+### Feature #566: Landingspagina: persona 'De Financiële Onafhankelijkheidsstrijder' - PASSING
+- Added 4th persona card to Voor wie section in components/landing/features.tsx
+- Horizon colors (bg-horizon-500 accent, horizon-600 label, horizon-700 tags)
+- Title: 'De financiële onafhankelijkheidsstrijder'
+- Subtitle: 'Actief op weg naar financiële vrijheid en eerder stoppen'
+- Description: 'Maximaliseert de spaarquote, optimaliseert rendement en wil zo snel mogelijk de FIRE-datum bereiken.'
+- 5 feature tags: FIRE-countdown, Spaarquote tracking, Rendement optimalisatie, Monte Carlo simulatie, Eerder stoppen analyse
+- Identical structure to existing 3 persona cards (hover effect, accent bar, tags)
+- Zero console errors
+
+### Feature #568: Landingspagina: persona-grid naar 4 kolommen - PASSING
+- Changed grid from md:grid-cols-3 to sm:grid-cols-2 lg:grid-cols-4
+- Mobile (< 640px): 1 column stacked
+- Tablet (640-1023px): 2x2 grid
+- Desktop (≥ 1024px): 4 columns in one row
+- Verified at desktop viewport with browser automation
+- Zero console errors
+
+### Files Modified
+- components/landing/features.tsx — 4th persona card + responsive grid
+
+### Current Status
+- 2 features completed this session (#566, #568)
+- Commit: aa436bcc
+
+## Session 2026-03-23 - Features #564, #569
+
+### Feature #564: Beheer propositie: pensioenplanner beschrijving aanscherpen op pensioengat - PASSING
+- Updated subtitle from "Geïnteresseerd in pensioen en financiële toekomst" to "Wil weten of het pensioen straks genoeg is"
+- Updated description to focus on pensioengat, AOW, werkgeverspensioen instead of FIRE/eerder stoppen
+- Verified pensioenplanner clearly differs from FIRE-strijder persona
+
+### Feature #569: Landingspagina: pensioenplanner beschrijving aanscherpen op pensioengat - PASSING
+- Same text changes applied to components/landing/features.tsx
+- Consistent with beheer propositie page
+- Verified no FIRE-strijder persona conflicts
+
+### Files Modified
+- app/(app)/beheer/propositie/page.tsx — pensioenplanner subtitle + description
+- components/landing/features.tsx — pensioenplanner subtitle + description
+
+### Current Status
+- 2 features completed this session (#564, #569)
+- Commit: 22f6e713
