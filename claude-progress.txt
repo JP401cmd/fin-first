@@ -20205,3 +20205,37 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#516)
+
+## Session 2026-03-23 - Features #527, #528
+
+### Feature #527: Redactionele noten data-driven maken in alle modals - PASSING
+- Overgang modal: calculates freedomDays = portfolioAtTransitionStart / dailyExpenseRate
+  - Format: "{durationYears} jaar overgang — je leeft van {X} eerder opgebouwde vrijheidsdagen"
+  - Fallback to static text when yearlyExpenses = 0
+- Onttrekking modal: calculates avg freedomDays/year = (withdrawal + AOW) / dailyExpenseRate
+  - Format: "{durationYears} jaar vrijheid geleefd — gemiddeld {X} vrijheidsdagen per jaar"
+  - Fallback to static text when yearlyExpenses = 0
+- Opbouw modal: already data-driven (unchanged)
+- Linter cleanup: shared ReceiptRow component extracted, positive/negative props unified
+- Verified in browser: all 3 modals show correct data-driven editorial notes
+- Commit: 743e338d
+
+### Feature #528: MC Opbouw: dynamische checkpoint-leeftijden - PASSING
+- Replaced hardcoded [55,58,60,62,65] with dynamic checkpoint generation
+- buildCheckpointAges: generates ~5 evenly spaced ages between currentAge+5 and fireAge+5
+- FIRE age always included as checkpoint with "(FIRE)" label
+- Duplicates filtered via Set, sorted ascending
+- FIRE row highlighted: font-semibold + border-l-2 border-l-horizon-600 + bg-subtle/30
+- Verified in browser: checkpoints [40, 46, 52, 58, 59(FIRE), 64] for user age 35, fireAge 59
+- Zero new console errors
+- Commit: 1e977146
+
+### Files Modified
+- components/app/horizon/phase-modal-overgang.tsx — data-driven editorial note
+- components/app/horizon/phase-modal-onttrekking.tsx — data-driven editorial note
+- components/app/horizon/phase-modal-opbouw.tsx — linter cleanup (shared ReceiptRow import)
+- components/app/horizon/phase-analysis/receipt-row.tsx — new shared component
+- components/app/horizon/phase-analysis/opbouw/monte-carlo-opbouw.tsx — dynamic checkpoints
+
+### Current Status
+- 2 features completed this session (#527, #528)
