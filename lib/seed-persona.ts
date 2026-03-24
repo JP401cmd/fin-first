@@ -199,6 +199,7 @@ export async function seedPersonaData(
   profileData.feature_preferences = {
     ...(typeof persona.profile.feature_preferences === 'object' ? persona.profile.feature_preferences : {}),
     _invulfase_active: invulfaseActive,
+    _invulfase_skipped: [],
   }
 
   // Marginaal tarief (optional, per-persona — null means auto-derived)

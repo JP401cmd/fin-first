@@ -33,28 +33,28 @@ function makeTestEvent(overrides: Partial<LifeEvent> = {}): LifeEvent {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 const tests: TestCase[] = [
-  // Test 1: erfenis met positieve one_time_cost → 'opbouwen'
+  // Test 1: erfenis met negatieve one_time_cost (income) → 'opbouwen'
   {
     id: 'classify-erfenis-opbouwen',
-    name: 'Erfenis (one_time_cost: 50000) → opbouwen',
+    name: 'Erfenis (one_time_cost: -50000) → opbouwen',
     category: CAT,
-    description: 'Erfenis met positief eenmalig bedrag bouwt vrijheid op',
+    description: 'Erfenis met negatief eenmalig bedrag (inkomst) bouwt vrijheid op',
     priority: 'critical',
     estimatedDurationMs: 50,
     async fn() {
       const event = makeTestEvent({
         name: 'Erfenis',
-        one_time_cost: 50000,
+        one_time_cost: -50000,
       })
       const result = classifyLifeEvent(event)
       assertEqual(result, 'opbouwen', 'Erfenis moet classificeren als opbouwen')
     },
   },
 
-  // Test 2: kind met negatieve netto impact → 'investeren'
+  // Test 2: kind met positieve one_time_cost (uitgave) + hoge maandkosten → 'investeren'
   {
     id: 'classify-kind-investeren',
-    name: 'Kind (one_time_cost: -5000, monthly_cost: 500, 216m) → investeren',
+    name: 'Kind (one_time_cost: 5000, monthly_cost: 500, 216m) → investeren',
     category: CAT,
     description: 'Kind met hoge maandelijkse kosten investeert vrijheid in bewuste levenskeuze',
     priority: 'critical',
@@ -62,14 +62,14 @@ const tests: TestCase[] = [
     async fn() {
       const event = makeTestEvent({
         name: 'Kind',
-        one_time_cost: -5000,
+        one_time_cost: 5000,
         monthly_cost_change: 500,
         duration_months: 216,
       })
       const result = classifyLifeEvent(event)
       assertEqual(result, 'investeren', 'Kind moet classificeren als investeren')
 
-      // Verify net impact is negative: -5000 + (0 * 216) - (500 * 216) = -113000
+      // Verify net impact is negative: -(5000) + (0 * 216) - (500 * 216) = -113000
       const impact = computeLifeEventNetImpact(event)
       assert(impact < 0, `Net impact moet negatief zijn, was ${impact}`)
     },
@@ -98,10 +98,10 @@ const tests: TestCase[] = [
     },
   },
 
-  // Test 4: sabbatical met kosten + inkomensverlies → 'investeren'
+  // Test 4: sabbatical met eenmalige kosten (positief) + inkomensverlies → 'investeren'
   {
     id: 'classify-sabbatical-investeren',
-    name: 'Sabbatical (cost: -5000, income: -5500, 6m) → investeren',
+    name: 'Sabbatical (cost: 5000, income: -5500, 6m) → investeren',
     category: CAT,
     description: 'Sabbatical met kosten en inkomensverlies investeert vrijheid',
     priority: 'critical',
@@ -109,14 +109,14 @@ const tests: TestCase[] = [
     async fn() {
       const event = makeTestEvent({
         name: 'Sabbatical',
-        one_time_cost: -5000,
+        one_time_cost: 5000,
         monthly_income_change: -5500,
         duration_months: 6,
       })
       const result = classifyLifeEvent(event)
       assertEqual(result, 'investeren', 'Sabbatical moet classificeren als investeren')
 
-      // Net impact: -5000 + (-5500 * 6) - (0 * 6) = -38000
+      // Net impact: -(5000) + (-5500 * 6) - (0 * 6) = -38000
       const impact = computeLifeEventNetImpact(event)
       assert(impact < 0, `Net impact moet negatief zijn, was ${impact}`)
     },
@@ -178,10 +178,10 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 50,
     async fn() {
-      const erfenis = makeTestEvent({ id: 'erfenis', name: 'Erfenis', one_time_cost: 50000 })
+      const erfenis = makeTestEvent({ id: 'erfenis', name: 'Erfenis', one_time_cost: -50000 })
       const aow = makeTestEvent({ id: 'aow', name: 'AOW', monthly_income_change: 1380, duration_months: 240 })
       const kind = makeTestEvent({ id: 'kind', name: 'Kind', monthly_cost_change: 500, duration_months: 216 })
-      const sabbatical = makeTestEvent({ id: 'sabbatical', name: 'Sabbatical', one_time_cost: -5000, monthly_income_change: -5500, duration_months: 6 })
+      const sabbatical = makeTestEvent({ id: 'sabbatical', name: 'Sabbatical', one_time_cost: 5000, monthly_income_change: -5500, duration_months: 6 })
       const neutraal = makeTestEvent({ id: 'neutraal', name: 'Neutraal', duration_months: 12 })
 
       const { opbouwen, investeren } = splitLifeEvents([erfenis, aow, kind, sabbatical, neutraal])
@@ -244,32 +244,32 @@ const tests: TestCase[] = [
     id: 'compute-net-impact-correct',
     name: 'computeLifeEventNetImpact berekent correct netto bedrag',
     category: CAT,
-    description: 'Net impact = one_time_cost + (income * effectiveDuration) - (cost * effectiveDuration)',
+    description: 'Net impact = -one_time_cost + (income * effectiveDuration) - (cost * effectiveDuration)',
     priority: 'critical',
     estimatedDurationMs: 50,
     async fn() {
-      // Erfenis: 50000 + 0 - 0 = 50000
-      const erfenis = makeTestEvent({ one_time_cost: 50000 })
+      // Erfenis (inkomst, negatief in DB): -(-50000) + 0 - 0 = 50000
+      const erfenis = makeTestEvent({ one_time_cost: -50000 })
       assertEqual(computeLifeEventNetImpact(erfenis), 50000, 'Erfenis net impact = 50000')
 
-      // Kind: -5000 + (0 * 216) - (500 * 216) = -113000
-      const kind = makeTestEvent({ one_time_cost: -5000, monthly_cost_change: 500, duration_months: 216 })
+      // Kind (uitgave, positief in DB): -(5000) + (0 * 216) - (500 * 216) = -113000
+      const kind = makeTestEvent({ one_time_cost: 5000, monthly_cost_change: 500, duration_months: 216 })
       assertEqual(computeLifeEventNetImpact(kind), -113000, 'Kind net impact = -113000')
 
-      // AOW: 0 + (1380 * 240) - (0 * 240) = 331200
+      // AOW: -(0) + (1380 * 240) - (0 * 240) = 331200
       const aow = makeTestEvent({ monthly_income_change: 1380, duration_months: 240 })
       assertEqual(computeLifeEventNetImpact(aow), 331200, 'AOW net impact = 331200')
 
-      // Sabbatical: -5000 + (-5500 * 6) - (0 * 6) = -38000
-      const sabbatical = makeTestEvent({ one_time_cost: -5000, monthly_income_change: -5500, duration_months: 6 })
+      // Sabbatical (uitgave, positief in DB): -(5000) + (-5500 * 6) - (0 * 6) = -38000
+      const sabbatical = makeTestEvent({ one_time_cost: 5000, monthly_income_change: -5500, duration_months: 6 })
       assertEqual(computeLifeEventNetImpact(sabbatical), -38000, 'Sabbatical net impact = -38000')
 
-      // Hypotheek: 0 + (0 * 360) - (-1200 * 360) = 432000
+      // Hypotheek: -(0) + (0 * 360) - (-1200 * 360) = 432000
       const hypotheek = makeTestEvent({ monthly_cost_change: -1200, duration_months: 360 })
       assertEqual(computeLifeEventNetImpact(hypotheek), 432000, 'Hypotheek net impact = 432000')
 
-      // Mixed: 10000 + (500 * 12) - (200 * 12) = 13600
-      const mixed = makeTestEvent({ one_time_cost: 10000, monthly_income_change: 500, monthly_cost_change: 200, duration_months: 12 })
+      // Mixed (inkomst, negatief in DB): -(-10000) + (500 * 12) - (200 * 12) = 13600
+      const mixed = makeTestEvent({ one_time_cost: -10000, monthly_income_change: 500, monthly_cost_change: 200, duration_months: 12 })
       assertEqual(computeLifeEventNetImpact(mixed), 13600, 'Mixed event net impact = 13600')
     },
   },

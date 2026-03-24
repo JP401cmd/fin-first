@@ -2,37 +2,41 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { X, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { X, ArrowRight, Sparkles } from 'lucide-react'
 
-interface NextStep {
+interface ChecklistItem {
   key: string
   title: string
-  description: string
   href: string
-  icon: string
-  completed: boolean
+  status: string
 }
 
-interface NextStepsResponse {
-  next_step: NextStep | null
-  pending_steps: NextStep[]
-  completed_count: number
-  total_steps: number
+interface ChecklistCategory {
+  items: ChecklistItem[]
+}
+
+interface ChecklistResponse {
+  categories: ChecklistCategory[]
+  progress: {
+    percentage: number
+  }
 }
 
 export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
   const [active, setActive] = useState(initialActive)
-  const [nextSteps, setNextSteps] = useState<NextStepsResponse | null>(null)
+  const [checklist, setChecklist] = useState<ChecklistResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [dismissing, setDismissing] = useState(false)
 
-  // Fetch next steps
   useEffect(() => {
     if (!active) return
-    fetch('/api/next-steps')
+    fetch('/api/invulfase/checklist')
       .then(r => r.json())
-      .then(data => setNextSteps(data))
+      .then(data => {
+        if (Array.isArray(data.categories) && data.progress) {
+          setChecklist(data)
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [active])
@@ -40,7 +44,6 @@ export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
   const handleDismiss = useCallback(async () => {
     setDismissing(true)
     try {
-      // Mark invulfase as inactive
       await fetch('/api/invulfase', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -48,7 +51,6 @@ export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
       })
       setActive(false)
     } catch {
-      // Still dismiss visually even if API fails
       setActive(false)
     } finally {
       setDismissing(false)
@@ -57,7 +59,6 @@ export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
 
   if (!active) return null
 
-  // While loading, show a minimal banner
   if (loading) {
     return (
       <div className="border-b border-kern-200 bg-kern-50/80">
@@ -73,20 +74,28 @@ export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
     )
   }
 
-  // If all steps are completed, auto-dismiss
-  if (nextSteps && nextSteps.pending_steps.length === 0) {
-    return null
+  // Find first incomplete item across all categories
+  let nextItem: ChecklistItem | null = null
+  if (checklist) {
+    for (const cat of checklist.categories) {
+      for (const item of cat.items) {
+        if (item.status === 'empty' || item.status === 'partial') {
+          nextItem = item
+          break
+        }
+      }
+      if (nextItem) break
+    }
   }
 
-  var completedCount = nextSteps?.completed_count ?? 0
-  var totalSteps = nextSteps?.total_steps ?? 0
-  var progressPct = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0
-  var currentStep = nextSteps?.next_step
+  // If no pending items, auto-dismiss
+  if (checklist && !nextItem) return null
+
+  const progressPct = checklist?.progress.percentage ?? 0
 
   return (
     <div className="border-b border-kern-200 bg-gradient-to-r from-kern-50 to-kern-50/60">
       <div className="mx-auto max-w-6xl px-4 py-2.5 sm:px-6 sm:py-3">
-        {/* Main banner row */}
         <div className="flex items-center justify-between gap-3 sm:gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kern-100">
@@ -98,12 +107,12 @@ export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
                   Invulfase
                 </span>
                 <span className="rounded-full bg-kern-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-kern-600">
-                  {completedCount}/{totalSteps}
+                  {progressPct}%
                 </span>
               </div>
-              {currentStep && (
+              {nextItem && (
                 <p className="mt-0.5 truncate text-xs text-kern-600">
-                  Volgende stap: {currentStep.title}
+                  Volgende stap: {nextItem.title}
                 </p>
               )}
             </div>
@@ -120,10 +129,10 @@ export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
               </div>
             </div>
 
-            {/* Next step link — min 44px touch target on mobile */}
-            {currentStep && (
+            {/* Next step link */}
+            {nextItem && (
               <Link
-                href={currentStep.href}
+                href={nextItem.href}
                 className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg bg-kern-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-kern-700 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5"
               >
                 <span className="hidden sm:inline">Volgende stap</span>
@@ -131,7 +140,7 @@ export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
               </Link>
             )}
 
-            {/* Dismiss button — min 44px touch target on mobile */}
+            {/* Dismiss button */}
             <button
               onClick={handleDismiss}
               disabled={dismissing}
@@ -142,107 +151,6 @@ export function InvulfaseBanner({ initialActive }: { initialActive: boolean }) {
               <X className="h-4 w-4" />
             </button>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Welcome card shown on /core after onboarding.
- * Displays next-steps suggestions in a card layout.
- */
-export function InvulfaseWelcomeCard() {
-  const [nextSteps, setNextSteps] = useState<NextStepsResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [dismissed, setDismissed] = useState(false)
-  const [invulfaseActive, setInvulfaseActive] = useState(false)
-
-  useEffect(() => {
-    // Check if invulfase is active
-    fetch('/api/invulfase')
-      .then(r => r.json())
-      .then(data => {
-        setInvulfaseActive(data.active)
-        if (data.active) {
-          // Only fetch next steps if invulfase is active
-          return fetch('/api/next-steps')
-            .then(r => r.json())
-            .then(steps => setNextSteps(steps))
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
-
-  if (!invulfaseActive || dismissed || loading) return null
-  if (!nextSteps || nextSteps.pending_steps.length === 0) return null
-
-  // Show max 3 pending steps
-  var visibleSteps = nextSteps.pending_steps.slice(0, 3)
-
-  return (
-    <div className="card-editorial mb-6 overflow-hidden border-l-3 border-kern-400">
-      <div className="p-5">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-kern-100">
-              <Sparkles className="h-4.5 w-4.5 text-kern-600" />
-            </div>
-            <div>
-              <h3 className="font-display text-sm font-semibold text-[var(--ink)]">
-                Welkom bij TriFinity!
-              </h3>
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                Vul je gegevens verder aan om het meeste uit de app te halen.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setDismissed(true)}
-            className="-mr-1 flex h-[44px] w-[44px] items-center justify-center rounded-md text-[var(--ink-4)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-3)] sm:mr-0 sm:h-auto sm:w-auto sm:p-1"
-            aria-label="Sluiten"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Steps list */}
-        <div className="mt-4 space-y-2">
-          {visibleSteps.map(function(step) {
-            return (
-              <Link
-                key={step.key}
-                href={step.href}
-                className="group flex items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5 transition-colors hover:border-kern-300 hover:bg-kern-50/50"
-              >
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--ink-4)] group-hover:text-kern-500" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-[var(--ink-2)] group-hover:text-[var(--ink)]">
-                    {step.title}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-[var(--ink-4)]">
-                    {step.description}
-                  </p>
-                </div>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[var(--ink-4)] transition-transform group-hover:translate-x-0.5 group-hover:text-kern-500" />
-              </Link>
-            )
-          })}
-        </div>
-
-        {/* Progress indicator */}
-        <div className="mt-4 flex items-center gap-3">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--subtle)]">
-            <div
-              className="h-full rounded-full bg-kern-500 transition-all duration-500"
-              style={{ width: `${nextSteps.total_steps > 0 ? Math.round((nextSteps.completed_count / nextSteps.total_steps) * 100) : 0}%` }}
-            />
-          </div>
-          <span className="text-[11px] font-medium tabular-nums text-[var(--ink-4)]">
-            {nextSteps.completed_count}/{nextSteps.total_steps} stappen
-          </span>
         </div>
       </div>
     </div>

@@ -115,7 +115,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   const totalInleg = accumulationRows.reduce((sum, r) => sum + r.savings, 0)
   const totalRendement = accumulationRows.reduce((sum, r) => sum + r.totalGrowth, 0)
   const totalBox3 = accumulationRows.reduce((sum, r) => sum + r.totalBox3, 0)
-  const totalEvents = accumulationRows.reduce((sum, r) => sum + r.cashflowNet, 0)
+  const totalEvents = accumulationRows.reduce((sum, r) => sum + r.cashflowNet + r.oneTimeNet, 0)
 
   // Start value: net worth at beginning of first accumulation year (assets - debts)
   const startVermogen = accumulationRows.length > 0

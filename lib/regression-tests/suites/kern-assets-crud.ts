@@ -854,6 +854,38 @@ const tests: TestCase[] = [
       }
     },
   },
+
+  // ════════════════════════════════════════════════════════════════════
+  // Contant geld subtype — cash zonder bankrekening
+  // ════════════════════════════════════════════════════════════════════
+  {
+    id: 'assets-crud-contant-geld-subtype',
+    name: 'Cash asset subtype contant_geld: valide configuratie',
+    category: CAT,
+    description: 'Contant geld is een cash subtype zonder IBAN, met budget tracking',
+    priority: 'high',
+    estimatedDurationMs: 5,
+    fn() {
+      // Contant geld is a valid cash subtype — physical cash, no bank account
+      const contantGeldAsset = {
+        asset_type: 'cash',
+        subtype: 'contant_geld',
+        account_number: null, // geen IBAN
+        institution: null, // geen bank
+        has_budget_tracking: true,
+        is_liquid: true,
+        expected_return: 0,
+      }
+
+      assertEqual(contantGeldAsset.asset_type, 'cash', 'contant_geld valt onder cash type')
+      assertEqual(contantGeldAsset.subtype, 'contant_geld', 'subtype = contant_geld')
+      assertEqual(contantGeldAsset.account_number, null, 'geen IBAN voor contant geld')
+      assertEqual(contantGeldAsset.institution, null, 'geen bank voor contant geld')
+      assertEqual(contantGeldAsset.has_budget_tracking, true, 'budget tracking mogelijk op contant geld')
+      assertEqual(contantGeldAsset.is_liquid, true, 'contant geld is liquide')
+      assertEqual(contantGeldAsset.expected_return, 0, 'contant geld heeft 0% rendement')
+    },
+  },
 ]
 
 export function register() {

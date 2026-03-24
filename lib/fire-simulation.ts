@@ -51,6 +51,7 @@ export interface SimRow {
   savings: number
   withdrawal: number
   cashflowNet: number
+  oneTimeNet: number
   endPortfolio: number
   grossIncome: number
   grossExpenses: number
@@ -140,6 +141,15 @@ export function runSimulation(
     return cf.direction === 'income' ? monthly : -monthly
   }
 
+  /** Compute signed yearly amount for a recurring cashflow, prorated for partial years */
+  function recurringYearly(cf: SimCashflow, age: number): number {
+    const monthly = recurringMonthly(cf, age)
+    if (monthly === 0) return 0
+    const cfEnd = cf.toAge ?? (age + 1)
+    const months = Math.round(Math.min(12, Math.max(0, (Math.min(age + 1, cfEnd) - Math.max(age, cf.fromAge)) * 12)))
+    return monthly * months
+  }
+
   /** Compute signed one-time amount for a one-time cashflow at a given age */
   function oneTimeAmount(cf: SimCashflow, age: number): number {
     if (cf.type !== 'one_time') return 0
@@ -221,7 +231,7 @@ export function runSimulation(
       let recurringIncome = 0
       let recurringExpense = 0
       for (const cf of cashflows) {
-        const val = recurringMonthly(cf, age) * 12
+        const val = recurringYearly(cf, age)
         recurringNet += val
         if (val > 0) recurringIncome += val; else recurringExpense += Math.abs(val)
       }
@@ -250,6 +260,7 @@ export function runSimulation(
         currentAge: age,
         endAge: simEndAge,
         endStrategy: useWithdrawalStrategy ? strategy : undefined,
+        inflation,
       }
       const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
 
@@ -269,7 +280,8 @@ export function runSimulation(
           growth: Math.round(growth),
           savings: 0,
           withdrawal: Math.round(withdrawal),
-          cashflowNet: Math.round(oneTimeNet + recurringNet),
+          cashflowNet: Math.round(recurringNet),
+          oneTimeNet: Math.round(oneTimeNet),
           endPortfolio: Math.round(Math.max(rawEnd, 0)),
           grossIncome: Math.round(rowGrossIncome),
           grossExpenses: Math.round(rowGrossExpenses),
@@ -362,6 +374,9 @@ export function runSimulation(
 
     portfolioPreFire = portfolio
 
+    // Save portfolio before one-time cashflows for accurate startPortfolio
+    const portfolioPreOneTime = portfolio
+
     let oneTimeNet = 0
     for (const cf of cashflows) {
       const amt = oneTimeAmount(cf, age)
@@ -373,7 +388,7 @@ export function runSimulation(
     let cfIncome = 0
     let cfExpense = 0
     for (const cf of cashflows) {
-      const val = recurringMonthly(cf, age) * 12
+      const val = recurringYearly(cf, age)
       cashflowNet += val
       if (val > 0) cfIncome += val; else cfExpense += Math.abs(val)
     }
@@ -390,19 +405,20 @@ export function runSimulation(
     const growth = portfolio * portReturn
     const endPortfolio = portfolio + growth + effectiveSavings
 
-    // grossIncome: netto maandinkomen×12 (= annualSavings + yearlyExpenses) + positive cashflows + portfolio growth
-    const accGrossIncome = annualSavings + yearlyExpenses + cfIncome + otIncome + Math.max(0, growth)
+    // grossIncome: netto maandinkomen×12 (= annualSavings + yearlyExpenses) + positive cashflows (no growth)
+    const accGrossIncome = annualSavings + yearlyExpenses + cfIncome + otIncome
     // grossExpenses: jaarlijkse uitgaven + negative cashflows
     const accGrossExpenses = yearlyExpenses + cfExpense + otExpense
 
     accRows.push({
       age,
       phase: 'accumulation',
-      startPortfolio: Math.round(portfolio),
+      startPortfolio: Math.round(portfolioPreOneTime),
       growth: Math.round(growth),
       savings: Math.round(annualSavings),
       withdrawal: 0,
-      cashflowNet: Math.round(cashflowNet + oneTimeNet),
+      cashflowNet: Math.round(cashflowNet),
+      oneTimeNet: Math.round(oneTimeNet),
       endPortfolio: Math.round(Math.max(endPortfolio, 0)),
       grossIncome: Math.round(accGrossIncome),
       grossExpenses: Math.round(accGrossExpenses),
@@ -702,7 +718,7 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
       const monthlyCost = Number(ev.monthly_cost_change ?? 0)
       if (monthlyCost !== 0) {
         const toAge = ev.duration_months && ev.duration_months > 0
-          ? age + Math.ceil(ev.duration_months / 12)
+          ? age + ev.duration_months / 12
           : null
         flows.push({
           id: `le-costchange-${ev.id}`,
@@ -722,7 +738,7 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
       const monthlyIncome = Number(ev.monthly_income_change ?? 0)
       if (monthlyIncome !== 0) {
         const toAge = ev.duration_months && ev.duration_months > 0
-          ? age + Math.ceil(ev.duration_months / 12)
+          ? age + ev.duration_months / 12
           : null
         flows.push({
           id: `le-incomechange-${ev.id}`,

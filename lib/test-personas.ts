@@ -606,6 +606,7 @@ const roosData: PersonaData = {
   bank_accounts: [
     { name: 'Betaalrekening ING', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 245, is_active: true, sort_order: 0 },
     { name: 'Tweede rekening ABN', iban: 'NL02ABNA0450884700', bank_name: 'ABN AMRO', account_type: 'checking', balance: -180, is_active: true, sort_order: 1 },
+    { name: 'Contant geld thuis', iban: '', bank_name: '', account_type: 'contant_geld', balance: 150, is_active: true, sort_order: 2 },
   ],
   assets: [
     { name: 'Auto (private lease)', asset_type: 'vehicle', current_value: 0, purchase_value: 0, purchase_date: '2024-01-01', expected_return: 0, monthly_contribution: 0, institution: 'LeasePlan', subtype: 'auto_financial_lease', depreciation_rate: 15 },

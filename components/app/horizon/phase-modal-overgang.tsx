@@ -121,7 +121,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
     : 0
 
   const totalEvents = hasTransitionRows
-    ? transitionRows.reduce((sum, r) => sum + r.cashflowNet, 0)
+    ? transitionRows.reduce((sum, r) => sum + r.cashflowNet + r.oneTimeNet, 0)
     : 0
 
   const totalIncome = hasTransitionRows

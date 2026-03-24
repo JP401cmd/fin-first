@@ -550,13 +550,14 @@ export type LifeEventClassification = 'opbouwen' | 'investeren'
  * When duration_months > 0: one_time_cost + (monthly_income_change - monthly_cost_change) × duration_months
  * When duration_months = 0 (permanent/indefinite): one_time_cost + (monthly_income_change - monthly_cost_change) × 240
  *   240 months (20 years) is used as a reasonable proxy for permanent changes, consistent with AOW duration conventions.
- * Note: one_time_cost is negative for costs, positive for income.
+ * Note: one_time_cost is positive for costs, negative for income (same as DB/cashflow convention).
  */
 export function computeLifeEventNetImpact(event: LifeEvent): number {
   const { one_time_cost, monthly_income_change, monthly_cost_change, duration_months } = event
   // duration_months === 0 means permanent/indefinite (see lifeEventsToCashflows); use 240 months as proxy
   const effectiveDuration = duration_months > 0 ? duration_months : 240
-  return one_time_cost + (monthly_income_change * effectiveDuration) - (monthly_cost_change * effectiveDuration)
+  // Negate one_time_cost: positive in DB = expense (reduces freedom), negative = income (builds freedom)
+  return -one_time_cost + (monthly_income_change * effectiveDuration) - (monthly_cost_change * effectiveDuration)
 }
 
 /**

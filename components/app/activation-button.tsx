@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 import { FfinAvatar } from '@/components/app/avatars'
 import { formatCurrency } from '@/lib/format'
@@ -29,7 +28,6 @@ const PHASE_LABELS: Record<string, string> = {
 }
 
 export function ActivationButton({ data }: { data: FeatureAccessData }) {
-  const router = useRouter()
   const [showModal, setShowModal] = useState(false)
   const [activating, setActivating] = useState(false)
 
@@ -45,8 +43,15 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
     setActivating(true)
     try {
       const res = await fetch('/api/activate', { method: 'POST' })
-      if (!res.ok) throw new Error('Activation failed')
-      router.refresh()
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        if (body.error === 'Already activated') {
+          window.location.href = '/will'
+          return
+        }
+        throw new Error('Activation failed')
+      }
+      window.location.href = '/will'
     } catch {
       setActivating(false)
     }

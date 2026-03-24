@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
@@ -89,6 +89,7 @@ export const SimChart = memo(function SimChart({
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
+  const [hoveredAge, setHoveredAge] = useState<number | null>(null)
 
   const [containerW, setContainerW] = useState(600)
   useEffect(() => {
@@ -344,8 +345,60 @@ export const SimChart = memo(function SimChart({
     return `${prefix}€${Math.round(amount)}`
   }
 
+  /** Format an absolute value for the crosshair tooltip (no sign prefix) */
+  function fmtAbs(val: number): string {
+    const abs = Math.abs(val)
+    if (abs >= 1_000_000) return `€${(abs / 1_000_000).toFixed(1)}M`
+    if (abs >= 1_000) return `€${Math.round(abs / 1_000)}K`
+    return `€${Math.round(abs)}`
+  }
+
+  // ── Crosshair tooltip handlers ──────────────────────────────────────────
+  const handleOverlayMouseMove = useCallback((e: React.MouseEvent<SVGRectElement>) => {
+    const svgEl = ref.current?.querySelector('svg')
+    if (!svgEl) return
+    const rect = svgEl.getBoundingClientRect()
+    const svgX = ((e.clientX - rect.left) / rect.width) * W
+    const raw = minAge + ((svgX - PAD.left) / innerW) * (maxAge - minAge)
+    const age = Math.max(minAge, Math.min(maxAge, Math.round(raw)))
+    setHoveredAge(age)
+  }, [ref, W, minAge, maxAge, PAD.left, innerW])
+
+  const handleOverlayMouseLeave = useCallback(() => {
+    setHoveredAge(null)
+  }, [])
+
+  /** SimRow for the currently hovered age (null if nothing hovered) */
+  const hoveredRow = useMemo(() => {
+    if (hoveredAge === null) return null
+    return rows.find(r => r.age === hoveredAge) ?? null
+  }, [hoveredAge, rows])
+
+  /** SVG x-position of the hovered age crosshair */
+  const crosshairX = hoveredAge !== null ? PAD.left + xScale(hoveredAge) : null
+
+  /** Compute the portfolio value at hoveredAge for the dot on the line */
+  const crosshairY = useMemo(() => {
+    if (hoveredAge === null) return null
+    // The allPts array maps age → value on the drawn line.
+    // At x = hoveredAge the line shows the startPortfolio of that year
+    // (which equals endPortfolio of the previous year).
+    const pt = allPts.find(([a]) => a === hoveredAge)
+    if (pt) return PAD.top + yScale(Math.max(pt[1], 0))
+    // Fallback: try the startPortfolio entry at the exact age
+    const ptStart = allPts.find(([a]) => a === hoveredAge)
+    if (ptStart) return PAD.top + yScale(Math.max(ptStart[1], 0))
+    return null
+  }, [hoveredAge, allPts, PAD.top, yScale])
+
+  /** Determine the colour for the crosshair dot based on phase */
+  const crosshairDotColor = useMemo(() => {
+    if (!hoveredRow) return COLOR_OPBOUW
+    return hoveredRow.phase === 'retirement' ? COLOR_AFBOUW : COLOR_OPBOUW
+  }, [hoveredRow, COLOR_OPBOUW, COLOR_AFBOUW])
+
   return (
-    <div ref={ref}>
+    <div ref={ref} className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" overflow="hidden" aria-hidden="true">
         {/* Grid lines */}
         {yTicks.map(({ val, y }) => (
@@ -639,6 +692,37 @@ export const SimChart = memo(function SimChart({
           />
         )}
 
+        {/* Crosshair hover overlay — invisible rect covering chart area for mouse tracking */}
+        <rect
+          x={PAD.left} y={PAD.top}
+          width={innerW} height={innerH}
+          fill="transparent"
+          pointerEvents="all"
+          style={{ cursor: 'crosshair' }}
+          onMouseMove={handleOverlayMouseMove}
+          onMouseLeave={handleOverlayMouseLeave}
+        />
+
+        {/* Crosshair vertical line */}
+        {hoveredAge !== null && crosshairX !== null && (
+          <line
+            x1={crosshairX} x2={crosshairX}
+            y1={PAD.top} y2={PAD.top + innerH}
+            stroke="var(--ink-3)" strokeWidth={1} opacity={0.4}
+            pointerEvents="none"
+          />
+        )}
+
+        {/* Crosshair dot on the wealth line */}
+        {hoveredAge !== null && crosshairX !== null && crosshairY !== null && (
+          <circle
+            cx={crosshairX} cy={crosshairY} r={4}
+            fill={crosshairDotColor}
+            stroke="var(--paper)" strokeWidth={1.5}
+            pointerEvents="none"
+          />
+        )}
+
         {/* Dot at FIRE junction (hidden in pensioen mode) */}
         {!isPensioenMode && xFire !== null && yFireDot !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
           <circle cx={xFire} cy={yFireDot} r={5}
@@ -816,6 +900,91 @@ export const SimChart = memo(function SimChart({
           )
         })}
       </svg>
+
+      {/* Crosshair tooltip (HTML overlay for crisp text rendering) */}
+      {hoveredAge !== null && hoveredRow && crosshairX !== null && (() => {
+        // Convert SVG crosshair X to CSS percentage within the container
+        const pctX = crosshairX / W
+        // Position tooltip to the right by default; flip left if too close to right edge
+        const tooltipW = 180
+        const flipThreshold = 0.7
+        const showLeft = pctX > flipThreshold
+        // Vertical position: roughly at chart midpoint
+        const pctY = (PAD.top + innerH * 0.2) / H
+
+        // Collect drijvers (positive factors)
+        const drijvers: { label: string; value: number }[] = []
+        if (hoveredRow.growth > 0) drijvers.push({ label: 'Rendement', value: hoveredRow.growth })
+        if (hoveredRow.savings > 0) drijvers.push({ label: 'Sparen', value: hoveredRow.savings })
+        if (hoveredRow.cashflowNet > 0) drijvers.push({ label: 'Inkomsten', value: hoveredRow.cashflowNet })
+        if (hoveredRow.oneTimeNet > 0) drijvers.push({ label: 'Eenmalig', value: hoveredRow.oneTimeNet })
+
+        // Collect drukkers (negative factors)
+        const drukkers: { label: string; value: number }[] = []
+        if (hoveredRow.withdrawal > 0) drukkers.push({ label: 'Onttrekking', value: hoveredRow.withdrawal })
+        if (hoveredRow.cashflowNet < 0) drukkers.push({ label: 'Uitgaven', value: Math.abs(hoveredRow.cashflowNet) })
+        if (hoveredRow.oneTimeNet < 0) drukkers.push({ label: 'Eenmalig', value: Math.abs(hoveredRow.oneTimeNet) })
+        if (hoveredRow.growth < 0) drukkers.push({ label: 'Rendement', value: Math.abs(hoveredRow.growth) })
+
+        return (
+          <div
+            className="pointer-events-none absolute z-10"
+            style={{
+              left: showLeft ? `calc(${(pctX * 100).toFixed(1)}% - ${tooltipW + 12}px)` : `calc(${(pctX * 100).toFixed(1)}% + 12px)`,
+              top: `${(pctY * 100).toFixed(1)}%`,
+              width: tooltipW,
+            }}
+          >
+            <div
+              className="rounded-lg px-3 py-2"
+              style={{ background: 'var(--ink)', opacity: 0.94 }}
+            >
+              {/* Header: age */}
+              <div
+                className="font-semibold"
+                style={{ fontSize: 11, color: 'var(--paper)' }}
+              >
+                Leeftijd {hoveredRow.age}
+              </div>
+
+              {/* Separator */}
+              <div className="my-1" style={{ height: 1, background: 'var(--ink-3)', opacity: 0.4 }} />
+
+              {/* Vermogen */}
+              <div className="flex items-baseline justify-between" style={{ fontSize: 10, color: 'var(--paper)' }}>
+                <span>Vermogen</span>
+                <span className="font-mono tabular-nums font-semibold">{fmtAbs(hoveredRow.startPortfolio)}</span>
+              </div>
+
+              {/* Drijvers section */}
+              {drijvers.length > 0 && (
+                <>
+                  <div className="mt-1.5" style={{ height: 1, background: 'var(--ink-3)', opacity: 0.25 }} />
+                  {drijvers.map(d => (
+                    <div key={d.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
+                      <span style={{ color: '#6ee7b7' }}>&#9650; {d.label}</span>
+                      <span className="font-mono tabular-nums" style={{ color: '#6ee7b7' }}>+{fmtAbs(d.value)}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Drukkers section */}
+              {drukkers.length > 0 && (
+                <>
+                  <div className="mt-1.5" style={{ height: 1, background: 'var(--ink-3)', opacity: 0.25 }} />
+                  {drukkers.map(d => (
+                    <div key={d.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
+                      <span style={{ color: '#fca5a5' }}>&#9660; {d.label}</span>
+                      <span className="font-mono tabular-nums" style={{ color: '#fca5a5' }}>{'\u2212'}{fmtAbs(d.value)}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Household partner legend */}
       {householdOverlays && householdOverlays.length > 0 && (

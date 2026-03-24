@@ -7,6 +7,7 @@ import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { NextResponse } from 'next/server'
 import { checkTierGate } from '@/lib/require-tier'
+import { NEWS_SYSTEM_PROMPT } from '@/lib/news-system-prompt'
 
 // ── Cache TTL ────────────────────────────────────────────────────────
 
@@ -34,71 +35,13 @@ const newsItemSchema = z.object({
   category: z.enum(NEWS_CATEGORIES).describe('Nieuwscategorie'),
   date: z.string().describe('Datum van het nieuws in YYYY-MM-DD formaat'),
   sourceContext: z.string().optional().describe('Broncontext of toelichting (bijv. "Belastingplan 2026", "ECB persconferentie")'),
+  sourceUrl: z.string().optional().describe('Directe URL naar het bronartikelen waarop dit nieuwsitem gebaseerd is'),
+  sourceName: z.string().optional().describe('Naam van de bron (bijv. "Belastingdienst", "Rijksoverheid", "ECB")'),
 })
 
 export type NewsItem = z.infer<typeof newsItemSchema>
 
-// ── System prompt ────────────────────────────────────────────────────
-
-const NEWS_SYSTEM_PROMPT = `Je bent een persoonlijke financiele nieuwsassistent voor TriFinity, een Nederlandse personal finance app.
-
-KERNFILOSOFIE: "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd."
-
-Je taak:
-1. Genereer 5-8 Nederlandse financiele nieuwsberichten op basis van actuele trends en wetswijzigingen.
-2. Gebruik TWEE typen berichten: "direct" (concrete persoonlijke impact) en "relevant" (financieel relevant zonder concrete impact).
-
-TWEE TYPEN BERICHTEN:
-
-1. DIRECT IMPACT (impactType: "direct"):
-   - Nieuws waarvan je de concrete financiele impact voor DEZE gebruiker kunt berekenen
-   - personalImpact bevat specifieke euro-bedragen of vrijheidstijd gebaseerd op het profiel
-   - Voorbeeld: "Met jouw maanduitgaven van €2.800 bespaart dit je €45/maand — 1,2 extra vrijheidsdagen per jaar"
-   - Minimaal 4 berichten moeten direct impact hebben
-
-2. RELEVANT (impactType: "relevant"):
-   - Financieel nieuws dat relevant is voor de gebruiker maar waarvan je geen concrete impact kunt berekenen
-   - personalImpact bevat een korte uitleg WAAROM dit relevant kan zijn voor de financiele situatie van de gebruiker
-   - Voorbeeld: "Als belegger in ETF's is deze wijziging in EU-regelgeving het volgen waard"
-   - Maximaal 4 relevante berichten (mag ook 0 zijn)
-   - Gebruik dit voor bredere financiele trends, toekomstige ontwikkelingen, of achtergrondnieuws
-
-SORTERING:
-- Genereer EERST alle "direct" berichten, daarna de "relevant" berichten
-- Het EERSTE bericht moet het bericht zijn met de GROOTSTE concrete impact voor de gebruiker — dit wordt het hoofdartikel
-
-CATEGORIEËN:
-- fiscaal: Belastingwijzigingen, box 1/2/3, toeslagen, aftrekposten
-- rente: ECB-beslissingen, spaarrente, hypotheekrentes
-- woningmarkt: Huizenprijzen, NHG, huurmarkt
-- beleggingen: AEX, ETF's, crypto-regulering, dividenden
-- pensioen: AOW, pensioenwet, lijfrente
-- macro: Inflatie, koopkracht, loongroei, werkloosheid
-
-REGELS:
-- Schrijf ALTIJD in het Nederlands
-- Baseer je op actuele Nederlandse financiele trends per maart 2026
-- Elke headline moet kort en informatief zijn (max 80 tekens)
-- Gebruik het YYYY-MM-DD datumformaat
-- Zorg voor spreiding over categorieën (minimaal 3 verschillende)
-- sourceContext is optioneel maar wordt gewaardeerd voor context
-- Als er eerder gegenereerde koppen worden meegegeven, vermijd dezelfde onderwerpen
-
-REGELS VOOR "direct" BERICHTEN:
-- personalImpact MOET concrete euro-bedragen OF vrijheidstijd bevatten
-- GEEN hypothetische impact: schrijf nooit "als je...", "mocht je...", "indien je..."
-- personalImpact moet refereren aan de werkelijke situatie: "Met jouw vermogen van...", "Op basis van je maanduitgaven van..."
-
-REGELS VOOR "relevant" BERICHTEN:
-- personalImpact legt uit WAAROM dit relevant is voor het profiel van de gebruiker
-- Refereer aan de context van de gebruiker (bijv. "als belegger", "met jouw pensioenopbouw") maar zonder specifieke bedragen
-- Houd de toon informatief, niet alarmerend
-
-VRIJHEIDSTIJD BEREKENING (alleen voor "direct"):
-Als de gebruiker dagelijkse kosten heeft, gebruik die als basis:
-- vrijheidsdagen = euro-impact / dagelijkse kosten
-- Voorbeeld: "Dit bespaart je €90/maand — dat zijn 2,3 extra vrijheidsdagen per jaar"
-`
+// System prompt is imported from lib/news-system-prompt.ts (single source of truth)
 
 // ── Cache helpers ────────────────────────────────────────────────────
 
@@ -418,6 +361,35 @@ export async function GET(request: Request) {
 
   const recentHeadlines = await getRecentHeadlines(supabase, user.id)
 
+  // ── Load source articles from news_articles DB ─────────────────
+
+  interface DbArticle {
+    id: string
+    title: string
+    summary: string | null
+    source_url: string
+    source_name: string
+    category: string | null
+    published_at: string | null
+  }
+
+  let sourceArticles: DbArticle[] = []
+  try {
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const { data } = await supabase
+      .from('news_articles')
+      .select('id, title, summary, source_url, source_name, category, published_at')
+      .gte('fetched_at', thirtyDaysAgo.toISOString())
+      .order('published_at', { ascending: false })
+      .limit(50)
+
+    sourceArticles = data || []
+  } catch (err) {
+    console.error('[/api/news] Failed to load source articles from DB:', err)
+  }
+
   // ── Fire-and-forget background generation ──────────────────────
 
   const state: GenerationState = { items: [], complete: false, startedAt: Date.now() }
@@ -430,6 +402,13 @@ export async function GET(request: Request) {
         ? `\n\nEERDER GEGENEREERDE KOPPEN (afgelopen 2 maanden — vermijd herhaling van dezelfde onderwerpen):\n${recentHeadlines.map(h => `- "${h}"`).join('\n')}\n\nGenereer nieuws over ANDERE onderwerpen. Varieer in invalshoek, subcategorie en focus.`
         : ''
 
+      // Build source context from database articles
+      const sourcesContext = sourceArticles.length > 0
+        ? `\n\nACTUELE NIEUWSBRONNEN (baseer je artikelen hierop — gebruik sourceUrl en sourceName):\n${sourceArticles.map(a =>
+          `- [${a.source_name}] "${a.title}" (${a.published_at ? a.published_at.split('T')[0] : 'onbekend'})\n  Link: ${a.source_url}\n  ${a.summary || ''}`
+        ).join('\n\n')}`
+        : ''
+
       const result = streamObject({
         model,
         output: 'array',
@@ -440,7 +419,7 @@ export async function GET(request: Request) {
 FINANCIEEL PROFIEL VAN DE GEBRUIKER:
 ${financialContext}
 
-Genereer 5-8 Nederlandse financiele nieuwsitems. Begin met minimaal 4 "direct" impact berichten (het eerste bericht moet de grootste impact hebben). Vul aan met maximaal 4 "relevant" berichten. Sorteer: direct-impact eerst, dan relevant.${headlinesContext}`,
+Genereer 5-8 Nederlandse financiele nieuwsitems. Begin met minimaal 4 "direct" impact berichten (het eerste bericht moet de grootste impact hebben). Vul aan met maximaal 4 "relevant" berichten. Sorteer: direct-impact eerst, dan relevant.${headlinesContext}${sourcesContext}`,
       })
 
       for await (const item of result.elementStream) {
@@ -457,6 +436,14 @@ Genereer 5-8 Nederlandse financiele nieuwsitems. Begin met minimaal 4 "direct" i
 
       state.complete = true
       await setCachedNews(supabase, user.id, state.items)
+
+      // Mark source articles as used so admins can track what's been consumed
+      if (sourceArticles.length > 0) {
+        await supabase
+          .from('news_articles')
+          .update({ is_used: true })
+          .in('id', sourceArticles.map(a => a.id))
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       console.error('[/api/news] Background generation failed:', errMsg)

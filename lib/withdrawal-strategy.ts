@@ -54,6 +54,8 @@ export interface WithdrawalContext {
   endStrategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
   /** Geïndexeerd nalatenschapsbedrag (alleen voor legacy strategie) */
   legacyAmount?: number
+  /** Inflatiepercentage als decimaal (bijv. 0.02 voor 2%) — nodig voor reëel rendement in annuïteit */
+  inflation?: number
 }
 
 /** State for bucket strategy — tracks allocation across 3 buckets */
@@ -140,10 +142,14 @@ export function applyWithdrawalStrategy(
 /**
  * Static withdrawal: base logic = max(0, baseExpenses - recurringIncome).
  *
- * When endStrategy === 'deplete', uses annuity formula to ensure the portfolio
- * depletes to ≈€0 at endAge:
- *   annuity = portfolio × r / (1 − (1+r)^(−n))
- * where n = remaining years, r = real return (yearReturn).
+ * When endStrategy === 'deplete', uses growing annuity formula to ensure the
+ * portfolio depletes to ≈€0 at endAge while matching inflation-indexed expenses:
+ *   PMT = P × (r − g) / (1 − ((1+g)/(1+r))^n)
+ * where r = nominal return, g = inflation, n = remaining years.
+ *
+ * This is self-consistent with the simulation: portfolio grows at nominal rate r,
+ * withdrawals grow at inflation rate g, and the portfolio depletes to exactly €0
+ * at endAge by construction.
  *
  * The final withdrawal is max(annuityWithdrawal, baseExpenses - recurringIncome)
  * so that at minimum the living expenses are covered.
@@ -157,17 +163,23 @@ function applyStatic(ctx: WithdrawalContext): number {
   if (ctx.endStrategy === 'deplete') {
     const n = Math.max(1, ctx.endAge - ctx.currentAge)
     const r = ctx.yearReturn
+    const g = ctx.inflation ?? 0
+    const rg = r - g
 
     let annuityWithdrawal: number
     if (n <= 1) {
-      // Last year: withdraw everything
-      annuityWithdrawal = ctx.currentPortfolio
-    } else if (Math.abs(r) < 1e-10) {
-      // Zero return: simple equal division
+      // Last year: withdraw everything. When inflation is set (grow-then-withdraw
+      // order), include this year's growth: P × (1+r). Without inflation
+      // (withdraw-then-grow order), just withdraw P.
+      annuityWithdrawal = g > 0
+        ? ctx.currentPortfolio * (1 + r)
+        : ctx.currentPortfolio
+    } else if (Math.abs(rg) < 1e-10) {
+      // r ≈ g: growing annuity degenerates to equal division
       annuityWithdrawal = ctx.currentPortfolio / n
     } else {
-      // Annuity formula: P × r / (1 − (1+r)^(−n))
-      annuityWithdrawal = ctx.currentPortfolio * r / (1 - Math.pow(1 + r, -n))
+      // Growing annuity (exact): P × (r−g) / (1 − ((1+g)/(1+r))^n)
+      annuityWithdrawal = ctx.currentPortfolio * rg / (1 - Math.pow((1 + g) / (1 + r), n))
     }
 
     // Ensure at least the living expenses are covered (net of recurring income)
@@ -188,11 +200,13 @@ function applyStatic(ctx: WithdrawalContext): number {
 // ── Guardrails (Guyton-Klinger) ──────────────────────────────────────
 
 /**
- * Compute the annuity base for deplete/legacy strategies.
+ * Compute the annuity base for deplete/legacy strategies using the growing
+ * annuity formula: P × (r−g) / (1 − ((1+g)/(1+r))^n)
  *
- * For deplete: annuity = portfolio × r / (1 − (1+r)^(−n))
- * For legacy:  annuity = (portfolio − indexedLegacy) × r / (1 − (1+r)^(−n))
- *   where the available portfolio is reduced by the indexed legacy target.
+ * This is self-consistent with the simulation model where portfolio compounds
+ * at nominal rate r and expenses grow at inflation rate g.
+ *
+ * For legacy: the available portfolio is reduced by the indexed legacy target.
  *
  * The annuity recalculates each year on remaining portfolio and remaining years
  * (schuivende basis / sliding basis).
@@ -200,6 +214,8 @@ function applyStatic(ctx: WithdrawalContext): number {
 function computeAnnuityBase(ctx: WithdrawalContext): number {
   const n = Math.max(1, ctx.endAge - ctx.currentAge)
   const r = ctx.yearReturn
+  const g = ctx.inflation ?? 0
+  const rg = r - g
 
   // For legacy: only the surplus above the indexed legacy target is available
   let availablePortfolio = ctx.currentPortfolio
@@ -208,12 +224,17 @@ function computeAnnuityBase(ctx: WithdrawalContext): number {
   }
 
   if (n <= 1) {
-    return availablePortfolio
+    // Last year: withdraw everything. Include growth only for grow-then-withdraw
+    // order (when inflation is set). See applyStatic n<=1 for full explanation.
+    return g > 0
+      ? availablePortfolio * (1 + ctx.yearReturn)
+      : availablePortfolio
   }
-  if (Math.abs(r) < 1e-10) {
+  if (Math.abs(rg) < 1e-10) {
     return availablePortfolio / n
   }
-  return availablePortfolio * r / (1 - Math.pow(1 + r, -n))
+  // Growing annuity (exact): P × (r−g) / (1 − ((1+g)/(1+r))^n)
+  return availablePortfolio * rg / (1 - Math.pow((1 + g) / (1 + r), n))
 }
 
 /**

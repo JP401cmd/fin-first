@@ -207,10 +207,10 @@ describe('Life events — eenmalige onttrekking', () => {
     // Extra expense should raise FIRE age
     expect(withExpense.fireAge!).toBeGreaterThanOrEqual(baseline.fireAge!)
 
-    // Portfolio at age 50 should show negative cashflowNet (expense)
+    // Portfolio at age 50 should show negative oneTimeNet (one-time expense)
     const row50 = withExpense.rows.find(r => r.age === 50)
     expect(row50).toBeDefined()
-    expect(row50!.cashflowNet).toBeLessThan(0)
+    expect(row50!.oneTimeNet).toBeLessThan(0)
 
     // Visible dip: endPortfolio at 50 with expense < endPortfolio at 50 without
     const baselineRow50 = baseline.rows.find(r => r.age === 50)

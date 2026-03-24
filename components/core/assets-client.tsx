@@ -347,7 +347,8 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
     if (asset.asset_type === 'cash') {
       const linkedBA = linkedBankAccounts.get(asset.id)
       if (linkedBA) {
-        router.push(`/core/assets/cash/${linkedBA.id}`)
+        setCashAccountId(linkedBA.id)
+        setShowCashModal(true)
         return
       }
     }
@@ -612,7 +613,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                                 asset.subtype && ASSET_SUBTYPE_LABELS.cash?.[asset.subtype],
                                 asset.account_number,
                                 asset.institution,
-                              ].filter(Boolean).join(' \u2022 ') || 'Bankrekening'
+                              ].filter(Boolean).join(' \u2022 ') || (asset.subtype === 'contant_geld' ? 'Contant geld' : 'Bankrekening')
                             : [
                                 ASSET_TYPE_LABELS[asset.asset_type],
                                 asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype],
@@ -2565,8 +2566,8 @@ function AssetForm({
             </div>
           )}
 
-          {/* Cash-specific: IBAN + Bank name */}
-          {assetType === 'cash' && (
+          {/* Cash-specific: IBAN + Bank name (hidden for contant geld) */}
+          {assetType === 'cash' && subtype !== 'contant_geld' && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">IBAN</label>
@@ -2587,6 +2588,13 @@ function AssetForm({
                 />
               </div>
             </div>
+          )}
+
+          {/* Info text for contant geld */}
+          {assetType === 'cash' && subtype === 'contant_geld' && (
+            <p className="text-xs text-[var(--ink-3)] pl-1">
+              Contant geld heeft geen IBAN of bank — vul alleen het bedrag in.
+            </p>
           )}
 
           {/* Value fields */}

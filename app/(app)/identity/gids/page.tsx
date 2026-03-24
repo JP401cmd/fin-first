@@ -220,7 +220,7 @@ export default function GidsPage() {
               <>
                 Al je bezittingen op één plek — van je spaarrekening tot je ETF-portfolio, van je huis tot je crypto. Samen vormen ze je <strong>opgeslagen tijd</strong>.
                 <br /><br />
-                In de onboarding voeg je al je bezittingen toe in één stap, inclusief je <strong>bankrekeningen</strong> — betaal-, spaar- en gezamenlijke rekeningen zijn geïntegreerd in het vermogensoverzicht. Registreer bezittingen over <strong>11 types</strong>: cash, spaarrekening, belegging (ETF/indexfonds/aandelen/obligaties), pensioen (uitkerings-/premieregeling/lijfrente), vastgoed, crypto, voertuig, fysiek bezit, deelneming, levensverzekering en vordering. Elk type heeft eigen velden, waarderingslogica en fiscale classificatie.
+                In de onboarding voeg je al je bezittingen toe in één stap, inclusief je <strong>bankrekeningen</strong> — betaal-, spaar- en gezamenlijke rekeningen zijn geïntegreerd in het vermogensoverzicht. Registreer bezittingen over <strong>11 types</strong>: cash (bankrekeningen &amp; contant geld), spaarrekening, belegging (ETF/indexfonds/aandelen/obligaties), pensioen (uitkerings-/premieregeling/lijfrente), vastgoed, crypto, voertuig, fysiek bezit, deelneming, levensverzekering en vordering. Elk type heeft eigen velden, waarderingslogica en fiscale classificatie.
                 <br /><br />
                 Binnen beleggingen, crypto, spaargeld en pensioen kun je <strong>holdings bijhouden</strong> activeren — een toggle per bezitting die gedetailleerde positietracking inschakelt. Zodra je dat doet, verschijnt een <strong>Holdings-badge</strong> op de kaart en kun je individuele holdings toevoegen met naam, ticker of ISIN, aantal stuks en aankoopprijs. Registreer <strong>koop-, verkoop- en dividendtransacties</strong> voor nauwkeurig rendement per positie. Importeer je posities in bulk via <strong>broker-import</strong>: upload een CSV van <strong>DEGIRO, Saxo Bank of ING Beleggen</strong> — de app herkent je broker automatisch aan de kolomkoppen en importeert posities en transacties.
                 <br /><br />
@@ -709,9 +709,9 @@ export default function GidsPage() {
             }
             howTo={{
               steps: [
-                "Bekijken \u2014 Ga naar De Wil \u2192 Voorstellen. Elk voorstel toont wat je kunt doen, waarom het helpt, en hoeveel vrijheidstijd het oplevert.",
+                "Analyseren \u2014 Tik op \u2018Analyseren\u2019 en Will opent een popup met voortgang terwijl je profiel wordt geanalyseerd. De voorstellen verschijnen een voor een.",
+                "Beoordelen \u2014 Zodra de analyse klaar is, kun je elk voorstel direct accepteren, uitstellen of afwijzen. Je ziet precies hoeveel vrijheidstijd elk voorstel oplevert.",
                 "Impact \u2014 De AI berekent per voorstel hoeveel maanden eerder je financieel vrij bent als je het uitvoert. Gebaseerd op je werkelijke cijfers, niet op aannames.",
-                "Accepteren \u2014 Tik op accepteren en het voorstel wordt een actie op je kanban-bord. Je kunt het ook uitstellen of afwijzen \u2014 je feedback maakt toekomstige voorstellen beter.",
                 "Bronnen \u2014 Voorstellen komen van de AI (automatisch), van Will (via chat), of je maakt ze zelf aan.",
               ],
               tip: "Accepteer eerst de voorstellen met de hoogste vrijheidstijd-impact \u2014 die leveren het snelst resultaat op.",

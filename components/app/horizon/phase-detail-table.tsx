@@ -497,8 +497,8 @@ export function PhaseDetailTable({
                         </>
                       )}
 
-                      <FinTable.Td numeric color={colorClass(row.cashflowNet)}>
-                        {formatCurrency(d(row.cashflowNet))}
+                      <FinTable.Td numeric color={colorClass(row.cashflowNet + row.oneTimeNet)}>
+                        {formatCurrency(d(row.cashflowNet + row.oneTimeNet))}
                       </FinTable.Td>
                       <FinTable.Td numeric color={row.totalBox3 > 0.5 ? 'text-[var(--negative)]' : undefined}>
                         {row.totalBox3 > 0 ? `−${formatCurrency(d(row.totalBox3)).replace('€', '€ ').trim()}` : formatCurrency(0)}
@@ -609,7 +609,7 @@ export function PhaseDetailTable({
                   )}
 
                   {(() => {
-                    const totalEvents = rows.reduce((sum, r) => sum + r.cashflowNet, 0)
+                    const totalEvents = rows.reduce((sum, r) => sum + r.cashflowNet + r.oneTimeNet, 0)
                     const totalBox3 = rows.reduce((sum, r) => sum + r.totalBox3, 0)
                     const avgFactor = rows[rows.length - 1].inflationFactor
                     const endNetWorth = rows[rows.length - 1].netWorth

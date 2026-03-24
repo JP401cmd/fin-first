@@ -204,12 +204,26 @@ export async function GET() {
   captureBalanceSnapshots(supabase, user.id, today, assets, debts).catch(() => {})
 
   // Sync last_known_phase to profiles (fire-and-forget — layout also handles this on page load,
-  // but cron-triggered snapshots would otherwise leave profiles stale)
-  supabase
-    .from('profiles')
-    .update({ last_known_phase: levelToPhaseId(sovereigntyLevel) })
-    .eq('id', user.id)
-    .then(() => {}) // Non-critical
+  // but cron-triggered snapshots would otherwise leave profiles stale).
+  // IMPORTANT: Only update if last_known_phase is already set (not null).
+  // A null value means the user hasn't activated yet — we must not bypass the activation flow.
+  void (async () => {
+    try {
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('last_known_phase')
+        .eq('id', user.id)
+        .single()
+      if (p && p.last_known_phase !== null) {
+        await supabase
+          .from('profiles')
+          .update({ last_known_phase: levelToPhaseId(sovereigntyLevel) })
+          .eq('id', user.id)
+      }
+    } catch {
+      // Non-critical
+    }
+  })()
 
   // Trigger badge evaluation after snapshot creation (fire-and-forget, server-side)
   // This evaluates badges after monthly close/snapshot events

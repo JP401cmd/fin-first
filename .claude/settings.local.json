@@ -64,7 +64,12 @@
       "Bash(find C:Usersjanpacddevelopmentfin -type f \\\\\\(-name *asset* -o -name *debt* -o -name *mortgage* \\\\\\))",
       "Bash(autoforge --version)",
       "Bash(cat \"/c/Users/janpa/cd/development/fin/app/\\(app\\)/horizon/page.tsx\")",
-      "Bash(netstat -ano)"
+      "Bash(netstat -ano)",
+      "Bash(ls -la /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/)",
+      "Bash(find /c/Users/janpa/cd/development/fin -type f \\\\\\(-name *regression* -o -name *e2e* \\\\\\))",
+      "Bash(npx eslint:*)",
+      "Bash(npx next:*)",
+      "Bash(head -50 /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/identity/gids/page.tsx)"
     ]
   },
   "enableAllProjectMcpServers": true,

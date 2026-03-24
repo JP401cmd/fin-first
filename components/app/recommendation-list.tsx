@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sparkles, Loader2 } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { WillDots } from '@/components/app/will-dots'
 import { RecommendationCard } from '@/components/app/recommendation-card'
 import { RecommendationModal } from '@/components/app/recommendation-modal'
+import { RecommendationGenerationModal } from '@/components/app/recommendation-generation-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { BudgetIcon } from '@/components/app/budget-shared'
 import type { Recommendation, RecommendationType } from '@/lib/recommendation-data'
@@ -27,42 +28,25 @@ type RecommendationListProps = {
 export function RecommendationList({ initialRecommendations, hideHeader, generateTrigger }: RecommendationListProps) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>(initialRecommendations)
   useEffect(() => { setRecommendations(initialRecommendations) }, [initialRecommendations])
-  const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [generationModalOpen, setGenerationModalOpen] = useState(false)
 
   // Allow parent to trigger generation via counter prop
   useEffect(() => {
     if (generateTrigger && generateTrigger > 0) {
-      generateRecommendations()
+      setGenerationModalOpen(true)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generateTrigger])
 
-  async function generateRecommendations() {
-    setIsGenerating(true)
+  function openGenerationModal() {
     setError(null)
-    try {
-      const res = await fetch('/api/ai/recommendations', { method: 'POST' })
-      if (!res.ok) {
-        let errorMsg = 'Generatie mislukt'
-        try {
-          const errData = await res.json()
-          if (errData.error) errorMsg = errData.error
-        } catch {
-          const text = await res.text()
-          if (text) errorMsg = text
-        }
-        throw new Error(errorMsg)
-      }
-      const data = await res.json()
-      setRecommendations((prev) => [...data.recommendations, ...prev])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Er ging iets mis')
-    } finally {
-      setIsGenerating(false)
-    }
+    setGenerationModalOpen(true)
+  }
+
+  function handleNewRecommendations(recs: Recommendation[]) {
+    setRecommendations((prev) => [...recs, ...prev])
   }
 
   async function handleDecide(id: string, action: 'accept' | 'reject' | 'postpone', data?: Record<string, unknown>) {
@@ -115,16 +99,11 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
         {pending.length > 0 && (
           <button
             type="button"
-            onClick={generateRecommendations}
-            disabled={isGenerating}
+            onClick={openGenerationModal}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)] disabled:opacity-50"
           >
-            {isGenerating ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5" />
-            )}
-            <span className="hidden sm:inline">{isGenerating ? 'Analyseren...' : 'Analyseren'}</span>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Analyseren</span>
           </button>
         )}
       </div>
@@ -135,7 +114,7 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
   )
 
   // --- Empty state ---
-  if (pending.length === 0 && !isGenerating) {
+  if (pending.length === 0 && !generationModalOpen) {
     return (
       <div className="space-y-4">
         {!hideHeader && header}
@@ -151,14 +130,20 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
           )}
           <button
             type="button"
-            onClick={generateRecommendations}
-            disabled={isGenerating}
+            onClick={openGenerationModal}
             className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)] disabled:opacity-50"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Analyseren
           </button>
         </div>
+
+        {/* Generation modal */}
+        <RecommendationGenerationModal
+          open={generationModalOpen}
+          onClose={() => setGenerationModalOpen(false)}
+          onNewRecommendations={handleNewRecommendations}
+        />
       </div>
     )
   }
@@ -170,24 +155,6 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
 
       {error && (
         <p className="text-sm text-red-600">{error}</p>
-      )}
-
-      {/* Skeleton cards while generating */}
-      {isGenerating && (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse rounded-[var(--r-lg)] border border-[var(--border-ed)] border-l-4 border-l-wil-200 bg-[var(--paper)] px-3 py-2.5">
-              <div className="flex items-center gap-2.5">
-                <div className="h-7 w-7 shrink-0 rounded-full bg-wil-100" />
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <div className="h-3.5 w-2/5 rounded bg-zinc-200" />
-                  <div className="h-3 w-16 rounded bg-zinc-100" />
-                </div>
-                <div className="h-3.5 w-14 rounded bg-wil-100/60" />
-              </div>
-            </div>
-          ))}
-        </div>
       )}
 
       {/* Visible recommendation cards (max 5, compact) */}
@@ -269,6 +236,13 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
           onClose={() => setSelectedRec(null)}
         />
       )}
+
+      {/* Generation modal */}
+      <RecommendationGenerationModal
+        open={generationModalOpen}
+        onClose={() => setGenerationModalOpen(false)}
+        onNewRecommendations={handleNewRecommendations}
+      />
     </div>
   )
 }

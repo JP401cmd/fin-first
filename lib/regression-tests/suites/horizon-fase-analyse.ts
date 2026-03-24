@@ -49,6 +49,7 @@ function makeRow(overrides: Partial<UnifiedProjectionRow> & { age: number; year?
     withdrawal: overrides.withdrawal ?? 30_000,
     withdrawalByType: {},
     cashflowNet: overrides.cashflowNet ?? 0,
+    oneTimeNet: overrides.oneTimeNet ?? 0,
     totalGrowth: overrides.totalGrowth ?? 20_000,
     totalBox3: overrides.totalBox3 ?? 5_000,
     cumulativeBox3: overrides.cumulativeBox3 ?? 0,

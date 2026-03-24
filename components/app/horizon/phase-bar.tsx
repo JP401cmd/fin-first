@@ -106,14 +106,6 @@ export function PhaseBar({
         const isNarrow = widthPx >= NARROW_THRESHOLD && widthPx < WIDE_THRESHOLD
 
         const Icon = seg.icon
-        const borderRadius =
-          i === 0 && i === clippedSegments.length - 1
-            ? 'var(--r, 8px)'
-            : i === 0
-            ? 'var(--r, 8px) 0 0 var(--r, 8px)'
-            : i === clippedSegments.length - 1
-            ? '0 var(--r, 8px) var(--r, 8px) 0'
-            : '0'
 
         if (isCollapsed) {
           return (
@@ -124,7 +116,7 @@ export function PhaseBar({
               style={{
                 width: widthPx,
                 background: seg.color,
-                borderRadius,
+                borderRadius: 0,
                 minWidth: 0,
               }}
               className="h-full shrink-0"
@@ -144,23 +136,27 @@ export function PhaseBar({
               width: widthPx,
               background: seg.color,
               color: seg.textColor,
-              borderRadius,
+              borderRadius: 0,
               minWidth: MIN_SEGMENT_PX,
             }}
-            className="group relative flex h-full shrink-0 cursor-pointer items-center justify-center gap-1.5 overflow-hidden px-2 text-[12px] font-medium transition-all select-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--color-horizon-500)] focus-visible:ring-offset-1 focus-visible:outline-none active:scale-[0.98]"
+            className="group relative flex h-full shrink-0 cursor-pointer items-center justify-center gap-1.5 overflow-hidden px-2 text-[12px] font-medium ring-1 ring-inset ring-white/20 transition-all select-none hover:-translate-y-0.5 hover:shadow-sm hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--color-horizon-500)] focus-visible:ring-offset-1 focus-visible:outline-none active:scale-[0.98]"
           >
-            {/* Wide: name + age range */}
+            {/* Wide: icon + name + age range */}
             {isWide && (
               <>
+                <Icon size={14} className="shrink-0 opacity-90" />
                 <span className="truncate font-semibold">{seg.label}</span>
-                <span className="shrink-0 text-[10px] opacity-80">
+                <span className="shrink-0 text-[10px] opacity-70">
                   {Math.round(seg.startAge)}&ndash;{Math.round(seg.endAge)}
                 </span>
               </>
             )}
-            {/* Narrow: only name */}
+            {/* Narrow: icon + name */}
             {isNarrow && (
-              <span className="truncate font-semibold">{seg.label}</span>
+              <>
+                <Icon size={14} className="shrink-0 opacity-90" />
+                <span className="truncate font-semibold">{seg.label}</span>
+              </>
             )}
             {/* Collapsed icon-only (when between MIN and NARROW) */}
             {!isWide && !isNarrow && (

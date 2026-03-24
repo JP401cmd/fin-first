@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Sparkles, ChevronRight, ChevronLeft,
   Zap, Target, ListChecks, CreditCard,
@@ -11,7 +10,6 @@ import {
 import { FfinAvatar } from '@/components/app/avatars'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { formatCurrency } from '@/lib/format'
-import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
 
 // ── Phase styling ──────────────────────────────────────────
@@ -141,8 +139,6 @@ function KernCheckRow({ label, value }: { label: string; value: string }) {
 // ── Main component ─────────────────────────────────────────
 
 export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
-  const router = useRouter()
-  const { clearActivation } = useFeatureAccess()
   const [stepIdx, setStepIdx] = useState(0)
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
   const [activating, setActivating] = useState(false)
@@ -184,11 +180,17 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
     setActivating(true)
     try {
       const res = await fetch('/api/activate', { method: 'POST' })
-      if (!res.ok) throw new Error('Activation failed')
-      clearActivation()
-      router.refresh()
-      onClose()
-      router.push('/will')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        // Already activated — just navigate
+        if (body.error === 'Already activated') {
+          window.location.href = '/will'
+          return
+        }
+        throw new Error('Activation failed')
+      }
+      // Full page load ensures layout re-reads last_known_phase from DB
+      window.location.href = '/will'
     } catch {
       setActivating(false)
     }

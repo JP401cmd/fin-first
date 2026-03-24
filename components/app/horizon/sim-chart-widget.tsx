@@ -308,7 +308,7 @@ export const SimChartModal = memo(function SimChartModal({
                   {(() => {
                     let cumLifeEvent = 0
                     return rows.map((row, i) => {
-                      cumLifeEvent += row.cashflowNet
+                      cumLifeEvent += row.cashflowNet + row.oneTimeNet
                       const isFireRow = fireAge !== null && row.age === fireAge && row.phase === 'retirement'
                       const isAccumulation = row.phase === 'accumulation'
                       return (
@@ -349,12 +349,12 @@ export const SimChartModal = memo(function SimChartModal({
                             )}
                           </td>
                           <td className={`px-3 py-1.5 tabular-nums text-right ${
-                            row.cashflowNet > 0 ? 'text-horizon-700'
-                            : row.cashflowNet < 0 ? 'text-kern-700'
+                            (row.cashflowNet + row.oneTimeNet) > 0 ? 'text-horizon-700'
+                            : (row.cashflowNet + row.oneTimeNet) < 0 ? 'text-kern-700'
                             : 'text-[var(--ink-4)]'
                           }`}>
-                            {row.cashflowNet !== 0
-                              ? <>{row.cashflowNet > 0 ? '+' : ''}{fmt(row.cashflowNet)}</>
+                            {(row.cashflowNet + row.oneTimeNet) !== 0
+                              ? <>{(row.cashflowNet + row.oneTimeNet) > 0 ? '+' : ''}{fmt(row.cashflowNet + row.oneTimeNet)}</>
                               : <span className="text-[var(--ink-4)]">—</span>
                             }
                           </td>

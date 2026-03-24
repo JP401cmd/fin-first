@@ -22,6 +22,7 @@ export const ACCOUNT_TYPES = [
   { value: 'savings', label: 'Spaarrekening' },
   { value: 'joint', label: 'En/of-rekening' },
   { value: 'business', label: 'Zakelijke rekening' },
+  { value: 'contant_geld', label: 'Contant geld' },
   { value: 'other', label: 'Overig' },
 ] as const
 
@@ -108,35 +109,37 @@ export function AccountFormModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Bijv. Hoofdrekening"
+              placeholder={accountType === 'contant_geld' ? 'Bijv. Portemonnee' : 'Bijv. Hoofdrekening'}
               className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               required
               autoFocus
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">IBAN</label>
-              <input
-                type="text"
-                value={iban}
-                onChange={(e) => setIban(e.target.value.toUpperCase())}
-                placeholder="NL91ABNA..."
-                className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
-              />
+          {accountType !== 'contant_geld' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">IBAN</label>
+                <input
+                  type="text"
+                  value={iban}
+                  onChange={(e) => setIban(e.target.value.toUpperCase())}
+                  placeholder="NL91ABNA..."
+                  className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Bank</label>
+                <input
+                  type="text"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="Bijv. ING"
+                  className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                />
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Bank</label>
-              <input
-                type="text"
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                placeholder="Bijv. ING"
-                className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
-              />
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -164,8 +167,8 @@ export function AccountFormModal({
             </div>
           </div>
 
-          {/* Own IBAN registry */}
-          <div className="border-t border-[var(--border-ed)] pt-3">
+          {/* Own IBAN registry (hidden for contant geld) */}
+          {accountType !== 'contant_geld' && <div className="border-t border-[var(--border-ed)] pt-3">
             <button
               type="button"
               onClick={() => setShowOwnIbans((v) => !v)}
@@ -216,7 +219,7 @@ export function AccountFormModal({
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           <div className="flex items-center justify-between pt-2">
             {account && canDelete ? (

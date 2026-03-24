@@ -115,8 +115,10 @@ export interface UnifiedProjectionRow {
   withdrawal: number
   /** Onttrekking per asset type (waterfall breakdown) — alleen gevuld bij withdrawal > 0 */
   withdrawalByType: Partial<Record<AssetType, number>>
-  /** Netto kasstroom uit life events / extra cashflows */
+  /** Netto kasstroom uit recurring life events / extra cashflows */
   cashflowNet: number
+  /** Netto eenmalige kasstromen dit jaar */
+  oneTimeNet: number
   /** Totaal rendement over alle asset types */
   totalGrowth: number
   /** Totale Box 3 belasting dit jaar (som van alle asset types) */
@@ -728,7 +730,7 @@ export function toSimRow(row: UnifiedProjectionRow): SimRow {
 
   const grossExpenses = row.phase === 'withdrawal'
     ? row.withdrawal + row.savings
-    : row.grossIncome - row.savings - row.cashflowNet
+    : row.grossIncome - row.savings - row.cashflowNet - row.oneTimeNet
 
   return {
     age: row.age,
@@ -738,6 +740,7 @@ export function toSimRow(row: UnifiedProjectionRow): SimRow {
     savings: row.savings,
     withdrawal: row.withdrawal,
     cashflowNet: row.cashflowNet,
+    oneTimeNet: row.oneTimeNet,
     endPortfolio: row.netWorth,
     grossIncome: row.grossIncome,
     grossExpenses,
@@ -932,6 +935,15 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     return cf.direction === 'income' ? monthly : -monthly
   }
 
+  /** Compute signed yearly amount for a recurring cashflow, prorated for partial years */
+  function recurringYearly(cf: SimCashflow, age: number): number {
+    const monthly = recurringMonthly(cf, age)
+    if (monthly === 0) return 0
+    const cfEnd = cf.toAge ?? (age + 1)
+    const months = Math.round(Math.min(12, Math.max(0, (Math.min(age + 1, cfEnd) - Math.max(age, cf.fromAge)) * 12)))
+    return monthly * months
+  }
+
   /** Signed one-time amount for a one-time cashflow at a given age */
   function oneTimeAmount(cf: SimCashflow, age: number): number {
     if (cf.type !== 'one_time') return 0
@@ -1102,7 +1114,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       // Recurring cashflows net
       let recurringNet = 0
       for (const cf of cashflows) {
-        recurringNet += recurringMonthly(cf, age) * 12
+        recurringNet += recurringYearly(cf, age)
       }
 
       // Current total portfolio for withdrawal strategy context
@@ -1119,6 +1131,10 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       // This ensures the FIRE target accounts for strategy-specific withdrawal patterns
       // (e.g., guardrails ±20%, VPW portfolio-based %). previousWithdrawal is tracked
       // across years so guardrails can apply prosperity/capital preservation rules.
+      // Binary search context: do NOT pass inflation. The growing annuity formula
+      // is designed for grow-then-withdraw order (old engine), but the lightweight
+      // decumulation uses withdraw-then-grow. Without inflation, the annuity falls
+      // back to the nominal formula which is consistent with this binary search.
       const wCtx: WithdrawalContext = {
         baseExpenses: expensesThisYear,
         recurringIncome: recurringNet,
@@ -1208,9 +1224,10 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       // Recurring cashflows net
       let recurringNet = 0
       for (const cf of cashflows) {
-        recurringNet += recurringMonthly(cf, age) * 12
+        recurringNet += recurringYearly(cf, age)
       }
 
+      // Binary search (flat): same as lightweight — no inflation for nominal annuity
       const wCtx: WithdrawalContext = {
         baseExpenses: expensesThisYear,
         recurringIncome: recurringNet,
@@ -1373,6 +1390,10 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
           runningDebts,
         )
 
+    // Save pre-oneTime net worth for accurate startNetWorth display
+    const preOneTimeNetWorth = sumBucketValues(runningBuckets)
+      - runningDebts.reduce((s, rd) => s + rd.balance * (rd.netWorthInclusionPct / 100), 0)
+
     // One-time cashflows — add to investable buckets proportionally
     let oneTimeNet = 0
     for (const cf of cashflows) {
@@ -1399,7 +1420,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     // Recurring cashflows net
     let cashflowNet = 0
     for (const cf of cashflows) {
-      cashflowNet += recurringMonthly(cf, age) * 12
+      cashflowNet += recurringYearly(cf, age)
     }
 
     // Reset bucket contributions to their base (monthly_contribution × 12)
@@ -1461,12 +1482,13 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       totalAssets: Math.round(totalAssets),
       totalDebts: Math.round(totalDebtsValue),
       netWorth: Math.round(netWorth),
-      startNetWorth: Math.round(startNetWorth),
+      startNetWorth: Math.round(preOneTimeNetWorth),
       grossIncome: Math.round(annualSavings + yearlyExpenses),
       savings: Math.round(annualSavings),
       withdrawal: 0,
       withdrawalByType: {},
-      cashflowNet: Math.round(cashflowNet + oneTimeNet),
+      cashflowNet: Math.round(cashflowNet),
+      oneTimeNet: Math.round(oneTimeNet),
       totalGrowth: Math.round(totalGrowth),
       totalBox3: Math.round(totalBox3),
       cumulativeBox3: Math.round(cumulativeBox3),
@@ -1625,7 +1647,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     let recurringNet = 0
     let recurringIncome = 0
     for (const cf of cashflows) {
-      const val = recurringMonthly(cf, age) * 12
+      const val = recurringYearly(cf, age)
       recurringNet += val
       if (val > 0) recurringIncome += val
     }
@@ -1666,6 +1688,9 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       endAge: strategy === 'perpetual' ? computedFireAge + 100 : effectiveEndAge,
       endStrategy: strategy,
       legacyAmount: indexedLegacyForCtx,
+      // Note: inflation NOT passed here. The growing annuity formula is designed
+      // for grow-then-withdraw order (old engine). The unified engine uses
+      // withdraw-then-grow, so the nominal annuity (without inflation) is used.
     }
     const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
 
@@ -1724,7 +1749,8 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       withdrawalByType: Object.fromEntries(
         Object.entries(withdrawalByType).map(([k, v]) => [k, Math.round(v)])
       ) as Partial<Record<AssetType, number>>,
-      cashflowNet: Math.round(oneTimeNet + recurringNet),
+      cashflowNet: Math.round(recurringNet),
+      oneTimeNet: Math.round(oneTimeNet),
       totalGrowth: Math.round(totalGrowth),
       totalBox3: Math.round(totalBox3),
       cumulativeBox3: Math.round(cumulativeBox3),

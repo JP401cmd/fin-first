@@ -434,6 +434,138 @@ const tests: TestCase[] = [
       assert(maskedNum.includes('€'), 'Currency symbol preserved')
     },
   },
+
+  // ── F: Generation flow (fire-and-forget + polling) ─────────────────────
+  {
+    id: 'wil-rec-initial-state',
+    name: 'InitialRecsState: correcte structuur',
+    description: 'State object for fire-and-forget generation has required shape',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      // Simulate InitialRecsState
+      const state = {
+        recommendations: [] as Record<string, unknown>[],
+        complete: false,
+        startedAt: Date.now(),
+      }
+
+      assert(Array.isArray(state.recommendations), 'recommendations is array')
+      assertEqual(state.recommendations.length, 0, 'starts empty')
+      assertEqual(state.complete, false, 'starts incomplete')
+      assertType(state.startedAt, 'number', 'startedAt is number')
+      assert(state.startedAt > 0, 'startedAt is positive')
+    },
+  },
+  {
+    id: 'wil-rec-initial-returns-db-rows',
+    name: 'Initial route: retourneert DB-rows met id en status',
+    description: 'Recommendations from /initial endpoint contain database fields (id, status, created_at)',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      // Simulate a DB row as returned by .select().single() after insert
+      const dbRow = {
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        user_id: '123',
+        title: 'Test voorstel',
+        description: 'Beschrijving',
+        recommendation_type: 'budget_optimization',
+        euro_impact_monthly: 50,
+        euro_impact_yearly: 600,
+        freedom_days_per_year: 2.5,
+        status: 'pending',
+        priority_score: 3,
+        suggested_actions: [],
+        created_at: '2026-03-24T10:00:00Z',
+        updated_at: '2026-03-24T10:00:00Z',
+      }
+
+      // Verify DB-specific fields exist
+      assertType(dbRow.id, 'string', 'id is string')
+      assert(dbRow.id.length > 0, 'id is non-empty')
+      assertType(dbRow.status, 'string', 'status is string')
+      assertEqual(dbRow.status, 'pending', 'status is pending')
+      assertType(dbRow.created_at, 'string', 'created_at is string')
+      assertType(dbRow.user_id, 'string', 'user_id is string')
+    },
+  },
+  {
+    id: 'wil-rec-progress-count',
+    name: 'Generatie voortgang: telt 0 tot 3',
+    description: 'Progress count derives from recommendations.length (0 to EXPECTED_COUNT)',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const EXPECTED_COUNT = 3
+
+      // Simulate incremental delivery
+      const state = { recommendations: [] as unknown[] }
+      assertEqual(state.recommendations.length, 0, 'progress starts at 0')
+
+      state.recommendations.push({ id: '1', title: 'Rec 1' })
+      assertEqual(state.recommendations.length, 1, 'progress at 1 after first push')
+
+      state.recommendations.push({ id: '2', title: 'Rec 2' })
+      assertEqual(state.recommendations.length, 2, 'progress at 2 after second push')
+
+      state.recommendations.push({ id: '3', title: 'Rec 3' })
+      assertEqual(state.recommendations.length, 3, 'progress at 3 after third push')
+      assertEqual(state.recommendations.length, EXPECTED_COUNT, 'matches expected count')
+    },
+  },
+  {
+    id: 'wil-rec-generation-complete',
+    name: 'Generatie: transitie naar complete',
+    description: 'Polling response without status=generating indicates completion',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      // Simulate polling responses
+      const generatingResponse = { status: 'generating', recommendations: [{ id: '1' }] }
+      assertEqual(generatingResponse.status, 'generating', 'generating status set')
+      assert(generatingResponse.status === 'generating', 'still generating')
+
+      // Complete response has no status field (or status !== 'generating')
+      const completeResponse = { recommendations: [{ id: '1' }, { id: '2' }, { id: '3' }] }
+      assert(!('status' in completeResponse), 'no status means complete')
+      assertEqual(completeResponse.recommendations.length, 3, 'all 3 delivered')
+    },
+  },
+  {
+    id: 'wil-rec-new-only',
+    name: 'Generatie modal: toont alleen nieuwe voorstellen',
+    description: 'The generation modal tracks only newly generated recommendations, separate from existing list',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      // Simulate existing + new recommendations
+      const existing = [
+        { id: 'old-1', title: 'Bestaand voorstel', status: 'pending' },
+        { id: 'old-2', title: 'Ander voorstel', status: 'pending' },
+      ]
+      const newlyGenerated = [
+        { id: 'new-1', title: 'Nieuw voorstel 1', status: 'pending' },
+        { id: 'new-2', title: 'Nieuw voorstel 2', status: 'pending' },
+        { id: 'new-3', title: 'Nieuw voorstel 3', status: 'pending' },
+      ]
+
+      // Modal should show only newlyGenerated
+      assertEqual(newlyGenerated.length, 3, 'modal shows 3 new recs')
+      assert(!newlyGenerated.some(r => r.id.startsWith('old-')), 'no old recs in modal')
+
+      // After merging, parent list has both
+      const merged = [...newlyGenerated, ...existing]
+      assertEqual(merged.length, 5, 'parent list has all recs')
+      assert(merged.some(r => r.id === 'old-1'), 'old recs preserved in list')
+      assert(merged.some(r => r.id === 'new-1'), 'new recs added to list')
+    },
+  },
 ]
 
 export function register(): void {

@@ -306,6 +306,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         withdrawal: 0,
         withdrawalByType: {},
         cashflowNet: 0,
+        oneTimeNet: 0,
         totalGrowth: 7_600,
         totalBox3: 1_500,
         cumulativeBox3: 7_500,
@@ -330,7 +331,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         assetBuckets: { investment: { startValue: 500_000, growth: 35_000, contributions: 0, box3Drag: 8_000, endValue: 527_000 } },
         debtBalances: {},
         totalAssets: 527_000, totalDebts: 0, netWorth: 527_000, startNetWorth: 500_000,
-        grossIncome: 0, savings: 0, withdrawal: 0, withdrawalByType: {}, cashflowNet: 0,
+        grossIncome: 0, savings: 0, withdrawal: 0, withdrawalByType: {}, cashflowNet: 0, oneTimeNet: 0,
         totalGrowth: 35_000, totalBox3: 8_000, cumulativeBox3: 50_000,
         inflationFactor: 1.22,
       }
@@ -343,7 +344,7 @@ describe('Unified Projection — Fase 1a: Per-asset rendement & Box 3', () => {
         assetBuckets: { investment: { startValue: 800_000, growth: 56_000, contributions: 0, box3Drag: 12_000, endValue: 812_000 } },
         debtBalances: {},
         totalAssets: 812_000, totalDebts: 0, netWorth: 812_000, startNetWorth: 800_000,
-        grossIncome: 20_000, savings: 0, withdrawal: 32_000, withdrawalByType: { investment: 32_000 }, cashflowNet: 0,
+        grossIncome: 20_000, savings: 0, withdrawal: 32_000, withdrawalByType: { investment: 32_000 }, cashflowNet: 0, oneTimeNet: 0,
         totalGrowth: 56_000, totalBox3: 12_000, cumulativeBox3: 150_000,
         inflationFactor: 1.49,
       }
@@ -1360,9 +1361,9 @@ describe('Unified Projection — Fase 1d: Life events integratie', () => {
       expect(diff).toBeGreaterThan(70_000) // At least €70K after drag
       expect(diff).toBeLessThan(100_000)   // Not more than inheritance + 1 year growth
 
-      // The cashflowNet at age 55 should include the inheritance
+      // The oneTimeNet at age 55 should include the inheritance
       const row55 = resultWithErf.rows.find(r => r.age === 55)!
-      expect(row55.cashflowNet).toBeGreaterThan(70_000)
+      expect(row55.oneTimeNet).toBeGreaterThan(70_000)
 
       // Investment bucket should have grown (erfenis goes to investable)
       const investBucket55 = row55.assetBuckets['investment']
@@ -1405,9 +1406,9 @@ describe('Unified Projection — Fase 1d: Life events integratie', () => {
       expect(nwWithout - nwWith).toBeGreaterThan(10_000)
       expect(nwWithout - nwWith).toBeLessThan(15_000)
 
-      // cashflowNet at 50 should be negative
+      // oneTimeNet at 50 should be negative (begrafeniskosten is a one-time expense)
       const row50 = resultWith.rows.find(r => r.age === 50)!
-      expect(row50.cashflowNet).toBeLessThan(0)
+      expect(row50.oneTimeNet).toBeLessThan(0)
     })
   })
 
@@ -1438,10 +1439,10 @@ describe('Unified Projection — Fase 1d: Life events integratie', () => {
       expect(at48).toBeDefined()
       expect(at48!.cashflowNet).toBeLessThan(0)
 
-      // At 55: erfenis — positive cashflowNet
+      // At 55: erfenis — positive oneTimeNet (one-time inheritance)
       const at55 = result.rows.find(r => r.age === 55)
       expect(at55).toBeDefined()
-      expect(at55!.cashflowNet).toBeGreaterThan(40_000)
+      expect(at55!.oneTimeNet).toBeGreaterThan(40_000)
 
       // At 67: AOW — positive cashflowNet
       const at67 = result.rows.find(r => r.age === 67)

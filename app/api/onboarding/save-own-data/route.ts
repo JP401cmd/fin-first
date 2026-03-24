@@ -290,6 +290,19 @@ export async function POST(req: Request) {
       if (result.error) {
         throw new Error(result.error)
       }
+      // Activate invulfase (not included in the RPC function)
+      if (!result.already_completed) {
+        const { data: fpProfile } = await supabase
+          .from('profiles')
+          .select('feature_preferences')
+          .eq('id', user.id)
+          .single()
+        const fpPrefs = (fpProfile?.feature_preferences as Record<string, unknown>) ?? {}
+        await supabase
+          .from('profiles')
+          .update({ feature_preferences: { ...fpPrefs, _invulfase_active: true } })
+          .eq('id', user.id)
+      }
       return Response.json({ success: true, alreadyCompleted: result.already_completed ?? false })
     }
 

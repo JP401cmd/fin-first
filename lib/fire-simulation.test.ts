@@ -417,10 +417,10 @@ describe('D — Cashflows', () => {
 
     expect(withInheritance.fireReachable).toBe(true)
 
-    // Row at age 55 should have positive cashflowNet
+    // Row at age 55 should have positive oneTimeNet (inheritance is a one-time cashflow)
     const row55 = withInheritance.rows.find(r => r.age === 55)
     expect(row55).toBeDefined()
-    expect(row55!.cashflowNet).toBeGreaterThan(0)
+    expect(row55!.oneTimeNet).toBeGreaterThan(0)
 
     // Portfolio with inheritance should be higher than without at any overlapping age after 55
     const with55 = withInheritance.rows.find(r => r.age === 55)
@@ -631,8 +631,9 @@ describe('F — grossIncome / grossExpenses', () => {
     }
   })
 
-  // F4: grossIncome - grossExpenses ≈ net portfolio change per year (accumulation)
-  it('F4: grossIncome - grossExpenses ≈ endPortfolio - startPortfolio in accumulation', () => {
+  // F4: grossIncome - grossExpenses + growth ≈ net portfolio change per year (accumulation)
+  // grossIncome excludes portfolio growth, so we add it back for the identity check
+  it('F4: grossIncome - grossExpenses + growth ≈ endPortfolio - startPortfolio in accumulation', () => {
     const result = runStandard()
     const accRows = result.rows.filter(r => r.phase === 'accumulation')
 
@@ -640,7 +641,7 @@ describe('F — grossIncome / grossExpenses', () => {
 
     for (const row of accRows) {
       const netChange = row.endPortfolio - row.startPortfolio
-      const grossNet = row.grossIncome - row.grossExpenses
+      const grossNet = row.grossIncome - row.grossExpenses + row.growth
       // Allow tolerance of 2 for rounding (each field is Math.round'd independently)
       expect(Math.abs(grossNet - netChange)).toBeLessThanOrEqual(2)
     }

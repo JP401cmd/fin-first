@@ -16,7 +16,7 @@ export async function POST() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.last_known_phase !== null) {
+  if (profile && profile.last_known_phase !== null) {
     return Response.json({ error: 'Already activated' }, { status: 400 })
   }
 

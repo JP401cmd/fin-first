@@ -678,10 +678,10 @@ describe('G. Life events', () => {
       cashflows: [erfenis],
     })
     const result = runUnifiedProjection(input)
-    // The row at age 50 should show the erfenis in cashflowNet
+    // The row at age 50 should show the erfenis in oneTimeNet
     const row50 = result.rows.find(r => r.age === 50)
     if (row50) {
-      expect(row50.cashflowNet).toBeGreaterThanOrEqual(100_000)
+      expect(row50.oneTimeNet).toBeGreaterThanOrEqual(100_000)
     }
   })
 
@@ -738,8 +738,8 @@ describe('G. Life events', () => {
     const result = runUnifiedProjection(input)
     const row40 = result.rows.find(r => r.age === 40)
     if (row40) {
-      // cashflowNet should be negative (expense)
-      expect(row40.cashflowNet).toBeLessThan(0)
+      // oneTimeNet should be negative (one-time expense)
+      expect(row40.oneTimeNet).toBeLessThan(0)
     }
   })
 
@@ -1018,6 +1018,7 @@ describe('J. Backwards-compatible mapping', () => {
       withdrawal: 0,
       withdrawalByType: {},
       cashflowNet: 0,
+      oneTimeNet: 0,
       totalGrowth: 14_000,
       totalBox3: 2_000,
       cumulativeBox3: 8_000,
@@ -1050,6 +1051,7 @@ describe('J. Backwards-compatible mapping', () => {
       withdrawal: 30_000,
       withdrawalByType: { investment: 30_000 },
       cashflowNet: 0,
+      oneTimeNet: 0,
       totalGrowth: 25_000,
       totalBox3: 5_000,
       cumulativeBox3: 50_000,
@@ -1096,6 +1098,7 @@ describe('J. Backwards-compatible mapping', () => {
       withdrawal: 0,
       withdrawalByType: {},
       cashflowNet: 0,
+      oneTimeNet: 0,
       totalGrowth: 14_000,
       totalBox3: 2_000,
       cumulativeBox3: 8_000,

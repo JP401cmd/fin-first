@@ -32,12 +32,13 @@ function makeEvent(overrides: Partial<LifeEvent> & { name: string }): LifeEvent 
 
 // ── Test data ───────────────────────────────────────────────────────────────
 
-const erfenis = makeEvent({ name: 'Erfenis', event_type: 'inheritance', target_age: 55, one_time_cost: 100_000 })
+// DB convention: positive one_time_cost = expense, negative = income
+const erfenis = makeEvent({ name: 'Erfenis', event_type: 'inheritance', target_age: 55, one_time_cost: -100_000 })
 const aow = makeEvent({ name: 'AOW', event_type: 'aow', target_age: 67, monthly_income_change: 1200, duration_months: 240 })
-const huisVerkoop = makeEvent({ name: 'Huis verkoop', event_type: 'house_sale', target_age: 60, one_time_cost: 250_000 })
-const kinderen = makeEvent({ name: 'Kinderen', event_type: 'children', target_age: 35, one_time_cost: -5_000, monthly_cost_change: 500, duration_months: 216 })
-const verbouwing = makeEvent({ name: 'Verbouwing', event_type: 'renovation', target_age: 40, one_time_cost: -50_000 })
-const wereldreis = makeEvent({ name: 'Wereldreis', event_type: 'world_trip', target_age: 45, one_time_cost: -30_000, duration_months: 12, monthly_cost_change: 1500 })
+const huisVerkoop = makeEvent({ name: 'Huis verkoop', event_type: 'house_sale', target_age: 60, one_time_cost: -250_000 })
+const kinderen = makeEvent({ name: 'Kinderen', event_type: 'children', target_age: 35, one_time_cost: 5_000, monthly_cost_change: 500, duration_months: 216 })
+const verbouwing = makeEvent({ name: 'Verbouwing', event_type: 'renovation', target_age: 40, one_time_cost: 50_000 })
+const wereldreis = makeEvent({ name: 'Wereldreis', event_type: 'world_trip', target_age: 45, one_time_cost: 30_000, duration_months: 12, monthly_cost_change: 1500 })
 
 describe('Levensgebeurtenissen UI — twee-kolommen rendering', () => {
   it('gemixte events vullen beide kolommen', () => {
@@ -102,8 +103,8 @@ describe('Levensgebeurtenissen UI — twee-kolommen rendering', () => {
   })
 
   it('null target_age sorteert als laatste', () => {
-    const noAge = makeEvent({ name: 'Ongedateerd', one_time_cost: -10_000, target_age: null })
-    const withAge = makeEvent({ name: 'Gedateerd', one_time_cost: -20_000, target_age: 50 })
+    const noAge = makeEvent({ name: 'Ongedateerd', one_time_cost: 10_000, target_age: null })
+    const withAge = makeEvent({ name: 'Gedateerd', one_time_cost: 20_000, target_age: 50 })
     const sortByAge = (a: LifeEvent, b: LifeEvent) => (a.target_age ?? 999) - (b.target_age ?? 999)
     const { investeren } = splitLifeEvents([noAge, withAge])
     const sorted = [...investeren].sort(sortByAge)

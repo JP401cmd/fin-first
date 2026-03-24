@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
-import { TrendingUp, Lightbulb, MessageSquare, CheckCheck, Loader2 } from 'lucide-react'
+import { TrendingUp, Lightbulb, MessageSquare, CheckCheck, Loader2, ExternalLink } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import type { NewsItem } from '@/app/api/news/route'
 
@@ -170,10 +170,24 @@ export function HeroNewsArticle({ item, isRead, onMarkRead, readOnly }: {
         <span aria-label={item.summary}>{restOfSummary}</span>
       </p>
 
-      <div className="mt-3 clear-left">
+      <div className="mt-3 flex items-center gap-1 clear-left">
         <span className="font-inter text-[11px] text-[var(--ink-4)]">
           {formatNewsDate(item.date)}
         </span>
+        {item.sourceUrl && (
+          <>
+            <span className="text-[var(--ink-4)]">&middot;</span>
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-0.5 font-inter text-[11px] text-[var(--ink-4)] underline decoration-[var(--ink-4)]/30 underline-offset-2 transition-colors hover:text-[var(--ink-2)]"
+            >
+              {item.sourceName || 'Bron'}
+              <ExternalLink className="ml-0.5 inline h-2.5 w-2.5" />
+            </a>
+          </>
+        )}
       </div>
 
       {item.impactType === 'relevant' ? (
@@ -217,9 +231,25 @@ export function NewsArticle({ item, isRead, onMarkRead, readOnly }: {
         {item.summary}
       </p>
 
-      <span className="mt-2 inline-block font-inter text-[11px] text-[var(--ink-4)]">
-        {formatNewsDate(item.date)}
-      </span>
+      <div className="mt-2 flex items-center gap-1">
+        <span className="font-inter text-[11px] text-[var(--ink-4)]">
+          {formatNewsDate(item.date)}
+        </span>
+        {item.sourceUrl && (
+          <>
+            <span className="text-[var(--ink-4)]">&middot;</span>
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-0.5 font-inter text-[11px] text-[var(--ink-4)] underline decoration-[var(--ink-4)]/30 underline-offset-2 transition-colors hover:text-[var(--ink-2)]"
+            >
+              {item.sourceName || 'Bron'}
+              <ExternalLink className="ml-0.5 inline h-2.5 w-2.5" />
+            </a>
+          </>
+        )}
+      </div>
 
       {item.impactType === 'relevant' ? (
         <RelevanceBlock relevance={item.personalImpact} />

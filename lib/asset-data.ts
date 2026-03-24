@@ -22,7 +22,7 @@ export type AssetType =
 export type RiskProfile = 'laag' | 'middel' | 'hoog'
 export type RetirementProviderType = 'bedrijfspensioenfonds' | 'verzekeraar' | 'ppi'
 
-export type CashSubtype = 'checking' | 'savings_account' | 'joint' | 'business' | 'other_cash'
+export type CashSubtype = 'checking' | 'savings_account' | 'joint' | 'business' | 'contant_geld' | 'other_cash'
 export type SavingsSubtype = 'vrij_opneembaar' | 'deposito' | 'termijndeposito'
 export type InvestmentSubtype = 'etf' | 'indexfonds' | 'aandelen' | 'obligaties' | 'mixed'
 export type RetirementSubtype = 'uitkeringsregeling' | 'premieregeling' | 'lijfrente'
@@ -170,6 +170,7 @@ export const ASSET_SUBTYPE_LABELS: Partial<Record<AssetType, Record<string, stri
     savings_account: 'Spaarrekening',
     joint: 'En/of-rekening',
     business: 'Zakelijke rekening',
+    contant_geld: 'Contant geld',
     other_cash: 'Overig',
   },
   savings: {
@@ -257,6 +258,7 @@ export const ASSET_SUBTYPE_DEFAULTS: Record<string, Partial<{
   savings_account: { risk_profile: 'laag', is_liquid: true, expected_return: 2.5 },
   joint: { risk_profile: 'laag', is_liquid: true, expected_return: 0 },
   business: { risk_profile: 'laag', is_liquid: true, expected_return: 0 },
+  contant_geld: { risk_profile: 'laag', is_liquid: true, expected_return: 0 },
   other_cash: { risk_profile: 'laag', is_liquid: true, expected_return: 0 },
   // Savings
   vrij_opneembaar: { risk_profile: 'laag', is_liquid: true, expected_return: 2.5 },

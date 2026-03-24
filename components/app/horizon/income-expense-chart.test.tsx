@@ -30,6 +30,7 @@ function makeRows(count: number, startAge: number): SimRow[] {
     savings: 18000,
     withdrawal: 0,
     cashflowNet: 0,
+    oneTimeNet: 0,
     endPortfolio: 125000 + i * 10500,
     grossIncome: 54000 + i * 500,
     grossExpenses: 36000,

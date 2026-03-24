@@ -184,6 +184,7 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/horizon-fase-analyse').then(m => m.register()).catch(e => { console.warn('[test-registry] horizon-fase-analyse failed:', e) }),
     import('@/lib/regression-tests/suites/levensgebeurtenissen-ui').then(m => m.register()).catch(e => { console.warn('[test-registry] levensgebeurtenissen-ui failed:', e) }),
     import('@/lib/regression-tests/suites/levensgebeurtenissen-classificatie').then(m => m.register()).catch(e => { console.warn('[test-registry] levensgebeurtenissen-classificatie failed:', e) }),
+    import('@/lib/regression-tests/suites/invulfase-checklist').then(m => m.register()).catch(e => { console.warn('[test-registry] invulfase-checklist failed:', e) }),
   ])
 
   // Log any rejected promises (shouldn't happen due to .catch, but just in case)

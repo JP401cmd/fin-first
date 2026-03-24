@@ -39,7 +39,7 @@ const recommendationSchema = z.object({
 // ── Module-level state (fire-and-forget pattern) ───────────
 
 interface InitialRecsState {
-  recommendations: z.infer<typeof recommendationSchema>['recommendations']
+  recommendations: Record<string, unknown>[]   // Full DB rows (with id, status, etc.)
   complete: boolean
   startedAt: number
 }
@@ -155,7 +155,7 @@ export async function POST() {
           freedom_days_impact: freedomDaysAllowed ? a.freedom_days_impact : 0,
         }))
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('recommendations')
           .insert({
             user_id: userId,
@@ -173,9 +173,11 @@ export async function POST() {
             ai_generation_id: generationId,
             status: 'pending',
           })
+          .select()
+          .single()
 
-        if (!error) {
-          state.recommendations.push(rec)
+        if (!error && inserted) {
+          state.recommendations.push(inserted)
         }
       }
 
