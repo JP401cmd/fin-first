@@ -404,6 +404,46 @@ export default function GidsPage() {
           />
 
           <GuideTopicCard
+            icon={BarChart3}
+            title="Tegenpartij-analyse"
+            color="var(--color-kern-400)"
+            description={
+              <>
+                <strong>
+                  Wie krijgt jouw tijd? Ontdek per tegenpartij waar je geld naartoe
+                  gaat.
+                </strong>
+                <br />
+                <br />
+                Tik vanuit een transactie op <strong>Analyseer</strong> en je ziet
+                direct het volledige beeld van die tegenpartij:{" "}
+                <strong>totale uitgaven</strong> over de gehele periode,{" "}
+                <strong>maandelijkse trend</strong> (stijgend, dalend of stabiel),{" "}
+                <strong>categorieverdeling</strong> (over welke budgetten zijn de
+                transacties verspreid?) en <strong>frequentie</strong> (hoe vaak
+                betaal je aan deze partij?).
+                <br />
+                <br />
+                Dit geeft antwoord op vragen als: &ldquo;Hoeveel heb ik in totaal
+                uitgegeven bij Albert Heijn?&rdquo;, &ldquo;Geven we steeds meer uit
+                aan Thuisbezorgd?&rdquo; of &ldquo;Hoeveel vrijheidsdagen kost mijn
+                energieleverancier per jaar?&rdquo;
+              </>
+            }
+            howTo={{
+              steps: [
+                "Open een transactie in je transactieoverzicht (De Kern \u2192 Bezittingen \u2192 een rekening \u2192 transactie)",
+                "Tik op \u2018Analyseer tegenpartij\u2019 onderaan het transactieformulier",
+                "Bekijk het totaaloverzicht: totaal uitgegeven, aantal transacties, gemiddeld bedrag",
+                "Scroll door de maandelijkse trendgrafiek \u2014 stijgt, daalt of is je besteding stabiel?",
+                "Tik op een maandkolom om in te zoomen \u2014 je ziet de budgetverdeling en alle transacties van die maand. Tik op een transactie om deze te bewerken",
+                "Bekijk de categorieverdeling: sommige tegenpartijen vallen onder meerdere budgetten",
+              ],
+              tip: "Begin met je top-5 grootste tegenpartijen \u2014 zij vertegenwoordigen vaak 60% van je uitgaven. E\u00e9n bewuste aanpassing bespaart meer dan tien kleine.",
+            }}
+          />
+
+          <GuideTopicCard
             icon={FileText}
             title="Belasting"
             color="var(--color-kern-400)"
@@ -711,10 +751,11 @@ export default function GidsPage() {
               steps: [
                 "Analyseren \u2014 Tik op \u2018Analyseren\u2019 en Will opent een popup met voortgang terwijl je profiel wordt geanalyseerd. De voorstellen verschijnen een voor een.",
                 "Beoordelen \u2014 Zodra de analyse klaar is, kun je elk voorstel direct accepteren, uitstellen of afwijzen. Je ziet precies hoeveel vrijheidstijd elk voorstel oplevert.",
+                "Filteren \u2014 Open \u2018Alle voorstellen\u2019 voor een filterbaar overzicht. Bovenaan zie je de totale impact in vrijheidsdagen. Filter op status (openstaand, geaccepteerd, uitgesteld, afgewezen) of type (budget, vermogen, schuld, inkomen, sparen).",
                 "Impact \u2014 De AI berekent per voorstel hoeveel maanden eerder je financieel vrij bent als je het uitvoert. Gebaseerd op je werkelijke cijfers, niet op aannames.",
                 "Bronnen \u2014 Voorstellen komen van de AI (automatisch), van Will (via chat), of je maakt ze zelf aan.",
               ],
-              tip: "Accepteer eerst de voorstellen met de hoogste vrijheidstijd-impact \u2014 die leveren het snelst resultaat op.",
+              tip: "Gebruik het filterbare overzicht om de voorstellen met de hoogste vrijheidstijd-impact te vinden \u2014 die leveren het snelst resultaat op.",
             }}
           />
 
@@ -725,21 +766,31 @@ export default function GidsPage() {
             description={
               <>
                 <strong>
-                  Inzicht zonder actie verandert niets. Het actiebord is waar je
-                  goede voornemens concrete stappen worden.
+                  Inzicht zonder actie verandert niets. Het actie-overzicht is
+                  waar je goede voornemens concrete stappen worden.
                 </strong>
                 <br />
                 <br />
                 <strong>Overzicht</strong> \u2014 Ga naar De Wil \u2192 Acties en
-                je ziet je open acties op een kanban-bord. Elke actie heeft vier
-                mogelijke statussen: <strong>open</strong> (te doen),{" "}
-                <strong>postponed</strong> (uitgesteld voor later),{" "}
-                <strong>completed</strong> (voltooid) en{" "}
-                <strong>rejected</strong> (afgewezen). Per actie zie je de
-                beschrijving, de bron (<em>ai</em> = AI-gegenereerd,{" "}
-                <em>manual</em> = handmatig, <em>chat</em> = via Will) en de
-                geschatte <strong>vrijheidsdagen</strong> die je wint bij
-                voltooiing. Filter op status om focus te houden.
+                open het filterbare actie-overzicht. Bovenaan zie je de{" "}
+                <strong>totale impact in vrijheidsdagen</strong> van je selectie
+                \u2014 het kerncijfer dat toont hoeveel vrijheid je acties
+                vertegenwoordigen. Elke actie heeft vier mogelijke statussen:{" "}
+                <strong>open</strong> (te doen),{" "}
+                <strong>uitgesteld</strong> (voor later),{" "}
+                <strong>afgerond</strong> (voltooid) en{" "}
+                <strong>afgewezen</strong>. Per actie zie je de bron (
+                <em>AI</em>, <em>handmatig</em> of <em>chat</em>) en de geschatte{" "}
+                <strong>vrijheidsdagen</strong> die je wint bij voltooiing.
+                <br />
+                <br />
+                <strong>Filteren</strong> \u2014 Gebruik de drie filters bovenaan
+                het overzicht om snel te vinden wat je zoekt:{" "}
+                <strong>status</strong> (open, uitgesteld, afgerond, afgewezen),{" "}
+                <strong>onderwerp</strong> (budget, vermogen, schuld, inkomen,
+                sparen of handmatig) en{" "}
+                <strong>weekplanning</strong> (deze week, volgende week, later of
+                niet gepland). De impact-samenvatting past zich aan op je selectie.
                 <br />
                 <br />
                 <strong>Aanmaken</strong> \u2014 Maak zelf een actie aan, accepteer
@@ -750,28 +801,29 @@ export default function GidsPage() {
                 <br />
                 <strong>Voltooien</strong> \u2014 Markeer een actie als voltooid en
                 de gewonnen vrijheidsdagen worden opgeteld bij je maandtotaal.
-                Voltooide acties verhuizen naar het archief, waar je je voortgang
-                over tijd terugziet. Je FIRE-datum verschuift mee met elke
+                Voltooide acties verschijnen in de gefilterde lijst onder
+                &ldquo;Afgerond&rdquo;. Je FIRE-datum verschuift mee met elke
                 voltooide actie.
                 <br />
                 <br />
                 <strong>Uitstellen of afwijzen</strong> \u2014 Niet nu? Stel een
                 actie uit \u2014 hij blijft zichtbaar maar staat niet in de weg.
                 Niet relevant? Wijs af en de actie verdwijnt uit je actieve lijst.
-                Prioritering gaat via sort_order, zodat de belangrijkste acties
-                bovenaan staan.
+                Sorteer op impact, prioriteit of weekplanning om de belangrijkste
+                acties bovenaan te krijgen.
               </>
             }
             howTo={{
               steps: [
-                "Bekijken \u2014 Ga naar De Wil \u2192 Acties. Je ziet je open acties met per actie de vrijheidsdagen-impact en de bron.",
+                "Bekijken \u2014 Ga naar De Wil \u2192 Acties. Bovenaan zie je de totale impact in vrijheidsdagen en drie filterrijen voor status, onderwerp en weekplanning.",
+                "Filteren \u2014 Selecteer een status, onderwerp of week om je lijst te verfijnen. De impact-samenvatting toont hoeveel vrijheidsdagen je selectie vertegenwoordigt.",
                 "Aanmaken \u2014 Tik op \u201c+ Nieuwe actie\u201d om er zelf een aan te maken, of accepteer een AI-voorstel. Acties uit Will-gesprekken verschijnen automatisch.",
-                "Voltooien \u2014 Markeer een actie als voltooid. De gewonnen vrijheidsdagen worden opgeteld bij je maandtotaal en de actie verhuist naar het archief.",
+                "Voltooien \u2014 Markeer een actie als voltooid. De gewonnen vrijheidsdagen worden opgeteld bij je maandtotaal.",
                 "Uitstellen \u2014 Tik op \u201cUitstellen\u201d als je een actie wilt bewaren voor later. Hij blijft zichtbaar maar staat niet in de weg.",
                 "Afwijzen \u2014 Niet relevant? Wijs een actie af. Afgewezen acties verdwijnen uit je actieve lijst.",
                 "Widgets \u2014 Bekijk je voortgang via de widgets: acties (overzicht), beslissingspatronen (patronen in je keuzes) en vrijheidsdagen_maand (maandtotaal gewonnen dagen).",
               ],
-              tip: "Plan elke week \u00e9\u00e9n actie in. Consistent kleine stappen leveren meer vrijheidstijd op dan af en toe een sprint.",
+              tip: "Plan elke week \u00e9\u00e9n actie in via de weekplanning-filter. Consistent kleine stappen leveren meer vrijheidstijd op dan af en toe een sprint.",
             }}
           />
 
@@ -832,34 +884,38 @@ export default function GidsPage() {
 
           <GuideTopicCard
             icon={RefreshCw}
-            title="Abonnementen"
+            title="Vaste Kosten Analyse"
             color="var(--color-wil-400)"
             description={
               <>
-                Abonnementen zijn stille geldlekken. &euro;15 per maand klinkt
+                Vaste kosten zijn stille geldlekken. &euro;15 per maand klinkt
                 onschuldig, maar het kost je 2 dagen vrijheid per jaar. Elke.
                 Jaar. Weer.
                 <br />
                 <br />
+                De Vaste Kosten Analyse splitst je terugkerende uitgaven in
+                twee overzichtelijke kolommen:{" "}
+                <strong>Abonnementen</strong> (streaming, sport, software) die
+                je direct kunt opzeggen, en{" "}
+                <strong>Vaste Kosten</strong> (huur, hypotheek, energie,
+                verzekeringen, vervoer) die je bewust wilt volgen.
+                <br />
+                <br />
                 TriFinity scant automatisch je transactiegeschiedenis op{" "}
-                <strong>terugkerende patronen</strong>: abonnementen,
-                verzekeringen, lidmaatschappen en andere vaste lasten. Elke
-                post wordt gedetecteerd met een frequentie (
+                <strong>terugkerende patronen</strong>. Elke post wordt
+                gedetecteerd met een frequentie (
                 <strong>
                   wekelijks, maandelijks, per kwartaal, jaarlijks
                 </strong>
                 ) en een betrouwbaarheidsniveau (hoog, middel, laag). Je kunt
                 ze ook <strong>handmatig toevoegen</strong> als de automatische
-                detectie iets mist.
+                detectie iets mist. Met de knop{" "}
+                <strong>Nu scannen</strong> ververs je de analyse op elk moment.
                 <br />
                 <br />
-                Per abonnement zie je de <strong>jaarlijkse kosten</strong> en
-                hoeveel <strong>vrijheidsdagen</strong> het je kost. Klein
-                bedrag, groot effect over jaren. De app toont welke
-                abonnementen de meeste vrijheidstijd kosten &mdash; zodat je
-                kunt overwegen of de waarde opweegt tegen de prijs. Soms is
-                het schrappen van twee vergeten abonnementen genoeg om een
-                halve vrijheidsdag per maand te winnen.
+                Per post zie je de <strong>maandelijkse kosten</strong> en per
+                kolom een subtotaal. Abonnementen kun je direct opzeggen via
+                een opzegbrief &mdash; klik op een abonnement om te starten.
                 <br />
                 <br />
                 Gerelateerde widgets: <strong>vaste_lasten</strong>{" "}
@@ -869,12 +925,12 @@ export default function GidsPage() {
             }
             howTo={{
               steps: [
-                "Overzicht \u2014 Ga naar De Kern \u2192 Bezittingen \u2192 Vaste lasten. Je ziet al je terugkerende kosten: abonnementen, verzekeringen, lidmaatschappen.",
-                "Detectie \u2014 De app herkent automatisch terugkerende transacties in je bankdata. Importeer minimaal 3 maanden \u2014 hoe meer, hoe beter de detectie. Je kunt ook handmatig toevoegen.",
-                "Impact \u2014 Per abonnement zie je de jaarlijkse kosten en hoeveel vrijheidsdagen het je kost. Klein bedrag, groot effect over jaren.",
-                "Opzeggen \u2014 De app toont welke abonnementen de meeste vrijheidstijd kosten. Overweeg of de waarde opweegt tegen de prijs.",
+                "Overzicht \u2014 Ga naar De Wil \u2192 scroll naar \u2018Vaste Kosten Analyse\u2019. Je ziet twee kolommen: abonnementen links, vaste kosten rechts.",
+                "Detectie \u2014 De app herkent automatisch terugkerende transacties in je bankdata. Importeer minimaal 3 maanden \u2014 hoe meer, hoe beter de detectie. Druk op \u2018Nu scannen\u2019 om de analyse te verversen.",
+                "Impact \u2014 Per kolom zie je het subtotaal en onderaan het grand total van al je vaste lasten per maand.",
+                "Opzeggen \u2014 Klik op een abonnement om een opzegbrief te genereren. Vaste kosten zoals huur en energie zijn informatief \u2014 die volg je bewust.",
               ],
-              tip: "Check je abonnementen elk kwartaal. Vergeten streamingdiensten en ongebruikte sportschoolpassen zijn de meest voorkomende tijdlekken. \u20ac15/maand = 2 vrijheidsdagen/jaar.",
+              tip: "Check je vaste kosten elk kwartaal. Vergeten streamingdiensten en ongebruikte sportschoolpassen zijn de meest voorkomende tijdlekken. \u20ac15/maand = 2 vrijheidsdagen/jaar.",
             }}
           />
 
@@ -1052,6 +1108,31 @@ export default function GidsPage() {
           />
 
           <GuideHorizonUitleg />
+
+          <GuideTopicCard
+            icon={BarChart3}
+            title="Vermogensstromen"
+            color="var(--color-horizon-400)"
+            description={
+              <>
+                Zie per levensjaar wat je vermogen aanvult en wat het afroomt.
+                De bronanalyse toont <strong>besparingen</strong>,{" "}
+                <strong>rendement</strong> en levensgebeurtenissen als aanvulling
+                — en <strong>Box 3 belasting</strong>, levensonderhoud en kosten
+                als onttrekking. Je ziet direct in welke jaren je vermogen krimpt:
+                het inzicht dat laat zien waar je plan kwetsbaar is.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Horizon en scroll naar \u2018Inkomen & Uitgaven\u2019",
+                "Schakel naar \u2018Bronnen\u2019 om het gestapelde overzicht te zien",
+                "Hover over een leeftijd voor de exacte breakdown per bron",
+                "Let op rode zones \u2014 dit zijn periodes waarin je vermogen krimpt",
+              ],
+              tip: "In de opbouwfase zie je besparingen en rendement als aanvulling. Na pensionering verschuift dit: rendement en levensgebeurtenissen vullen aan, terwijl levensonderhoud en belasting onttrekken.",
+            }}
+          />
 
           <GuideTopicCard
             icon={Sparkles}

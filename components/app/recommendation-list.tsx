@@ -6,14 +6,8 @@ import { WillDots } from '@/components/app/will-dots'
 import { RecommendationCard } from '@/components/app/recommendation-card'
 import { RecommendationModal } from '@/components/app/recommendation-modal'
 import { RecommendationGenerationModal } from '@/components/app/recommendation-generation-modal'
-import { BottomSheet } from '@/components/app/bottom-sheet'
-import { BudgetIcon } from '@/components/app/budget-shared'
-import type { Recommendation, RecommendationType } from '@/lib/recommendation-data'
-import {
-  RECOMMENDATION_TYPE_LABELS,
-  RECOMMENDATION_TYPE_ICONS,
-  getRecommendationTypeColor,
-} from '@/lib/recommendation-data'
+import { RecommendationListModal } from '@/components/app/recommendation-list-modal'
+import type { Recommendation } from '@/lib/recommendation-data'
 
 const MAX_VISIBLE = 5
 
@@ -169,64 +163,24 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
         ))}
       </div>
 
-      {/* "Bekijk alle" link when more than 5 */}
-      {hasMore && (
-        <button
-          type="button"
-          onClick={() => setShowAll(true)}
-          className="w-full rounded-[var(--r)] py-2 text-center text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
-        >
-          Bekijk alle {pending.length} voorstellen
-        </button>
-      )}
+      {/* "Bekijk alle" link — always visible */}
+      <button
+        type="button"
+        onClick={() => setShowAll(true)}
+        className="w-full rounded-[var(--r)] py-2 text-center text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
+      >
+        {pending.length > MAX_VISIBLE
+          ? `Bekijk alle ${pending.length} voorstellen`
+          : 'Alle voorstellen bekijken'}
+      </button>
 
-      {/* BottomSheet with all recommendations, grouped by type */}
-      <BottomSheet
+      {/* Filterable recommendations modal */}
+      <RecommendationListModal
         open={showAll}
         onClose={() => setShowAll(false)}
-        title="Alle voorstellen"
-        size="lg"
-      >
-        <div className="px-5 pb-6 pt-2">
-          <p className="mb-5 text-sm text-[var(--ink-3)]">
-            {pending.length} openstaande {pending.length === 1 ? 'aanbeveling' : 'aanbevelingen'} op basis van je financiele profiel
-          </p>
-          <div className="space-y-6">
-            {(Object.keys(RECOMMENDATION_TYPE_LABELS) as RecommendationType[])
-              .map((type) => {
-                const group = pending.filter((r) => r.recommendation_type === type)
-                if (group.length === 0) return null
-                const colors = getRecommendationTypeColor(type)
-                const iconName = RECOMMENDATION_TYPE_ICONS[type]
-                return (
-                  <div key={type}>
-                    <div className="mb-2 flex items-center gap-2">
-                      <div className={`flex items-center justify-center rounded-md ${colors.bgLight} p-1`}>
-                        <BudgetIcon name={iconName} className={`h-3.5 w-3.5 ${colors.text}`} />
-                      </div>
-                      <h4 className="text-xs font-semibold text-[var(--ink-2)]">
-                        {RECOMMENDATION_TYPE_LABELS[type]}
-                      </h4>
-                      <span className="font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
-                        {group.length}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {group.map((rec) => (
-                        <RecommendationCard
-                          key={rec.id}
-                          recommendation={rec}
-                          onClick={() => { setShowAll(false); setSelectedRec(rec) }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )
-              })
-              .filter(Boolean)}
-          </div>
-        </div>
-      </BottomSheet>
+        recommendations={recommendations}
+        onSelect={(rec) => { setShowAll(false); setSelectedRec(rec) }}
+      />
 
       {/* Detail modal */}
       {selectedRec && (

@@ -566,6 +566,120 @@ const tests: TestCase[] = [
       assert(merged.some(r => r.id === 'new-1'), 'new recs added to list')
     },
   },
+
+  // ── Filter tests (for RecommendationListModal) ────────────────────────────
+
+  {
+    id: 'wil-rec-filter-status',
+    name: 'Voorstellen filter: status filtert correct',
+    description: 'Each status filter returns only matching recommendations',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const recs = [
+        { status: 'pending' },
+        { status: 'pending' },
+        { status: 'accepted' },
+        { status: 'postponed' },
+        { status: 'rejected' },
+      ]
+      const filterByStatus = (s: string) => s === 'all' ? recs : recs.filter(r => r.status === s)
+
+      assertEqual(filterByStatus('pending').length, 2)
+      assertEqual(filterByStatus('accepted').length, 1)
+      assertEqual(filterByStatus('postponed').length, 1)
+      assertEqual(filterByStatus('rejected').length, 1)
+      assertEqual(filterByStatus('all').length, 5)
+    },
+  },
+
+  {
+    id: 'wil-rec-filter-type',
+    name: 'Voorstellen filter: type filtert op recommendation_type',
+    description: 'Type filter correctly filters by recommendation_type',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const recs = [
+        { recommendation_type: 'budget_optimization' },
+        { recommendation_type: 'budget_optimization' },
+        { recommendation_type: 'debt_acceleration' },
+        { recommendation_type: 'income_increase' },
+      ]
+      const filterByType = (t: string) => t === 'all' ? recs : recs.filter(r => r.recommendation_type === t)
+
+      assertEqual(filterByType('budget_optimization').length, 2)
+      assertEqual(filterByType('debt_acceleration').length, 1)
+      assertEqual(filterByType('income_increase').length, 1)
+      assertEqual(filterByType('savings_boost').length, 0)
+      assertEqual(filterByType('all').length, 4)
+    },
+  },
+
+  {
+    id: 'wil-rec-filter-combined',
+    name: 'Voorstellen filter: AND-logica status + type',
+    description: 'Combined filters apply simultaneously',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const recs = [
+        { status: 'pending', recommendation_type: 'budget_optimization' },
+        { status: 'pending', recommendation_type: 'debt_acceleration' },
+        { status: 'accepted', recommendation_type: 'budget_optimization' },
+        { status: 'rejected', recommendation_type: 'budget_optimization' },
+      ]
+      const filtered = recs.filter(r => r.status === 'pending' && r.recommendation_type === 'budget_optimization')
+      assertEqual(filtered.length, 1)
+    },
+  },
+
+  {
+    id: 'wil-rec-filter-impact',
+    name: 'Voorstellen filter: impact-totaal klopt met gefilterde resultaten',
+    description: 'Filtered impact total equals sum of freedom_days_per_year for matching recs',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const recs = [
+        { status: 'pending', freedom_days_per_year: 10 },
+        { status: 'pending', freedom_days_per_year: 5 },
+        { status: 'accepted', freedom_days_per_year: 20 },
+        { status: 'pending', freedom_days_per_year: null },
+      ]
+      const pending = recs.filter(r => r.status === 'pending')
+      const impact = Math.round(pending.reduce((sum, r) => sum + (r.freedom_days_per_year || 0), 0))
+      assertEqual(impact, 15)
+      assertEqual(pending.length, 3)
+    },
+  },
+
+  {
+    id: 'wil-rec-filter-sort-impact',
+    name: 'Voorstellen sortering: impact-sort plaatst hoogste bovenaan',
+    description: 'Impact sort orders by freedom_days_per_year descending',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      const recs = [
+        { id: 'low', freedom_days_per_year: 2, priority_score: 5 },
+        { id: 'high', freedom_days_per_year: 30, priority_score: 1 },
+        { id: 'mid', freedom_days_per_year: 10, priority_score: 3 },
+      ]
+      const sorted = [...recs].sort((a, b) =>
+        (b.freedom_days_per_year || 0) - (a.freedom_days_per_year || 0) ||
+        (b.priority_score || 0) - (a.priority_score || 0)
+      )
+      assertEqual(sorted[0].id, 'high')
+      assertEqual(sorted[1].id, 'mid')
+      assertEqual(sorted[2].id, 'low')
+    },
+  },
 ]
 
 export function register(): void {

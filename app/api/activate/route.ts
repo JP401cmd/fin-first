@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
+import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
+import { deleteAllUserData, seedPersonaData } from '@/lib/seed-persona'
 
 export async function POST() {
   const supabase = await createClient()
@@ -20,7 +22,19 @@ export async function POST() {
     return Response.json({ error: 'Already activated' }, { status: 400 })
   }
 
-  // Fetch financial data to compute current phase
+  // Check if this is a test user with a linked persona seed
+  const personaKey = user.user_metadata?.test_persona_key as string | undefined
+  if (personaKey && PERSONAS[personaKey as PersonaKey]) {
+    const persona = PERSONAS[personaKey as PersonaKey]
+
+    // Seed persona data (replaces any onboarding data)
+    const noop = () => {}
+    await deleteAllUserData(supabase, user.id, noop)
+    await seedPersonaData(supabase, user.id, persona, noop)
+    await supabase.from('profiles').update({ is_demo_user: true }).eq('id', user.id)
+  }
+
+  // Fetch financial data to compute current phase (after potential seeding)
   const threeMonthsAgo = new Date()
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
@@ -50,5 +64,5 @@ export async function POST() {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  return Response.json({ success: true, phase })
+  return Response.json({ success: true, phase, seeded: !!personaKey })
 }

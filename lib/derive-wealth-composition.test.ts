@@ -34,6 +34,8 @@ function makeSimRow(
     endPortfolio,
     grossIncome: 0,
     grossExpenses: 0,
+    flowIn: 0,
+    flowOut: 0,
   }
 }
 

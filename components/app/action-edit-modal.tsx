@@ -8,36 +8,13 @@ import {
   getSourceBadgeClasses,
   ACTION_SOURCE_LABELS,
 } from '@/lib/recommendation-data'
+import { getWeekLabel, getWeekDates } from '@/lib/week-utils'
 
 type ActionEditModalProps = {
   action: Action
   onClose: () => void
   onSave: (data: Record<string, unknown>) => Promise<void>
   onStatusChange: (status: ActionStatus, data?: Record<string, unknown>) => Promise<void>
-}
-
-function getWeekLabel(date: Date): string {
-  const year = date.getFullYear()
-  const oneJan = new Date(year, 0, 1)
-  const days = Math.floor((date.getTime() - oneJan.getTime()) / (24 * 60 * 60 * 1000))
-  const week = Math.ceil((days + oneJan.getDay() + 1) / 7)
-  return `${year}-W${String(week).padStart(2, '0')}`
-}
-
-function getWeekDates(weekStr: string): string {
-  const [yearStr, weekPart] = weekStr.split('-W')
-  const year = parseInt(yearStr)
-  const week = parseInt(weekPart)
-  const jan1 = new Date(year, 0, 1)
-  const dayOffset = (1 - jan1.getDay() + 7) % 7
-  const monday = new Date(year, 0, 1 + dayOffset + (week - 1) * 7)
-  if (monday.getDay() !== 1) {
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
-  }
-  const sunday = new Date(monday)
-  sunday.setDate(sunday.getDate() + 6)
-  const fmt = (d: Date) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-  return `${fmt(monday)} - ${fmt(sunday)}`
 }
 
 export function ActionEditModal({ action, onClose, onSave, onStatusChange }: ActionEditModalProps) {

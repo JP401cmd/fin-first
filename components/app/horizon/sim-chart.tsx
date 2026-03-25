@@ -313,7 +313,7 @@ export const SimChart = memo(function SimChart({
     .map(cf => {
       const pt = allPts.find(([age]) => age === cf.fromAge + 1) ?? null
       const y = pt ? PAD.top + yScale(Math.max(pt[1], 0)) : null
-      return { cf, x: PAD.left + xScale(cf.fromAge), y }
+      return { cf, x: PAD.left + xScale(cf.fromAge + 1), y }
     })
 
   // Recurring cashflow bands (colored rectangles spanning fromAge → toAge)
@@ -737,17 +737,17 @@ export const SimChart = memo(function SimChart({
             onMouseLeave={() => setHoveredCfId(null)}
             style={{ cursor: 'default' }}
           >
-            <circle cx={x} cy={y - 8} r={hoveredCfId === cf.id ? 6 : 4}
+            <circle cx={x} cy={y} r={hoveredCfId === cf.id ? 6 : 4}
               fill={cf.direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW}
               stroke="var(--paper)" strokeWidth={1} opacity={0.9}
               style={{ transition: 'r 150ms ease' }} />
-            <text x={x} y={y - 16} textAnchor="middle" fontSize={7}
+            <text x={x} y={y - 8} textAnchor="middle" fontSize={7}
               fill={cf.direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW}
               fontFamily="var(--font-inter, sans-serif)" fontWeight={500}>
               {cf.name.length > 8 ? cf.name.slice(0, 7) + '…' : cf.name}
             </text>
             {/* Amount label */}
-            <text x={x} y={y - 24} textAnchor="middle" fontSize={7.5}
+            <text x={x} y={y - 16} textAnchor="middle" fontSize={7.5}
               fill={cf.direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW}
               fontFamily="var(--font-dm-mono, monospace)" fontWeight={600}>
               {fmtAmount(cf.amount, cf.direction)}
@@ -758,20 +758,20 @@ export const SimChart = memo(function SimChart({
               <g>
                 <rect
                   x={Math.max(PAD.left, Math.min(x - 65, W - PAD.right - 130))}
-                  y={Math.max(PAD.top, y - 60)}
+                  y={Math.max(PAD.top, y - 52)}
                   width={130} height={freedomDaysFor(cf.amount) ? 36 : 26}
                   rx={4} fill="var(--ink)" opacity={0.92}
                 />
                 <text
                   x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                  y={Math.max(PAD.top + 11, y - 48)}
+                  y={Math.max(PAD.top + 11, y - 40)}
                   textAnchor="middle" fontSize={8} fontWeight={600}
                   fill="var(--paper)" fontFamily="var(--font-inter, sans-serif)">
                   {cf.name}
                 </text>
                 <text
                   x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                  y={Math.max(PAD.top + 21, y - 37)}
+                  y={Math.max(PAD.top + 21, y - 29)}
                   textAnchor="middle" fontSize={7}
                   fill="var(--paper)" fontFamily="var(--font-dm-mono, monospace)">
                   {fmtAmount(cf.amount, cf.direction)} · leeftijd {cf.fromAge}
@@ -779,7 +779,7 @@ export const SimChart = memo(function SimChart({
                 {freedomDaysFor(cf.amount) && (
                   <text
                     x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                    y={Math.max(PAD.top + 31, y - 27)}
+                    y={Math.max(PAD.top + 31, y - 19)}
                     textAnchor="middle" fontSize={7}
                     fill={cf.direction === 'income' ? '#6ee7b7' : '#fca5a5'}
                     fontFamily="var(--font-inter, sans-serif)">

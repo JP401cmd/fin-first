@@ -43,6 +43,12 @@ export interface SimCashflow {
   indexed: boolean     // true: amount grows with inflation
 }
 
+export interface IncomeExpenseItem {
+  id: string        // 'savings' | 'growth' | 'withdrawal' | 'box3' | cf.id
+  label: string     // 'Besparingen' | 'Rendement' | cf.name
+  amount: number    // altijd positief
+}
+
 export interface SimRow {
   age: number
   phase: 'accumulation' | 'retirement'
@@ -55,6 +61,12 @@ export interface SimRow {
   endPortfolio: number
   grossIncome: number
   grossExpenses: number
+  /** Vermogensstromen: totaal aanvulling op netto vermogen */
+  flowIn: number
+  /** Vermogensstromen: totaal onttrekking van netto vermogen */
+  flowOut: number
+  incomeBreakdown?: IncomeExpenseItem[]
+  expenseBreakdown?: IncomeExpenseItem[]
 }
 
 export interface SimResult {
@@ -230,10 +242,18 @@ export function runSimulation(
       let recurringNet = 0
       let recurringIncome = 0
       let recurringExpense = 0
+      const retIncomeItems: IncomeExpenseItem[] = []
+      const retExpenseItems: IncomeExpenseItem[] = []
       for (const cf of cashflows) {
         const val = recurringYearly(cf, age)
         recurringNet += val
-        if (val > 0) recurringIncome += val; else recurringExpense += Math.abs(val)
+        if (val > 0) {
+          recurringIncome += val
+          retIncomeItems.push({ id: cf.id, label: cf.name, amount: val })
+        } else if (val < 0) {
+          recurringExpense += Math.abs(val)
+          retExpenseItems.push({ id: cf.id, label: cf.name, amount: Math.abs(val) })
+        }
       }
 
       // Split one-time cashflows into income/expense
@@ -242,7 +262,13 @@ export function runSimulation(
       for (const cf of cashflows) {
         const amt = oneTimeAmount(cf, age)
         // Note: oneTimeNet already accumulated above; here we just classify
-        if (amt > 0) oneTimeIncome += amt; else if (amt < 0) oneTimeExpense += Math.abs(amt)
+        if (amt > 0) {
+          oneTimeIncome += amt
+          retIncomeItems.push({ id: cf.id, label: cf.name, amount: amt })
+        } else if (amt < 0) {
+          oneTimeExpense += Math.abs(amt)
+          retExpenseItems.push({ id: cf.id, label: cf.name, amount: Math.abs(amt) })
+        }
       }
 
       // Build withdrawal context and apply strategy
@@ -273,6 +299,24 @@ export function runSimulation(
         // grossExpenses: withdrawal (onttrekking) + negative cashflows
         const rowGrossExpenses = withdrawal + recurringExpense + oneTimeExpense
 
+        // Build breakdown: vermogensstromen (flows to/from net worth)
+        const grossGrowthRet = portfolio * grossReturn
+        const box3TaxRet = returnModel === 'nl_box3' ? portfolio * BOX3_DRAG : 0
+
+        const incomeBreakdown: IncomeExpenseItem[] = [
+          ...(grossGrowthRet > 0 ? [{ id: 'growth', label: 'Rendement', amount: Math.round(grossGrowthRet) }] : []),
+          ...retIncomeItems.map(it => ({ ...it, amount: Math.round(it.amount) })),
+        ]
+        const expenseBreakdown: IncomeExpenseItem[] = [
+          ...(withdrawal > 0 ? [{ id: 'withdrawal', label: 'Levensonderhoud', amount: Math.round(withdrawal) }] : []),
+          ...(box3TaxRet > 0 ? [{ id: 'box3', label: 'Box 3 belasting', amount: Math.round(box3TaxRet) }] : []),
+          ...retExpenseItems.map(it => ({ ...it, amount: Math.round(it.amount) })),
+        ]
+
+        // flowIn/flowOut: vermogensstromen (flows to/from net worth)
+        const retFlowIn = Math.max(0, grossGrowthRet) + recurringIncome + oneTimeIncome
+        const retFlowOut = withdrawal + box3TaxRet + recurringExpense + oneTimeExpense
+
         rows.push({
           age,
           phase: 'retirement',
@@ -285,6 +329,10 @@ export function runSimulation(
           endPortfolio: Math.round(Math.max(rawEnd, 0)),
           grossIncome: Math.round(rowGrossIncome),
           grossExpenses: Math.round(rowGrossExpenses),
+          flowIn: Math.round(retFlowIn),
+          flowOut: Math.round(retFlowOut),
+          incomeBreakdown,
+          expenseBreakdown,
         })
       }
 
@@ -387,10 +435,18 @@ export function runSimulation(
     let cashflowNet = 0
     let cfIncome = 0
     let cfExpense = 0
+    const accIncomeItems: IncomeExpenseItem[] = []
+    const accExpenseItems: IncomeExpenseItem[] = []
     for (const cf of cashflows) {
       const val = recurringYearly(cf, age)
       cashflowNet += val
-      if (val > 0) cfIncome += val; else cfExpense += Math.abs(val)
+      if (val > 0) {
+        cfIncome += val
+        accIncomeItems.push({ id: cf.id, label: cf.name, amount: val })
+      } else if (val < 0) {
+        cfExpense += Math.abs(val)
+        accExpenseItems.push({ id: cf.id, label: cf.name, amount: Math.abs(val) })
+      }
     }
 
     // Split one-time cashflows into income/expense for gross calculations
@@ -398,7 +454,13 @@ export function runSimulation(
     let otExpense = 0
     for (const cf of cashflows) {
       const amt = oneTimeAmount(cf, age)
-      if (amt > 0) otIncome += amt; else if (amt < 0) otExpense += Math.abs(amt)
+      if (amt > 0) {
+        otIncome += amt
+        accIncomeItems.push({ id: cf.id, label: cf.name, amount: amt })
+      } else if (amt < 0) {
+        otExpense += Math.abs(amt)
+        accExpenseItems.push({ id: cf.id, label: cf.name, amount: Math.abs(amt) })
+      }
     }
 
     const effectiveSavings = annualSavings + cashflowNet
@@ -409,6 +471,24 @@ export function runSimulation(
     const accGrossIncome = annualSavings + yearlyExpenses + cfIncome + otIncome
     // grossExpenses: jaarlijkse uitgaven + negative cashflows
     const accGrossExpenses = yearlyExpenses + cfExpense + otExpense
+
+    // Build breakdown: vermogensstromen (flows to/from net worth)
+    const grossGrowthAcc = portfolio * grossReturn
+    const box3TaxAcc = returnModel === 'nl_box3' ? portfolio * BOX3_DRAG : 0
+
+    const incomeBreakdown: IncomeExpenseItem[] = [
+      ...(annualSavings > 0 ? [{ id: 'savings', label: 'Besparingen', amount: Math.round(annualSavings) }] : []),
+      ...(grossGrowthAcc > 0 ? [{ id: 'growth', label: 'Rendement', amount: Math.round(grossGrowthAcc) }] : []),
+      ...accIncomeItems.map(it => ({ ...it, amount: Math.round(it.amount) })),
+    ]
+    const expenseBreakdown: IncomeExpenseItem[] = [
+      ...(box3TaxAcc > 0 ? [{ id: 'box3', label: 'Box 3 belasting', amount: Math.round(box3TaxAcc) }] : []),
+      ...accExpenseItems.map(it => ({ ...it, amount: Math.round(it.amount) })),
+    ]
+
+    // flowIn/flowOut: vermogensstromen (flows to/from net worth)
+    const accFlowIn = Math.max(0, annualSavings) + Math.max(0, grossGrowthAcc) + cfIncome + otIncome
+    const accFlowOut = box3TaxAcc + cfExpense + otExpense
 
     accRows.push({
       age,
@@ -422,6 +502,10 @@ export function runSimulation(
       endPortfolio: Math.round(Math.max(endPortfolio, 0)),
       grossIncome: Math.round(accGrossIncome),
       grossExpenses: Math.round(accGrossExpenses),
+      flowIn: Math.round(accFlowIn),
+      flowOut: Math.round(accFlowOut),
+      incomeBreakdown,
+      expenseBreakdown,
     })
 
     portfolio = endPortfolio

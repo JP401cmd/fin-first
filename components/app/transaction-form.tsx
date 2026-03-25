@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText } from 'lucide-react'
+import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3 } from 'lucide-react'
+import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import type { Budget } from '@/lib/budget-data'
@@ -27,7 +28,7 @@ type BudgetGroup = {
   children: Budget[]
 }
 
-type Phase = 'form' | 'scope' | 'saving'
+type Phase = 'form' | 'scope' | 'saving' | 'analyse'
 
 type PendingRow = {
   user_id: string
@@ -54,12 +55,14 @@ export function TransactionForm({
   budgetGroups,
   onClose,
   onSaved,
+  disableAnalysis,
 }: {
   transaction?: Transaction
   accountId: string
   budgetGroups: BudgetGroup[]
   onClose: () => void
   onSaved: () => void
+  disableAnalysis?: boolean
 }) {
   const isEdit = !!transaction
   const [saving, setSaving] = useState(false)
@@ -378,7 +381,21 @@ export function TransactionForm({
   ]
 
   return (
-    <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Transactie bewerken' : 'Nieuwe transactie'}>
+    <BottomSheet
+      open={true}
+      onClose={onClose}
+      title={phase === 'analyse' ? (transaction?.counterparty_name ?? 'Tegenpartij analyse') : (isEdit ? 'Transactie bewerken' : 'Nieuwe transactie')}
+      size={phase === 'analyse' ? 'lg' : 'md'}
+    >
+      {phase === 'analyse' && transaction && (
+        <CounterpartyAnalysisPanel
+          counterpartyName={transaction.counterparty_name}
+          counterpartyIban={transaction.counterparty_iban}
+          onBack={() => setPhase('form')}
+          budgetGroups={budgetGroups}
+        />
+      )}
+
       {phase === 'scope' && (
         <div className="p-6 flex flex-col gap-4">
           <button
@@ -416,7 +433,7 @@ export function TransactionForm({
         </div>
       )}
 
-      {phase !== 'scope' && (
+      {phase === 'form' && (
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -767,8 +784,22 @@ export function TransactionForm({
             </div>
           </div>
 
+          {/* Analyse button */}
+          {isEdit && !disableAnalysis && (transaction?.counterparty_name || transaction?.counterparty_iban) && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setPhase('analyse')}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Analyseer tegenpartij
+              </button>
+            </div>
+          )}
+
           {/* Actions */}
-          <div className="mt-6 flex items-center justify-between border-t border-[var(--border-ed)] pt-4">
+          <div className="mt-4 flex items-center justify-between border-t border-[var(--border-ed)] pt-4">
             <div>
               {isEdit && (
                 <button

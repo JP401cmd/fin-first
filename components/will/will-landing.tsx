@@ -12,24 +12,10 @@ import { DAIshboard } from '@/components/daishboard/daishboard'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { ActionCenter } from './action-center'
-import { CollapsibleSection } from '@/components/app/collapsible-section'
+import { VasteKostenAnalyse, type RecurringItem } from './vaste-kosten-analyse'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { MonthlyCheckinCard } from '@/components/dashboard/monthly-checkin-card'
-import { ChevronRight } from 'lucide-react'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
-
-type SubscriptionItem = {
-  id: string
-  name: string
-  averageAmount: number
-  monthlyAmount: number
-  frequency: 'monthly' | 'weekly' | 'quarterly' | 'yearly'
-  nextDate: string | null
-  confidence: 'high' | 'medium' | 'low'
-  isVariableAmount: boolean
-  occurrences: number
-  alreadyConfirmed: boolean
-}
 
 interface WillLandingProps {
   dashboardData: DashboardData
@@ -54,34 +40,44 @@ export function WillLanding({
   const router = useRouter()
   const { dashboardType } = useDashboardType()
 
-  // Subscription state (loaded client-side)
-  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
-  const [subscriptionMonthly, setSubscriptionMonthly] = useState(0)
-  const [subscriptionsOpen, setSubscriptionsOpen] = useState(false)
+  // Recurring costs state (loaded client-side)
+  const [subscriptions, setSubscriptions] = useState<RecurringItem[]>([])
+  const [vasteKosten, setVasteKosten] = useState<RecurringItem[]>([])
+  const [totalMonthlySubs, setTotalMonthlySubs] = useState(0)
+  const [totalMonthlyVK, setTotalMonthlyVK] = useState(0)
+  const [totalMonthly, setTotalMonthly] = useState(0)
+  const [loadingRecurring, setLoadingRecurring] = useState(true)
   const [opzegTarget, setOpzegTarget] = useState<CancellationMetadata | null>(null)
-  const [opzegSubscription, setOpzegSubscription] = useState<SubscriptionItem | null>(null)
+
+  // Reusable fetch for initial load + "Nu scannen" refresh
+  const loadRecurringData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/subscriptions')
+      const data = await res.json()
+      if (data.subscriptions) {
+        setSubscriptions(data.subscriptions as RecurringItem[])
+        setVasteKosten(data.vasteKosten as RecurringItem[] ?? [])
+        setTotalMonthlySubs(data.totalMonthlySubscriptions ?? 0)
+        setTotalMonthlyVK(data.totalMonthlyVasteKosten ?? 0)
+        setTotalMonthly(data.totalMonthly ?? 0)
+      }
+    } finally {
+      setLoadingRecurring(false)
+    }
+  }, [])
 
   // Deep-link: open modal via ?modal= URL param
   useEffect(() => {
     const modal = searchParams.get('modal')
     if (modal === 'subscriptions') {
-      setSubscriptionsOpen(true)
       router.replace('/will', { scroll: false })
     }
   }, [searchParams, router])
 
-  // Load subscriptions client-side (non-blocking)
+  // Load recurring data client-side (non-blocking)
   useEffect(() => {
-    fetch('/api/subscriptions')
-      .then(r => r.json())
-      .then(data => {
-        if (data.subscriptions) {
-          setSubscriptions(data.subscriptions as SubscriptionItem[])
-          setSubscriptionMonthly(data.totalMonthly ?? 0)
-        }
-      })
-      .catch(() => {/* ignore */})
-  }, [])
+    loadRecurringData().catch(() => {/* ignore */})
+  }, [loadRecurringData])
 
   const handleCancellationOpen = useCallback((metadata: CancellationMetadata) => {
     setOpzegTarget(metadata)
@@ -152,84 +148,45 @@ export function WillLanding({
           />
         </section>
 
-        {/* ── Sectie 4: Abonnementen (collapsible) ───────────── */}
-        {subscriptions.length > 0 && (
-          <section className="mt-10">
-            <CollapsibleSection
-              storageKey="will-abonnementen"
-              title={`Abonnementen (${subscriptions.length})`}
-              defaultOpen={false}
-            >
-              <div className="space-y-2">
-                {subscriptions.map(sub => (
-                  <div
-                    key={sub.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      const metadata: CancellationMetadata = {
-                        type: 'subscription_cancellation',
-                        subscription_name: sub.name,
-                        monthly_amount: sub.monthlyAmount,
-                        frequency: sub.frequency,
-                        user_name: userProfile?.full_name ?? '',
-                        user_address: '',
-                        user_postcode: '',
-                        user_city: '',
-                      }
-                      setOpzegSubscription(sub)
-                      handleCancellationOpen(metadata)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        const metadata: CancellationMetadata = {
-                          type: 'subscription_cancellation',
-                          subscription_name: sub.name,
-                          monthly_amount: sub.monthlyAmount,
-                          frequency: sub.frequency,
-                          user_name: userProfile?.full_name ?? '',
-                          user_address: '',
-                          user_postcode: '',
-                          user_city: '',
-                        }
-                        setOpzegSubscription(sub)
-                        handleCancellationOpen(metadata)
-                      }
-                    }}
-                    className="flex cursor-pointer items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 transition-colors hover:bg-[var(--subtle)]"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-[var(--ink)]">{sub.name}</p>
-                      <p className="text-xs text-[var(--ink-3)]">{sub.frequency}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-mono text-sm tabular-nums text-[var(--ink)]">
-                        €{sub.monthlyAmount.toFixed(2)}/mnd
-                      </p>
-                      <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" />
-                    </div>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-3">
-                  <span className="text-xs font-medium text-[var(--ink-2)]">Totaal per maand</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    €{subscriptionMonthly.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </CollapsibleSection>
-          </section>
-        )}
+        {/* ── Sectie 4: Vaste Kosten Analyse (2 kolommen) ──── */}
+        <section className="mt-10" aria-label="Vaste Kosten Analyse">
+          {loadingRecurring ? (
+            <div className="animate-pulse rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
+              <div className="h-4 w-48 rounded bg-[var(--subtle)]" />
+            </div>
+          ) : (subscriptions.length > 0 || vasteKosten.length > 0) ? (
+            <VasteKostenAnalyse
+              subscriptions={subscriptions}
+              vasteKosten={vasteKosten}
+              totalMonthlySubscriptions={totalMonthlySubs}
+              totalMonthlyVasteKosten={totalMonthlyVK}
+              totalMonthly={totalMonthly}
+              userProfile={userProfile}
+              onCancellationOpen={handleCancellationOpen}
+              onRefresh={loadRecurringData}
+            />
+          ) : null}
+        </section>
 
         {/* ── Opzeg Modal ────────────────────────────────────── */}
         <OpzegModal
           open={!!opzegTarget}
-          onClose={() => { setOpzegTarget(null); setOpzegSubscription(null) }}
-          subscription={opzegSubscription}
+          onClose={() => setOpzegTarget(null)}
+          subscription={opzegTarget ? {
+            id: '',
+            name: opzegTarget.subscription_name,
+            averageAmount: opzegTarget.monthly_amount,
+            monthlyAmount: opzegTarget.monthly_amount,
+            frequency: opzegTarget.frequency as 'monthly' | 'weekly' | 'quarterly' | 'yearly',
+            nextDate: null,
+            confidence: 'high' as const,
+            isVariableAmount: false,
+            occurrences: 0,
+            alreadyConfirmed: false,
+          } : null}
           initialMetadata={opzegTarget ?? undefined}
           userProfile={userProfile}
-          onSavedToActionList={() => { setOpzegTarget(null); setOpzegSubscription(null) }}
+          onSavedToActionList={() => setOpzegTarget(null)}
         />
       </div>
     </FreedomDaysAnimationProvider>

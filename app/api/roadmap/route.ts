@@ -96,9 +96,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'feature_nr is verplicht' }, { status: 400 })
   }
 
-  if (!['a', 'b', 'c', 'd'].includes(fase)) {
+  if (!['a', 'b', 'c', 'd', 'p'].includes(fase)) {
     return NextResponse.json(
-      { error: 'fase moet a, b, c of d zijn' },
+      { error: 'fase moet a, b, c, d of p zijn' },
       { status: 400 },
     )
   }

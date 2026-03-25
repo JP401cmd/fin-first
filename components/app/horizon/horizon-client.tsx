@@ -93,6 +93,7 @@ import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { PhaseBar } from '@/components/app/horizon/phase-bar'
 import { CHART_PAD } from '@/lib/chart-constants'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
+import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
@@ -171,6 +172,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [mcExpanded, setMcExpanded] = useState(false)
   const [mcData, setMcData] = useState<MonteCarloResult | null>(null)
   const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
+  const [ieViewMode, setIeViewMode] = useState<'lines' | 'breakdown'>('lines')
   const [chartMode, setChartMode] = useState<'vermogenspad' | 'vermogensopbouw'>('vermogenspad')
 
   // Kassabon modal state
@@ -775,6 +777,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     if (!unifiedRows?.length) return []
     return unifiedRowsToStackedRows(unifiedRows)
   }, [chartMode, unifiedRows])
+
+  // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode
+  const ieBreakdownResult = useMemo(() => {
+    if (ieViewMode !== 'breakdown' || !unifiedRows?.length || !simResult?.rows.length) return null
+    return buildBreakdown(unifiedRows, simResult.rows, debts)
+  }, [ieViewMode, unifiedRows, simResult, debts])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -2018,27 +2026,57 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         </div>
                       </div>
                       {/* ── Inkomen & Uitgaven toggle + collapsible chart ── */}
-                      <button
-                        type="button"
-                        onClick={() => setIncomeExpenseExpanded(prev => !prev)}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        className="flex w-full items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none border-t border-[var(--border-ed)]"
-                        style={{ minHeight: 44 }}
-                        aria-expanded={incomeExpenseExpanded}
-                        aria-controls="income-expense-panel"
-                        aria-label={incomeExpenseExpanded ? 'Inkomen & Uitgaven grafiek verbergen' : 'Inkomen & Uitgaven grafiek tonen'}
-                      >
-                        <span>Inkomen &amp; Uitgaven</span>
-                        {incomeExpenseExpanded
-                          ? <ChevronUp size={14} />
-                          : <ChevronDown size={14} />
-                        }
-                      </button>
+                      <div className="flex w-full items-center border-t border-[var(--border-ed)]">
+                        <button
+                          type="button"
+                          onClick={() => setIncomeExpenseExpanded(prev => !prev)}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="flex flex-1 items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none"
+                          style={{ minHeight: 44 }}
+                          aria-expanded={incomeExpenseExpanded}
+                          aria-controls="income-expense-panel"
+                          aria-label={incomeExpenseExpanded ? 'Inkomen & Uitgaven grafiek verbergen' : 'Inkomen & Uitgaven grafiek tonen'}
+                        >
+                          <span>Inkomen &amp; Uitgaven</span>
+                          {incomeExpenseExpanded
+                            ? <ChevronUp size={14} />
+                            : <ChevronDown size={14} />
+                          }
+                        </button>
+                        {incomeExpenseExpanded && (
+                          <div className="flex items-center gap-0.5 pr-3" onPointerDown={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => setIeViewMode('lines')}
+                              className={`rounded-sm px-3 py-2.5 text-[10px] uppercase tracking-[0.08em] font-medium transition-colors cursor-pointer ${
+                                ieViewMode === 'lines'
+                                  ? 'text-[var(--ink)] bg-[var(--subtle)]'
+                                  : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
+                              }`}
+                              style={{ minHeight: 44 }}
+                            >
+                              Lijnen
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIeViewMode('breakdown')}
+                              className={`rounded-sm px-3 py-2.5 text-[10px] uppercase tracking-[0.08em] font-medium transition-colors cursor-pointer ${
+                                ieViewMode === 'breakdown'
+                                  ? 'text-[var(--ink)] bg-[var(--subtle)]'
+                                  : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
+                              }`}
+                              style={{ minHeight: 44 }}
+                            >
+                              Bronnen
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <div
                         id="income-expense-panel"
                         className="overflow-hidden transition-all duration-300 ease-in-out"
                         style={{
-                          maxHeight: incomeExpenseExpanded ? 250 : 0,
+                          maxHeight: incomeExpenseExpanded ? (ieViewMode === 'breakdown' ? 420 : 280) : 0,
                           opacity: incomeExpenseExpanded ? 1 : 0,
                         }}
                       >
@@ -2051,6 +2089,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           fireAge={simResult.fireAge}
                           planningMode={planningMode}
                           aowAgeFractional={userAowAge.fractional}
+                          viewMode={ieViewMode}
+                          breakdownResult={ieBreakdownResult}
                         />
                       </div>
 

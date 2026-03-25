@@ -968,12 +968,12 @@ export function CashAccountView({
   }
 
   return (
-    <div className={embedded ? '' : 'mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8'}>
+    <div className={embedded ? 'px-5 py-4 sm:px-6 sm:py-5' : 'mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8'}>
       {/* Back to combined — embedded single account */}
       {embedded && !isCombined && onNavigateToAccount && (
         <button
           onClick={() => onNavigateToAccount(undefined)}
-          className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] shadow-[var(--s0)] transition-all hover:shadow-[var(--s1)] hover:text-[var(--ink)]"
+          className="mb-5 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] shadow-[var(--s0)] transition-all hover:shadow-[var(--s1)] hover:text-[var(--ink)]"
         >
           <ArrowLeft className="h-4 w-4" />
           Alle rekeningen
@@ -992,7 +992,7 @@ export function CashAccountView({
       )}
 
       {/* Account header */}
-      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-[var(--r-lg)] bg-kern-100">
@@ -1057,7 +1057,7 @@ export function CashAccountView({
 
       {/* Accounts overview — combined mode only, only when navigation callback is provided */}
       {isCombined && allAccounts.length > 0 && onNavigateToAccount && (
-        <section className="mt-3 sm:mt-6" data-testid="accounts-overview">
+        <section className="mt-5 sm:mt-8" data-testid="accounts-overview">
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
             {/* Totaal header */}
             <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3">
@@ -1110,7 +1110,7 @@ export function CashAccountView({
       )}
 
       {/* Action bar */}
-      <div className="mt-3 sm:mt-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-5 sm:mt-8 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Link
             href="/core/cash/import"
@@ -1161,7 +1161,7 @@ export function CashAccountView({
 
       {/* Bank connections — hidden in combined embedded mode */}
       {gcEnabled && !isCombined && (
-        <section className="mt-3 sm:mt-6">
+        <section className="mt-5 sm:mt-8">
           <button
             onClick={() => setShowBankConnections((v) => !v)}
             className="flex w-full items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
@@ -1222,7 +1222,7 @@ export function CashAccountView({
         )
         if (pendingTransfers.length === 0) return null
         return (
-          <div className="mt-3 sm:mt-6">
+          <div className="mt-5 sm:mt-8">
             <PendingTransferBanner
               count={pendingTransfers.length}
               onReview={() => setReviewTransferTxs(pendingTransfers)}
@@ -1232,7 +1232,7 @@ export function CashAccountView({
       })()}
 
       {/* Monthly overview */}
-      <section className="mt-3 sm:mt-6 grid grid-cols-3 gap-3 sm:gap-4" data-testid="monthly-summary">
+      <section className="mt-5 sm:mt-8 grid grid-cols-3 gap-3 sm:gap-5" data-testid="monthly-summary">
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
           <div className="flex items-center justify-center gap-1.5">
             <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
@@ -1310,7 +1310,7 @@ export function CashAccountView({
 
       {/* Uncategorized transactions banner */}
       {uncatTx.length > 0 && (
-        <div className="mt-3 sm:mt-6">
+        <div className="mt-5 sm:mt-8">
           <UncategorizedTransactionsBanner
             count={uncatTx.length}
             totalAmount={uncatTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)}
@@ -1323,7 +1323,7 @@ export function CashAccountView({
       {/* Sankey flow diagram */}
       <FeatureGate featureId="cashflow_sankey" fallback="hidden">
       {sankeyData && sankeyData.nodes.length > 0 && (
-        <section className="mt-3 sm:mt-6">
+        <section className="mt-5 sm:mt-8">
           <button
             onClick={() => setShowSankey((v) => !v)}
             className="flex w-full items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
@@ -1351,7 +1351,7 @@ export function CashAccountView({
       </FeatureGate>
 
       {/* Tab strip */}
-      <div className="mt-3 sm:mt-6 flex border-b border-[var(--border-ed)]">
+      <div className="mt-5 sm:mt-8 flex border-b border-[var(--border-ed)]">
         {([
           { id: 'transacties' as const, label: 'Transacties' },
           { id: 'kalender' as const, label: 'Kalender' },
@@ -1374,7 +1374,7 @@ export function CashAccountView({
       {activeTab === 'transacties' && (
       <>
       {/* Recurring transactions */}
-      <section className="mt-3 sm:mt-6">
+      <section className="mt-5 sm:mt-8">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowRecurring((v) => !v)}
@@ -1492,7 +1492,7 @@ export function CashAccountView({
       {/* Cashflow Prognose */}
       <FeatureGate featureId="cashflow_forecast" fallback="hidden">
         {cashFlowHasData && cashFlowForecast.length >= 2 && (
-          <section className="mt-3 sm:mt-6" data-testid="cashflow-forecast-section">
+          <section className="mt-5 sm:mt-8" data-testid="cashflow-forecast-section">
             <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <LineChart className="h-4 w-4 text-kern-600" />
@@ -1512,7 +1512,7 @@ export function CashAccountView({
       </FeatureGate>
 
       {/* Transaction filters */}
-      <section className="mt-3 sm:mt-6" data-testid="transaction-filters">
+      <section className="mt-5 sm:mt-8" data-testid="transaction-filters">
         <div className="flex flex-col gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-3)]" />
@@ -1574,7 +1574,7 @@ export function CashAccountView({
       {/* Transaction list */}
       {/* Partner privacy notice + category totals for 'totals' mode */}
       {perspective === 'household' && isPartnerTxTotals && partnerCategorySummary && (
-        <section className="mt-3 sm:mt-6" data-testid="partner-tx-privacy-summary">
+        <section className="mt-5 sm:mt-8" data-testid="partner-tx-privacy-summary">
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
             <div className="mb-3 flex items-center gap-2">
               <Shield className="h-4 w-4 text-[var(--ink-3)]" />
@@ -1653,7 +1653,7 @@ export function CashAccountView({
 
       {/* Partner privacy hidden notice */}
       {perspective === 'household' && isPartnerTxHidden && (
-        <section className="mt-3 sm:mt-6">
+        <section className="mt-5 sm:mt-8">
           <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['transactions']} />
         </section>
       )}
@@ -1664,7 +1664,7 @@ export function CashAccountView({
           <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['transactions']} />
         </div>
       )}
-      <section className="mt-3 sm:mt-6" data-testid="transaction-list">
+      <section className="mt-5 sm:mt-8" data-testid="transaction-list">
         {sortedDates.length === 0 ? (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center" data-testid="no-transactions">
             <Wallet className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
@@ -1878,7 +1878,7 @@ export function CashAccountView({
 
       {/* Settlement — household only */}
       {activeTab === 'transacties' && perspective === 'household' && hasHousehold && householdId && currentUserId && (
-        <section className="mt-3 sm:mt-6" data-testid="settlement-section">
+        <section className="mt-5 sm:mt-8" data-testid="settlement-section">
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
             <div className="mb-4 flex items-center gap-2 border-b border-[var(--border-ed)] pb-3">
               <div className="h-3 w-[3px] rounded-full bg-wil-500" />
@@ -1894,7 +1894,7 @@ export function CashAccountView({
       )}
 
       {activeTab === 'kalender' && (
-        <section className="mt-3 sm:mt-6" data-testid="bill-calendar-section">
+        <section className="mt-5 sm:mt-8" data-testid="bill-calendar-section">
           <BillCalendar
             recurrings={recurrings}
             transactions={transactions.map((tx): CalendarTransaction => ({
@@ -1931,7 +1931,7 @@ export function CashAccountView({
       {/* Asset edit modal */}
       {linkedAsset && (
         <BottomSheet open={showAssetEdit} onClose={() => setShowAssetEdit(false)} title="Rekening bewerken" size="md">
-          <div className="p-5">
+          <div className="p-6">
             <AssetEditForm
               asset={linkedAsset}
               saving={assetSaving}
@@ -2077,52 +2077,52 @@ function AssetEditForm({
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
           <input
             type="number"
             value={currentValue}
             onChange={(e) => setCurrentValue(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm font-mono tabular-nums"
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm font-mono tabular-nums"
           />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">IBAN</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">IBAN</label>
           <input
             value={iban}
             onChange={(e) => setIban(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
             placeholder="NL00 BANK 0000 0000 00"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Bank naam</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Bank naam</label>
           <input
             value={bankName}
             onChange={(e) => setBankName(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
           />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Type</label>
           <select
             value={subtype}
             onChange={(e) => setSubtype(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
           >
             {ACCOUNT_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -2130,20 +2130,20 @@ function AssetEditForm({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Net worth inclusie %</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Net worth inclusie %</label>
           <input
             type="number"
             min={0}
             max={100}
             value={nwPct}
             onChange={(e) => setNwPct(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm font-mono tabular-nums"
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm font-mono tabular-nums"
           />
         </div>
       </div>
 
       {/* Transacties loskoppelen */}
-      <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+      <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
         {!confirmDisconnect ? (
           <button
             type="button"
@@ -2158,7 +2158,7 @@ function AssetEditForm({
             <p className="text-xs text-[var(--ink-2)]">
               De rekening wordt weer een gewone asset zonder transacties en budgetten.
             </p>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
                 onClick={onDisconnect}
@@ -2178,7 +2178,7 @@ function AssetEditForm({
         )}
       </div>
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex justify-end gap-3 border-t border-[var(--border-ed)] pt-4">
         <button
           onClick={onCancel}
           className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"

@@ -69,7 +69,17 @@
       "Bash(find /c/Users/janpa/cd/development/fin -type f \\\\\\(-name *regression* -o -name *e2e* \\\\\\))",
       "Bash(npx eslint:*)",
       "Bash(npx next:*)",
-      "Bash(head -50 /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/identity/gids/page.tsx)"
+      "Bash(head -50 /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/identity/gids/page.tsx)",
+      "Bash(find \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\" -type f -name \"page.tsx\")",
+      "Bash(grep -r .from\\\\\\(['']transactions[''] C:Usersjanpacddevelopmentfin --include=*.ts --include=*.tsx)",
+      "Bash(find /c/Users/janpa/cd/development/fin -maxdepth 1 -type f \\\\\\(-name *.md -o -name .env* -o -name tsconfig.json -o -name jest.config.* -o -name vitest.config.* \\\\\\))",
+      "Bash(ls -la C:/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/will/)",
+      "Bash(ls -la \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\")",
+      "Bash(ls -la \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\\\\core\")",
+      "Bash(find \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\" -maxdepth 2 -name \"page.tsx\")",
+      "Bash(ls -1 /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/)",
+      "Bash(head -200 \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\\\\identity\\\\gids\\\\page.tsx\")",
+      "Bash(cat /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/beheer/testdata/page.tsx)"
     ]
   },
   "enableAllProjectMcpServers": true,

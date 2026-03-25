@@ -732,6 +732,26 @@ export function toSimRow(row: UnifiedProjectionRow): SimRow {
     ? row.withdrawal + row.savings
     : row.grossIncome - row.savings - row.cashflowNet - row.oneTimeNet
 
+  // Vermogensstromen: flows to/from net worth
+  // Bruto rendement = netto rendement + Box 3 (totalGrowth is already net of box3)
+  const grossGrowth = row.totalGrowth + row.totalBox3
+  // Totale schuldrente
+  let totalDebtInterest = 0
+  for (const detail of Object.values(row.debtBalances)) {
+    totalDebtInterest += detail.interestPaid
+  }
+  // Positieve/negatieve cashflows splitsen
+  const cfPositive = Math.max(0, row.cashflowNet) + Math.max(0, row.oneTimeNet)
+  const cfNegative = Math.abs(Math.min(0, row.cashflowNet)) + Math.abs(Math.min(0, row.oneTimeNet))
+
+  const flowIn = (legacyPhase === 'accumulation' ? Math.max(0, row.savings) : 0)
+    + Math.max(0, grossGrowth)
+    + cfPositive
+  const flowOut = row.totalBox3
+    + totalDebtInterest
+    + (legacyPhase === 'retirement' ? row.withdrawal : 0)
+    + cfNegative
+
   return {
     age: row.age,
     phase: legacyPhase,
@@ -744,6 +764,8 @@ export function toSimRow(row: UnifiedProjectionRow): SimRow {
     endPortfolio: row.netWorth,
     grossIncome: row.grossIncome,
     grossExpenses,
+    flowIn: Math.round(flowIn),
+    flowOut: Math.round(flowOut),
   }
 }
 

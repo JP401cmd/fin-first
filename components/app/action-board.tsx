@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, ChevronDown, Users, CheckCircle } from 'lucide-react'
+import { Plus, Users, CheckCircle } from 'lucide-react'
 import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ActionListModal } from '@/components/app/action-list-modal'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
@@ -27,8 +27,6 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   useEffect(() => { setActions(initialActions) }, [initialActions])
   const [showForm, setShowForm] = useState(false)
   const [showAll, setShowAll] = useState(false)
-  const [showModalCompleted, setShowModalCompleted] = useState(false)
-  const [showModalRejected, setShowModalRejected] = useState(false)
   const { triggerAnimation } = useFreedomDaysAnimation()
 
   // Allow parent to trigger showing the add form via counter prop
@@ -79,13 +77,6 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   const partnerOpenActions = partnerAssignedActions
     .filter((a) => a.status === 'open')
     .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0) || a.sort_order - b.sort_order)
-
-  const totalOpenDays = openActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
-  const totalCompletedDays = completedActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
-
-  // All open (own + partner) sorted by impact for the modal
-  const allOpenByImpact = [...openActions, ...postponedActions, ...partnerOpenActions]
-    .sort((a, b) => (b.freedom_days_impact || 0) - (a.freedom_days_impact || 0))
 
   // Block view: open + postponed own actions, max 5
   const activeActions = [...openActions, ...postponedActions]
@@ -257,121 +248,19 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
       </button>
 
       {/* ============ Modal ============ */}
-      <BottomSheet
+      <ActionListModal
         open={showAll}
-        onClose={() => { setShowAll(false); setShowModalCompleted(false); setShowModalRejected(false) }}
-        title="Alle acties"
-        size="lg"
-      >
-        <div className="px-5 pb-6 pt-2">
-          {/* Summary strip */}
-          <div className="mb-5 flex items-center gap-4 text-xs text-[var(--ink-3)]">
-            <span><span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{allOpenByImpact.length}</span> openstaand</span>
-            {totalOpenDays > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-wil-50 px-2 py-0.5 font-mono tabular-nums text-[10px] font-medium text-wil-700">
-                {Math.round(totalOpenDays)}d potentieel
-              </span>
-            )}
-            {completedActions.length > 0 && (
-              <span><span className="font-mono tabular-nums font-semibold text-emerald-600">{completedActions.length}</span> afgerond</span>
-            )}
-            {rejectedActions.length > 0 && (
-              <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-3)]">{rejectedActions.length}</span> afgewezen</span>
-            )}
-          </div>
-
-          {/* New action button */}
-          {!showForm && (
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Nieuwe actie
-            </button>
-          )}
-
-          {showForm && (
-            <div className="mb-4">
-              <ActionForm onSubmit={handleCreateAction} onCancel={() => setShowForm(false)} />
-            </div>
-          )}
-
-          {/* Open actions — sorted by impact */}
-          {allOpenByImpact.length > 0 && (
-            <div className="space-y-2">
-              {allOpenByImpact.map((action) => (
-                <ActionCard
-                  key={action.id}
-                  action={action}
-                  {...cardProps}
-                  isPartnerAssigned={isPartnerAssigned(action) as boolean}
-                />
-              ))}
-            </div>
-          )}
-
-          {allOpenByImpact.length === 0 && (
-            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-6 text-center">
-              <p className="text-sm text-[var(--ink-3)]">Geen openstaande acties</p>
-            </div>
-          )}
-
-          {/* Completed actions — collapsible */}
-          {completedActions.length > 0 && (
-            <div className="mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)]/30">
-              <button
-                type="button"
-                onClick={() => setShowModalCompleted(!showModalCompleted)}
-                className="flex w-full items-center gap-2 px-4 py-3 text-left"
-              >
-                <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${showModalCompleted ? 'rotate-0' : '-rotate-90'}`} />
-                <span className="text-xs font-semibold text-[var(--ink-2)]">Afgerond</span>
-                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-emerald-50 px-1.5 font-mono text-[10px] font-bold tabular-nums text-emerald-700">
-                  {completedActions.length}
-                </span>
-                {totalCompletedDays > 0 && (
-                  <span className="ml-auto font-mono text-[10px] tabular-nums font-medium text-emerald-600">
-                    {Math.round(totalCompletedDays)}d gewonnen
-                  </span>
-                )}
-              </button>
-              {showModalCompleted && (
-                <div className="space-y-2 px-4 pb-4">
-                  {completedActions.map((action) => (
-                    <ActionCard key={action.id} action={action} {...cardProps} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Rejected actions — collapsible */}
-          {rejectedActions.length > 0 && (
-            <div className="mt-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)]/30">
-              <button
-                type="button"
-                onClick={() => setShowModalRejected(!showModalRejected)}
-                className="flex w-full items-center gap-2 px-4 py-3 text-left"
-              >
-                <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${showModalRejected ? 'rotate-0' : '-rotate-90'}`} />
-                <span className="text-xs font-semibold text-[var(--ink-2)]">Afgewezen</span>
-                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-zinc-100 px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
-                  {rejectedActions.length}
-                </span>
-              </button>
-              {showModalRejected && (
-                <div className="space-y-2 px-4 pb-4">
-                  {rejectedActions.map((action) => (
-                    <ActionCard key={action.id} action={action} {...cardProps} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </BottomSheet>
+        onClose={() => setShowAll(false)}
+        actions={actions}
+        onStatusChange={handleStatusChange}
+        onUpdate={handleUpdateAction}
+        onCreateAction={handleCreateAction}
+        onCancellationOpen={onCancellationOpen}
+        partnerInfo={partnerInfo}
+        onAssign={handleAssign}
+        currentUserId={currentUserId}
+        isPartnerAssigned={(a) => isPartnerAssigned(a) as boolean}
+      />
     </div>
   )
 }

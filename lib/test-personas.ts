@@ -12,6 +12,7 @@
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'
 import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
+import { getCurrentWeek, getNextWeek } from '@/lib/week-utils'
 
 const S = BUDGET_SLUGS
 
@@ -32,7 +33,7 @@ function monthsAgo(months: number, day = 1): string {
 
 // ── Types ─────────────────────────────────────────────────────
 
-export type PersonaKey = 'roos' | 'daan' | 'lisa' | 'willem' | 'rashid' | 'marijke'
+export type PersonaKey = 'roos' | 'daan' | 'lisa' | 'willem' | 'rashid' | 'marijke' | 'ronald' | 'bas' | 'leo' | 'jochen'
 
 export type SovereigntyPhase = 'recovery' | 'stability' | 'momentum' | 'mastery'
 
@@ -219,6 +220,7 @@ export interface PersonaRecommendation {
     euro_impact_monthly: number
     status: string
     priority_score: number
+    scheduled_week?: string
   }[]
 }
 
@@ -659,8 +661,8 @@ const roosData: PersonaData = {
         { title: 'Zeg Spotify op (gebruik gratis versie)', freedom_days_impact: 1, euro_impact_monthly: 11 },
       ],
       actions: [
-        { source: 'ai', title: 'Zeg Disney+ op', description: 'Ga naar je Disney+ account en zeg het abonnement op', freedom_days_impact: 1, euro_impact_monthly: 14, status: 'open', priority_score: 3 },
-        { source: 'ai', title: 'Zeg Spotify op', description: 'Schakel over naar de gratis versie van Spotify', freedom_days_impact: 1, euro_impact_monthly: 11, status: 'open', priority_score: 3 },
+        { source: 'ai', title: 'Zeg Disney+ op', description: 'Ga naar je Disney+ account en zeg het abonnement op', freedom_days_impact: 1, euro_impact_monthly: 14, status: 'open', priority_score: 3, scheduled_week: getCurrentWeek() },
+        { source: 'ai', title: 'Zeg Spotify op', description: 'Schakel over naar de gratis versie van Spotify', freedom_days_impact: 1, euro_impact_monthly: 11, status: 'open', priority_score: 3, scheduled_week: getNextWeek() },
       ],
     },
     {
@@ -678,7 +680,7 @@ const roosData: PersonaData = {
         { title: 'Beperk bezorging tot 1x per week', freedom_days_impact: 4, euro_impact_monthly: 50 },
       ],
       actions: [
-        { source: 'ai', title: 'Stel een weekmenu samen', description: 'Plan je maaltijden voor de week en doe 1 grote boodschap', freedom_days_impact: 5, euro_impact_monthly: 50, status: 'open', priority_score: 4 },
+        { source: 'ai', title: 'Stel een weekmenu samen', description: 'Plan je maaltijden voor de week en doe 1 grote boodschap', freedom_days_impact: 5, euro_impact_monthly: 50, status: 'open', priority_score: 4, scheduled_week: getCurrentWeek() },
         { source: 'ai', title: 'Verwijder bezorgapps van je telefoon', description: 'Verwijder Thuisbezorgd en Uber Eats van je telefoon om impulsbestellingen te voorkomen', freedom_days_impact: 4, euro_impact_monthly: 50, status: 'open', priority_score: 4 },
       ],
     },
@@ -762,8 +764,9 @@ const daanTransactions: PersonaTransactionTemplate[] = [
   ...generateGroceryTransactions(15, 95, 20), // Hogere boodschappen, kookt weinig
   // Irregular/seasonal transactions
   ...generateIrregularTransactions([
-    // Bonus
+    // Bonus + declaratie (dual-direction: werkgever is zowel inkomst als uitgave)
     { monthsAgo: 1, day: 15, amount: 1700, description: 'Bonus Q4 TechFlow', counterparty_name: 'TechFlow BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true },
+    { monthsAgo: 6, day: 20, amount: 250, description: 'Declaratie thuiswerkkosten Q2', counterparty_name: 'TechFlow BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true },
     // Vakantie (groot deel van uitgaven)
     { monthsAgo: 7, day: 1, amount: -480, description: 'Vlucht Ibiza', counterparty_name: 'Transavia', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
     { monthsAgo: 7, day: 5, amount: -520, description: 'Airbnb Ibiza', counterparty_name: 'Airbnb', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
@@ -883,7 +886,7 @@ const daanData: PersonaData = {
         { title: 'Beperk impulsaankopen kleding', description: 'Stel een wachtperiode van 48 uur in voor aankopen >€50', freedom_days_impact: 11, euro_impact_monthly: 100 },
       ],
       actions: [
-        { source: 'ai', title: 'Stel een maandelijks uitgavenplafond in', description: 'Zet een automatische waarschuwing bij 80% van je budget', freedom_days_impact: 45, euro_impact_monthly: 340, status: 'open', priority_score: 5 },
+        { source: 'ai', title: 'Stel een maandelijks uitgavenplafond in', description: 'Zet een automatische waarschuwing bij 80% van je budget', freedom_days_impact: 45, euro_impact_monthly: 340, status: 'open', priority_score: 5, scheduled_week: getCurrentWeek() },
       ],
     },
     {
@@ -1141,7 +1144,7 @@ const lisaData: PersonaData = {
         { title: 'Stel automatische verhoging Meesman in', freedom_days_impact: 45, euro_impact_monthly: 350 },
       ],
       actions: [
-        { source: 'ai', title: 'Plan Meesman verhoging', description: 'Zet een reminder om de Meesman inleg te verhogen zodra de kinderopvangkosten wegvallen', freedom_days_impact: 45, euro_impact_monthly: 350, status: 'open', priority_score: 4 },
+        { source: 'ai', title: 'Plan Meesman verhoging', description: 'Zet een reminder om de Meesman inleg te verhogen zodra de kinderopvangkosten wegvallen', freedom_days_impact: 45, euro_impact_monthly: 350, status: 'open', priority_score: 4, scheduled_week: getNextWeek() },
       ],
     },
     {
@@ -1413,7 +1416,7 @@ const willemData: PersonaData = {
         { title: 'Voeg dividend-ETF toe aan portefeuille', freedom_days_impact: 7 },
       ],
       actions: [
-        { source: 'ai', title: 'Analyseer huidige asset allocatie', description: 'Bekijk je DEGIRO portefeuille en bepaal de huidige verdeling over aandelen, obligaties en overig', freedom_days_impact: 8, euro_impact_monthly: 0, status: 'open', priority_score: 4 },
+        { source: 'ai', title: 'Analyseer huidige asset allocatie', description: 'Bekijk je DEGIRO portefeuille en bepaal de huidige verdeling over aandelen, obligaties en overig', freedom_days_impact: 8, euro_impact_monthly: 0, status: 'open', priority_score: 4, scheduled_week: getCurrentWeek() },
         { source: 'ai', title: 'Koop Vanguard Global Aggregate Bond ETF', description: 'Verschuif 20% van je aandelenposities naar een breed obligatie-ETF', freedom_days_impact: 7, euro_impact_monthly: 0, status: 'open', priority_score: 4 },
       ],
     },
@@ -1668,7 +1671,7 @@ const rashidData: PersonaData = {
         { title: 'Koppel je bankrekening voor automatisch inzicht', freedom_days_impact: 5, euro_impact_monthly: 200 },
       ],
       actions: [
-        { source: 'ai', title: 'Maak je eerste budgetten aan', description: 'Ga naar De Kern → Budgetten en stel je eerste categorieën in. Begin simpel: vaste lasten, boodschappen en leuke dingen.', freedom_days_impact: 5, euro_impact_monthly: 200, status: 'open', priority_score: 4 },
+        { source: 'ai', title: 'Maak je eerste budgetten aan', description: 'Ga naar De Kern → Budgetten en stel je eerste categorieën in. Begin simpel: vaste lasten, boodschappen en leuke dingen.', freedom_days_impact: 5, euro_impact_monthly: 200, status: 'open', priority_score: 4, scheduled_week: getCurrentWeek() },
         { source: 'ai', title: 'Koppel je ING rekening', description: 'Koppel je betaalrekening voor automatische transactie-import, zodat je zonder moeite inzicht krijgt.', freedom_days_impact: 5, euro_impact_monthly: 200, status: 'open', priority_score: 4 },
       ],
     },
@@ -1923,7 +1926,7 @@ const marijkeData: PersonaData = {
         { title: 'Overweeg deposito-ladder voor voorspelbaar inkomen', freedom_days_impact: 0 },
       ],
       actions: [
-        { source: 'ai', title: 'Analyseer huidige risicoverdeling', description: 'Bekijk de verdeling over aandelen, obligaties en deposito\'s en vergelijk met je risicoprofiel', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 4 },
+        { source: 'ai', title: 'Analyseer huidige risicoverdeling', description: 'Bekijk de verdeling over aandelen, obligaties en deposito\'s en vergelijk met je risicoprofiel', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 4, scheduled_week: getNextWeek() },
         { source: 'ai', title: 'Plan een herbalancering', description: 'Verschuif geleidelijk 10% van aandelen-ETFs naar obligatie-ETFs of een deposito-ladder', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 3 },
       ],
     },
@@ -2064,6 +2067,107 @@ const marijkeData: PersonaData = {
 }
 
 // ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// Landing page testpersona's — gebaseerd op bestaande seeds
+// Elk vertegenwoordigt een gebruikersgroep van de landing page
+// ══════════════════════════════════════════════════════════════
+
+const ronaldData: PersonaData = {
+  ...marijkeData,
+  meta: {
+    name: 'Ronald Hoekstra',
+    subtitle: 'De pensioenplanner',
+    description: 'Bijna met pensioen op 64. Wil het pensioengat in kaart brengen en weten of AOW + werkgeverspensioen + eigen vermogen samen genoeg zijn. Gebruikersgroep: pensioenplanner.',
+    color: 'emerald',
+    avatarColor: '#4A7A5B',
+    netWorth: 850000,
+    income: 3400,
+    expenses: 2800,
+    backgroundStory: 'Ronald was 30 jaar technisch manager bij Tata Steel in IJmuiden. Samen met zijn vrouw Anja (62) heeft hij een hypotheekvrij huis in Beverwijk. Over een jaar gaat hij met pensioen. Hij wil precies weten of het ABP-pensioen, de AOW en zijn beleggingsportefeuille samen genoeg zijn om hun levensstijl voort te zetten. Zijn grootste vraag: hoeveel mag hij onttrekken zonder dat het geld opraakt?',
+    challenges: ['Pensioengat berekenen: is het genoeg?', 'Onttrekkingsstrategie bepalen (guardrails vs. vast percentage)', 'Portefeuille verschuiven naar minder risico', 'Stijgende zorgkosten inplannen'],
+    currentSituation: 'Nog 1 jaar werkzaam, daarna volledig pensioen. Comfortabel vermogen opgebouwd, maar onzeker over de onttrekkingsfase.',
+    firstGoal: 'Campertrip door Noorwegen na pensioen',
+    sovereignty: 'mastery',
+  },
+  profile: {
+    ...marijkeData.profile,
+    full_name: 'Ronald Hoekstra',
+    date_of_birth: '1962-03-15',
+  },
+}
+
+const basData: PersonaData = {
+  ...lisaData,
+  meta: {
+    name: 'Bas Mulder',
+    subtitle: 'De vermogensverdeler',
+    description: 'Financieel analist met €100K+ vermogen verspreid over spaargeld, beleggingen, hypotheek en een bedrijfsdeel. Wil alles bij elkaar zien en begrijpen hoe het samenhangt. Gebruikersgroep: vermogensverdeler.',
+    color: 'amber',
+    avatarColor: '#8B6914',
+    netWorth: 100000,
+    income: 5200,
+    expenses: 4700,
+    backgroundStory: 'Bas is financieel analist bij een middelgroot accountantskantoor in Utrecht. Met zijn vrouw Sophie (43) en twee kinderen (8 en 11) woont hij in een rijtjeshuis in De Meern. Ze hebben net de €100K nettovermogen-grens gepasseerd. Beleggingen bij Meesman, hypotheek bij Obvion, spaargeld bij ASN. Bas wil overzicht: wat bezitten ze precies, hoe hangt het samen, en hoe presteert de portefeuille? Hij is analytisch ingesteld en wil data, geen vage dashboards.',
+    challenges: ['Overzicht over 6+ financiële producten bij verschillende partijen', 'Vermogensallocatie optimaliseren (te veel in spaar, te weinig in indexfondsen)', 'Box 3 belasting berekenen en minimaliseren', 'Hypotheek vs. beleggen afweging'],
+    currentSituation: 'Net de €100K gepasseerd. Vermogen groeit door compound interest, maar verspreid over te veel partijen voor goed overzicht.',
+    firstGoal: 'Vermogen naar €250K en kinderekening opzetten',
+    sovereignty: 'momentum',
+  },
+  profile: {
+    ...lisaData.profile,
+    full_name: 'Bas Mulder',
+    date_of_birth: '1981-09-22',
+  },
+}
+
+const leoData: PersonaData = {
+  ...roosData,
+  meta: {
+    name: 'Leo Pietersen',
+    subtitle: 'De budgetteerder',
+    description: 'Grafisch vormgever die na een impulsieve periode grip wil krijgen op zijn uitgaven. Geeft meer uit dan er binnenkomt en wil patronen herkennen. Gebruikersgroep: budgetteerder.',
+    color: 'red',
+    avatarColor: '#9B4D4D',
+    netWorth: -15000,
+    income: 2800,
+    expenses: 3200,
+    backgroundStory: 'Leo is freelance grafisch vormgever in Rotterdam. Na een jaar van grote uitgaven — nieuwe MacBook Pro, designmeubels, festivals — zit hij met een creditcardschuld en een privélease die hij liever kwijt was. Zijn inkomsten zijn goed maar onregelmatig, en hij heeft geen idee waar het geld naartoe gaat. Zijn bankrekening is een zwart gat. Leo wil geen streng budget, maar wél inzicht: hoeveel gaat er naar abonnementen? Hoeveel naar uit eten? En hoeveel kost die impulsiviteit hem aan vrijheidstijd?',
+    challenges: ['Uitgaven > inkomsten: €400/maand negatief', 'Creditcardschuld van €4.500 met hoge rente', 'Geen noodfonds, geen buffer', 'Abonnementen-wildgroei (streaming, software, gym)'],
+    currentSituation: 'Elke maand dieper in het rood. Weet dat het anders moet maar mist de tools om patronen te herkennen.',
+    firstGoal: 'Creditcardschuld aflossen en 1 maand buffer opbouwen',
+    sovereignty: 'recovery',
+  },
+  profile: {
+    ...roosData.profile,
+    full_name: 'Leo Pietersen',
+    date_of_birth: '1991-01-08',
+  },
+}
+
+const jochenData: PersonaData = {
+  ...willemData,
+  meta: {
+    name: 'Jochen Brouwer',
+    subtitle: 'De FIRE-strijder',
+    description: 'Software architect met €1.4M vermogen die actief werkt naar financiële onafhankelijkheid op 55. Maximaliseert spaarquote en optimaliseert rendement. Gebruikersgroep: fire_strijder.',
+    color: 'sky',
+    avatarColor: '#2A6B8A',
+    netWorth: 1460000,
+    income: 6500,
+    expenses: 3000,
+    backgroundStory: 'Jochen is lead software architect bij Adyen in Amsterdam. Met zijn vrouw Maren (50) en twee studerende kinderen woont hij in een afbetaald huis in Haarlem. Al 15 jaar bezig met FIRE: maximale spaarquote (53%), indexfondsen bij DeGiro, en elk jaar een stap dichter bij de streep. De hypotheek is afgelost, de kinderen studeren op eigen beurs. Jochen telt af: nog 3 jaar. Hij wil de precieze datum weten, Monte Carlo-simulaties draaien, en elke optimalisatie pakken die er nog is.',
+    challenges: ['Exacte FIRE-datum bepalen (doel: 55 jaar)', 'Sequence-of-returns risk managen in laatste opbouwjaren', 'Portefeuille optimaliseren: kosten verlagen, allocatie finetunen', 'Overgang van opbouw- naar onttrekkingsfase plannen'],
+    currentSituation: 'Op 92% van FIRE-doel. €705K belegbaar vermogen, target €900K. 53% spaarquote. Nog ~3 jaar als rendementen meezitten.',
+    firstGoal: 'Financieel onafhankelijk op 55',
+    sovereignty: 'mastery',
+  },
+  profile: {
+    ...willemData.profile,
+    full_name: 'Jochen Brouwer',
+    date_of_birth: '1974-07-03',
+  },
+}
+
 // Export
 // ══════════════════════════════════════════════════════════════
 
@@ -2074,6 +2178,10 @@ export const PERSONAS: Record<PersonaKey, PersonaData> = {
   willem: willemData,
   rashid: rashidData,
   marijke: marijkeData,
+  ronald: ronaldData,
+  bas: basData,
+  leo: leoData,
+  jochen: jochenData,
 }
 
-export const PERSONA_KEYS: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem', 'rashid', 'marijke']
+export const PERSONA_KEYS: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem', 'rashid', 'marijke', 'ronald', 'bas', 'leo', 'jochen']

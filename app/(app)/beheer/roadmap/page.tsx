@@ -1102,6 +1102,191 @@ function CompetitorGroup({ title, apps }: { title: string; apps: string[] }) {
   )
 }
 
+/* -- Productie Readiness features ------------------------------- */
+const PRODUCTIE_FEATURES: readonly Feature[] = [
+  {
+    nr: 1,
+    name: 'Security Headers & Middleware',
+    description: 'HTTP security headers (CSP, X-Frame-Options, HSTS) toevoegen aan alle responses en middleware implementeren voor CSRF-bescherming en globale rate limiting. Momenteel ontbreekt een middleware.ts volledig en heeft next.config.ts geen security headers.',
+    werking: 'Security headers worden in next.config.ts geconfigureerd via de headers() functie. Een nieuwe middleware.ts op root-niveau handelt CSRF-token validatie af voor alle muterende endpoints (POST/PUT/DELETE). Rate limiting wordt geïmplementeerd als in-memory store (of Redis bij schaling) in de middleware, met configureerbare limieten per endpoint-groep (auth: strikt, API: normaal, static: geen).',
+    afhankelijkheden: [
+      'next.config.ts (headers configuratie)',
+      'middleware.ts (nieuw — CSRF + rate limiting)',
+      'app/api/* (alle muterende routes)',
+      'lib/supabase/server.ts (auth context)',
+    ],
+    technisch: 'next.config.ts: headers() met Content-Security-Policy, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Strict-Transport-Security, Referrer-Policy. middleware.ts: CSRF via double-submit cookie pattern (geen extra state nodig), rate limiter met sliding window counter per IP+userId. Aparte limieten voor /api/auth (5/min), /api/chat (20/min), overige API (60/min). CORS configuratie voor productie domein.',
+    waardeGebruiker: 'Beschermt gebruikers tegen cross-site attacks, clickjacking, en brute-force aanvallen. Essentieel voor een financiële applicatie die gevoelige vermogensdata bevat.',
+    aandachtspunten: [
+      'CSP moet AI SDK externe calls (api.anthropic.com, api.openai.com) whitelisten.',
+      'Rate limiting moet household-members als aparte users tellen.',
+      'CSRF tokens moeten werken met Supabase auth flow.',
+      'Vercel Edge Functions hebben beperkingen voor stateful middleware.',
+    ],
+    competitors: 'Industriestandaard — alle productie-apps hebben dit.',
+    priority: 'Hoog',
+  },
+  {
+    nr: 2,
+    name: 'Error Tracking & Monitoring',
+    description: 'Sentry integreren voor gecentraliseerde error tracking, performance monitoring (APM), en alerting. Momenteel worden errors alleen client-side gevangen door error.tsx boundaries maar niet gerapporteerd naar een centraal systeem.',
+    werking: 'Sentry SDK wordt geïnstalleerd voor zowel client (React) als server (Node). Alle unhandled exceptions, API fouten, en performance metrics worden automatisch gerapporteerd. Custom breadcrumbs voor financiële operaties (transacties, simulaties). Alert rules voor kritieke flows: auth failures, data corruption, FIRE berekening errors.',
+    afhankelijkheden: [
+      'app/error.tsx (bestaande error boundary)',
+      'app/(app)/error.tsx (app error boundary)',
+      'app/api/* (server-side error handling)',
+      'package.json (@sentry/nextjs)',
+      'next.config.ts (Sentry webpack plugin)',
+    ],
+    technisch: 'npm install @sentry/nextjs. sentry.client.config.ts + sentry.server.config.ts + sentry.edge.config.ts. Instrumentation via next.config.ts withSentryConfig wrapper. Custom Sentry.captureException calls in kritieke API routes. Performance tracing voor dashboard load, FIRE simulatie, en AI chat. Source maps uploaden naar Sentry voor readable stack traces. Environment tagging (development/staging/production).',
+    waardeGebruiker: 'Problemen worden proactief ontdekt en opgelost voordat gebruikers ze melden. Snellere bugfixes door complete context (browser, OS, user actions) bij elke error.',
+    aandachtspunten: [
+      'PII moet gefilterd worden uit Sentry events (IBAN, BSN, bedragen).',
+      'Sentry free tier: 5K errors/maand — voldoende voor launch.',
+      'Source maps moeten NIET publiek toegankelijk zijn.',
+      'Performance sampling rate: 10% in productie om kosten te beperken.',
+    ],
+    competitors: 'Industriestandaard — Sentry, DataDog, of equivalent.',
+    priority: 'Hoog',
+  },
+  {
+    nr: 3,
+    name: 'CI/CD Pipeline',
+    description: 'GitHub Actions workflows opzetten voor automatische tests, linting, type checking, en deployment. Momenteel ontbreekt CI/CD volledig — er is geen .github/workflows directory.',
+    werking: 'Drie workflows: (1) PR Check — runt bij elke pull request: vitest, eslint, tsc --noEmit, next build. (2) Deploy — runt bij merge naar main: Vercel deployment + smoke tests. (3) Nightly — dagelijkse regressietests en dependency vulnerability scan.',
+    afhankelijkheden: [
+      '.github/workflows/ (nieuw)',
+      'package.json (test/lint scripts)',
+      'vitest.config.ts (bestaand)',
+      'vercel.json (deployment config)',
+    ],
+    technisch: 'PR workflow: checkout → setup-node → npm ci → parallel jobs (vitest, eslint, tsc, next build). Deploy workflow: Vercel CLI deployment + curl health check + basis smoke test. Nightly workflow: volledige regressie suite + npm audit + Dependabot alerts check. Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID. Cache: node_modules via actions/cache voor snellere runs.',
+    waardeGebruiker: 'Voorkomt dat bugs in productie terechtkomen. Elke code-wijziging wordt automatisch gevalideerd voordat het live gaat.',
+    aandachtspunten: [
+      'GitHub Actions free tier: 2000 min/maand — ruim voldoende.',
+      'Vercel preview deployments voor PR review.',
+      'next build kan lang duren (300+ paginas) — overweeg turbo cache.',
+      'Supabase test database nodig voor integratietests in CI.',
+    ],
+    competitors: 'Industriestandaard — alle professionele projecten hebben CI/CD.',
+    priority: 'Hoog',
+  },
+  {
+    nr: 4,
+    name: 'Privacy, AVG & Juridisch',
+    description: 'Privacy policy, algemene voorwaarden, cookiebeleid, en AVG-compliance documenten opstellen en implementeren. Cookie consent banner toevoegen. Momenteel ontbreken alle juridische paginas.',
+    werking: 'Juridische paginas als statische routes: /privacy, /voorwaarden, /cookies. Cookie consent banner (client-side) die verschijnt bij eerste bezoek en keuze opslaat in localStorage + cookie. AVG-compliant data export (bestaand via /api/export) en account deletion (bestaand via /api/account/delete) worden gedocumenteerd. Verwerkersovereenkomsten afsluiten met Supabase, Anthropic, OpenAI.',
+    afhankelijkheden: [
+      'app/privacy/page.tsx (nieuw)',
+      'app/voorwaarden/page.tsx (nieuw)',
+      'components/cookie-consent.tsx (nieuw)',
+      'app/api/export (bestaand — data portability)',
+      'app/api/account/delete (bestaand — right to erasure)',
+    ],
+    technisch: 'Statische paginas met juridische tekst (door jurist te reviewen). Cookie consent component: localStorage voor snelle check, cookie voor server-side aware. Categorieën: noodzakelijk (altijd aan), analytisch (opt-in), marketing (opt-in — momenteel niet gebruikt). AVG register: documentatie van alle verwerkingen, rechtsgronden, bewaartermijnen. Footer links naar alle juridische paginas.',
+    waardeGebruiker: 'Vertrouwen en transparantie. Wettelijk verplicht onder de AVG voor elke app die persoonsgegevens verwerkt. Zonder dit mag de app niet live.',
+    aandachtspunten: [
+      'Juridische teksten moeten door een jurist gereviewed worden.',
+      'Verwerkersovereenkomsten met AI providers (Anthropic, OpenAI) zijn complex.',
+      'Data bewaartermijnen moeten per categorie vastgesteld worden.',
+      'Cookie consent moet "reject all" even prominent tonen als "accept all".',
+      'Supabase data regio (EU) is cruciaal voor AVG compliance.',
+    ],
+    competitors: 'Wettelijke verplichting — geen keuze.',
+    priority: 'Hoog',
+  },
+  {
+    nr: 5,
+    name: 'Performance Optimalisatie',
+    description: 'Bundle analyse, Core Web Vitals monitoring, database query optimalisatie, en caching strategie implementeren. Vercel Speed Insights is geïnstalleerd maar er is geen actief performance budget of monitoring.',
+    werking: 'Bundle analyzer toevoegen voor inzicht in JavaScript payload. Lighthouse CI in GitHub Actions voor performance regressie detectie. Database indexen reviewen en optimaliseren voor veelgebruikte queries (dashboard load, holdings lijst, transactie historie). ISR/SSG overwegen voor semi-statische paginas. Lazy loading voor zware componenten (grafieken, AI chat).',
+    afhankelijkheden: [
+      'next.config.ts (bundle analyzer)',
+      'package.json (@next/bundle-analyzer)',
+      'vercel.json (caching headers)',
+      'supabase/migrations (indexen)',
+      'components/widgets/* (lazy loading)',
+    ],
+    technisch: 'npm install @next/bundle-analyzer. ANALYZE=true next build voor bundle rapport. Performance budget: First Load JS < 150kB per route. Database: EXPLAIN ANALYZE op dashboard query, holdings lijst, transactie queries. Indexen op: holdings(user_id, ticker), transactions(holding_id, date), snapshots(user_id, month). next/dynamic voor Chart componenten en AI chat. Image optimization: next/image met sizes prop op alle afbeeldingen.',
+    waardeGebruiker: 'Snellere app = betere ervaring. Mobiele gebruikers met langzame verbindingen merken het verschil direct. Google rankt snellere sites hoger.',
+    aandachtspunten: [
+      'Turbopack is uitgeschakeld wegens Windows cache corruptie — kan performance in dev beïnvloeden.',
+      '10+ AI SDKs in dependencies — niet allemaal nodig op elke pagina.',
+      'Dashboard laadt veel data server-side — monitoren of dit bottleneck wordt.',
+      'Vercel Serverless Function size limits (50MB) — AI SDKs zijn groot.',
+    ],
+    competitors: 'ProjectionLab (snelle client-side berekeningen), YNAB (geoptimaliseerde web app).',
+    priority: 'Middel',
+  },
+  {
+    nr: 6,
+    name: 'E2E Testing & Load Testing',
+    description: 'Playwright opzetten voor end-to-end tests van kritieke user flows en k6 voor load testing. Momenteel zijn er uitgebreide regressietests en unit tests, maar geen browser-gebaseerde E2E tests.',
+    werking: 'Playwright test suite voor de 5 kritiekste flows: (1) Registratie → onboarding → eerste dashboard, (2) Holding toevoegen → transactie boeken → portfolio update, (3) Budget aanmaken → uitgave categoriseren → maandoverzicht, (4) FIRE simulatie → parameters wijzigen → herberekening, (5) Check-in flow → snapshot → trend vergelijking. Load test met k6: 50 concurrent users op dashboard en API endpoints.',
+    afhankelijkheden: [
+      'playwright.config.ts (nieuw)',
+      'tests/e2e/ (nieuw)',
+      'k6/ (nieuw)',
+      'lib/regression-tests/ (bestaande test suites als referentie)',
+      '.github/workflows/ (CI integratie)',
+    ],
+    technisch: 'npm install -D @playwright/test. Playwright config: chromium + firefox, base URL configureerbaar. Test helpers voor auth (herbruikbare login state via storageState). k6 scripts met ramping VUs: 10 → 50 → 100 over 5 minuten. Dashboard load test target: p95 < 2s bij 50 users. API stress test: /api/dashboard, /api/holdings, /api/fire-simulation. CI: Playwright op PR (headless), k6 nightly.',
+    waardeGebruiker: 'Zekerheid dat de app werkt zoals verwacht na elke wijziging. Load tests voorkomen dat de app crasht bij groei.',
+    aandachtspunten: [
+      'E2E tests hebben een test Supabase project nodig met seed data.',
+      'Playwright tests zijn langzamer dan unit tests — selectief draaien op PR.',
+      'Load testing tegen productie is risicovol — staging environment nodig.',
+      'Test data cleanup na elke E2E run.',
+    ],
+    competitors: 'Industriestandaard voor productie-apps.',
+    priority: 'Middel',
+  },
+  {
+    nr: 7,
+    name: 'Staging Environment & Deployment Runbook',
+    description: 'Staging omgeving opzetten als exact spiegelbeeld van productie, plus een deployment runbook met stapsgewijze instructies voor releases, rollbacks, en incident response.',
+    werking: 'Vercel preview branch "staging" als permanente staging omgeving met eigen Supabase project. Deployment checklist: (1) alle CI checks groen, (2) staging deployment + smoke test, (3) productie deployment, (4) post-deploy health check, (5) rollback procedure bij issues. Runbook als intern document met contactpersonen en escalatiepaden.',
+    afhankelijkheden: [
+      'vercel.json (staging branch config)',
+      'Supabase staging project (nieuw)',
+      '.env.staging (nieuw)',
+      'docs/deployment-runbook.md (nieuw)',
+    ],
+    technisch: 'Vercel: staging branch auto-deploy naar staging.[domain]. Supabase: apart project met zelfde migraties (supabase db push). Environment variabelen per omgeving: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AI API keys (aparte keys voor staging). Rollback: Vercel instant rollback via dashboard of CLI (vercel rollback). Database rollback: migratie rollback scripts (handmatig — Supabase heeft geen auto-rollback).',
+    waardeGebruiker: 'Voorkomt dat bugs direct bij gebruikers terechtkomen. Elke release wordt eerst getest in een productie-identieke omgeving.',
+    aandachtspunten: [
+      'Supabase free tier: 2 projecten — staging kost extra (Pro plan $25/maand).',
+      'Staging data moet realistisch maar niet echt zijn (geen echte gebruikersdata).',
+      'AI API costs verdubbelen met staging (aparte API keys met spending limits).',
+      'Database migraties moeten altijd forward-compatible zijn (geen breaking changes).',
+    ],
+    competitors: 'Industriestandaard voor professionele deployments.',
+    priority: 'Middel',
+  },
+  {
+    nr: 8,
+    name: 'Uptime Monitoring & Backup Verificatie',
+    description: 'Externe uptime monitoring instellen die alert bij downtime, plus geautomatiseerde verificatie dat database backups daadwerkelijk werkend zijn. Momenteel is er een /api/health endpoint maar geen externe monitoring.',
+    werking: 'Externe uptime monitor (BetterUptime, UptimeRobot, of Vercel) pingt elke 5 minuten /api/health. Bij 2 opeenvolgende failures: email + Slack alert. Maandelijkse backup restore test: Supabase point-in-time recovery testen naar een test database en verificatie dat data intact is. Status page voor gebruikers bij gepland onderhoud.',
+    afhankelijkheden: [
+      'app/api/health/route.ts (bestaand)',
+      'Externe monitoring service (nieuw)',
+      'Supabase backup configuratie',
+      'Status page (optioneel — Instatus/Statuspage)',
+    ],
+    technisch: 'UptimeRobot free tier: 50 monitors, 5 min interval. Monitor: GET /api/health — verwacht 200 + {"status":"ok"}. Slack webhook voor alerts. Backup verificatie script: supabase db dump → restore naar test project → SELECT count(*) op kritieke tabellen → vergelijk met bron. Cron: maandelijks via GitHub Actions. Status page: simpele statische pagina op status.[domain] of Instatus free tier.',
+    waardeGebruiker: 'Zekerheid dat de app beschikbaar is en dat data veilig is. Bij een incident worden gebruikers geïnformeerd via de status page.',
+    aandachtspunten: [
+      'Health check moet database connectiviteit testen (niet alleen HTTP 200).',
+      'Supabase Pro plan heeft dagelijkse backups + point-in-time recovery.',
+      'Backup restore test mag NOOIT tegen productie draaien.',
+      'Alert fatigue voorkomen — alleen alerten bij echte issues.',
+    ],
+    competitors: 'Industriestandaard — elke SaaS heeft uptime monitoring.',
+    priority: 'Middel',
+  },
+]
+
 /* -- Phase config for rendering --------------------------------- */
 const PHASE_CONFIG = [
   { id: 'Fase A', fase: 'a', title: 'De Brug', subtitle: 'Bouw voort op wat er al is \u2014 maximaliseer waarde van bestaande data', accentColor: 'var(--kern-500)', accentBg: 'var(--kern-l, #fef3c7)', features: FASE_A_FEATURES },
@@ -1358,7 +1543,63 @@ export default function RoadmapPage() {
         </div>
       </div>
 
-      {/* --- Section 4: Bronnen & Methodologie --- */}
+      {/* --- Section 4: Productie Readiness --- */}
+      <div>
+        <div className="flex items-center gap-4 mb-6">
+          <div className="h-px flex-1 bg-[var(--border-ed)]" />
+          <p className="font-display text-sm font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+            Productie Readiness
+          </p>
+          <div className="h-px flex-1 bg-[var(--border-ed)]" />
+        </div>
+
+        {/* Production progress */}
+        {(() => {
+          const total = PRODUCTIE_FEATURES.length
+          const counts = { backlog: 0, in_ontwikkeling: 0, testen: 0, afgerond: 0 }
+          for (const f of PRODUCTIE_FEATURES) {
+            const s = overlayMap.get(statusKey('p', f.nr))?.status ?? 'backlog'
+            counts[s]++
+          }
+          return (
+            <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 mb-6">
+              <p className="label-editorial mb-3 text-[var(--ink-4)]">Voortgang</p>
+              <div className="flex gap-4 mb-3">
+                {(Object.entries(counts) as [RoadmapStatus, number][]).map(([s, c]) => (
+                  <div key={s} className="text-center">
+                    <p className={`font-mono text-lg font-bold tabular-nums ${STATUS_CONFIG[s].color}`}>{c}</p>
+                    <p className="font-sans text-[10px] uppercase tracking-[0.06em] text-[var(--ink-4)]">{STATUS_CONFIG[s].label}</p>
+                  </div>
+                ))}
+                <div className="text-center">
+                  <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{total}</p>
+                  <p className="font-sans text-[10px] uppercase tracking-[0.06em] text-[var(--ink-4)]">Totaal</p>
+                </div>
+              </div>
+              <div className="h-2 w-full rounded-full bg-[var(--subtle)] overflow-hidden flex">
+                <div className="h-2 bg-green-500 transition-all" style={{ width: `${(counts.afgerond / total) * 100}%` }} />
+                <div className="h-2 bg-amber-400 transition-all" style={{ width: `${(counts.testen / total) * 100}%` }} />
+                <div className="h-2 bg-blue-400 transition-all" style={{ width: `${(counts.in_ontwikkeling / total) * 100}%` }} />
+              </div>
+            </div>
+          )
+        })()}
+
+        <PhaseSection
+          id="Productie"
+          title="Launch Readiness"
+          subtitle="Non-functionele vereisten voor een veilige, betrouwbare productie-release"
+          accentColor="#dc2626"
+          accentBg="#fef2f2"
+          features={PRODUCTIE_FEATURES}
+          fase="p"
+          overlayMap={overlayMap}
+          onStatusChange={handleStatusChange}
+          onOpmerkingenChange={handleOpmerkingenChange}
+        />
+      </div>
+
+      {/* --- Section 5: Bronnen & Methodologie --- */}
       <details className="group rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
         <summary className="cursor-pointer select-none px-6 py-4 font-display text-sm font-bold text-[var(--ink)] transition-colors hover:bg-[var(--subtle)]">
           Bronnen &amp; Methodologie

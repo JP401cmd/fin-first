@@ -119,6 +119,14 @@ export const ACTION_SOURCE_LABELS: Record<ActionSource, string> = {
   chat: 'Chat',
 }
 
+export const RECOMMENDATION_TYPE_SHORT_LABELS: Record<RecommendationType, string> = {
+  budget_optimization: 'Budget',
+  asset_reallocation: 'Vermogen',
+  debt_acceleration: 'Schuld',
+  income_increase: 'Inkomen',
+  savings_boost: 'Sparen',
+}
+
 export function getRecommendationTypeColor(type: RecommendationType): {
   bg: string
   bgLight: string

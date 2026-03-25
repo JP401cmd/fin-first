@@ -379,6 +379,9 @@ export default function BeheerTestdataPage() {
         )}
       </div>
 
+      {/* Test users management */}
+      <TestUserManager />
+
       {/* Budget templates */}
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <div className="mb-4">
@@ -950,6 +953,245 @@ function CheckinManager() {
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
               >
                 Alles wissen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Testgebruikers beheer ──────────────────────────────────────────── */
+
+interface TestUser {
+  id: string
+  email: string
+  personaKey: string | null
+  personaName: string | null
+  personaSubtitle: string | null
+  onboardingCompleted: boolean
+  lastKnownPhase: string | null
+  isDemoUser: boolean
+  lastSignIn: string | null
+}
+
+function TestUserManager() {
+  const [users, setUsers] = useState<TestUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [passwordModal, setPasswordModal] = useState<TestUser | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmReset, setConfirmReset] = useState<TestUser | null>(null)
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/test-users')
+      const data = await res.json()
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error ?? `API fout (${res.status})` })
+        return
+      }
+      setUsers(data.users ?? [])
+    } catch (e) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Kon testgebruikers niet laden' })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchUsers() }, [fetchUsers])
+
+  async function handleReset(user: TestUser) {
+    setConfirmReset(null)
+    setActionLoading(user.id)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/admin/test-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset', userId: user.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMessage({ type: 'success', text: data.message })
+        await fetchUsers()
+      } else {
+        setMessage({ type: 'error', text: data.error })
+      }
+    } catch (e) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Fout' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handlePasswordChange() {
+    if (!passwordModal) return
+    setActionLoading(passwordModal.id)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/admin/test-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'change_password', userId: passwordModal.id, newPassword }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMessage({ type: 'success', text: data.message })
+        setPasswordModal(null)
+        setNewPassword('')
+      } else {
+        setMessage({ type: 'error', text: data.error })
+      }
+    } catch (e) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Fout' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const STATUS_COLORS: Record<string, string> = {
+    ready: 'bg-emerald-50 text-emerald-700',
+    onboarding: 'bg-amber-50 text-amber-700',
+    activated: 'bg-wil-50 text-wil-700',
+  }
+
+  function getStatus(u: TestUser) {
+    if (u.lastKnownPhase) return { label: `Actief (${u.lastKnownPhase})`, key: 'activated' }
+    if (u.onboardingCompleted) return { label: 'Onboarding afgerond', key: 'onboarding' }
+    return { label: 'Klaar voor onboarding', key: 'ready' }
+  }
+
+  return (
+    <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+      <div className="mb-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Beheer — Testgebruikers</p>
+        <h3 className="mt-0.5 text-lg font-semibold text-[var(--ink)]">Landing page testaccounts</h3>
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
+          4 testgebruikers gekoppeld aan de landing page persona&apos;s. Reset om de onboarding + activatie opnieuw te doorlopen.
+        </p>
+      </div>
+
+      {message && (
+        <div className={`mb-4 border px-4 py-2.5 text-sm ${
+          message.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-8 text-sm text-[var(--ink-3)]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Testgebruikers laden...
+        </div>
+      ) : users.length === 0 ? (
+        <p className="py-6 text-center text-sm text-[var(--ink-3)]">
+          Geen testgebruikers gevonden. Voer de migration uit om ze aan te maken.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {users.map((u) => {
+            const status = getStatus(u)
+            const isLoading = actionLoading === u.id
+            return (
+              <div key={u.id} className="flex items-center gap-4 border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[var(--ink)]">{u.personaName ?? u.email}</p>
+                    <span className={`inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium ${STATUS_COLORS[status.key] ?? 'bg-zinc-100 text-[var(--ink-3)]'}`}>
+                      {status.label}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                    {u.email} — {u.personaSubtitle ?? 'geen persona'}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPasswordModal(u)}
+                    disabled={isLoading}
+                    className="border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] disabled:opacity-50"
+                  >
+                    Wachtwoord
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmReset(u)}
+                    disabled={isLoading}
+                    className="border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                  >
+                    {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Reset'}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Confirm reset dialog */}
+      {confirmReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md bg-[var(--paper)] p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--ink)]">Testgebruiker resetten?</h3>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">
+              Dit wist <span className="font-semibold text-red-600">alle</span> financiele data van{' '}
+              <span className="font-semibold">{confirmReset.personaName ?? confirmReset.email}</span>{' '}
+              en zet de onboarding terug naar het begin. De gebruiker kan opnieuw inloggen en de volledige flow doorlopen.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmReset(null)}
+                className="border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={() => handleReset(confirmReset)}
+                className="bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+              >
+                Resetten
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password change dialog */}
+      {passwordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md bg-[var(--paper)] p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--ink)]">Wachtwoord wijzigen</h3>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">
+              Nieuw wachtwoord voor <span className="font-semibold">{passwordModal.email}</span>
+            </p>
+            <input
+              type="text"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Nieuw wachtwoord (min. 6 tekens)"
+              className="mt-4 w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
+            />
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => { setPasswordModal(null); setNewPassword('') }}
+                className="border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={handlePasswordChange}
+                disabled={newPassword.length < 6 || actionLoading === passwordModal.id}
+                className="bg-wil-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
+              >
+                {actionLoading === passwordModal.id ? 'Opslaan...' : 'Opslaan'}
               </button>
             </div>
           </div>

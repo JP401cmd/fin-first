@@ -1,12 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { detectRecurringTransactions } from '@/lib/recurring-detection'
+import { detectRecurringTransactions, detectCategory, CATEGORY_LABELS, type RecurringCategory } from '@/lib/recurring-detection'
+
+const SUBSCRIPTION_CATEGORIES: RecurringCategory[] = ['subscription']
+const VASTE_KOSTEN_CATEGORIES: RecurringCategory[] = ['rent', 'mortgage', 'utility', 'insurance', 'transport']
 
 /**
  * GET /api/subscriptions
  *
- * Detects subscription patterns from the last 12 months of transaction history.
- * Returns confirmed and auto-detected subscriptions with monthly cost totals.
+ * Detects recurring expense patterns from the last 12 months of transaction history.
+ * Returns subscriptions and fixed costs (vaste kosten) with monthly cost totals.
  */
 export async function GET() {
   try {
@@ -51,26 +54,38 @@ export async function GET() {
       }
     }
 
-    // Build confirmed subscriptions directly from DB (expenses only: amount < 0)
-    const confirmedSubscriptions = existingRecurrings.filter(r => Number(r.amount) < 0).map(r => ({
-      id: r.id,
-      name: r.name || r.counterparty_name || 'Onbekend',
-      averageAmount: Math.abs(Number(r.amount)),
-      monthlyAmount: toMonthly(Number(r.amount), r.frequency ?? 'monthly'),
-      frequency: (r.frequency ?? 'monthly') as 'monthly' | 'weekly' | 'quarterly' | 'yearly',
-      nextDate: null as string | null,
-      confidence: 'high' as const,
-      isVariableAmount: false,
-      occurrences: null as number | null,
-      alreadyConfirmed: true,
-    }))
+    // Build confirmed recurring items from DB (expenses only: amount < 0)
+    const confirmedItems = existingRecurrings.filter(r => Number(r.amount) < 0).map(r => {
+      const name = r.name || r.counterparty_name || 'Onbekend'
+      const category = detectCategory(r.counterparty_name ?? '', name, false)
+      return {
+        id: r.id,
+        name,
+        averageAmount: Math.abs(Number(r.amount)),
+        monthlyAmount: toMonthly(Number(r.amount), r.frequency ?? 'monthly'),
+        frequency: (r.frequency ?? 'monthly') as 'monthly' | 'weekly' | 'quarterly' | 'yearly',
+        nextDate: null as string | null,
+        confidence: 'high' as const,
+        isVariableAmount: false,
+        occurrences: null as number | null,
+        alreadyConfirmed: true,
+        category,
+        categoryLabel: CATEGORY_LABELS[category],
+      }
+    })
 
     if (transactions.length < 3) {
-      const totalMonthly = confirmedSubscriptions.reduce((sum, s) => sum + s.monthlyAmount, 0)
+      const subs = confirmedItems.filter(i => SUBSCRIPTION_CATEGORIES.includes(i.category))
+      const vk = confirmedItems.filter(i => VASTE_KOSTEN_CATEGORIES.includes(i.category))
+      const totalSubs = subs.reduce((s, i) => s + i.monthlyAmount, 0)
+      const totalVK = vk.reduce((s, i) => s + i.monthlyAmount, 0)
       return NextResponse.json({
-        subscriptions: confirmedSubscriptions,
-        totalMonthly: Math.round(totalMonthly * 100) / 100,
-        count: confirmedSubscriptions.length,
+        subscriptions: subs,
+        vasteKosten: vk,
+        totalMonthlySubscriptions: Math.round(totalSubs * 100) / 100,
+        totalMonthlyVasteKosten: Math.round(totalVK * 100) / 100,
+        totalMonthly: Math.round((totalSubs + totalVK) * 100) / 100,
+        count: subs.length + vk.length,
       })
     }
 
@@ -90,15 +105,16 @@ export async function GET() {
       budgets,
     )
 
-    // Filter: only subscriptions with confidence high or medium, expenses only
+    // Filter: expenses with medium/high confidence in subscription or vaste kosten categories
+    const relevantCategories = [...SUBSCRIPTION_CATEGORIES, ...VASTE_KOSTEN_CATEGORIES]
     const detected = allDetected.filter(
       d =>
-        d.suggestedCategory === 'subscription' &&
+        relevantCategories.includes(d.suggestedCategory) &&
         !d.isIncome &&
         d.confidence !== 'low',
     )
 
-    const detectedSubscriptions = detected.map(d => ({
+    const detectedItems = detected.map(d => ({
       id: d.key,
       name: d.counterpartyName || d.commonDescription,
       averageAmount: Math.abs(d.averageAmount),
@@ -109,18 +125,26 @@ export async function GET() {
       isVariableAmount: d.isVariableAmount,
       occurrences: d.occurrences,
       alreadyConfirmed: d.alreadyExists,
+      category: d.suggestedCategory,
+      categoryLabel: CATEGORY_LABELS[d.suggestedCategory],
     }))
 
     // Merge: confirmed first, then new auto-detections that aren't already confirmed
-    const newDetections = detectedSubscriptions.filter(s => !s.alreadyConfirmed)
-    const merged = [...confirmedSubscriptions, ...newDetections]
+    const newDetections = detectedItems.filter(s => !s.alreadyConfirmed)
+    const allItems = [...confirmedItems.filter(i => relevantCategories.includes(i.category)), ...newDetections]
 
-    const totalMonthly = merged.reduce((sum, s) => sum + s.monthlyAmount, 0)
+    const subscriptions = allItems.filter(i => SUBSCRIPTION_CATEGORIES.includes(i.category))
+    const vasteKosten = allItems.filter(i => VASTE_KOSTEN_CATEGORIES.includes(i.category))
+    const totalSubs = subscriptions.reduce((s, i) => s + i.monthlyAmount, 0)
+    const totalVK = vasteKosten.reduce((s, i) => s + i.monthlyAmount, 0)
 
     return NextResponse.json({
-      subscriptions: merged,
-      totalMonthly: Math.round(totalMonthly * 100) / 100,
-      count: merged.length,
+      subscriptions,
+      vasteKosten,
+      totalMonthlySubscriptions: Math.round(totalSubs * 100) / 100,
+      totalMonthlyVasteKosten: Math.round(totalVK * 100) / 100,
+      totalMonthly: Math.round((totalSubs + totalVK) * 100) / 100,
+      count: subscriptions.length + vasteKosten.length,
     })
   } catch (err) {
     console.error('[/api/subscriptions]', err)
