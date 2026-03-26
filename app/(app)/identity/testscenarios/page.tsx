@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Target, PiggyBank, TrendingUp, Wallet, Sparkles, ArrowRight, ChevronDown } from 'lucide-react'
+import { Target, PiggyBank, TrendingUp, Wallet, Sparkles, ArrowRight, ChevronDown, Check } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { SectionDivider } from '@/components/app/section-divider'
 
@@ -123,34 +123,40 @@ const GROUPS: ScenarioGroup[] = [
     barClass: 'bg-wil-500',
     scenarios: [
       {
-        title: 'Bekijk je budgetoverzicht',
-        description: 'Ga naar De Kern en bekijk je budgetten. Klik op een categorie voor de transacties.',
-        insight: 'In welke categorie geef je het meest uit?',
-        href: '/core',
-      },
-      {
-        title: 'Ontdek je abonnementen',
-        description: 'Ga naar De Wil en bekijk je terugkerende uitgaven. Elk abonnement toont de vrijheidstijd-impact.',
-        insight: 'Welke abonnementen kosten je de meeste vrijheidstijd?',
-        href: '/will',
-      },
-      {
-        title: 'Vraag AI-aanbevelingen op',
-        description: 'Ga naar De Wil \u2192 Inzicht en klik op \u201cAnalyseren\u201d. Will analyseert je profiel.',
-        insight: 'Welke concrete besparingen stelt Will voor?',
-        href: '/will',
-      },
-      {
-        title: 'Maak een actie aan',
-        description: 'Ga naar De Wil \u2192 Acties en maak een handmatige actie aan (bijv. \u201cGym opzeggen\u201d). Plan hem in voor deze week.',
-        insight: 'Hoeveel vrijheidsdagen levert deze actie op?',
-        href: '/will',
+        title: 'Pas je budgetplan aan',
+        description: 'Ga naar De Kern \u2192 Budgetten en klik op een budget. Bewerk het limietbedrag, het type (vast/flex) of het interval.',
+        insight: 'Past je budgetplan nog bij je huidige uitgavenpatroon?',
+        href: '/core/budgets',
       },
       {
         title: 'Doe een maandelijkse check-in',
-        description: 'Ga naar De Kern en klik op de check-in kaart. Reflecteer op je uitgaven van afgelopen maand.',
+        description: 'Ga naar De Kern en klik op de check-in kaart. Reflecteer op je uitgaven van afgelopen maand en vergelijk met je budget.',
         insight: 'Zijn je uitgaven verbeterd ten opzichte van vorige maand?',
         href: '/core',
+      },
+      {
+        title: 'Bekijk de 3 budget weergaves',
+        description: 'Ga naar De Kern \u2192 Budgetten en wissel tussen de drie weergaves: Boom (overzicht), Donut (verdeling) en Heatmap (intensiteit).',
+        insight: 'Welke weergave geeft jou het beste inzicht in je uitgaven?',
+        href: '/core/budgets',
+      },
+      {
+        title: 'Onderzoek een te hoog budget',
+        description: 'Zoek een budget dat over de limiet zit. Klik door naar de transacties en bekijk de tegenpartij-analyse: welke winkels of bedrijven drijven de kosten op?',
+        insight: 'Welke tegenpartij is verantwoordelijk voor het grootste deel van de overschrijding?',
+        href: '/core/budgets',
+      },
+      {
+        title: 'Dashboard aanpassen en favorieten',
+        description: 'Bewerk twee budgetten en markeer ze als favoriet via het hartje. Ga daarna naar je dashboard en bekijk of je favorieten zichtbaar zijn.',
+        insight: 'Heb je snel toegang tot de budgetten die er het meest toe doen?',
+        href: '/core/budgets',
+      },
+      {
+        title: 'Maak een budget rapportage',
+        description: 'Ga naar Rapportages en genereer een maandoverzicht van de huidige maand. De AI analyseert je budgetprestaties en highlights.',
+        insight: 'Welke budgetten springen eruit en waar liggen bespaarkansen?',
+        href: '/rapportages',
       },
     ],
   },
@@ -224,16 +230,45 @@ const GENERAL_SCENARIOS: Scenario[] = [
     href: '/rapportages',
   },
   {
-    title: 'Ontdek de gids',
-    description: 'Ga naar Identiteit \u2192 Gids en lees de uitleg van een module die je nog niet kent. Probeer de interactieve conceptkaarten.',
-    insight: 'Welk concept was nieuw voor je?',
-    href: '/identity/gids',
+    title: 'Ontdek je persoonlijke instellingen',
+    description: 'Ga naar Identiteit \u2192 Instellingen \u2192 Weergave en pas je moduleKleuren en lettertype aan. Bekijk hoe de app er met jouw keuzes uitziet.',
+    insight: 'Voelt de app meer \u201cvan jou\u201d met je eigen kleuren en typografie?',
+    href: '/identity/instellingen',
   },
 ]
+
+// ── Persistence ──────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'trifinity-test-scenarios-done'
+
+const TOTAL_SCENARIOS =
+  GENERAL_SCENARIOS.length + GROUPS.reduce((n, g) => n + g.scenarios.length, 0)
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TestScenariosPage() {
+  const [completed, setCompleted] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) setCompleted(new Set(JSON.parse(stored)))
+    } catch { /* empty */ }
+  }, [])
+
+  const toggle = useCallback((title: string) => {
+    setCompleted(prev => {
+      const next = new Set(prev)
+      if (next.has(title)) next.delete(title)
+      else next.add(title)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }, [])
+
+  const doneCount = completed.size
+  const pct = Math.round((doneCount / TOTAL_SCENARIOS) * 100)
+
   return (
     <div className="mx-auto max-w-3xl">
       {/* ── Masthead ── */}
@@ -245,35 +280,70 @@ export default function TestScenariosPage() {
         <p className="mt-3 max-w-xl font-serif text-base leading-relaxed text-[var(--ink-3)]">
           Concrete opdrachten om de app te verkennen. Elke opdracht leidt naar een
           functie die een inzicht oplevert of invloed heeft op je financi&euml;le plaatje.
-          Kies de groep die bij je past, of begin met de algemene opdrachten onderaan.
+          Begin met de algemene opdrachten bovenaan, of kies de groep die bij je past.
         </p>
         <div className="mt-5 flex items-center gap-6 text-xs text-[var(--ink-4)]">
           <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">4</span> gebruikersgroepen</span>
-          <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">25</span> opdrachten</span>
+          <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">26</span> opdrachten</span>
           <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">5</span> modules</span>
         </div>
+
+        {/* ── Progress bar ── */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-[var(--ink-2)]">
+              <span className="font-mono tabular-nums">{doneCount}</span> van <span className="font-mono tabular-nums">{TOTAL_SCENARIOS}</span> afgerond
+            </span>
+            <span className="font-mono tabular-nums font-semibold text-[var(--ink-3)]">{pct}%</span>
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div
+              className="h-full rounded-full bg-kern-500 transition-all duration-300"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
       </header>
+
+      {/* ── General scenarios ── */}
+      <GeneralSection completed={completed} onToggle={toggle} />
+
+      <SectionDivider variant="asterisk" />
 
       {/* ── Persona groups ── */}
       {GROUPS.map((group, gi) => (
         <div key={group.title}>
           {gi > 0 && <SectionDivider variant="asterisk" />}
-          <ScenarioSection group={group} />
+          <ScenarioSection group={group} completed={completed} onToggle={toggle} />
         </div>
       ))}
 
+      {/* ── Feedback CTA ── */}
       <SectionDivider variant="asterisk" />
-
-      {/* ── General scenarios ── */}
-      <GeneralSection />
+      <section className="mb-8 text-center">
+        <h2 className="font-display text-xl font-semibold text-[var(--ink)]">
+          Hoe bevalt TriFinity?
+        </h2>
+        <p className="mt-2 font-serif text-sm text-[var(--ink-3)]">
+          Deel je ervaring en help ons de app te verbeteren.
+        </p>
+        <Link
+          href="/identity/testscenarios/vragenlijsten"
+          className="mt-4 inline-flex items-center gap-2 border border-[var(--border-md)] bg-[var(--paper)] px-6 py-3 text-sm font-semibold text-[var(--ink)] transition-all hover:-translate-y-px hover:shadow-[var(--s1)]"
+        >
+          Naar vragenlijsten
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </section>
     </div>
   )
 }
 
 // ── Components ───────────────────────────────────────────────────────────────
 
-function ScenarioSection({ group, defaultOpen = false }: { group: ScenarioGroup; defaultOpen?: boolean }) {
+function ScenarioSection({ group, completed, onToggle, defaultOpen = false }: { group: ScenarioGroup; completed: Set<string>; onToggle: (t: string) => void; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
+  const groupDone = group.scenarios.filter(s => completed.has(s.title)).length
   return (
     <section className="mb-2">
       {/* Clickable section header */}
@@ -289,6 +359,7 @@ function ScenarioSection({ group, defaultOpen = false }: { group: ScenarioGroup;
           </p>
           <h2 className="mt-1 font-display text-xl font-semibold text-[var(--ink)]">
             {group.title}
+            <span className="ml-2 font-mono text-xs font-normal tabular-nums text-[var(--ink-4)]">{groupDone}/{group.scenarios.length}</span>
           </h2>
           <p className="mt-1 font-serif text-sm text-[var(--ink-3)]">
             {group.subtitle}
@@ -307,6 +378,8 @@ function ScenarioSection({ group, defaultOpen = false }: { group: ScenarioGroup;
               scenario={scenario}
               borderClass={group.borderClass}
               staggerIndex={i}
+              checked={completed.has(scenario.title)}
+              onToggle={() => onToggle(scenario.title)}
             />
           ))}
         </div>
@@ -315,8 +388,9 @@ function ScenarioSection({ group, defaultOpen = false }: { group: ScenarioGroup;
   )
 }
 
-function GeneralSection() {
+function GeneralSection({ completed, onToggle }: { completed: Set<string>; onToggle: (t: string) => void }) {
   const [open, setOpen] = useState(false)
+  const groupDone = GENERAL_SCENARIOS.filter(s => completed.has(s.title)).length
   return (
     <section className="mb-8">
       <button
@@ -331,6 +405,7 @@ function GeneralSection() {
           </p>
           <h2 className="mt-1 font-display text-xl font-semibold text-[var(--ink)]">
             Algemene opdrachten
+            <span className="ml-2 font-mono text-xs font-normal tabular-nums text-[var(--ink-4)]">{groupDone}/{GENERAL_SCENARIOS.length}</span>
           </h2>
           <p className="mt-1 font-serif text-sm text-[var(--ink-3)]">
             Voor elke gebruiker &mdash; ongeacht je financi&euml;le situatie.
@@ -347,6 +422,8 @@ function GeneralSection() {
               scenario={scenario}
               borderClass="border-l-[var(--border-md)]"
               staggerIndex={i}
+              checked={completed.has(scenario.title)}
+              onToggle={() => onToggle(scenario.title)}
             />
           ))}
         </div>
@@ -360,28 +437,45 @@ function ScenarioCard({
   scenario,
   borderClass,
   staggerIndex,
+  checked,
+  onToggle,
 }: {
   index: number
   scenario: Scenario
   borderClass: string
   staggerIndex: number
+  checked: boolean
+  onToggle: () => void
 }) {
   return (
-    <Link
-      href={scenario.href}
-      className={`group block border border-[var(--border-ed)] border-l-4 ${borderClass} bg-[var(--paper)] px-5 py-4 transition-all duration-150 hover:border-[var(--border-md)] hover:-translate-y-px hover:shadow-[var(--s1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wil-500 focus-visible:ring-offset-2 animate-fade-up`}
+    <div
+      className={`group relative border border-[var(--border-ed)] border-l-4 ${borderClass} bg-[var(--paper)] transition-all duration-150 animate-fade-up ${checked ? 'opacity-60' : 'hover:-translate-y-px hover:border-[var(--border-md)] hover:shadow-[var(--s1)]'}`}
       style={{ '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties}
     >
-      <div className="flex items-start gap-4">
-        {/* Number */}
-        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center border border-[var(--border-ed)] font-mono text-xs font-bold tabular-nums text-[var(--ink-3)]">
-          {index}
-        </span>
+      <div className="flex items-start gap-4 px-5 py-4">
+        {/* Checkbox */}
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center border transition-colors duration-150 ${
+            checked
+              ? 'border-kern-500 bg-kern-500 text-white'
+              : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
+          }`}
+        >
+          {checked
+            ? <Check className="h-4 w-4" />
+            : <span className="font-mono text-xs font-bold tabular-nums">{index}</span>
+          }
+        </button>
 
-        {/* Content */}
-        <div className="min-w-0 flex-1">
+        {/* Content — links to the page */}
+        <Link
+          href={scenario.href}
+          className="min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wil-500 focus-visible:ring-offset-2"
+        >
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-[var(--ink)]">
+            <h3 className={`text-sm font-semibold ${checked ? 'line-through text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>
               {scenario.title}
             </h3>
             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[var(--ink-4)] transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-[var(--ink-3)]" />
@@ -392,8 +486,8 @@ function ScenarioCard({
           <p className="mt-2 border-t border-dotted border-[var(--border-ed)] pt-2 font-serif text-xs italic text-[var(--ink-2)]">
             {scenario.insight}
           </p>
-        </div>
+        </Link>
       </div>
-    </Link>
+    </div>
   )
 }
