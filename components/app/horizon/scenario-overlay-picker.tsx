@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import type { SavedScenario } from '@/app/api/scenarios/route'
-import { WHATIF_SCENARIO_COLORS } from '@/app/api/scenarios/route'
+import type { SavedScenario } from '@/lib/scenario-types'
+import { WHATIF_SCENARIO_COLORS } from '@/lib/scenario-types'
 import { formatFireAgeShort } from '@/lib/horizon-data'
 import { ChevronDown, Layers } from 'lucide-react'
 

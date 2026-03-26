@@ -1,15 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 
-// ── Color palette ────────────────────────────────────────────────────
-
-export const WHATIF_SCENARIO_COLORS = [
-  { hex: '#6366f1', label: 'Indigo' },
-  { hex: '#f59e0b', label: 'Amber' },
-  { hex: '#10b981', label: 'Smaragd' },
-  { hex: '#ef4444', label: 'Robijn' },
-  { hex: '#8b5cf6', label: 'Violet' },
-] as const
+// Re-export for backward compatibility (server-side consumers)
+export { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 
 // ── Key helper ───────────────────────────────────────────────────────
 
@@ -17,33 +11,6 @@ const MAX_SCENARIOS = 5
 
 function settingsKey(userId: string) {
   return `whatif_scenarios:${userId}`
-}
-
-export interface SavedScenario {
-  id: string
-  name: string
-  createdAt: string
-  overrides: {
-    monthlyIncome: number
-    workDaysPerWeek: number
-    savingsRate: number
-    expectedReturn: number
-    extraContribution: number
-  }
-  events: Array<{
-    id: string
-    name: string
-    event_type: string
-    target_age: number | null
-    one_time_cost: number | string | null
-    monthly_cost_change: number | string | null
-    monthly_income_change: number | string | null
-    duration_months: number | null
-    whatIfDisabled?: boolean
-    metadata?: Record<string, unknown>
-  }>
-  fireAge: number | null
-  colorIndex: number
 }
 
 // ── GET — return all saved scenarios ─────────────────────────────

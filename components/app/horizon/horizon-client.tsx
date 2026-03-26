@@ -99,7 +99,7 @@ import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composit
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { runUnifiedProjection, toSimResult, runSimulationUnified as runSimAowStop, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
-import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/app/api/scenarios/route'
+import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'

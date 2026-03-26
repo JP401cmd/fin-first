@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Save, FolderOpen, Trash2, X, Check, Loader2, ChevronDown } from 'lucide-react'
 import type { WhatIfOverrides } from './whatif-sliders'
 import type { WhatIfEvent } from './whatif-events'
-import type { SavedScenario } from '@/app/api/scenarios/route'
+import type { SavedScenario } from '@/lib/scenario-types'
 import { formatFireAgeShort } from '@/lib/horizon-data'
 
 interface WhatIfScenariosProps {
