@@ -11,6 +11,7 @@ import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 export interface SuggestedEvent {
   event_type: string
   name: string
+  target_age: number | null
   one_time_cost: number
   monthly_cost_change: number
   monthly_income_change: number

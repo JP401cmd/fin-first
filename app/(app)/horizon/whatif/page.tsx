@@ -12,6 +12,7 @@ import {
   formatFireAge,
   formatFireAgeShort,
   formatFireAgeDelta,
+  LIFE_EVENT_CATALOG,
 } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
@@ -30,6 +31,8 @@ import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import { type SuggestedEvent } from '@/components/app/horizon/whatif-suggestion-cards'
+import { useWhatIfSuggestions } from '@/lib/hooks/use-whatif-suggestions'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
 import { WhatIfPresets } from '@/components/app/horizon/whatif-presets'
@@ -495,6 +498,34 @@ export default function WhatIfPage() {
     }
   }, [overrides, baseline, baselineFireAge, whatIfFireAge, fireAgeDelta, activeEvents])
 
+  // ── AI suggestions ───────────────────────────────────────
+  const { suggestions, loading: suggestionsLoading, dismiss: dismissSuggestion } =
+    useWhatIfSuggestions({
+      overrides,
+      baseline,
+      fireAgeDelta,
+      activeEventNames: activeEvents.map(e => e.name),
+    })
+
+  const handleAddSuggestion = useCallback((s: SuggestedEvent) => {
+    handleAddEvent({
+      id: crypto.randomUUID(),
+      name: s.name,
+      event_type: s.event_type,
+      target_age: s.target_age,
+      target_date: null,
+      one_time_cost: s.one_time_cost,
+      monthly_cost_change: s.monthly_cost_change,
+      monthly_income_change: s.monthly_income_change,
+      duration_months: s.duration_months,
+      icon: LIFE_EVENT_CATALOG[s.event_type]?.icon ?? 'Calendar',
+      is_active: true,
+      sort_order: events.length,
+      is_indexed: false,
+      metadata: {},
+    } as WhatIfEvent)
+  }, [handleAddEvent, events.length])
+
   // Class for the dimension wrapper — skip own veil when arriving via dream gate
   const dimensionClass = viaDreamgate.current
     ? 'whatif-dimension whatif-dimension--no-veil min-h-screen'
@@ -728,6 +759,10 @@ export default function WhatIfPage() {
               computeImpact={computeImpact}
               dailyExpenses={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
               isHousehold={isHousehold}
+              suggestions={suggestions}
+              suggestionsLoading={suggestionsLoading}
+              onAddSuggestion={handleAddSuggestion}
+              onDismissSuggestion={dismissSuggestion}
             />
           </div>
 
