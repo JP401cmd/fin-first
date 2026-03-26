@@ -30,6 +30,9 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
   aowAgeFractional,
   viewMode = 'lines',
   breakdownResult,
+  baselineRows,
+  ghostOverlayRows,
+  ghostColor,
 }: {
   rows: SimRow[]
   currentAge: number
@@ -41,6 +44,9 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
   aowAgeFractional?: number
   viewMode?: 'lines' | 'breakdown'
   breakdownResult?: BreakdownResult | null
+  baselineRows?: SimRow[]
+  ghostOverlayRows?: SimRow[]
+  ghostColor?: string
 }) {
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 1200 })
 
@@ -138,6 +144,9 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
         fireAge={fireAge}
         isPensioenMode={isPensioenMode}
         aowAgeFractional={aowAgeFractional}
+        baselineRows={baselineRows}
+        ghostOverlayRows={ghostOverlayRows}
+        ghostColor={ghostColor}
       />
     </div>
   )
@@ -158,6 +167,7 @@ function LinesView({
   rows, W, H, innerW, innerH, minAge, maxAge, xScale, hasEntered,
   hoveredAge, svgHandlers,
   fireAge, isPensioenMode, aowAgeFractional,
+  baselineRows, ghostOverlayRows, ghostColor,
 }: {
   rows: SimRow[]
   W: number; H: number; innerW: number; innerH: number
@@ -169,12 +179,22 @@ function LinesView({
   fireAge?: number | null
   isPensioenMode: boolean
   aowAgeFractional?: number
+  baselineRows?: SimRow[]
+  ghostOverlayRows?: SimRow[]
+  ghostColor?: string
 }) {
   const visibleRows = rows.filter(r => r.age >= minAge && r.age < maxAge)
   const incomePts: [number, number][] = visibleRows.map(r => [r.age, r.flowIn])
   const expensePts: [number, number][] = visibleRows.map(r => [r.age, r.flowOut])
 
-  const allVals = [...incomePts.map(([, v]) => v), ...expensePts.map(([, v]) => v)]
+  const ghostInVals = (baselineRows ?? ghostOverlayRows ?? [])
+    .filter(r => r.age >= minAge && r.age < maxAge)
+    .flatMap(r => [r.flowIn, r.flowOut])
+  const allVals = [
+    ...incomePts.map(([, v]) => v),
+    ...expensePts.map(([, v]) => v),
+    ...ghostInVals,
+  ]
   const rawMax = allVals.length > 0 ? Math.max(...allVals) : 1
   const maxVal = Math.max(rawMax, 1) * 1.08
 
@@ -268,6 +288,44 @@ function LinesView({
             opacity={hasEntered ? 0.1 : 0}
             style={{ transition: hasEntered ? 'opacity 0.6s ease 0.3s' : 'none' }} />
         ))}
+
+        {/* Baseline ghost lines */}
+        {baselineRows && baselineRows.length > 1 && (() => {
+          const ghostVisible = baselineRows.filter(r => r.age >= minAge && r.age < maxAge)
+          const ghostIncome = ghostVisible.map(r => [r.age, r.flowIn] as [number, number])
+          const ghostExpense = ghostVisible.map(r => [r.age, r.flowOut] as [number, number])
+          return (
+            <>
+              {ghostIncome.length > 1 && (
+                <path d={pointsToPath(ghostIncome)} fill="none" stroke="var(--ink-4)" strokeWidth={1.5}
+                  strokeDasharray="6 4" opacity={0.35} strokeLinecap="round" strokeLinejoin="round" />
+              )}
+              {ghostExpense.length > 1 && (
+                <path d={pointsToPath(ghostExpense)} fill="none" stroke="var(--ink-4)" strokeWidth={1.5}
+                  strokeDasharray="6 4" opacity={0.35} strokeLinecap="round" strokeLinejoin="round" />
+              )}
+            </>
+          )
+        })()}
+
+        {/* Scenario overlay ghost lines */}
+        {ghostOverlayRows && ghostColor && ghostOverlayRows.length > 1 && (() => {
+          const ghostVisible = ghostOverlayRows.filter(r => r.age >= minAge && r.age < maxAge)
+          const ghostIncome = ghostVisible.map(r => [r.age, r.flowIn] as [number, number])
+          const ghostExpense = ghostVisible.map(r => [r.age, r.flowOut] as [number, number])
+          return (
+            <>
+              {ghostIncome.length > 1 && (
+                <path d={pointsToPath(ghostIncome)} fill="none" stroke={ghostColor} strokeWidth={1.5}
+                  strokeDasharray="6 4" opacity={0.4} strokeLinecap="round" strokeLinejoin="round" />
+              )}
+              {ghostExpense.length > 1 && (
+                <path d={pointsToPath(ghostExpense)} fill="none" stroke={ghostColor} strokeWidth={1.5}
+                  strokeDasharray="6 4" opacity={0.4} strokeLinecap="round" strokeLinejoin="round" />
+              )}
+            </>
+          )
+        })()}
 
         {incomePts.length > 1 && (
           <path d={pointsToPath(incomePts)} fill="none" stroke={COLOR_INCOME} strokeWidth={2}
