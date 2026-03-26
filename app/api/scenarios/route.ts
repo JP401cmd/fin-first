@@ -1,6 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+// ── Color palette ────────────────────────────────────────────────────
+
+export const WHATIF_SCENARIO_COLORS = [
+  { hex: '#6366f1', label: 'Indigo' },
+  { hex: '#f59e0b', label: 'Amber' },
+  { hex: '#10b981', label: 'Smaragd' },
+  { hex: '#ef4444', label: 'Robijn' },
+  { hex: '#8b5cf6', label: 'Violet' },
+] as const
+
 // ── Key helper ───────────────────────────────────────────────────────
 
 const MAX_SCENARIOS = 5
@@ -33,6 +43,7 @@ export interface SavedScenario {
     metadata?: Record<string, unknown>
   }>
   fireAge: number | null
+  colorIndex: number
 }
 
 // ── GET — return all saved scenarios ─────────────────────────────
@@ -80,6 +91,16 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Find the first unused color index
+  const usedIndices = new Set(existing.map(s => s.colorIndex ?? 0))
+  let colorIndex = 0
+  for (let i = 0; i < WHATIF_SCENARIO_COLORS.length; i++) {
+    if (!usedIndices.has(i)) {
+      colorIndex = i
+      break
+    }
+  }
+
   const newScenario: SavedScenario = {
     id: crypto.randomUUID(),
     name: body.name.trim().slice(0, 100),
@@ -98,6 +119,7 @@ export async function POST(request: NextRequest) {
       metadata: e.metadata ?? {},
     })),
     fireAge: body.fireAge ?? null,
+    colorIndex,
   }
 
   const updated = [...existing, newScenario]
