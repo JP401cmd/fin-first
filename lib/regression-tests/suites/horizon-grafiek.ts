@@ -910,6 +910,10 @@ const tests: TestCase[] = [
         willem: { totalAssets: 1457000, totalDebts: 0, fireAge: ageAtDate('1968-11-30'), fireReachable: true },
         rashid: { totalAssets: 250000, totalDebts: 0, fireAge: 55, fireReachable: true },
         marijke: { totalAssets: 850000, totalDebts: 0, fireAge: ageAtDate('1957-06-20'), fireReachable: true },
+        ronald: { totalAssets: 850000, totalDebts: 0, fireAge: ageAtDate('1962-03-15'), fireReachable: true },
+        bas: { totalAssets: 100000, totalDebts: 0, fireAge: 60, fireReachable: true },
+        leo: { totalAssets: 0, totalDebts: 15000, fireAge: null, fireReachable: false },
+        jochen: { totalAssets: 1457000, totalDebts: 0, fireAge: 55, fireReachable: true },
       }
 
       for (const key of PERSONA_KEYS) {
