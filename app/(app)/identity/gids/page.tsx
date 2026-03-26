@@ -1430,7 +1430,9 @@ export default function GidsPage() {
                 {" "}
                 <strong>Levensgebeurtenissen:</strong> voeg events toe aan je
                 scenario (sabbatical, verhuizing, kind). Per event zie je hoeveel
-                maanden je FIRE-datum verschuift.{" "}
+                maanden je FIRE-datum verschuift.
+                {" "}
+                Onder de projectiegrafiek zie je nu ook de vermogensstromen-grafiek: instroom vs. uitstroom van je vermogen per jaar.{" "}
                 <strong>Presets:</strong> klik op een preset \u2014{" "}
                 <em>sabbatical</em>, <em>bonus</em>, <em>loonsverhoging</em>,{" "}
                 <em>minder werken</em> \u2014 om snel een scenario te laden.{" "}
@@ -1441,6 +1443,8 @@ export default function GidsPage() {
                 kent je aanpassingen en geeft gerichte suggesties: &ldquo;Als je
                 die sabbatical wilt, kun je dit doen om het te
                 compenseren.&rdquo;
+                {" "}
+                Will suggereert ook automatisch passende levensgebeurtenissen wanneer je grote wijzigingen maakt aan je scenario.
               </>
             }
             howTo={{
@@ -1451,6 +1455,9 @@ export default function GidsPage() {
                 "Voeg levensgebeurtenissen toe: per event zie je hoeveel maanden je FIRE-datum verschuift",
                 "Sla scenario\u2019s op en vergelijk ze: de kassabon-vergelijking toont per regel het verschil met je huidige situatie",
                 "Open Will vanuit je scenario \u2014 de AI kent je aanpassingen en geeft gerichte suggesties om je droom haalbaar te maken",
+                "Bekijk de vermogensstromen onder de projectie \u2014 hier zie je waar je geld naartoe gaat per leeftijd",
+                "Let op Will\u2019s suggesties bij grote wijzigingen \u2014 automatisch verschijnen passende events die je met een klik toevoegt",
+                "Selecteer een opgeslagen scenario als overlay op de Horizon-pagina om direct visueel te vergelijken met je huidige pad",
               ],
               tip: "Probeer: \u201cWat als ik mijn spaarquote met 10% verhoog en over 5 jaar een kind krijg?\u201d \u2014 de combinatie geeft het eerlijkste beeld.",
             }}
