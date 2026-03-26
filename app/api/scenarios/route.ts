@@ -13,6 +13,12 @@ function settingsKey(userId: string) {
   return `whatif_scenarios:${userId}`
 }
 
+/** Parse app_settings value (text column → JSON) */
+function parseValue(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw) return {}
+  try { return typeof raw === 'string' ? JSON.parse(raw) : raw } catch { return {} }
+}
+
 // ── GET — return all saved scenarios ─────────────────────────────
 
 export async function GET() {
@@ -26,7 +32,8 @@ export async function GET() {
     .eq('key', settingsKey(user.id))
     .maybeSingle()
 
-  const scenarios: SavedScenario[] = data?.value?.scenarios ?? []
+  const parsed = parseValue(data?.value)
+  const scenarios: SavedScenario[] = (parsed.scenarios as SavedScenario[]) ?? []
   return NextResponse.json({ scenarios })
 }
 
@@ -49,7 +56,8 @@ export async function POST(request: NextRequest) {
     .eq('key', settingsKey(user.id))
     .maybeSingle()
 
-  const existing: SavedScenario[] = data?.value?.scenarios ?? []
+  const parsed = parseValue(data?.value)
+  const existing: SavedScenario[] = (parsed.scenarios as SavedScenario[]) ?? []
 
   if (existing.length >= MAX_SCENARIOS) {
     return NextResponse.json(
@@ -94,7 +102,7 @@ export async function POST(request: NextRequest) {
   await supabase
     .from('app_settings')
     .upsert(
-      { key: settingsKey(user.id), value: { scenarios: updated } },
+      { key: settingsKey(user.id), value: JSON.stringify({ scenarios: updated }) },
       { onConflict: 'key' },
     )
 
@@ -120,7 +128,8 @@ export async function DELETE(request: NextRequest) {
     .eq('key', settingsKey(user.id))
     .maybeSingle()
 
-  const existing: SavedScenario[] = data?.value?.scenarios ?? []
+  const parsed = parseValue(data?.value)
+  const existing: SavedScenario[] = (parsed.scenarios as SavedScenario[]) ?? []
   const filtered = existing.filter(s => s.id !== scenarioId)
 
   if (filtered.length === existing.length) {
@@ -130,7 +139,7 @@ export async function DELETE(request: NextRequest) {
   await supabase
     .from('app_settings')
     .upsert(
-      { key: settingsKey(user.id), value: { scenarios: filtered } },
+      { key: settingsKey(user.id), value: JSON.stringify({ scenarios: filtered }) },
       { onConflict: 'key' },
     )
 
