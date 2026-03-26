@@ -43,6 +43,9 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { Loader2, AlertTriangle, ArrowRight, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
+import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
+import { type StackedRow } from '@/lib/wealth-composition'
+import { buildBreakdownFromSimRows } from '@/lib/income-expense-breakdown'
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -77,8 +80,10 @@ export default function WhatIfPage() {
   // ── BottomSheet for full comparison ─────────────────────
   const [comparisonOpen, setComparisonOpen] = useState(false)
 
-  // ── Vermogensstromen chart expand/collapse ────────────
+  // ── Chart mode + view mode ──────────────────────────
+  const [chartMode, setChartMode] = useState<'vermogenspad' | 'vermogensopbouw'>('vermogenspad')
   const [ieExpanded, setIeExpanded] = useState(typeof window !== 'undefined' && window.innerWidth >= 768)
+  const [ieViewMode, setIeViewMode] = useState<'lines' | 'breakdown'>('lines')
 
   // ── Set Will's auto-open message for the global chat FAB ──
   const { setAutoOpenMessage } = useChatContext()
@@ -413,6 +418,41 @@ export default function WhatIfPage() {
     return `${overrides.monthlyIncome}-${overrides.workDaysPerWeek}-${overrides.savingsRate}-${overrides.expectedReturn}-${overrides.extraContribution}-${activeEvents.length}`
   }, [overrides, activeEvents.length])
 
+  // ── Wealth composition (simplified: inleg vs groei) ──────────
+  const wealthCompositionRows: StackedRow[] = useMemo(() => {
+    if (chartMode !== 'vermogensopbouw') return []
+    const rows = whatIfSim?.result.rows
+    if (!rows?.length) return []
+    let cumulativeSavings = 0
+    let cumulativeGrowth = 0
+    return rows.map(r => {
+      cumulativeSavings += r.savings
+      cumulativeGrowth += r.growth
+      const portfolio = r.endPortfolio
+      // Split portfolio proportionally into "spaargeld" (contributions) and "beleggingen" (growth)
+      const total = Math.max(1, cumulativeSavings + cumulativeGrowth)
+      const savingsShare = Math.max(0, portfolio * (cumulativeSavings / total))
+      const growthShare = Math.max(0, portfolio - savingsShare)
+      return {
+        age: r.age,
+        spaargeld: savingsShare,
+        beleggingen: growthShare,
+        pensioen: 0,
+        vastgoed: 0,
+        overig: 0,
+        schulden: 0,
+      }
+    })
+  }, [chartMode, whatIfSim])
+
+  // ── Income/Expense breakdown (from SimRow data) ──────────
+  const ieBreakdownResult = useMemo(() => {
+    if (ieViewMode !== 'breakdown') return null
+    const rows = whatIfSim?.result.rows
+    if (!rows?.length) return null
+    return buildBreakdownFromSimRows(rows)
+  }, [ieViewMode, whatIfSim])
+
   // ── Build scenario context for Will's global chat (debounced) ──
   const autoOpenTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   useEffect(() => {
@@ -616,28 +656,60 @@ export default function WhatIfPage() {
               </div>
             )}
 
+            {/* ── Chart mode toggle (Pad / Opbouw) ──────────── */}
+            <div className="mb-2 flex items-center justify-end gap-1">
+              {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setChartMode(mode)}
+                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
+                    chartMode === mode
+                      ? 'border-wil-300 bg-wil-50 text-wil-700'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-wil-200 hover:text-[var(--ink-2)]'
+                  }`}
+                  aria-pressed={chartMode === mode}
+                  style={{ minHeight: 32 }}
+                >
+                  {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
+                </button>
+              ))}
+            </div>
+
             <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
               <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
                 {(visibleMin, visibleMax) => (
                   <>
-                    <SimChart
-                      key={scenarioKey}
-                      rows={simResult.rows}
-                      fireAge={simResult.fireAge}
-                      fireAgeFractional={simResult.fireAgeFractional}
-                      currentAge={currentAge ?? 30}
-                      endAge={simResult.displayEndAge}
-                      cashflows={simCashflows}
-                      fireTarget={simResult.requiredFirePortfolio}
-                      strategy={simResult.strategy}
-                      targetEndPortfolio={simResult.targetEndPortfolio}
-                      baselineRows={baselineSim?.result.rows}
-                      baselineFireAge={baselineFireAge}
-                      dailyExpenseRate={input ? input.yearlyMustExpenses / 365 : undefined}
-                      visibleMinAge={visibleMin}
-                      visibleMaxAge={visibleMax}
-                      aowAgeFractional={userAowAge.fractional}
-                    />
+                    {chartMode === 'vermogenspad' ? (
+                      <SimChart
+                        key={scenarioKey}
+                        rows={simResult.rows}
+                        fireAge={simResult.fireAge}
+                        fireAgeFractional={simResult.fireAgeFractional}
+                        currentAge={currentAge ?? 30}
+                        endAge={simResult.displayEndAge}
+                        cashflows={simCashflows}
+                        fireTarget={simResult.requiredFirePortfolio}
+                        strategy={simResult.strategy}
+                        targetEndPortfolio={simResult.targetEndPortfolio}
+                        baselineRows={baselineSim?.result.rows}
+                        baselineFireAge={baselineFireAge}
+                        dailyExpenseRate={input ? input.yearlyMustExpenses / 365 : undefined}
+                        visibleMinAge={visibleMin}
+                        visibleMaxAge={visibleMax}
+                        aowAgeFractional={userAowAge.fractional}
+                      />
+                    ) : (
+                      <WealthCompositionChart
+                        stackedRows={wealthCompositionRows}
+                        currentAge={currentAge ?? 30}
+                        endAge={simResult.displayEndAge}
+                        visibleMinAge={visibleMin}
+                        visibleMaxAge={visibleMax}
+                        fireAge={simResult.fireAge}
+                        fireAgeFractional={simResult.fireAgeFractional}
+                      />
+                    )}
                     {events.length > 0 && (
                       <EventsTimeline
                         events={events.filter(e => !e.whatIfDisabled)}
@@ -649,23 +721,53 @@ export default function WhatIfPage() {
                     )}
                     {/* Vermogensstromen toggle + chart */}
                     <div className="border-t border-[var(--border-ed)]">
-                      <button
-                        type="button"
-                        onClick={() => setIeExpanded(prev => !prev)}
-                        className="flex w-full items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none"
-                        style={{ minHeight: 44 }}
-                        aria-expanded={ieExpanded}
-                        aria-label={ieExpanded ? 'Vermogensstromen verbergen' : 'Vermogensstromen tonen'}
-                      >
-                        <span>Vermogensstromen</span>
-                        {ieExpanded
-                          ? <ChevronUp size={14} />
-                          : <ChevronDown size={14} />
-                        }
-                      </button>
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => setIeExpanded(prev => !prev)}
+                          className="flex flex-1 items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none"
+                          style={{ minHeight: 44 }}
+                          aria-expanded={ieExpanded}
+                          aria-label={ieExpanded ? 'Vermogensstromen verbergen' : 'Vermogensstromen tonen'}
+                        >
+                          <span>Inkomen &amp; Uitgaven</span>
+                          {ieExpanded
+                            ? <ChevronUp size={14} />
+                            : <ChevronDown size={14} />
+                          }
+                        </button>
+                        {ieExpanded && (
+                          <div className="flex items-center gap-0.5 pr-3">
+                            <button
+                              type="button"
+                              onClick={() => setIeViewMode('lines')}
+                              className={`px-3 py-2.5 text-[10px] uppercase tracking-[0.08em] font-medium transition-colors cursor-pointer ${
+                                ieViewMode === 'lines'
+                                  ? 'text-[var(--ink)] bg-[var(--subtle)]'
+                                  : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
+                              }`}
+                              style={{ minHeight: 32 }}
+                            >
+                              Lijnen
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIeViewMode('breakdown')}
+                              className={`px-3 py-2.5 text-[10px] uppercase tracking-[0.08em] font-medium transition-colors cursor-pointer ${
+                                ieViewMode === 'breakdown'
+                                  ? 'text-[var(--ink)] bg-[var(--subtle)]'
+                                  : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
+                              }`}
+                              style={{ minHeight: 32 }}
+                            >
+                              Bronnen
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <div
                         style={{
-                          maxHeight: ieExpanded ? 200 : 0,
+                          maxHeight: ieExpanded ? 300 : 0,
                           overflow: 'hidden',
                           opacity: ieExpanded ? 1 : 0,
                           transition: 'max-height 0.3s ease, opacity 0.2s ease',
@@ -679,7 +781,8 @@ export default function WhatIfPage() {
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
                           fireAge={simResult.fireAge}
-                          viewMode="lines"
+                          viewMode={ieViewMode}
+                          breakdownResult={ieBreakdownResult}
                         />
                       </div>
                     </div>
