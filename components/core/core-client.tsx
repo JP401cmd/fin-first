@@ -42,6 +42,7 @@ import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { InvulfaseChecklist } from '@/components/app/invulfase-checklist'
+import { WelcomeKrant } from '@/components/app/welcome-krant'
 import dynamic from 'next/dynamic'
 
 const DynBudgetsPage = dynamic(() => import('@/components/app/budgets-client'), {
@@ -1078,7 +1079,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-8">
-      {/* === 0. Invulfase Welcome Card === */}
+      {/* === 0a. Welcome Krant (one-time popup) === */}
+      <WelcomeKrant />
+
+      {/* === 0b. Invulfase Checklist === */}
       <InvulfaseChecklist />
 
       {/* === 1. Hero (Gradient) === */}

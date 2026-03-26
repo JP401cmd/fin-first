@@ -58,6 +58,7 @@ export const SimChart = memo(function SimChart({
   visibleMaxAge,
   aowAgeFractional,
   planningMode = 'fire',
+  showDepletionWarning,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -86,6 +87,8 @@ export const SimChart = memo(function SimChart({
   aowAgeFractional?: number
   /** Planning mode: 'fire' (default) uses FIRE age as split point, 'pensioen' uses AOW age */
   planningMode?: 'fire' | 'pensioen'
+  /** Show red depletion zone when portfolio hits zero (AOW-stop mode) */
+  showDepletionWarning?: boolean
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -489,6 +492,25 @@ export const SimChart = memo(function SimChart({
         {/* Zero baseline */}
         <line x1={PAD.left} x2={PAD.left + innerW} y1={yZero} y2={yZero}
           stroke="var(--border-md)" strokeWidth={1.5} />
+
+        {/* Depletion zone — red tint when portfolio hits zero (AOW-stop mode) */}
+        {showDepletionWarning && (() => {
+          const depletionPt = allPts.find(([, v]) => v <= 0)
+          if (!depletionPt || depletionPt[0] >= maxAge || depletionPt[0] <= minAge) return null
+          const x1 = PAD.left + xScale(depletionPt[0])
+          const x2 = PAD.left + xScale(maxAge)
+          return (
+            <>
+              <rect x={x1} y={PAD.top} width={Math.max(0, x2 - x1)} height={innerH}
+                fill="#ef4444" opacity={0.06} />
+              <text x={x1 + 4} y={PAD.top + 14} fontSize={8}
+                fill="#dc2626" fontWeight={600}
+                fontFamily="var(--font-inter, sans-serif)">
+                Vermogen op
+              </text>
+            </>
+          )
+        })()}
 
         {/* Recurring cashflow dashed verticals (one per unique fromAge) */}
         {recurringMarkers.map(({ fromAge, direction }) => {

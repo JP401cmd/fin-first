@@ -79,7 +79,12 @@
       "Bash(find \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\" -maxdepth 2 -name \"page.tsx\")",
       "Bash(ls -1 /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/)",
       "Bash(head -200 \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\\\\identity\\\\gids\\\\page.tsx\")",
-      "Bash(cat /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/beheer/testdata/page.tsx)"
+      "Bash(cat /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/beheer/testdata/page.tsx)",
+      "Bash(find /c/Users/janpa/cd/development/fin -maxdepth 2 -type f \\\\\\(-name *persona* -o -name *seed* \\\\\\))",
+      "Bash(cat \"/c/Users/janpa/cd/development/fin/app/\\(app\\)/identity/gids/page.tsx\")",
+      "Bash(sort -k2 -rh)",
+      "Bash(then echo:*)",
+      "Bash(__NEW_LINE_5f7081a5a1ef98f6__ find:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

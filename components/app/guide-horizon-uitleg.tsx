@@ -773,6 +773,13 @@ export default function GuideHorizonUitleg() {
             stoppen met werken maar wel inzicht wilt in je financiële situatie bij pensionering.
             Of als je al bijna met pensioen gaat en wilt zien of je vermogen toereikend is.
           </p>
+          <p className="mt-2">
+            <strong>Automatische suggestie:</strong> Wanneer je berekende FIRE-leeftijd
+            <em> na</em> je AOW-leeftijd valt, toont de horizon-pagina automatisch een
+            keuzebalk: &quot;Doorgaan&quot; of &quot;Stop op AOW&quot;. De tweede optie
+            simuleert wat er gebeurt als je op AOW-leeftijd stopt — inclusief een
+            waarschuwing als je vermogen opraakt voor je eindleeftijd.
+          </p>
           <p>
             <strong>Wat verandert er in de interface?</strong>
           </p>

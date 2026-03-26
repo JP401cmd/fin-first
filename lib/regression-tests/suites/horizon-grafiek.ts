@@ -944,6 +944,91 @@ const tests: TestCase[] = [
       }
     },
   },
+
+  // ── AOW-stop toggle tests ──────────────────────────────────────────────
+
+  {
+    id: 'aow-stop-shortfall-detection',
+    name: 'AOW-stop: shortfall scenario detectie',
+    category: CAT,
+    description: 'FIRE > AOW triggers shortfall detection for toggle visibility',
+    priority: 'critical', estimatedDurationMs: 100,
+    fn() {
+      // Low savings, high expenses → FIRE age will be > 67
+      const r = runSim({
+        currentAge: 35,
+        endAge: 90,
+        currentPortfolio: 50_000,
+        yearlyExpenses: 50_000,
+        annualSavings: 5_000,
+        grossReturn: 0.05,
+      })
+      assert(r.fireReachable, 'FIRE still reachable')
+      assertNotNull(r.fireAge)
+      assertGreaterThan(r.fireAge!, NL_AOW_AGE, 'FIRE age > AOW age = shortfall')
+    },
+  },
+  {
+    id: 'aow-stop-forced-fire-at-aow',
+    name: 'AOW-stop: forcedFireAge op AOW leeftijd',
+    category: CAT,
+    description: 'Simulation with forcedFireAge=67 produces valid rows',
+    priority: 'critical', estimatedDurationMs: 100,
+    fn() {
+      const r = runSimulation(35, 90, 50_000, 50_000, 5_000, 0.05, 'nl_box3', 0.02, [],
+        { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+        undefined,
+        NL_AOW_AGE,
+      )
+      assert(r.rows.length > 0, 'has rows')
+      assertEqual(r.rows[0].age, 35, 'eerste row = currentAge')
+      // Portfolio at AOW should exist
+      const rowAtAow = r.rows.find(row => row.age === NL_AOW_AGE)
+      assertNotNull(rowAtAow, 'row at AOW exists')
+      assertFinite(rowAtAow!.endPortfolio, 'portfolio at AOW finite')
+    },
+  },
+  {
+    id: 'aow-stop-depletion-age',
+    name: 'AOW-stop: vermogen raakt op voor endAge',
+    category: CAT,
+    description: 'When forced to stop at AOW with insufficient wealth, depletion occurs',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      const r = runSimulation(35, 90, 50_000, 50_000, 5_000, 0.05, 'nl_box3', 0.02, [],
+        { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+        undefined,
+        NL_AOW_AGE,
+      )
+      // Find the first row where endPortfolio <= 0
+      const depletionRow = r.rows.find(row => row.endPortfolio <= 0)
+      assertNotNull(depletionRow, 'depletion occurs')
+      assertLessThan(depletionRow!.age, 90, 'depletion before endAge')
+      assertGreaterThanOrEqual(depletionRow!.age, NL_AOW_AGE, 'depletion after AOW')
+    },
+  },
+  {
+    id: 'aow-stop-fasebalk-2-segmenten',
+    name: 'AOW-stop: PhaseBar toont 2 segmenten (Opbouw + Onttrekking)',
+    category: CAT,
+    description: 'When AOW-stop is active (treated as pensioen mode), phase bar collapses overgang',
+    priority: 'high', estimatedDurationMs: 10,
+    fn() {
+      // User selects "stoppen op AOW" → isPensioenMode=true for PhaseBar
+      const segments = buildSegments({
+        currentAge: 35,
+        fireAge: NL_AOW_AGE,
+        aowAge: NL_AOW_AGE,
+        endAge: 90,
+        fireReachable: true,
+        isPensioenMode: true,
+      })
+      assertEqual(segments.length, 2, '2 segmenten (geen overgang)')
+      assertEqual(segments[0].id, 'opbouw', 'eerste = opbouw')
+      assertEqual(segments[1].id, 'onttrekking', 'tweede = onttrekking')
+      assertEqual(segments[1].startAge, NL_AOW_AGE, 'onttrekking begint bij AOW')
+    },
+  },
 ]
 
 export function register(): void {
