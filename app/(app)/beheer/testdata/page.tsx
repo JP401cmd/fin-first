@@ -1088,9 +1088,36 @@ function TestUserManager() {
           Testgebruikers laden...
         </div>
       ) : users.length === 0 ? (
-        <p className="py-6 text-center text-sm text-[var(--ink-3)]">
-          Geen testgebruikers gevonden. Voer de migration uit om ze aan te maken.
-        </p>
+        <div className="py-6 text-center">
+          <p className="mb-3 text-sm text-[var(--ink-3)]">
+            Geen testgebruikers gevonden.
+          </p>
+          <button
+            type="button"
+            onClick={async () => {
+              setLoading(true)
+              setMessage(null)
+              try {
+                const res = await fetch('/api/admin/test-users/create', { method: 'POST' })
+                const data = await res.json()
+                if (res.ok) {
+                  const created = (data.results ?? []).filter((r: { status: string }) => r.status === 'created').length
+                  setMessage({ type: 'success', text: `${created} testgebruiker(s) aangemaakt.` })
+                  await fetchUsers()
+                } else {
+                  setMessage({ type: 'error', text: data.error ?? 'Aanmaken mislukt' })
+                }
+              } catch (e) {
+                setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Fout' })
+              } finally {
+                setLoading(false)
+              }
+            }}
+            className="border border-wil-300 bg-wil-50 px-4 py-2 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100"
+          >
+            Testgebruikers aanmaken
+          </button>
+        </div>
       ) : (
         <div className="space-y-3">
           {users.map((u) => {

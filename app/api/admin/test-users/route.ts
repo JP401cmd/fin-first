@@ -15,45 +15,73 @@ const TEST_EMAILS = [
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  if (!url || !serviceKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
   return createServiceClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }
 
-/** GET — list test users via SECURITY DEFINER RPC (no service role needed) */
+/** GET — list test users with their current state */
 export async function GET() {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Use the SECURITY DEFINER RPC — works with the user's own session
-  const { data: rows, error } = await supabase.rpc('get_test_users_with_profiles', {
-    test_emails: TEST_EMAILS,
-  })
+  try {
+    const service = getServiceClient()
 
-  if (error) {
-    console.error('[test-users] RPC error:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+    // List all users via admin API
+    const { data: { users }, error: listError } = await service.auth.admin.listUsers({ perPage: 200 })
 
-  const users = (rows ?? []).map((r: Record<string, unknown>) => {
-    const personaKey = r.persona_key as string | undefined
-    const persona = personaKey ? PERSONAS[personaKey as PersonaKey] : null
-    return {
-      id: r.user_id as string,
-      email: r.email as string,
-      personaKey,
-      personaName: persona?.meta.name ?? null,
-      personaSubtitle: persona?.meta.subtitle ?? null,
-      onboardingCompleted: r.onboarding_completed ?? false,
-      lastKnownPhase: r.last_known_phase ?? null,
-      isDemoUser: r.is_demo_user ?? false,
-      lastSignIn: r.last_sign_in_at ?? null,
+    if (listError) {
+      return NextResponse.json({ error: listError.message }, { status: 500 })
     }
-  })
 
-  return NextResponse.json({ users })
+    const testUsers = (users ?? [])
+      .filter((u) => TEST_EMAILS.includes(u.email ?? ''))
+      .map((u) => {
+        const personaKey = u.user_metadata?.test_persona_key as string | undefined
+        const persona = personaKey ? PERSONAS[personaKey as PersonaKey] : null
+        return {
+          id: u.id,
+          email: u.email,
+          personaKey,
+          personaName: persona?.meta.name ?? null,
+          personaSubtitle: persona?.meta.subtitle ?? null,
+          lastSignIn: u.last_sign_in_at ?? null,
+        }
+      })
+
+    // Get profile status
+    const profileIds = testUsers.map((u) => u.id)
+    if (profileIds.length === 0) {
+      return NextResponse.json({ users: [] })
+    }
+
+    const { data: profiles } = await service
+      .from('profiles')
+      .select('id, onboarding_completed, last_known_phase, is_demo_user')
+      .in('id', profileIds)
+
+    const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
+
+    const enriched = testUsers.map((u) => {
+      const profile = profileMap.get(u.id)
+      return {
+        ...u,
+        onboardingCompleted: profile?.onboarding_completed ?? false,
+        lastKnownPhase: profile?.last_known_phase ?? null,
+        isDemoUser: profile?.is_demo_user ?? false,
+      }
+    })
+
+    return NextResponse.json({ users: enriched })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Onbekende fout'
+    console.error('[test-users] GET error:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
 
 /** POST — reset or change password for a test user */
@@ -70,56 +98,57 @@ export async function POST(req: Request) {
     newPassword?: string
   }
 
-  // Verify this is a test user via RPC
-  const { data: rows } = await supabase.rpc('get_test_users_with_profiles', {
-    test_emails: TEST_EMAILS,
-  })
-  const targetUser = (rows ?? []).find((r: Record<string, unknown>) => r.user_id === userId)
-  if (!targetUser) {
-    return NextResponse.json({ error: 'Geen testgebruiker' }, { status: 400 })
-  }
-
-  if (action === 'reset') {
-    // Use service role for cross-user data deletion
+  try {
     const service = getServiceClient()
-    const noop = () => {}
-    await deleteAllUserData(service, userId, noop)
 
-    await service
-      .from('profiles')
-      .update({
-        onboarding_completed: false,
-        last_known_phase: null,
-        is_demo_user: false,
-        updated_at: new Date().toISOString(),
+    // Verify this is a test user
+    const { data: { user: targetUser }, error: getUserError } = await service.auth.admin.getUserById(userId)
+    if (getUserError || !targetUser || !TEST_EMAILS.includes(targetUser.email ?? '')) {
+      return NextResponse.json({ error: 'Geen testgebruiker' }, { status: 400 })
+    }
+
+    if (action === 'reset') {
+      const noop = () => {}
+      await deleteAllUserData(service, userId, noop)
+
+      await service
+        .from('profiles')
+        .update({
+          onboarding_completed: false,
+          last_known_phase: null,
+          is_demo_user: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId)
+
+      return NextResponse.json({
+        success: true,
+        message: `Testgebruiker ${targetUser.email} is gereset. Onboarding kan opnieuw doorlopen worden.`,
       })
-      .eq('id', userId)
-
-    return NextResponse.json({
-      success: true,
-      message: `Testgebruiker ${targetUser.email} is gereset. Onboarding kan opnieuw doorlopen worden.`,
-    })
-  }
-
-  if (action === 'change_password') {
-    if (!newPassword || newPassword.length < 6) {
-      return NextResponse.json({ error: 'Wachtwoord moet minimaal 6 tekens zijn' }, { status: 400 })
     }
 
-    const service = getServiceClient()
-    const { error } = await service.auth.admin.updateUserById(userId, {
-      password: newPassword,
-    })
+    if (action === 'change_password') {
+      if (!newPassword || newPassword.length < 6) {
+        return NextResponse.json({ error: 'Wachtwoord moet minimaal 6 tekens zijn' }, { status: 400 })
+      }
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      const { error } = await service.auth.admin.updateUserById(userId, {
+        password: newPassword,
+      })
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Wachtwoord van ${targetUser.email} is gewijzigd.`,
+      })
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `Wachtwoord van ${targetUser.email} is gewijzigd.`,
-    })
+    return NextResponse.json({ error: 'Ongeldige actie' }, { status: 400 })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Onbekende fout'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
-
-  return NextResponse.json({ error: 'Ongeldige actie' }, { status: 400 })
 }
