@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
-import { previewEventCashflows, type SimCashflow } from '@/lib/fire-simulation'
+import { previewEventCashflows, lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -96,7 +96,11 @@ import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-char
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
-import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { runUnifiedProjection, toSimResult, runSimulationUnified as runSimAowStop, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
+import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/app/api/scenarios/route'
+import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
@@ -164,6 +168,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [simModalOpen, setSimModalOpen] = useState(false)
   const [activeFaseModal, setActiveFaseModal] = useState<'opbouw' | 'overgang' | 'onttrekking' | null>(null)
 
+  // AOW-stop toggle state (local, non-persistent)
+  const [aowStopToggle, setAowStopToggle] = useState<'doorgaan' | 'stoppen'>('doorgaan')
+
   // Scenario overlay state
   const [scenariosExpanded, setScenariosExpanded] = useState(false)
   const [scenarioData, setScenarioData] = useState<ScenarioOverlay[] | null>(null)
@@ -182,6 +189,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [showResilienceReceipt, setShowResilienceReceipt] = useState(false)
   const [showSwrReceipt, setShowSwrReceipt] = useState(false)
   const [horizonHeroExpanded, setHorizonHeroExpanded] = useState(false)
+
+  // Saved scenario overlay state
+  const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -282,6 +293,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       }
     }
     fetchDividends()
+  }, [])
+
+  // Fetch saved what-if scenarios for overlay picker
+  useEffect(() => {
+    fetch('/api/scenarios')
+      .then(r => r.ok ? r.json() : { scenarios: [] })
+      .then(data => setSavedScenarios(data.scenarios ?? []))
+      .catch(() => {})
   }, [])
 
   // Client-side data reload (used after event CRUD operations)
@@ -658,7 +677,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // ── Pensioen-modus afgeleid ──────────────────────────────────────────────
   const isPensioenMode = simResult?.strategy === 'pensioen'
-  const planningMode: 'fire' | 'pensioen' = isPensioenMode ? 'pensioen' : 'fire'
+
+  // ── AOW-stop shortfall detectie ────────────────────────────────────────
+  const isShortfallScenario = !isPensioenMode
+    && !isHouseholdView && !isPartnerView
+    && simResult?.fireReachable === true
+    && simResult?.fireAge != null
+    && simResult.fireAge > Math.round(userAowAge.fractional)
+  const isAowStopActive = isShortfallScenario && aowStopToggle === 'stoppen'
+  const planningMode: 'fire' | 'pensioen' = isPensioenMode || isAowStopActive ? 'pensioen' : 'fire'
+
+  // Reset AOW-stop toggle when strategy changes
+  useEffect(() => { setAowStopToggle('doorgaan') }, [fireStrategy?.strategy])
 
   // Pensioen-specific computed values
   const aowAgeFormatted = userAowAge.months > 0
@@ -722,6 +752,54 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
   })()
 
+  // ── AOW-stop simulatie (lokale wat-als bij shortfall) ───────────────────
+  // Gebruikt dezelfde runUnifiedProjection engine als de hoofdsimulatie,
+  // maar met forcedFireAge op AOW-leeftijd (identiek aan pensioen-modus).
+  const aowStopSimResult = useMemo(() => {
+    if (!isShortfallScenario || !effectiveInput || currentAge == null) return null
+    const aowAgeInt = Math.ceil(userAowAge.fractional)
+    const yearlyExp = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses : 0
+    if (yearlyExp <= 0) return null
+    const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
+    const pensioenEndAge = Math.max(strat.endAge, 90)
+    const unifiedInput: UnifiedProjectionInput = {
+      assets: initialData.assets ?? [],
+      debts,
+      currentAge,
+      endAge: pensioenEndAge,
+      yearlyExpenses: yearlyExp,
+      annualSavings: (effectiveInput.monthlyContributions ?? 0) * 12,
+      monthlySurplus: effectiveInput.monthlyContributions ?? 0,
+      monthlyIncome: effectiveInput.monthlyIncome ?? 0,
+      incomeGrowthRate: 0,
+      grossReturn: fireParams.grossReturn,
+      inflationRate: fireParams.inflationRate,
+      box3Method: initialData.box3Method ?? 'forfaitair',
+      cashflows: simCashflows,
+      strategyConfig: { ...strat, strategy: 'deplete', endAge: pensioenEndAge },
+      withdrawalStrategy: withdrawalStrategyConfig,
+      forcedFireAge: aowAgeInt,
+      hasPartner: initialData.hasPartner ?? false,
+      bankAccountCash: initialData.unlinkedCash ?? 0,
+    }
+    const unifiedResult = runUnifiedProjection(unifiedInput)
+    const result = toSimResult(unifiedResult)
+    return {
+      ...result,
+      strategy: 'pensioen' as const,
+      fireAge: aowAgeInt,
+      fireAgeFractional: userAowAge.fractional,
+      fireReachable: true,
+      requiredFirePortfolio: result.firePortfolioAtFire,
+    }
+  }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireParams.grossReturn, fireParams.inflationRate, simCashflows, fireStrategy, withdrawalStrategyConfig, debts, initialData.assets, initialData.box3Method, initialData.hasPartner, initialData.unlinkedCash])
+
+  const effectiveSimRows = isAowStopActive && aowStopSimResult ? aowStopSimResult.rows : (simResult?.rows ?? [])
+  const aowAgeIntForDepletion = Math.ceil(userAowAge.fractional)
+  const depletionAge = isAowStopActive && aowStopSimResult
+    ? aowStopSimResult.rows.find(r => r.age >= aowAgeIntForDepletion && r.endPortfolio <= 0)?.age ?? null
+    : null
+
   // ── Erfgenamen (heirs) derivation for End-of-Life analysis ───────────────
   const erfgenamen = useMemo(() => {
     const heirs: { relatie: 'kind' | 'partner' | 'overig'; fractie: number }[] = []
@@ -783,6 +861,78 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     if (ieViewMode !== 'breakdown' || !unifiedRows?.length || !simResult?.rows.length) return null
     return buildBreakdown(unifiedRows, simResult.rows, debts)
   }, [ieViewMode, unifiedRows, simResult, debts])
+
+  // Saved scenario ghost overlay — re-runs simulation with selected scenario's overrides
+  // applied to the current financial data, then renders as a ghost line over the main chart.
+  const scenarioOverlayData = useMemo(() => {
+    if (!selectedScenarioId) return null
+    const scenario = savedScenarios.find(s => s.id === selectedScenarioId)
+    if (!scenario) return null
+
+    const { effectiveInput: initialEffectiveInput, fireParams: initialFireParams, fireStrategy: initialFireStrategy } = initialData
+    const currentAgeVal = initialEffectiveInput.dateOfBirth ? ageAtDate(initialEffectiveInput.dateOfBirth) : null
+    if (currentAgeVal === null) return null
+
+    const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn)
+    const { adjustedInput, annualSavings } = applyWhatIfOverrides(initialEffectiveInput, scenario.overrides, baselineOvr)
+
+    // Build cashflows from scenario events, normalising numeric fields that may be stored as strings.
+    // Only the fields present on LifeEvent are mapped — extra fields from SavedScenario are omitted.
+    const scenarioEvents = (scenario.events ?? [])
+      .filter(e => !e.whatIfDisabled)
+      .map(e => ({
+        id: e.id,
+        name: e.name,
+        event_type: e.event_type,
+        target_age: e.target_age,
+        target_date: null as string | null,
+        one_time_cost: Number(e.one_time_cost ?? 0),
+        monthly_cost_change: Number(e.monthly_cost_change ?? 0),
+        monthly_income_change: Number(e.monthly_income_change ?? 0),
+        duration_months: Number(e.duration_months ?? 0),
+        is_active: true,
+        sort_order: 0,
+        is_indexed: false,
+        icon: '',
+        metadata: e.metadata,
+      }))
+
+    const cashflows = lifeEventsToCashflows(scenarioEvents)
+    const currentPortfolio = Math.max(0, adjustedInput.totalAssets - adjustedInput.totalDebts)
+    const yearlyExpenses = adjustedInput.yearlyMustExpenses > 0 ? adjustedInput.yearlyMustExpenses : 0
+    if (yearlyExpenses <= 0) return null
+
+    const grossReturn = adjustedInput.expectedReturn ?? initialFireParams.grossReturn
+    const endStrategy = initialFireStrategy ?? DEFAULT_FIRE_STRATEGY
+
+    // Use runSimulationUnified (aliased as runSimAowStop) for consistency with the rest of the file
+    const result = runSimAowStop(
+      currentAgeVal,
+      endStrategy.endAge ?? 90,
+      currentPortfolio,
+      yearlyExpenses,
+      annualSavings,
+      grossReturn,
+      'nl_box3',
+      initialFireParams.inflationRate,
+      cashflows,
+      endStrategy,
+    )
+
+    const color = WHATIF_SCENARIO_COLORS[scenario.colorIndex ?? 0]
+
+    return {
+      overlay: {
+        name: scenario.name as 'pessimist' | 'optimist',
+        label: scenario.name,
+        color: color.hex,
+        points: result.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
+      },
+      rows: result.rows,
+      events: scenarioEvents,
+      color: color.hex,
+    }
+  }, [selectedScenarioId, savedScenarios, initialData])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -1902,6 +2052,38 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
               {/* ── Overlay toggles boven de grafiek ── */}
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                {/* AOW-stop toggle — alleen bij shortfall scenario (FIRE > AOW) */}
+                {isShortfallScenario && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setAowStopToggle('doorgaan')}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        aowStopToggle === 'doorgaan'
+                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                      }`}
+                      aria-pressed={aowStopToggle === 'doorgaan'}
+                    >
+                      <TrendingUp className="h-3 w-3" />
+                      Doorgaan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAowStopToggle('stoppen')}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        aowStopToggle === 'stoppen'
+                          ? 'border-amber-300 bg-amber-50 text-amber-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-amber-200 hover:text-[var(--ink-2)]'
+                      }`}
+                      aria-pressed={aowStopToggle === 'stoppen'}
+                    >
+                      <Landmark className="h-3 w-3" />
+                      Stop op AOW
+                    </button>
+                    <span className="mx-0.5 h-4 w-px bg-[var(--border-ed)]" />
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={() => setScenariosExpanded(prev => !prev)}
@@ -1939,6 +2121,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   )}
                 </button>
 
+                {/* ── Saved scenario overlay picker ── */}
+                <ScenarioOverlayPicker
+                  scenarios={savedScenarios}
+                  selectedId={selectedScenarioId}
+                  onSelect={setSelectedScenarioId}
+                />
+
                 {/* ── Chart mode toggle (compact pill, right-aligned) ── */}
                 <div className="ml-auto flex items-center gap-1">
                   {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => (
@@ -1958,6 +2147,25 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   ))}
                 </div>
               </div>
+
+              {/* ── AOW-stop waarschuwingsbanner ── */}
+              {isAowStopActive && (
+                <div className={`mb-3 flex items-start gap-2.5 border px-3 py-2.5 ${depletionAge != null ? 'border-amber-200 bg-amber-50/60' : 'border-[var(--border-ed)] bg-[var(--subtle)]/40'}`}>
+                  <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${depletionAge != null ? 'text-amber-500' : 'text-[var(--ink-3)]'}`} />
+                  <div>
+                    <p className={`font-sans text-[12px] font-medium ${depletionAge != null ? 'text-amber-800' : 'text-[var(--ink-2)]'}`}>
+                      {depletionAge != null
+                        ? 'Vermogen raakt op voor eindleeftijd'
+                        : 'Simulatie: stoppen op AOW-leeftijd'}
+                    </p>
+                    <p className={`mt-0.5 font-sans text-[11px] ${depletionAge != null ? 'text-amber-700' : 'text-[var(--ink-3)]'}`}>
+                      {depletionAge != null
+                        ? `Bij stoppen op AOW-leeftijd (${aowAgeFormatted}) is je vermogen rond leeftijd ${depletionAge} op — je haalt de ingestelde eindleeftijd van ${aowStopSimResult?.displayEndAge ?? (fireStrategy?.endAge ?? 90)} niet.`
+                        : `De grafiek toont wat er gebeurt als je stopt met werken op je AOW-leeftijd (${aowAgeFormatted}) en gaat onttrekken uit je opgebouwde vermogen.`}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
@@ -1979,23 +2187,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         >
                           <SimChart
                             key={planningMode}
-                            rows={simResult.rows}
-                            fireAge={simResult.fireAge}
-                            fireAgeFractional={simResult.fireAgeFractional}
+                            rows={isAowStopActive ? effectiveSimRows : simResult.rows}
+                            fireAge={isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge}
+                            fireAgeFractional={isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional}
                             currentAge={currentAge ?? 30}
                             endAge={simResult.displayEndAge}
                             cashflows={simCashflows}
                             fireTarget={simResult.requiredFirePortfolio}
                             strategy={simResult.strategy}
                             targetEndPortfolio={simResult.targetEndPortfolio}
-                            scenarioOverlays={scenarioOverlays}
-                            monteCarloOverlay={monteCarloOverlay}
+                            scenarioOverlays={isAowStopActive ? undefined : [
+                              ...(scenarioOverlays ?? []),
+                              ...(scenarioOverlayData ? [scenarioOverlayData.overlay] : []),
+                            ]}
+                            monteCarloOverlay={isAowStopActive ? undefined : monteCarloOverlay}
                             dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
                             householdOverlays={isHouseholdView ? householdOverlays ?? undefined : undefined}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             aowAgeFractional={userAowAge.fractional}
                             planningMode={planningMode}
+                            showDepletionWarning={isAowStopActive}
                           />
                         </div>
 
@@ -2081,16 +2293,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         }}
                       >
                         <IncomeExpenseChart
-                          rows={simResult.rows}
+                          rows={isAowStopActive ? effectiveSimRows : simResult.rows}
                           currentAge={currentAge ?? 30}
                           endAge={simResult.displayEndAge}
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
-                          fireAge={simResult.fireAge}
+                          fireAge={isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge}
                           planningMode={planningMode}
                           aowAgeFractional={userAowAge.fractional}
                           viewMode={ieViewMode}
                           breakdownResult={ieBreakdownResult}
+                          ghostOverlayRows={scenarioOverlayData?.rows}
+                          ghostColor={scenarioOverlayData?.color}
                         />
                       </div>
 
@@ -2102,6 +2316,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           endAge={simResult.displayEndAge}
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
+                          scenarioEvents={scenarioOverlayData?.events}
+                          scenarioColor={scenarioOverlayData?.color}
                         />
                       )}
 
@@ -2110,12 +2326,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         <div className="mt-2" style={{ marginLeft: CHART_PAD.left, marginRight: CHART_PAD.right }}>
                           <PhaseBar
                             currentAge={currentAge}
-                            fireAge={simResult.fireAge}
-                            fireAgeFractional={simResult.fireAgeFractional}
+                            fireAge={isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge}
+                            fireAgeFractional={isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional}
                             aowAge={userAowAge.fractional}
                             endAge={simResult.displayEndAge}
                             fireReachable={simResult.fireReachable}
-                            isPensioenMode={isPensioenMode}
+                            isPensioenMode={isAowStopActive || isPensioenMode}
                             onSegmentClick={(fase) => setActiveFaseModal(fase)}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
