@@ -38,7 +38,8 @@ import { WhatIfScenarios } from '@/components/app/horizon/whatif-scenarios'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { useChatContext } from '@/components/app/chat/chat-provider'
-import { Loader2, AlertTriangle, ArrowRight, ChevronRight } from 'lucide-react'
+import { Loader2, AlertTriangle, ArrowRight, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
+import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,9 @@ export default function WhatIfPage() {
 
   // ── BottomSheet for full comparison ─────────────────────
   const [comparisonOpen, setComparisonOpen] = useState(false)
+
+  // ── Vermogensstromen chart expand/collapse ────────────
+  const [ieExpanded, setIeExpanded] = useState(typeof window !== 'undefined' && window.innerWidth >= 768)
 
   // ── Set Will's auto-open message for the global chat FAB ──
   const { setAutoOpenMessage } = useChatContext()
@@ -612,6 +616,42 @@ export default function WhatIfPage() {
                         visibleMaxAge={visibleMax}
                       />
                     )}
+                    {/* Vermogensstromen toggle + chart */}
+                    <div className="border-t border-[var(--border-ed)]">
+                      <button
+                        type="button"
+                        onClick={() => setIeExpanded(prev => !prev)}
+                        className="flex w-full items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none"
+                        style={{ minHeight: 44 }}
+                        aria-expanded={ieExpanded}
+                        aria-label={ieExpanded ? 'Vermogensstromen verbergen' : 'Vermogensstromen tonen'}
+                      >
+                        <span>Vermogensstromen</span>
+                        {ieExpanded
+                          ? <ChevronUp size={14} />
+                          : <ChevronDown size={14} />
+                        }
+                      </button>
+                      <div
+                        style={{
+                          maxHeight: ieExpanded ? 200 : 0,
+                          overflow: 'hidden',
+                          opacity: ieExpanded ? 1 : 0,
+                          transition: 'max-height 0.3s ease, opacity 0.2s ease',
+                        }}
+                      >
+                        <IncomeExpenseChart
+                          rows={simResult.rows}
+                          baselineRows={baselineSim?.result.rows}
+                          currentAge={currentAge ?? 30}
+                          endAge={simResult.displayEndAge}
+                          visibleMinAge={visibleMin}
+                          visibleMaxAge={visibleMax}
+                          fireAge={simResult.fireAge}
+                          viewMode="lines"
+                        />
+                      </div>
+                    </div>
                   </>
                 )}
               </ZoomableChartContainer>
@@ -644,6 +684,22 @@ export default function WhatIfPage() {
                   {cf.name} (leeftijd {cf.fromAge})
                 </span>
               ))}
+              {ieExpanded && (
+                <>
+                  <span className="flex items-center gap-1.5">
+                    <svg width="20" height="2" aria-hidden="true">
+                      <line x1="0" y1="1" x2="20" y2="1" stroke="var(--horizon-500, #8b5cf6)" strokeWidth="2" />
+                    </svg>
+                    Instroom
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <svg width="20" height="2" aria-hidden="true">
+                      <line x1="0" y1="1" x2="20" y2="1" stroke="var(--kern-500, #f59e0b)" strokeWidth="2" />
+                    </svg>
+                    Uitstroom
+                  </span>
+                </>
+              )}
             </div>
           </section>
         )}
