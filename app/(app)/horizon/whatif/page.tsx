@@ -28,6 +28,7 @@ import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
@@ -238,60 +239,13 @@ export default function WhatIfPage() {
   // ── Derived baseline values (snapshot of real data) ──────
   const baseline = useMemo<WhatIfOverrides | null>(() => {
     if (!input) return null
-    const savingsRate = input.monthlyIncome > 0
-      ? Math.round(((input.monthlyIncome - input.monthlyExpenses) / input.monthlyIncome) * 100)
-      : 0
-    return {
-      monthlyIncome: Math.round(input.monthlyIncome),
-      workDaysPerWeek: 5,
-      savingsRate: Math.max(0, Math.min(80, savingsRate)),
-      expectedReturn: userGrossReturn * 100,
-      extraContribution: 0,
-    }
+    return buildBaselineOverrides(input, userGrossReturn)
   }, [input, userGrossReturn])
 
-  // ── Compute what-if FinancialInput from overrides ──────────
-  const whatIfInput = useMemo<FinancialInput | null>(() => {
-    if (!input || !overrides || !baseline) return null
-
-    // Apply income from slider, adjusted proportionally by work days (5 = full-time)
-    const effectiveIncome = overrides.monthlyIncome * (overrides.workDaysPerWeek / 5)
-    const baselineEffectiveIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
-
-    // Savings rate changes adjust expenses on BASELINE income (lifestyle adjustment)
-    // Income changes do NOT affect expenses — all extra income goes 1:1 to savings
-    const savingsRateExpenseDelta = baselineEffectiveIncome * ((overrides.savingsRate - baseline.savingsRate) / 100)
-    const adjustedExpenses = Math.max(0, input.monthlyExpenses - savingsRateExpenseDelta)
-
-    // Monthly contributions = base + extra
-    const adjustedContributions = input.monthlyContributions + overrides.extraContribution
-
-    return {
-      ...input,
-      monthlyIncome: effectiveIncome,
-      monthlyExpenses: adjustedExpenses,
-      monthlyContributions: adjustedContributions,
-      expectedReturn: overrides.expectedReturn / 100,
-    }
-  }, [input, overrides, baseline])
-
-  // ── Delta-based annual savings (matches horizon at entry) ──
-  const whatIfAnnualSavings_sim = useMemo(() => {
-    if (!input || !overrides || !baseline) return 0
-    const baseAnnualSavings = (input.monthlyContributions ?? 0) * 12
-    const effectiveIncome = overrides.monthlyIncome * (overrides.workDaysPerWeek / 5)
-    const baselineEffectiveIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
-
-    // 1. Income delta: ALL extra income → savings (1:1)
-    const incomeDelta = effectiveIncome - baselineEffectiveIncome
-
-    // 2. Savings rate delta: applied to BASELINE income (lifestyle adjustment)
-    const savingsRateDelta = baselineEffectiveIncome * ((overrides.savingsRate - baseline.savingsRate) / 100)
-
-    // 3. Extra monthly contribution
-    const extraDelta = overrides.extraContribution ?? 0
-
-    return Math.max(0, baseAnnualSavings + (incomeDelta + savingsRateDelta + extraDelta) * 12)
+  // ── Compute what-if FinancialInput + annual savings from overrides ──────────
+  const { adjustedInput: whatIfInput, annualSavings: whatIfAnnualSavings_sim } = useMemo(() => {
+    if (!input || !overrides || !baseline) return { adjustedInput: null as FinancialInput | null, annualSavings: 0 }
+    return applyWhatIfOverrides(input, overrides, baseline)
   }, [input, overrides, baseline])
 
   // ── Run baseline simulation ──────────────────────────────
