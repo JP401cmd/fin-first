@@ -285,6 +285,7 @@ export interface PersonaData {
   valuations?: PersonaValuation[]
   holdings?: PersonaHolding[]
   target_allocations?: PersonaTargetAllocation[]
+  appSettings?: Record<string, unknown>
 }
 
 // ── Shared budget structures ──────────────────────────────────
@@ -1085,6 +1086,7 @@ const lisaData: PersonaData = {
     withdrawal_strategy: 'bucket',
     marginaal_tarief: 0.3697, // modaal inkomen — laagste schijf
     invulfase_active: false,
+    feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
       'assets', 'holdings', 'budgetten', { id: 'uitgaven_heatmap', size: 'half' },
@@ -1272,6 +1274,36 @@ const lisaData: PersonaData = {
       ],
     },
   ],
+  appSettings: {
+    'whatif_scenarios:PLACEHOLDER': {
+      scenarios: [{
+        id: 'sample-lisa-1',
+        name: 'Tweede kind op 38',
+        createdAt: '2026-02-15T10:00:00Z',
+        overrides: {
+          monthlyIncome: 4200,
+          workDaysPerWeek: 4,
+          savingsRate: 25,
+          expectedReturn: 7,
+          extraContribution: 0,
+        },
+        events: [{
+          id: 'lisa-evt-1',
+          name: 'Tweede kind',
+          event_type: 'children',
+          target_age: 38,
+          one_time_cost: 3000,
+          monthly_cost_change: 400,
+          monthly_income_change: 0,
+          duration_months: 216,
+          whatIfDisabled: false,
+          metadata: { aantalKinderen: 2 },
+        }],
+        fireAge: 58,
+        colorIndex: 0,
+      }],
+    },
+  },
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1356,6 +1388,7 @@ const willemData: PersonaData = {
     withdrawal_strategy: 'vpw',
     rebalance_threshold: 10, // agressief — hoge tolerantie, minder herbalanceren
     invulfase_active: false,
+    feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
       'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'gezondheids_score',
@@ -1576,6 +1609,36 @@ const willemData: PersonaData = {
     { view_mode: 'asset_class', category: 'real_estate', target_pct: 5 },
     { view_mode: 'asset_class', category: 'crypto', target_pct: 5 },
   ],
+  appSettings: {
+    'whatif_scenarios:PLACEHOLDER': {
+      scenarios: [{
+        id: 'sample-willem-1',
+        name: 'Vroeg stoppen op 50',
+        createdAt: '2026-03-01T10:00:00Z',
+        overrides: {
+          monthlyIncome: 6500,
+          workDaysPerWeek: 5,
+          savingsRate: 55,
+          expectedReturn: 6.5,
+          extraContribution: 500,
+        },
+        events: [{
+          id: 'willem-evt-1',
+          name: 'Vroegpensioen',
+          event_type: 'early_retirement',
+          target_age: 50,
+          one_time_cost: 0,
+          monthly_cost_change: 0,
+          monthly_income_change: -6500,
+          duration_months: 0,
+          whatIfDisabled: false,
+          metadata: {},
+        }],
+        fireAge: 50,
+        colorIndex: 1,
+      }],
+    },
+  },
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1868,6 +1931,7 @@ const marijkeData: PersonaData = {
     net_monthly_income: 3400,
     estimated_monthly_expenses: 2800,
     invulfase_active: false,
+    feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'passief_inkomen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',
       'holdings', 'vrijheidsmijlpalen', 'acties', 'gezondheids_score',

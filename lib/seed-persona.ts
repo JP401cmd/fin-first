@@ -719,5 +719,25 @@ export async function seedPersonaData(
   onProgress('Waarderingen & holdings toevoegen...', 'phase4', 'insert',
     (summary.valuations ?? 0) + (summary.holdings ?? 0) + (summary.holding_transactions ?? 0) + (summary.target_allocations ?? 0))
 
+  // ── Phase 5: App settings (scenarios, preferences) ──────────
+
+  // Seed app_settings for personas with saved scenarios
+  if (persona.appSettings) {
+    let appSettingsCount = 0
+    for (const [keyTemplate, value] of Object.entries(persona.appSettings)) {
+      const key = keyTemplate.replace('PLACEHOLDER', userId)
+      const { error: settingsErr } = await supabase
+        .from('app_settings')
+        .upsert(
+          { key, value },
+          { onConflict: 'key' },
+        )
+      if (settingsErr) throw new Error(`App settings upsert mislukt (key: ${key}): ${settingsErr.message}`)
+      appSettingsCount++
+    }
+    summary.app_settings = appSettingsCount
+    onProgress('App-instellingen toevoegen...', 'phase5', 'insert', appSettingsCount)
+  }
+
   return summary
 }
