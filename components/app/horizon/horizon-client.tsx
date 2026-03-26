@@ -2256,31 +2256,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           }
                         </button>
                         {incomeExpenseExpanded && (
-                          <div className="flex items-center gap-0.5 pr-3" onPointerDown={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => setIeViewMode('lines')}
-                              className={`rounded-sm px-3 py-2.5 text-[10px] uppercase tracking-[0.08em] font-medium transition-colors cursor-pointer ${
-                                ieViewMode === 'lines'
-                                  ? 'text-[var(--ink)] bg-[var(--subtle)]'
-                                  : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
-                              }`}
-                              style={{ minHeight: 44 }}
-                            >
-                              Lijnen
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setIeViewMode('breakdown')}
-                              className={`rounded-sm px-3 py-2.5 text-[10px] uppercase tracking-[0.08em] font-medium transition-colors cursor-pointer ${
-                                ieViewMode === 'breakdown'
-                                  ? 'text-[var(--ink)] bg-[var(--subtle)]'
-                                  : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
-                              }`}
-                              style={{ minHeight: 44 }}
-                            >
-                              Bronnen
-                            </button>
+                          <div className="flex items-center gap-1 pr-3" onPointerDown={(e) => e.stopPropagation()}>
+                            {(['lines', 'breakdown'] as const).map((mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setIeViewMode(mode)}
+                                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none cursor-pointer ${
+                                  ieViewMode === mode
+                                    ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                                    : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                                }`}
+                                aria-pressed={ieViewMode === mode}
+                              >
+                                {mode === 'lines' ? 'Lijnen' : 'Bronnen'}
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>

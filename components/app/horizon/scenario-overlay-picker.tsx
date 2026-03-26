@@ -53,31 +53,27 @@ export function ScenarioOverlayPicker({
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        className="card-editorial flex items-center gap-2 px-3 py-2 text-left transition-all hover:shadow-sm"
-        style={{ minHeight: 44 }}
+        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none cursor-pointer ${
+          selected
+            ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+        }`}
         aria-expanded={open}
         aria-haspopup="listbox"
       >
-        <Layers size={14} className="text-[var(--ink-3)]" />
-        <div className="flex-1 min-w-0">
-          <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-4)]">
-            Scenario overlay
-          </span>
-          <div className="flex items-center gap-1.5">
-            {color && (
-              <span
-                className="inline-block h-2 w-2 shrink-0"
-                style={{ backgroundColor: color.hex }}
-              />
-            )}
-            <span className="font-sans text-xs text-[var(--ink)] truncate">
-              {selected ? selected.name : 'Geen'}
-            </span>
-          </div>
-        </div>
+        {color && (
+          <span
+            className="inline-block h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: color.hex }}
+          />
+        )}
+        <Layers size={12} className={selected ? 'text-horizon-600' : 'text-[var(--ink-4)]'} />
+        <span className="max-w-[100px] truncate">
+          {selected ? selected.name : 'Overlay'}
+        </span>
         <ChevronDown
-          size={14}
-          className={`text-[var(--ink-4)] transition-transform ${open ? 'rotate-180' : ''}`}
+          size={12}
+          className={`transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
