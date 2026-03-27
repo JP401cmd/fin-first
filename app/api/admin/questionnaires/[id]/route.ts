@@ -62,24 +62,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   if (questions) {
-    const { data: existingQuestions } = await supabase
+    // Delete all existing questions and re-insert (simpler than upsert with mixed new/existing)
+    const { error: deleteError } = await supabase
       .from('questionnaire_questions')
-      .select('id')
+      .delete()
       .eq('questionnaire_id', id)
 
-    const existingIds = new Set((existingQuestions ?? []).map(q => q.id))
-    const incomingIds = new Set(questions.filter(q => q.id).map(q => q.id))
-
-    const toDelete = [...existingIds].filter(eid => !incomingIds.has(eid))
-    if (toDelete.length > 0) {
-      await supabase
-        .from('questionnaire_questions')
-        .delete()
-        .in('id', toDelete)
-    }
+    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
 
     const rows = questions.map((q, i) => ({
-      id: q.id ?? undefined,
       questionnaire_id: id,
       sort_order: i + 1,
       type: q.type,
@@ -91,11 +82,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       is_multi_select: q.is_multi_select ?? false,
     }))
 
-    const { error: upsertError } = await supabase
+    const { error: insertError } = await supabase
       .from('questionnaire_questions')
-      .upsert(rows, { onConflict: 'id' })
+      .insert(rows)
 
-    if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 })
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })
