@@ -174,11 +174,11 @@ export function runSimulation(
   // Resolve withdrawal strategy — default to static (identical to old hardcoded logic)
   const wsConfig = withdrawalStrategy ?? WITHDRAWAL_DEFAULTS
 
-  // VPW + perpetual/legacy is onverenigbaar: VPW onttrekt per definitie volledig
+  // VPW + perpetual/legacy/pensioen is onverenigbaar: VPW onttrekt per definitie volledig
   // binnen de resterende horizon (vpwRate=1.0 in laatste jaar), wat conflicteert met
-  // eeuwigdurend vermogensbehoud (perpetual) en nalatenschap (legacy).
+  // eeuwigdurend vermogensbehoud (perpetual), nalatenschap (legacy) en vaste onttrekking (pensioen).
   // VPW is alleen compatibel met 'deplete' (portfolio → €0 op einddatum).
-  if ((strategy === 'perpetual' || strategy === 'legacy') && wsConfig.strategy === 'vpw') {
+  if ((strategy === 'perpetual' || strategy === 'legacy' || strategy === 'pensioen') && wsConfig.strategy === 'vpw') {
     return {
       rows: [],
       fireAge: null,
@@ -587,7 +587,9 @@ export function runSimulation(
       ? Math.round(legacyAmount * Math.pow(1 + inflation, effectiveEndAge - currentAge))
       : strategy === 'perpetual'
         ? Math.round(requiredFirePortfolioExact * Math.pow(1 + inflation, displayEndAge - computedFireAge))
-        : 0,
+        : strategy === 'pensioen'
+          ? (decRows.length > 0 ? decRows[decRows.length - 1].endPortfolio : 0)
+          : 0,
     displayEndAge,
   }
 }

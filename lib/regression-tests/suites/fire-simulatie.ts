@@ -653,20 +653,25 @@ const tests: TestCase[] = [
   },
   {
     id: 'fire-sim-pensioen-all-ws',
-    name: 'Pensioen × 4 withdrawal strategies',
+    name: 'Pensioen × compatibele withdrawal strategies + VPW incompatibel',
     category: CAT,
-    description: 'Alle 4 onttrekkingsstrategieën combineerbaar met pensioen',
+    description: 'static/guardrails/bucket combineerbaar met pensioen, VPW incompatibel',
     priority: 'critical', estimatedDurationMs: 400,
     fn() {
       const pensioenStrat: FireStrategyConfig = { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }
-      const wsTypes: Array<'static' | 'guardrails' | 'vpw' | 'bucket'> = ['static', 'guardrails', 'vpw', 'bucket']
-      for (const ws of wsTypes) {
+      // Compatible strategies: static, guardrails, bucket
+      const compatibleWs: Array<'static' | 'guardrails' | 'bucket'> = ['static', 'guardrails', 'bucket']
+      for (const ws of compatibleWs) {
         const r = runStd({}, [], pensioenStrat, { ...WITHDRAWAL_DEFAULTS, strategy: ws })
         assert(r.rows.length > 0, `${ws}×pensioen heeft rows`)
         for (const row of r.rows) {
           assertFinite(row.endPortfolio, `${ws}×pensioen row ${row.age} finite`)
         }
       }
+      // VPW is incompatible with pensioen (returns empty result)
+      const vpwResult = runStd({}, [], pensioenStrat, { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' })
+      assertEqual(vpwResult.rows.length, 0, 'vpw×pensioen incompatibel: geen rows')
+      assertEqual(vpwResult.fireReachable, false, 'vpw×pensioen incompatibel: niet bereikbaar')
     },
   },
 ]

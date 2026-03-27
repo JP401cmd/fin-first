@@ -928,9 +928,9 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
   // ── Resolve withdrawal strategy ────────────────────────────────────
   const wsConfig = withdrawalStrategy ?? WITHDRAWAL_DEFAULTS
 
-  // VPW + perpetual/legacy incompatibiliteit — VPW onttrekt per definitie
-  // volledig binnen resterende horizon, conflicteert met behoud/nalatenschap
-  if ((strategy === 'perpetual' || strategy === 'legacy') && wsConfig.strategy === 'vpw') {
+  // VPW + perpetual/legacy/pensioen incompatibiliteit — VPW onttrekt per definitie
+  // volledig binnen resterende horizon, conflicteert met behoud/nalatenschap/vaste onttrekking
+  if ((strategy === 'perpetual' || strategy === 'legacy' || strategy === 'pensioen') && wsConfig.strategy === 'vpw') {
     return {
       rows: [],
       fireAge: null,
@@ -1541,7 +1541,9 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         ? legacyAmount
         : strategy === 'perpetual'
           ? Math.round(requiredAt(effectiveEndAge - 1) * Math.pow(1 + inflationRate, effectiveEndAge - currentAge))
-          : 0,
+          : strategy === 'pensioen'
+            ? (accRows.length > 0 ? accRows[accRows.length - 1].netWorth : 0)
+            : 0,
       displayEndAge,
     }
   }
@@ -1803,7 +1805,9 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       ? Math.round(legacyAmount * Math.pow(1 + inflationRate, effectiveEndAge - currentAge))
       : strategy === 'perpetual'
         ? Math.round(requiredFirePortfolioExact * Math.pow(1 + inflationRate, displayEndAge - computedFireAge))
-        : 0,
+        : strategy === 'pensioen'
+          ? (decRows.length > 0 ? decRows[decRows.length - 1].netWorth : 0)
+          : 0,
     displayEndAge,
   }
 }

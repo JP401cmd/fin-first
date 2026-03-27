@@ -94,6 +94,10 @@ export const SimChartModal = memo(function SimChartModal({
                 ? 'behoud van vermogen'
                 : strategy === 'legacy'
                 ? `erfenis ${fmt(targetEndPortfolio)} op leeftijd ${displayEndAge}`
+                : strategy === 'pensioen'
+                ? targetEndPortfolio > 0
+                  ? `nalatenschap ${fmt(targetEndPortfolio)} op leeftijd ${displayEndAge}`
+                  : `vaste onttrekking \u00b7 einddatum leeftijd ${displayEndAge}`
                 : `einddatum leeftijd ${displayEndAge}`}
             </p>
           </div>
@@ -217,6 +221,8 @@ export const SimChartModal = memo(function SimChartModal({
                 ? 'Portfolio behoudt koopkracht — netto reëel rendement dekt opnames.'
                 : strategy === 'legacy'
                 ? `Portfolio sluit op ${fmt(targetEndPortfolio)} (geïndexeerd) op leeftijd ${displayEndAge}.`
+                : strategy === 'pensioen'
+                ? `Vaste onttrekking op basis van je ingestelde jaarbudget. Restant op leeftijd ${displayEndAge}: ${fmt(targetEndPortfolio)}.`
                 : `Portfolio sluit op €0 op leeftijd ${displayEndAge}.`}
             </p>
             <p className="mt-1">

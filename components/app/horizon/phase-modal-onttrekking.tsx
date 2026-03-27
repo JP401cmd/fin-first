@@ -282,7 +282,9 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           </div>
           {targetEndPortfolio > 0 && (
             <div className="flex justify-between text-[11px]">
-              <span className="text-[var(--ink-3)]">Doelvermogen</span>
+              <span className="text-[var(--ink-3)]">
+                {strategy === 'pensioen' ? 'Geschatte nalatenschap' : 'Doelvermogen'}
+              </span>
               <span className="font-mono tabular-nums text-[var(--ink-2)]">
                 {formatCurrency(Math.round(targetEndPortfolio))}
               </span>

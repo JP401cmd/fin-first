@@ -1088,10 +1088,11 @@ export default function GidsPage() {
                 <strong>4% tot 10%</strong> en zie hoe je FIRE-leeftijd
                 verschuift. Kies je FIRE-eindstrategie:{" "}
                 <strong>perpetueel</strong> (eeuwig leven van je vermogen),{" "}
-                <strong>legacy</strong> (nalaten aan erfgenamen) of{" "}
+                <strong>legacy</strong> (nalaten aan erfgenamen),{" "}
                 <strong>deplete</strong> (alles opmaken voor een bepaalde
-                leeftijd). Box 3 belasting wordt automatisch meegerekend in de
-                simulatie.
+                leeftijd) of <strong>pensioen</strong> (opbouw tot AOW, vaste
+                onttrekking, restant als nalatenschap). Box 3 belasting wordt
+                automatisch meegerekend in de simulatie.
               </>
             }
             howTo={{
@@ -1100,7 +1101,7 @@ export default function GidsPage() {
                 "Lees de vermogensgrafiek: de x-as toont je leeftijd, de y-as je vermogen. De drie lijnen zijn pessimistisch, verwacht en optimistisch",
                 "Vergelijk de scenario\u2019s: pas je verwacht rendement aan van 4% tot 10% en zie direct hoe je FIRE-leeftijd verschuift",
                 "Pas je verwacht rendement, inflatie en SWR aan via Identiteit \u2192 Instellingen \u2192 FIRE Instellingen",
-                "Kies je eindstrategie: perpetueel, legacy of deplete \u2014 elk verandert je benodigd vermogen",
+                "Kies je eindstrategie: perpetueel, legacy, deplete of pensioen \u2014 elk verandert je benodigd vermogen",
                 "Bekijk de countdown: hoeveel jaar, maanden en dagen tot je FIRE-datum",
               ],
               tip: "Je FIRE-leeftijd is geen lot \u2014 het is een kompas. Elke verhoging van je spaarquote met 1% verschuift de datum.",
@@ -1214,7 +1215,7 @@ export default function GidsPage() {
             valueText="FIRE bereiken is één ding. Weten hoe je je vermogen veilig opneemt is minstens zo belangrijk. Kies een strategie die past bij jouw leven."
             description={
               <>
-                TriFinity ondersteunt drie eindstrategieën (FireEndStrategy):
+                TriFinity ondersteunt vier eindstrategieën (FireEndStrategy):
                 <br />
                 <br />
                 <strong>Perpetual (eeuwigdurend)</strong> — je neemt jaarlijks
@@ -1237,8 +1238,16 @@ export default function GidsPage() {
                 als je langer leeft dan gepland.
                 <br />
                 <br />
+                <strong>Pensioen</strong> — vermogensopbouw tot de
+                AOW-leeftijd (67), daarna vaste onttrekking op basis van je
+                ingestelde jaarlijkse budget, ge&iuml;ndexeerd voor inflatie.
+                Het restant op je gekozen eindleeftijd wordt als nalatenschap
+                getoond. Ideaal als je niet eerder wilt stoppen maar wel
+                inzicht wilt in je vermogensverloop na pensioen.
+                <br />
+                <br />
                 <strong>Instellen:</strong> ga naar Identiteit → Instellingen →
-                FIRE-parameters (sectie C). Kies je strategie, eindleeftijd en
+                FIRE Instellingen (sectie C). Kies je strategie, eindleeftijd en
                 eventueel legacy-bedrag. Alle projecties — FIRE-datum,
                 vermogenspad, Monte Carlo simulatie — passen zich direct aan.
                 <br />
@@ -1262,14 +1271,14 @@ export default function GidsPage() {
             }
             howTo={{
               steps: [
-                "Ga naar Identiteit → Instellingen → FIRE Instellingen en kies je eindstrategie: perpetueel, legacy of deplete",
+                "Ga naar Identiteit → Instellingen → FIRE Instellingen en kies je eindstrategie: perpetueel, legacy, deplete of pensioen",
                 "Stel je verwacht rendement en inflatiepercentage in — deze bepalen je SWR en benodigd FIRE-vermogen",
-                "Bij Legacy: voer het gewenste nalatenschapsbedrag in. Bij Deplete: kies je eindleeftijd (bijv. 85 of 90 jaar)",
+                "Bij Legacy: voer het gewenste nalatenschapsbedrag in. Bij Deplete: kies je eindleeftijd (bijv. 85 of 90 jaar). Bij Pensioen: kies je eindleeftijd — het restant wordt als nalatenschap berekend",
                 "Ga naar De Horizon — je onttrekkingsstrategie wordt direct verwerkt in de FIRE-projectie en het vermogenspad",
-                "Vergelijk de drie strategieën: perpetueel vereist het meeste vermogen, deplete het minste — maar geeft geen buffer",
+                "Vergelijk de vier strategieën: perpetueel vereist het meeste vermogen, deplete het minste, pensioen toont het verloop na AOW met vaste onttrekking",
                 "Bekijk de SWR-monitor widget op je dashboard — deze toont je veilige onttrekking gecorrigeerd voor Box 3 belasting en inflatie",
               ],
-              tip: "Begin met perpetueel als veilige basis. Als je FIRE-datum te ver weg lijkt, experimenteer met deplete — je ziet direct hoeveel jaar eerder je vrij bent. Legacy is de gulden middenweg als je ook aan erfgenamen denkt.",
+              tip: "Begin met perpetueel als veilige basis. Als je FIRE-datum te ver weg lijkt, experimenteer met deplete — je ziet direct hoeveel jaar eerder je vrij bent. Legacy is de gulden middenweg als je ook aan erfgenamen denkt. Pensioen is ideaal als je tot de AOW-leeftijd werkt en wilt zien wat er overblijft.",
             }}
           />
 

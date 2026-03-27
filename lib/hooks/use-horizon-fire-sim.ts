@@ -106,11 +106,10 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const aowAge = aowAgeFractionalParam ?? NL_AOW_AGE
     const aowAgeInt = Math.ceil(aowAge)
 
-    // For pensioen: use 'deplete' internally so the engine runs decumulation
-    // from AOW→endAge. Ensure endAge is at least 90.
-    const pensioenEndAge = Math.max(strategyForSim.endAge, 90)
+    // For pensioen: keep strategy as 'pensioen' so the withdrawal engine uses
+    // fixed expenses (not annuity). Ensure endAge is at least AOW+1.
     const effectiveStrategy = isPensioen
-      ? { ...strategyForSim, strategy: 'deplete' as const, endAge: pensioenEndAge }
+      ? { ...strategyForSim, endAge: Math.max(strategyForSim.endAge, aowAgeInt + 1) }
       : strategyForSim
     const simEndAge = effectiveStrategy.endAge
 

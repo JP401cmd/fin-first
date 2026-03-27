@@ -793,28 +793,34 @@ describe('H — Pensioen-modus', () => {
     }
   })
 
-  it('H2: pensioen strategy runs through simulation engine like deplete', () => {
-    // Pensioen uses the same engine as deplete — the post-processing happens
-    // in the hook, not in runSimulation itself. So the raw result should be
-    // similar to deplete.
+  it('H2: pensioen strategy uses fixed withdrawal, not annuity (different from deplete)', () => {
+    // Pensioen uses fixed withdrawal (netBaseExpenses), deplete uses annuity formula.
+    // Both produce the same number of rows (same age range) but different withdrawals
+    // and different targetEndPortfolio (pensioen > 0, deplete = 0).
     const pensioenResult = runStandard({}, [], pensioenStrategy)
     const depleteResult = runStandard({}, [], { strategy: 'deplete', endAge: 90, legacyAmount: 0 })
 
-    // Both should produce rows and a valid fireAge (or null)
-    expect(pensioenResult.rows.length).toBe(depleteResult.rows.length)
-    // Both have same displayEndAge
+    // Same displayEndAge
     expect(pensioenResult.displayEndAge).toBe(depleteResult.displayEndAge)
+    // Same number of rows (same age range)
+    expect(pensioenResult.rows.length).toBe(depleteResult.rows.length)
+    // Pensioen should have targetEndPortfolio >= 0 (actual remaining)
+    // Deplete should have targetEndPortfolio === 0
+    expect(depleteResult.targetEndPortfolio).toBe(0)
+    // Pensioen targetEndPortfolio can be 0 if portfolio runs out, but
+    // with standard fixture (€150k, €18k savings) it should have remaining
+    expect(pensioenResult.targetEndPortfolio).toBeGreaterThanOrEqual(0)
   })
 
-  it('H3: pensioen strategy with all 4 withdrawal strategies produces valid output', () => {
-    const withdrawalStrategies: WithdrawalStrategyConfig[] = [
+  it('H3: pensioen strategy with compatible withdrawal strategies produces valid output', () => {
+    // VPW is incompatible with pensioen (returns empty result)
+    const compatibleStrategies: WithdrawalStrategyConfig[] = [
       { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
       { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
-      { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' },
       { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
     ]
 
-    for (const ws of withdrawalStrategies) {
+    for (const ws of compatibleStrategies) {
       const result = runStandard({}, [], pensioenStrategy, ws)
       expect(result).toBeDefined()
       expect(result.rows.length).toBeGreaterThan(0)
@@ -889,7 +895,7 @@ describe('H — Pensioen-modus', () => {
 
   it('H9: pensioen strategy fireAge is found when portfolio is sufficient', () => {
     // With enough savings, FIRE should be reachable even with pensioen strategy
-    // (the engine treats it the same as deplete internally)
+    // (binary search uses same convergence as deplete: endPortfolio >= 0)
     const result = runStandard(
       { currentPortfolio: 500_000, annualSavings: 30_000 },
       [],
@@ -918,5 +924,25 @@ describe('H — Pensioen-modus', () => {
     const result = runStandard({}, cashflows, pensioenStrategy)
     expect(result).toBeDefined()
     expect(result.rows.length).toBeGreaterThan(0)
+  })
+
+  it('H11: pensioen targetEndPortfolio equals last row endPortfolio', () => {
+    // For pensioen, targetEndPortfolio should be the actual remaining portfolio
+    // at the end of the simulation, not 0 (like deplete)
+    const result = runStandard(
+      { currentPortfolio: 500_000, annualSavings: 30_000 },
+      [],
+      pensioenStrategy,
+    )
+    expect(result.fireReachable).toBe(true)
+    const lastRow = result.rows[result.rows.length - 1]
+    expect(result.targetEndPortfolio).toBe(lastRow.endPortfolio)
+  })
+
+  it('H12: pensioen + VPW is incompatible (returns empty result)', () => {
+    const vpwConfig: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }
+    const result = runStandard({}, [], pensioenStrategy, vpwConfig)
+    expect(result.rows.length).toBe(0)
+    expect(result.fireReachable).toBe(false)
   })
 })

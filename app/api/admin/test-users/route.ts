@@ -111,15 +111,23 @@ export async function POST(req: Request) {
       const noop = () => {}
       await deleteAllUserData(service, userId, noop)
 
+      // Reset profile to pre-onboarding state + clear welcome flag
       await service
         .from('profiles')
         .update({
           onboarding_completed: false,
           last_known_phase: null,
           is_demo_user: false,
+          feature_preferences: {},
           updated_at: new Date().toISOString(),
         })
         .eq('id', userId)
+
+      // Also clear any app_settings entries for this user (sovereignty level, checkins, etc.)
+      await service
+        .from('app_settings')
+        .delete()
+        .like('key', `%${userId}%`)
 
       return NextResponse.json({
         success: true,

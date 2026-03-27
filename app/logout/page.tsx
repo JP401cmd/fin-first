@@ -1,8 +1,18 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
 
-export default async function LogoutPage() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  redirect('/')
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+
+export default function LogoutPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.signOut().finally(() => {
+      router.replace('/')
+    })
+  }, [router])
+
+  return null
 }

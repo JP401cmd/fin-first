@@ -44,6 +44,216 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.87',
+    date: '2026-03-27',
+    title:
+      'Unified Projection Engine, fase-analyse met Monte Carlo, pensioen-modus, what-if scenario\'s & editorial design',
+    sections: [
+      {
+        module: 'De Horizon — Unified Projection Engine',
+        color: 'purple',
+        items: [
+          {
+            title: 'Unified Projection Engine (Fase 0–6)',
+            description:
+              'Volledig nieuwe projectie-engine vervangt de oude simulatie. Per-asset rendement en Box 3-berekening per type per jaar, schuldaflossing per schuld, FIRE-detectie met onttrekkingsstrategieën (perpetual, legacy, deplete, pensioen), life events integratie en annuïteitsformules. Eén orchestratiefunctie (runUnifiedProjection) met volledige unit tests en parity tests tegen de oude engine.',
+          },
+          {
+            title: 'Migratie naar unified engine',
+            description:
+              'useHorizonFireSim, vermogensopbouw grafiek en Kern vermogensprognose volledig gemigreerd naar de unified engine. HorizonPageData uitgebreid met box3Method en hasPartner. Deprecation wrapper voor achterwaartse compatibiliteit tijdens de overgang.',
+          },
+          {
+            title: 'Waterfall withdrawal tracking',
+            description:
+              'Onttrekkingen worden nu per assetgroep bijgehouden in de juiste volgorde (spaargeld vóór beleggingen). Nieuwe netWorth-kolom, gewogen gemiddeld rendement herberekend bij FIRE-leeftijd, en startportfolio matched met kern net worth.',
+          },
+          {
+            title: 'Guardrails & binary search',
+            description:
+              'FIRE-target met PV-annuïteitsformule voor deplete strategie. Binary search target behoudt koopkracht. Perpetual binary search correct op inflatie-gecorrigeerd doel. Guardrails verankerd voor pensioen high-portfolio scenario\'s.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — Fase-analyse & Monte Carlo',
+        color: 'purple',
+        items: [
+          {
+            title: 'PhaseBar & fase-modals',
+            description:
+              'Nieuwe proportionele fasebalk (PhaseBar) onder de grafiek, gesynchroniseerd met chart zoom viewport. Drie uitgebreide fase-modals: Opbouw (vermogensprognose, asset-type breakdown), Overgang (gap/tekort-analyse met deeltijdwerk), Onttrekking (kasstroomanalyse, inkomstenbronnen). Gedeelde PhaseDetailTable voor jaar-op-jaar detailweergave.',
+          },
+          {
+            title: 'Monte Carlo simulaties per fase',
+            description:
+              'Elke fase-modal bevat nu Monte Carlo simulaties met mediaan eindvermogen, checkpoints op dynamische leeftijden relatief aan FIRE-leeftijd. Critical SWR berekening via iteratieve MC binary search. Stress tests met crisis-scenario\'s en combinatie-scenario.',
+          },
+          {
+            title: 'Gevoeligheidsanalyses',
+            description:
+              'Spaarquote-gevoeligheid, koopkrachterosie (inflatiedaling over tijd), deeltijdwerk flex impact en inflatie-gevoeligheidstabel. SORR 1-jaar buffer optie met gepersonaliseerde fragiele decade. End of Life analyse met erfgenamen, partner-AOW en nabestaandenpensioen.',
+          },
+          {
+            title: 'Data-driven editorial notes',
+            description:
+              'Alle fase-modals bevatten nu dynamische contextgebonden toelichtingen gebaseerd op de gebruikersdata. Inklapbare Aannames-secties tonen de gebruikte parameters per analyse.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — Pensioen-modus',
+        color: 'purple',
+        items: [
+          {
+            title: 'Pensioen als 4e strategie',
+            description:
+              'Nieuw FireEndStrategy type \'pensioen\' met vaste einddatum op AOW-leeftijd. Volledige integratie in SimChart, WealthComposition en IncomeExpense charts via planningMode prop. Vierde kaart in StrategieModal met AOW-preview.',
+          },
+          {
+            title: 'Pensioen KPI\'s & simulatie',
+            description:
+              'KPI\'s Vermogen op AOW en Maandelijkse Onttrekking tonen werkelijk vermogen bij pensioen. Decumulatie start vanuit werkelijk portfolio. Simulatie loopt door tot leeftijd 90 met vaste pensioendatum. Pensioen-strategie opslaan via feature_preferences fallback.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — What-If Scenario\'s',
+        color: 'purple',
+        items: [
+          {
+            title: 'Scenario opslaan & vergelijken',
+            description:
+              'Scenario\'s opslaan, laden en vergelijken met kleurenpalet en colorIndex. Ghost-line overlay op IncomeExpenseChart toont baseline naast scenario. Scenario overlay picker dropdown voor snelle vergelijking. Extractie van override-logica naar gedeelde lib/whatif-overrides.ts.',
+          },
+          {
+            title: 'AI-suggesties',
+            description:
+              'Nieuw AI suggestion API endpoint met significant-delta detectie en suggestion prompt builder. useWhatIfSuggestions hook met debounced fetch. Visuele suggestiekaarten in de what-if pagina en events panel. Scenario event markers op de EventsTimeline.',
+          },
+          {
+            title: 'Chartweergaven & toggles',
+            description:
+              'Pad/Opbouw chart toggle, Lijnen/Bronnen view toggle als pill buttons. AOW-stop toggle en depletion warning. Welcome krant bij eerste bezoek. Regressietests voor scenario CRUD, isolatie en delta-detectie.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Mission Control Redesign',
+        color: 'amber',
+        items: [
+          {
+            title: 'Layout herstructurering',
+            description:
+              'Cash samengevoegd met Assets (Bezittingen). Nieuwe indeling: Vermogen+Schulden bovenaan, Budgets onderaan. Budget-kaart opgesplitst in twee kolommen: links Inkomen/Sparen/Schulden, rechts individuele Uitgaven. Budgets-kaart 50% hoger dan Vermogen/Schulden-rij.',
+          },
+          {
+            title: 'Interactieve verbeteringen',
+            description:
+              'Inklapbare Vermogen & Schulden kaarten op desktop. Flash-animaties bij live waardeveranderingen. 3-koloms KPI layout met Dagelijkse Kosten kaart. FIRE voortgangsbalk vervangt dubbel netto vermogen. Mobiele optimalisatie met 44px touch targets.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Holdings Tracking',
+        color: 'amber',
+        items: [
+          {
+            title: 'Portfolio holdings tracking',
+            description:
+              'Nieuwe has_holdings_tracking toggle in profiel met pill badge. Portfolio Holdings verplaatst naar eigen full-width rij. Realtime subscription zorgt dat de kaart direct verdwijnt bij uitschakelen. Gids navigatie bijgewerkt voor holdings tracking.',
+          },
+        ],
+      },
+      {
+        module: 'Dashboard — Widgets & Presets',
+        color: 'blue',
+        items: [
+          {
+            title: 'Widget preset systeem',
+            description:
+              'Volledig nieuw preset datamodel met beheer admin-pagina. Inline editing, drag-reorder en size selector per widget. API-endpoint voor preset CRUD. Preset dropdown met module-kleuren en bevestigingsdialoog. Vier voorgedefinieerde presets: Budgetteerder, FIRE Strijder, Pensioenplanner, Vermogensverdeler.',
+          },
+          {
+            title: 'Widget formaten & resilience',
+            description:
+              'Alle widgets ondersteunen nu 4 formaten (mini, half, full, quarter). WidgetErrorBoundary en loading fallbacks voorkomen stille widget-failures. Horizontale layout voor half-size widgets benut extra breedte. Quarter-size geoptimaliseerd voor 160px hoogte. WidgetShell overflow safety.',
+          },
+          {
+            title: 'Uitgaven heatmap widget',
+            description:
+              'Heatmap ondersteunt nu alle 4 widget-formaten. TreemapCell rendering, SVG viewBox en constanten schalen mee per formaat. Mini-mode toont compacte kleurblokken zonder tekst. Budgettype-headers groter dan items voor visuele hiërarchie.',
+          },
+        ],
+      },
+      {
+        module: 'Dashboard — Levensgebeurtenissen',
+        color: 'blue',
+        items: [
+          {
+            title: 'Twee-koloms layout',
+            description:
+              'Levensgebeurtenissen widget met opbouwen/investeren twee-koloms indeling voor half en full sizes. Kolomheaders met titels, subtitels, totalen en emerald/rood kleurenschema. Classificatiehulpfuncties en terminologie-update naar "vrijheid opbouwen/investeren". Vriendelijke lege states en regressietests.',
+          },
+        ],
+      },
+      {
+        module: 'Design — Editorial Finance',
+        color: 'teal',
+        items: [
+          {
+            title: 'fd.nl design language',
+            description:
+              'Semantische kleurtokens (text-positive/text-negative) vervangen hardcoded groen/rood. Nieuw SectionDivider component (lijn en asterisk varianten). FinTable gestandaardiseerd tabelcomponent. Krantstijl timestamp-formatting. Actieve navigatietab met border-top en achtergrondtint.',
+          },
+          {
+            title: 'Typografie & mobiel',
+            description:
+              'Body text verhoogd naar text-base (16px) voor contentsecties. Mobiele bottom-nav met actieve tab-indicatie. Responsieve aanpassingen voor alle fase-modals (60vh hoogte, touch targets).',
+          },
+        ],
+      },
+      {
+        module: 'Propositie — Persona\'s & Landing',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Vier persona-kaarten',
+            description:
+              'Landing page uitgebreid met 4e persona-kaart en responsive 4-koloms grid. Persona-grid samenvattingstabel met feature tags. FIRE-strijder persona aangescherpt met tags. Pensioenplanner persona gefocust op pensioengat. Gestylede preset dropdown met module-kleuren.',
+          },
+        ],
+      },
+      {
+        module: 'Testfase — Vragenlijsten',
+        color: 'rose',
+        items: [
+          {
+            title: 'Vragenlijst-systeem',
+            description:
+              'Volledige vragenlijst-module voor de testfase: database-tabellen, admin en user API routes, beheer-pagina\'s met CRUD voor vragen, gebruikers-invulflow met voortgangsindicatie. Multi-select ondersteuning voor meerkeuzevragen. Sessie verwijderen en gebruikersnaam in resultaten. Feedback CTA en beheer navigatietab.',
+          },
+        ],
+      },
+      {
+        module: 'Platform & Testing',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Regressietests',
+            description:
+              'Uitgebreide regressietest-suites voor fase-analyse, Monte Carlo checkpoints, gevoeligheidsanalyses, crisis-scenario\'s, design tokens, levensgebeurtenissen en heatmap-formaten. Persona seed data validatie voor unified engine compatibiliteit.',
+          },
+          {
+            title: 'Beheer & infrastructuur',
+            description:
+              'Service-role admin API vervangt RPC voor test-users. What-if scenario sample data voor testpersona\'s Lisa en Willem. Roadmap-pagina met persistentie via app_settings. authenticatedFetch in alle testsuites.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.86',
     date: '2026-03-19',
     title:

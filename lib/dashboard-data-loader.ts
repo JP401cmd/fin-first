@@ -40,6 +40,7 @@ import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { calculateBox3, type TaxYear } from '@/lib/box3-data'
+import { NL_AOW_AGE } from '@/lib/constants'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -497,6 +498,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     try {
       const currentAge = ageAtDate(dob)
       const simCashflows = lifeEventsToCashflows((eventsResult.data ?? []) as LifeEvent[])
+      // For pensioen strategy: force FIRE transition at AOW age (skip binary search)
+      const dashboardForcedFireAge = fireStrategy.strategy === 'pensioen'
+        ? Math.ceil(NL_AOW_AGE)
+        : undefined
       const simResult = runSimulation(
         currentAge,
         fireStrategy.endAge,
@@ -508,6 +513,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         fireParams.inflationRate,
         simCashflows,
         fireStrategy,
+        undefined,
+        dashboardForcedFireAge,
       )
       simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
       simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null

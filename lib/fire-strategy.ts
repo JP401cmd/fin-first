@@ -39,7 +39,7 @@ export const STRATEGY_LABELS: Record<FireEndStrategy, { name: string; subtitle: 
   },
   pensioen: {
     name: 'Pensioenleeftijd',
-    subtitle: 'Vermogensopbouw tot AOW, daarna onttrekking',
+    subtitle: 'Opbouw tot AOW, vaste onttrekking, restant als nalatenschap',
   },
 }
 

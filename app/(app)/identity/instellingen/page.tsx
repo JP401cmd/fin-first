@@ -1225,16 +1225,23 @@ export default function InstellingenPage() {
             })}
           </div>
 
-          {/* Extra inputs for deplete / legacy */}
+          {/* Extra inputs for deplete / legacy / pensioen */}
           {(fireEndStrategy === 'deplete' || fireEndStrategy === 'legacy' || fireEndStrategy === 'pensioen') && (
             <div className="mt-4">
-              <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Eindleeftijd</label>
+              <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                {fireEndStrategy === 'pensioen' ? 'Eindleeftijd simulatie' : 'Eindleeftijd'}
+              </label>
               <input
                 type="number" min={50} max={120} step={1} value={fireEndAge}
                 onChange={e => setFireEndAge(e.target.value)}
                 className="mt-1.5 w-32 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
               />
               <span className="ml-2 text-sm text-[var(--ink-3)]">jaar</span>
+              {fireEndStrategy === 'pensioen' && (
+                <p className="mt-1.5 font-sans text-[11px] text-[var(--ink-3)]">
+                  Tot welke leeftijd de simulatie doorloopt. Het resterende vermogen wordt als nalatenschap getoond.
+                </p>
+              )}
             </div>
           )}
           {fireEndStrategy === 'legacy' && (

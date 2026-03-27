@@ -1200,7 +1200,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   {(coreSimTarget ?? data.fireTarget) > 0 ? (
                     <>
                       <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]" data-testid="fire-progress-pct-mobile">
-                        {((effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+                        {Math.min(100, (effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
                       </p>
                       <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="fire-progress-subtitle-mobile">
                         {formatCurrency(effectiveNetWorth)} van {formatCurrency(coreSimTarget ?? data.fireTarget)}
@@ -1256,7 +1256,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 {(coreSimTarget ?? data.fireTarget) > 0 ? (
                   <>
                     <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]" data-testid="fire-progress-pct">
-                      {((effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+                      {Math.min(100, (effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
                     </p>
                     <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="fire-progress-subtitle">
                       {formatCurrency(effectiveNetWorth)} van {formatCurrency(coreSimTarget ?? data.fireTarget)}
@@ -1952,7 +1952,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="text-[var(--ink-2)]">Voortgang</span>
-                  <span className="tabular-nums font-medium text-kern-600">{((data.netWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%</span>
+                  <span className="tabular-nums font-medium text-kern-600">{Math.min(100, (data.netWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%</span>
                 </div>
               </div>
 

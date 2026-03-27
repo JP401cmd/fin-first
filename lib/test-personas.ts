@@ -2145,8 +2145,8 @@ const ronaldData: PersonaData = {
     color: 'emerald',
     avatarColor: '#4A7A5B',
     netWorth: 850000,
-    income: 3400,
-    expenses: 2800,
+    income: 5200,
+    expenses: 3950,
     backgroundStory: 'Ronald was 30 jaar technisch manager bij Tata Steel in IJmuiden. Samen met zijn vrouw Anja (62) heeft hij een hypotheekvrij huis in Beverwijk. Over een jaar gaat hij met pensioen. Hij wil precies weten of het ABP-pensioen, de AOW en zijn beleggingsportefeuille samen genoeg zijn om hun levensstijl voort te zetten. Zijn grootste vraag: hoeveel mag hij onttrekken zonder dat het geld opraakt?',
     challenges: ['Pensioengat berekenen: is het genoeg?', 'Onttrekkingsstrategie bepalen (guardrails vs. vast percentage)', 'Portefeuille verschuiven naar minder risico', 'Stijgende zorgkosten inplannen'],
     currentSituation: 'Nog 1 jaar werkzaam, daarna volledig pensioen. Comfortabel vermogen opgebouwd, maar onzeker over de onttrekkingsfase.',
@@ -2157,7 +2157,25 @@ const ronaldData: PersonaData = {
     ...marijkeData.profile,
     full_name: 'Ronald Hoekstra',
     date_of_birth: '1962-03-15',
+    net_monthly_income: 5200,
+    estimated_monthly_expenses: 3950,
+    retirement_expense_method: 'essential_budgets' as const,
   },
+  // Realistische essenti\u00eble budgetten voor stel met eigen huis, ~\u20ac3.950/mnd (\u20ac47.400/jaar)
+  budgets: makeBudgets({
+    [S.INKOMEN]: 5200, [S.SALARIS_UITKERING]: 4800,
+    [S.TOESLAGEN_KINDERBIJSLAG]: 0, [S.TERUGGAVE_BELASTING]: 0, [S.OVERIGE_INKOMSTEN]: 400,
+    [S.VASTE_LASTEN_WONEN]: 850, [S.HUUR_HYPOTHEEK]: 0, [S.GAS_WATER_LICHT]: 280,
+    [S.VERZEKERINGEN_WONEN]: 450, [S.GEMEENTELIJKE_LASTEN]: 120,
+    [S.DAGELIJKSE_UITGAVEN]: 780, [S.BOODSCHAPPEN]: 480, [S.HUISHOUDEN_VERZORGING]: 80,
+    [S.KINDEREN_SCHOOL]: 0, [S.MEDISCHE_KOSTEN]: 220,
+    [S.VERVOER]: 320, [S.BRANDSTOF_OV]: 120, [S.AUTO_VASTE_LASTEN]: 110,
+    [S.AUTO_ONDERHOUD]: 60, [S.FIETS_DEELVERVOER]: 30,
+    [S.LEUKE_DINGEN]: 700, [S.UIT_ETEN_HORECA]: 180, [S.VRIJE_TIJD_SPORT]: 120,
+    [S.VAKANTIE]: 300, [S.KLEDING_OVERIGE]: 100,
+    [S.SPAREN_SCHULDEN]: 300, [S.SPAREN_NOODBUFFER]: 300, [S.INVESTEREN_FIRE]: 0,
+    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 0, [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
+  }),
 }
 
 const basData: PersonaData = {
