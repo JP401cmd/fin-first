@@ -470,13 +470,27 @@ function ResponsesSheet({ questionnaireId, onClose }: {
           {view === 'sessions' && !selectedSession && (
             <div className="space-y-2">
               {sessions.map(s => (
-                <button key={s.id} type="button" onClick={() => setSelectedSessionId(s.id)} className="flex w-full items-center justify-between rounded border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]">
-                  <div>
-                    <p className="text-sm font-medium text-[var(--ink)]">{s.user_email}</p>
-                    <p className="mt-0.5 text-xs text-[var(--ink-4)]">{new Date(s.started_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${s.completed_at ? 'bg-kern-500/10 text-kern-700' : 'bg-amber-100 text-amber-700'}`}>{s.completed_at ? 'Voltooid' : 'Onvolledig'}</span>
-                </button>
+                <div key={s.id} className="flex items-center gap-2 rounded border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:bg-[var(--subtle)]">
+                  <button type="button" onClick={() => setSelectedSessionId(s.id)} className="flex min-w-0 flex-1 items-center justify-between px-4 py-3 text-left">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--ink)]">{s.user_email}</p>
+                      <p className="mt-0.5 text-xs text-[var(--ink-4)]">{new Date(s.started_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${s.completed_at ? 'bg-kern-500/10 text-kern-700' : 'bg-amber-100 text-amber-700'}`}>{s.completed_at ? 'Voltooid' : 'Onvolledig'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm('Weet je zeker dat je deze invulling wilt verwijderen?')) return
+                      await fetch(`/api/admin/questionnaires/${questionnaireId}/responses?session_id=${s.id}`, { method: 'DELETE' })
+                      setSessions(prev => prev.filter(p => p.id !== s.id))
+                    }}
+                    className="mr-3 shrink-0 text-[var(--ink-4)] hover:text-red-500"
+                    title="Verwijder invulling"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
               {sessions.length === 0 && <p className="text-sm text-[var(--ink-3)]">Nog geen invullingen.</p>}
             </div>
