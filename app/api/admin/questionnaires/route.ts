@@ -1,15 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
-
-function getServiceClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 export async function GET() {
   const supabase = await createClient()
@@ -17,8 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const service = getServiceClient()
-  const { data: questionnaires, error } = await service
+  const { data: questionnaires, error } = await supabase
     .from('questionnaires')
     .select(`
       *,
@@ -69,8 +59,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Title and at least one question required' }, { status: 400 })
   }
 
-  const service = getServiceClient()
-  const { data: questionnaire, error: qError } = await service
+  const { data: questionnaire, error: qError } = await supabase
     .from('questionnaires')
     .insert({ title, description: description ?? null })
     .select('id')
@@ -92,7 +81,7 @@ export async function POST(req: Request) {
     is_multi_select: q.is_multi_select ?? false,
   }))
 
-  const { error: questionsError } = await service
+  const { error: questionsError } = await supabase
     .from('questionnaire_questions')
     .insert(questionRows)
 

@@ -17,7 +17,9 @@ CREATE POLICY "authenticated_read_active_questionnaires" ON questionnaires
   FOR SELECT TO authenticated USING (is_active = true);
 
 CREATE POLICY "superadmin_all_questionnaires" ON questionnaires
-  FOR ALL USING (
+  FOR ALL TO authenticated USING (
+    EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'superadmin')
+  ) WITH CHECK (
     EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'superadmin')
   );
 
@@ -58,7 +60,9 @@ CREATE POLICY "authenticated_read_questions" ON questionnaire_questions
   FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "superadmin_all_questions" ON questionnaire_questions
-  FOR ALL USING (
+  FOR ALL TO authenticated USING (
+    EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'superadmin')
+  ) WITH CHECK (
     EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'superadmin')
   );
 
@@ -84,8 +88,8 @@ CREATE POLICY "users_own_sessions" ON questionnaire_sessions
   FOR ALL TO authenticated USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "superadmin_read_all_sessions" ON questionnaire_sessions
-  FOR SELECT USING (
+CREATE POLICY "superadmin_all_sessions" ON questionnaire_sessions
+  FOR ALL TO authenticated USING (
     EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'superadmin')
   );
 
@@ -126,8 +130,8 @@ CREATE POLICY "users_own_responses" ON questionnaire_responses
     )
   );
 
-CREATE POLICY "superadmin_read_all_responses" ON questionnaire_responses
-  FOR SELECT USING (
+CREATE POLICY "superadmin_all_responses" ON questionnaire_responses
+  FOR ALL TO authenticated USING (
     EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'superadmin')
   );
 
