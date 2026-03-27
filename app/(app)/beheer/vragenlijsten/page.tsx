@@ -80,10 +80,23 @@ export default function BeheerVragenlijsten() {
   const [creating, setCreating] = useState(false)
   const [viewingResponsesId, setViewingResponsesId] = useState<string | null>(null)
 
+  const [listError, setListError] = useState<string | null>(null)
+
   const loadList = useCallback(async () => {
-    const res = await fetch('/api/admin/questionnaires')
-    const data = await res.json()
-    setQuestionnaires(data.questionnaires ?? [])
+    try {
+      const res = await fetch('/api/admin/questionnaires')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        setListError(err.error ?? `HTTP ${res.status}`)
+        setLoading(false)
+        return
+      }
+      const data = await res.json()
+      setQuestionnaires(data.questionnaires ?? [])
+      setListError(null)
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : 'Onbekende fout')
+    }
     setLoading(false)
   }, [])
 
@@ -118,6 +131,8 @@ export default function BeheerVragenlijsten() {
             <div key={i} className="h-16 animate-pulse rounded border border-[var(--border-ed)] bg-[var(--subtle)]" />
           ))}
         </div>
+      ) : listError ? (
+        <p className="mt-6 text-sm text-red-600">Fout bij laden: {listError}</p>
       ) : questionnaires.length === 0 ? (
         <p className="mt-6 text-sm text-[var(--ink-3)]">Nog geen vragenlijsten aangemaakt.</p>
       ) : (
