@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
+
+function getServiceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -9,7 +18,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { data, error } = await supabase
+  const service = getServiceClient()
+  const { data, error } = await service
     .from('questionnaires')
     .select(`
       *,
@@ -30,6 +40,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!(await isSuperAdmin(supabase))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+
+  const service = getServiceClient()
 
   const body = await req.json()
   const { title, description, is_active, questions } = body as {
@@ -54,7 +66,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (is_active !== undefined) updates.is_active = is_active
 
   if (Object.keys(updates).length > 0) {
-    const { error } = await supabase
+    const { error } = await service
       .from('questionnaires')
       .update(updates)
       .eq('id', id)
@@ -62,7 +74,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   if (questions) {
-    const { data: existingQuestions } = await supabase
+    const { data: existingQuestions } = await service
       .from('questionnaire_questions')
       .select('id')
       .eq('questionnaire_id', id)
@@ -72,7 +84,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const toDelete = [...existingIds].filter(eid => !incomingIds.has(eid))
     if (toDelete.length > 0) {
-      await supabase
+      await service
         .from('questionnaire_questions')
         .delete()
         .in('id', toDelete)
@@ -91,7 +103,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       is_multi_select: q.is_multi_select ?? false,
     }))
 
-    const { error: upsertError } = await supabase
+    const { error: upsertError } = await service
       .from('questionnaire_questions')
       .upsert(rows, { onConflict: 'id' })
 
