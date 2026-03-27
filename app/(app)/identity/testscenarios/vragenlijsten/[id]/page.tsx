@@ -14,6 +14,7 @@ interface Question {
   scale_min_label: string | null
   scale_max_label: string | null
   is_required: boolean
+  is_multi_select: boolean
 }
 
 interface SessionData {
@@ -223,29 +224,51 @@ export default function QuestionnaireFillPage() {
 
         {currentQuestion.type === 'multiple_choice' && currentQuestion.options && (
           <div className="space-y-2">
-            {(currentQuestion.options as string[]).map(option => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setAnswer(currentQuestion.id, { choice: option })}
-                className={`flex w-full items-center gap-3 rounded border px-4 py-3 text-left text-sm transition-colors ${
-                  currentAnswer?.choice === option
-                    ? 'border-kern-500 bg-kern-500/5 font-medium text-[var(--ink)]'
-                    : 'border-[var(--border-ed)] text-[var(--ink-2)] hover:border-[var(--border-md)]'
-                }`}
-              >
-                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                  currentAnswer?.choice === option
-                    ? 'border-kern-500 bg-kern-500'
-                    : 'border-[var(--border-md)]'
-                }`}>
-                  {currentAnswer?.choice === option && (
-                    <span className="h-2 w-2 rounded-full bg-white" />
-                  )}
-                </span>
-                {option}
-              </button>
-            ))}
+            {currentQuestion.is_multi_select && (
+              <p className="text-xs text-[var(--ink-4)]">Meerdere antwoorden mogelijk</p>
+            )}
+            {(currentQuestion.options as string[]).map(option => {
+              const selectedChoices: string[] = currentAnswer?.choice ? (() => { try { return JSON.parse(currentAnswer.choice) } catch { return [currentAnswer.choice] } })() : []
+              const isSelected = currentQuestion.is_multi_select
+                ? selectedChoices.includes(option)
+                : currentAnswer?.choice === option
+
+              const handleClick = () => {
+                if (currentQuestion.is_multi_select) {
+                  const current: string[] = currentAnswer?.choice ? (() => { try { return JSON.parse(currentAnswer.choice) } catch { return [currentAnswer.choice] } })() : []
+                  const next = current.includes(option)
+                    ? current.filter(o => o !== option)
+                    : [...current, option]
+                  setAnswer(currentQuestion.id, { choice: next.length > 0 ? JSON.stringify(next) : undefined })
+                } else {
+                  setAnswer(currentQuestion.id, { choice: option })
+                }
+              }
+
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={handleClick}
+                  className={`flex w-full items-center gap-3 rounded border px-4 py-3 text-left text-sm transition-colors ${
+                    isSelected
+                      ? 'border-kern-500 bg-kern-500/5 font-medium text-[var(--ink)]'
+                      : 'border-[var(--border-ed)] text-[var(--ink-2)] hover:border-[var(--border-md)]'
+                  }`}
+                >
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center border ${
+                    currentQuestion.is_multi_select ? 'rounded' : 'rounded-full'
+                  } ${
+                    isSelected ? 'border-kern-500 bg-kern-500' : 'border-[var(--border-md)]'
+                  }`}>
+                    {isSelected && (
+                      <span className={`bg-white ${currentQuestion.is_multi_select ? 'h-2.5 w-1.5 -mt-0.5 border-b-2 border-r-2 border-white rotate-45' : 'h-2 w-2 rounded-full'}`} />
+                    )}
+                  </span>
+                  {option}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>

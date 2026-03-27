@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS questionnaire_questions (
   scale_min_label TEXT,
   scale_max_label TEXT,
   is_required BOOLEAN NOT NULL DEFAULT true,
+  is_multi_select BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

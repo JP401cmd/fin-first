@@ -44,6 +44,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       scale_min_label?: string
       scale_max_label?: string
       is_required?: boolean
+      is_multi_select?: boolean
     }[]
   }
 
@@ -87,6 +88,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       scale_min_label: q.type === 'scale' ? q.scale_min_label ?? null : null,
       scale_max_label: q.type === 'scale' ? q.scale_max_label ?? null : null,
       is_required: q.is_required ?? true,
+      is_multi_select: q.is_multi_select ?? false,
     }))
 
     const { error: upsertError } = await supabase

@@ -17,6 +17,7 @@ interface QuestionDraft {
   scale_min_label?: string
   scale_max_label?: string
   is_required: boolean
+  is_multi_select: boolean
 }
 
 interface QuestionnaireSummary {
@@ -44,6 +45,7 @@ interface QuestionnaireDetail {
     scale_min_label: string | null
     scale_max_label: string | null
     is_required: boolean
+    is_multi_select: boolean
   }[]
 }
 
@@ -200,6 +202,7 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
             scale_min_label: qq.scale_min_label ?? undefined,
             scale_max_label: qq.scale_max_label ?? undefined,
             is_required: qq.is_required,
+            is_multi_select: qq.is_multi_select,
           }))
         )
         setLoading(false)
@@ -213,6 +216,7 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
         type,
         question_text: '',
         is_required: true,
+        is_multi_select: false,
         ...(type === 'multiple_choice' ? { options: [''] } : {}),
         ...(type === 'scale' ? { scale_min_label: 'Zeer slecht', scale_max_label: 'Uitstekend' } : {}),
       },
@@ -252,6 +256,7 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
         scale_min_label: q.scale_min_label,
         scale_max_label: q.scale_max_label,
         is_required: q.is_required,
+        is_multi_select: q.is_multi_select,
       })),
     }
 
@@ -339,7 +344,13 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
                             <button type="button" onClick={() => { updateQuestion(i, { options: (q.options ?? []).filter((_, j) => j !== oi) }) }} className="text-[var(--ink-4)] hover:text-red-500"><X className="h-3 w-3" /></button>
                           </div>
                         ))}
-                        <button type="button" onClick={() => updateQuestion(i, { options: [...(q.options ?? []), ''] })} className="text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]">+ Optie toevoegen</button>
+                        <div className="flex items-center justify-between">
+                          <button type="button" onClick={() => updateQuestion(i, { options: [...(q.options ?? []), ''] })} className="text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]">+ Optie toevoegen</button>
+                          <label className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                            <input type="checkbox" checked={q.is_multi_select} onChange={e => updateQuestion(i, { is_multi_select: e.target.checked })} className="h-3 w-3 rounded border-[var(--border-md)]" />
+                            Meerdere antwoorden
+                          </label>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -366,6 +377,15 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
       )}
     </BottomSheet>
   )
+}
+
+function formatChoice(choice: string | null): string {
+  if (!choice) return '\u2014'
+  try {
+    const parsed = JSON.parse(choice)
+    if (Array.isArray(parsed)) return parsed.join(', ')
+  } catch { /* plain string */ }
+  return choice
 }
 
 function ResponsesSheet({ questionnaireId, onClose }: {
@@ -445,7 +465,7 @@ function ResponsesSheet({ questionnaireId, onClose }: {
                   .map(r => (
                   <div key={r.id} className="rounded border border-[var(--border-ed)] px-4 py-3">
                     <p className="text-xs font-medium text-[var(--ink-3)]">{r.question_text_snapshot}</p>
-                    <p className="mt-1 text-sm text-[var(--ink)]">{r.answer_text ?? (r.answer_scale != null ? `${r.answer_scale}/10` : r.answer_choice) ?? '\u2014'}</p>
+                    <p className="mt-1 text-sm text-[var(--ink)]">{r.answer_text ?? (r.answer_scale != null ? `${r.answer_scale}/10` : formatChoice(r.answer_choice)) ?? '\u2014'}</p>
                   </div>
                 ))}
               </div>
@@ -502,7 +522,12 @@ function ResponsesSheet({ questionnaireId, onClose }: {
 
                 {q.type === 'multiple_choice' && responses.length > 0 && (() => {
                   const counts: Record<string, number> = {}
-                  for (const r of responses) { if (r.answer_choice) counts[r.answer_choice] = (counts[r.answer_choice] ?? 0) + 1 }
+                  for (const r of responses) {
+                    if (!r.answer_choice) continue
+                    let choices: string[]
+                    try { const parsed = JSON.parse(r.answer_choice); choices = Array.isArray(parsed) ? parsed : [r.answer_choice] } catch { choices = [r.answer_choice] }
+                    for (const c of choices) counts[c] = (counts[c] ?? 0) + 1
+                  }
                   const maxCount = Math.max(...Object.values(counts), 1)
                   return (
                     <div className="mb-4 space-y-1.5">
@@ -523,7 +548,7 @@ function ResponsesSheet({ questionnaireId, onClose }: {
                     return (
                       <div key={r.id} className="rounded border border-[var(--border-ed)] px-4 py-3">
                         <p className="text-xs text-[var(--ink-4)]">{session?.user_email ?? '?'} &mdash; {new Date(r.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</p>
-                        <p className="mt-1 text-sm text-[var(--ink)]">{r.answer_text ?? (r.answer_scale != null ? `${r.answer_scale}/10` : r.answer_choice) ?? '\u2014'}</p>
+                        <p className="mt-1 text-sm text-[var(--ink)]">{r.answer_text ?? (r.answer_scale != null ? `${r.answer_scale}/10` : formatChoice(r.answer_choice)) ?? '\u2014'}</p>
                       </div>
                     )
                   })}
