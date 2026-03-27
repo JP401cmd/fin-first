@@ -1,0 +1,118 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { ArrowRight, CheckCircle2, Clock } from 'lucide-react'
+import { SectionDivider } from '@/components/app/section-divider'
+
+interface QuestionnaireItem {
+  id: string
+  title: string
+  description: string | null
+  question_count: number
+  answered_count: number
+  has_open_session: boolean
+  has_completed: boolean
+}
+
+export default function VragenlijstenPage() {
+  const [questionnaires, setQuestionnaires] = useState<QuestionnaireItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/questionnaires')
+      .then(r => r.json())
+      .then(d => setQuestionnaires(d.questionnaires ?? []))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <header className="mb-10 border-b border-[var(--border-ed)] pb-6">
+        <p className="label-editorial text-[var(--ink-3)]">Feedback</p>
+        <h1 className="mt-2 font-display text-3xl font-bold leading-tight text-[var(--ink)] sm:text-4xl">
+          Vragenlijsten
+        </h1>
+        <p className="mt-3 max-w-xl font-serif text-base leading-relaxed text-[var(--ink-3)]">
+          Deel je ervaringen met TriFinity. Elke vragenlijst duurt een paar minuten en
+          helpt ons de app te verbeteren.
+        </p>
+      </header>
+
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2].map(i => (
+            <div key={i} className="h-28 animate-pulse rounded border border-[var(--border-ed)] bg-[var(--subtle)]" />
+          ))}
+        </div>
+      ) : questionnaires.length === 0 ? (
+        <p className="font-serif text-sm text-[var(--ink-3)]">
+          Er zijn momenteel geen vragenlijsten beschikbaar.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {questionnaires.map(q => (
+            <QuestionnaireCard key={q.id} questionnaire={q} />
+          ))}
+        </div>
+      )}
+
+      <SectionDivider variant="asterisk" />
+
+      <div className="text-center">
+        <Link
+          href="/identity/testscenarios"
+          className="text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+        >
+          &larr; Terug naar testscenario&rsquo;s
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+function QuestionnaireCard({ questionnaire: q }: { questionnaire: QuestionnaireItem }) {
+  const pct = q.question_count > 0 ? Math.round((q.answered_count / q.question_count) * 100) : 0
+  const isComplete = q.has_completed && !q.has_open_session
+  const isInProgress = q.has_open_session
+
+  return (
+    <Link
+      href={`/identity/testscenarios/vragenlijsten/${q.id}`}
+      className="group block border border-[var(--border-ed)] bg-[var(--paper)] px-5 py-4 transition-all duration-150 hover:-translate-y-px hover:border-[var(--border-md)] hover:shadow-[var(--s1)]"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">{q.title}</h3>
+          {q.description && (
+            <p className="mt-1 font-serif text-sm text-[var(--ink-3)]">{q.description}</p>
+          )}
+          <div className="mt-3 flex items-center gap-3 text-xs text-[var(--ink-4)]">
+            <span className="font-mono tabular-nums">{q.question_count} vragen</span>
+            {isInProgress && (
+              <span className="flex items-center gap-1 text-amber-600">
+                <Clock className="h-3 w-3" />
+                Bezig &mdash; {q.answered_count}/{q.question_count}
+              </span>
+            )}
+            {isComplete && !isInProgress && (
+              <span className="flex items-center gap-1 text-kern-600">
+                <CheckCircle2 className="h-3 w-3" />
+                Afgerond
+              </span>
+            )}
+          </div>
+          {isInProgress && (
+            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+              <div
+                className="h-full rounded-full bg-kern-500 transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          )}
+        </div>
+        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--ink-3)]" />
+      </div>
+    </Link>
+  )
+}
