@@ -408,15 +408,17 @@ export function RecommendationGenerationModal({
         }
         if (data.recommendations?.length) {
           setNewRecs(data.recommendations as Recommendation[])
-        }
-        if (!data.status || data.status !== 'generating') {
-          if (data.recommendations?.length) {
-            setPhase('results')
-            onNewRecsRef.current(data.recommendations as Recommendation[])
-          }
+          setPhase('results')
+          onNewRecsRef.current(data.recommendations as Recommendation[])
           return
         }
-        startPolling()
+        if (data.status === 'generating') {
+          startPolling()
+          return
+        }
+        // POST returned without results and without generating status
+        setError('Will kon geen nieuwe voorstellen genereren.')
+        setPhase('error')
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Er ging iets mis')

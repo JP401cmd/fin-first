@@ -36,35 +36,11 @@ const recommendationSchema = z.object({
   })),
 })
 
-// ── Module-level state (fire-and-forget pattern) ───────────
-
-interface InitialRecsState {
-  recommendations: Record<string, unknown>[]   // Full DB rows (with id, status, etc.)
-  complete: boolean
-  startedAt: number
-}
-
-const activeGenerations = new Map<string, InitialRecsState>()
-const generationErrors = new Map<string, string>()
-
-const STALE_TIMEOUT_MS = 2 * 60 * 1000 // 2 minutes
-
-function cleanupStale() {
-  const now = Date.now()
-  for (const [key, state] of activeGenerations) {
-    if (now - state.startedAt > STALE_TIMEOUT_MS) {
-      activeGenerations.delete(key)
-    }
-  }
-  for (const [key] of generationErrors) {
-    // Errors are consumed on first read, but clean stale ones just in case
-    if (!activeGenerations.has(key)) {
-      generationErrors.delete(key)
-    }
-  }
-}
-
-// ── POST: start generation ─────────────────────────────────
+// ── POST: generate recommendations synchronously ──────────
+// Previous fire-and-forget pattern used module-level Maps which
+// don't survive across serverless instances on Vercel, causing
+// GET polls to miss in-progress results and show an error.
+// Now POST waits for AI completion and returns results directly.
 
 export async function POST() {
   const supabase = await createClient()
@@ -79,25 +55,6 @@ export async function POST() {
     return Response.json({ error: tierGate.error }, { status: 403 })
   }
 
-  cleanupStale()
-
-  // If already running or complete, return current state
-  const existing = activeGenerations.get(user.id)
-  if (existing) {
-    if (existing.complete) {
-      return Response.json({ recommendations: existing.recommendations })
-    }
-    return Response.json({ status: 'generating', recommendations: existing.recommendations })
-  }
-
-  // Check for error from previous run
-  const prevError = generationErrors.get(user.id)
-  if (prevError) {
-    generationErrors.delete(user.id)
-    return Response.json({ error: prevError }, { status: 500 })
-  }
-
-  // Prepare context synchronously
   const [{ data: budgets }, { data: profile }] = await Promise.all([
     supabase.from('budgets').select('slug, is_essential'),
     supabase.from('profiles').select('retirement_expense_method, budgeting_active').eq('id', user.id).single(),
@@ -109,7 +66,7 @@ export async function POST() {
   let context: string
   try {
     context = await buildRecommendationContext(supabase, budgetingActive)
-  } catch (err) {
+  } catch {
     return Response.json({ error: 'Context kon niet worden opgebouwd.' }, { status: 500 })
   }
 
@@ -123,76 +80,67 @@ export async function POST() {
     return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
   }
 
-  // Create state object and start fire-and-forget generation
-  const state: InitialRecsState = {
-    recommendations: [],
-    complete: false,
-    startedAt: Date.now(),
-  }
-  activeGenerations.set(user.id, state)
-
   const generationId = crypto.randomUUID()
   const userId = user.id
 
-  // Fire-and-forget async IIFE
-  ;(async () => {
-    try {
-      const result = await generateObject({
-        model,
-        schema: recommendationSchema,
-        system: RECOMMENDATIONS_SYSTEM_PROMPT,
-        prompt: `Analyseer het volgende financiële profiel en genereer 3 optimalisatievoorstellen:\n\n${context}`,
-      })
+  try {
+    const result = await generateObject({
+      model,
+      schema: recommendationSchema,
+      system: RECOMMENDATIONS_SYSTEM_PROMPT,
+      prompt: `Analyseer het volgende financiële profiel en genereer 3 optimalisatievoorstellen:\n\n${context}`,
+    })
 
-      // Insert into database and push to state
-      for (const rec of result.object.recommendations) {
-        const slug = rec.related_budget_slug
-        const isEssential = slug ? (budgetMap.get(slug) ?? false) : false
-        const freedomDaysAllowed = isEssential && usesEssentialBudgets
-        const validFreedomDays = freedomDaysAllowed ? rec.freedom_days_per_year : 0
-        const validActions = rec.actions.map(a => ({
-          ...a,
-          freedom_days_impact: freedomDaysAllowed ? a.freedom_days_impact : 0,
-        }))
+    const recommendations: Record<string, unknown>[] = []
 
-        const { data: inserted, error } = await supabase
-          .from('recommendations')
-          .insert({
-            user_id: userId,
-            title: maskPIIInOutput(rec.title),
-            description: maskPIIInOutput(rec.description),
-            recommendation_type: rec.recommendation_type,
-            euro_impact_monthly: rec.euro_impact_monthly,
-            euro_impact_yearly: rec.euro_impact_yearly,
-            freedom_days_per_year: validFreedomDays,
-            current_value: rec.current_value ?? null,
-            proposed_value: rec.proposed_value ?? null,
-            related_budget_slug: rec.related_budget_slug ?? null,
-            priority_score: Math.max(1, Math.min(5, Math.round(rec.priority_score))),
-            suggested_actions: validActions,
-            ai_generation_id: generationId,
-            status: 'pending',
-          })
-          .select()
-          .single()
+    for (const rec of result.object.recommendations) {
+      const slug = rec.related_budget_slug
+      const isEssential = slug ? (budgetMap.get(slug) ?? false) : false
+      const freedomDaysAllowed = isEssential && usesEssentialBudgets
+      const validFreedomDays = freedomDaysAllowed ? rec.freedom_days_per_year : 0
+      const validActions = rec.actions.map(a => ({
+        ...a,
+        freedom_days_impact: freedomDaysAllowed ? a.freedom_days_impact : 0,
+      }))
 
-        if (!error && inserted) {
-          state.recommendations.push(inserted)
-        }
+      const { data: inserted, error } = await supabase
+        .from('recommendations')
+        .insert({
+          user_id: userId,
+          title: maskPIIInOutput(rec.title),
+          description: maskPIIInOutput(rec.description),
+          recommendation_type: rec.recommendation_type,
+          euro_impact_monthly: rec.euro_impact_monthly,
+          euro_impact_yearly: rec.euro_impact_yearly,
+          freedom_days_per_year: validFreedomDays,
+          current_value: rec.current_value ?? null,
+          proposed_value: rec.proposed_value ?? null,
+          related_budget_slug: rec.related_budget_slug ?? null,
+          priority_score: Math.max(1, Math.min(5, Math.round(rec.priority_score))),
+          suggested_actions: validActions,
+          ai_generation_id: generationId,
+          status: 'pending',
+        })
+        .select()
+        .single()
+
+      if (!error && inserted) {
+        recommendations.push(inserted)
       }
-
-      state.complete = true
-    } catch (err) {
-      console.error('[initial-recs] Generation failed:', err)
-      generationErrors.set(userId, err instanceof Error ? err.message : 'Generation failed')
-      activeGenerations.delete(userId)
     }
-  })()
 
-  return Response.json({ status: 'generating', recommendations: [] })
+    return Response.json({ recommendations })
+  } catch (err) {
+    console.error('[initial-recs] Generation failed:', err)
+    return Response.json({
+      error: err instanceof Error ? err.message : 'AI-generatie mislukt',
+    }, { status: 500 })
+  }
 }
 
-// ── GET: poll for results ──────────────────────────────────
+// ── GET: poll fallback (checks database) ──────────────────
+
+const RECENT_WINDOW_MS = 2 * 60 * 1000
 
 export async function GET() {
   const supabase = await createClient()
@@ -207,21 +155,18 @@ export async function GET() {
     return Response.json({ error: tierGateGet.error }, { status: 403 })
   }
 
-  cleanupStale()
+  // Check database for recently generated recommendations
+  const cutoff = new Date(Date.now() - RECENT_WINDOW_MS).toISOString()
+  const { data: recentRecs } = await supabase
+    .from('recommendations')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('status', 'pending')
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
 
-  const state = activeGenerations.get(user.id)
-  if (state) {
-    if (state.complete) {
-      activeGenerations.delete(user.id)
-      return Response.json({ recommendations: state.recommendations })
-    }
-    return Response.json({ status: 'generating', recommendations: state.recommendations })
-  }
-
-  const error = generationErrors.get(user.id)
-  if (error) {
-    generationErrors.delete(user.id)
-    return Response.json({ error }, { status: 500 })
+  if (recentRecs && recentRecs.length > 0) {
+    return Response.json({ recommendations: recentRecs })
   }
 
   return Response.json({ recommendations: [] })
