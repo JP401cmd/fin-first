@@ -62,31 +62,68 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   if (questions) {
-    // Delete all existing questions and re-insert (simpler than upsert with mixed new/existing)
-    const { error: deleteError } = await supabase
+    // Separate existing (have id) from new questions (no id)
+    // This preserves question IDs so response foreign keys stay intact
+    const { data: existingQuestions } = await supabase
       .from('questionnaire_questions')
-      .delete()
+      .select('id')
       .eq('questionnaire_id', id)
 
-    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    const existingIds = new Set((existingQuestions ?? []).map(q => q.id))
+    const incomingIds = new Set(questions.filter(q => q.id).map(q => q.id))
 
-    const rows = questions.map((q, i) => ({
-      questionnaire_id: id,
-      sort_order: i + 1,
-      type: q.type,
-      question_text: q.question_text,
-      options: q.type === 'multiple_choice' ? q.options ?? null : null,
-      scale_min_label: q.type === 'scale' ? q.scale_min_label ?? null : null,
-      scale_max_label: q.type === 'scale' ? q.scale_max_label ?? null : null,
-      is_required: q.is_required ?? true,
-      is_multi_select: q.is_multi_select ?? false,
-    }))
+    // 1. Delete removed questions
+    const toDelete = [...existingIds].filter(eid => !incomingIds.has(eid))
+    if (toDelete.length > 0) {
+      await supabase
+        .from('questionnaire_questions')
+        .delete()
+        .in('id', toDelete)
+    }
 
-    const { error: insertError } = await supabase
-      .from('questionnaire_questions')
-      .insert(rows)
+    // 2. Update existing questions in place
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i]
+      if (q.id && existingIds.has(q.id)) {
+        await supabase
+          .from('questionnaire_questions')
+          .update({
+            sort_order: i + 1,
+            type: q.type,
+            question_text: q.question_text,
+            options: q.type === 'multiple_choice' ? q.options ?? null : null,
+            scale_min_label: q.type === 'scale' ? q.scale_min_label ?? null : null,
+            scale_max_label: q.type === 'scale' ? q.scale_max_label ?? null : null,
+            is_required: q.is_required ?? true,
+            is_multi_select: q.is_multi_select ?? false,
+          })
+          .eq('id', q.id)
+      }
+    }
 
-    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+    // 3. Insert new questions
+    const newQuestions = questions
+      .map((q, i) => ({ q, i }))
+      .filter(({ q }) => !q.id || !existingIds.has(q.id))
+    if (newQuestions.length > 0) {
+      const rows = newQuestions.map(({ q, i }) => ({
+        questionnaire_id: id,
+        sort_order: i + 1,
+        type: q.type,
+        question_text: q.question_text,
+        options: q.type === 'multiple_choice' ? q.options ?? null : null,
+        scale_min_label: q.type === 'scale' ? q.scale_min_label ?? null : null,
+        scale_max_label: q.type === 'scale' ? q.scale_max_label ?? null : null,
+        is_required: q.is_required ?? true,
+        is_multi_select: q.is_multi_select ?? false,
+      }))
+
+      const { error: insertError } = await supabase
+        .from('questionnaire_questions')
+        .insert(rows)
+
+      if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ success: true })

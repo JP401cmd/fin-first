@@ -86,8 +86,10 @@ export default function BeheerVragenlijsten() {
     try {
       const res = await fetch('/api/admin/questionnaires')
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-        setListError(err.error ?? `HTTP ${res.status}`)
+        const body = await res.text()
+        let errMsg = `HTTP ${res.status}`
+        try { errMsg = JSON.parse(body).error ?? errMsg } catch { errMsg += `: ${body.slice(0, 200)}` }
+        setListError(errMsg)
         setLoading(false)
         return
       }
@@ -438,7 +440,10 @@ function ResponsesSheet({ questionnaireId, onClose }: {
   const selectedSession = selectedSessionId ? sessions.find(s => s.id === selectedSessionId) : null
 
   const questionAggregates = (qId: string) => {
-    return sessions.flatMap(s => s.questionnaire_responses.filter(r => r.question_id === qId))
+    const q = questions.find(q => q.id === qId)
+    return sessions.flatMap(s => s.questionnaire_responses.filter(r =>
+      r.question_id === qId || (r.question_id === null && q && r.question_text_snapshot === q.question_text)
+    ))
   }
 
   return (
@@ -485,8 +490,8 @@ function ResponsesSheet({ questionnaireId, onClose }: {
               <div className="space-y-3">
                 {selectedSession.questionnaire_responses
                   .sort((a, b) => {
-                    const qA = questions.findIndex(q => q.id === a.question_id)
-                    const qB = questions.findIndex(q => q.id === b.question_id)
+                    const qA = questions.findIndex(q => q.id === a.question_id || (a.question_id === null && q.question_text === a.question_text_snapshot))
+                    const qB = questions.findIndex(q => q.id === b.question_id || (b.question_id === null && q.question_text === b.question_text_snapshot))
                     return qA - qB
                   })
                   .map(r => (
