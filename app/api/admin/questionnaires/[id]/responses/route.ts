@@ -18,55 +18,64 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const service = getServiceClient()
+  try {
+    const service = getServiceClient()
 
-  const { data: sessions, error: sError } = await service
-    .from('questionnaire_sessions')
-    .select(`
-      id,
-      user_id,
-      started_at,
-      completed_at,
-      questionnaire_responses(
+    const { data: sessions, error: sError } = await service
+      .from('questionnaire_sessions')
+      .select(`
         id,
-        question_id,
-        question_text_snapshot,
-        answer_text,
-        answer_scale,
-        answer_choice,
-        created_at
-      )
-    `)
-    .eq('questionnaire_id', id)
-    .order('started_at', { ascending: false })
+        user_id,
+        started_at,
+        completed_at,
+        questionnaire_responses(
+          id,
+          question_id,
+          question_text_snapshot,
+          answer_text,
+          answer_scale,
+          answer_choice,
+          created_at
+        )
+      `)
+      .eq('questionnaire_id', id)
+      .order('started_at', { ascending: false })
 
-  if (sError) return NextResponse.json({ error: sError.message }, { status: 500 })
+    if (sError) return NextResponse.json({ error: sError.message }, { status: 500 })
 
-  const { data: questions } = await service
-    .from('questionnaire_questions')
-    .select('id, sort_order, type, question_text')
-    .eq('questionnaire_id', id)
-    .order('sort_order', { ascending: true })
+    const { data: questions } = await service
+      .from('questionnaire_questions')
+      .select('id, sort_order, type, question_text')
+      .eq('questionnaire_id', id)
+      .order('sort_order', { ascending: true })
 
-  const userIds = [...new Set((sessions ?? []).map(s => s.user_id))]
-  const userMap: Record<string, string> = {}
+    // Resolve user emails — gracefully handle failure
+    const userIds = [...new Set((sessions ?? []).map(s => s.user_id))]
+    const userMap: Record<string, string> = {}
 
-  if (userIds.length > 0) {
-    const { data: { users } } = await service.auth.admin.listUsers({ perPage: 200 })
-    for (const u of users ?? []) {
-      if (userIds.includes(u.id)) {
-        userMap[u.id] = u.email ?? u.id.slice(0, 8)
+    if (userIds.length > 0) {
+      try {
+        const { data: { users } } = await service.auth.admin.listUsers({ perPage: 200 })
+        for (const u of users ?? []) {
+          if (userIds.includes(u.id)) {
+            userMap[u.id] = u.email ?? u.id.slice(0, 8)
+          }
+        }
+      } catch {
+        // listUsers failed — fall back to user_id prefix
       }
     }
+
+    const enrichedSessions = (sessions ?? []).map(s => ({
+      ...s,
+      user_email: userMap[s.user_id] ?? s.user_id.slice(0, 8),
+    }))
+
+    return NextResponse.json({
+      sessions: enrichedSessions,
+      questions: questions ?? [],
+    })
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 })
   }
-
-  const enrichedSessions = (sessions ?? []).map(s => ({
-    ...s,
-    user_email: userMap[s.user_id] ?? s.user_id.slice(0, 8),
-  }))
-
-  return NextResponse.json({
-    sessions: enrichedSessions,
-    questions: questions ?? [],
-  })
 }
