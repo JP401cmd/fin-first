@@ -395,18 +395,26 @@ function ResponsesSheet({ questionnaireId, onClose }: {
   const [sessions, setSessions] = useState<SessionResponse[]>([])
   const [questions, setQuestions] = useState<QuestionSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'sessions' | 'questions'>('sessions')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/admin/questionnaires/${questionnaireId}/responses`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(d => {
         setSessions(d.sessions ?? [])
         setQuestions(d.questions ?? [])
-        setLoading(false)
       })
+      .catch(err => {
+        console.error('Failed to load responses:', err)
+        setError(err.message ?? 'Onbekende fout')
+      })
+      .finally(() => setLoading(false))
   }, [questionnaireId])
 
   const totalSessions = sessions.length
@@ -422,6 +430,10 @@ function ResponsesSheet({ questionnaireId, onClose }: {
     <BottomSheet open={true} onClose={onClose} title="Resultaten" size="full">
       {loading ? (
         <div className="p-6"><div className="h-40 animate-pulse rounded bg-[var(--subtle)]" /></div>
+      ) : error ? (
+        <div className="p-6">
+          <p className="text-sm text-red-600">Fout bij laden: {error}</p>
+        </div>
       ) : (
         <div className="p-6">
           <div className="mb-6 flex gap-6 text-xs text-[var(--ink-3)]">
