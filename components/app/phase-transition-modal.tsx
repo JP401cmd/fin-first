@@ -192,7 +192,7 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
         {/* Body: motivational message (no feature listing) */}
         <div data-testid="phase-transition-body" className="px-6 py-5">
           <p className="text-sm text-[var(--ink-2)] text-center leading-relaxed">
-            Je financiele situatie is verbeterd! Blijf bouwen aan je financiele vrijheid
+            Je financiële situatie is verbeterd! Blijf bouwen aan je financiële vrijheid
             — je bent op de goede weg.
           </p>
         </div>

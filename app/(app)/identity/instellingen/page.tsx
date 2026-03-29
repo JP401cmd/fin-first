@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Scale } from 'lucide-react'
+import { ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Scale, Link2, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -23,6 +23,7 @@ import { formatCurrency } from '@/lib/format'
 import { MODULE_CATALOG } from '@/lib/module-registry'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
+import { useSubscriptionToggle } from '@/lib/hooks/use-subscription-toggle'
 
 // ── Typography helpers ────────────────────────────────────────────────────
 
@@ -85,8 +86,12 @@ export default function InstellingenPage() {
 
   // ─ Module toggle state ─
   const [moduleToggleErrors, setModuleToggleErrors] = useState<string[]>([])
-  const { activeModules } = useModuleAccess()
+  const { activeModules, subscriptions: activeSubscriptions } = useModuleAccess()
   const { modules: activeModuleToggles, toggle: toggleModule, saving: moduleSaving } = useModuleToggle(activeModules)
+
+  // ─ Tier / Subscription toggle state ─
+  const { subscriptions: activeTierToggles, toggle: toggleSubscription, saving: tierSaving } = useSubscriptionToggle(activeSubscriptions)
+  const [tierToggleError, setTierToggleError] = useState<string | null>(null)
 
   // ─ Section: Rebalancing ─
   const [rebalanceThreshold, setRebalanceThreshold] = useState(5)
@@ -691,7 +696,7 @@ export default function InstellingenPage() {
           Instellingen
         </h1>
         <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
-          Notificaties, berekeningen, weergave, huishouden en gegevensbeheer.
+          Modules, notificaties, berekeningen, weergave en gegevensbeheer.
         </p>
       </div>
 
@@ -792,6 +797,104 @@ export default function InstellingenPage() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* ── Abonnementen (Tiers) ──────────────────────────────────── */}
+      {/* Sits directly below Modules: together they define what the user sees in the app */}
+      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <div className="px-4 sm:px-8 py-4">
+          <h2 className="label-editorial text-[var(--ink-2)]">Abonnementen</h2>
+          <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+            Optionele add-ons die extra functionaliteit ontgrendelen.
+          </p>
+        </div>
+
+        <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-3">
+          {/* Connected tier — bank integration */}
+          <div className="flex items-start justify-between rounded-xl border border-[var(--border-ed)] px-4 py-3 gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+                <Link2 className="h-4 w-4 text-kern-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[var(--ink)]">Connected</p>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-snug">
+                  Bankintegratie via TrueLayer — automatische import en realtime saldo.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={activeTierToggles.includes('connected')}
+              aria-label={`Connected ${activeTierToggles.includes('connected') ? 'uitschakelen' : 'inschakelen'}`}
+              disabled={tierSaving}
+              onClick={async () => {
+                setTierToggleError(null)
+                const result = await toggleSubscription('connected', !activeTierToggles.includes('connected'))
+                if (!result.success && result.error) {
+                  setTierToggleError(result.error)
+                  setTimeout(() => setTierToggleError(null), 5000)
+                }
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kern-500 disabled:opacity-50 ${
+                activeTierToggles.includes('connected') ? 'bg-kern-500' : 'bg-zinc-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                  activeTierToggles.includes('connected') ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* AI tier — AI features */}
+          <div className="flex items-start justify-between rounded-xl border border-[var(--border-ed)] px-4 py-3 gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-horizon-50">
+                <Sparkles className="h-4 w-4 text-horizon-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[var(--ink)]">AI</p>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-snug">
+                  AI Assistent, AI Analyse, AI Aanbevelingen en AI Rapportage.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={activeTierToggles.includes('ai')}
+              aria-label={`AI ${activeTierToggles.includes('ai') ? 'uitschakelen' : 'inschakelen'}`}
+              disabled={tierSaving}
+              onClick={async () => {
+                setTierToggleError(null)
+                const result = await toggleSubscription('ai', !activeTierToggles.includes('ai'))
+                if (!result.success && result.error) {
+                  setTierToggleError(result.error)
+                  setTimeout(() => setTierToggleError(null), 5000)
+                }
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-horizon-500 disabled:opacity-50 ${
+                activeTierToggles.includes('ai') ? 'bg-horizon-500' : 'bg-zinc-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                  activeTierToggles.includes('ai') ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Error message */}
+          {tierToggleError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-xs text-red-700">{tierToggleError}</p>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── A: Notificaties ─────────────────────────────────────────── */}

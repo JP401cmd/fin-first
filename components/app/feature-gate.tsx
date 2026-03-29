@@ -160,12 +160,12 @@ export function LockedFeatureCard({ featureId, currentPhase: _currentPhase, modu
 
         {/* Feature description */}
         <p className="text-xs text-[var(--ink-3)]">
-          {featureDef?.description ?? 'Deze feature vereist een actieve module.'}
+          {featureDef?.description ?? 'Deze functie vereist een actieve module.'}
         </p>
 
         {/* Module activation badge */}
         {moduleDef && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--ink-3)]">
             <Settings className="h-3 w-3" />
             Schakel {moduleDef.label} in via Instellingen
           </span>
@@ -251,11 +251,11 @@ export function NewFeatureSpotlight({ featureId, children }: { featureId: string
       data-testid={`new-feature-spotlight-${featureId}`}
     >
       {/* Spotlight ring — animated subtle glow */}
-      <div className="absolute -inset-0.5 rounded-[var(--r-lg)] bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 opacity-30 blur-sm animate-pulse pointer-events-none" />
+      <div className="absolute -inset-0.5 rounded-[var(--r-lg)] bg-gradient-to-r from-wil-400 via-horizon-400 to-wil-400 opacity-30 blur-sm animate-pulse pointer-events-none" />
 
       {/* "Nieuw" badge */}
       <div className="absolute -top-2 -right-2 z-10">
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-md">
+        <span className="inline-flex items-center gap-1 rounded-full bg-wil-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-md">
           <Sparkles className="h-3 w-3" />
           Nieuw
         </span>
@@ -268,7 +268,7 @@ export function NewFeatureSpotlight({ featureId, children }: { featureId: string
           data-testid={`spotlight-tooltip-${featureId}`}
         >
           <div className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-[var(--s2)]">
-            <span className="text-blue-300">Nieuw!</span>{' '}
+            <span className="text-wil-300">Nieuw!</span>{' '}
             {featureLabel} is nu beschikbaar
           </div>
           {/* Arrow pointing down */}
@@ -277,7 +277,7 @@ export function NewFeatureSpotlight({ featureId, children }: { featureId: string
       )}
 
       {/* The actual feature content, slightly elevated */}
-      <div className="relative rounded-[var(--r-lg)] ring-2 ring-blue-300/50">
+      <div className="relative rounded-[var(--r-lg)] ring-2 ring-wil-300/50">
         {children}
       </div>
     </div>

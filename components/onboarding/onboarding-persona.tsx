@@ -149,7 +149,7 @@ export function OnboardingPersona({
               key={persona.id}
               type="button"
               onClick={() => onSelectPersona(persona.id)}
-              className={`group w-full min-h-[48px] rounded-xl border-2 p-4 text-left transition-all active:scale-[0.99] ${
+              className={`group w-full min-h-[48px] cursor-pointer rounded-xl border-2 p-4 text-left transition-all active:scale-[0.99] ${
                 isSelected
                   ? 'border-wil-500 bg-wil-50/60 shadow-sm'
                   : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-md'

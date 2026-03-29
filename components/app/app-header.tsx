@@ -74,31 +74,34 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
             <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity<span className="text-kern-500">.</span>
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex">
-            {navItems.map((item) => {
-              // item may be undefined if navConfig lookup fails (defensive guard)
-              if (!item) return null
-              const isActive = pathname.startsWith(item.href)
-              // Non-kern tabs are added dynamically when the user activates a
-              // module, so they receive the reveal animation.
-              const isNonKern = item.href !== '/core'
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 rounded-t-sm ${
-                    isNonKern ? 'animate-nav-reveal' : ''
-                  } ${
-                    isActive
-                      ? `${activeClasses[item.color]}`
-                      : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
-          </nav>
+          {/* Hide tab bar when only 1 tab — user is already on that module's page */}
+          {navItems.length > 1 && (
+            <nav className="hidden items-center gap-1 md:flex">
+              {navItems.map((item) => {
+                // item may be undefined if navConfig lookup fails (defensive guard)
+                if (!item) return null
+                const isActive = pathname.startsWith(item.href)
+                // Non-kern tabs are added dynamically when the user activates a
+                // module, so they receive the reveal animation.
+                const isNonKern = item.href !== '/core'
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 rounded-t-sm ${
+                      isNonKern ? 'animate-nav-reveal' : ''
+                    } ${
+                      isActive
+                        ? `${activeClasses[item.color]}`
+                        : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </nav>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

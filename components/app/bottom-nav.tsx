@@ -45,6 +45,9 @@ export function BottomNav() {
     ? activeNavModules.filter(m => m === 'kern').map(m => tabConfig[m])
     : activeNavModules.map(m => tabConfig[m])
 
+  // Hide tab bar when only 1 tab — user is already on that module's page
+  if (visibleTabs.length <= 1) return null
+
   return (
     <nav className="fixed bottom-0 left-0 z-40 border-t-2 border-[var(--border-md)] bg-[var(--paper)]/90 backdrop-blur-md safe-bottom transition-[right] duration-300 md:hidden" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
       <div className="flex items-center justify-around" style={{ height: 'var(--bottom-nav-height)' }}>
