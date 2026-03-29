@@ -169,45 +169,45 @@ const tests: TestCase[] = [
 
   {
     id: 'mod-home-budget',
-    name: "getHomePath(['budgetteren']) === '/core/budgets'",
-    description: 'Alleen budgetteren actief → startpagina is /core/budgets',
+    name: "getHomePath(['budgetteren']) === '/core'",
+    description: 'Alleen budgetteren actief → startpagina is /core (kern overzicht)',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
       const path = getHomePath(['budgetteren'])
-      assertEqual(path, '/core/budgets', 'home path for budgetteren')
+      assertEqual(path, '/core', 'home path for budgetteren')
     },
   },
 
   {
     id: 'mod-home-assets',
-    name: "getHomePath(['vermogensregistratie']) === '/core/assets'",
-    description: 'Alleen vermogensregistratie actief → startpagina is /core/assets',
+    name: "getHomePath(['vermogensregistratie']) === '/core'",
+    description: 'Alleen vermogensregistratie actief → startpagina is /core (kern overzicht)',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
       const path = getHomePath(['vermogensregistratie'])
-      assertEqual(path, '/core/assets', 'home path for vermogensregistratie')
+      assertEqual(path, '/core', 'home path for vermogensregistratie')
     },
   },
 
   {
     id: 'mod-home-dashboard',
-    name: 'getHomePath met inzicht_acties === /dashboard',
-    description: 'inzicht_acties activeert de rijkste startpagina /dashboard',
+    name: 'getHomePath met inzicht_acties === /wil',
+    description: 'inzicht_acties activeert de rijkste startpagina /wil',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
       // inzicht_acties has highest priority in getHomePath regardless of other modules
       const withInzicht: ModuleId[] = ['budgetteren', 'inzicht_acties']
-      assertEqual(getHomePath(withInzicht), '/dashboard', 'home path with inzicht_acties')
+      assertEqual(getHomePath(withInzicht), '/will', 'home path with inzicht_acties')
 
       // Also works with vermogensregistratie
       const withAssets: ModuleId[] = ['vermogensregistratie', 'inzicht_acties']
-      assertEqual(getHomePath(withAssets), '/dashboard', 'home path with inzicht_acties + assets')
+      assertEqual(getHomePath(withAssets), '/will', 'home path with inzicht_acties + assets')
     },
   },
 
@@ -261,21 +261,110 @@ const tests: TestCase[] = [
 
   {
     id: 'mod-widget-foundation',
-    name: 'Foundation widget netto_vermogen altijd zichtbaar',
+    name: 'Foundation widget jouw_pad altijd zichtbaar',
     description: 'Widgets die niet in WIDGET_MODULE_MAP staan zijn altijd zichtbaar, ongeacht modules',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      // netto_vermogen is a foundation widget — not in WIDGET_MODULE_MAP
-      // Should be visible even with an empty module set
-      const noModules = isWidgetVisible('netto_vermogen', [], [])
-      assertEqual(noModules.visible, true, 'netto_vermogen visible with no modules')
-      assertEqual(noModules.reason, 'visible', 'netto_vermogen reason with no modules')
+      // jouw_pad is a foundation widget — not in WIDGET_MODULE_MAP
+      const noModules = isWidgetVisible('jouw_pad', [], [])
+      assertEqual(noModules.visible, true, 'jouw_pad visible with no modules')
+      assertEqual(noModules.reason, 'visible', 'jouw_pad reason with no modules')
 
-      // Also visible when some modules are active
-      const withModules = isWidgetVisible('netto_vermogen', ['budgetteren'], [])
-      assertEqual(withModules.visible, true, 'netto_vermogen visible with budgetteren')
+      const withModules = isWidgetVisible('jouw_pad', ['budgetteren'], [])
+      assertEqual(withModules.visible, true, 'jouw_pad visible with budgetteren')
+    },
+  },
+
+  // ── Budget-only widget zichtbaarheid ────────────────────────────────────
+
+  {
+    id: 'mod-widget-netto-vermogen-hidden-budget-only',
+    name: 'netto_vermogen widget verborgen bij budget-only',
+    description: 'netto_vermogen vereist vermogensregistratie; bij alleen budgetteren is het verborgen',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      const result = isWidgetVisible('netto_vermogen', ['budgetteren'], [])
+      assertEqual(result.visible, false, 'netto_vermogen visible with budget-only')
+      assertEqual(result.reason, 'module_inactive', 'netto_vermogen reason with budget-only')
+    },
+  },
+
+  {
+    id: 'mod-widget-netto-vermogen-visible-with-vermogen',
+    name: 'netto_vermogen widget zichtbaar met vermogensregistratie',
+    description: 'netto_vermogen wordt zichtbaar wanneer vermogensregistratie actief is',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      const result = isWidgetVisible('netto_vermogen', ['vermogensregistratie'], [])
+      assertEqual(result.visible, true, 'netto_vermogen visible with vermogensregistratie')
+    },
+  },
+
+  {
+    id: 'mod-widget-schulden-hidden-budget-only',
+    name: 'schulden widget verborgen bij budget-only',
+    description: 'schulden vereist vermogensregistratie; bij alleen budgetteren is het verborgen',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      const result = isWidgetVisible('schulden', ['budgetteren'], [])
+      assertEqual(result.visible, false, 'schulden visible with budget-only')
+      assertEqual(result.reason, 'module_inactive', 'schulden reason with budget-only')
+    },
+  },
+
+  {
+    id: 'mod-widget-vrijheidsvoortgang-hidden-budget-only',
+    name: 'vrijheidsvoortgang widget verborgen bij budget-only',
+    description: 'vrijheidsvoortgang vereist toekomstplannen; bij alleen budgetteren is het verborgen',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      const result = isWidgetVisible('vrijheidsvoortgang', ['budgetteren'], [])
+      assertEqual(result.visible, false, 'vrijheidsvoortgang visible with budget-only')
+      assertEqual(result.reason, 'module_inactive', 'vrijheidsvoortgang reason with budget-only')
+    },
+  },
+
+  {
+    id: 'mod-widget-fire-visible-budget-toekomst',
+    name: 'FIRE widgets zichtbaar met budget + toekomst',
+    description: 'FIRE widgets verschijnen wanneer toekomstplannen actief is naast budgetteren',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      const modules: ModuleId[] = ['budgetteren', 'toekomstplannen']
+      const fire = isWidgetVisible('fire_prognose', modules, [])
+      assertEqual(fire.visible, true, 'fire_prognose visible with budget+toekomst')
+      const vrijheid = isWidgetVisible('vrijheidsvoortgang', modules, [])
+      assertEqual(vrijheid.visible, true, 'vrijheidsvoortgang visible with budget+toekomst')
+    },
+  },
+
+  {
+    id: 'mod-widget-assets-visible-budget-vermogen',
+    name: 'assets/schulden widgets zichtbaar met budget + vermogen',
+    description: 'assets en schulden widgets verschijnen wanneer vermogensregistratie actief is',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      const modules: ModuleId[] = ['budgetteren', 'vermogensregistratie']
+      const assets = isWidgetVisible('assets', modules, [])
+      assertEqual(assets.visible, true, 'assets visible with budget+vermogen')
+      const nw = isWidgetVisible('netto_vermogen', modules, [])
+      assertEqual(nw.visible, true, 'netto_vermogen visible with budget+vermogen')
+      const schulden = isWidgetVisible('schulden', modules, [])
+      assertEqual(schulden.visible, true, 'schulden visible with budget+vermogen')
     },
   },
 

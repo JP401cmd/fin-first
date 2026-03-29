@@ -111,7 +111,7 @@ export const PERSONA_MODULE_PRESETS: Record<PersonaId, ModuleId[]> = {
 
 // ── Widget → Module Mapping ──────────────────────────────────────────────────
 // Maps each widget ID to the module that must be active for it to show.
-// Widgets NOT in this map are "foundation" widgets (e.g. netto_vermogen, jouw_pad)
+// Widgets NOT in this map are "foundation" widgets (e.g. jouw_pad, acties, meldingen)
 // that are always visible regardless of which modules the user has activated.
 
 export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
@@ -128,6 +128,8 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   assets: 'vermogensregistratie',
   belasting_box3: 'vermogensregistratie',
   box3_drag: 'vermogensregistratie',
+  netto_vermogen: 'vermogensregistratie',
+  schulden: 'vermogensregistratie',
 
   // Aandelenregistratie
   holdings: 'aandelenregistratie',
@@ -153,6 +155,7 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   monte_carlo: 'toekomstplannen',
   backtesting_score: 'toekomstplannen',
   levensgebeurtenissen: 'toekomstplannen',
+  vrijheidsvoortgang: 'toekomstplannen',
 }
 
 // ── Lookup Maps ─────────────────────────────────────────────────────────────
@@ -257,14 +260,11 @@ export function getActiveNavModules(activeModules: ModuleId[]): NavModule[] {
  * Determine the landing page path based on active modules.
  *
  * Priority:
- * 1. inzicht_acties → '/dashboard' (richest overview)
- * 2. budgetteren    → '/core/budgets'
- * 3. vermogensregistratie → '/core/assets'
- * 4. fallback       → '/core'
+ * 1. inzicht_acties → '/will' (richest overview)
+ * 2. budgetteren / vermogensregistratie → '/core' (kern overzicht)
+ * 3. fallback       → '/core'
  */
 export function getHomePath(activeModules: ModuleId[]): string {
-  if (activeModules.includes('inzicht_acties')) return '/dashboard'
-  if (activeModules.includes('budgetteren')) return '/core/budgets'
-  if (activeModules.includes('vermogensregistratie')) return '/core/assets'
+  if (activeModules.includes('inzicht_acties')) return '/will'
   return '/core'
 }
