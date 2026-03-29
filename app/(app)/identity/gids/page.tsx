@@ -66,7 +66,7 @@ interface GuideProgress {
     freedomDays: { days: number; months: number; years: number };
     fireAge: number | null;
     fireTarget: number;
-    sovereigntyLevel: number;
+    activeModules: string[];
   };
   steps: {
     hasAssets: boolean;
@@ -960,7 +960,7 @@ export default function GidsPage() {
                 Unfavoriten = widget verdwijnt. Standaard staan{" "}
                 <strong>7 widgets</strong> aan; geavanceerde widgets
                 ontgrendelen automatisch naarmate je meer data invoert en je
-                soevereiniteitsniveau stijgt.
+                actieve modules uitbreidt.
               </>
             }
             howTo={{
@@ -1574,9 +1574,8 @@ export default function GidsPage() {
               tijd je waard is.
               {" "}
               Naarmate je meer data invoert, ontgrendel je diepere inzichten via het{" "}
-              <strong>sovereignty-groeipad</strong>: van basis-overzicht (Recovery)
-              via Stability en Momentum naar Mastery \u2014 met volledige
-              FIRE-projectie en Monte Carlo simulatie.
+              <strong>modulepad</strong>: van budgetteren of vermogensregistratie als basis,
+              uitbreidbaar met inzicht &amp; acties, toekomstplannen en nieuws.
             </>
           }
           howTo={{
@@ -1699,7 +1698,7 @@ export default function GidsPage() {
               <strong>Budgetwaarschuwing</strong> — je nadert of overschrijdt een
               limiet.{" "}
               <strong>Mijlpaal bereikt</strong> — nieuw vermogensrecord of
-              soevereiniteitsniveau gestegen.{" "}
+              nieuwe module ingeschakeld.{" "}
               <strong>AI-inzicht</strong> — Will heeft iets ontdekt in je
               patronen of uitgaven.{" "}
               <strong>Sync voltooid</strong> — bankdata is bijgewerkt of
@@ -1799,17 +1798,16 @@ export default function GidsPage() {
               Je dashboard is je persoonlijke cockpit \u2014 meer dan{" "}
               <strong>26 widgets</strong> geven je in \u00e9\u00e9n oogopslag
               inzicht in je vermogen, budget, acties, FIRE-prognose en voortgang.
-              Widgets vari\u00ebren in grootte (mini tot volledig) en ontgrendelen
-              progressief naarmate je soevereiniteitsniveau stijgt. Sleep ze in de
+              Widgets vari\u00ebren in grootte (mini tot volledig) en worden zichtbaar op basis van je actieve modules. Sleep ze in de
               volgorde die voor jou werkt, schakel uit wat je niet nodig hebt, en
-              ontdek nieuwe widgets zodra je een niveau stijgt.
+              schakel een module in via Instellingen om nieuwe widgets te ontdekken.
             </>
           }
           howTo={{
             steps: [
               "Je dashboard is je startpagina na inloggen",
               "Ga naar Identiteit \u2192 Instellingen \u2192 Widgets om widgets aan/uit te zetten en de volgorde aan te passen",
-              "Nieuwe widgets ontgrendelen automatisch bij een hoger soevereiniteitsniveau",
+              "Nieuwe widgets worden beschikbaar wanneer je extra modules inschakelt",
               "Sleep widgets naar een andere positie op het dashboard zelf",
             ],
             tip: "Begin met de standaard 7 widgets. Voeg pas meer toe als je weet welke inzichten je dagelijks wilt zien.",
@@ -1887,7 +1885,7 @@ export default function GidsPage() {
               <strong>pensioenleeftijd</strong>, <strong>inkomen</strong> en{" "}
               <strong>huishoudtype</strong>. Deze gegevens bepalen je
               vrijheidstijdberekeningen, FIRE-prognoses (FIRE-leeftijd,
-              pensioen-AOW) en soevereiniteitsniveau.
+              pensioen-AOW) en FIRE-parameters.
               <br />
               <br />
               <strong>Profielgegevens</strong> \u2014 Ga naar Identiteit \u2192
@@ -1897,9 +1895,9 @@ export default function GidsPage() {
               <br />
               <br />
               Je{" "}
-              <strong>soevereiniteitsniveau</strong> (van Herstel tot Meesterschap)
-              wordt automatisch berekend op basis van je financi\u00eble positie en
-              ontgrendelt progressief nieuwe functies en widgets.
+              <strong>actieve modules</strong> bepalen welke functies en widgets je ziet.
+              Ga naar Instellingen om modules in of uit te schakelen. Start met
+              budgetteren of vermogensregistratie als basis en breid uit wanneer je er klaar voor bent.
               <br />
               <br />
               <strong>Data-eigenaarschap</strong> \u2014 TriFinity respecteert je
@@ -1920,7 +1918,7 @@ export default function GidsPage() {
               "Ga naar Identiteit \u2192 Profiel om je persoonlijke gegevens te bekijken en bewerken",
               "Vul je naam, geboortedatum en geschat maandelijks inkomen in \u2014 deze sturen al je berekeningen",
               "Stel je gewenste pensioenleeftijd in \u2014 dit is de benchmark voor je FIRE-projectie",
-              "Bekijk je soevereiniteitsniveau \u2014 dit groeit automatisch naarmate je financi\u00eble positie verbetert",
+              "Bekijk je actieve modules en schakel nieuwe modules in wanneer je daar behoefte aan hebt",
               "Exporteer al je data als bestand via Instellingen \u2192 Gegevens \u2014 je bezit je eigen geschiedenis",
               "Account verwijderen: via Instellingen \u2192 Gegevens wordt al je data permanent gewist",
             ],
@@ -1950,8 +1948,7 @@ export default function GidsPage() {
               <br />
               <strong>B) Widgets</strong>: schakel widgets aan of uit, kies het
               formaat (mini, quarter, half of full) en bepaal de volgorde op je
-              De Wil-pagina. Ontdek nieuwe widgets naarmate je
-              soevereiniteitsniveau stijgt.
+              De Wil-pagina. Ontdek nieuwe widgets door extra modules in te schakelen.
               <br />
               <br />
               <strong>C) FIRE-parameters</strong>: stel je verwacht rendement in
@@ -1966,8 +1963,7 @@ export default function GidsPage() {
               <strong>D) Weergave</strong>: kies een typografisch thema
               (Editorial, Andada of Digital). Pas de kleuren van elke module aan
               \u2014 Kern, Wil en Horizon \u2014 met voorgedefinieerde paletten of eigen
-              kleuren. Stel kleuren in per budgetcategorie en per
-              soevereiniteitsfase.
+              kleuren. Stel kleuren in per budgetcategorie en per module.
               <br />
               <br />
               <strong>E) Gegevens</strong>: beheer je profiel, exporteer al je

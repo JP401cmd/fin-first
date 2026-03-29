@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { ageAtDate, NL_SWR } from '@/lib/horizon-data'
 import { calculateFreedomTime } from '@/lib/format'
 
@@ -8,7 +7,7 @@ import { calculateFreedomTime } from '@/lib/format'
  * Returns bundled progress data for the Gids page:
  * - Counts: assets, transactions, completed actions, life events
  * - Financial: net worth, daily expenses, freedom days, FIRE age
- * - Meta: sovereignty level, per-step completion booleans
+ * - Meta: active modules, per-step completion booleans
  */
 export async function GET() {
   try {
@@ -60,7 +59,7 @@ export async function GET() {
         .eq('user_id', user.id),
       supabase
         .from('profiles')
-        .select('date_of_birth, expected_return, inflation_rate')
+        .select('date_of_birth, expected_return, inflation_rate, active_modules')
         .eq('id', user.id)
         .single(),
       supabase
@@ -130,22 +129,6 @@ export async function GET() {
       monthlyExpenses = totalExpenses / dataMonths
       dailyExpenseRate = (monthlyExpenses * 12) / 365
     }
-
-    // Sovereignty level
-    const hasConsumerDebt = debts.some(
-      (d) =>
-        d.debt_type === 'creditcard' ||
-        d.debt_type === 'persoonlijke_lening' ||
-        d.debt_type === 'doorlopend_krediet'
-    )
-    const freedomPct =
-      monthlyExpenses > 0 ? (netWorth / (monthlyExpenses * 12)) * 100 : 0
-    const sovereigntyLevel = computeSovereigntyLevel(
-      netWorth,
-      monthlyExpenses,
-      freedomPct,
-      hasConsumerDebt
-    )
 
     // Freedom days
     const freedomDays =
@@ -220,7 +203,7 @@ export async function GET() {
         freedomDays,
         fireAge,
         fireTarget: Math.round(fireTarget),
-        sovereigntyLevel,
+        activeModules: profile?.active_modules ?? [],
       },
       steps,
       calculatedAt: new Date().toISOString(),
