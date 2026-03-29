@@ -16,7 +16,9 @@ import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingBudgets } from '@/components/onboarding/onboarding-budgets'
 import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
 import { OnboardingPreferences, INITIAL_PREFERENCES, buildWidgetPrefsFromPreferences } from '@/components/onboarding/onboarding-preferences'
+import { OnboardingPersona } from '@/components/onboarding/onboarding-persona'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
+import { type PersonaId, type ModuleId, PERSONA_MODULE_PRESETS, ALL_MODULES } from '@/lib/module-registry'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -35,6 +37,7 @@ const SAVING_MESSAGES = [
 type Step =
   | 'intro'
   | 'identity'
+  | 'persona'
   | 'budgets'
   | 'extras'
   | 'preferences'
@@ -43,7 +46,7 @@ type Step =
 
 type Direction = 'forward' | 'back'
 
-const FULL_STEP_ORDER: Step[] = ['intro', 'identity', 'extras', 'budgets', 'preferences', 'saving', 'success']
+const FULL_STEP_ORDER: Step[] = ['intro', 'identity', 'persona', 'extras', 'budgets', 'preferences', 'saving', 'success']
 
 function getStepOrder(budgetteringMode: string): Step[] {
   if (budgetteringMode === 'none') {
@@ -56,6 +59,8 @@ interface State {
   step: Step
   direction: Direction
   identity: IdentityData
+  persona: PersonaId | 'custom' | null
+  selectedModules: ModuleId[]
   budgetAmounts: Record<string, number>
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -66,6 +71,8 @@ interface State {
 /** Data portion of state that gets persisted to localStorage (excludes step/direction) */
 interface PersistedData {
   identity: IdentityData
+  persona: PersonaId | 'custom' | null
+  selectedModules: ModuleId[]
   budgetAmounts: Record<string, number>
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -78,6 +85,8 @@ interface PersistedData {
 type Action =
   | { type: 'SET_STEP'; step: Step }
   | { type: 'SET_IDENTITY'; data: IdentityData }
+  | { type: 'SET_PERSONA'; persona: PersonaId | 'custom' }
+  | { type: 'TOGGLE_MODULE'; moduleId: ModuleId; enabled: boolean }
   | { type: 'SET_BUDGET_AMOUNTS'; amounts: Record<string, number> }
   | { type: 'SET_BANK_ACCOUNTS'; items: BankAccountEntry[] }
   | { type: 'SET_ASSETS'; items: AssetEntry[] }
@@ -88,6 +97,8 @@ type Action =
 const initialState: State = {
   step: 'intro',
   direction: 'forward',
+  persona: null,
+  selectedModules: [],
   identity: {
     full_name: '',
     date_of_birth: '',
@@ -120,6 +131,25 @@ function reducer(state: State, action: Action): State {
       const newIdx = stepOrder.indexOf(action.step)
       const direction: Direction = newIdx >= oldIdx ? 'forward' : 'back'
       return { ...state, step: action.step, direction }
+    }
+    case 'SET_PERSONA': {
+      // When selecting a named persona, preload the module set from the preset.
+      // When selecting 'custom', keep the current selectedModules (or use all if empty).
+      const modules: ModuleId[] =
+        action.persona === 'custom'
+          ? state.selectedModules.length > 0
+            ? state.selectedModules
+            : [...ALL_MODULES]
+          : [...PERSONA_MODULE_PRESETS[action.persona]]
+      return { ...state, persona: action.persona, selectedModules: modules }
+    }
+    case 'TOGGLE_MODULE': {
+      // Only allow toggling in custom persona mode
+      if (state.persona !== 'custom') return state
+      const updated = action.enabled
+        ? [...state.selectedModules, action.moduleId]
+        : state.selectedModules.filter((m) => m !== action.moduleId)
+      return { ...state, selectedModules: updated }
     }
     case 'SET_IDENTITY': {
       let newState = { ...state, identity: action.data }
@@ -155,6 +185,8 @@ function reducer(state: State, action: Action): State {
         step: restoredStep,
         direction: 'forward' as Direction,
         identity: action.data.identity,
+        persona: action.data.persona ?? null,
+        selectedModules: action.data.selectedModules ?? [],
         budgetAmounts: action.data.budgetAmounts,
         bankAccounts: action.data.bankAccounts,
         assets: action.data.assets,
@@ -186,6 +218,8 @@ function saveToLocalStorage(state: State) {
   try {
     const data: PersistedData = {
       identity: state.identity,
+      persona: state.persona,
+      selectedModules: state.selectedModules,
       budgetAmounts: state.budgetAmounts,
       bankAccounts: state.bankAccounts,
       assets: state.assets,
@@ -210,7 +244,10 @@ function loadFromLocalStorage(): PersistedData | null {
     if (!Array.isArray(data.bankAccounts)) data.bankAccounts = []
     if (!Array.isArray(data.assets)) data.assets = []
     if (!Array.isArray(data.debts)) data.debts = []
+    if (!Array.isArray(data.selectedModules)) data.selectedModules = []
     if (!data.budgetAmounts || typeof data.budgetAmounts !== 'object') data.budgetAmounts = {}
+    // persona may be absent from older drafts — default to null
+    if (data.persona === undefined) data.persona = null
     return data
   } catch {
     return null
@@ -344,6 +381,8 @@ export default function OnboardingPage() {
         widgetPrefs,
         budgetteringMode,
         idempotencyKey,
+        // Pass selected modules so the API can persist them to active_modules
+        activeModules: state.selectedModules.length > 0 ? state.selectedModules : undefined,
       }
 
       // Only send non-empty optional arrays
@@ -548,9 +587,20 @@ export default function OnboardingPage() {
             <OnboardingIdentity
               data={state.identity}
               onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
-              onNext={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
+              onNext={() => dispatch({ type: 'SET_STEP', step: 'persona' })}
               onBack={() => dispatch({ type: 'SET_STEP', step: 'intro' })}
               hideBudgets={noBudgets}
+            />
+          )}
+
+          {state.step === 'persona' && (
+            <OnboardingPersona
+              selectedPersona={state.persona}
+              selectedModules={state.selectedModules}
+              onSelectPersona={(persona) => dispatch({ type: 'SET_PERSONA', persona })}
+              onToggleModule={(moduleId, enabled) => dispatch({ type: 'TOGGLE_MODULE', moduleId, enabled })}
+              onNext={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
+              onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
             />
           )}
 
@@ -563,7 +613,7 @@ export default function OnboardingPage() {
               onAssetChange={(items) => dispatch({ type: 'SET_ASSETS', items })}
               onDebtChange={(items) => dispatch({ type: 'SET_DEBTS', items })}
               onNext={() => dispatch({ type: 'SET_STEP', step: noBudgets ? 'preferences' : 'budgets' })}
-              onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
+              onBack={() => dispatch({ type: 'SET_STEP', step: 'persona' })}
               hideBudgets={noBudgets}
               budgetteringMode={state.identity.budgettering_mode}
             />

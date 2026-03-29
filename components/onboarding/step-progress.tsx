@@ -1,5 +1,6 @@
 const ALL_STEPS = [
   { key: 'profiel', label: 'Profiel & Vrijheid', icon: '👤' },
+  { key: 'persona', label: 'Jouw profiel', icon: '✦' },
   { key: 'startpunt', label: 'Startpunt', icon: '📍' },
   { key: 'budgetten', label: 'Budgetten', icon: '💰' },
   { key: 'voorkeuren', label: 'Voorkeuren', icon: '⚙️' },

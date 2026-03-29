@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getDefaultBudgets } from '@/lib/budget-data'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { type ModuleId } from '@/lib/module-registry'
 
 /** Retry a function up to maxRetries times with exponential backoff */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
@@ -206,6 +207,15 @@ const bodySchema = z.object({
   }).optional(),
   budgetteringMode: z.enum(['none', 'template', 'manual']).optional(),
   idempotencyKey: z.string().uuid().optional(),
+  /** User-selected modules from the persona/custom step */
+  activeModules: z.array(z.enum([
+    'budgetteren',
+    'vermogensregistratie',
+    'aandelenregistratie',
+    'inzicht_acties',
+    'toekomstplannen',
+    'nieuws',
+  ])).optional(),
 })
 
 export async function POST(req: Request) {
@@ -223,7 +233,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Ongeldige invoer', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { identity, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey } = parsed.data
+  const { identity, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey, activeModules } = parsed.data
 
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
@@ -290,7 +300,7 @@ export async function POST(req: Request) {
       if (result.error) {
         throw new Error(result.error)
       }
-      // Activate invulfase (not included in the RPC function)
+      // Activate invulfase (not included in the RPC function) and persist active modules
       if (!result.already_completed) {
         const { data: fpProfile } = await supabase
           .from('profiles')
@@ -298,9 +308,18 @@ export async function POST(req: Request) {
           .eq('id', user.id)
           .single()
         const fpPrefs = (fpProfile?.feature_preferences as Record<string, unknown>) ?? {}
+        const profileUpdates: Record<string, unknown> = {
+          feature_preferences: { ...fpPrefs, _invulfase_active: true },
+        }
+        // Persist selected modules when provided by the persona step
+        if (activeModules && activeModules.length > 0) {
+          profileUpdates.active_modules = activeModules
+          // Keep budgeting_active in sync — it's a derived boolean convenience column
+          profileUpdates.budgeting_active = (activeModules as ModuleId[]).includes('budgetteren')
+        }
         await supabase
           .from('profiles')
-          .update({ feature_preferences: { ...fpPrefs, _invulfase_active: true } })
+          .update(profileUpdates)
           .eq('id', user.id)
       }
       return Response.json({ success: true, alreadyCompleted: result.already_completed ?? false })
@@ -316,6 +335,12 @@ export async function POST(req: Request) {
 
     // 1. Update profile (onboarding_completed is set to false first; will be set to true at the end
     // after all data is saved successfully — this ensures retries work correctly)
+    // Derive budgeting_active: prefer module-based check when activeModules is present,
+    // otherwise fall back to the legacy budgetteringMode flag
+    const budgetingActive = activeModules
+      ? (activeModules as ModuleId[]).includes('budgetteren')
+      : budgetteringMode !== 'none'
+
     const profileData: Record<string, unknown> = {
       id: user.id,
       full_name: identity.full_name,
@@ -325,8 +350,12 @@ export async function POST(req: Request) {
       net_monthly_income: identity.net_monthly_income,
       onboarding_completed: false,
       is_demo_user: false,
-      budgeting_active: budgetteringMode !== 'none',
+      budgeting_active: budgetingActive,
       updated_at: new Date().toISOString(),
+    }
+    // Persist the selected module set when provided
+    if (activeModules && activeModules.length > 0) {
+      profileData.active_modules = activeModules
     }
     // Only include idempotency key if the column exists (migration may not be applied yet)
     if (!profileError || !profileError.message?.includes('onboarding_idempotency_key')) {
