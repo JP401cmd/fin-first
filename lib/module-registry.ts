@@ -21,7 +21,10 @@ export type PersonaId =
   | 'pensioenplanner'
   | 'fire_fighter'
 
-/** Navigation tab identifiers (existing app structure) */
+/**
+ * Navigation tab identifiers. Strict subset of WidgetModule (excludes 'cross')
+ * and FeatureModule (excludes 'bank', 'ai'). These represent user-visible navigation tabs.
+ */
 export type NavModule = 'kern' | 'wil' | 'horizon'
 
 export interface ModuleDef {
@@ -108,6 +111,8 @@ export const PERSONA_MODULE_PRESETS: Record<PersonaId, ModuleId[]> = {
 
 // ── Widget → Module Mapping ──────────────────────────────────────────────────
 // Maps each widget ID to the module that must be active for it to show.
+// Widgets NOT in this map are "foundation" widgets (e.g. netto_vermogen, jouw_pad)
+// that are always visible regardless of which modules the user has activated.
 
 export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   // Budgetteren
@@ -150,13 +155,29 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   levensgebeurtenissen: 'toekomstplannen',
 }
 
+// ── Lookup Maps ─────────────────────────────────────────────────────────────
+
+const MODULE_MAP: Record<ModuleId, ModuleDef> = Object.fromEntries(
+  MODULE_CATALOG.map((m) => [m.id, m]),
+) as Record<ModuleId, ModuleDef>
+
 // ── Functions ────────────────────────────────────────────────────────────────
 
 /**
- * Look up a module definition by ID.
+ * Get the required module for a widget, or undefined if always visible.
+ * Widgets not in WIDGET_MODULE_MAP are shown regardless of active modules.
  */
-export function getModuleDef(moduleId: ModuleId): ModuleDef | undefined {
-  return MODULE_CATALOG.find((m) => m.id === moduleId)
+export function getWidgetRequiredModule(widgetId: string): ModuleId | undefined {
+  return WIDGET_MODULE_MAP[widgetId]
+}
+
+/**
+ * Look up a module definition by ID.
+ * Always returns a valid definition since ModuleId is a closed union
+ * with exactly one catalog entry per member.
+ */
+export function getModuleDef(moduleId: ModuleId): ModuleDef {
+  return MODULE_MAP[moduleId]
 }
 
 /**
@@ -189,13 +210,11 @@ export function validateModules(modules: ModuleId[]): { valid: boolean; errors: 
   // Rules 2-4: check each module's dependencies from the catalog
   for (const moduleId of modules) {
     const def = getModuleDef(moduleId)
-    if (!def) continue
 
     // Hard dependencies (requires): all must be present
     for (const reqId of def.requires) {
       if (!has(reqId)) {
-        const reqDef = getModuleDef(reqId)
-        const reqLabel = reqDef?.label ?? reqId
+        const reqLabel = getModuleDef(reqId).label
         errors.push(`${def.label} vereist dat ${reqLabel} actief is.`)
       }
     }
@@ -205,7 +224,7 @@ export function validateModules(modules: ModuleId[]): { valid: boolean; errors: 
       const hasAny = def.requiresOneOf.some((id) => has(id))
       if (!hasAny) {
         const labels = def.requiresOneOf
-          .map((id) => getModuleDef(id)?.label ?? id)
+          .map((id) => getModuleDef(id).label)
           .join(' of ')
         errors.push(`${def.label} vereist dat ${labels} actief is.`)
       }
@@ -225,7 +244,7 @@ export function getActiveNavModules(activeModules: ModuleId[]): NavModule[] {
 
   for (const moduleId of activeModules) {
     const def = getModuleDef(moduleId)
-    if (def?.navModule) {
+    if (def.navModule) {
       activeNavSet.add(def.navModule)
     }
   }
