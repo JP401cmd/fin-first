@@ -20,11 +20,6 @@ import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/
 import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 
 import { formatCurrency } from '@/lib/format'
-import { useFeatureAccess } from '@/components/app/feature-access-provider'
-import { useFeatureToggle } from '@/lib/hooks/use-feature-toggle'
-import { UNIFIED_FEATURES, type CommercialTier, type FeatureModule } from '@/lib/feature-registry'
-import { isFeatureAccessible, getFeatureAccess } from '@/lib/compute-feature-access'
-import { Lock as LockIcon } from 'lucide-react'
 import { MODULE_CATALOG } from '@/lib/module-registry'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
@@ -85,7 +80,6 @@ export default function InstellingenPage() {
   const [weergaveOpen, setWeergaveOpen] = useState(false)
   const [gegevensOpen, setGegevensOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
-  const [functiesOpen, setFunctiesOpen] = useState(false)
   const [rebalancingOpen, setRebalancingOpen] = useState(false)
   const [modulesOpen, setModulesOpen] = useState(false)
 
@@ -100,10 +94,6 @@ export default function InstellingenPage() {
   const [rebalanceSaving, setRebalanceSaving] = useState(false)
   const [rebalanceMessage, setRebalanceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [hasTargetAllocations, setHasTargetAllocations] = useState(false)
-
-  // ─ Feature toggle hook ─
-  const { features, subscriptions, phase } = useFeatureAccess()
-  const { toggle: toggleFeature, resetToDefaults: resetFeatureDefaults, saving: featureSaving } = useFeatureToggle()
 
   // ─ Section F: Privacy & AI ─
   const [aiEnabled, setAiEnabled] = useState(true)
@@ -1786,137 +1776,7 @@ export default function InstellingenPage() {
       </section>
       )}
 
-      {/* ── F: Functies ──────────────────────────────────────────────── */}
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setFunctiesOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Functies</h2>
-            {!functiesOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Functionaliteiten aan- of uitzetten</p>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${functiesOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {functiesOpen && (
-          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-6">
-            {/* Subscriptions + Phase indicators */}
-            <div className="flex flex-wrap gap-3 text-sm text-[var(--ink-2)]">
-              <span className="rounded-lg border border-[var(--border-ed)] px-3 py-1.5 bg-[var(--subtle)]">
-                Abonnementen: <strong>{subscriptions.length === 0 ? 'Gratis' : subscriptions.map(s => s === 'connected' ? 'Connected' : s === 'ai' ? 'AI' : s).join(' + ')}</strong>
-              </span>
-              <span className="rounded-lg border border-[var(--border-ed)] px-3 py-1.5 bg-[var(--subtle)]">
-                Fase: <strong className="capitalize">{phase}</strong>
-              </span>
-            </div>
-
-            <p className="text-xs text-[var(--ink-3)]">
-              Zet functies aan of uit. Tier-locked functies vereisen een hoger abonnement.
-            </p>
-
-            {/* Feature groups by module */}
-            {(['kern', 'horizon', 'wil', 'bank', 'ai'] as FeatureModule[]).map(mod => {
-              const moduleFeatures = UNIFIED_FEATURES.filter(f => f.module === mod)
-              if (moduleFeatures.length === 0) return null
-
-              const accessibleCount = moduleFeatures.filter(f => isFeatureAccessible(features, f.id)).length
-              const moduleLabel = mod === 'kern' ? 'Kern' : mod === 'wil' ? 'Wil' : mod === 'horizon' ? 'Horizon' : mod === 'bank' ? 'Bank' : 'AI'
-
-              return (
-                <div key={mod}>
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                      {moduleLabel}
-                    </span>
-                    <span className="text-[10px] text-[var(--ink-4)]">
-                      ({accessibleCount}/{moduleFeatures.length})
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {moduleFeatures.map(feat => {
-                      const access = getFeatureAccess(features, feat.id)
-                      const isTierLocked = access?.reason === 'tier_locked'
-                      const isAccessible = access?.accessible ?? true
-                      const isDefault = access?.defaultEnabled ?? true
-                      const phaseLabel = feat.defaultPhase === 'recovery' ? null : feat.defaultPhase
-
-                      const TIER_LABELS: Record<CommercialTier, string> = { gratis: 'Gratis', connected: 'Connected', ai: 'AI' }
-
-                      return (
-                        <div
-                          key={feat.id}
-                          className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
-                            isTierLocked
-                              ? 'border-[var(--border-ed)] bg-[var(--subtle)]/50 opacity-60'
-                              : 'border-[var(--border-ed)]'
-                          }`}
-                        >
-                          <div className="flex-1 pr-4 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {isTierLocked && <LockIcon className="h-3.5 w-3.5 shrink-0 text-[var(--ink-4)]" />}
-                              <span className="text-sm font-medium text-[var(--ink)]">{feat.label}</span>
-                              {phaseLabel && !isTierLocked && (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                  isDefault
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-zinc-100 text-[var(--ink-3)]'
-                                }`}>
-                                  {isDefault ? `${phaseLabel} ✓` : `Aanbevolen vanaf ${phaseLabel}`}
-                                </span>
-                              )}
-                            </div>
-                            {isTierLocked && (
-                              <p className="mt-0.5 text-xs text-[var(--ink-4)]">
-                                Vereist {TIER_LABELS[feat.requiredTier]} abonnement
-                              </p>
-                            )}
-                          </div>
-                          {isTierLocked ? (
-                            <LockIcon className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
-                          ) : (
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={isAccessible}
-                              disabled={featureSaving}
-                              onClick={() => toggleFeature(feat.id, !isAccessible)}
-                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-wil-500 disabled:opacity-50 ${
-                                isAccessible ? 'bg-wil-500' : 'bg-zinc-300'
-                              }`}
-                            >
-                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                                isAccessible ? 'translate-x-6' : 'translate-x-1'
-                              }`} />
-                            </button>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Reset + upgrade actions */}
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
-                onClick={resetFeatureDefaults}
-                disabled={featureSaving}
-                className="flex items-center gap-1.5 rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors disabled:opacity-50"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Standaardinstellingen herstellen
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ── G: Privacy & AI ──────────────────────────────────────────── */}
+      {/* ── F: Privacy & AI ──────────────────────────────────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         <button
           type="button"
