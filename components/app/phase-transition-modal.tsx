@@ -1,9 +1,8 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
-import { PHASES, FEATURES, DEFAULT_MATRIX } from '@/lib/feature-phases'
+import { PHASES } from '@/lib/feature-phases'
 import { FfinAvatar } from '@/components/app/avatars'
 import { X } from 'lucide-react'
 
@@ -11,64 +10,6 @@ type Props = {
   oldPhase: string
   newPhase: string
   onClose: () => void
-}
-
-// Map feature IDs to the most relevant app page for navigation
-const FEATURE_PAGE_MAP: Record<string, string> = {
-  // Kern features → /core
-  nibud_benchmark: '/core/budgets',
-  box3_belasting: '/core/debts',
-  budget_optimalisatie: '/core/budgets',
-  schulden_aflosplan: '/core/debts',
-  asset_allocatie: '/core/assets',
-  vermogensverloop: '/core',
-  snapshot_vergelijking: '/core',
-  cashflow_sankey: '/core',
-  data_export: '/core',
-  // Wil features → /will
-  doelen_systeem: '/will',
-  beslissingspatronen: '/will',
-  // Horizon features → /horizon
-  fire_projecties: '/horizon',
-  monte_carlo: '/horizon',
-  levensgebeurtenissen: '/horizon',
-  withdrawal_strategie: '/horizon',
-  gezondheids_score: '/horizon',
-  vermogensprojectie_chart: '/horizon',
-  fire_scenario_analyse: '/horizon',
-  fire_geavanceerde_params: '/horizon',
-}
-
-/**
- * Determine the best navigation target based on newly unlocked features.
- * Picks the page that has the most newly unlocked features.
- * Falls back to /dashboard if no clear winner.
- */
-function getBestNavigationTarget(featureIds: string[]): string {
-  if (featureIds.length === 0) return '/will'
-
-  const pageCounts: Record<string, number> = {}
-  for (const id of featureIds) {
-    const page = FEATURE_PAGE_MAP[id] ?? '/will'
-    // Group subpages to their parent module for counting
-    const module = page.startsWith('/core') ? '/core'
-      : page.startsWith('/will') ? '/will'
-      : page.startsWith('/horizon') ? '/horizon'
-      : '/will'
-    pageCounts[module] = (pageCounts[module] ?? 0) + 1
-  }
-
-  // Find the module with the most newly unlocked features
-  let bestPage = '/will'
-  let bestCount = 0
-  for (const [page, count] of Object.entries(pageCounts)) {
-    if (count > bestCount) {
-      bestCount = count
-      bestPage = page
-    }
-  }
-
-  return bestPage
 }
 
 const PHASE_COLORS: Record<string, { gradient: string; bg: string; border: string; text: string; badge: string; particle: string }> = {
@@ -149,7 +90,6 @@ function SparkleParticles({ color }: { color: string }) {
 }
 
 export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
-  const router = useRouter()
   const colors = PHASE_COLORS[newPhase] ?? PHASE_COLORS.stability
   const oldColors = PHASE_COLORS[oldPhase] ?? PHASE_COLORS.recovery
   const [isVisible, setIsVisible] = useState(false)
@@ -171,19 +111,6 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
-
-  // Compute newly unlocked features
-  const newFeatures = FEATURES.filter(f =>
-    DEFAULT_MATRIX[f.id]?.[newPhase] && !DEFAULT_MATRIX[f.id]?.[oldPhase]
-  )
-
-  // Determine where the CTA should navigate
-  const targetPage = getBestNavigationTarget(newFeatures.map(f => f.id))
-
-  const handleCtaClick = useCallback(() => {
-    onClose()
-    router.push(targetPage)
-  }, [onClose, router, targetPage])
 
   // Handle overlay click (clicking outside the modal)
   const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -262,43 +189,22 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
           `}</style>
         </div>
 
-        {/* Body: newly unlocked features */}
+        {/* Body: motivational message (no feature listing) */}
         <div data-testid="phase-transition-body" className="px-6 py-5">
-          {newFeatures.length > 0 && (
-            <>
-              <h3 data-testid="phase-transition-unlocked-title" className="text-sm font-semibold text-[var(--ink-2)] mb-3">
-                Nieuw ontgrendeld ({newFeatures.length})
-              </h3>
-              <div data-testid="phase-transition-feature-list" className="space-y-2 max-h-64 overflow-y-auto">
-                {newFeatures.map(f => (
-                  <div
-                    key={f.id}
-                    data-testid={`unlocked-feature-${f.id}`}
-                    className={`rounded-lg ${colors.bg} ${colors.border} border px-4 py-3`}
-                  >
-                    <p className={`text-sm font-medium ${colors.text}`}>{f.label}</p>
-                    <p className="text-xs text-[var(--ink-3)] mt-0.5">{f.description}</p>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {newFeatures.length === 0 && (
-            <p className="text-sm text-[var(--ink-3)] text-center py-2">
-              Je bent klaar voor de volgende stap in je financiele reis.
-            </p>
-          )}
+          <p className="text-sm text-[var(--ink-2)] text-center leading-relaxed">
+            Je financiele situatie is verbeterd! Blijf bouwen aan je financiele vrijheid
+            — je bent op de goede weg.
+          </p>
         </div>
 
         {/* Footer */}
         <div className="border-t border-[var(--border-ed)] px-6 py-4">
           <button
             data-testid="phase-transition-cta"
-            onClick={handleCtaClick}
+            onClick={onClose}
             className={`w-full rounded-lg bg-gradient-to-r ${colors.gradient} px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90`}
           >
-            Ontdek je nieuwe mogelijkheden
+            Verder
           </button>
         </div>
       </div>

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, type ReactNode } from 'react'
-import { Lock, Sparkles } from 'lucide-react'
-import { useFeatureAccess } from '@/components/app/feature-access-provider'
-import { FEATURES, PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
+import { Lock, Sparkles, Settings } from 'lucide-react'
+import { useFeatureAccess, useModuleAccess } from '@/components/app/feature-access-provider'
+import { FEATURES } from '@/lib/feature-phases'
 import { isFeatureAccessible, getFeatureAccess } from '@/lib/compute-feature-access'
 import { UNIFIED_FEATURES } from '@/lib/feature-registry'
 import { LEGACY_FEATURE_MAP } from '@/lib/feature-phases'
+import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 
 type FeatureGateProps = {
   featureId: string
@@ -15,33 +16,21 @@ type FeatureGateProps = {
 }
 
 /**
- * Find the earliest phase where a feature becomes available.
+ * ModuleGate — gates children by whether a module is active.
+ * Replaces sovereignty-level gating with user-selectable module gating.
+ * When the module is inactive, renders nothing (fallback='hidden') or the
+ * provided fallback ReactNode.
  */
-function getUnlockPhase(featureId: string): { id: string; label: string; color: string; index: number } | null {
-  const row = DEFAULT_MATRIX[featureId]
-  if (!row) return null
-  for (let i = 0; i < PHASES.length; i++) {
-    if (row[PHASES[i].id] === true) {
-      return { id: PHASES[i].id, label: PHASES[i].label, color: PHASES[i].color, index: i }
-    }
+export function ModuleGate({ moduleId, children, fallback = 'hidden' }: {
+  moduleId: ModuleId
+  children: ReactNode
+  fallback?: 'hidden' | ReactNode
+}) {
+  const { isModuleActive } = useModuleAccess()
+  if (!isModuleActive(moduleId)) {
+    return fallback === 'hidden' ? null : <>{fallback}</>
   }
-  return null
-}
-
-/** Phase badge color classes */
-const PHASE_BADGE_COLORS: Record<string, string> = {
-  rose: 'bg-rose-100 text-rose-700',
-  blue: 'bg-blue-100 text-blue-700',
-  teal: 'bg-teal-100 text-teal-700',
-  amber: 'bg-amber-100 text-amber-700',
-}
-
-/** Phase progress bar color classes */
-const PHASE_BAR_COLORS: Record<string, string> = {
-  rose: 'bg-rose-400',
-  blue: 'bg-blue-400',
-  teal: 'bg-teal-400',
-  amber: 'bg-amber-400',
+  return <>{children}</>
 }
 
 /** Tier accent colors for TierLockedCard */
@@ -134,29 +123,23 @@ export function TierLockedCard({ featureId, requiredTier }: { featureId: string;
 }
 
 /**
- * LockedFeatureCard — shows a locked feature with:
- * - Feature name and description
- * - Unlock phase badge
- * - Mini progress bar toward unlock
- * - Dashed border and muted styling
- * - Non-clickable (div, not a link)
+ * LockedFeatureCard — shows a feature that requires a module to be activated.
+ *
+ * Updated from sovereignty-phase gating to module-based gating:
+ * instead of "Beschikbaar vanaf [Phase]", shows "Schakel [Module] in via Instellingen".
+ *
+ * Keeps backward-compatible props (currentPhase still accepted but unused).
+ * Dashed border, muted styling, non-clickable (div, not a link).
  */
-export function LockedFeatureCard({ featureId, currentPhase }: { featureId: string; currentPhase: string }) {
+export function LockedFeatureCard({ featureId, currentPhase: _currentPhase, moduleId }: {
+  featureId: string
+  /** @deprecated Phase-based gating is removed. Kept for backward compat. */
+  currentPhase?: string
+  /** The module that must be activated for this feature. */
+  moduleId?: ModuleId
+}) {
   const featureDef = FEATURES.find(f => f.id === featureId)
-  const unlockPhase = getUnlockPhase(featureId)
-
-  // Compute progress toward unlock
-  const currentPhaseIndex = PHASES.findIndex(p => p.id === currentPhase)
-  const unlockPhaseIndex = unlockPhase?.index ?? PHASES.length
-  // Progress: how far through the phases (0 = just started, 100 = at unlock phase)
-  // If currentPhaseIndex === 0 and unlock is at 2, progress = 0/2 = 0%
-  // If currentPhaseIndex === 1 and unlock is at 2, progress = 1/2 = 50%
-  const progressPct = unlockPhaseIndex > 0
-    ? Math.min(Math.round((currentPhaseIndex / unlockPhaseIndex) * 100), 100)
-    : 0
-
-  const badgeColorClass = unlockPhase ? (PHASE_BADGE_COLORS[unlockPhase.color] ?? 'bg-zinc-100 text-[var(--ink-2)]') : 'bg-zinc-100 text-[var(--ink-2)]'
-  const barColorClass = unlockPhase ? (PHASE_BAR_COLORS[unlockPhase.color] ?? 'bg-zinc-400') : 'bg-zinc-400'
+  const moduleDef = moduleId ? MODULE_CATALOG.find(m => m.id === moduleId) : null
 
   return (
     <div
@@ -165,9 +148,9 @@ export function LockedFeatureCard({ featureId, currentPhase }: { featureId: stri
       aria-disabled="true"
     >
       <div className="flex flex-col items-center gap-3 text-center">
-        {/* Lock icon */}
+        {/* Settings icon (module activation prompt) */}
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-200/60">
-          <Lock className="h-5 w-5 text-[var(--ink-3)]" />
+          <Settings className="h-5 w-5 text-[var(--ink-3)]" />
         </div>
 
         {/* Feature name */}
@@ -177,30 +160,24 @@ export function LockedFeatureCard({ featureId, currentPhase }: { featureId: stri
 
         {/* Feature description */}
         <p className="text-xs text-[var(--ink-3)]">
-          {featureDef?.description ?? 'Deze feature is nog niet beschikbaar in je huidige fase.'}
+          {featureDef?.description ?? 'Deze feature vereist een actieve module.'}
         </p>
 
-        {/* Unlock phase badge */}
-        {unlockPhase && (
-          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${badgeColorClass}`}>
-            <Lock className="h-3 w-3" />
-            Beschikbaar vanaf {unlockPhase.label}
+        {/* Module activation badge */}
+        {moduleDef && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700">
+            <Settings className="h-3 w-3" />
+            Schakel {moduleDef.label} in via Instellingen
           </span>
         )}
 
-        {/* Mini progress bar toward unlock */}
-        <div className="mt-1 w-full max-w-[200px]">
-          <div className="flex items-center justify-between text-[10px] text-[var(--ink-3)] mb-1">
-            <span>{PHASES[currentPhaseIndex]?.label ?? 'Start'}</span>
-            <span>{unlockPhase?.label ?? '?'}</span>
-          </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
-            <div
-              className={`h-full rounded-full transition-all ${barColorClass}`}
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
+        {/* Fallback when no module is specified */}
+        {!moduleDef && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[10px] font-semibold text-[var(--ink-3)]">
+            <Settings className="h-3 w-3" />
+            Activeer via Instellingen
+          </span>
+        )}
       </div>
     </div>
   )
