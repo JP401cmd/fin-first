@@ -111,6 +111,44 @@ export function computeSavingsRate(
   return ((monthlyIncome - monthlyExpenses + savingsBudgetSpent) / monthlyIncome) * 100
 }
 
+/** Savings rate method used to determine the displayed rate. */
+export type SavingsRateMethod = 'transaction' | 'estimate' | 'net_worth_delta'
+
+/**
+ * Alternative savings rate computed from net worth snapshots (delta method).
+ * Used when budgetteren is not active — compares net worth change over time
+ * relative to estimated monthly income.
+ *
+ * Returns null if insufficient data (need >= 2 snapshots spanning >= 28 days).
+ */
+export function computeSavingsRateFromNetWorthDelta(
+  snapshots: { snapshot_date: string; net_worth: number }[],
+  monthlyIncome: number,
+): { rate: number; months: number } | null {
+  if (snapshots.length < 2 || monthlyIncome <= 0) return null
+
+  const sorted = [...snapshots].sort((a, b) =>
+    a.snapshot_date.localeCompare(b.snapshot_date),
+  )
+
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+
+  const daysDiff =
+    (new Date(last.snapshot_date).getTime() - new Date(first.snapshot_date).getTime()) /
+    (1000 * 60 * 60 * 24)
+
+  // Need at least ~1 month of data for a meaningful rate
+  if (daysDiff < 28) return null
+
+  const months = daysDiff / 30.44 // average days per month
+  const deltaNetWorth = last.net_worth - first.net_worth
+  const avgMonthlySaving = deltaNetWorth / months
+  const rate = (avgMonthlySaving / monthlyIncome) * 100
+
+  return { rate: Math.round(rate * 10) / 10, months: Math.round(months) }
+}
+
 // ── Input: raw financial data from DB ────────────────────────
 
 export interface FinancialInput {

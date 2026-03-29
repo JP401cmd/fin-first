@@ -8,10 +8,19 @@ import {
   ArrowRight, ChevronDown,
   CheckCircle2, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Minus,
+  BarChart3, PieChart,
+  LayoutGrid, List,
 } from 'lucide-react'
 import { formatCurrency, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
-import { buildSegments, typeColors } from '@/components/app/budget-donut'
+import { BudgetDonut, buildSegments, typeColors } from '@/components/app/budget-donut'
 import type { BudgetWithChildren } from '@/lib/budget-data'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
+import { VermogenAssetCard } from '@/components/core/vermogen-asset-card'
+import { VermogenDebtCard } from '@/components/core/vermogen-debt-card'
+import { VermogenWealthGroup } from '@/components/core/vermogen-wealth-group'
+import { type WealthGroup, WEALTH_GROUPS } from '@/lib/wealth-composition'
+import type { AssetType } from '@/lib/asset-data'
 
 interface KernMissionControlProps {
   budgetingActive: boolean
@@ -40,6 +49,11 @@ interface KernMissionControlProps {
     positionCount: number
     top3: { ticker: string; value: number }[]
   } | null
+  // Full asset/debt records for cards view
+  fullAssets?: Asset[]
+  fullDebts?: Debt[]
+  // Module awareness
+  hasVermogen?: boolean
   // Callbacks
   onCardClick: (type: 'budgets' | 'assets' | 'debts', itemId?: string) => void
 }
@@ -65,6 +79,9 @@ export function KernMissionControl({
   rawTotalDebts,
   debtProgress,
   holdingsPortfolio,
+  fullAssets = [],
+  fullDebts = [],
+  hasVermogen = true,
   onCardClick,
 }: KernMissionControlProps) {
   // Flash animations for live value changes
@@ -109,25 +126,33 @@ export function KernMissionControl({
         subtitle: overBudgetCount > 0 ? `${overBudgetCount} over` : 'op schema',
       },
     ] : []),
-    {
+    ...(hasVermogen ? [{
       key: 'assets' as const,
-      label: 'Vermogen',
+      label: 'Bezittingen',
       metric: formatCurrency(heroTotal),
       subtitle: assetGrowthDirection === 'up' ? 'groeiend' : assetGrowthDirection === 'down' ? 'dalend' : 'stabiel',
-    },
-    {
+    }] : []),
+    ...(hasVermogen ? [{
       key: 'debts' as const,
       label: 'Schulden',
       metric: rawTotalDebts > 0 ? formatCurrency(rawTotalDebts) : 'Vrij',
       subtitle: rawTotalDebts === 0 ? 'schuldvrij' : debtProgress ? `${debtProgress.progressPct.toFixed(0)}% afgelost` : 'actief',
-    },
+    }] : []),
   ]
 
-  const [activeTab, setActiveTab] = useState<TabKey>(budgetingActive ? 'budgets' : 'assets')
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    budgetingActive ? 'budgets' : hasVermogen ? 'assets' : 'budgets'
+  )
+
+  // Budget view toggle: list (default) or donut chart
+  const [budgetView, setBudgetView] = useState<'list' | 'donut'>('list')
 
   // Desktop-only collapsible state for Vermogen & Schulden cards
   const [assetsOpen, setAssetsOpen] = useState(false)
   const [debtsOpen, setDebtsOpen] = useState(false)
+
+  // Toggle between compact list and individual cards for bezittingen/schulden
+  const [vermogenView, setVermogenView] = useState<'compact' | 'cards'>('compact')
 
   // Health score: percentage of "missions" with positive status
   const healthScore = (() => {
@@ -137,13 +162,14 @@ export function KernMissionControl({
       green += overBudgetCount === 0 ? 1 : 0
       total++
     }
-    // Assets (includes cash) health
-    green += assetGrowthDirection !== 'down' ? 1 : 0
-    total++
-    green += totalCash >= 0 ? 1 : 0
-    total++
-    green += rawTotalDebts === 0 || (debtProgress != null && debtProgress.progressPct > 50) ? 1 : 0
-    total++
+    if (hasVermogen) {
+      green += assetGrowthDirection !== 'down' ? 1 : 0
+      total++
+      green += totalCash >= 0 ? 1 : 0
+      total++
+      green += rawTotalDebts === 0 || (debtProgress != null && debtProgress.progressPct > 50) ? 1 : 0
+      total++
+    }
     return total > 0 ? Math.round((green / total) * 100) : 0
   })()
 
@@ -345,6 +371,20 @@ export function KernMissionControl({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-0.5 rounded-[var(--r)] bg-[var(--subtle)] p-0.5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setBudgetView('list') }}
+                      className={`rounded-[var(--r-sm)] p-1.5 transition-colors ${budgetView === 'list' ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'}`}
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setBudgetView('donut') }}
+                      className={`rounded-[var(--r-sm)] p-1.5 transition-colors ${budgetView === 'donut' ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'}`}
+                    >
+                      <PieChart className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     overBudgetCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
                   }`}>
@@ -354,25 +394,37 @@ export function KernMissionControl({
                 </div>
               </div>
 
-              {/* Two-column split: Left = Inkomen/Sparen/Schulden, Right = Uitgaven — all with same structure */}
-              {/* On mobile (< lg): Uitgaven first (order-1), then Inkomen/Sparen/Schulden (order-2) */}
-              <div className="flex flex-col gap-4 lg:flex-row lg:gap-0">
-                {/* ─── Left column: Inkomen, Sparen, Schulden (type-headers only, no individual budgets) ─── */}
-                <div className="order-2 lg:order-none lg:basis-1/2 lg:shrink-0 lg:pr-5 space-y-3 border-t border-[var(--border-ed)] pt-3 lg:border-t-0 lg:pt-0">
-                  {leftTypes.filter(lt => lt.summary || lt.segs.length > 0).length > 0 ? (
-                    leftTypes.map(({ type, segs, summary }) => renderTypeSection(type, segs, summary, false))
-                  ) : (
-                    <p className="text-xs text-[var(--ink-4)]">Geen inkomen/sparen/schulden budgetten</p>
-                  )}
-                </div>
+              {budgetView === 'list' ? (
+                <>
+                  {/* Two-column split: Left = Inkomen/Sparen/Schulden, Right = Uitgaven — all with same structure */}
+                  {/* On mobile (< lg): Uitgaven first (order-1), then Inkomen/Sparen/Schulden (order-2) */}
+                  <div className="flex flex-col gap-4 lg:flex-row lg:gap-0">
+                    {/* ─── Left column: Inkomen, Sparen, Schulden (type-headers only, no individual budgets) ─── */}
+                    <div className="order-2 lg:order-none lg:basis-1/2 lg:shrink-0 lg:pr-5 space-y-3 border-t border-[var(--border-ed)] pt-3 lg:border-t-0 lg:pt-0">
+                      {leftTypes.filter(lt => lt.summary || lt.segs.length > 0).length > 0 ? (
+                        leftTypes.map(({ type, segs, summary }) => renderTypeSection(type, segs, summary, false))
+                      ) : (
+                        <p className="text-xs text-[var(--ink-4)]">Geen inkomen/sparen/schulden budgetten</p>
+                      )}
+                    </div>
 
-                {/* ─── Right column: Uitgaven (same structure as left types) — shown first on mobile ─── */}
-                <div className="order-1 lg:order-none lg:basis-1/2 min-w-0 overflow-hidden lg:border-l lg:border-[var(--border-ed)] lg:pl-5">
-                  {renderTypeSection('expense', expenseSegments, expenseSummary) || (
-                    <p className="text-xs text-[var(--ink-4)]">Geen uitgavenbudgetten</p>
-                  )}
+                    {/* ─── Right column: Uitgaven (same structure as left types) — shown first on mobile ─── */}
+                    <div className="order-1 lg:order-none lg:basis-1/2 min-w-0 overflow-hidden lg:border-l lg:border-[var(--border-ed)] lg:pl-5">
+                      {renderTypeSection('expense', expenseSegments, expenseSummary) || (
+                        <p className="text-xs text-[var(--ink-4)]">Geen uitgavenbudgetten</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <BudgetDonut
+                    groups={overviewBudgetGroups}
+                    spending={overviewSpending}
+                    onNavigate={(budgetId) => onCardClick('budgets', budgetId)}
+                  />
                 </div>
-              </div>
+              )}
 
               <div className="mt-2 sm:mt-3 flex items-center justify-between">
                 <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Beheer budgetten</span>
@@ -383,13 +435,35 @@ export function KernMissionControl({
         })()}
 
         {/* ── Visual separator between Budgets (cashflow) and Assets/Debts (vermogen) ── */}
-        {budgetingActive && (
+        {budgetingActive && hasVermogen && (
           <div className="hidden lg:block lg:col-span-2 h-px bg-[var(--border-md)]" role="separator" />
         )}
 
+        {/* ── Bezittingen & Schulden view toggle ── */}
+        {hasVermogen && (
+          <div className={`lg:col-span-2 flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-1 ${activeTab === 'budgets' ? 'hidden lg:flex' : ''}`}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">Bezittingen & Schulden</p>
+            <div className="flex items-center gap-0.5 rounded-[var(--r)] bg-[var(--subtle)] p-0.5">
+              <button
+                onClick={(e) => { e.stopPropagation(); setVermogenView('compact') }}
+                className={`rounded-[var(--r-sm)] p-1.5 transition-colors ${vermogenView === 'compact' ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'}`}
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setVermogenView('cards') }}
+                className={`rounded-[var(--r-sm)] p-1.5 transition-colors ${vermogenView === 'cards' ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'}`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {vermogenView === 'compact' && (<>
         {/* ── Assets card (includes cash / liquide middelen) — bottom left ── */}
         {/* Desktop: collapsible dropdown. Mobile: full content visible (tab system). */}
-        {(() => {
+        {hasVermogen && (() => {
           const maxValue = allAssetItems.length > 0 ? Math.max(...allAssetItems.map(a => Math.abs(a.value))) : 1
           return (
             <div
@@ -411,7 +485,7 @@ export function KernMissionControl({
                     <PiggyBank className="h-5 w-5 text-kern-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-[var(--ink-2)]">Vermogen</p>
+                    <p className="text-sm font-semibold text-[var(--ink-2)]">Bezittingen</p>
                     {/* Compact total on desktop header (always visible) */}
                     <p className={`hidden lg:block font-mono text-lg font-bold tabular-nums text-[var(--ink)] rounded-sm ${assetsFlash}`}>{formatCurrency(heroTotal)}</p>
                   </div>
@@ -525,7 +599,7 @@ export function KernMissionControl({
 
         {/* ── Debts card — bottom right ── */}
         {/* Desktop: collapsible dropdown. Mobile: full content visible (tab system). */}
-        {(() => {
+        {hasVermogen && (() => {
           const maxDebtBalance = debtsList.length > 0 ? Math.max(...debtsList.map(d => d.current_balance)) : 1
           return (
             <div
@@ -643,9 +717,87 @@ export function KernMissionControl({
             </div>
           )
         })()}
+        </>)}
+
+        {vermogenView === 'cards' && hasVermogen && (() => {
+          const LAYER_ORDER: WealthGroup[] = ['spaargeld', 'beleggingen', 'pensioen', 'vastgoed', 'overig']
+          const activeAssets = fullAssets.filter(a => a.is_active)
+          const activeDebts = fullDebts.filter(d => d.is_active)
+
+          // Group assets by wealth layer
+          const groupedAssets: Record<WealthGroup, Asset[]> = {
+            spaargeld: [], beleggingen: [], pensioen: [], vastgoed: [], overig: [],
+          }
+          for (const asset of activeAssets) {
+            const layer = WEALTH_GROUPS[asset.asset_type as AssetType]
+            if (layer) groupedAssets[layer].push(asset)
+          }
+
+          let stagger = 0
+
+          return (
+            <div className={`lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 ${activeTab === 'budgets' ? 'hidden lg:grid' : ''}`}>
+              {/* Left column: Bezittingen cards */}
+              <div className={`p-3 sm:p-5 ${getBorderClasses('assets')}`}>
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-positive">Bezittingen</p>
+                <div className="space-y-4">
+                  {LAYER_ORDER.map((layer, layerIdx) => {
+                    const assets = groupedAssets[layer]
+                    if (assets.length === 0) return null
+                    const layerTotal = assets.reduce((sum, a) => sum + a.current_value, 0)
+                    const startStagger = stagger
+                    stagger += assets.length
+                    return (
+                      <VermogenWealthGroup
+                        key={layer}
+                        layer={layer}
+                        totalValue={layerTotal}
+                        count={assets.length}
+                        defaultOpen={layerIdx === 0 || assets.length <= 3}
+                      >
+                        <div className="grid grid-cols-1 gap-2">
+                          {assets.map((asset, i) => (
+                            <VermogenAssetCard
+                              key={asset.id}
+                              asset={asset}
+                              onClick={(id) => onCardClick('assets', id)}
+                              staggerIndex={startStagger + i}
+                            />
+                          ))}
+                        </div>
+                      </VermogenWealthGroup>
+                    )
+                  })}
+                  {activeAssets.length === 0 && (
+                    <p className="py-4 text-center text-xs text-[var(--ink-4)]">Geen bezittingen</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Right column: Schulden cards */}
+              <div className={`p-3 sm:p-5 ${getBorderClasses('debts')}`}>
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-negative">Schulden</p>
+                {activeDebts.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2">
+                    {activeDebts.map((debt, i) => (
+                      <VermogenDebtCard
+                        key={debt.id}
+                        debt={debt}
+                        onClick={(id) => onCardClick('debts', id)}
+                        staggerIndex={i}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-4 text-center text-xs text-[var(--ink-4)]">Geen schulden</p>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ── Portfolio Holdings — full-width row below Vermogen+Schulden ── */}
-        {holdingsPortfolio && (
+        {hasVermogen && holdingsPortfolio && (
           <Link
             href="/core/assets/holdings"
             className="group lg:col-span-2 border-t border-[var(--border-ed)] p-3 sm:p-5 transition-colors hover:bg-emerald-500/[0.03]"

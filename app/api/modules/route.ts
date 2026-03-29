@@ -51,6 +51,17 @@ export async function PUT(req: Request) {
     return NextResponse.json({ errors }, { status: 400 })
   }
 
+  // Fetch current modules to detect budgetteren toggle
+  const { data: currentProfile } = await supabase
+    .from('profiles')
+    .select('active_modules')
+    .eq('id', user.id)
+    .single()
+
+  const currentModules = (currentProfile?.active_modules as ModuleId[] | null) ?? []
+  const hadBudgetteren = currentModules.includes('budgetteren')
+  const hasBudgetteren = sanitized.includes('budgetteren')
+
   const { error } = await supabase
     .from('profiles')
     .update({ active_modules: sanitized })
@@ -58,6 +69,29 @@ export async function PUT(req: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Sync budgeting data layer when budgetteren module is toggled
+  if (hadBudgetteren && !hasBudgetteren) {
+    // Budgetteren deactivated → disable transaction tracking on all cash assets
+    await Promise.all([
+      supabase
+        .from('assets')
+        .update({ has_budget_tracking: false })
+        .eq('user_id', user.id)
+        .eq('asset_type', 'cash')
+        .eq('is_active', true),
+      supabase
+        .from('profiles')
+        .update({ budgeting_active: false })
+        .eq('id', user.id),
+    ])
+  } else if (!hadBudgetteren && hasBudgetteren) {
+    // Budgetteren activated → set profile flag (user chooses which accounts to track)
+    await supabase
+      .from('profiles')
+      .update({ budgeting_active: true })
+      .eq('id', user.id)
   }
 
   return NextResponse.json({ activeModules: sanitized })

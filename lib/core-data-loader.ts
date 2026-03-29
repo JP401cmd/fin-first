@@ -12,6 +12,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireParams } from '@/lib/fire-params'
+import { type SavingsRateMethod, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
 import { resolveFireParams } from '@/lib/fire-params'
 import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
@@ -21,6 +22,7 @@ import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 export interface CorePageData {
   // Profile / budgeting
   budgetingActive: boolean
+  activeModules: string[]
   profileIncome: number
   profileExpenses: number
 
@@ -31,6 +33,7 @@ export interface CorePageData {
   // Savings rate
   savingsRate6m: number
   savingsRateMonths: number
+  savingsRateMethod: SavingsRateMethod
   savingsReceiptData: {
     extHalfYearIncome: number
     extHalfYearExpenses: number
@@ -168,7 +171,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .limit(1),
     supabase
       .from('profiles')
-      .select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active')
+      .select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules')
       .single(),
     supabase
       .from('bank_accounts')
@@ -202,6 +205,8 @@ export const loadCoreData = cache(async function loadCoreData(
   const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
   const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
   const budgetingActive = profileResult.data?.budgeting_active !== false
+  const activeModules: string[] = (profileResult.data?.active_modules as string[] | null) ?? []
+  const hasVermogen = activeModules.includes('vermogensregistratie')
 
   // ── Last 12 months income — extrapolate if less than 12 months of data ──
   const last12MonthsIncome = income12Result.data.reduce((s, t) => s + Number(t.amount), 0)
@@ -323,17 +328,20 @@ export const loadCoreData = cache(async function loadCoreData(
   const totalCashValue = cashWithTracking.reduce((s, a) => s + a.balance, 0) + unlinkedCash
   const totalNonCashAssets = totalAssets - totalCashValue
 
+  const effectiveTotalAssets = hasVermogen ? totalAssets : totalCashValue
+  const effectiveTotalDebts = hasVermogen ? totalDebts : 0
+
   const rawFinancials = {
     monthlyIncome: effectiveMonthlyIncome,
     monthlyExpenses: effectiveMonthlyExpenses,
-    totalAssets,
-    totalDebts,
+    totalAssets: effectiveTotalAssets,
+    totalDebts: effectiveTotalDebts,
     extrapolatedIncome,
     yearlyMustExpenses,
     yearlyRetirementExpenses,
   }
 
-  const netWorth = totalAssets - totalDebts
+  const netWorth = effectiveTotalAssets - effectiveTotalDebts
   const monthlySavings = effectiveMonthlyIncome - effectiveMonthlyExpenses
 
   // ── Has transactions ──
@@ -396,6 +404,7 @@ export const loadCoreData = cache(async function loadCoreData(
   let savingsBreakdown: { name: string; icon: string; budgetType: string; amount6m: number }[] = []
   let savingsBudgetTotal6m = 0
   let computedSavingsRate6m = 0
+  let savingsRateMethod: SavingsRateMethod = 'estimate'
 
   if (budgetResult.data) {
     budgetCount = (budgetResult.data as Budget[]).filter(b => !b.parent_id).length
@@ -487,13 +496,28 @@ export const loadCoreData = cache(async function loadCoreData(
       const rate = extHalfYearIncome > 0 ? (correctedHalfYearSavings / extHalfYearIncome) * 100 : 0
       if (rate === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
         computedSavingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
+        savingsRateMethod = 'estimate'
       } else {
         computedSavingsRate6m = rate
+        savingsRateMethod = 'transaction'
       }
     }
   } else if (effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
     // No spending data at all — use profile estimates for savings rate
     computedSavingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
+    savingsRateMethod = 'estimate'
+  }
+
+  // Try net-worth-delta method when still on 'estimate' and snapshots are available
+  if (savingsRateMethod === 'estimate' && snapshotResult.data && effectiveMonthlyIncome > 0) {
+    const deltaResult = computeSavingsRateFromNetWorthDelta(
+      snapshotResult.data as NetWorthSnapshot[],
+      effectiveMonthlyIncome,
+    )
+    if (deltaResult) {
+      computedSavingsRate6m = deltaResult.rate
+      savingsRateMethod = 'net_worth_delta'
+    }
   }
 
   // ── Compute debt payoff progress ──
@@ -657,6 +681,7 @@ export const loadCoreData = cache(async function loadCoreData(
   // ── Return complete data bundle ──
   return {
     budgetingActive,
+    activeModules,
     profileIncome: profileMonthlyIncome,
     profileExpenses: profileMonthlyExpenses,
 
@@ -665,6 +690,7 @@ export const loadCoreData = cache(async function loadCoreData(
 
     savingsRate6m: computedSavingsRate6m,
     savingsRateMonths: savingsRateDataMonths,
+    savingsRateMethod,
     savingsReceiptData: {
       extHalfYearIncome,
       extHalfYearExpenses,

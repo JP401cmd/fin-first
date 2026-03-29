@@ -37,6 +37,7 @@ import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { AccountFormModal, ACCOUNT_TYPES, type Account } from '@/components/app/account-form-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
 type Transaction = {
   id: string
@@ -100,6 +101,7 @@ export function CashAccountView({
 }) {
   const isCombined = !accountId
   const router = useRouter()
+  const featureAccessCtx = useFeatureAccess()
   const [account, setAccount] = useState<Account | null>(null)
   const [allAccounts, setAllAccounts] = useState<Account[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -963,6 +965,63 @@ export function CashAccountView({
             </Link>
           )}
         </div>
+      </div>
+    )
+  }
+
+  const { activeModules: cashViewModules } = featureAccessCtx
+  const hasBudgetterenModule = cashViewModules.includes('budgetteren')
+
+  if (!hasBudgetterenModule) {
+    const displayAccounts = isCombined ? allAccounts : [account]
+    const totalBalance = displayAccounts.reduce((s, a) => s + Number(a.balance), 0)
+
+    return (
+      <div className={embedded ? 'px-5 py-4 sm:px-6 sm:py-5' : 'mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8'}>
+        {!embedded && (
+          <Link href={backHref} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink)]">
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel}
+          </Link>
+        )}
+
+        <h1 className="mb-4 font-display text-xl font-bold text-[var(--ink)]">
+          {isCombined ? 'Bankrekeningen' : account.name}
+        </h1>
+
+        {isCombined && (
+          <div className="mb-4 card-editorial p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Totaal saldo</p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
+              {formatCurrency(totalBalance)}
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {displayAccounts.map((acc) => (
+            <div key={acc.id} className="card-editorial p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Wallet className="h-5 w-5 text-[var(--ink-3)]" />
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--ink)]">{acc.name}</p>
+                    {acc.bank_name && (
+                      <p className="text-xs text-[var(--ink-3)]">{acc.bank_name}</p>
+                    )}
+                  </div>
+                </div>
+                <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
+                  {formatCurrency(Number(acc.balance))}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-4 text-center text-xs text-[var(--ink-4)]">
+          Transactieregistratie is niet actief. Activeer Budgetteren om transacties bij te houden.
+        </p>
       </div>
     )
   }

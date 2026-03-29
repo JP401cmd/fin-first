@@ -58,6 +58,7 @@ const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
 import { usePerspective } from '@/components/app/perspective-provider'
 import { KernMissionControl } from '@/components/app/core/kern-mission-control'
 import { SectionDivider } from '@/components/app/section-divider'
+import type { SavingsRateMethod } from '@/lib/core-metrics'
 import { Users, EyeOff } from 'lucide-react'
 import { FhinAvatar } from '@/components/app/avatars'
 
@@ -74,6 +75,7 @@ export default function CorePage({ initialData }: { initialData?: CorePageData }
   const [incomeMonths, setIncomeMonths] = useState(12)
   const [savingsRate6m, setSavingsRate6m] = useState(0)
   const [savingsRateMonths, setSavingsRateMonths] = useState(6)
+  const [savingsRateMethod, setSavingsRateMethod] = useState<SavingsRateMethod>('estimate')
   const [budgetCount, setBudgetCount] = useState(0)
   const [hasTransactions, setHasTransactions] = useState(false)
 const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalCurrent: number; progressPct: number } | null>(null)
@@ -147,6 +149,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const { perspective, partnerName } = usePerspective()
   const featureAccess = useFeatureAccess()
   const needsActivation = featureAccess.needsActivation
+  const { activeModules } = featureAccess
+  const hasVermogen = activeModules.includes('vermogensregistratie')
+  const hasToekomst = activeModules.includes('toekomstplannen')
+  const isBudgetOnly = !hasVermogen && !hasToekomst
   const [showRoadmap, setShowRoadmap] = useState(false)
   const [householdOverrides, setHouseholdOverrides] = useState<{
     netWorth: number; totalAssets: number; totalDebts: number
@@ -164,6 +170,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     setIncomeMonths(initialData.incomeMonths)
     setSavingsRate6m(initialData.savingsRate6m)
     setSavingsRateMonths(initialData.savingsRateMonths)
+    setSavingsRateMethod(initialData.savingsRateMethod)
     setBudgetCount(initialData.budgetCount)
     setHasTransactions(initialData.hasTransactions)
     setDebtProgress(initialData.debtProgress)
@@ -413,12 +420,15 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setTotalCash(totalCashValue)
       setTotalNonCashAssets(totalAssets - totalCashValue)
 
-      setRawFinancials({ monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses, yearlyRetirementExpenses })
+      // Module-aware: use cash-only when vermogensregistratie is off
+      const effectiveTotalAssets = hasVermogen ? totalAssets : totalCashValue
+      const effectiveTotalDebts = hasVermogen ? totalDebts : 0
+      setRawFinancials({ monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses, totalAssets: effectiveTotalAssets, totalDebts: effectiveTotalDebts, extrapolatedIncome, yearlyMustExpenses, yearlyRetirementExpenses })
       setFullAssets(assetsResult.data as unknown as Asset[])
       setFullDebts(debtsResult.data as unknown as Debt[])
       setCoreUnlinkedCash(unlinkedCash)
 
-      const netWorth = totalAssets - totalDebts
+      const netWorth = effectiveTotalAssets - effectiveTotalDebts
       const monthlySavings = effectiveMonthlyIncome - effectiveMonthlyExpenses
 
       // Household & partner perspective: fetch partner totals if in a household
@@ -586,13 +596,16 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           const computedRate = extHalfYearIncome > 0 ? (correctedHalfYearSavings / extHalfYearIncome) * 100 : 0
           if (computedRate === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
             setSavingsRate6m(Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100))
+            setSavingsRateMethod('estimate')
           } else {
             setSavingsRate6m(computedRate)
+            setSavingsRateMethod('transaction')
           }
         }
       } else if (effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
         // No spending data at all — use profile estimates for savings rate
         setSavingsRate6m(Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100))
+        setSavingsRateMethod('estimate')
       }
 
       // Compute debt payoff progress
@@ -1011,6 +1024,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const effectiveNetWorth = activeOverrides ? activeOverrides.netWorth : data?.netWorth ?? 0
   const effectiveTotalAssets = activeOverrides ? activeOverrides.totalAssets : rawFinancials?.totalAssets ?? 0
   const effectiveTotalDebts = activeOverrides ? activeOverrides.totalDebts : rawFinancials?.totalDebts ?? 0
+  // Module-aware hero: show net worth when vermogensregistratie is active, otherwise total cash
+  const heroAmount = hasVermogen ? effectiveNetWorth : (totalCash ?? 0)
+  const heroLabel = hasVermogen ? 'netto vermogen' : 'totaal saldo'
   // Recompute freedom time for non-personal perspectives
   const effectiveFreedomYears = (() => {
     if (!data) return 0
@@ -1077,6 +1093,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     setSnapshotLoading(false)
   }
 
+  // Module-aware: is budgetteren inactive?
+  const isVermogenOnly = hasVermogen && !activeModules.includes('budgetteren')
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-8">
       {/* === 0a. Welcome Krant (one-time popup) === */}
@@ -1098,9 +1117,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 className="mb-3 sm:mb-5 cursor-pointer text-left transition-opacity hover:opacity-80"
               >
                 <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
-                  {formatCurrency(effectiveNetWorth)}
+                  {formatCurrency(heroAmount)}
                 </span>
-                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">netto vermogen</span>
+                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">{heroLabel}</span>
               </button>
 
               <p className="mb-3 text-sm text-[var(--ink-3)]">
@@ -1124,17 +1143,19 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 className="mb-3 sm:mb-5 cursor-pointer text-left transition-opacity hover:opacity-80"
               >
                 <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
-                  {formatCurrency(effectiveNetWorth)}
+                  {formatCurrency(heroAmount)}
                 </span>
-                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">netto vermogen</span>
+                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">{heroLabel}</span>
               </button>
 
-              <p className="mb-3 font-serif italic text-sm text-[var(--ink-3)]">
-                dat is {effectiveFreedomYears > 0 ? `${effectiveFreedomYears} jaar en ` : ''}{effectiveFreedomMonths} maanden vrijheid
-              </p>
+              {hasToekomst && (
+                <p className="mb-3 font-serif italic text-sm text-[var(--ink-3)]">
+                  dat is {effectiveFreedomYears > 0 ? `${effectiveFreedomYears} jaar en ` : ''}{effectiveFreedomMonths} maanden vrijheid
+                </p>
+              )}
 
               {/* FIRE progress bar */}
-              {(coreSimTarget ?? data.fireTarget) > 0 && (
+              {hasToekomst && (coreSimTarget ?? data.fireTarget) > 0 && (
                 <div className="mb-4 sm:mb-6" data-testid="fire-progress-bar">
                   <div className="mb-1 flex items-baseline justify-between">
                     <span className="font-mono text-xs text-[var(--ink-3)]">
@@ -1168,15 +1189,17 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 {savingsRateMonths < 6 ? `${savingsRateMonths}m data` : '6m'}
               </p>
             </button>
-            <button
-              type="button"
-              onClick={() => setShowFreeDaysReceipt(true)}
-              className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-kern-300"
-            >
-              <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vrije dagen</p>
-              <p className="font-mono text-xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}/jaar</p>
-              <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">passief inkomen</p>
-            </button>
+            {hasToekomst && (
+              <button
+                type="button"
+                onClick={() => setShowFreeDaysReceipt(true)}
+                className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-kern-300"
+              >
+                <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vrije dagen</p>
+                <p className="font-mono text-xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}/jaar</p>
+                <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">passief inkomen</p>
+              </button>
+            )}
           </div>
 
           {/* Expandable detail — mobile only */}
@@ -1191,28 +1214,32 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </button>
             {heroExpanded && (
               <div className="grid grid-cols-1 gap-3 animate-fade-up">
-                <button
-                  type="button"
-                  onClick={() => setShowNetWorthReceipt(true)}
-                  className="w-full cursor-pointer text-left rounded-[var(--r)] transition-all hover:shadow-[var(--s1)]"
-                >
-                  <p className="label-editorial text-[var(--ink-3)]">Voortgang FIRE</p>
-                  {(coreSimTarget ?? data.fireTarget) > 0 ? (
-                    <>
-                      <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]" data-testid="fire-progress-pct-mobile">
-                        {Math.min(100, (effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
-                      </p>
-                      <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="fire-progress-subtitle-mobile">
-                        {formatCurrency(effectiveNetWorth)} van {formatCurrency(coreSimTarget ?? data.fireTarget)}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">Stel je FIRE-doel in</p>
-                  )}
-                </button>
-                <button type="button" onClick={() => setShowProjectionModal(true)} className="w-full cursor-pointer text-left">
-                  <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
-                </button>
+                {hasToekomst && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNetWorthReceipt(true)}
+                    className="w-full cursor-pointer text-left rounded-[var(--r)] transition-all hover:shadow-[var(--s1)]"
+                  >
+                    <p className="label-editorial text-[var(--ink-3)]">Voortgang FIRE</p>
+                    {(coreSimTarget ?? data.fireTarget) > 0 ? (
+                      <>
+                        <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]" data-testid="fire-progress-pct-mobile">
+                          {Math.min(100, (effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+                        </p>
+                        <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="fire-progress-subtitle-mobile">
+                          {formatCurrency(effectiveNetWorth)} van {formatCurrency(coreSimTarget ?? data.fireTarget)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">Stel je FIRE-doel in</p>
+                    )}
+                  </button>
+                )}
+                {hasVermogen && (
+                  <button type="button" onClick={() => setShowProjectionModal(true)} className="w-full cursor-pointer text-left">
+                    <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowBudgetModal(true)}
@@ -1247,42 +1274,59 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           {/* Full 3-col layout — desktop only */}
           <div className="hidden sm:grid sm:grid-cols-3 sm:gap-5">
             <div>
-              <button
-                type="button"
-                onClick={() => setShowNetWorthReceipt(true)}
-                className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
-              >
-                <p className="label-editorial text-[var(--ink-3)]">Voortgang FIRE</p>
-                {(coreSimTarget ?? data.fireTarget) > 0 ? (
-                  <>
-                    <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]" data-testid="fire-progress-pct">
-                      {Math.min(100, (effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
-                    </p>
-                    <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="fire-progress-subtitle">
-                      {formatCurrency(effectiveNetWorth)} van {formatCurrency(coreSimTarget ?? data.fireTarget)}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">Stel je FIRE-doel in</p>
-                )}
-                {isHouseholdView && (
-                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">
-                    Persoonlijk: {formatCurrency(data.netWorth)} · Partner: {formatCurrency(effectiveNetWorth - data.netWorth)}
-                  </p>
-                )}
-                {isPartnerView && (
-                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">
-                    Bezittingen: {formatCurrency(effectiveTotalAssets)} · Schulden: {formatCurrency(effectiveTotalDebts)}
-                  </p>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowProjectionModal(true)}
-                className="mt-1 w-full cursor-pointer text-left"
-              >
-                <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
-              </button>
+              {isBudgetOnly ? (
+                <button
+                  type="button"
+                  onClick={() => setShowBudgetModal(true)}
+                  className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
+                >
+                  <p className="label-editorial text-[var(--ink-3)]">Verloop</p>
+                  <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />
+                </button>
+              ) : (
+                <>
+                  {hasToekomst && (
+                    <button
+                      type="button"
+                      onClick={() => setShowNetWorthReceipt(true)}
+                      className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
+                    >
+                      <p className="label-editorial text-[var(--ink-3)]">Voortgang FIRE</p>
+                      {(coreSimTarget ?? data.fireTarget) > 0 ? (
+                        <>
+                          <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]" data-testid="fire-progress-pct">
+                            {Math.min(100, (effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+                          </p>
+                          <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="fire-progress-subtitle">
+                            {formatCurrency(effectiveNetWorth)} van {formatCurrency(coreSimTarget ?? data.fireTarget)}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">Stel je FIRE-doel in</p>
+                      )}
+                      {isHouseholdView && (
+                        <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                          Persoonlijk: {formatCurrency(data.netWorth)} · Partner: {formatCurrency(effectiveNetWorth - data.netWorth)}
+                        </p>
+                      )}
+                      {isPartnerView && (
+                        <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                          Bezittingen: {formatCurrency(effectiveTotalAssets)} · Schulden: {formatCurrency(effectiveTotalDebts)}
+                        </p>
+                      )}
+                    </button>
+                  )}
+                  {hasVermogen && (
+                    <button
+                      type="button"
+                      onClick={() => setShowProjectionModal(true)}
+                      className="mt-1 w-full cursor-pointer text-left"
+                    >
+                      <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
+                    </button>
+                  )}
+                </>
+              )}
             </div>
             <button
               type="button"
@@ -1310,7 +1354,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   </p>
                 </div>
               )}
-              <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />
+              {!isBudgetOnly && <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />}
             </button>
             <div data-testid="hero-kerngetallen">
               <p className="label-editorial text-[var(--ink-3)]">Kerngetallen</p>
@@ -1332,20 +1376,22 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data`
                   : 'laatste 6 maanden'}
               </p>
-              <div className="mt-3">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowFreeDaysReceipt(true)}
-                    className="flex items-center gap-1.5 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
-                  >
-                    <p className="font-mono text-2xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}</p>
-                    <span className="text-sm text-[var(--ink-3)]">vrije dagen/jaar</span>
-                  </button>
-                  <HeroTooltip text={`Klik op het getal voor de volledige berekening. Hoeveel dagen per jaar je passief inkomen (${(fireSwr * 100).toFixed(2)}% NL-SWR op must-uitgaven) je dagelijkse kosten dekt.`} />
+              {hasToekomst && (
+                <div className="mt-3">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowFreeDaysReceipt(true)}
+                      className="flex items-center gap-1.5 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
+                    >
+                      <p className="font-mono text-2xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}</p>
+                      <span className="text-sm text-[var(--ink-3)]">vrije dagen/jaar</span>
+                    </button>
+                    <HeroTooltip text={`Klik op het getal voor de volledige berekening. Hoeveel dagen per jaar je passief inkomen (${(fireSwr * 100).toFixed(2)}% NL-SWR op must-uitgaven) je dagelijkse kosten dekt.`} />
+                  </div>
+                  <p className="text-[10px] text-[var(--ink-4)]">gedekt door passief inkomen</p>
                 </div>
-                <p className="text-[10px] text-[var(--ink-4)]">gedekt door passief inkomen</p>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -1373,6 +1419,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           rawTotalDebts={rawFinancials!.totalDebts}
           debtProgress={debtProgress}
           holdingsPortfolio={holdingsPortfolio}
+          hasVermogen={hasVermogen}
+          fullAssets={fullAssets ?? []}
+          fullDebts={fullDebts ?? []}
           onCardClick={(type, itemId) => setActiveModal({ type, itemId })}
         />
       </section>
@@ -1421,6 +1470,14 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
             <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per jaar</p>
           </button>
+          {!hasVermogen && (
+            <button onClick={() => setActiveModal({ type: 'assets' })}
+              className="flex-1 card-editorial p-3 text-left">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Rekeningen</p>
+              <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(totalCash)}</p>
+              <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">{cashAccounts.length} rekening{cashAccounts.length !== 1 ? 'en' : ''}</p>
+            </button>
+          )}
         </div>
 
         {/* Full cards on desktop — 2-col tablet, 3-col desktop */}
@@ -1434,7 +1491,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </div>
             <p className="text-sm font-medium text-[var(--ink-3)]">Geschat Jaarinkomen</p>
             <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.estimatedYearlyIncome)}</p>
-            <FreedomTimeBadge amount={data.estimatedYearlyIncome} className="mt-1" />
+            {hasToekomst && <FreedomTimeBadge amount={data.estimatedYearlyIncome} className="mt-1" />}
             <p className="mt-1 text-xs text-[var(--ink-3)]">
               {incomeMonths < 12
                 ? `geextrapoleerd vanuit ${incomeMonths} maand${incomeMonths > 1 ? 'en' : ''}`
@@ -1451,7 +1508,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </div>
             <p className="text-sm font-medium text-[var(--ink-3)]">Jaarlijkse Must Uitgaven</p>
             <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
-            <FreedomTimeBadge amount={data.yearlyMustExpenses} className="mt-1" />
+            {hasToekomst && <FreedomTimeBadge amount={data.yearlyMustExpenses} className="mt-1" />}
             <p className="mt-1 text-xs text-[var(--ink-3)]">essentiële kosten per jaar</p>
             <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
               Stel je eigen jaarlijkse uitgave na retirement in via{' '}
@@ -1461,30 +1518,46 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </p>
           </button>
 
-          {/* 3rd KPI card — Dagelijkse Kosten (visible on lg ≥1024px) */}
-          <button type="button" onClick={() => setShowFreeDaysReceipt(true)} className="hidden lg:block rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 lg:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-kern-50">
-                <Wallet className="h-6 w-6 text-kern-600" />
+          {/* 3rd KPI card — Bankrekeningen (budget-only) or Dagelijkse Kosten (with vermogen) */}
+          {!hasVermogen ? (
+            <button type="button" onClick={() => setActiveModal({ type: 'assets' })} className="hidden lg:block rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 lg:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-kern-50">
+                  <Wallet className="h-6 w-6 text-kern-600" />
+                </div>
+                <KpiTooltip text="Totaal saldo van al je bankrekeningen." />
               </div>
-              <KpiTooltip text="Wat je gemiddeld per dag nodig hebt voor essentiële kosten. Dit is de basis voor je vrijheidstijd-berekening." />
-            </div>
-            <p className="text-sm font-medium text-[var(--ink-3)]">Dagelijkse Kosten</p>
-            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-              {formatCurrency(data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses / 365 : data.yearlyExpenses / 365)}
-            </p>
-            <p className="mt-1 text-xs text-[var(--ink-3)]">per dag aan essentiële uitgaven</p>
-            <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
-              {(() => {
-                const daily = data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses / 365 : data.yearlyExpenses / 365
-                if (daily <= 0) return 'Voeg uitgaven toe om vrijheidstijd te berekenen'
-                const minutesPerEuro = (24 * 60) / daily
-                return minutesPerEuro >= 60
-                  ? `€ 1 spaart = ${(minutesPerEuro / 60).toFixed(1)} uur vrijheid`
-                  : `€ 1 spaart = ${Math.round(minutesPerEuro)} min vrijheid`
-              })()}
-            </p>
-          </button>
+              <p className="text-sm font-medium text-[var(--ink-3)]">Bankrekeningen</p>
+              <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(totalCash)}</p>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
+                {cashAccounts.length} rekening{cashAccounts.length !== 1 ? 'en' : ''}
+              </p>
+            </button>
+          ) : (
+            <button type="button" onClick={() => setShowFreeDaysReceipt(true)} className="hidden lg:block rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 lg:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-kern-50">
+                  <Wallet className="h-6 w-6 text-kern-600" />
+                </div>
+                <KpiTooltip text="Wat je gemiddeld per dag nodig hebt voor essentiële kosten. Dit is de basis voor je vrijheidstijd-berekening." />
+              </div>
+              <p className="text-sm font-medium text-[var(--ink-3)]">Dagelijkse Kosten</p>
+              <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
+                {formatCurrency(data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses / 365 : data.yearlyExpenses / 365)}
+              </p>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">per dag aan essentiële uitgaven</p>
+              <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
+                {(() => {
+                  const daily = data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses / 365 : data.yearlyExpenses / 365
+                  if (daily <= 0) return 'Voeg uitgaven toe om vrijheidstijd te berekenen'
+                  const minutesPerEuro = (24 * 60) / daily
+                  return minutesPerEuro >= 60
+                    ? `€ 1 spaart = ${(minutesPerEuro / 60).toFixed(1)} uur vrijheid`
+                    : `€ 1 spaart = ${Math.round(minutesPerEuro)} min vrijheid`
+                })()}
+              </p>
+            </button>
+          )}
         </div>
       </section>
 
@@ -1502,22 +1575,22 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       <FullScreenModal
         open={activeModal?.type === 'assets'}
         onClose={() => { setActiveModal(null); loadData() }}
-        title="Vermogen"
+        title={hasVermogen ? "Bezittingen" : "Bankrekeningen"}
         href="/core/assets"
       >
         <DynAssetsPage initialAssetId={activeModal?.type === 'assets' ? activeModal.itemId : undefined} />
       </FullScreenModal>
-      <FullScreenModal
+      {hasVermogen && <FullScreenModal
         open={activeModal?.type === 'debts'}
         onClose={() => { setActiveModal(null); loadData() }}
         title="Schulden"
         href="/core/debts"
       >
         <DynDebtsPage initialDebtId={activeModal?.type === 'debts' ? activeModal.itemId : undefined} />
-      </FullScreenModal>
+      </FullScreenModal>}
 
       {/* === Vermogen Modal (verloop + prognose) === */}
-      <FullScreenModal
+      {hasVermogen && <FullScreenModal
         open={showProjectionModal}
         onClose={() => setShowProjectionModal(false)}
         title="Netto Vermogen"
@@ -1596,7 +1669,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           )}
           </FeatureGate>
         </div>
-      </FullScreenModal>
+      </FullScreenModal>}
 
       {/* === Budget Uitgaven Modal === */}
       <FullScreenModal
@@ -2030,19 +2103,21 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       </BottomSheet>
 
       {/* === Kassabon Modal: Netto Vermogen === */}
-      <BottomSheet open={showNetWorthReceipt} onClose={() => setShowNetWorthReceipt(false)} title="Netto Vermogen">
+      <BottomSheet open={showNetWorthReceipt} onClose={() => setShowNetWorthReceipt(false)} title={hasVermogen ? "Netto Vermogen" : "Totaal Saldo"}>
         <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           <div className="mb-3 text-center">
-            <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">NETTO VERMOGEN</p>
-            <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">Bezittingen minus schulden — huidig</p>
+            <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{hasVermogen ? 'NETTO VERMOGEN' : 'TOTAAL SALDO'}</p>
+            <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">{hasVermogen ? 'Bezittingen minus schulden — huidig' : 'Som van al je bankrekeningen'}</p>
           </div>
 
           <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-            Netto vermogen = alle activa minus alle schulden, gewogen naar het percentage dat je instelt per item.
+            {hasVermogen
+              ? 'Netto vermogen = alle activa minus alle schulden, gewogen naar het percentage dat je instelt per item.'
+              : 'Totaal saldo = de som van al je gekoppelde bankrekeningen.'}
           </div>
 
-          {/* Bezittingen */}
-          {assetsList.length > 0 && (
+          {/* Bezittingen — only when vermogensregistratie active */}
+          {hasVermogen && assetsList.length > 0 && (
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
               <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">Bezittingen</p>
               {assetsList.map((a) => {
@@ -2063,8 +2138,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </div>
           )}
 
-          {/* Schulden */}
-          {debtsList.length > 0 && (
+          {/* Schulden — only when vermogensregistratie active */}
+          {hasVermogen && debtsList.length > 0 && (
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
               <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">Schulden</p>
               {debtsList.map((d) => {
@@ -2085,19 +2160,34 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </div>
           )}
 
+          {/* Bankrekeningen — only when vermogensregistratie is NOT active */}
+          {!hasVermogen && cashAccounts.length > 0 && (
+            <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+              <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">Bankrekeningen</p>
+              {cashAccounts.map((a) => (
+                <div key={a.id} className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">{a.name}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(a.balance)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {data && (
             <>
               <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-                <span className="font-sans text-[var(--ink)]">Netto vermogen</span>
-                <span className={`tabular-nums ${data.netWorth >= 0 ? 'text-[var(--ink)]' : 'text-negative'}`}>{formatCurrency(data.netWorth)}</span>
+                <span className="font-sans text-[var(--ink)]">{hasVermogen ? 'Netto vermogen' : 'Totaal saldo'}</span>
+                <span className={`tabular-nums ${(hasVermogen ? data.netWorth : totalCash) >= 0 ? 'text-[var(--ink)]' : 'text-negative'}`}>{formatCurrency(hasVermogen ? data.netWorth : totalCash)}</span>
               </div>
-              <div className="mt-3 flex justify-center">
-                <FreedomTimeBadge amount={Math.abs(data.netWorth)} />
-              </div>
+              {hasToekomst && (
+                <div className="mt-3 flex justify-center">
+                  <FreedomTimeBadge amount={Math.abs(hasVermogen ? data.netWorth : totalCash)} />
+                </div>
+              )}
             </>
           )}
 
-          <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van activa en schulden — gewogen naar het ingestelde inclusiepercentage</p>
+          <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{hasVermogen ? 'Berekend op basis van activa en schulden — gewogen naar het ingestelde inclusiepercentage' : 'Berekend op basis van gekoppelde bankrekeningen'}</p>
         </div>
       </BottomSheet>
 

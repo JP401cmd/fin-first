@@ -165,7 +165,9 @@ export default function GidsPage() {
           icon={Landmark}
           title="Weet waar je staat"
           color="var(--color-kern-400)"
-          subtitle="Breng al je bezittingen (inclusief bankrekeningen), schulden en vermogen samen op één plek"
+          subtitle={progress?.financial?.activeModules?.includes('vermogensregistratie')
+            ? "Breng al je bezittingen (inclusief bankrekeningen), schulden en vermogen samen op één plek"
+            : "Je totaal saldo — de som van je bankrekeningen — is je primaire financiële metric. Activeer Vermogensregistratie voor het volledige netto vermogen."}
           statusLines={
             progress
               ? progress.steps.hasAssets || progress.steps.hasDebts
@@ -342,7 +344,8 @@ export default function GidsPage() {
 
         <SectionDivider variant="asterisk" className="my-6" />
 
-        {/* ── Stap 2: Begrijp je patronen ── */}
+        {/* ── Stap 2: Conditioneel — budgetteren vs vermogensregistratie-only ── */}
+        {progress?.financial?.activeModules?.includes('budgetteren') !== false ? (
         <ReisStapSection
           id="guide-reis-2"
           step={2}
@@ -690,6 +693,75 @@ export default function GidsPage() {
             }
           />
         </ReisStapSection>
+        ) : (
+        <ReisStapSection
+          id="guide-reis-2"
+          step={2}
+          icon={TrendingUp}
+          title="Houd je vermogen bij"
+          color="var(--color-kern-400)"
+          subtitle="Werk je bezittingen en schulden regelmatig bij om je vermogensverloop te volgen"
+          statusLines={
+            progress
+              ? (progress.counts.assets > 0 || progress.counts.debts > 0)
+                ? [
+                    `Je hebt ${progress.counts.assets} bezitting${progress.counts.assets !== 1 ? "en" : ""} en ${progress.counts.debts} schuld${progress.counts.debts !== 1 ? "en" : ""} geregistreerd.`,
+                  ]
+                : ["Registreer je eerste bezitting of schuld."]
+              : ["Laden..."]
+          }
+          valueSentence="Regelmatige updates maken je vermogensverloop inzichtelijk."
+          ctaLabel="Werk je vermogen bij"
+          ctaHref="/core/assets"
+          isComplete={!!progress?.steps.hasAssets}
+        >
+          <GuideTopicCard
+            icon={TrendingUp}
+            title="Vermogensupdates"
+            color="var(--color-kern-400)"
+            description={
+              <>
+                <strong>Je vermogen bijhouden is de basis.</strong> Door regelmatig de waarde van je bezittingen en het saldo van je schulden bij te werken, bouw je een tijdlijn op van je financiele voortgang.
+                <br /><br />
+                <strong>Maandelijkse check-in:</strong> Neem elke maand een paar minuten om je bezittingen bij te werken. Vastgoed, beleggingen en pensioen veranderen in waarde — door dit bij te houden zie je trends en kun je bijsturen.
+                <br /><br />
+                <strong>Net worth snapshots:</strong> Elke keer dat je je vermogen bijwerkt, maakt TriFinity een snapshot. Over tijd vormen deze snapshots een grafiek van je vermogensverloop — je ziet direct of je op koers ligt.
+                <br /><br />
+                <strong>Spaarquote via vermogensdelta:</strong> Zonder budgetteren berekent TriFinity je spaarquote op basis van je vermogensverandering. Hoe vaker je bijwerkt, hoe nauwkeuriger deze schatting.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Ga naar De Kern en bekijk je bezittingen en schulden",
+                "Klik op een bezitting om de huidige waarde bij te werken",
+                "Klik op een schuld om het openstaande saldo bij te werken",
+                "Bekijk je vermogensverloop via het netto vermogen kassabon — tik op het bedrag in de hero",
+                "Maak regelmatig snapshots via de check-in of handmatig via het vermogensverloop-overzicht",
+              ],
+              tip: "Plan een vast moment per maand (bijv. de eerste zondag) om je vermogen bij te werken. Consistentie geeft de beste inzichten.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={FileText}
+            title="Belasting"
+            color="var(--color-kern-400)"
+            description={
+              <>
+                <strong>Box 3 belasting wordt automatisch berekend</strong> op basis van je geregistreerde bezittingen en schulden. Je ziet direct hoeveel je betaalt en hoeveel vrijheidsdagen dat kost.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Registreer je bezittingen — de app classificeert automatisch naar Box 3 categorien",
+                "Bekijk je Box 3 berekening via De Kern → Belasting",
+                "Check de box3_drag-widget op je dashboard voor de impact op je vrijheid",
+              ],
+              tip: "Houd je vermogen actueel rond de peildatum (1 januari) voor een nauwkeurige Box 3 berekening.",
+            }}
+          />
+        </ReisStapSection>
+        )}
 
         <SectionDivider variant="asterisk" className="my-6" />
 
