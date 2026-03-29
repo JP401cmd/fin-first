@@ -4,7 +4,6 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { PHASES, levelToPhaseId } from '@/lib/feature-phases'
 import { ageAtDate } from '@/lib/horizon-data'
 import { ChevronRight, BookOpen, Check } from 'lucide-react'
 import {
@@ -13,8 +12,6 @@ import {
   chronologyLevels,
   phaseColors,
   levelCriteriaMap,
-  featureIcons,
-  getFeaturesPerPhase,
 } from '@/lib/identity-constants'
 import type { IdentityPageData } from '@/lib/identity-data-loader'
 
@@ -28,7 +25,6 @@ export default function IdentityClient({ initialData }: IdentityClientProps) {
 
   // Interactive state
   const [temporalBalance, setTemporalBalance] = useState(initialData.temporalBalance)
-  const [expandedPhase, setExpandedPhase] = useState<string | null>(null)
   const [showSwitchDialog, setShowSwitchDialog] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState<string | null>(null)
@@ -43,8 +39,6 @@ export default function IdentityClient({ initialData }: IdentityClientProps) {
     financialData,
     completedMonths,
   } = initialData
-
-  const featuresPerPhase = getFeaturesPerPhase()
 
   // Save temporal balance immediately on change
   const updateTemporalBalance = useCallback(async (value: number) => {
@@ -334,16 +328,9 @@ export default function IdentityClient({ initialData }: IdentityClientProps) {
           {chronologyPhases.map((phase) => {
             const levels = chronologyLevels.filter((l) => l.phase === phase.phase)
             const colors = phaseColors[phase.color]
-            const phaseId = PHASES[phase.phase - 1]?.id ?? ''
-            const phaseFeatures = featuresPerPhase[phaseId] ?? []
-            const currentPhaseId = levelToPhaseId(sovereigntyLevel)
-            const currentPhaseIdx = PHASES.findIndex(p => p.id === currentPhaseId)
-            const thisPhaseIdx = PHASES.findIndex(p => p.id === phaseId)
-            const isPhaseUnlocked = thisPhaseIdx <= currentPhaseIdx
-            const isPhaseExpanded = expandedPhase === phaseId
 
             return (
-              <div key={phase.phase} data-testid={`phase-${phaseId}`}>
+              <div key={phase.phase}>
                 {/* Phase header */}
                 <div className="mb-3 flex items-center gap-2">
                   <span className={`inline-flex rounded-[var(--r-sm)] border px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${colors.badge}`}>
@@ -352,94 +339,6 @@ export default function IdentityClient({ initialData }: IdentityClientProps) {
                   <span className="text-sm font-semibold text-[var(--ink-2)]">{phase.name}</span>
                   <span className="text-xs text-[var(--ink-3)]">&mdash; {phase.subtitle}</span>
                 </div>
-
-                {/* Feature roadmap icons for this phase */}
-                {phaseFeatures.length > 0 && (
-                  <div className="mb-3 ml-3" data-testid={`feature-roadmap-${phaseId}`}>
-                    <button
-                      onClick={() => setExpandedPhase(isPhaseExpanded ? null : phaseId)}
-                      className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
-                      data-testid={`feature-roadmap-toggle-${phaseId}`}
-                    >
-                      <span className="text-xs">{isPhaseExpanded ? '\u25BC' : '\u25B6'}</span>
-                      <span>{phaseFeatures.length} feature{phaseFeatures.length !== 1 ? 's' : ''} worden ontgrendeld</span>
-                      {isPhaseUnlocked ? (
-                        <span className="ml-1 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 border border-emerald-200">
-                          ✓ Beschikbaar
-                        </span>
-                      ) : (
-                        <span className="ml-1 inline-flex items-center rounded-[var(--r-sm)] bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-3)] border border-[var(--border-ed)]">
-                          Vergrendeld
-                        </span>
-                      )}
-                    </button>
-
-                    {/* Feature icon pills */}
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {phaseFeatures.map((feature) => {
-                        const icon = featureIcons[feature.id] ?? '\u26A1'
-                        return (
-                          <div
-                            key={feature.id}
-                            className={`group relative inline-flex items-center gap-1 rounded-[var(--r-sm)] px-2 py-0.5 text-[11px] font-medium border transition-all ${
-                              isPhaseUnlocked
-                                ? `${colors.badge} opacity-100`
-                                : 'bg-[var(--subtle)] text-[var(--ink-3)] border-[var(--border-ed)] opacity-60'
-                            }`}
-                            data-testid={`feature-pill-${feature.id}`}
-                            data-unlocked={isPhaseUnlocked ? 'true' : 'false'}
-                          >
-                            <span className="text-xs">{icon}</span>
-                            <span className="hidden sm:inline">{feature.label}</span>
-                            <div className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-2 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-                              <p className="text-[11px] font-semibold text-[var(--ink-2)]">{feature.label}</p>
-                              <p className="text-[10px] text-[var(--ink-3)]">{feature.description}</p>
-                              {isPhaseUnlocked ? (
-                                <p className="mt-1 text-[10px] font-semibold text-emerald-600">✓ Ontgrendeld</p>
-                              ) : (
-                                <p className="mt-1 text-[10px] font-semibold text-[var(--ink-3)]">Beschikbaar vanaf {phase.name}</p>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Expanded feature list */}
-                    {isPhaseExpanded && (
-                      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3 mb-2" data-testid={`feature-list-${phaseId}`}>
-                        <p className="label-editorial text-[var(--ink-3)] mb-2">
-                          Features in {phase.name}
-                        </p>
-                        <div className="space-y-1.5">
-                          {phaseFeatures.map((feature) => {
-                            const icon = featureIcons[feature.id] ?? '\u26A1'
-                            return (
-                              <div
-                                key={feature.id}
-                                className={`flex items-start gap-2 rounded-[var(--r)] p-1.5 ${isPhaseUnlocked ? '' : 'opacity-50'}`}
-                                data-testid={`feature-detail-${feature.id}`}
-                              >
-                                <span className="text-sm shrink-0 mt-0.5">{icon}</span>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-semibold text-[var(--ink-2)]">{feature.label}</span>
-                                    {isPhaseUnlocked ? (
-                                      <span className="text-[10px] text-emerald-600 font-medium">✓</span>
-                                    ) : (
-                                      <span className="text-[10px] text-[var(--ink-3)]">—</span>
-                                    )}
-                                  </div>
-                                  <p className="text-[11px] text-[var(--ink-3)] leading-snug">{feature.description}</p>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Levels in this phase */}
                 <div className="ml-3 border-l-2 border-[var(--border-ed)] pl-6 pb-6">
