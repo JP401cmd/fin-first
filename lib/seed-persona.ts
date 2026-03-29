@@ -211,6 +211,9 @@ export async function seedPersonaData(
   // Widget dashboard preferences (optional, per-persona)
   if (persona.profile.widget_prefs) profileData.widget_prefs = persona.profile.widget_prefs
 
+  // Active modules (module system)
+  profileData.active_modules = persona.profile.active_modules
+
   const { error: profileError } = await supabase
     .from('profiles')
     .upsert(profileData)

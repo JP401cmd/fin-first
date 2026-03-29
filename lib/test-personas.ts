@@ -11,6 +11,8 @@
  */
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'
+import type { ModuleId } from '@/lib/module-registry'
+import { ALL_MODULES } from '@/lib/module-registry'
 import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
 import { getCurrentWeek, getNextWeek } from '@/lib/week-utils'
 
@@ -51,6 +53,7 @@ export interface PersonaMeta {
   currentSituation: string
   firstGoal: string
   sovereignty: SovereigntyPhase
+  modules: ModuleId[]
 }
 
 export interface PersonaProfile {
@@ -85,6 +88,8 @@ export interface PersonaProfile {
   rebalance_threshold?: number // drift threshold 1-20%, default 5
   // Widget dashboard
   widget_prefs?: { widgets: { id: string; enabled: boolean; size: 'mini' | 'quarter' | 'half' | 'full'; order: number }[] }
+  // Active modules (module system)
+  active_modules: ModuleId[]
 }
 
 export interface PersonaBankAccount {
@@ -588,6 +593,7 @@ const roosData: PersonaData = {
     currentSituation: 'Diep in de rode cijfers — netto vermogen -€15.000 met drie actieve schulden. Haar financiële klok loopt achteruit.',
     firstGoal: 'Noodfonds aanleggen en uit de schulden komen',
     sovereignty: 'recovery',
+    modules: ['budgetteren'],
   },
   profile: {
     full_name: 'Roos van Dijk',
@@ -605,6 +611,7 @@ const roosData: PersonaData = {
       'netto_vermogen', { id: 'schulden', size: 'full' }, 'cash_flow',
       'budgetten', 'acties', 'spaarquote', 'vrijheidsdagen_maand',
     ]),
+    active_modules: ['budgetteren'],
   },
   bank_accounts: [
     { name: 'Betaalrekening ING', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 245, is_active: true, sort_order: 0 },
@@ -817,6 +824,7 @@ const daanData: PersonaData = {
     currentSituation: 'Leeft van salaris tot salaris — €340/mnd cashflow voor sparen en schulden. Geniet nu van het leven maar bouwt weinig vrijheid op.',
     firstGoal: 'Noodfonds van €5.000 opbouwen voor 2 maanden buffer',
     sovereignty: 'stability',
+    modules: ['budgetteren', 'vermogensregistratie'],
   },
   profile: {
     full_name: 'Daan Bakker',
@@ -835,6 +843,7 @@ const daanData: PersonaData = {
       'netto_vermogen', 'cash_flow', 'spaarquote', 'doelen',
       { id: 'fire_prognose', size: 'full' }, 'acties', 'trend_sparen', 'jouw_pad',
     ]),
+    active_modules: ['budgetteren', 'vermogensregistratie'],
   },
   bank_accounts: [
     { name: 'Betaalrekening ING', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 850, is_active: true, sort_order: 0 },
@@ -1071,6 +1080,7 @@ const lisaData: PersonaData = {
     currentSituation: 'Solide momentum — netto vermogen €100.000, investeert €400/mnd. Het compounding effect begint zichtbaar te worden.',
     firstGoal: 'Netto vermogen naar €250.000 en studiefonds starten',
     sovereignty: 'momentum',
+    modules: ['budgetteren', 'vermogensregistratie', 'inzicht_acties', 'toekomstplannen'],
   },
   profile: {
     full_name: 'Lisa de Groot',
@@ -1092,6 +1102,7 @@ const lisaData: PersonaData = {
       'assets', 'holdings', 'budgetten', { id: 'uitgaven_heatmap', size: 'half' },
       'monte_carlo', 'trend_sparen', 'acties', { id: 'inflatie_impact', size: 'mini' },
     ]),
+    active_modules: ['budgetteren', 'vermogensregistratie', 'inzicht_acties', 'toekomstplannen'],
   },
   bank_accounts: [
     { name: 'Gezamenlijke rekening Rabo', iban: 'NL39RABO0300065264', bank_name: 'Rabobank', account_type: 'checking', balance: 3200, is_active: true, sort_order: 0 },
@@ -1373,6 +1384,7 @@ const willemData: PersonaData = {
     currentSituation: 'Aan de rand van volledige vrijheid — investeerbaar vermogen €705K van de benodigde €900K. Vroegpensioen gepland in 2028.',
     firstGoal: 'Volledige financiële onafhankelijkheid (365 vrijheidsdagen)',
     sovereignty: 'mastery',
+    modules: ALL_MODULES,
   },
   profile: {
     full_name: 'Willem Jansen',
@@ -1394,6 +1406,7 @@ const willemData: PersonaData = {
       'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'gezondheids_score',
       { id: 'beleggingsrendement', size: 'mini' }, { id: 'rebalancing', size: 'mini' },
     ]),
+    active_modules: ALL_MODULES,
   },
   bank_accounts: [
     { name: 'Betaalrekening ABN AMRO', iban: 'NL02ABNA0450884700', bank_name: 'ABN AMRO', account_type: 'checking', balance: 8500, is_active: true, sort_order: 0 },
@@ -1661,6 +1674,7 @@ const rashidData: PersonaData = {
     currentSituation: 'Financieel stabiel met positieve cashflow, maar geen gedetailleerd inzicht in uitgavenpatronen. Gebruikt de app puur voor vermogensoverzicht en maandelijkse check-ins.',
     firstGoal: '€500K netto vermogen',
     sovereignty: 'momentum',
+    modules: ['vermogensregistratie', 'aandelenregistratie', 'nieuws'],
   },
   profile: {
     full_name: 'Rashid Dimohammed',
@@ -1680,6 +1694,7 @@ const rashidData: PersonaData = {
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'fire_prognose', 'vrijheidsscenarios', 'acties', 'doelen',
     ]),
+    active_modules: ['vermogensregistratie', 'aandelenregistratie', 'nieuws'],
   },
   bank_accounts: [
     { name: 'Betaalrekening ING', iban: 'NL91INGB0006543210', bank_name: 'ING', account_type: 'checking', balance: 40000, is_active: true, sort_order: 0 },
@@ -1910,6 +1925,7 @@ const marijkeData: PersonaData = {
     currentSituation: 'Comfortabel met pensioen met \u20ac600/maand surplus. Portefeuille in uitkeringsfase, focus op kapitaalbehoud en dividend-inkomsten.',
     firstGoal: 'Wereldcruise met Henk',
     sovereignty: 'mastery',
+    modules: ALL_MODULES,
   },
   profile: {
     full_name: 'Marijke Vermeer',
@@ -1936,6 +1952,7 @@ const marijkeData: PersonaData = {
       'netto_vermogen', 'passief_inkomen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',
       'holdings', 'vrijheidsmijlpalen', 'acties', 'gezondheids_score',
     ]),
+    active_modules: ALL_MODULES,
   },
   bank_accounts: [
     { name: 'Betaalrekening Rabobank', iban: 'NL22RABO0300056788', bank_name: 'Rabobank', account_type: 'checking', balance: 5200, is_active: true, sort_order: 0 },
@@ -2152,6 +2169,7 @@ const ronaldData: PersonaData = {
     currentSituation: 'Nog 1 jaar werkzaam, daarna volledig pensioen. Comfortabel vermogen opgebouwd, maar onzeker over de onttrekkingsfase.',
     firstGoal: 'Campertrip door Noorwegen na pensioen',
     sovereignty: 'mastery',
+    modules: ALL_MODULES,
   },
   profile: {
     ...marijkeData.profile,
@@ -2160,6 +2178,7 @@ const ronaldData: PersonaData = {
     net_monthly_income: 5200,
     estimated_monthly_expenses: 3950,
     retirement_expense_method: 'essential_budgets' as const,
+    active_modules: ALL_MODULES,
   },
   // Realistische essenti\u00eble budgetten voor stel met eigen huis, ~\u20ac3.950/mnd (\u20ac47.400/jaar)
   budgets: makeBudgets({
@@ -2194,11 +2213,13 @@ const basData: PersonaData = {
     currentSituation: 'Net de €100K gepasseerd. Vermogen groeit door compound interest, maar verspreid over te veel partijen voor goed overzicht.',
     firstGoal: 'Vermogen naar €250K en kinderekening opzetten',
     sovereignty: 'momentum',
+    modules: ALL_MODULES,
   },
   profile: {
     ...lisaData.profile,
     full_name: 'Bas Mulder',
     date_of_birth: '1981-09-22',
+    active_modules: ALL_MODULES,
   },
 }
 
@@ -2218,11 +2239,13 @@ const leoData: PersonaData = {
     currentSituation: 'Elke maand dieper in het rood. Weet dat het anders moet maar mist de tools om patronen te herkennen.',
     firstGoal: 'Creditcardschuld aflossen en 1 maand buffer opbouwen',
     sovereignty: 'recovery',
+    modules: ['budgetteren', 'vermogensregistratie', 'aandelenregistratie', 'inzicht_acties'],
   },
   profile: {
     ...roosData.profile,
     full_name: 'Leo Pietersen',
     date_of_birth: '1991-01-08',
+    active_modules: ['budgetteren', 'vermogensregistratie', 'aandelenregistratie', 'inzicht_acties'],
   },
 }
 
@@ -2242,11 +2265,13 @@ const jochenData: PersonaData = {
     currentSituation: 'Op 92% van FIRE-doel. €705K belegbaar vermogen, target €900K. 53% spaarquote. Nog ~3 jaar als rendementen meezitten.',
     firstGoal: 'Financieel onafhankelijk op 55',
     sovereignty: 'mastery',
+    modules: ['budgetteren'],
   },
   profile: {
     ...willemData.profile,
     full_name: 'Jochen Brouwer',
     date_of_birth: '1974-07-03',
+    active_modules: ['budgetteren'],
   },
 }
 
