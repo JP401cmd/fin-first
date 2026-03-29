@@ -4,6 +4,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { FeatureAccessData, FeatureAccessMap } from '@/lib/compute-feature-access'
 import { UNIFIED_FEATURES, isPhaseSufficient, type PhaseId } from '@/lib/feature-registry'
 import { PhaseTransitionModal } from '@/components/app/phase-transition-modal'
+import { ALL_MODULES, isModuleActive, type ModuleId } from '@/lib/module-registry'
 
 type FeatureAccessContextValue = FeatureAccessData & {
   needsActivation: boolean
@@ -13,6 +14,8 @@ type FeatureAccessContextValue = FeatureAccessData & {
   refreshFeaturePrefs: (prefs: Record<string, boolean>) => void
   /** Optimistically clear needsActivation after successful activation */
   clearActivation: () => void
+  /** Active module IDs for the current user */
+  activeModules: ModuleId[]
 }
 
 const FeatureAccessContext = createContext<FeatureAccessContextValue | null>(null)
@@ -32,6 +35,7 @@ export function useFeatureAccess(): FeatureAccessContextValue {
     newlyUnlockedFeatures: [],
     refreshFeaturePrefs: () => {},
     clearActivation: () => {},
+    activeModules: [...ALL_MODULES],
   }
   return ctx
 }
@@ -40,11 +44,14 @@ export function FeatureAccessProvider({
   data,
   phaseTransition,
   needsActivation,
+  activeModules = [...ALL_MODULES],
   children,
 }: {
   data: FeatureAccessData
   phaseTransition?: { oldPhase: string; newPhase: string } | null
   needsActivation?: boolean
+  /** Active modules for the current user. Defaults to all modules (backward compat). */
+  activeModules?: ModuleId[]
   children: ReactNode
 }) {
   const [showTransitionModal, setShowTransitionModal] = useState(!!phaseTransition)
@@ -86,6 +93,7 @@ export function FeatureAccessProvider({
     newlyUnlockedFeatures,
     refreshFeaturePrefs,
     clearActivation,
+    activeModules,
   }
 
   return (
@@ -100,4 +108,17 @@ export function FeatureAccessProvider({
       )}
     </FeatureAccessContext.Provider>
   )
+}
+
+/**
+ * Focused hook for module access. Returns only module-related data,
+ * abstracting away legacy sovereignty fields.
+ */
+export function useModuleAccess() {
+  const ctx = useFeatureAccess()
+  return {
+    activeModules: ctx.activeModules,
+    subscriptions: ctx.subscriptions,
+    isModuleActive: (id: ModuleId) => isModuleActive(ctx.activeModules, id),
+  }
 }
