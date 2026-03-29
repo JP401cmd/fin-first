@@ -25,6 +25,9 @@ import { useFeatureToggle } from '@/lib/hooks/use-feature-toggle'
 import { UNIFIED_FEATURES, type CommercialTier, type FeatureModule } from '@/lib/feature-registry'
 import { isFeatureAccessible, getFeatureAccess } from '@/lib/compute-feature-access'
 import { Lock as LockIcon } from 'lucide-react'
+import { MODULE_CATALOG } from '@/lib/module-registry'
+import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
 
 // ── Typography helpers ────────────────────────────────────────────────────
 
@@ -84,6 +87,12 @@ export default function InstellingenPage() {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [functiesOpen, setFunctiesOpen] = useState(false)
   const [rebalancingOpen, setRebalancingOpen] = useState(false)
+  const [modulesOpen, setModulesOpen] = useState(false)
+
+  // ─ Module toggle state ─
+  const [moduleToggleErrors, setModuleToggleErrors] = useState<string[]>([])
+  const { activeModules } = useModuleAccess()
+  const { modules: activeModuleToggles, toggle: toggleModule, saving: moduleSaving } = useModuleToggle(activeModules)
 
   // ─ Section: Rebalancing ─
   const [rebalanceThreshold, setRebalanceThreshold] = useState(5)
@@ -695,6 +704,105 @@ export default function InstellingenPage() {
           Notificaties, berekeningen, weergave, huishouden en gegevensbeheer.
         </p>
       </div>
+
+      {/* ── Modules ──────────────────────────────────────────────────── */}
+      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setModulesOpen(o => !o)}
+          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+        >
+          <div>
+            <h2 className="label-editorial text-[var(--ink-2)]">Modules</h2>
+            {!modulesOpen && (
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                {activeModuleToggles.length} van {MODULE_CATALOG.length} actief
+              </p>
+            )}
+          </div>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${modulesOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {modulesOpen && (
+          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-4">
+            <p className="text-xs text-[var(--ink-3)]">
+              Kies welke modules actief zijn. Minstens één basismodule is vereist.
+            </p>
+
+            {/* Error messages from validation */}
+            {moduleToggleErrors.length > 0 && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                {moduleToggleErrors.map((err, i) => (
+                  <p key={i} className="text-xs text-red-700">{err}</p>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {MODULE_CATALOG.map((mod) => {
+                const isActive = activeModuleToggles.includes(mod.id)
+                const hasDependency = mod.requires.length > 0 || (mod.requiresOneOf && mod.requiresOneOf.length > 0)
+
+                const dependencyLabel = (() => {
+                  if (mod.requires.length > 0) {
+                    const labels = mod.requires
+                      .map((id) => MODULE_CATALOG.find((m) => m.id === id)?.label ?? id)
+                      .join(', ')
+                    return `Vereist: ${labels}`
+                  }
+                  if (mod.requiresOneOf && mod.requiresOneOf.length > 0) {
+                    const labels = mod.requiresOneOf
+                      .map((id) => MODULE_CATALOG.find((m) => m.id === id)?.label ?? id)
+                      .join(' of ')
+                    return `Vereist: ${labels}`
+                  }
+                  return null
+                })()
+
+                return (
+                  <div
+                    key={mod.id}
+                    className="flex items-start justify-between rounded-xl border border-[var(--border-ed)] px-4 py-3 gap-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--ink)]">{mod.label}</p>
+                      <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-snug">{mod.description}</p>
+                      {hasDependency && dependencyLabel && (
+                        <p className="mt-1 text-[11px] text-[var(--ink-4)]">{dependencyLabel}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isActive}
+                      aria-label={`${mod.label} ${isActive ? 'uitschakelen' : 'inschakelen'}`}
+                      disabled={moduleSaving}
+                      onClick={async () => {
+                        setModuleToggleErrors([])
+                        const result = await toggleModule(mod.id, !isActive)
+                        if (!result.success) {
+                          setModuleToggleErrors(result.errors)
+                          // Auto-clear errors after 5 seconds
+                          setTimeout(() => setModuleToggleErrors([]), 5000)
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-wil-500 disabled:opacity-50 ${
+                        isActive ? 'bg-wil-500' : 'bg-zinc-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                          isActive ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* ── A: Notificaties ─────────────────────────────────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
