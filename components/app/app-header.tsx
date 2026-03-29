@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bell, Users } from 'lucide-react'
 import { useFeatureAccess, useModuleAccess } from '@/components/app/feature-access-provider'
-import { getActiveNavModules } from '@/lib/module-registry'
+import { getActiveNavModules, getHomePath } from '@/lib/module-registry'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
@@ -70,7 +70,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
     <header className="sticky top-0 z-50 border-b-2 border-[var(--ink)] bg-[var(--paper)] shadow-[var(--s0)]">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <div className="flex items-center gap-8">
-          <Link href="/will" className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">
+          <Link href={getHomePath(activeModules)} className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">
             <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity<span className="text-kern-500">.</span>
           </Link>
 
