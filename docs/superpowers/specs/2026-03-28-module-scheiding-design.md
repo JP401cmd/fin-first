@@ -8,6 +8,16 @@
 
 De app gebruikt momenteel een sovereignty-level systeem (-2 tot 6) dat features automatisch ontgrendelt op basis van de financiële situatie van de gebruiker. Dit systeem is krachtig maar maakt de app complex voor gebruikers die maar een deel van de functionaliteit nodig hebben. Door de app op te splitsen in schakelbare modules kan elke gebruikersgroep (persona) een gefocuste, eenvoudige ervaring krijgen die meegroeit met hun behoeften.
 
+### Architectuurprincipe
+
+De module-scheiding is een **functionele presentatielaag** — zij bepaalt welke pagina's, widgets en navigatie-items een gebruiker ziet. De scheiding raakt niet aan de onderliggende datamodellen, berekeningen of gedeelde utilities. Elke module leest uit dezelfde tabellen, gebruikt dezelfde libraries en respecteert dezelfde business rules. Het fundament (assets, schulden, netto vermogen, profieldata) draait altijd en is voor alle modules identiek. Dit garandeert dat het in- of uitschakelen van een module nooit dataverlies, inconsistentie of regressie in een andere module veroorzaakt.
+
+**Richtlijn voor nieuwe functionaliteit:**
+> Nieuwe features moeten altijd gebouwd worden op het gedeelde fundament (datamodel, berekeningen, utilities) en mogen alleen in de presentatielaag aan een module gekoppeld worden. Als een feature data nodig heeft die nog niet in het fundament zit, wordt het fundament uitgebreid — niet de module.
+
+**Fallback bij afgesloten modules:**
+> Berekeningen die hun primaire databron uit een andere module halen, moeten altijd een fallback hebben voor als die module niet actief is. Voorbeeld: de spaarquote wordt automatisch berekend uit budgetdata, maar als Budgetteren uit staat moet er een alternatief pad zijn (bijv. handmatige invoer via check-in, of schatting op basis van netto-inkomsten en vermogensgroei). Bouw nooit een feature die stilzwijgend breekt of lege data toont omdat een andere module uit staat.
+
 ## Ontwerpbeslissingen
 
 ### Fundament (altijd actief)
@@ -106,13 +116,13 @@ Volledig zoals de huidige app
 
 ### Impact op Bestaande Systemen
 
-**Sovereignty systeem → verwijderen:**
-- `computeSovereigntyLevel()`, `PHASES`, `levelToPhaseId()` worden vervangen
-- `WIDGET_MIN_LEVEL` in widget-catalog.ts verdwijnt
-- `feature-phases.ts` wordt vervangen door module-gebaseerde gating
+**Sovereignty systeem → ontkoppelen van gating, behouden als motivatie:**
+- `computeSovereigntyLevel()`, `PHASES`, `levelToPhaseId()` blijven bestaan — sovereignty is een motivatie-indicator voor de gebruiker
+- Phase transition modal en level-up celebration blijven — tekst aangepast van "nieuwe features ontgrendeld" naar puur viering van financiële voortgang
+- Sovereignty widget (jouw_pad, vrijheidsvoortgang) blijft zichtbaar
+- `WIDGET_MIN_LEVEL` verdwijnt als gating-mechanisme maar level wordt nog getoond als informatief gegeven
 - `compute-feature-access.ts` wordt herschreven: 3-layer check (tier → sovereignty → user override) wordt 2-layer (module actief? → tier check)
-- Phase transition modal en level-up celebration verdwijnen
-- `FeatureAccessProvider` wordt `ModuleAccessProvider`
+- Feature gating verplaatst volledig naar module-systeem — sovereignty beïnvloedt alleen weergave, niet toegang
 
 **Gezondheids-score → adaptief:**
 - Score berekent alleen pijlers relevant voor actieve modules
@@ -209,3 +219,4 @@ De app kan op strategische momenten modules suggereren:
 - [ ] Migratiestrategie voor bestaande gebruikers: hoe worden huidige sovereignty levels + feature_preferences omgezet naar active_modules?
 - [ ] Landing page aanpassen: persona-kaarten → module-selectie flow
 - [ ] Regression tests herschrijven voor module-gebaseerde gating i.p.v. sovereignty-levels
+- [ ] Inventariseren welke berekeningen cross-module databronnen gebruiken en per geval een fallback-pad definiëren (bijv. spaarquote, gezondheids-score pijlers, FIRE-projectie uitgaven)
