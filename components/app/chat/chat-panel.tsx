@@ -3,8 +3,9 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useChatContext } from './chat-provider'
+import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { WillDots } from '@/components/app/will-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
@@ -131,9 +132,22 @@ export function ChatPanel() {
   // Modal state
   const [editAction, setEditAction] = useState<Action | null>(null)
 
+  // Dynamic domain: route-aware and gated by active modules
+  const pathname = usePathname()
+  const { activeModules } = useModuleAccess()
+
+  const domain = useMemo(() => {
+    // Route-based domain selection, gated by active modules
+    if (pathname.startsWith('/horizon') && activeModules.includes('toekomstplannen')) return 'horizon'
+    if (pathname.startsWith('/will') && activeModules.includes('inzicht_acties')) return 'wil'
+    // Default: wil if available, otherwise kern
+    if (activeModules.includes('inzicht_acties')) return 'wil'
+    return 'kern'
+  }, [pathname, activeModules])
+
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain: 'wil' } }),
-    [],
+    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain } }),
+    [domain],
   )
 
   const { messages: rawMessages, sendMessage, status, error, clearError, regenerate } = useChat({
