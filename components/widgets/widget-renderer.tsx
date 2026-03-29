@@ -261,6 +261,8 @@ const BudgetHeatmapWidget = dynamic(
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
+import { isWidgetVisible } from '@/lib/compute-module-access'
+import { useModuleAccess } from '@/components/app/feature-access-provider'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
@@ -613,8 +615,15 @@ interface WidgetRendererProps {
 }
 
 export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps) {
-  // Hide budget-related widgets when budgeting is off
-  if (!data.budgetingActive && (BUDGET_WIDGETS.has(id) || id.startsWith('budget_fav:'))) return null
+  // Module-based visibility check (runs first, replaces budgetingActive gate)
+  // isWidgetVisible handles named budget widgets via WIDGET_MODULE_MAP['budgetteren'],
+  // so the old `!data.budgetingActive && BUDGET_WIDGETS.has(id)` guard is superseded.
+  // Dynamic `budget_fav:*` widgets are not in WIDGET_MODULE_MAP, so they are explicitly
+  // gated here: they only show when the budgetteren module is active.
+  const { activeModules, subscriptions } = useModuleAccess()
+  if (id.startsWith('budget_fav:') && !activeModules.includes('budgetteren')) return null
+  const moduleAccess = isWidgetVisible(id, activeModules, subscriptions)
+  if (!moduleAccess.visible) return null
 
   // Handle dynamic favorite budget widgets
   if (id.startsWith('budget_fav:')) {

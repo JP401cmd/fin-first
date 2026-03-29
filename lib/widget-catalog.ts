@@ -3,6 +3,8 @@
 
 import { PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
 import { WIDGET_TO_FEATURE } from '@/lib/feature-registry'
+import type { ModuleId } from '@/lib/module-registry'
+import { getWidgetRequiredModule } from '@/lib/module-registry'
 
 export type WidgetSize = 'mini' | 'quarter' | 'half' | 'full'
 
@@ -27,6 +29,8 @@ export interface WidgetDef {
   minLevel: number             // sovereignty level required (-2..6)
   /** Phase label shown in locked placeholder */
   requiredPhase?: string
+  /** Module that must be active for this widget to be visible (undefined = always visible) */
+  requiredModule?: ModuleId
 }
 
 export interface WidgetPref {
@@ -619,15 +623,18 @@ export const WIDGET_HREFS: Record<string, string> = {
 
 export const WIDGET_FEATURE_MAP: Record<string, string> = WIDGET_TO_FEATURE
 
-// ── Sync minLevel & requiredPhase from matrix ────────────────
-// Override hardcoded values with derived values from DEFAULT_MATRIX
-// to prevent drift between widget-catalog and feature-phases.
+// ── Sync minLevel, requiredPhase & requiredModule from matrix/registry ───────
+// Single source of truth: DEFAULT_MATRIX drives minLevel/requiredPhase; WIDGET_MODULE_MAP
+// drives requiredModule. Running this loop prevents drift between widget-catalog,
+// feature-phases, and module-registry.
 for (const widget of WIDGET_CATALOG) {
   const featureId = WIDGET_FEATURE_MAP[widget.id]
   if (featureId) {
     widget.minLevel = deriveMinLevel(featureId)
     widget.requiredPhase = deriveRequiredPhase(featureId)
   }
+  // Populate module gate from WIDGET_MODULE_MAP (undefined when always visible)
+  widget.requiredModule = getWidgetRequiredModule(widget.id)
 }
 
 /** Widgets that require budgeting to be active (hidden when budgetingActive = false) */
