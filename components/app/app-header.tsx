@@ -4,26 +4,28 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bell, Users } from 'lucide-react'
-import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { useFeatureAccess, useModuleAccess } from '@/components/app/feature-access-provider'
+import { getActiveNavModules } from '@/lib/module-registry'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 
-const staticNavItems = [
-  { label: 'De Kern', href: '/core', color: 'amber', requiresActivation: false },
-  { label: 'De Wil', href: '/will', color: 'teal', requiresActivation: true },
-  { label: 'De Horizon', href: '/horizon', color: 'purple', requiresActivation: true },
-] as const
+// Static config for each nav module — label, path, and color token
+const navConfig: Record<string, { label: string; href: string; color: string }> = {
+  kern:    { label: 'De Kern',     href: '/core',    color: 'amber'  },
+  wil:     { label: 'De Wil',      href: '/will',    color: 'teal'   },
+  horizon: { label: 'De Horizon',  href: '/horizon', color: 'purple' },
+}
 
 const activeClasses: Record<string, string> = {
-  amber: 'text-kern-600 border-kern-500 bg-kern-50/40',
-  teal: 'text-wil-600 border-wil-500 bg-wil-50/40',
+  amber:  'text-kern-600 border-kern-500 bg-kern-50/40',
+  teal:   'text-wil-600 border-wil-500 bg-wil-50/40',
   purple: 'text-horizon-600 border-horizon-500 bg-horizon-50/40',
 }
 
 const hoverClasses: Record<string, string> = {
-  amber: 'hover:text-kern-600',
-  teal: 'hover:text-wil-600',
+  amber:  'hover:text-kern-600',
+  teal:   'hover:text-wil-600',
   purple: 'hover:text-horizon-600',
 }
 
@@ -33,12 +35,17 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   const { needsActivation } = useFeatureAccess()
+  const { activeModules } = useModuleAccess()
   const { perspective, isHousehold, partnerName } = usePerspective()
   const { unreadCount, openModal } = useNotifications()
 
+  // Derive which nav tabs to show from active modules.
+  // During the invulfase (needsActivation), only De Kern is shown so the user
+  // can complete onboarding before accessing the other modules.
+  const activeNavModules = getActiveNavModules(activeModules)
   const navItems = needsActivation
-    ? staticNavItems.filter(i => !i.requiresActivation)
-    : staticNavItems
+    ? activeNavModules.filter(m => m === 'kern').map(m => navConfig[m])
+    : activeNavModules.map(m => navConfig[m])
 
   // Close dropdown on click outside or Escape
   useEffect(() => {
@@ -69,13 +76,18 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
 
           <nav className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
+              // item may be undefined if navConfig lookup fails (defensive guard)
+              if (!item) return null
               const isActive = pathname.startsWith(item.href)
+              // Non-kern tabs are added dynamically when the user activates a
+              // module, so they receive the reveal animation.
+              const isNonKern = item.href !== '/core'
               return (
                 <Link
                   key={item.label}
                   href={item.href}
                   className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 rounded-t-sm ${
-                    item.requiresActivation ? 'animate-nav-reveal' : ''
+                    isNonKern ? 'animate-nav-reveal' : ''
                   } ${
                     isActive
                       ? `${activeClasses[item.color]}`
