@@ -69,6 +69,14 @@ You: I'll create that feature now.
 [calls feature_create with appropriate parameters]
 You: Done! I've added "S3 Sync Integration" to your backlog. It's now visible on the kanban board.
 
+## Module-scheiding Architectuurprincipe
+
+De app is opgesplitst in schakelbare modules (zie `docs/superpowers/specs/2026-03-28-module-scheiding-design.md`). Bij het bouwen van nieuwe functionaliteit gelden twee regels:
+
+1. **Fundament, geen module-logica.** Nieuwe features worden gebouwd op het gedeelde fundament (datamodel, berekeningen, utilities). Alleen de presentatielaag (pagina's, widgets, navigatie) wordt aan een module gekoppeld. Als een feature data nodig heeft die nog niet in het fundament zit, wordt het fundament uitgebreid — niet de module.
+
+2. **Fallback bij afgesloten modules.** Berekeningen die hun primaire databron uit een andere module halen, moeten altijd een fallback hebben voor als die module niet actief is. Voorbeeld: de spaarquote wordt automatisch berekend uit budgetdata, maar als Budgetteren uit staat moet er een alternatief pad zijn (bijv. handmatige invoer via check-in, of schatting op basis van netto-inkomsten en vermogensgroei). Bouw nooit een feature die stilzwijgend breekt of lege data toont omdat een andere module uit staat.
+
 ## Guidelines
 
 1. Be concise and helpful

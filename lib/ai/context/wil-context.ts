@@ -1,18 +1,23 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, bulletList } from './formatter'
 import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
+import type { ModuleId } from '@/lib/module-registry'
 
 /**
  * Wil-specific context: goals, budget optimization opportunities,
  * active recommendations and open actions.
  * Uses real Supabase data.
+ * When inzicht_acties module is inactive, skips goals/recommendations/actions queries.
  */
-export async function buildWilContext(supabase: SupabaseClient, budgetingActive = true): Promise<string> {
+export async function buildWilContext(supabase: SupabaseClient, budgetingActive = true, activeModules: ModuleId[] = []): Promise<string> {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
   const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString()
+
+  const inzichtActiesActive = activeModules.includes('inzicht_acties')
+  const noData = Promise.resolve({ data: null })
 
   const [budgetsRes, transactionsRes, goalsRes, recsRes, actionsRes, pastActionsRes, pastRecsRes] = await Promise.all([
     supabase
@@ -24,40 +29,51 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
       .select('budget_id, amount, transaction_type')
       .gte('date', monthStart)
       .lt('date', monthEnd),
-    supabase
-      .from('goals')
-      .select('name, goal_type, target_value, current_value, target_date, is_completed')
-      .eq('is_completed', false)
-      .order('sort_order', { ascending: true })
-      .limit(10),
-    supabase
-      .from('recommendations')
-      .select('title, freedom_days_per_year, status, recommendation_type')
-      .in('status', ['pending', 'accepted'])
-      .order('created_at', { ascending: false })
-      .limit(10),
-    supabase
-      .from('actions')
-      .select('title, freedom_days_impact, status, source')
-      .in('status', ['open', 'postponed'])
-      .order('priority_score', { ascending: false })
-      .limit(10),
+    // Goals, recommendations, actions belong to inzicht_acties module — skip when inactive
+    inzichtActiesActive
+      ? supabase
+          .from('goals')
+          .select('name, goal_type, target_value, current_value, target_date, is_completed')
+          .eq('is_completed', false)
+          .order('sort_order', { ascending: true })
+          .limit(10)
+      : noData,
+    inzichtActiesActive
+      ? supabase
+          .from('recommendations')
+          .select('title, freedom_days_per_year, status, recommendation_type')
+          .in('status', ['pending', 'accepted'])
+          .order('created_at', { ascending: false })
+          .limit(10)
+      : noData,
+    inzichtActiesActive
+      ? supabase
+          .from('actions')
+          .select('title, freedom_days_impact, status, source')
+          .in('status', ['open', 'postponed'])
+          .order('priority_score', { ascending: false })
+          .limit(10)
+      : noData,
     // Fetch completed/rejected actions from the past year to prevent duplicate suggestions
-    supabase
-      .from('actions')
-      .select('title, status')
-      .in('status', ['completed', 'rejected'])
-      .gte('updated_at', oneYearAgo)
-      .order('updated_at', { ascending: false })
-      .limit(30),
+    inzichtActiesActive
+      ? supabase
+          .from('actions')
+          .select('title, status')
+          .in('status', ['completed', 'rejected'])
+          .gte('updated_at', oneYearAgo)
+          .order('updated_at', { ascending: false })
+          .limit(30)
+      : noData,
     // Fetch dismissed/completed recommendations from the past year to prevent duplicates
-    supabase
-      .from('recommendations')
-      .select('title, status')
-      .in('status', ['dismissed', 'completed'])
-      .gte('updated_at', oneYearAgo)
-      .order('updated_at', { ascending: false })
-      .limit(30),
+    inzichtActiesActive
+      ? supabase
+          .from('recommendations')
+          .select('title, status')
+          .in('status', ['dismissed', 'completed'])
+          .gte('updated_at', oneYearAgo)
+          .order('updated_at', { ascending: false })
+          .limit(30)
+      : noData,
   ])
 
   const budgets = budgetsRes.data ?? []

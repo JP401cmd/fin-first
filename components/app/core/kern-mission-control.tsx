@@ -144,15 +144,35 @@ export function KernMissionControl({
     budgetingActive ? 'budgets' : hasVermogen ? 'assets' : 'budgets'
   )
 
-  // Budget view toggle: list (default) or donut chart
-  const [budgetView, setBudgetView] = useState<'list' | 'donut'>('list')
+  // Budget view toggle — persisted in localStorage
+  const [budgetView, setBudgetViewState] = useState<'list' | 'donut'>(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('kern-budget-view')
+      if (v === 'list' || v === 'donut') return v
+    }
+    return 'list'
+  })
+  const setBudgetView = (mode: 'list' | 'donut') => {
+    setBudgetViewState(mode)
+    localStorage.setItem('kern-budget-view', mode)
+  }
 
   // Desktop-only collapsible state for Vermogen & Schulden cards
   const [assetsOpen, setAssetsOpen] = useState(false)
   const [debtsOpen, setDebtsOpen] = useState(false)
 
-  // Toggle between compact list and individual cards for bezittingen/schulden
-  const [vermogenView, setVermogenView] = useState<'compact' | 'cards'>('compact')
+  // Vermogen view toggle — persisted in localStorage
+  const [vermogenView, setVermogenViewState] = useState<'compact' | 'cards'>(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('kern-vermogen-view')
+      if (v === 'compact' || v === 'cards') return v
+    }
+    return 'compact'
+  })
+  const setVermogenView = (mode: 'compact' | 'cards') => {
+    setVermogenViewState(mode)
+    localStorage.setItem('kern-vermogen-view', mode)
+  }
 
   // Health score: percentage of "missions" with positive status
   const healthScore = (() => {

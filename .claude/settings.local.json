@@ -84,7 +84,21 @@
       "Bash(cat \"/c/Users/janpa/cd/development/fin/app/\\(app\\)/identity/gids/page.tsx\")",
       "Bash(sort -k2 -rh)",
       "Bash(then echo:*)",
-      "Bash(__NEW_LINE_5f7081a5a1ef98f6__ find:*)"
+      "Bash(__NEW_LINE_5f7081a5a1ef98f6__ find:*)",
+      "Bash(mkdir -p /c/Users/janpa/cd/development/fin/app/api/admin/questionnaires/[id]/responses)",
+      "Bash(mkdir -p /c/Users/janpa/cd/development/fin/app/api/questionnaires/[id]/session)",
+      "Bash(mkdir -p /c/Users/janpa/cd/development/fin/app/api/questionnaires/[id]/respond)",
+      "Bash(ls \"C:/Users/janpa/cd/development/fin/app/\\(app\\)/identity/testscenarios/\")",
+      "Bash(ls \"C:/Users/janpa/cd/development/fin/app/\\(app\\)/beheer/\")",
+      "Bash(ls \"C:/Users/janpa/cd/development/fin/app/\\(app\\)/beheer/testdata/\")",
+      "Bash(find /c/Users/janpa/cd/development/fin -type f \\\\\\(-name *sovereignty* -o -name *feature-access* -o -name *feature-gate* -o -name *widget-renderer* \\\\\\))",
+      "Bash(find /c/Users/janpa/cd/development/fin -type f \\\\\\(-name *save*onboarding* -o -name *onboarding*route* \\\\\\))",
+      "Bash(find /c/Users/janpa/cd/development/fin -type f \\\\\\(-name page.tsx -o -name *context* -o -name *hook* \\\\\\) ! -path */node_modules/* ! -path */.worktrees/*)",
+      "Bash(find /c/Users/janpa/cd/development/fin -path ./node_modules -prune -o -path ./.worktrees -prune -o -path ./.next -prune -o -type f \\\\\\(-name *gid* -o -name *guide* \\\\\\) -print)",
+      "Bash(ls -la '/c/Users/janpa/cd/development/fin/app/\\(app\\)/')",
+      "Bash(2)",
+      "Bash(find \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\\\\core\" -type d)",
+      "Bash(find /c/Users/janpa/cd/development/fin -type f \\\\\\(-name *.d.ts -o -name *.ts \\\\\\) -path *types* -not -path *node_modules*)"
     ]
   },
   "enableAllProjectMcpServers": true,

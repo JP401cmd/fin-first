@@ -130,7 +130,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
     supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id, interest_rate, repayment_type, remaining_term_months, monthly_payment').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences').single(),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -165,6 +165,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ai_enabled column may not exist yet (migration pending) — default to true
   const profileAiEnabled = (profileResult.data as Record<string, unknown> | null)?.ai_enabled !== false
 
+  const activeModules: string[] = ((profileResult.data as Record<string, unknown> | null)?.active_modules as string[] | null) ?? []
+  const hasVermogen = activeModules.includes('vermogensregistratie')
+
   // Core calculations
   let monthlyIncome = 0
   let monthlyExpenses = 0
@@ -195,9 +198,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
     s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
   const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
-  const totalAssets = totalAssetsOnly + unlinkedCash
-  const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
+  const totalAssetsRaw = totalAssetsOnly + unlinkedCash
+  const totalDebtsRaw = (debtsResult.data ?? []).reduce((s, d) =>
     s + Number(d.current_balance) * (((d as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
+  // When vermogensregistratie is not active, use cash-only as net worth
+  const cashOnlyAssets = (assetsResult.data ?? [])
+    .filter((a: { asset_type?: string | null }) => a.asset_type === 'cash')
+    .reduce((s, a) => s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0) + unlinkedCash
+  const totalAssets = hasVermogen ? totalAssetsRaw : cashOnlyAssets
+  const totalDebts = hasVermogen ? totalDebtsRaw : 0
   const netWorth = totalAssets - totalDebts
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 

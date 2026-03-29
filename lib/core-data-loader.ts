@@ -307,25 +307,19 @@ export const loadCoreData = cache(async function loadCoreData(
     net_worth_inclusion_pct: d.net_worth_inclusion_pct ?? 100,
   }))
 
-  // ── Split assets into cash-with-tracking and everything else ──
-  const cashWithTracking = assetsResult.data
-    .filter(a => a.asset_type === 'cash' && a.has_budget_tracking)
+  // ── Split assets into cash (all cash-type) and everything else ──
+  const allCashAssets = assetsResult.data
+    .filter(a => a.asset_type === 'cash')
     .map(a => ({ id: a.id, name: a.name, balance: Number(a.current_value), source: 'asset' as const }))
-  const cashWithoutTracking = assetsResult.data
-    .filter(a => a.asset_type === 'cash' && !a.has_budget_tracking)
-    .map(a => ({ id: a.id, name: a.name, current_value: Number(a.current_value), net_worth_inclusion_pct: a.net_worth_inclusion_pct ?? 100 }))
   const unlinkedBanks = (bankAccountsResult.data ?? [])
     .map(a => ({ id: a.id, name: a.name, balance: Number(a.balance), source: 'bank' as const }))
-  const cashAccounts = [...cashWithTracking, ...unlinkedBanks]
+  const cashAccounts = [...allCashAssets, ...unlinkedBanks]
 
-  const nonCashAssets = [
-    ...assetsResult.data
-      .filter(a => a.asset_type !== 'cash')
-      .map(a => ({ id: a.id, name: a.name, current_value: Number(a.current_value), net_worth_inclusion_pct: a.net_worth_inclusion_pct ?? 100 })),
-    ...cashWithoutTracking,
-  ]
+  const nonCashAssets = assetsResult.data
+    .filter(a => a.asset_type !== 'cash')
+    .map(a => ({ id: a.id, name: a.name, current_value: Number(a.current_value), net_worth_inclusion_pct: a.net_worth_inclusion_pct ?? 100 }))
 
-  const totalCashValue = cashWithTracking.reduce((s, a) => s + a.balance, 0) + unlinkedCash
+  const totalCashValue = allCashAssets.reduce((s, a) => s + a.balance, 0) + unlinkedCash
   const totalNonCashAssets = totalAssets - totalCashValue
 
   const effectiveTotalAssets = hasVermogen ? totalAssets : totalCashValue

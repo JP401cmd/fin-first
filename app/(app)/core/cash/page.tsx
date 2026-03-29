@@ -1,12 +1,5 @@
-'use client'
-
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { CashOverview } from '@/components/app/cash-overview'
 
 export default function CashAllPage() {
-  const router = useRouter()
-  useEffect(() => {
-    router.replace('/core/assets')
-  }, [router])
-  return null
+  return <CashOverview />
 }
