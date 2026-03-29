@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Lock, Save, RotateCcw, Search } from 'lucide-react'
+import { Lock, Save, RotateCcw, Search, ChevronDown } from 'lucide-react'
 import { UNIFIED_FEATURES, type PhaseId, type CommercialTier } from '@/lib/feature-registry'
 import { PHASES } from '@/lib/feature-phases'
 import { TIERS } from '@/lib/tier-config'
+import { MODULE_CATALOG } from '@/lib/module-registry'
 
 type FeatureOverrides = Record<string, { unlockPhase?: string }>
 
@@ -32,6 +33,7 @@ export default function ToegangsPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [selectedTierTab, setSelectedTierTab] = useState<CommercialTier | 'all'>('all')
+  const [moduleOverviewOpen, setModuleOverviewOpen] = useState(false)
 
   // Subscription assignment
   const [assignEmail, setAssignEmail] = useState('')
@@ -160,6 +162,90 @@ export default function ToegangsPage() {
 
   return (
     <div className="space-y-8">
+
+      {/* ── Module Overzicht ──────────────────────────────────────────── */}
+      <div className="rounded-xl border border-[var(--border-ed)] overflow-hidden">
+        {/* Collapsible header */}
+        <button
+          type="button"
+          onClick={() => setModuleOverviewOpen(prev => !prev)}
+          className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+        >
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--ink)]">Module Overzicht</h3>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+              {MODULE_CATALOG.length} modules — referentie voor de modulaire functionaliteitsstructuur
+            </p>
+          </div>
+          <ChevronDown
+            className={`h-4 w-4 text-[var(--ink-3)] transition-transform duration-200 ${moduleOverviewOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+
+        {/* Collapsible body */}
+        {moduleOverviewOpen && (
+          <div className="border-t border-[var(--border-ed)]">
+            {/* Info note */}
+            <div className="bg-[var(--subtle)] px-5 py-3">
+              <p className="text-xs text-[var(--ink-3)]">
+                Gebruikers beheren hun eigen modules via <span className="font-medium text-[var(--ink-2)]">Instellingen → Modules</span>.
+                Dit overzicht is een leesbare referentie; module-activatie per gebruiker vindt plaats via de app zelf.
+              </p>
+            </div>
+
+            {/* Module table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+                    <th className="px-5 py-3 text-left font-semibold text-[var(--ink-2)]">Module</th>
+                    <th className="px-4 py-3 text-left font-semibold text-[var(--ink-2)]">Beschrijving</th>
+                    <th className="px-4 py-3 text-center font-semibold text-[var(--ink-2)]">Zelfstandig</th>
+                    <th className="px-4 py-3 text-left font-semibold text-[var(--ink-2)]">Vereist</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-ed)]">
+                  {MODULE_CATALOG.map(mod => {
+                    // Build dependency label
+                    const hardDeps = mod.requires.length > 0
+                      ? mod.requires
+                          .map(id => MODULE_CATALOG.find(m => m.id === id)?.label ?? id)
+                          .join(', ')
+                      : null
+                    const softDeps = mod.requiresOneOf && mod.requiresOneOf.length > 0
+                      ? mod.requiresOneOf
+                          .map(id => MODULE_CATALOG.find(m => m.id === id)?.label ?? id)
+                          .join(' of ')
+                      : null
+                    const depsLabel = [hardDeps, softDeps].filter(Boolean).join('; ') || null
+
+                    return (
+                      <tr key={mod.id} className="hover:bg-[var(--subtle)]/50 transition-colors">
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-[var(--ink)]">{mod.label}</p>
+                          <p className="text-[10px] text-[var(--ink-4)] font-mono">{mod.id}</p>
+                        </td>
+                        <td className="px-4 py-3 text-[var(--ink-2)]">{mod.description}</td>
+                        <td className="px-4 py-3 text-center">
+                          {mod.standalone ? (
+                            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">✓</span>
+                          ) : (
+                            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-zinc-100 text-zinc-400 text-xs">✗</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--ink-3)] text-xs">
+                          {depsLabel ?? <span className="text-[var(--ink-4)]">—</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div>
         <h2 className="text-lg font-semibold text-[var(--ink)]">Functionaliteitenbeheer</h2>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
