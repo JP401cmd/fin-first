@@ -15,6 +15,7 @@
  */
 
 import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { ModuleId } from '@/lib/module-registry'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
@@ -136,26 +137,83 @@ const BASE_WEIGHTS: Record<string, number> = {
 }
 
 /**
- * Redistribute pillar weights proportionally after excluding some pillars.
- * When budgetingActive === false, the budget_discipline pillar is excluded
- * and its weight is redistributed proportionally among the remaining 5 pillars.
+ * Maps health score pillars to the module that must be active for them to be included.
+ * Pillars mapped to `null` are always computed (foundation data, no module required).
+ */
+const PILLAR_MODULE_REQUIREMENTS: Record<string, ModuleId | null> = {
+  savings_rate: 'budgetteren',
+  debt_ratio: 'vermogensregistratie',
+  emergency_fund: null,          // Always available — core financial health indicator
+  fire_progress: 'toekomstplannen',
+  diversification: 'vermogensregistratie',
+  budget_discipline: 'budgetteren',
+}
+
+/**
+ * Determine which pillar IDs are active given a set of active modules.
+ * Pillars with `null` requirement are always included.
+ * When no `activeModules` array is provided, all pillars are included.
+ */
+function getActivePillarIds(activeModules?: ModuleId[]): Set<string> {
+  if (!activeModules) {
+    // Backward-compat: all pillars active
+    return new Set(Object.keys(PILLAR_MODULE_REQUIREMENTS))
+  }
+  const active = new Set<string>()
+  for (const [pillarId, requiredModule] of Object.entries(PILLAR_MODULE_REQUIREMENTS)) {
+    if (requiredModule === null || activeModules.includes(requiredModule)) {
+      active.add(pillarId)
+    }
+  }
+  return active
+}
+
+/**
+ * Compute redistributed weight for a pillar given the set of active pillar IDs.
+ * Active pillar weights are scaled proportionally so they sum to 1.0.
+ * Returns 0 for pillars not in the active set.
+ */
+function getRedistributedWeightForSet(pillarId: string, activePillarIds: Set<string>): number {
+  if (!activePillarIds.has(pillarId)) return 0
+  const totalActiveWeight = Array.from(activePillarIds).reduce(
+    (sum, id) => sum + (BASE_WEIGHTS[id] ?? 0),
+    0,
+  )
+  if (totalActiveWeight === 0) return 0
+  return (BASE_WEIGHTS[pillarId] ?? 0) / totalActiveWeight
+}
+
+/**
+ * @deprecated Use `getRedistributedWeightForSet` with an explicit active-pillar set.
+ * Kept only to support the legacy `budgetingActive` boolean path when `activeModules`
+ * is not provided. Replicates the old 5-vs-6 pillar behaviour exactly.
  */
 function getRedistributedWeight(pillarId: string, includeBudget: boolean): number {
-  if (includeBudget) return BASE_WEIGHTS[pillarId] ?? 0
-  if (pillarId === 'budget_discipline') return 0
-  // Redistribute: remaining pillars sum to 0.90, scale each to fill 1.0
-  const totalWithoutBudget = 1 - BASE_WEIGHTS.budget_discipline
-  return (BASE_WEIGHTS[pillarId] ?? 0) / totalWithoutBudget
+  // The legacy 5-pillar set excludes only budget_discipline; all other pillars stay.
+  const legacyActiveSet = includeBudget
+    ? new Set(Object.keys(BASE_WEIGHTS))
+    : new Set(Object.keys(BASE_WEIGHTS).filter(id => id !== 'budget_discipline'))
+  return getRedistributedWeightForSet(pillarId, legacyActiveSet)
 }
 
 // ── Main computation ─────────────────────────────────────────
 
 /**
  * Compute health score from DashboardData.
- * @param budgetingActive - Whether the user has active budgeting. When false,
- *   the budget discipline pillar is excluded and weights are redistributed.
+ *
+ * @param data - Full dashboard data bundle
+ * @param budgetingActive - Whether the user has active budgeting. Kept for
+ *   backward compatibility; ignored when `activeModules` is provided.
+ * @param activeModules - Optional list of active module IDs. When provided,
+ *   only pillars whose required module is in this list (or always-on pillars)
+ *   are included, and weights are redistributed proportionally to sum to 1.0.
+ *   When omitted, all pillars are included (full backward compat).
  */
-export function computeHealthScore(data: DashboardData, budgetingActive = true): HealthScore {
+export function computeHealthScore(
+  data: DashboardData,
+  budgetingActive = true,
+  activeModules?: ModuleId[],
+): HealthScore {
   const savingsRateScore = scoreSavingsRate(data.savingsRate6m)
   const debtRatioScore = scoreDebtRatio(data.totalAssets, data.totalDebts)
   const emergencyScore = scoreEmergencyFund(data.emergencyFund.monthsCovered)
@@ -177,12 +235,25 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
   const budgetWithin = budgetCategories.filter(c => c.spent <= c.limit).length
   const budgetTotal = budgetCategories.length
 
+  // Determine which pillars to include.
+  // When activeModules is provided: use module-aware filtering.
+  // When not provided: fall back to the legacy budgetingActive boolean path
+  // (all 6 pillars vs. 5 pillars with budget_discipline excluded) so existing
+  // callers that pass only budgetingActive continue to work identically.
+  const activePillarSet: Set<string> = activeModules !== undefined
+    ? getActivePillarIds(activeModules)
+    : new Set(budgetingActive
+        ? Object.keys(BASE_WEIGHTS)
+        : Object.keys(BASE_WEIGHTS).filter(id => id !== 'budget_discipline'))
+  // budgetingActive derived from the resolved pillar set (for HealthScore.budgetingActive field)
+  const resolvedBudgetingActive = activePillarSet.has('budget_discipline')
+
   const allPillars: HealthPillar[] = [
     {
       id: 'savings_rate',
       name: 'Spaarquote',
       score: savingsRateScore,
-      weight: getRedistributedWeight('savings_rate', budgetingActive),
+      weight: getRedistributedWeightForSet('savings_rate', activePillarSet),
       explanation: 'Hoeveel procent van je inkomen spaar je? (6-maands gemiddelde)',
       improvementTip: data.savingsRate6m < 10
         ? 'Begin met 10% van je inkomen automatisch opzij te zetten.'
@@ -197,7 +268,7 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
       id: 'debt_ratio',
       name: 'Schuldratio',
       score: debtRatioScore,
-      weight: getRedistributedWeight('debt_ratio', budgetingActive),
+      weight: getRedistributedWeightForSet('debt_ratio', activePillarSet),
       explanation: 'Verhouding tussen je schulden en je totale vermogen.',
       improvementTip: debtRatio > 50
         ? 'Focus op de duurste schuld eerst (avalanche-methode) om sneller schuldenvrij te worden.'
@@ -212,7 +283,7 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
       id: 'emergency_fund',
       name: 'Noodfonds',
       score: emergencyScore,
-      weight: getRedistributedWeight('emergency_fund', budgetingActive),
+      weight: getRedistributedWeightForSet('emergency_fund', activePillarSet),
       explanation: 'Hoeveel maanden kun je rondkomen van je noodfonds?',
       improvementTip: data.emergencyFund.monthsCovered < 1
         ? 'Start met een doel van 1 maand buffer — automatiseer een vaste storting.'
@@ -227,7 +298,7 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
       id: 'fire_progress',
       name: 'FIRE-voortgang',
       score: fireScore,
-      weight: getRedistributedWeight('fire_progress', budgetingActive),
+      weight: getRedistributedWeightForSet('fire_progress', activePillarSet),
       explanation: 'Hoever ben je op weg naar financiële vrijheid?',
       improvementTip: data.freedomPct < 10
         ? 'Begin klein — elke euro opgebouwd vermogen brengt je dichter bij vrijheid.'
@@ -246,7 +317,7 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
       id: 'diversification',
       name: 'Diversificatie',
       score: diversificationScore,
-      weight: getRedistributedWeight('diversification', budgetingActive),
+      weight: getRedistributedWeightForSet('diversification', activePillarSet),
       explanation: 'Spreiding over verschillende vermogenstypes (cash, aandelen, vastgoed, etc.).',
       improvementTip: data.assetsByType.length <= 1
         ? 'Spreid je vermogen — overweeg naast cash ook een indexfonds.'
@@ -261,7 +332,7 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
       id: 'budget_discipline',
       name: 'Budgetdiscipline',
       score: budgetScore,
-      weight: getRedistributedWeight('budget_discipline', budgetingActive),
+      weight: getRedistributedWeightForSet('budget_discipline', activePillarSet),
       explanation: 'Hoeveel van je budgetcategorieën blijven binnen de limiet?',
       improvementTip: budgetTotal === 0
         ? 'Stel budgetten in voor je belangrijkste uitgavencategorieën.'
@@ -272,8 +343,8 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
     },
   ]
 
-  // Filter out excluded pillars
-  const pillars = budgetingActive ? allPillars : allPillars.filter(p => p.id !== 'budget_discipline')
+  // Retain only active pillars (weight === 0 means the pillar was excluded)
+  const pillars = allPillars.filter(p => activePillarSet.has(p.id))
 
   // Weighted total
   const total = Math.round(
@@ -301,25 +372,21 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
     const prevDiv = diversificationScore
     const prevBudget = budgetScore
 
-    if (budgetingActive) {
-      previousMonth = Math.round(
-        prevSavingsScore * 0.25 +
-        prevDebtScore * 0.20 +
-        prevEmergency * 0.15 +
-        prevFire * 0.20 +
-        prevDiv * 0.10 +
-        prevBudget * 0.10
-      )
-    } else {
-      // 5-pillar weights (proportional redistribution)
-      previousMonth = Math.round(
-        prevSavingsScore * getRedistributedWeight('savings_rate', false) +
-        prevDebtScore * getRedistributedWeight('debt_ratio', false) +
-        prevEmergency * getRedistributedWeight('emergency_fund', false) +
-        prevFire * getRedistributedWeight('fire_progress', false) +
-        prevDiv * getRedistributedWeight('diversification', false)
-      )
+    // Compute previous month score using the same active-pillar set and redistributed weights
+    const prevScores: Record<string, number> = {
+      savings_rate: prevSavingsScore,
+      debt_ratio: prevDebtScore,
+      emergency_fund: prevEmergency,
+      fire_progress: prevFire,
+      diversification: prevDiv,
+      budget_discipline: prevBudget,
     }
+    previousMonth = Math.round(
+      Array.from(activePillarSet).reduce(
+        (sum, id) => sum + (prevScores[id] ?? 0) * getRedistributedWeightForSet(id, activePillarSet),
+        0,
+      )
+    )
     trend = total - previousMonth
   }
 
@@ -330,7 +397,7 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
     previousMonth,
     trend,
     activePillarCount: pillars.length,
-    budgetingActive,
+    budgetingActive: resolvedBudgetingActive,
   }
 }
 
@@ -340,10 +407,20 @@ export function computeHealthScore(data: DashboardData, budgetingActive = true):
 
 /**
  * Compute health score from lightweight inputs (server-side / snapshot context).
- * @param budgetingActive - Whether the user has active budgeting. When false,
- *   the budget discipline pillar is excluded and weights are redistributed.
+ *
+ * @param input - Lightweight health score inputs
+ * @param budgetingActive - Whether the user has active budgeting. Kept for
+ *   backward compatibility; ignored when `activeModules` is provided.
+ * @param activeModules - Optional list of active module IDs. When provided,
+ *   only pillars whose required module is active (or always-on pillars) are
+ *   included, and weights are redistributed proportionally to sum to 1.0.
+ *   When omitted, all pillars are included (full backward compat).
  */
-export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingActive = true): HealthScore {
+export function computeHealthScoreFromInputs(
+  input: HealthScoreInput,
+  budgetingActive = true,
+  activeModules?: ModuleId[],
+): HealthScore {
   const savingsRateScore = scoreSavingsRate(input.savingsRate6m)
   const debtRatioScore = scoreDebtRatio(input.totalAssets, input.totalDebts)
   const emergencyScore = scoreEmergencyFund(input.emergencyFundMonths)
@@ -360,12 +437,24 @@ export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingA
     ? Math.round((input.totalDebts / input.totalAssets) * 100)
     : (input.totalDebts > 0 ? 100 : 0)
 
+  // Determine which pillars to include.
+  // When activeModules is provided: use module-aware filtering.
+  // When not provided: fall back to the legacy budgetingActive boolean path
+  // (all 6 pillars vs. 5 pillars with budget_discipline excluded) so existing
+  // callers that pass only budgetingActive continue to work identically.
+  const activePillarSet: Set<string> = activeModules !== undefined
+    ? getActivePillarIds(activeModules)
+    : new Set(budgetingActive
+        ? Object.keys(BASE_WEIGHTS)
+        : Object.keys(BASE_WEIGHTS).filter(id => id !== 'budget_discipline'))
+  const resolvedBudgetingActive = activePillarSet.has('budget_discipline')
+
   const allPillars: HealthPillar[] = [
     {
       id: 'savings_rate',
       name: 'Spaarquote',
       score: savingsRateScore,
-      weight: getRedistributedWeight('savings_rate', budgetingActive),
+      weight: getRedistributedWeightForSet('savings_rate', activePillarSet),
       explanation: 'Hoeveel procent van je inkomen spaar je? (6-maands gemiddelde)',
       improvementTip: input.savingsRate6m < 10
         ? 'Begin met 10% van je inkomen automatisch opzij te zetten.'
@@ -380,7 +469,7 @@ export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingA
       id: 'debt_ratio',
       name: 'Schuldratio',
       score: debtRatioScore,
-      weight: getRedistributedWeight('debt_ratio', budgetingActive),
+      weight: getRedistributedWeightForSet('debt_ratio', activePillarSet),
       explanation: 'Verhouding tussen je schulden en je totale vermogen.',
       improvementTip: debtRatio > 50
         ? 'Focus op de duurste schuld eerst (avalanche-methode) om sneller schuldenvrij te worden.'
@@ -395,7 +484,7 @@ export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingA
       id: 'emergency_fund',
       name: 'Noodfonds',
       score: emergencyScore,
-      weight: getRedistributedWeight('emergency_fund', budgetingActive),
+      weight: getRedistributedWeightForSet('emergency_fund', activePillarSet),
       explanation: 'Hoeveel maanden kun je rondkomen van je noodfonds?',
       improvementTip: input.emergencyFundMonths < 1
         ? 'Start met een doel van 1 maand buffer — automatiseer een vaste storting.'
@@ -410,7 +499,7 @@ export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingA
       id: 'fire_progress',
       name: 'FIRE-voortgang',
       score: fireScore,
-      weight: getRedistributedWeight('fire_progress', budgetingActive),
+      weight: getRedistributedWeightForSet('fire_progress', activePillarSet),
       explanation: 'Hoever ben je op weg naar financiële vrijheid?',
       improvementTip: input.freedomPct < 10
         ? 'Begin klein — elke euro opgebouwd vermogen brengt je dichter bij vrijheid.'
@@ -429,7 +518,7 @@ export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingA
       id: 'diversification',
       name: 'Diversificatie',
       score: diversificationScore,
-      weight: getRedistributedWeight('diversification', budgetingActive),
+      weight: getRedistributedWeightForSet('diversification', activePillarSet),
       explanation: 'Spreiding over verschillende vermogenstypes (cash, aandelen, vastgoed, etc.).',
       improvementTip: input.assetTypeCount <= 1
         ? 'Spreid je vermogen — overweeg naast cash ook een indexfonds.'
@@ -444,7 +533,7 @@ export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingA
       id: 'budget_discipline',
       name: 'Budgetdiscipline',
       score: budgetScore,
-      weight: getRedistributedWeight('budget_discipline', budgetingActive),
+      weight: getRedistributedWeightForSet('budget_discipline', activePillarSet),
       explanation: 'Hoeveel van je budgetcategorieën blijven binnen de limiet?',
       improvementTip: budgetTotal === 0
         ? 'Stel budgetten in voor je belangrijkste uitgavencategorieën.'
@@ -455,8 +544,8 @@ export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingA
     },
   ]
 
-  // Filter out excluded pillars
-  const pillars = budgetingActive ? allPillars : allPillars.filter(p => p.id !== 'budget_discipline')
+  // Retain only active pillars
+  const pillars = allPillars.filter(p => activePillarSet.has(p.id))
 
   const total = Math.round(
     pillars.reduce((sum, p) => sum + p.score * p.weight, 0)
@@ -469,7 +558,7 @@ export function computeHealthScoreFromInputs(input: HealthScoreInput, budgetingA
     previousMonth: null,
     trend: 0,
     activePillarCount: pillars.length,
-    budgetingActive,
+    budgetingActive: resolvedBudgetingActive,
   }
 }
 
