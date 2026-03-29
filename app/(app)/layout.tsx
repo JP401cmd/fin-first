@@ -17,6 +17,8 @@ import { NotificationProvider } from '@/components/app/notifications/notificatio
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
+import { ALL_MODULES } from '@/lib/module-registry'
+import type { ModuleId } from '@/lib/module-registry'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import {
@@ -57,7 +59,7 @@ export default async function AppLayout({
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
   const [profileRes, assetsRes, debtsRes, txRes, matrixRes, lastLevelRes] = await Promise.all([
-    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules').eq('id', user.id).single(),
     supabase.from('assets').select('current_value').eq('user_id', user.id).eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type').eq('user_id', user.id).eq('is_active', true),
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
@@ -124,6 +126,9 @@ export default async function AppLayout({
   const featurePrefs = (profile?.feature_preferences as Record<string, unknown>) ?? {}
   const invulfaseActive = featurePrefs._invulfase_active === true
 
+  // ── Active modules ────────────────────────────────────
+  const activeModules: ModuleId[] = (profile?.active_modules as ModuleId[]) ?? [...ALL_MODULES]
+
   // ── Module colors (SSR) ────────────────────────────────
   const mc = profile?.module_colors as Record<string, string> | null
   const moduleColors: ModuleColorConfig = {
@@ -165,7 +170,7 @@ export default async function AppLayout({
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
                   <DashboardTypeProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
-                      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+                      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation} activeModules={activeModules}>
                         <ChatLayoutWrapper>
                           <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
                           <DailyExpenseProvider>
