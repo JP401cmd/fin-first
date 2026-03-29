@@ -85,8 +85,8 @@ export default function InstellingenPage() {
 
   // ─ Module toggle state ─
   const [moduleToggleErrors, setModuleToggleErrors] = useState<string[]>([])
-  const { activeModules } = useModuleAccess()
-  const { modules: activeModuleToggles, toggle: toggleModule, saving: moduleSaving } = useModuleToggle(activeModules)
+  const { activeModules, refreshModules } = useModuleAccess()
+  const { modules: activeModuleToggles, toggle: toggleModule, saving: moduleSaving } = useModuleToggle(activeModules, refreshModules)
 
   // ─ Section: Rebalancing ─
   const [rebalanceThreshold, setRebalanceThreshold] = useState(5)

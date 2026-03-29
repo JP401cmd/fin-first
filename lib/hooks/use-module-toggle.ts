@@ -7,9 +7,12 @@ import { validateModules } from '@/lib/module-registry'
 /**
  * Hook for toggling user-selectable modules.
  * Validates dependency rules before persisting, performs optimistic update,
- * and reloads the page after a successful save so nav/dashboard recomputes.
+ * and calls onSaved callback to refresh the context without page reload.
  */
-export function useModuleToggle(initialModules: ModuleId[]) {
+export function useModuleToggle(
+  initialModules: ModuleId[],
+  onSaved?: (modules: ModuleId[]) => void,
+) {
   const [modules, setModules] = useState<ModuleId[]>(initialModules)
   const [saving, setSaving] = useState(false)
 
@@ -42,8 +45,8 @@ export function useModuleToggle(initialModules: ModuleId[]) {
           return { success: false, errors: ['Opslaan mislukt'] }
         }
 
-        // Force full re-render: nav, dashboard layout, and widget gating all depend on active modules
-        window.location.reload()
+        // Update context so nav/widgets/dashboard re-render without page reload
+        onSaved?.(updated)
         return { success: true, errors: [] }
       } catch {
         setModules(modules) // Revert on network error
@@ -52,7 +55,7 @@ export function useModuleToggle(initialModules: ModuleId[]) {
         setSaving(false)
       }
     },
-    [modules],
+    [modules, onSaved],
   )
 
   return { modules, toggle, saving }

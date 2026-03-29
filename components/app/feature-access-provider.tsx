@@ -16,6 +16,8 @@ type FeatureAccessContextValue = FeatureAccessData & {
   clearActivation: () => void
   /** Active module IDs for the current user */
   activeModules: ModuleId[]
+  /** Update active modules client-side without page reload */
+  refreshModules: (modules: ModuleId[]) => void
 }
 
 const FeatureAccessContext = createContext<FeatureAccessContextValue | null>(null)
@@ -36,6 +38,7 @@ export function useFeatureAccess(): FeatureAccessContextValue {
     refreshFeaturePrefs: () => {},
     clearActivation: () => {},
     activeModules: [...ALL_MODULES],
+    refreshModules: () => {},
   }
   return ctx
 }
@@ -86,6 +89,13 @@ export function FeatureAccessProvider({
     setActivationCleared(true)
   }
 
+  const [moduleOverrides, setModuleOverrides] = useState<ModuleId[]>(activeModules)
+
+  /** Update active modules client-side without page reload */
+  function refreshModules(modules: ModuleId[]) {
+    setModuleOverrides(modules)
+  }
+
   const contextValue: FeatureAccessContextValue = {
     ...data,
     features: featureOverrides,
@@ -93,7 +103,8 @@ export function FeatureAccessProvider({
     newlyUnlockedFeatures,
     refreshFeaturePrefs,
     clearActivation,
-    activeModules,
+    activeModules: moduleOverrides,
+    refreshModules,
   }
 
   return (
@@ -120,5 +131,6 @@ export function useModuleAccess() {
     activeModules: ctx.activeModules,
     subscriptions: ctx.subscriptions,
     isModuleActive: (id: ModuleId) => isModuleActive(ctx.activeModules, id),
+    refreshModules: ctx.refreshModules,
   }
 }
