@@ -1172,6 +1172,38 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 </div>
               )}
 
+              {/* Vermogen progress bar (vermogensregistratie-only — bezittingen vs schulden) */}
+              {isVermogenOnly && effectiveTotalAssets > 0 && (
+                <div className="mb-4 sm:mb-6" data-testid="vermogen-progress-bar">
+                  <div className="mb-1 flex items-baseline justify-between">
+                    <span className="font-mono text-xs text-positive">
+                      {formatCurrency(effectiveTotalAssets)}
+                    </span>
+                    <span className="font-mono text-xs text-negative">
+                      {effectiveTotalDebts > 0 ? formatCurrency(effectiveTotalDebts) : ''}
+                    </span>
+                  </div>
+                  <div className="flex h-[8px] w-full overflow-hidden rounded-full">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-700"
+                      style={{ width: `${(effectiveTotalAssets / (effectiveTotalAssets + effectiveTotalDebts)) * 100}%` }}
+                    />
+                    {effectiveTotalDebts > 0 && (
+                      <div
+                        className="h-full bg-gradient-to-r from-red-400 to-red-500 transition-all duration-700"
+                        style={{ width: `${(effectiveTotalDebts / (effectiveTotalAssets + effectiveTotalDebts)) * 100}%` }}
+                      />
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between">
+                    <span className="text-[10px] text-positive">bezittingen</span>
+                    {effectiveTotalDebts > 0 && (
+                      <span className="text-[10px] text-negative">schulden</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Budget progress bar (budget-only mode — replaces FIRE bar) */}
               {isBudgetOnly && totalBudgetLimit > 0 && (
                 <button
@@ -1200,7 +1232,34 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           )}
 
           {/* Compact 2-stat row — mobile only */}
-          <div className="flex gap-3 sm:hidden mb-3">
+          <div className={`flex gap-3 sm:hidden mb-3 ${isVermogenOnly ? 'grid grid-cols-3' : ''}`}>
+            {isVermogenOnly ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveModal({ type: 'assets' })}
+                  className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-kern-300"
+                >
+                  <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-positive">Bezittingen</p>
+                  <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(effectiveTotalAssets)}</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveModal({ type: 'debts' })}
+                  className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-kern-300"
+                >
+                  <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-negative">Schulden</p>
+                  <p className="font-mono text-lg font-bold tabular-nums text-negative">{effectiveTotalDebts > 0 ? formatCurrency(effectiveTotalDebts) : '—'}</p>
+                </button>
+                <div className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left">
+                  <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Schuldgraad</p>
+                  <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
+                    {effectiveTotalAssets > 0 ? `${((effectiveTotalDebts / effectiveTotalAssets) * 100).toFixed(0)}%` : '—'}
+                  </p>
+                </div>
+              </>
+            ) : (
+            <>
             <button
               type="button"
               onClick={() => setShowSavingsReceipt(true)}
@@ -1233,6 +1292,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">passief inkomen</p>
               </button>
             ) : null}
+            </>
+            )}
           </div>
 
           {/* Expandable detail — mobile only */}
@@ -1305,7 +1366,54 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           </div>
 
           {/* Full 3-col layout — desktop only */}
-          {isBudgetOnly ? (
+          {isVermogenOnly ? (
+            <div className="hidden sm:grid sm:grid-cols-3 sm:gap-5">
+              {/* Col 1: Totale bezittingen */}
+              <button
+                type="button"
+                onClick={() => setActiveModal({ type: 'assets' })}
+                className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
+              >
+                <p className="label-editorial text-positive">Totale bezittingen</p>
+                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(effectiveTotalAssets)}</p>
+                <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                  {(fullAssets ?? []).filter(a => a.is_active).length} bezitting{(fullAssets ?? []).filter(a => a.is_active).length !== 1 ? 'en' : ''}
+                </p>
+              </button>
+              {/* Col 2: Totale schulden */}
+              <button
+                type="button"
+                onClick={() => setActiveModal({ type: 'debts' })}
+                className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
+              >
+                <p className="label-editorial text-negative">Totale schulden</p>
+                <p className={`mt-2 font-mono text-2xl font-bold tabular-nums ${effectiveTotalDebts > 0 ? 'text-negative' : 'text-positive'}`}>
+                  {effectiveTotalDebts > 0 ? formatCurrency(effectiveTotalDebts) : 'Schuldvrij'}
+                </p>
+                <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                  {(fullDebts ?? []).filter(d => d.is_active).length} schuld{(fullDebts ?? []).filter(d => d.is_active).length !== 1 ? 'en' : ''}
+                </p>
+              </button>
+              {/* Col 3: Schuldgraad */}
+              <div data-testid="hero-schuldgraad">
+                <p className="label-editorial text-[var(--ink-3)]">Schuldgraad</p>
+                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
+                  {effectiveTotalAssets > 0 ? `${((effectiveTotalDebts / effectiveTotalAssets) * 100).toFixed(1)}%` : '—'}
+                </p>
+                <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                  {effectiveTotalAssets > 0 && effectiveTotalDebts > 0
+                    ? effectiveTotalDebts / effectiveTotalAssets < 0.3
+                      ? 'Lage schuldenlast'
+                      : effectiveTotalDebts / effectiveTotalAssets < 0.6
+                        ? 'Matige schuldenlast'
+                        : 'Hoge schuldenlast'
+                    : effectiveTotalDebts === 0
+                      ? 'Geen schulden'
+                      : ''}
+                </p>
+              </div>
+            </div>
+          ) : isBudgetOnly ? (
             <div className="hidden sm:grid sm:grid-cols-3 sm:gap-5">
               {/* Col 1: Verloop */}
               <button
@@ -1495,10 +1603,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         />
       </section>
 
-      <SectionDivider variant="line" />
+      {!isVermogenOnly && <SectionDivider variant="line" />}
 
-      {/* === 7. Financiële Kerngetallen (Deep Dive) === */}
-      <section className="mt-4 sm:mt-8">
+      {/* === 7. Financiële Kerngetallen (Deep Dive) — hidden in vermogen-only mode === */}
+      {!isVermogenOnly && <section className="mt-4 sm:mt-8">
         <div className="mb-3 sm:mb-5 flex items-end justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1628,7 +1736,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </button>
           )}
         </div>
-      </section>
+      </section>}
 
       {/* === Mission Control Modals === */}
       {budgetingActive && (

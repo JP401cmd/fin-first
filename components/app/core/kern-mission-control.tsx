@@ -158,8 +158,8 @@ export function KernMissionControl({
   }
 
   // Desktop-only collapsible state for Vermogen & Schulden cards
-  const [assetsOpen, setAssetsOpen] = useState(false)
-  const [debtsOpen, setDebtsOpen] = useState(false)
+  const [assetsOpen, setAssetsOpen] = useState(!budgetingActive)
+  const [debtsOpen, setDebtsOpen] = useState(!budgetingActive)
 
   // Vermogen view toggle — persisted in localStorage
   const [vermogenView, setVermogenViewState] = useState<'compact' | 'cards'>(() => {
