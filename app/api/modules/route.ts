@@ -73,7 +73,31 @@ export async function PUT(req: Request) {
 
   // Sync budgeting data layer when budgetteren module is toggled
   if (hadBudgetteren && !hasBudgetteren) {
-    // Budgetteren deactivated → disable transaction tracking on all cash assets
+    // Budgetteren deactivated →
+    // 1. Snapshot which accounts had tracking (for restore on reactivation)
+    // 2. Disable tracking on all cash assets
+    // 3. Set budgeting_active = false
+    // Transactions and budgets are preserved — only the tracking flag changes.
+    const { data: trackedAssets } = await supabase
+      .from('assets')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('asset_type', 'cash')
+      .eq('has_budget_tracking', true)
+      .eq('is_active', true)
+
+    const trackedIds = (trackedAssets ?? []).map(a => a.id)
+
+    // Store snapshot in feature_preferences for later restore
+    const { data: fpProfile } = await supabase
+      .from('profiles')
+      .select('feature_preferences')
+      .eq('id', user.id)
+      .single()
+
+    const fp = (fpProfile?.feature_preferences as Record<string, unknown> | null) ?? {}
+    fp.budget_tracking_account_ids = trackedIds
+
     await Promise.all([
       supabase
         .from('assets')
@@ -83,14 +107,39 @@ export async function PUT(req: Request) {
         .eq('is_active', true),
       supabase
         .from('profiles')
-        .update({ budgeting_active: false })
+        .update({ budgeting_active: false, feature_preferences: fp })
         .eq('id', user.id),
     ])
   } else if (!hadBudgetteren && hasBudgetteren) {
-    // Budgetteren activated → set profile flag (user chooses which accounts to track)
+    // Budgetteren activated →
+    // 1. Restore tracking on previously tracked accounts (from snapshot)
+    // 2. Set budgeting_active = true
+    // 3. Clear the snapshot
+    const { data: fpProfile } = await supabase
+      .from('profiles')
+      .select('feature_preferences')
+      .eq('id', user.id)
+      .single()
+
+    const fp = (fpProfile?.feature_preferences as Record<string, unknown> | null) ?? {}
+    const savedIds = (fp.budget_tracking_account_ids as string[] | undefined) ?? []
+
+    if (savedIds.length > 0) {
+      // Restore tracking on the exact same accounts
+      await supabase
+        .from('assets')
+        .update({ has_budget_tracking: true })
+        .eq('user_id', user.id)
+        .eq('asset_type', 'cash')
+        .eq('is_active', true)
+        .in('id', savedIds)
+    }
+
+    // Clear snapshot and set budgeting_active
+    delete fp.budget_tracking_account_ids
     await supabase
       .from('profiles')
-      .update({ budgeting_active: true })
+      .update({ budgeting_active: true, feature_preferences: fp })
       .eq('id', user.id)
   }
 
