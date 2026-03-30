@@ -344,7 +344,9 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   }
 
   function handleAssetClick(asset: Asset) {
-    if (asset.asset_type === 'cash') {
+    // Cash with active budget tracking → open transaction view
+    // Cash without tracking (or budgetteren off) → open as regular asset
+    if (asset.asset_type === 'cash' && budgetingActive && asset.has_budget_tracking) {
       const linkedBA = linkedBankAccounts.get(asset.id)
       if (linkedBA) {
         setCashAccountId(linkedBA.id)
