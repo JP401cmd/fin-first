@@ -1,18 +1,24 @@
-const ALL_STEPS = [
-  { key: 'profiel', label: 'Profiel & Vrijheid', icon: '👤' },
-  { key: 'persona', label: 'Jouw profiel', icon: '✦' },
-  { key: 'startpunt', label: 'Startpunt', icon: '📍' },
-  { key: 'budgetten', label: 'Budgetten', icon: '💰' },
-  { key: 'voorkeuren', label: 'Voorkeuren', icon: '⚙️' },
-  { key: 'klaar', label: 'Klaar', icon: '✓' },
+// ── Phase-based onboarding progress indicator ────────────────────────────
+// 4 fixed phases: Gegevens → Modules → Instellen → Klaar
+// Phase 3 (Instellen) shows a sub-step counter for dynamic content steps.
+
+const PHASES = [
+  { key: 'gegevens', label: 'Gegevens' },
+  { key: 'modules', label: 'Modules' },
+  { key: 'instellen', label: 'Instellen' },
+  { key: 'klaar', label: 'Klaar' },
 ] as const
 
-export type StepKey = (typeof ALL_STEPS)[number]['key']
+export type PhaseKey = (typeof PHASES)[number]['key']
 
-export function StepProgress({ current, hideBudgets = false }: { current: StepKey; hideBudgets?: boolean }) {
-  const STEPS = hideBudgets ? ALL_STEPS.filter((s) => s.key !== 'budgetten') : ALL_STEPS
-  const currentIdx = STEPS.findIndex((s) => s.key === current)
-  const progressPct = Math.round((currentIdx / (STEPS.length - 1)) * 100)
+export interface StepProgressProps {
+  currentPhase: PhaseKey
+  subStep?: { current: number; total: number }
+}
+
+export function StepProgress({ currentPhase, subStep }: StepProgressProps) {
+  const currentIdx = PHASES.findIndex((p) => p.key === currentPhase)
+  const progressPct = Math.round((currentIdx / (PHASES.length - 1)) * 100)
 
   return (
     <div className="w-full">
@@ -24,13 +30,13 @@ export function StepProgress({ current, hideBudgets = false }: { current: StepKe
         />
       </div>
 
-      {/* Step indicators */}
+      {/* Phase indicators */}
       <div className="flex items-center justify-between">
-        {STEPS.map((step, i) => {
+        {PHASES.map((phase, i) => {
           const isDone = i < currentIdx
           const isActive = i === currentIdx
           return (
-            <div key={step.key} className="flex flex-col items-center gap-1">
+            <div key={phase.key} className="flex flex-col items-center gap-1">
               <div
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   isDone
@@ -54,12 +60,19 @@ export function StepProgress({ current, hideBudgets = false }: { current: StepKe
                   isActive ? 'text-[var(--ink)]' : isDone ? 'text-[var(--ink-2)]' : 'text-[var(--ink-4)]'
                 }`}
               >
-                {step.label}
+                {phase.label}
               </span>
             </div>
           )
         })}
       </div>
+
+      {/* Sub-step indicator for 'instellen' phase */}
+      {currentPhase === 'instellen' && subStep && (
+        <p className="mt-2 text-center text-[10px] font-medium text-[var(--ink-4)]">
+          Stap {subStep.current} van {subStep.total}
+        </p>
+      )}
     </div>
   )
 }
