@@ -1179,36 +1179,42 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               {isVermogenOnly && effectiveTotalAssets > 0 && (
                 <div className="mb-4 sm:mb-6" data-testid="vermogen-progress-bar">
                   <div className="mb-1 flex items-baseline justify-between">
-                    <span className="font-mono text-xs text-positive">
+                    <button type="button" onClick={() => setActiveModal({ type: 'assets' })} className="font-mono text-xs text-positive transition-opacity hover:opacity-70">
                       {formatCurrency(effectiveTotalAssets)}
-                    </span>
-                    <span className="font-mono text-xs text-negative">
-                      {effectiveTotalDebts > 0 ? formatCurrency(effectiveTotalDebts) : ''}
-                    </span>
+                    </button>
+                    {effectiveTotalDebts > 0 && (
+                      <button type="button" onClick={() => setActiveModal({ type: 'debts' })} className="font-mono text-xs text-negative transition-opacity hover:opacity-70">
+                        {formatCurrency(effectiveTotalDebts)}
+                      </button>
+                    )}
                   </div>
                   <div className="flex h-[8px] w-full overflow-hidden rounded-full">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-700"
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal({ type: 'assets' })}
+                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-700 hover:brightness-110"
                       style={{ width: `${(effectiveTotalAssets / (effectiveTotalAssets + effectiveTotalDebts)) * 100}%` }}
                     />
                     {effectiveTotalDebts > 0 && (
-                      <div
-                        className="h-full bg-gradient-to-r from-red-400 to-red-500 transition-all duration-700"
+                      <button
+                        type="button"
+                        onClick={() => setActiveModal({ type: 'debts' })}
+                        className="h-full bg-gradient-to-r from-red-400 to-red-500 transition-all duration-700 hover:brightness-110"
                         style={{ width: `${(effectiveTotalDebts / (effectiveTotalAssets + effectiveTotalDebts)) * 100}%` }}
                       />
                     )}
                   </div>
                   <div className="mt-1 flex items-baseline justify-between">
-                    <span className="text-[10px] text-positive">bezittingen</span>
+                    <button type="button" onClick={() => setActiveModal({ type: 'assets' })} className="text-[10px] text-positive transition-opacity hover:opacity-70">bezittingen</button>
                     {effectiveTotalDebts > 0 && (
-                      <span className="text-[10px] text-negative">schulden</span>
+                      <button type="button" onClick={() => setActiveModal({ type: 'debts' })} className="text-[10px] text-negative transition-opacity hover:opacity-70">schulden</button>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Budget progress bar (budget-only mode — replaces FIRE bar) */}
-              {isBudgetOnly && totalBudgetLimit > 0 && (
+              {/* Budget progress bar (when budgetteren active without toekomstplannen) */}
+              {budgetingActive && !hasToekomst && totalBudgetLimit > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowBudgetModal(true)}
@@ -1514,25 +1520,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 data-testid="hero-deze-maand"
               >
                 <p className="label-editorial text-[var(--ink-3)]">Deze maand</p>
-                {totalBudgetLimit > 0 && (
-                  <div className="mt-2">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-sm text-[var(--ink-3)]">Budget</span>
-                      <span className={`text-sm font-mono font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-600' : 'text-negative'}`}>
-                        {Math.round((totalBudgetSpent / totalBudgetLimit) * 100)}%
-                      </span>
-                    </div>
-                    <div className="mt-1 h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300' : 'bg-negative'}`}
-                        style={{ width: `${Math.min((totalBudgetSpent / totalBudgetLimit) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <p className="mt-0.5 text-[10px] font-mono text-[var(--ink-4)]">
-                      {formatCurrency(totalBudgetSpent)} / {formatCurrency(totalBudgetLimit)}
-                    </p>
-                  </div>
-                )}
                 <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />
               </button>
               <div data-testid="hero-kerngetallen">
