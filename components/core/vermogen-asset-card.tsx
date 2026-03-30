@@ -72,7 +72,7 @@ export function VermogenAssetCard({
   return (
     <button
       type="button"
-      onClick={() => onClick(asset.id)}
+      onClick={(e) => { e.stopPropagation(); onClick(asset.id) }}
       className="card-editorial animate-fade-up w-full text-left"
       style={
         { '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties

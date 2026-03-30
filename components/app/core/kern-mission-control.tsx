@@ -758,7 +758,10 @@ export function KernMissionControl({
           return (
             <>
             {/* Left column: Bezittingen cards */}
-            <div className={`p-3 sm:p-5 ${getBorderClasses('assets')} ${activeTab !== 'assets' ? 'hidden lg:block' : ''}`}>
+            <div
+              className={`cursor-pointer p-3 sm:p-5 ${getBorderClasses('assets')} ${activeTab !== 'assets' ? 'hidden lg:block' : ''} transition-colors hover:bg-emerald-500/[0.06]`}
+              onClick={() => onCardClick('assets')}
+            >
                 <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-positive">Bezittingen</p>
                 <div className="space-y-4">
                   {LAYER_ORDER.map((layer, layerIdx) => {
@@ -795,7 +798,10 @@ export function KernMissionControl({
               </div>
 
             {/* Right column: Schulden cards */}
-            <div className={`p-3 sm:p-5 ${getBorderClasses('debts')} ${activeTab !== 'debts' ? 'hidden lg:block' : ''}`}>
+            <div
+              className={`cursor-pointer p-3 sm:p-5 ${getBorderClasses('debts')} ${activeTab !== 'debts' ? 'hidden lg:block' : ''} transition-colors hover:bg-red-500/[0.06]`}
+              onClick={() => onCardClick('debts')}
+            >
                 <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-negative">Schulden</p>
                 {activeDebts.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2">

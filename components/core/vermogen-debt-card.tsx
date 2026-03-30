@@ -84,7 +84,7 @@ export function VermogenDebtCard({
   return (
     <button
       type="button"
-      onClick={() => onClick(debt.id)}
+      onClick={(e) => { e.stopPropagation(); onClick(debt.id) }}
       className="card-editorial animate-fade-up w-full text-left"
       style={
         { '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties
