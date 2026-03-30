@@ -247,6 +247,7 @@ export function OnboardingBudgets({
   onNext,
   onBack,
   saving = false,
+  subStep,
 }: {
   amounts: Record<string, number>
   onChange: (amounts: Record<string, number>) => void
@@ -256,6 +257,7 @@ export function OnboardingBudgets({
   onNext: () => void
   onBack: () => void
   saving?: boolean
+  subStep?: { current: number; total: number }
 }) {
   const [subChoice, setSubChoice] = useState<SubChoice>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<BudgetTemplateId | null>(null)
@@ -296,7 +298,7 @@ export function OnboardingBudgets({
       </button>
 
       <div className="mb-8">
-        <StepProgress current="budgetten" />
+        <StepProgress currentPhase="instellen" subStep={subStep} />
       </div>
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Budgettering</p>
