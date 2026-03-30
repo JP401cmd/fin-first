@@ -15,6 +15,7 @@ import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } fr
 import type { ModuleColorConfig, ModuleName, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import { ColorPickerCard } from '@/components/app/color-picker-card'
 import { Palette, RotateCcw, Type } from 'lucide-react'
+import { ExportDropdown } from '@/components/app/export-dropdown'
 import { type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
@@ -1944,6 +1945,17 @@ export default function InstellingenPage() {
             </button>
           </div>
         )}
+      </section>
+
+      {/* ── Data Export ─────────────────────────────────────────────── */}
+      <section className="mb-5 sm:mb-8 card-editorial overflow-hidden">
+        <div className="px-4 sm:px-8 py-4">
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Data Export</h2>
+          <p className="mt-1 text-xs text-[var(--ink-4)]">Download je financiële gegevens als CSV-bestand</p>
+          <div className="mt-3">
+            <ExportDropdown />
+          </div>
+        </div>
       </section>
 
       {/* ── E: Gegevens & Account ────────────────────────────────────── */}

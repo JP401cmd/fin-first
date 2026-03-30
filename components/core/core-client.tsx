@@ -1603,6 +1603,86 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         />
       </section>
 
+      {/* === Holdings Portfolio — eigen sectie, los van bezittingen/schulden === */}
+      {hasVermogen && holdingsPortfolio && (
+        <>
+          <SectionDivider variant="line" />
+          <section className="mt-4 sm:mt-8" data-testid="holdings-section">
+            <div className="mb-3 sm:mb-4 flex items-center gap-2">
+              <div className="h-5 w-1 rounded-full bg-emerald-500" />
+              <h2 className="label-editorial text-[var(--ink-2)]">Portfolio Holdings</h2>
+            </div>
+            <Link
+              href="/core/assets/holdings"
+              className="group card-editorial block overflow-hidden transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
+              data-testid="holdings-portfolio-card"
+            >
+              <div className="h-[3px] w-full bg-emerald-500" />
+              <div className="p-4 sm:p-5">
+                {/* Header row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-emerald-50 group-hover:bg-emerald-100">
+                      <TrendingUp className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
+                        {formatCurrency(holdingsPortfolio.totalValue)}
+                      </p>
+                      <p className={`font-mono text-xs font-medium tabular-nums ${
+                        holdingsPortfolio.dailyChangeAbsolute >= 0 ? 'text-positive' : 'text-negative'
+                      }`}>
+                        {holdingsPortfolio.dailyChangeAbsolute >= 0 ? '+' : ''}
+                        {formatCurrency(holdingsPortfolio.dailyChangeAbsolute)}
+                        {' '}
+                        ({holdingsPortfolio.dailyChangePct >= 0 ? '+' : ''}{holdingsPortfolio.dailyChangePct.toFixed(2)}%)
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-emerald-500" />
+                </div>
+
+                {/* Metrics row */}
+                <div className="mt-4 grid grid-cols-3 gap-4 border-t border-[var(--border-ed)] pt-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">Posities</p>
+                    <p className="mt-0.5 font-mono text-sm font-bold tabular-nums text-[var(--ink)]">
+                      {holdingsPortfolio.positionCount}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">Dagwijziging</p>
+                    <p className={`mt-0.5 font-mono text-sm font-bold tabular-nums ${
+                      holdingsPortfolio.dailyChangeAbsolute >= 0 ? 'text-positive' : 'text-negative'
+                    }`}>
+                      {holdingsPortfolio.dailyChangePct >= 0 ? '+' : ''}{holdingsPortfolio.dailyChangePct.toFixed(2)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">Top positie</p>
+                    <p className="mt-0.5 truncate text-sm font-medium text-[var(--ink-2)]">
+                      {holdingsPortfolio.top3[0]?.ticker ?? '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Top 3 holdings */}
+                {holdingsPortfolio.top3.length > 1 && (
+                  <div className="mt-3 flex items-center gap-3 border-t border-[var(--border-ed)] pt-3">
+                    {holdingsPortfolio.top3.map((h, i) => (
+                      <div key={h.ticker} className="flex items-center gap-1.5 text-xs text-[var(--ink-3)]">
+                        <span className="font-medium text-[var(--ink-2)]">{h.ticker}</span>
+                        <span className="font-mono tabular-nums">{formatCurrency(h.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Link>
+          </section>
+        </>
+      )}
+
       {!isVermogenOnly && <SectionDivider variant="line" />}
 
       {/* === 7. Financiële Kerngetallen (Deep Dive) — hidden in vermogen-only mode === */}
@@ -1628,9 +1708,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 : 'Gebaseerd op je geschatte inkomen en uitgaven.'}
             </p>
           </div>
-          <FeatureGate featureId="data_export" fallback="hidden">
-            <ExportDropdown />
-          </FeatureGate>
         </div>
 
         {/* Compact on mobile */}
