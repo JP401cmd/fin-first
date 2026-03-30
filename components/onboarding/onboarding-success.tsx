@@ -1,7 +1,29 @@
 import { WillDots } from '@/components/app/will-dots'
-import { Shield, Zap, Telescope, type LucideIcon } from 'lucide-react'
+import { Shield, Zap, Telescope, Newspaper, type LucideIcon } from 'lucide-react'
+import { type ModuleId, getActiveNavModules } from '@/lib/module-registry'
 
-export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) {
+export function OnboardingSuccess({
+  onDashboard,
+  activeModules,
+}: {
+  onDashboard: () => void
+  activeModules?: ModuleId[]
+}) {
+  const navModules = getActiveNavModules(activeModules ?? [])
+  const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
+
+  // Filter module cards to only show the nav modules the user activated
+  const visibleCards = isNewsOnly
+    ? []
+    : MODULE_CARDS.filter((c) => navModules.includes(c.navModule))
+
+  // Dynamic CTA label based on active modules
+  const ctaLabel = isNewsOnly
+    ? 'Naar de Trifinity Post'
+    : navModules.includes('wil')
+      ? 'Bekijk De Wil'
+      : 'Bekijk De Kern'
+
   return (
     <div className="flex flex-col items-center py-8 text-center sm:py-12">
       {/* Will's avatar — celebration emphasis with subtle pulse */}
@@ -22,20 +44,43 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
       {/* Editorial divider */}
       <div className="mx-auto mt-8 mb-8 h-px w-16 bg-[var(--border-md)]" />
 
-      {/* Introduction text */}
+      {/* Introduction text — adapted for news-only users */}
       <div className="mx-auto max-w-md font-serif text-sm leading-relaxed text-[var(--ink-3)]">
-        <p>
-          Ik ben Will, je persoonlijke financiële coach. Ik begeleid je door drie
-          perspectieven naar financiële vrijheid.
-        </p>
+        {isNewsOnly ? (
+          <p>
+            Ik ben Will, je persoonlijke financiële coach. Je vindt me elke dag in de Trifinity Post met nieuws en inzichten die relevant zijn voor jouw financiële situatie.
+          </p>
+        ) : (
+          <p>
+            Ik ben Will, je persoonlijke financiële coach. Ik begeleid je door drie
+            perspectieven naar financiële vrijheid.
+          </p>
+        )}
       </div>
 
-      {/* Three module cards — card-editorial with module-colored left border */}
-      <div className="mt-10 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
-        {MODULE_CARDS.map((card) => (
-          <ModuleCard key={card.name} {...card} />
-        ))}
-      </div>
+      {/* News-only card */}
+      {isNewsOnly && (
+        <div className="mt-10 w-full">
+          <NewsCard />
+        </div>
+      )}
+
+      {/* Module cards — only for active nav modules */}
+      {!isNewsOnly && visibleCards.length > 0 && (
+        <div
+          className={`mt-10 grid w-full grid-cols-1 gap-3 ${
+            visibleCards.length === 2
+              ? 'sm:grid-cols-2'
+              : visibleCards.length >= 3
+                ? 'sm:grid-cols-3'
+                : ''
+          }`}
+        >
+          {visibleCards.map((card) => (
+            <ModuleCard key={card.name} {...card} />
+          ))}
+        </div>
+      )}
 
       {/* Will's closing — font-serif italic */}
       <div className="mx-auto mt-10 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
@@ -44,20 +89,44 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
         </p>
       </div>
 
-      {/* Decorative module-color line before CTA */}
+      {/* Decorative color bar — only segments for active nav modules */}
       <div className="mt-8 flex w-full max-w-xs items-center gap-0">
-        <div className="h-0.5 flex-1 bg-kern-300" />
-        <div className="h-0.5 flex-1 bg-wil-300" />
-        <div className="h-0.5 flex-1 bg-horizon-300" />
+        {(isNewsOnly || navModules.includes('kern')) && (
+          <div className="h-0.5 flex-1 bg-kern-300" />
+        )}
+        {navModules.includes('wil') && (
+          <div className="h-0.5 flex-1 bg-wil-300" />
+        )}
+        {navModules.includes('horizon') && (
+          <div className="h-0.5 flex-1 bg-horizon-300" />
+        )}
       </div>
 
-      {/* Dashboard button — navigates to De Kern as starting point */}
+      {/* Dashboard button — label and destination adapt to active modules */}
       <button
         onClick={onDashboard}
         className="mt-6 min-h-[48px] w-full max-w-xs rounded-xl bg-kern-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-kern-700 hover:shadow-md active:bg-kern-800 active:shadow-none sm:w-auto sm:min-w-[200px]"
       >
-        Bekijk De Kern
+        {ctaLabel}
       </button>
+    </div>
+  )
+}
+
+/* ── News-only card ───────────────────────────────────────── */
+
+function NewsCard() {
+  return (
+    <div className="card-editorial flex items-start gap-3 border-l-3 border-wil-400 p-4 text-left">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wil-100">
+        <Newspaper className="h-5 w-5 text-wil-700" />
+      </div>
+      <div>
+        <p className="font-display text-sm font-semibold text-wil-700">De Trifinity Post</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-3)]">
+          Dagelijks financieel nieuws en inzichten, gepersonaliseerd voor jouw situatie.
+        </p>
+      </div>
     </div>
   )
 }
@@ -88,6 +157,7 @@ interface ModuleCardDef {
   iconBgClass: string
   iconTextClass: string
   nameTextClass: string
+  navModule: 'kern' | 'wil' | 'horizon'
 }
 
 const MODULE_CARDS: ModuleCardDef[] = [
@@ -99,6 +169,7 @@ const MODULE_CARDS: ModuleCardDef[] = [
     iconBgClass: 'bg-kern-100',
     iconTextClass: 'text-kern-700',
     nameTextClass: 'text-kern-700',
+    navModule: 'kern',
   },
   {
     name: 'De Wil',
@@ -108,14 +179,16 @@ const MODULE_CARDS: ModuleCardDef[] = [
     iconBgClass: 'bg-wil-100',
     iconTextClass: 'text-wil-700',
     nameTextClass: 'text-wil-700',
+    navModule: 'wil',
   },
   {
     name: 'De Horizon',
-    description: 'Zie je vrijheid groeien: prognoses, scenario\'s en het effect van elke keuze.',
+    description: "Zie je vrijheid groeien: prognoses, scenario's en het effect van elke keuze.",
     icon: Telescope,
     borderClass: 'border-horizon-400',
     iconBgClass: 'bg-horizon-100',
     iconTextClass: 'text-horizon-700',
     nameTextClass: 'text-horizon-700',
+    navModule: 'horizon',
   },
 ]
