@@ -756,9 +756,9 @@ export function KernMissionControl({
           let stagger = 0
 
           return (
-            <div className={`lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 ${activeTab === 'budgets' ? 'hidden lg:grid' : ''}`}>
-              {/* Left column: Bezittingen cards */}
-              <div className={`p-3 sm:p-5 ${getBorderClasses('assets')}`}>
+            <>
+            {/* Left column: Bezittingen cards */}
+            <div className={`p-3 sm:p-5 ${getBorderClasses('assets')} ${activeTab !== 'assets' ? 'hidden lg:block' : ''}`}>
                 <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-positive">Bezittingen</p>
                 <div className="space-y-4">
                   {LAYER_ORDER.map((layer, layerIdx) => {
@@ -794,8 +794,8 @@ export function KernMissionControl({
                 </div>
               </div>
 
-              {/* Right column: Schulden cards */}
-              <div className={`p-3 sm:p-5 ${getBorderClasses('debts')}`}>
+            {/* Right column: Schulden cards */}
+            <div className={`p-3 sm:p-5 ${getBorderClasses('debts')} ${activeTab !== 'debts' ? 'hidden lg:block' : ''}`}>
                 <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-negative">Schulden</p>
                 {activeDebts.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2">
@@ -811,8 +811,8 @@ export function KernMissionControl({
                 ) : (
                   <p className="py-4 text-center text-xs text-[var(--ink-4)]">Geen schulden</p>
                 )}
-              </div>
             </div>
+            </>
           )
         })()}
 
