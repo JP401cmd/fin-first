@@ -576,7 +576,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                   const returnPct = purchase > 0 ? ((value - purchase) / purchase) * 100 : 0
                   const icon = ASSET_TYPE_ICONS[asset.asset_type] ?? 'Briefcase'
                   const color = ASSET_TYPE_COLORS[asset.asset_type]
-                  const hasBudget = isCash && linkedBankAccounts.has(asset.id)
+                  const hasBudget = isCash && budgetingActive && asset.has_budget_tracking && linkedBankAccounts.has(asset.id)
 
                   return (
                     <div
@@ -726,6 +726,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         <AssetForm
           asset={selectedAsset}
           linkedBankAccounts={linkedBankAccounts}
+          budgetingActive={budgetingActive}
           onClose={() => setModalStep('detail')}
           onSaved={() => {
             setModalStep('detail')
@@ -774,6 +775,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           asset={editAsset ?? undefined}
           defaultType={newAssetType ?? undefined}
           linkedBankAccounts={linkedBankAccounts}
+          budgetingActive={budgetingActive}
           onClose={() => { setShowForm(false); setEditAsset(null); setNewAssetType(null) }}
           onSaved={() => {
             setShowForm(false)
@@ -2171,12 +2173,14 @@ function AssetForm({
   linkedBankAccounts,
   onClose,
   onSaved,
+  budgetingActive = true,
 }: {
   asset?: Asset
   defaultType?: AssetType
   linkedBankAccounts: Map<string, { id: string; linked_asset_id: string }>
   onClose: () => void
   onSaved: () => void
+  budgetingActive?: boolean
 }) {
   const isEdit = !!asset
   const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
@@ -2696,8 +2700,8 @@ function AssetForm({
             </>
           )}
 
-          {/* Budget tracking toggle (cash only) */}
-          {assetType === 'cash' && (
+          {/* Budget tracking toggle (cash only, hidden when budgetteren module is off) */}
+          {assetType === 'cash' && budgetingActive && (
             <>
               <label className="flex items-start gap-3 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/30 p-3 cursor-pointer">
                 <input
