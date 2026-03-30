@@ -58,6 +58,9 @@ const DynCashOverview = dynamic(
   () => import('@/components/app/cash-overview').then(m => ({ default: m.CashOverview })),
   { loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div> },
 )
+const DynHoldingsPage = dynamic(() => import('@/components/core/holdings-client'), {
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
+})
 
 import { usePerspective } from '@/components/app/perspective-provider'
 import { KernMissionControl } from '@/components/app/core/kern-mission-control'
@@ -111,7 +114,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   // Holdings portfolio card state
   const [holdingsPortfolio, setHoldingsPortfolio] = useState<CorePageData['holdingsPortfolio']>(null)
   // Mission Control modal state
-  const [activeModal, setActiveModal] = useState<{ type: 'budgets' | 'assets' | 'debts'; itemId?: string } | null>(null)
+  const [activeModal, setActiveModal] = useState<{ type: 'budgets' | 'assets' | 'debts' | 'holdings'; itemId?: string } | null>(null)
   const [showProjectionModal, setShowProjectionModal] = useState(false)
   // Kassabon modal state
   const [incomeByMonth, setIncomeByMonth] = useState<{month: string; amount: number}[]>([])
@@ -1612,9 +1615,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <div className="h-5 w-1 rounded-full bg-emerald-500" />
               <h2 className="label-editorial text-[var(--ink-2)]">Portfolio Holdings</h2>
             </div>
-            <Link
-              href="/core/assets/holdings"
-              className="group card-editorial block overflow-hidden transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
+            <button
+              type="button"
+              onClick={() => setActiveModal({ type: 'holdings' })}
+              className="group card-editorial block w-full overflow-hidden text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
               data-testid="holdings-portfolio-card"
             >
               <div className="h-[3px] w-full bg-emerald-500" />
@@ -1678,7 +1682,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   </div>
                 )}
               </div>
-            </Link>
+            </button>
           </section>
         </>
       )}
@@ -1845,6 +1849,14 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         href="/core/debts"
       >
         <DynDebtsPage initialDebtId={activeModal?.type === 'debts' ? activeModal.itemId : undefined} />
+      </FullScreenModal>}
+      {hasVermogen && <FullScreenModal
+        open={activeModal?.type === 'holdings'}
+        onClose={() => { setActiveModal(null); loadData() }}
+        title="Portfolio Holdings"
+        href="/core/assets/holdings"
+      >
+        <DynHoldingsPage />
       </FullScreenModal>}
 
       {/* === Vermogen Modal (verloop + prognose) === */}
