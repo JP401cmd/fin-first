@@ -12,6 +12,7 @@ import type { LucideProps } from 'lucide-react'
 import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
+import { type ModuleId } from '@/lib/module-registry'
 import { WIDGET_CATALOG, type WidgetPrefs, type WidgetPref } from '@/lib/widget-catalog'
 import { buildDashboardLayout, type FocusChoice, type AutoDashboardAnswers } from '@/lib/auto-dashboard-builder'
 
@@ -101,14 +102,16 @@ export function OnboardingPreferences({
   onNext,
   onBack,
   saving = false,
-  hideBudgetFocus = false,
+  activeModules,
+  subStep,
 }: {
   data: PreferencesData
   onChange: (data: PreferencesData) => void
   onNext: () => void
   onBack: () => void
   saving?: boolean
-  hideBudgetFocus?: boolean
+  activeModules?: ModuleId[]
+  subStep?: { current: number; total: number }
 }) {
   function handleSkipDefaults() {
     onChange(DEFAULT_PREFERENCES)
@@ -126,6 +129,13 @@ export function OnboardingPreferences({
 
   const canProceed = data.focuses.length > 0
 
+  const availableOptions = FOCUS_OPTIONS.filter((opt) => {
+    if (opt.id === 'budget_cashflow') return activeModules?.includes('budgetteren') ?? true
+    if (opt.id === 'assets_investments') return activeModules?.includes('vermogensregistratie') ?? true
+    if (opt.id === 'fire_freedom') return activeModules?.includes('toekomstplannen') ?? true
+    return true
+  })
+
   return (
     <div className="pb-20 sm:pb-0">
       <button
@@ -139,7 +149,7 @@ export function OnboardingPreferences({
       </button>
 
       <div className="mb-8">
-        <StepProgress current="voorkeuren" hideBudgets={hideBudgetFocus} />
+        <StepProgress currentPhase="instellen" subStep={subStep} />
       </div>
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Voorkeuren</p>
@@ -173,7 +183,7 @@ export function OnboardingPreferences({
         </h2>
         <p className="text-sm text-[var(--ink-3)]">Kies maximaal 2 onderwerpen</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-          {FOCUS_OPTIONS.filter(opt => !(hideBudgetFocus && opt.id === 'budget_cashflow')).map((opt) => {
+          {availableOptions.map((opt) => {
             const selected = data.focuses.includes(opt.id)
             const atMax = !selected && data.focuses.length >= 2
             const Icon = opt.icon
