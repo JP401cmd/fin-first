@@ -104,8 +104,8 @@ export const ALL_MODULES: ModuleId[] = MODULE_CATALOG.map((m) => m.id)
 
 export const PERSONA_MODULE_PRESETS: Record<PersonaId, ModuleId[]> = {
   budgetteerder: ['budgetteren'],
-  vermogensverdeler: ['vermogensregistratie'],
-  pensioenplanner: ['vermogensregistratie', 'toekomstplannen'],
+  vermogensverdeler: ['vermogensregistratie', 'inzicht_acties'],
+  pensioenplanner: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
   fire_fighter: [...ALL_MODULES],
 }
 
@@ -194,7 +194,7 @@ export function isModuleActive(activeModules: ModuleId[], moduleId: ModuleId): b
  * Validate a set of active modules against dependency rules.
  *
  * Rules:
- * 1. Minstens 'budgetteren' of 'vermogensregistratie' moet actief zijn
+ * 1. Minstens één module moet actief zijn
  * 2. 'aandelenregistratie' vereist 'vermogensregistratie'
  * 3. 'inzicht_acties' vereist 'budgetteren' of 'vermogensregistratie'
  * 4. 'toekomstplannen' vereist 'budgetteren' of 'vermogensregistratie'
@@ -205,16 +205,15 @@ export function validateModules(modules: ModuleId[]): { valid: boolean; errors: 
   const errors: string[] = []
   const has = (id: ModuleId) => modules.includes(id)
 
-  // Rule 1: at least one foundational module
-  if (!has('budgetteren') && !has('vermogensregistratie')) {
-    errors.push('Kies minstens Budgetteren of Vermogensregistratie als basismodule.')
+  // Rule 1: at least one module must be selected
+  if (modules.length === 0) {
+    errors.push('Kies minstens één module.')
   }
 
   // Rules 2-4: check each module's dependencies from the catalog
   for (const moduleId of modules) {
     const def = getModuleDef(moduleId)
 
-    // Hard dependencies (requires): all must be present
     for (const reqId of def.requires) {
       if (!has(reqId)) {
         const reqLabel = getModuleDef(reqId).label
@@ -222,13 +221,10 @@ export function validateModules(modules: ModuleId[]): { valid: boolean; errors: 
       }
     }
 
-    // Soft dependencies (requiresOneOf): at least one must be present
     if (def.requiresOneOf && def.requiresOneOf.length > 0) {
       const hasAny = def.requiresOneOf.some((id) => has(id))
       if (!hasAny) {
-        const labels = def.requiresOneOf
-          .map((id) => getModuleDef(id).label)
-          .join(' of ')
+        const labels = def.requiresOneOf.map((id) => getModuleDef(id).label).join(' of ')
         errors.push(`${def.label} vereist dat ${labels} actief is.`)
       }
     }
@@ -260,11 +256,13 @@ export function getActiveNavModules(activeModules: ModuleId[]): NavModule[] {
  * Determine the landing page path based on active modules.
  *
  * Priority:
- * 1. inzicht_acties → '/will' (richest overview)
- * 2. budgetteren / vermogensregistratie → '/core' (kern overzicht)
+ * 1. nieuws only → '/berichten' (news-only user path)
+ * 2. inzicht_acties → '/will' (richest overview)
  * 3. fallback       → '/core'
  */
 export function getHomePath(activeModules: ModuleId[]): string {
+  const isNewsOnly = activeModules.length === 1 && activeModules[0] === 'nieuws'
+  if (isNewsOnly) return '/berichten'
   if (activeModules.includes('inzicht_acties')) return '/will'
   return '/core'
 }

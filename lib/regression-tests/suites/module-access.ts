@@ -211,6 +211,27 @@ const tests: TestCase[] = [
     },
   },
 
+  {
+    id: 'mod-home-news-only',
+    name: "getHomePath(['nieuws']) === '/berichten'",
+    description: 'Alleen nieuws actief → startpagina is /berichten (nieuws-only pad)',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      // A user with only the nieuws module active lands on /berichten
+      assertEqual(getHomePath(['nieuws']), '/berichten', 'home path for news-only')
+
+      // inzicht_acties still takes priority over nieuws when combined
+      const withInzicht: ModuleId[] = ['nieuws', 'budgetteren', 'inzicht_acties']
+      assertEqual(getHomePath(withInzicht), '/will', 'nieuws + inzicht_acties still routes to /will')
+
+      // nieuws + budgetteren (no inzicht_acties) routes to /core, not /berichten
+      const withBudget: ModuleId[] = ['nieuws', 'budgetteren']
+      assertEqual(getHomePath(withBudget), '/core', 'nieuws + budgetteren routes to /core')
+    },
+  },
+
   // ── Widget zichtbaarheid ─────────────────────────────────────────────────
 
   {
