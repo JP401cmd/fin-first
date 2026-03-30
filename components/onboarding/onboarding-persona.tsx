@@ -5,18 +5,19 @@ import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import {
   type PersonaId,
-  PERSONA_MODULE_PRESETS,
   MODULE_CATALOG,
   type ModuleId,
+  getModuleDef,
   validateModules,
 } from '@/lib/module-registry'
 
 // ── Types ────────────────────────────────────────────────────
 
-export interface OnboardingPersonaProps {
+export interface OnboardingModulesProps {
+  /** Currently highlighted persona (null = none selected, 'custom' accepted for backwards compat) */
   selectedPersona: PersonaId | 'custom' | null
   selectedModules: ModuleId[]
-  onSelectPersona: (persona: PersonaId | 'custom') => void
+  onSelectPersona: (persona: PersonaId) => void
   onToggleModule: (moduleId: ModuleId, enabled: boolean) => void
   onNext: () => void
   onBack: () => void
@@ -25,7 +26,7 @@ export interface OnboardingPersonaProps {
 // ── Persona definitions ──────────────────────────────────────
 
 interface PersonaDef {
-  id: PersonaId | 'custom'
+  id: PersonaId
   name: string
   tagline: string
   description: string
@@ -44,14 +45,14 @@ const PERSONAS: PersonaDef[] = [
     id: 'vermogensverdeler',
     name: 'De Vermogensverdeler',
     tagline: 'Overzicht over alles',
-    description: 'Al je bezittingen en schulden op één plek.',
+    description: 'Al je bezittingen en schulden op één plek, met inzichten en acties.',
     emoji: '📊',
   },
   {
     id: 'pensioenplanner',
     name: 'De Pensioenplanner',
     tagline: 'Zekerheid over later',
-    description: 'FIRE-projecties en toekomstscenarios voor jouw pensioen.',
+    description: 'FIRE-projecties, toekomstscenarios en gepersonaliseerde inzichten.',
     emoji: '🔭',
   },
   {
@@ -61,46 +62,82 @@ const PERSONAS: PersonaDef[] = [
     description: 'Alle modules actief — maximale inzichten voor financiële vrijheid.',
     emoji: '🔥',
   },
-  {
-    id: 'custom',
-    name: 'Eigen selectie',
-    tagline: 'Kies zelf je modules',
-    description: 'Stel zelf samen welke onderdelen voor jou relevant zijn.',
-    emoji: '✦',
-  },
 ]
 
 // ── Speech bubble helper ─────────────────────────────────────
 
 function getSpeechText(persona: PersonaId | 'custom' | null): string {
-  if (!persona) {
-    return 'Welk profiel past het beste bij jou? Ik stel dan alvast de juiste modules in. Je kunt dit later altijd aanpassen.'
+  if (!persona || persona === 'custom') {
+    return 'Welk profiel past het beste bij jou? Ik stel dan alvast de juiste modules in. Je kunt altijd aanpassen.'
   }
-  const map: Record<PersonaId | 'custom', string> = {
+  const map: Record<PersonaId, string> = {
     budgetteerder: 'Slim! Ik activeer de budgetteringsmodule zodat je direct inzicht hebt in je uitgaven en cashflow.',
-    vermogensverdeler: 'Goed plan! Met vermogensregistratie houd je al je bezittingen en schulden overzichtelijk bij.',
-    pensioenplanner: 'Toekomstgericht! Ik activeer vermogen én toekomstplannen — zo zie je wanneer jouw vrijheid begint.',
+    vermogensverdeler: 'Goed plan! Met vermogensregistratie en inzicht & acties houd je overzicht en krijg je gerichte aanbevelingen.',
+    pensioenplanner: 'Toekomstgericht! Ik activeer vermogen, toekomstplannen en inzichten — zo zie je wanneer jouw vrijheid begint.',
     fire_fighter: 'Volledig aan de slag! Ik activeer alle modules zodat je het maximale uit TriFinity haalt.',
-    custom: 'Jij kiest! Selecteer hieronder de modules die je wilt activeren. Let op de afhankelijkheden.',
   }
   return map[persona]
 }
 
+// ── Dynamic step count calculator ────────────────────────────
+// Calculates how many onboarding content steps follow after module selection.
+
+function computeRemainingSteps(modules: ModuleId[]): number {
+  const has = (id: ModuleId) => modules.includes(id)
+
+  // Special case: only nieuws selected
+  if (modules.length === 1 && modules[0] === 'nieuws') return 1
+
+  let count = 0
+  // Bezittingen step: if vermogensregistratie OR budgetteren is active
+  if (has('vermogensregistratie') || has('budgetteren')) count += 1
+  // Budgets step: if budgetteren is active
+  if (has('budgetteren')) count += 1
+  // Horizon step: if toekomstplannen is active
+  if (has('toekomstplannen')) count += 1
+  // Preferences step: if inzicht_acties is active
+  if (has('inzicht_acties')) count += 1
+
+  return count
+}
+
+// ── Dependency label helper ──────────────────────────────────
+// Returns a human-readable dependency description for a module, or null if standalone.
+
+function getDependencyLabel(mod: { requires: ModuleId[]; requiresOneOf?: ModuleId[] }): string | null {
+  const parts: string[] = []
+
+  if (mod.requires.length > 0) {
+    const labels = mod.requires.map((id) => getModuleDef(id).label)
+    parts.push(`Vereist: ${labels.join(', ')}`)
+  }
+
+  if (mod.requiresOneOf && mod.requiresOneOf.length > 0) {
+    const labels = mod.requiresOneOf.map((id) => getModuleDef(id).label)
+    parts.push(`Vereist: ${labels.join(' of ')}`)
+  }
+
+  return parts.length > 0 ? parts.join('. ') : null
+}
+
 // ── Main Component ───────────────────────────────────────────
 
-export function OnboardingPersona({
+export function OnboardingModules({
   selectedPersona,
   selectedModules,
   onSelectPersona,
   onToggleModule,
   onNext,
   onBack,
-}: OnboardingPersonaProps) {
+}: OnboardingModulesProps) {
   // Compute current validation errors for the selected module set
   const { valid, errors: validationErrors } = validateModules(selectedModules)
 
-  // Whether the user can proceed: a persona must be chosen and modules must be valid
-  const canProceed = selectedPersona !== null && valid
+  // User can proceed when at least one module is selected and all dependencies are valid
+  const canProceed = selectedModules.length > 0 && valid
+
+  // Remaining onboarding steps based on current module selection
+  const remainingSteps = computeRemainingSteps(selectedModules)
 
   return (
     <div className="pb-20 sm:pb-0">
@@ -117,7 +154,7 @@ export function OnboardingPersona({
 
       {/* Progress indicator */}
       <div className="mb-8">
-        <StepProgress current="persona" />
+        <StepProgress currentPhase="modules" />
       </div>
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Profiel</p>
@@ -140,7 +177,7 @@ export function OnboardingPersona({
         Welk profiel past bij jou?
       </h2>
 
-      {/* Persona cards grid */}
+      {/* Persona cards grid — 4 presets, no "custom" option */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {PERSONAS.map((persona) => {
           const isSelected = selectedPersona === persona.id
@@ -201,81 +238,87 @@ export function OnboardingPersona({
         })}
       </div>
 
-      {/* Active modules section — shown once a persona is selected */}
-      {selectedPersona !== null && (
-        <div className="mt-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[var(--ink)]">Actieve modules</h3>
-            {selectedPersona === 'custom' && (
-              <span className="text-xs text-[var(--ink-4)]">Kies minstens één basismodule</span>
-            )}
-          </div>
+      {/* Modules section — ALWAYS visible and togglable */}
+      <div className="mt-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">Actieve modules</h3>
+          <span className="text-xs text-[var(--ink-4)]">Kies minstens één module</span>
+        </div>
 
-          {/* Module pills */}
-          <div className="flex flex-wrap gap-2">
-            {MODULE_CATALOG.map((mod) => {
-              const isActive = selectedModules.includes(mod.id)
-              const isCustom = selectedPersona === 'custom'
+        {/* Module cards — vertical list with toggle checkboxes */}
+        <div className="flex flex-col gap-2">
+          {MODULE_CATALOG.map((mod) => {
+            const isActive = selectedModules.includes(mod.id)
+            const depLabel = getDependencyLabel(mod)
 
-              // For non-custom personas, modules are display-only (not toggleable)
-              if (!isCustom) {
-                return (
-                  <span
-                    key={mod.id}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      isActive
-                        ? 'border-wil-300 bg-wil-50 text-wil-700'
-                        : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)]'
-                    }`}
-                  >
-                    {isActive && (
-                      <svg className="h-3 w-3 text-wil-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    {mod.label}
-                  </span>
-                )
-              }
-
-              // Custom mode: modules are toggleable buttons
-              return (
-                <button
-                  key={mod.id}
-                  type="button"
-                  onClick={() => onToggleModule(mod.id, !isActive)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-[0.97] ${
+            return (
+              <button
+                key={mod.id}
+                type="button"
+                onClick={() => onToggleModule(mod.id, !isActive)}
+                className={`group flex min-h-[44px] w-full items-start gap-3 rounded-xl border-2 p-3 text-left transition-all active:scale-[0.995] ${
+                  isActive
+                    ? 'border-wil-400 bg-wil-50/60'
+                    : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                }`}
+              >
+                {/* Toggle checkbox */}
+                <div
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors ${
                     isActive
-                      ? 'border-wil-400 bg-wil-50 text-wil-700 hover:bg-wil-100'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink)]'
+                      ? 'bg-wil-500 text-white'
+                      : 'border-2 border-[var(--border-md)] bg-[var(--paper)]'
                   }`}
-                  title={mod.description}
+                  aria-hidden="true"
                 >
                   {isActive && (
-                    <svg className="h-3 w-3 text-wil-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                     </svg>
                   )}
-                  {mod.label}
-                </button>
-              )
-            })}
-          </div>
+                </div>
 
-          {/* Dependency validation errors */}
-          {validationErrors.length > 0 && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <p className="mb-1 text-xs font-semibold text-amber-800">Let op:</p>
-              <ul className="space-y-0.5">
-                {validationErrors.map((err, i) => (
-                  <li key={i} className="text-xs text-amber-700">
-                    {err}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+                {/* Module info */}
+                <div className="min-w-0 flex-1">
+                  <span className={`text-sm font-bold ${isActive ? 'text-wil-900' : 'text-[var(--ink)]'}`}>
+                    {mod.label}
+                  </span>
+                  <p className="mt-0.5 text-xs leading-snug text-[var(--ink-3)]">
+                    {mod.description}
+                  </p>
+                  {depLabel && (
+                    <p className="mt-1 text-[10px] font-medium text-[var(--ink-4)]">
+                      {depLabel}
+                    </p>
+                  )}
+                </div>
+              </button>
+            )
+          })}
         </div>
+
+        {/* Dependency validation errors */}
+        {validationErrors.length > 0 && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <p className="mb-1 text-xs font-semibold text-amber-800">Let op:</p>
+            <ul className="space-y-0.5">
+              {validationErrors.map((err, i) => (
+                <li key={i} className="text-xs text-amber-700">
+                  {err}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Dynamic step count indicator */}
+      {selectedModules.length > 0 && remainingSteps > 0 && (
+        <p className="mt-4 text-xs text-[var(--ink-4)]">
+          Na deze stap volgen nog{' '}
+          <span className="font-semibold">{remainingSteps} instapstap{remainingSteps !== 1 ? 'pen' : ''}</span>
+          {' '}op basis van jouw keuze.
+        </p>
       )}
 
       {/* Sticky navigation — same pattern as all other steps */}
@@ -297,3 +340,9 @@ export function OnboardingPersona({
     </div>
   )
 }
+
+// backwards compat — remove after orchestrator is updated
+export const OnboardingPersona = OnboardingModules
+
+// Re-export the props type under the old name for backwards compat
+export type OnboardingPersonaProps = OnboardingModulesProps
