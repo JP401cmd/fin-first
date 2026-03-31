@@ -167,6 +167,19 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                 >
                   Rapportages
                 </Link>
+                {/* News-only users: subtle upgrade link to discover the full app */}
+                {activeModules.length === 1 && activeModules[0] === 'nieuws' && (
+                  <>
+                    <div className="my-1 border-t border-[var(--border-ed)]" />
+                    <Link
+                      href="/identity/instellingen"
+                      className="block px-4 py-2 text-sm text-wil-600 font-medium hover:bg-wil-50"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Ontdek meer
+                    </Link>
+                  </>
+                )}
                 <div className="my-1 border-t border-[var(--border-ed)]" />
                 <Link
                   href="/logout"
