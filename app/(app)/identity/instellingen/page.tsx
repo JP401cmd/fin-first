@@ -89,6 +89,13 @@ export default function InstellingenPage() {
   const { activeModules, refreshModules } = useModuleAccess()
   const { modules: activeModuleToggles, toggle: toggleModule, saving: moduleSaving } = useModuleToggle(activeModules, refreshModules)
 
+  // ─ Section: Financiële toelichting ─
+  const [toelichtingOpen, setToelichtingOpen] = useState(false)
+  const [financialContext, setFinancialContext] = useState('')
+  const [financialContextSaved, setFinancialContextSaved] = useState('')
+  const [contextSaving, setContextSaving] = useState(false)
+  const [contextMessage, setContextMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   // ─ Section: Rebalancing ─
   const [rebalanceThreshold, setRebalanceThreshold] = useState(5)
   const [rebalanceThresholdSaved, setRebalanceThresholdSaved] = useState(5)
@@ -198,7 +205,7 @@ export default function InstellingenPage() {
       const [notifData, profileData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
-          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold'
+          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold, financial_context'
         ).eq('id', user.id).single(),
       ])
 
@@ -310,6 +317,12 @@ export default function InstellingenPage() {
           const th = Number(d.rebalance_threshold)
           setRebalanceThreshold(th)
           setRebalanceThresholdSaved(th)
+        }
+
+        // Financial context
+        if (d.financial_context) {
+          setFinancialContext(d.financial_context as string)
+          setFinancialContextSaved(d.financial_context as string)
         }
       }
 
@@ -570,6 +583,27 @@ export default function InstellingenPage() {
     }
     setAiSaving(false)
   }, [supabase])
+
+  // ─ Section: Financiële toelichting handler ────────────────────────────────
+  const saveFinancialContext = useCallback(async () => {
+    setContextSaving(true)
+    setContextMessage(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+      const { error } = await supabase
+        .from('profiles')
+        .update({ financial_context: financialContext || null })
+        .eq('id', user.id)
+      if (error) throw error
+      setFinancialContextSaved(financialContext)
+      setContextMessage({ type: 'success', text: 'Toelichting opgeslagen' })
+      setTimeout(() => setContextMessage(null), 3000)
+    } catch {
+      setContextMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+    }
+    setContextSaving(false)
+  }, [supabase, financialContext])
 
   // ─ Section G: Huishouden Privacy handler ─────────────────────────────────
   const saveHouseholdPrivacy = useCallback(async () => {
@@ -1017,6 +1051,68 @@ export default function InstellingenPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+      </section>
+
+      {/* ── Financiële toelichting ────────────────────────────────────── */}
+      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setToelichtingOpen(o => !o)}
+          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+        >
+          <div>
+            <h2 className="label-editorial text-[var(--ink-2)]">Financiële toelichting</h2>
+            {!toelichtingOpen && (
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                {financialContext ? `${financialContext.length} tekens` : 'Nog niet ingevuld'}
+              </p>
+            )}
+          </div>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${toelichtingOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {toelichtingOpen && (
+          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-4">
+            <p className="text-xs text-[var(--ink-3)] leading-relaxed">
+              Beschrijf je financiële situatie in eigen woorden. Deze tekst wordt gebruikt als extra context voor het personaliseren van je nieuws.
+            </p>
+
+            <div>
+              <textarea
+                value={financialContext}
+                onChange={e => {
+                  if (e.target.value.length <= 1000) setFinancialContext(e.target.value)
+                }}
+                placeholder="Bijv. ik ben zzp'er in de IT, spaar maandelijks ~€1.500, heb een hypotheek op mijn appartement en beleg via DeGiro..."
+                rows={5}
+                className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:ring-2 focus:ring-zinc-900/10 resize-y"
+              />
+              <div className="mt-1 flex justify-end">
+                <span className={`text-xs tabular-nums ${financialContext.length >= 950 ? 'text-amber-600' : 'text-[var(--ink-4)]'}`}>
+                  {financialContext.length} / 1.000
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={saveFinancialContext}
+                disabled={contextSaving || financialContext === financialContextSaved}
+                className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {contextSaving ? 'Opslaan...' : 'Opslaan'}
+              </button>
+              {contextMessage && (
+                <span className={`text-sm ${contextMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {contextMessage.text}
+                </span>
+              )}
+              {financialContext !== financialContextSaved && !contextMessage && (
+                <span className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</span>
+              )}
+            </div>
           </div>
         )}
       </section>
