@@ -4,6 +4,7 @@ import { getDefaultBudgets } from '@/lib/budget-data'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { type ModuleId } from '@/lib/module-registry'
+import { extractFinancialData } from '@/lib/ai/extract-financial-data'
 
 /** Retry a function up to maxRetries times with exponential backoff */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
@@ -305,6 +306,63 @@ export async function POST(req: Request) {
       // Fallback to NL_AOW_AGE
     }
 
+    // ── News-only: extract structured data from free text ──────────────
+    // When a user selects ONLY the 'nieuws' module, they provide a free-text
+    // description instead of filling in asset/debt/budget forms. We use AI
+    // to extract structured financial data from that description.
+    const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
+    let extractedAssets: Array<{ name: string; asset_type: string; current_value: number; source: string }> = []
+    let extractedDebts: Array<{ name: string; debt_type: string; current_balance: number; source: string }> = []
+    let extractedLifeEvents: Array<{ name: string; event_type: string; target_age: number | null; description?: string }> = []
+    let financialContext: string | null = null
+    let aiIncomeEstimate: number | null = null
+    let aiExpensesEstimate: number | null = null
+
+    if (isNewsOnly && newsDescription) {
+      const dob = new Date(identity.date_of_birth)
+      const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+
+      const extraction = await extractFinancialData(supabase, newsDescription, {
+        age,
+        householdType: identity.household_type,
+        monthlyIncome: identity.net_monthly_income,
+        monthlyExpenses: identity.estimated_monthly_expenses,
+      })
+
+      extractedAssets = extraction.assets.map((a) => ({
+        name: a.name,
+        asset_type: a.asset_type,
+        current_value: a.estimated_value,
+        source: 'ai_extracted' as const,
+      }))
+
+      extractedDebts = extraction.debts.map((d) => ({
+        name: d.name,
+        debt_type: d.debt_type,
+        current_balance: d.estimated_balance,
+        source: 'ai_extracted' as const,
+      }))
+
+      extractedLifeEvents = extraction.life_events
+
+      financialContext = extraction.financial_context_remainder || null
+
+      // Capture AI income/expenses estimates for profile update
+      aiIncomeEstimate = extraction.monthly_income_estimate ?? null
+      aiExpensesEstimate = extraction.monthly_expenses_estimate ?? null
+    }
+
+    // Derive completed onboarding steps from active modules
+    const completedSteps: string[] = ['identity', 'modules']
+    if (isNewsOnly) {
+      completedSteps.push('nieuws_only')
+    } else {
+      if (activeModules?.some((m) => m === 'budgetteren' || m === 'vermogensregistratie')) completedSteps.push('bezittingen')
+      if (activeModules?.includes('budgetteren')) completedSteps.push('budgets')
+      if (activeModules?.includes('toekomstplannen')) completedSteps.push('horizon')
+      if (activeModules?.includes('inzicht_acties')) completedSteps.push('preferences')
+    }
+
     // ── Strategy: Try atomic RPC first, fall back to multi-step approach ──
     // The RPC wraps everything in a single PostgreSQL transaction — if ANY
     // step fails, the entire save is rolled back. No partial data possible.
@@ -334,6 +392,7 @@ export async function POST(req: Request) {
         const fpPrefs = (fpProfile?.feature_preferences as Record<string, unknown>) ?? {}
         const profileUpdates: Record<string, unknown> = {
           feature_preferences: { ...fpPrefs, _invulfase_active: true },
+          completed_onboarding_steps: completedSteps,
         }
         // Persist selected modules when provided by the persona step
         if (activeModules && activeModules.length > 0) {
@@ -341,10 +400,75 @@ export async function POST(req: Request) {
           // Keep budgeting_active in sync — it's a derived boolean convenience column
           profileUpdates.budgeting_active = (activeModules as ModuleId[]).includes('budgetteren')
         }
+        // News-only: store financial context and AI-estimated income/expenses
+        if (isNewsOnly) {
+          if (financialContext) profileUpdates.financial_context = financialContext
+          if (aiIncomeEstimate != null) profileUpdates.net_monthly_income = aiIncomeEstimate
+          if (aiExpensesEstimate != null) profileUpdates.estimated_monthly_expenses = aiExpensesEstimate
+        }
         await supabase
           .from('profiles')
           .update(profileUpdates)
           .eq('id', user.id)
+
+        // News-only: insert AI-extracted assets, debts, and life events
+        // These are persisted outside the RPC transaction since the RPC
+        // function does not know about the extraction results.
+        if (isNewsOnly) {
+          if (extractedAssets.length > 0) {
+            const rows = extractedAssets.map((a, i) => ({
+              user_id: user.id,
+              name: a.name,
+              asset_type: a.asset_type,
+              current_value: a.current_value,
+              purchase_value: a.current_value,
+              expected_return: 0,
+              monthly_contribution: 0,
+              is_active: true,
+              sort_order: i,
+              source: 'ai_extracted',
+            }))
+            const { error } = await supabase.from('assets').insert(rows)
+            if (error) console.error('AI-extracted assets insert error:', error)
+          }
+
+          if (extractedDebts.length > 0) {
+            const rows = extractedDebts.map((d, i) => ({
+              user_id: user.id,
+              name: d.name,
+              debt_type: d.debt_type,
+              original_amount: d.current_balance,
+              current_balance: d.current_balance,
+              interest_rate: 0,
+              monthly_payment: 0,
+              minimum_payment: 0,
+              start_date: new Date().toISOString().split('T')[0],
+              is_active: true,
+              sort_order: i,
+              source: 'ai_extracted',
+            }))
+            const { error } = await supabase.from('debts').insert(rows)
+            if (error) console.error('AI-extracted debts insert error:', error)
+          }
+
+          if (extractedLifeEvents.length > 0) {
+            const rows = extractedLifeEvents.map((e, i) => ({
+              user_id: user.id,
+              name: e.name,
+              event_type: e.event_type,
+              target_age: e.target_age,
+              monthly_income_change: 0,
+              monthly_cost_change: 0,
+              one_time_cost: 0,
+              duration_months: 0,
+              is_active: true,
+              sort_order: i + 1, // 0 is reserved for AOW
+              icon: 'Calendar',
+            }))
+            const { error } = await supabase.from('life_events').insert(rows)
+            if (error) console.error('AI-extracted life events insert error:', error)
+          }
+        }
       }
       return Response.json({ success: true, alreadyCompleted: result.already_completed ?? false })
     }
@@ -397,7 +521,14 @@ export async function POST(req: Request) {
     profileData.fire_end_age = horizonData?.fire_end_age ?? identity.fire_end_age ?? 90
     profileData.temporal_balance = horizonData?.temporal_balance ?? identity.temporal_balance ?? 3
     profileData.news_description = newsDescription ?? null
+    profileData.completed_onboarding_steps = completedSteps
     if (widgetPrefs) profileData.widget_prefs = widgetPrefs
+    // News-only: store financial context and AI-estimated income/expenses
+    if (isNewsOnly) {
+      if (financialContext) profileData.financial_context = financialContext
+      if (aiIncomeEstimate != null) profileData.net_monthly_income = aiIncomeEstimate
+      if (aiExpensesEstimate != null) profileData.estimated_monthly_expenses = aiExpensesEstimate
+    }
 
     const { error: profileErr } = await supabase
       .from('profiles')
@@ -661,6 +792,62 @@ export async function POST(req: Request) {
           .insert(userEvents)
         if (eventsError) console.error('Life events insert error:', eventsError)
       }
+    }
+
+    // 6c. News-only: insert AI-extracted assets, debts, and life events
+    // These come from the AI extraction above and have source: 'ai_extracted'
+    if (isNewsOnly && extractedAssets.length > 0) {
+      const rows = extractedAssets.map((a, i) => ({
+        user_id: user.id,
+        name: a.name,
+        asset_type: a.asset_type,
+        current_value: a.current_value,
+        purchase_value: a.current_value,
+        expected_return: 0,
+        monthly_contribution: 0,
+        is_active: true,
+        sort_order: i,
+        source: 'ai_extracted',
+      }))
+      const { error } = await supabase.from('assets').insert(rows)
+      if (error) console.error('AI-extracted assets insert error:', error)
+    }
+
+    if (isNewsOnly && extractedDebts.length > 0) {
+      const rows = extractedDebts.map((d, i) => ({
+        user_id: user.id,
+        name: d.name,
+        debt_type: d.debt_type,
+        original_amount: d.current_balance,
+        current_balance: d.current_balance,
+        interest_rate: 0,
+        monthly_payment: 0,
+        minimum_payment: 0,
+        start_date: new Date().toISOString().split('T')[0],
+        is_active: true,
+        sort_order: i,
+        source: 'ai_extracted',
+      }))
+      const { error } = await supabase.from('debts').insert(rows)
+      if (error) console.error('AI-extracted debts insert error:', error)
+    }
+
+    if (isNewsOnly && extractedLifeEvents.length > 0) {
+      const rows = extractedLifeEvents.map((e, i) => ({
+        user_id: user.id,
+        name: e.name,
+        event_type: e.event_type,
+        target_age: e.target_age,
+        monthly_income_change: 0,
+        monthly_cost_change: 0,
+        one_time_cost: 0,
+        duration_months: 0,
+        is_active: true,
+        sort_order: i + 1, // 0 is reserved for AOW
+        icon: 'Calendar',
+      }))
+      const { error } = await supabase.from('life_events').insert(rows)
+      if (error) console.error('AI-extracted life events insert error:', error)
     }
 
     // 7. Mark onboarding as completed LAST — only after all data is saved successfully
