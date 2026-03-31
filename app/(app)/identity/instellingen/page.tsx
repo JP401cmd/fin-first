@@ -21,9 +21,10 @@ import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/
 import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 
 import { formatCurrency } from '@/lib/format'
-import { MODULE_CATALOG } from '@/lib/module-registry'
+import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
+import { ModuleOnboardingModal, MODULE_REQUIRED_STEPS } from '@/components/app/module-onboarding-modal'
 
 // ── Typography helpers ────────────────────────────────────────────────────
 
@@ -88,6 +89,10 @@ export default function InstellingenPage() {
   const [moduleToggleErrors, setModuleToggleErrors] = useState<string[]>([])
   const { activeModules, refreshModules } = useModuleAccess()
   const { modules: activeModuleToggles, toggle: toggleModule, saving: moduleSaving } = useModuleToggle(activeModules, refreshModules)
+
+  // ─ Module onboarding state (progressive onboarding for new modules) ─
+  const [completedSteps, setCompletedSteps] = useState<string[]>([])
+  const [pendingModuleId, setPendingModuleId] = useState<ModuleId | null>(null)
 
   // ─ Section: Financiële toelichting ─
   const [toelichtingOpen, setToelichtingOpen] = useState(false)
@@ -205,7 +210,7 @@ export default function InstellingenPage() {
       const [notifData, profileData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
-          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold, financial_context'
+          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold, financial_context, completed_onboarding_steps'
         ).eq('id', user.id).single(),
       ])
 
@@ -323,6 +328,11 @@ export default function InstellingenPage() {
         if (d.financial_context) {
           setFinancialContext(d.financial_context as string)
           setFinancialContextSaved(d.financial_context as string)
+        }
+
+        // Completed onboarding steps (for progressive module onboarding)
+        if (d.completed_onboarding_steps) {
+          setCompletedSteps(d.completed_onboarding_steps as string[])
         }
       }
 
@@ -804,6 +814,15 @@ export default function InstellingenPage() {
                       disabled={moduleSaving}
                       onClick={async () => {
                         setModuleToggleErrors([])
+                        // When enabling a module, check if required onboarding steps are completed
+                        if (!isActive) {
+                          const requiredSteps = MODULE_REQUIRED_STEPS[mod.id as ModuleId] ?? []
+                          const missing = requiredSteps.filter((s) => !completedSteps.includes(s))
+                          if (missing.length > 0) {
+                            setPendingModuleId(mod.id as ModuleId)
+                            return
+                          }
+                        }
                         const result = await toggleModule(mod.id, !isActive)
                         if (!result.success) {
                           setModuleToggleErrors(result.errors)
@@ -2449,6 +2468,40 @@ export default function InstellingenPage() {
           </div>
         </div>
       </BottomSheet>
+
+      {/* ── Module onboarding modal ─────────────────────────────────── */}
+      {pendingModuleId && (
+        <ModuleOnboardingModal
+          moduleId={pendingModuleId}
+          completedSteps={completedSteps}
+          open={!!pendingModuleId}
+          onClose={() => setPendingModuleId(null)}
+          onComplete={async (newSteps) => {
+            // Merge new steps into completed set
+            const updatedSteps = [...new Set([...completedSteps, ...newSteps])]
+            setCompletedSteps(updatedSteps)
+
+            // Persist to backend (fire-and-forget with error logging)
+            if (newSteps.length > 0) {
+              fetch('/api/onboarding-steps', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ steps: updatedSteps }),
+              }).catch((err) => console.error('Failed to save onboarding steps:', err))
+            }
+
+            // Now actually toggle the module on
+            const moduleToActivate = pendingModuleId
+            setPendingModuleId(null)
+
+            const result = await toggleModule(moduleToActivate, true)
+            if (!result.success) {
+              setModuleToggleErrors(result.errors)
+              setTimeout(() => setModuleToggleErrors([]), 5000)
+            }
+          }}
+        />
+      )}
 
     </div>
   )
