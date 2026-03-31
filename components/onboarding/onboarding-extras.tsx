@@ -8,6 +8,7 @@ import { StepProgress } from './step-progress'
 import { MiniBankForm, type BankAccountEntry } from './mini-bank-form'
 import { MiniAssetForm, type AssetEntry } from './mini-asset-form'
 import { MiniDebtForm, type DebtEntry } from './mini-debt-form'
+import { type ModuleId } from '@/lib/module-registry'
 
 type Section = 'assets' | 'debts'
 
@@ -21,8 +22,8 @@ export function OnboardingExtras({
   onNext,
   onBack,
   saving = false,
-  hideBudgets = false,
-  budgetteringMode = 'none',
+  activeModules = [],
+  subStep,
 }: {
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -33,14 +34,15 @@ export function OnboardingExtras({
   onNext: () => void
   onBack: () => void
   saving?: boolean
-  hideBudgets?: boolean
-  budgetteringMode?: string
+  activeModules?: ModuleId[]
+  subStep?: { current: number; total: number }
 }) {
   const [openSections, setOpenSections] = useState<Record<Section, boolean>>({
     assets: false,
     debts: false,
   })
   const [showBudgetModal, setShowBudgetModal] = useState(false)
+  const [showHoldingsModal, setShowHoldingsModal] = useState(false)
 
   const toggle = (section: Section) => {
     setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }))
@@ -56,16 +58,29 @@ export function OnboardingExtras({
 
   const hasData = bankAccounts.length > 0 || assets.length > 0 || debts.length > 0
 
+  const hasBudgetteren = activeModules.includes('budgetteren')
+  const hasAandelenregistratie = activeModules.includes('aandelenregistratie')
+
   /**
-   * Validate budget tracking requirement before proceeding.
-   * When budgettering is active, at least one bank account must have
-   * has_budget_tracking enabled — otherwise we prompt the user.
+   * Validate module-specific requirements before proceeding.
+   * - budgetteren: at least one bank account must have has_budget_tracking enabled.
+   * - aandelenregistratie: at least one investment asset must have has_holdings_tracking enabled.
+   * Missing prerequisites prompt the user to auto-create a sensible default.
    */
   const handleNext = () => {
-    if (budgetteringMode !== 'none') {
+    if (hasBudgetteren) {
       const hasBudgetAccount = bankAccounts.some((a) => a.has_budget_tracking)
       if (!hasBudgetAccount) {
         setShowBudgetModal(true)
+        return
+      }
+    }
+    if (hasAandelenregistratie) {
+      const hasHoldingsAsset = assets.some(
+        (a) => a.asset_type === 'investment' && (a as unknown as Record<string, unknown>).has_holdings_tracking
+      )
+      if (!hasHoldingsAsset) {
+        setShowHoldingsModal(true)
         return
       }
     }
@@ -88,6 +103,45 @@ export function OnboardingExtras({
     onNext()
   }
 
+  /**
+   * Auto-create a default investment asset so the user can proceed.
+   * AssetEntry does not carry has_holdings_tracking — that flag lives on the
+   * persisted record written by the server. Creating the investment asset here
+   * satisfies the server-side save path which sets the flag automatically.
+   */
+  const handleAutoCreateHoldings = () => {
+    onAssetChange([
+      ...assets,
+      {
+        name: 'Beleggingsrekening',
+        asset_type: 'investment',
+        current_value: '0',
+        purchase_value: '0',
+        expected_return: '0.07',
+        monthly_contribution: '0',
+        institution: '',
+        subtype: 'etf',
+        risk_profile: 'middel',
+        tax_benefit: false,
+        is_liquid: true,
+        lock_end_date: '',
+        ticker_symbol: '',
+        rental_income: '',
+        woz_value: '',
+        retirement_provider_type: '',
+        depreciation_rate: '',
+        address_postcode: '',
+        address_house_number: '',
+        expiry_date: '',
+        beneficiary: '',
+        kvk_number: '',
+        ownership_percentage: '',
+        annual_dividend: '',
+      } as AssetEntry,
+    ])
+    setShowHoldingsModal(false)
+  }
+
   return (
     <div className="pb-20 sm:pb-0">
       <button
@@ -101,7 +155,7 @@ export function OnboardingExtras({
       </button>
 
       <div className="mb-8">
-        <StepProgress current="startpunt" hideBudgets={hideBudgets} />
+        <StepProgress currentPhase="instellen" subStep={subStep} />
       </div>
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Je startpunt</p>
@@ -207,6 +261,27 @@ export function OnboardingExtras({
               Terug naar bezittingen
             </button>
           </div>
+        </div>
+      </BottomSheet>
+
+      {/* Holdings tracking validation modal */}
+      <BottomSheet open={showHoldingsModal} onClose={() => setShowHoldingsModal(false)} title="Aandelenregistratie">
+        <p className="mb-4 text-sm text-[var(--ink-2)]">
+          Je hebt aandelenregistratie geactiveerd, maar nog geen beleggingsrekening. Wil je er een aanmaken?
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowHoldingsModal(false)}
+            className="flex-1 min-h-[44px] rounded-xl border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)]"
+          >
+            Zelf toevoegen
+          </button>
+          <button
+            onClick={handleAutoCreateHoldings}
+            className="flex-1 min-h-[44px] rounded-xl bg-kern-600 px-4 py-2 text-sm font-medium text-white"
+          >
+            Maak aan
+          </button>
         </div>
       </BottomSheet>
     </div>

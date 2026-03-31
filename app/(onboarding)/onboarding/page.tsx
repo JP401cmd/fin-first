@@ -10,15 +10,18 @@ import type { BankAccountEntry } from '@/components/onboarding/mini-bank-form'
 import type { AssetEntry } from '@/components/onboarding/mini-asset-form'
 import type { DebtEntry } from '@/components/onboarding/mini-debt-form'
 import type { PreferencesData } from '@/components/onboarding/onboarding-preferences'
+import type { HorizonData } from '@/components/onboarding/onboarding-horizon'
 
 import { OnboardingIntro } from '@/components/onboarding/onboarding-intro'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingBudgets } from '@/components/onboarding/onboarding-budgets'
 import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
 import { OnboardingPreferences, INITIAL_PREFERENCES, buildWidgetPrefsFromPreferences } from '@/components/onboarding/onboarding-preferences'
-import { OnboardingPersona } from '@/components/onboarding/onboarding-persona'
+import { OnboardingModules } from '@/components/onboarding/onboarding-persona'
+import { OnboardingHorizon, INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
+import { OnboardingNieuwsOnly } from '@/components/onboarding/onboarding-nieuws-only'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
-import { type PersonaId, type ModuleId, PERSONA_MODULE_PRESETS, ALL_MODULES } from '@/lib/module-registry'
+import { type PersonaId, type ModuleId, PERSONA_MODULE_PRESETS, getHomePath } from '@/lib/module-registry'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -37,30 +40,61 @@ const SAVING_MESSAGES = [
 type Step =
   | 'intro'
   | 'identity'
-  | 'persona'
+  | 'modules'
+  | 'bezittingen'
   | 'budgets'
-  | 'extras'
+  | 'horizon'
   | 'preferences'
+  | 'nieuws_only'
   | 'saving'
   | 'success'
 
 type Direction = 'forward' | 'back'
 
-const FULL_STEP_ORDER: Step[] = ['intro', 'identity', 'persona', 'extras', 'budgets', 'preferences', 'saving', 'success']
+/**
+ * Compute the dynamic step order based on which modules the user selected.
+ * Steps are only included when the corresponding module is active.
+ * Special case: if only 'nieuws' is selected, show a single nieuws_only step.
+ */
+function computeStepOrder(selectedModules: ModuleId[]): Step[] {
+  const steps: Step[] = ['intro', 'identity', 'modules']
+  const has = (m: ModuleId) => selectedModules.includes(m)
+  const isNewsOnly = selectedModules.length === 1 && has('nieuws')
 
-function getStepOrder(budgetteringMode: string): Step[] {
-  if (budgetteringMode === 'none') {
-    return FULL_STEP_ORDER.filter(s => s !== 'budgets')
+  if (isNewsOnly) {
+    steps.push('nieuws_only')
+  } else {
+    if (has('vermogensregistratie') || has('budgetteren')) steps.push('bezittingen')
+    if (has('budgetteren')) steps.push('budgets')
+    if (has('toekomstplannen')) steps.push('horizon')
+    if (has('inzicht_acties')) steps.push('preferences')
   }
-  return FULL_STEP_ORDER
+
+  steps.push('saving', 'success')
+  return steps
+}
+
+/**
+ * For steps in the "instellen" phase (between modules and saving), compute a
+ * sub-step indicator like "1 of 3". Returns undefined for non-instellen steps.
+ */
+function getSubStep(step: Step, stepOrder: Step[]): { current: number; total: number } | undefined {
+  const installenSteps = stepOrder.filter(
+    (s) => !['intro', 'identity', 'modules', 'saving', 'success'].includes(s)
+  )
+  const idx = installenSteps.indexOf(step)
+  if (idx === -1) return undefined
+  return { current: idx + 1, total: installenSteps.length }
 }
 
 interface State {
   step: Step
   direction: Direction
   identity: IdentityData
-  persona: PersonaId | 'custom' | null
+  persona: PersonaId | null
   selectedModules: ModuleId[]
+  horizon: HorizonData
+  newsDescription: string
   budgetAmounts: Record<string, number>
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -71,8 +105,10 @@ interface State {
 /** Data portion of state that gets persisted to localStorage (excludes step/direction) */
 interface PersistedData {
   identity: IdentityData
-  persona: PersonaId | 'custom' | null
+  persona: PersonaId | null
   selectedModules: ModuleId[]
+  horizon?: HorizonData
+  newsDescription?: string
   budgetAmounts: Record<string, number>
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -85,8 +121,10 @@ interface PersistedData {
 type Action =
   | { type: 'SET_STEP'; step: Step }
   | { type: 'SET_IDENTITY'; data: IdentityData }
-  | { type: 'SET_PERSONA'; persona: PersonaId | 'custom' }
+  | { type: 'SET_PERSONA'; persona: PersonaId }
   | { type: 'TOGGLE_MODULE'; moduleId: ModuleId; enabled: boolean }
+  | { type: 'SET_HORIZON'; data: HorizonData }
+  | { type: 'SET_NEWS_DESCRIPTION'; value: string }
   | { type: 'SET_BUDGET_AMOUNTS'; amounts: Record<string, number> }
   | { type: 'SET_BANK_ACCOUNTS'; items: BankAccountEntry[] }
   | { type: 'SET_ASSETS'; items: AssetEntry[] }
@@ -106,16 +144,9 @@ const initialState: State = {
     number_of_children: 0,
     net_monthly_income: '',
     estimated_monthly_expenses: '',
-    budgettering_mode: '',
-    expected_return: 0.07,
-    inflation_rate: 0.02,
-    retirement_expense_method: 'essential_budgets',
-    retirement_custom_amount: '',
-    fire_end_strategy: 'deplete',
-    fire_legacy_amount: '',
-    fire_end_age: 90,
-    temporal_balance: 3,
   },
+  horizon: INITIAL_HORIZON_DATA,
+  newsDescription: '',
   budgetAmounts: {},
   bankAccounts: [],
   assets: [],
@@ -126,45 +157,29 @@ const initialState: State = {
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_STEP': {
-      const stepOrder = getStepOrder(state.identity.budgettering_mode)
+      const stepOrder = computeStepOrder(state.selectedModules)
       const oldIdx = stepOrder.indexOf(state.step)
       const newIdx = stepOrder.indexOf(action.step)
       const direction: Direction = newIdx >= oldIdx ? 'forward' : 'back'
       return { ...state, step: action.step, direction }
     }
     case 'SET_PERSONA': {
-      // When selecting a named persona, preload the module set from the preset.
-      // When selecting 'custom', keep the current selectedModules (or use all if empty).
-      const modules: ModuleId[] =
-        action.persona === 'custom'
-          ? state.selectedModules.length > 0
-            ? state.selectedModules
-            : [...ALL_MODULES]
-          : [...PERSONA_MODULE_PRESETS[action.persona]]
+      const modules = [...PERSONA_MODULE_PRESETS[action.persona]]
       return { ...state, persona: action.persona, selectedModules: modules }
     }
     case 'TOGGLE_MODULE': {
-      // Only allow toggling in custom persona mode
-      if (state.persona !== 'custom') return state
+      // Always allow toggling — clear persona to null since it no longer matches a preset
       const updated = action.enabled
         ? [...state.selectedModules, action.moduleId]
         : state.selectedModules.filter((m) => m !== action.moduleId)
-      return { ...state, selectedModules: updated }
+      return { ...state, persona: null, selectedModules: updated }
     }
-    case 'SET_IDENTITY': {
-      let newState = { ...state, identity: action.data }
-      // When switching to no-budgets, clean up budget_cashflow from preferences
-      if (action.data.budgettering_mode === 'none' && state.preferences.focuses.includes('budget_cashflow')) {
-        newState = {
-          ...newState,
-          preferences: {
-            ...newState.preferences,
-            focuses: newState.preferences.focuses.filter(f => f !== 'budget_cashflow'),
-          },
-        }
-      }
-      return newState
-    }
+    case 'SET_IDENTITY':
+      return { ...state, identity: action.data }
+    case 'SET_HORIZON':
+      return { ...state, horizon: action.data }
+    case 'SET_NEWS_DESCRIPTION':
+      return { ...state, newsDescription: action.value }
     case 'SET_BUDGET_AMOUNTS':
       return { ...state, budgetAmounts: action.amounts }
     case 'SET_BANK_ACCOUNTS':
@@ -176,17 +191,18 @@ function reducer(state: State, action: Action): State {
     case 'SET_PREFERENCES':
       return { ...state, preferences: action.data }
     case 'RESTORE_STATE': {
-      // Restore persisted data while keeping step/direction from the restored lastStep
       const restoredStep = action.data.lastStep && !['saving', 'success'].includes(action.data.lastStep)
         ? action.data.lastStep
         : 'identity'
       return {
         ...state,
-        step: restoredStep,
-        direction: 'forward' as Direction,
+        step: restoredStep as Step,
+        direction: 'forward',
         identity: action.data.identity,
         persona: action.data.persona ?? null,
         selectedModules: action.data.selectedModules ?? [],
+        horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
+        newsDescription: action.data.newsDescription ?? '',
         budgetAmounts: action.data.budgetAmounts,
         bankAccounts: action.data.bankAccounts,
         assets: action.data.assets,
@@ -220,6 +236,8 @@ function saveToLocalStorage(state: State) {
       identity: state.identity,
       persona: state.persona,
       selectedModules: state.selectedModules,
+      horizon: state.horizon,
+      newsDescription: state.newsDescription,
       budgetAmounts: state.budgetAmounts,
       bankAccounts: state.bankAccounts,
       assets: state.assets,
@@ -237,17 +255,58 @@ function loadFromLocalStorage(): PersistedData | null {
   try {
     const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY)
     if (!raw) return null
-    const data = JSON.parse(raw) as PersistedData
-    // Basic validation: identity must have a name or date
-    if (!data.identity || typeof data.identity !== 'object') return null
-    // Ensure arrays are actually arrays
-    if (!Array.isArray(data.bankAccounts)) data.bankAccounts = []
-    if (!Array.isArray(data.assets)) data.assets = []
-    if (!Array.isArray(data.debts)) data.debts = []
-    if (!Array.isArray(data.selectedModules)) data.selectedModules = []
-    if (!data.budgetAmounts || typeof data.budgetAmounts !== 'object') data.budgetAmounts = {}
-    // persona may be absent from older drafts — default to null
-    if (data.persona === undefined) data.persona = null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration requires flexible typing
+    const parsed = JSON.parse(raw) as Record<string, any>
+    // Basic validation: identity must exist
+    if (!parsed.identity || typeof parsed.identity !== 'object') return null
+
+    // Migration: old format had FIRE params and budgettering_mode on identity
+    let identity: IdentityData
+    let horizon: HorizonData | undefined = parsed.horizon
+
+    if ('budgettering_mode' in parsed.identity) {
+      const old = parsed.identity as Record<string, unknown>
+      if (!horizon) {
+        horizon = {
+          fire_end_strategy: (old.fire_end_strategy as string) ?? 'deplete',
+          fire_end_age: (old.fire_end_age as number) ?? 90,
+          fire_legacy_amount: String(old.fire_legacy_amount ?? ''),
+          retirement_expense_method: (old.retirement_expense_method as string) ?? 'current_income',
+          retirement_custom_amount: String(old.retirement_custom_amount ?? ''),
+          temporal_balance: (old.temporal_balance as number) ?? 3,
+          life_events: [],
+        } as HorizonData
+      }
+      identity = {
+        full_name: (old.full_name as string) ?? '',
+        date_of_birth: (old.date_of_birth as string) ?? '',
+        household_type: (old.household_type as string) ?? 'solo',
+        number_of_children: (old.number_of_children as number) ?? 0,
+        net_monthly_income: (old.net_monthly_income as string) ?? '',
+        estimated_monthly_expenses: (old.estimated_monthly_expenses as string) ?? '',
+      } as IdentityData
+    } else {
+      identity = parsed.identity as IdentityData
+    }
+
+    const data: PersistedData = {
+      identity,
+      persona: parsed.persona ?? null,
+      selectedModules: Array.isArray(parsed.selectedModules) ? parsed.selectedModules : [],
+      horizon,
+      newsDescription: parsed.newsDescription,
+      budgetAmounts: parsed.budgetAmounts && typeof parsed.budgetAmounts === 'object' ? parsed.budgetAmounts : {},
+      bankAccounts: Array.isArray(parsed.bankAccounts) ? parsed.bankAccounts : [],
+      assets: Array.isArray(parsed.assets) ? parsed.assets : [],
+      debts: Array.isArray(parsed.debts) ? parsed.debts : [],
+      preferences: parsed.preferences ?? INITIAL_PREFERENCES,
+      lastStep: parsed.lastStep,
+    }
+
+    // Map old step names to new ones
+    if (data.lastStep === ('persona' as string)) data.lastStep = 'modules'
+    if (data.lastStep === ('extras' as string)) data.lastStep = 'bezittingen'
+
     return data
   } catch {
     return null
@@ -275,8 +334,23 @@ export default function OnboardingPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [restoredNotice, setRestoredNotice] = useState(false)
 
-  const noBudgets = state.identity.budgettering_mode === 'none'
-  const activeStepOrder = useMemo(() => getStepOrder(state.identity.budgettering_mode), [state.identity.budgettering_mode])
+  const activeStepOrder = useMemo(() => computeStepOrder(state.selectedModules), [state.selectedModules])
+
+  const goToNext = useCallback(() => {
+    const idx = activeStepOrder.indexOf(state.step)
+    if (idx < activeStepOrder.length - 1) {
+      dispatch({ type: 'SET_STEP', step: activeStepOrder[idx + 1] })
+    }
+  }, [activeStepOrder, state.step])
+
+  const goToBack = useCallback(() => {
+    const idx = activeStepOrder.indexOf(state.step)
+    if (idx > 0) {
+      dispatch({ type: 'SET_STEP', step: activeStepOrder[idx - 1] })
+    }
+  }, [activeStepOrder, state.step])
+
+  const currentSubStep = useMemo(() => getSubStep(state.step, activeStepOrder), [state.step, activeStepOrder])
 
   // Check if already onboarded + restore from localStorage
   useEffect(() => {
@@ -361,29 +435,45 @@ export default function OnboardingPage() {
       // Build widget prefs from user preferences
       const widgetPrefs = buildWidgetPrefsFromPreferences(preferences)
 
-      // Determine budgettering mode from user's explicit choice in identity step
-      const budgetteringMode = state.identity.budgettering_mode === 'none' ? 'none' : 'manual'
-
       // Generate idempotency key to prevent duplicate saves on retry
       const idempotencyKey = crypto.randomUUID()
 
       const body: Record<string, unknown> = {
         identity: {
-          ...identity,
+          full_name: identity.full_name,
+          date_of_birth: identity.date_of_birth,
+          household_type: identity.household_type,
+          number_of_children: identity.number_of_children,
           net_monthly_income: Number(identity.net_monthly_income),
           estimated_monthly_expenses: identity.estimated_monthly_expenses ? Number(identity.estimated_monthly_expenses) : undefined,
-          budgettering_mode: undefined, // strip from identity — not a profile field
-          retirement_custom_amount: identity.retirement_custom_amount ? Number(identity.retirement_custom_amount) : undefined,
-          fire_legacy_amount: identity.fire_legacy_amount ? Number(identity.fire_legacy_amount) : undefined,
-          fire_end_age: identity.fire_end_strategy === 'deplete' ? identity.fire_end_age : undefined,
         },
         budgetAmounts,
         widgetPrefs,
-        budgetteringMode,
         idempotencyKey,
-        // Pass selected modules so the API can persist them to active_modules
         activeModules: state.selectedModules.length > 0 ? state.selectedModules : undefined,
       }
+
+      // Add horizon data if toekomstplannen is active
+      if (state.selectedModules.includes('toekomstplannen')) {
+        body.horizonData = {
+          fire_end_strategy: state.horizon.fire_end_strategy,
+          fire_end_age: state.horizon.fire_end_age,
+          fire_legacy_amount: state.horizon.fire_legacy_amount ? Number(state.horizon.fire_legacy_amount) : undefined,
+          retirement_expense_method: state.horizon.retirement_expense_method,
+          retirement_custom_amount: state.horizon.retirement_custom_amount ? Number(state.horizon.retirement_custom_amount) : undefined,
+          temporal_balance: state.horizon.temporal_balance,
+          life_events: state.horizon.life_events,
+        }
+      }
+
+      // Add news description if present
+      if (state.newsDescription) {
+        body.newsDescription = state.newsDescription
+      }
+
+      // Derive budgettering mode from modules
+      const budgetteringMode = state.selectedModules.includes('budgetteren') ? 'manual' : 'none'
+      body.budgetteringMode = budgetteringMode
 
       // Only send non-empty optional arrays
       const validBanks = bankAccounts.filter((a) => a.name && a.bank_name && a.balance)
@@ -477,12 +567,13 @@ export default function OnboardingPage() {
         message = err instanceof Error ? err.message : 'Onbekende fout bij opslaan'
       }
       setSaveError(message)
-      // Go back to preferences step — all data is preserved in useReducer state
-      dispatch({ type: 'SET_STEP', step: 'preferences' })
+      // Go back to last content step before saving — all data is preserved in useReducer state
+      const contentSteps = activeStepOrder.filter(s => !['saving', 'success'].includes(s))
+      dispatch({ type: 'SET_STEP', step: contentSteps[contentSteps.length - 1] })
     } finally {
       setSaving(false)
     }
-  }, [saving, state])
+  }, [saving, state, activeStepOrder])
 
   const dismissError = useCallback(() => setSaveError(null), [])
 
@@ -580,31 +671,30 @@ export default function OnboardingPage() {
 
         <StepTransition key={state.step} direction={state.direction}>
           {state.step === 'intro' && (
-            <OnboardingIntro onNext={() => dispatch({ type: 'SET_STEP', step: 'identity' })} onLogout={handleLogout} />
+            <OnboardingIntro onNext={goToNext} onLogout={handleLogout} />
           )}
 
           {state.step === 'identity' && (
             <OnboardingIdentity
               data={state.identity}
               onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
-              onNext={() => dispatch({ type: 'SET_STEP', step: 'persona' })}
-              onBack={() => dispatch({ type: 'SET_STEP', step: 'intro' })}
-              hideBudgets={noBudgets}
+              onNext={goToNext}
+              onBack={goToBack}
             />
           )}
 
-          {state.step === 'persona' && (
-            <OnboardingPersona
+          {state.step === 'modules' && (
+            <OnboardingModules
               selectedPersona={state.persona}
               selectedModules={state.selectedModules}
-              onSelectPersona={(persona) => dispatch({ type: 'SET_PERSONA', persona })}
-              onToggleModule={(moduleId, enabled) => dispatch({ type: 'TOGGLE_MODULE', moduleId, enabled })}
-              onNext={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
-              onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
+              onSelectPersona={(p) => dispatch({ type: 'SET_PERSONA', persona: p })}
+              onToggleModule={(id, enabled) => dispatch({ type: 'TOGGLE_MODULE', moduleId: id, enabled })}
+              onNext={goToNext}
+              onBack={goToBack}
             />
           )}
 
-          {state.step === 'extras' && (
+          {state.step === 'bezittingen' && (
             <OnboardingExtras
               bankAccounts={state.bankAccounts}
               assets={state.assets}
@@ -612,10 +702,10 @@ export default function OnboardingPage() {
               onBankChange={(items) => dispatch({ type: 'SET_BANK_ACCOUNTS', items })}
               onAssetChange={(items) => dispatch({ type: 'SET_ASSETS', items })}
               onDebtChange={(items) => dispatch({ type: 'SET_DEBTS', items })}
-              onNext={() => dispatch({ type: 'SET_STEP', step: noBudgets ? 'preferences' : 'budgets' })}
-              onBack={() => dispatch({ type: 'SET_STEP', step: 'persona' })}
-              hideBudgets={noBudgets}
-              budgetteringMode={state.identity.budgettering_mode}
+              onNext={goToNext}
+              onBack={goToBack}
+              activeModules={state.selectedModules}
+              subStep={currentSubStep}
             />
           )}
 
@@ -626,8 +716,20 @@ export default function OnboardingPage() {
               netIncome={Number(state.identity.net_monthly_income) || 0}
               householdType={state.identity.household_type}
               numberOfChildren={state.identity.number_of_children}
-              onNext={() => dispatch({ type: 'SET_STEP', step: 'preferences' })}
-              onBack={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
+              onNext={goToNext}
+              onBack={goToBack}
+              subStep={currentSubStep}
+            />
+          )}
+
+          {state.step === 'horizon' && (
+            <OnboardingHorizon
+              data={state.horizon}
+              onChange={(data) => dispatch({ type: 'SET_HORIZON', data })}
+              onNext={goToNext}
+              onBack={goToBack}
+              activeModules={state.selectedModules}
+              subStep={currentSubStep}
             />
           )}
 
@@ -636,9 +738,19 @@ export default function OnboardingPage() {
               data={state.preferences}
               onChange={(data) => dispatch({ type: 'SET_PREFERENCES', data })}
               onNext={handleSaveOwnData}
-              onBack={() => dispatch({ type: 'SET_STEP', step: noBudgets ? 'extras' : 'budgets' })}
+              onBack={goToBack}
               saving={saving}
-              hideBudgetFocus={noBudgets}
+              activeModules={state.selectedModules}
+              subStep={currentSubStep}
+            />
+          )}
+
+          {state.step === 'nieuws_only' && (
+            <OnboardingNieuwsOnly
+              description={state.newsDescription}
+              onChange={(value) => dispatch({ type: 'SET_NEWS_DESCRIPTION', value })}
+              onNext={handleSaveOwnData}
+              onBack={goToBack}
             />
           )}
 
@@ -666,7 +778,13 @@ export default function OnboardingPage() {
           )}
 
           {state.step === 'success' && (
-            <OnboardingSuccess onDashboard={() => router.push('/core')} />
+            <OnboardingSuccess
+              onDashboard={() => {
+                clearLocalStorage()
+                router.push(getHomePath(state.selectedModules))
+              }}
+              activeModules={state.selectedModules}
+            />
           )}
         </StepTransition>
       </div>
