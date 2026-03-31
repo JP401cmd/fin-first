@@ -256,13 +256,13 @@ export function getActiveNavModules(activeModules: ModuleId[]): NavModule[] {
  * Determine the landing page path based on active modules.
  *
  * Priority:
- * 1. nieuws only → '/berichten' (news-only user path)
+ * 1. nieuws only → '/nieuws' (dedicated news-only page)
  * 2. inzicht_acties → '/will' (richest overview)
  * 3. fallback       → '/core'
  */
 export function getHomePath(activeModules: ModuleId[]): string {
   const isNewsOnly = activeModules.length === 1 && activeModules[0] === 'nieuws'
-  if (isNewsOnly) return '/berichten'
+  if (isNewsOnly) return '/nieuws'
   if (activeModules.includes('inzicht_acties')) return '/will'
   return '/core'
 }
