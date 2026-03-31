@@ -7,13 +7,10 @@ import { PhaseTransitionModal } from '@/components/app/phase-transition-modal'
 import { ALL_MODULES, isModuleActive, type ModuleId } from '@/lib/module-registry'
 
 type FeatureAccessContextValue = FeatureAccessData & {
-  needsActivation: boolean
   /** Feature IDs newly unlocked by a phase transition (for spotlight animations) */
   newlyUnlockedFeatures: string[]
   /** Refresh feature prefs after user toggle */
   refreshFeaturePrefs: (prefs: Record<string, boolean>) => void
-  /** Optimistically clear needsActivation after successful activation */
-  clearActivation: () => void
   /** Active module IDs for the current user */
   activeModules: ModuleId[]
   /** Update active modules client-side without page reload */
@@ -33,10 +30,8 @@ export function useFeatureAccess(): FeatureAccessContextValue {
     netWorth: 0,
     monthlyExpenses: 0,
     freedomPct: 0,
-    needsActivation: false,
     newlyUnlockedFeatures: [],
     refreshFeaturePrefs: () => {},
-    clearActivation: () => {},
     activeModules: [...ALL_MODULES],
     refreshModules: () => {},
   }
@@ -46,20 +41,17 @@ export function useFeatureAccess(): FeatureAccessContextValue {
 export function FeatureAccessProvider({
   data,
   phaseTransition,
-  needsActivation,
   activeModules = [...ALL_MODULES],
   children,
 }: {
   data: FeatureAccessData
   phaseTransition?: { oldPhase: string; newPhase: string } | null
-  needsActivation?: boolean
   /** Active modules for the current user. Defaults to all modules (backward compat). */
   activeModules?: ModuleId[]
   children: ReactNode
 }) {
   const [showTransitionModal, setShowTransitionModal] = useState(!!phaseTransition)
   const [featureOverrides, setFeatureOverrides] = useState<FeatureAccessMap>(data.features)
-  const [activationCleared, setActivationCleared] = useState(false)
 
   // Compute newly unlocked features when there's a phase transition
   const newlyUnlockedFeatures = phaseTransition
@@ -85,10 +77,6 @@ export function FeatureAccessProvider({
     })
   }
 
-  function clearActivation() {
-    setActivationCleared(true)
-  }
-
   const [moduleOverrides, setModuleOverrides] = useState<ModuleId[]>(activeModules)
 
   /** Update active modules client-side without page reload */
@@ -99,10 +87,8 @@ export function FeatureAccessProvider({
   const contextValue: FeatureAccessContextValue = {
     ...data,
     features: featureOverrides,
-    needsActivation: activationCleared ? false : !!needsActivation,
     newlyUnlockedFeatures,
     refreshFeaturePrefs,
-    clearActivation,
     activeModules: moduleOverrides,
     refreshModules,
   }

@@ -126,22 +126,20 @@ export async function GET() {
       detail: `emptyMessage: ${debtsEmptyState}, hint: ${debtsEmptyHint}, lengthCheck: ${debtsEmptyCheck}`,
     })
 
-    // Test 9: Assets page has auto-seeding for new users
-    const assetsAutoSeed = assetsSource.includes('seedAssets') && assetsSource.includes('getDefaultAssets')
-    const assetsDoubleLockCheck = assetsSource.includes('seedingRef')
+    // Test 9: Assets page does NOT auto-seed (auto-seeding removed, shows empty state)
+    const assetsNoAutoSeed = !assetsSource.includes('seedAssets') && !assetsSource.includes('getDefaultAssets')
     results.push({
-      test: 'Assets page auto-seeds default portfolio for new users (with race protection)',
-      passed: assetsAutoSeed && assetsDoubleLockCheck,
-      detail: `seedAssets: ${assetsAutoSeed}, seedingRef: ${assetsDoubleLockCheck}`,
+      test: 'Assets page does not auto-seed example data (shows empty state instead)',
+      passed: assetsNoAutoSeed,
+      detail: `noSeedAssets: ${assetsNoAutoSeed}`,
     })
 
-    // Test 10: Debts page has auto-seeding for new users
-    const debtsAutoSeed = debtsSource.includes('seedDebts') && debtsSource.includes('getDefaultDebts')
-    const debtsDoubleLockCheck = debtsSource.includes('seedingRef')
+    // Test 10: Debts page does NOT auto-seed (auto-seeding removed, shows empty state)
+    const debtsNoAutoSeed = !debtsSource.includes('seedDebts') && !debtsSource.includes('getDefaultDebts')
     results.push({
-      test: 'Debts page auto-seeds default debts for new users (with race protection)',
-      passed: debtsAutoSeed && debtsDoubleLockCheck,
-      detail: `seedDebts: ${debtsAutoSeed}, seedingRef: ${debtsDoubleLockCheck}`,
+      test: 'Debts page does not auto-seed example data (shows empty state instead)',
+      passed: debtsNoAutoSeed,
+      detail: `noSeedDebts: ${debtsNoAutoSeed}`,
     })
 
     // Test 11: Sovereignty level handles zero data

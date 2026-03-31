@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Wallet, Zap, Compass } from 'lucide-react'
 import type { ComponentType } from 'react'
-import { useFeatureAccess, useModuleAccess } from '@/components/app/feature-access-provider'
+import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { getActiveNavModules } from '@/lib/module-registry'
 
 // Static config per nav module — label, path, icon, and color token
@@ -34,16 +34,11 @@ const activeBorder: Record<string, string> = {
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { needsActivation } = useFeatureAccess()
   const { activeModules } = useModuleAccess()
 
   // Derive which tabs to show from active modules.
-  // During the invulfase (needsActivation), only De Kern is shown so the user
-  // can complete onboarding before accessing the other modules.
   const activeNavModules = getActiveNavModules(activeModules)
-  const visibleTabs = needsActivation
-    ? activeNavModules.filter(m => m === 'kern').map(m => tabConfig[m])
-    : activeNavModules.map(m => tabConfig[m])
+  const visibleTabs = activeNavModules.map(m => tabConfig[m])
 
   // Hide tab bar when only 1 tab — user is already on that module's page
   if (visibleTabs.length <= 1) return null

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
   Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon,
@@ -28,7 +28,6 @@ import {
   ASSET_TYPE_FIELDS,
   RISK_PROFILE_LABELS,
   RETIREMENT_PROVIDER_LABELS,
-  getDefaultAssets,
   projectPortfolio,
 } from '@/lib/asset-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
@@ -73,7 +72,6 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const [showCashModal, setShowCashModal] = useState(false)
   const [cashAccountId, setCashAccountId] = useState<string | undefined>(undefined)
   const [budgetingActive, setBudgetingActive] = useState(initialData?.budgetingActive ?? true)
-  const seedingRef = useRef(false)
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
   const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
@@ -100,13 +98,8 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
       if (fetchError) throw fetchError
 
       if (!data || data.length === 0) {
-        if (seedingRef.current) return
-        seedingRef.current = true
-        // Double-check: count to prevent race conditions
-        const { count } = await supabase.from('assets').select('id', { count: 'exact', head: true })
-        if (signal?.aborted) return
-        if (count && count > 0) { seedingRef.current = false; await loadAssets(signal); return }
-        await seedAssets(supabase)
+        setAssets([])
+        setLoading(false)
         return
       }
 
@@ -197,40 +190,6 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
       if (!signal?.aborted) setLoading(false)
     }
   }, [perspective])
-
-  async function seedAssets(supabase: ReturnType<typeof createClient>) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const defaults = getDefaultAssets()
-    const rows = defaults.map((a, i) => ({
-      user_id: user.id,
-      name: a.name,
-      asset_type: a.asset_type,
-      current_value: a.current_value,
-      purchase_value: a.purchase_value,
-      purchase_date: a.purchase_date,
-      expected_return: a.expected_return,
-      monthly_contribution: a.monthly_contribution,
-      institution: a.institution || null,
-      sort_order: i,
-      subtype: a.subtype || null,
-      risk_profile: a.risk_profile || null,
-      tax_benefit: a.tax_benefit ?? null,
-      is_liquid: a.is_liquid ?? null,
-      lock_end_date: a.lock_end_date || null,
-      ticker_symbol: a.ticker_symbol || null,
-      rental_income: a.rental_income ?? null,
-      woz_value: a.woz_value ?? null,
-      retirement_provider_type: a.retirement_provider_type || null,
-      depreciation_rate: a.depreciation_rate ?? null,
-      address_postcode: a.address_postcode || null,
-      address_house_number: a.address_house_number || null,
-    }))
-
-    await supabase.from('assets').insert(rows)
-    await loadAssets()
-  }
 
   const loadValuations = useCallback(async (assetId: string) => {
     const supabase = createClient()
@@ -537,8 +496,15 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         {activeAssets.length === 0 && (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
             <TrendingUp className="mx-auto h-8 w-8 text-kern-400" />
-            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen bezittingen geregistreerd</p>
-            <p className="mt-1 text-xs text-[var(--ink-3)]">Voeg een asset toe om je vermogen te volgen.</p>
+            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Nog geen bezittingen toegevoegd</p>
+            <p className="mt-1 text-xs text-[var(--ink-3)]">Voeg je eerste bezitting toe om je vermogen te volgen.</p>
+            <button
+              onClick={() => { setEditAsset(null); setShowForm(true) }}
+              className="mt-4 inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+            >
+              <Plus className="h-4 w-4" />
+              Bezitting toevoegen
+            </button>
           </div>
         )}
         {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {

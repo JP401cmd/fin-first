@@ -78,8 +78,6 @@ export interface PersonaProfile {
   // Profile income/expense estimates (for users without budgets/transactions)
   net_monthly_income?: number
   estimated_monthly_expenses?: number
-  // Invulfase (post-onboarding fill-in phase) — defaults to true
-  invulfase_active?: boolean
   // Arbitrary feature preferences (JSONB)
   feature_preferences?: Record<string, unknown>
   // Marginaal tarief (IB Box 1)
@@ -606,7 +604,6 @@ const roosData: PersonaData = {
     fire_end_age: 85,
     retirement_expense_method: 'current_income',
     withdrawal_strategy: 'static',
-    invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'schulden', size: 'full' }, 'cash_flow',
       'budgetten', 'acties', 'spaarquote', 'vrijheidsdagen_maand',
@@ -838,7 +835,6 @@ const daanData: PersonaData = {
     retirement_expense_method: 'essential_budgets',
     withdrawal_strategy: 'static',
     rebalance_threshold: 3, // conservatief — lage drempel, snel signaal
-    invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', 'spaarquote', 'doelen',
       { id: 'fire_prognose', size: 'full' }, 'acties', 'trend_sparen', 'jouw_pad',
@@ -1095,7 +1091,6 @@ const lisaData: PersonaData = {
     retirement_expense_method: 'essential_budgets',
     withdrawal_strategy: 'bucket',
     marginaal_tarief: 0.3697, // modaal inkomen — laagste schijf
-    invulfase_active: false,
     feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
@@ -1399,7 +1394,6 @@ const willemData: PersonaData = {
     retirement_expense_custom_amount: 3000,
     withdrawal_strategy: 'vpw',
     rebalance_threshold: 10, // agressief — hoge tolerantie, minder herbalanceren
-    invulfase_active: false,
     feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
@@ -1690,7 +1684,6 @@ const rashidData: PersonaData = {
     rebalance_threshold: 5, // gebalanceerd — standaard drempel
     net_monthly_income: 5500,
     estimated_monthly_expenses: 4200,
-    invulfase_active: true,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'fire_prognose', 'vrijheidsscenarios', 'acties', 'doelen',
     ]),
@@ -1946,7 +1939,6 @@ const marijkeData: PersonaData = {
     marginaal_tarief: 0.4950, // hoog inkomen — hoogste schijf
     net_monthly_income: 3400,
     estimated_monthly_expenses: 2800,
-    invulfase_active: false,
     feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'passief_inkomen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',

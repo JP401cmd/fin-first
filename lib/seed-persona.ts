@@ -192,14 +192,9 @@ export async function seedPersonaData(
   // Onboarding completed — personas represent post-onboarding state
   profileData.onboarding_completed = true
 
-  // Invulfase active — set per persona (post-onboarding fill-in phase)
-  // Stored in feature_preferences JSONB under '_invulfase_active' key,
-  // consistent with save-own-data API route
-  const invulfaseActive = persona.profile.invulfase_active ?? true
+  // Feature preferences (JSONB)
   profileData.feature_preferences = {
     ...(typeof persona.profile.feature_preferences === 'object' ? persona.profile.feature_preferences : {}),
-    _invulfase_active: invulfaseActive,
-    _invulfase_skipped: [],
   }
 
   // Marginaal tarief (optional, per-persona — null means auto-derived)

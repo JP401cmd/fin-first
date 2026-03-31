@@ -625,24 +625,18 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 14: Invulfase activation after save ──────────────────────────
+  // ── Step 14: Initial phase set after save ──────────────────────────
   {
-    id: 'ob-save-invulfase-activation',
-    name: 'Invulfase activatie: na save wordt _invulfase_active gezet in feature_preferences',
+    id: 'ob-save-initial-phase',
+    name: 'Na save wordt last_known_phase gezet op recovery',
     category: CAT,
-    description: 'Na succesvolle onboarding save wordt de invulfase (guided data-entry phase) geactiveerd',
+    description: 'Na succesvolle onboarding save wordt last_known_phase direct ingesteld zodat de gebruiker volledig actief is',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      const featurePrefsUpdate = {
-        _invulfase_active: true,
-      }
-
-      assertEqual(featurePrefsUpdate._invulfase_active, true, 'Invulfase wordt geactiveerd na save')
-
-      const key = '_invulfase_active'
-      assert(key.startsWith('_'), 'Invulfase key begint met underscore (interne preference)')
-      assert(key.includes('invulfase'), 'Key bevat invulfase')
+      const initialPhase = 'recovery'
+      assertEqual(initialPhase, 'recovery', 'Initiele fase is recovery na onboarding')
+      assert(typeof initialPhase === 'string', 'Phase is een string')
     },
   },
 

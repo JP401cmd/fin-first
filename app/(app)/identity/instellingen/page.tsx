@@ -24,7 +24,7 @@ import { formatCurrency } from '@/lib/format'
 import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
-import { ModuleOnboardingModal, MODULE_REQUIRED_STEPS } from '@/components/app/module-onboarding-modal'
+import { ModuleActivationModal, MODULE_REQUIRED_STEPS } from '@/components/app/module-activation-modal'
 
 // ── Typography helpers ────────────────────────────────────────────────────
 
@@ -93,6 +93,7 @@ export default function InstellingenPage() {
   // ─ Module onboarding state (progressive onboarding for new modules) ─
   const [completedSteps, setCompletedSteps] = useState<string[]>([])
   const [pendingModuleId, setPendingModuleId] = useState<ModuleId | null>(null)
+  const [userNetIncome, setUserNetIncome] = useState<number>(2500)
 
   // ─ Section: Financiële toelichting ─
   const [toelichtingOpen, setToelichtingOpen] = useState(false)
@@ -210,7 +211,7 @@ export default function InstellingenPage() {
       const [notifData, profileData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
-          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold, financial_context, completed_onboarding_steps'
+          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold, financial_context, completed_onboarding_steps, net_monthly_income'
         ).eq('id', user.id).single(),
       ])
 
@@ -333,6 +334,10 @@ export default function InstellingenPage() {
         // Completed onboarding steps (for progressive module onboarding)
         if (d.completed_onboarding_steps) {
           setCompletedSteps(d.completed_onboarding_steps as string[])
+        }
+        // Net monthly income (for module activation budget calculations)
+        if (d.net_monthly_income) {
+          setUserNetIncome(d.net_monthly_income as number)
         }
       }
 
@@ -2469,13 +2474,15 @@ export default function InstellingenPage() {
         </div>
       </BottomSheet>
 
-      {/* ── Module onboarding modal ─────────────────────────────────── */}
+      {/* ── Module activation modal (embedded onboarding forms) ──────── */}
       {pendingModuleId && (
-        <ModuleOnboardingModal
+        <ModuleActivationModal
           moduleId={pendingModuleId}
           completedSteps={completedSteps}
           open={!!pendingModuleId}
           onClose={() => setPendingModuleId(null)}
+          activeModules={activeModuleToggles}
+          netIncome={userNetIncome}
           onComplete={async (newSteps) => {
             // Merge new steps into completed set
             const updatedSteps = [...new Set([...completedSteps, ...newSteps])]

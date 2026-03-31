@@ -445,7 +445,7 @@ export default function TestAssetCrudPage() {
             <span className="mt-0.5 inline-block h-5 w-5 shrink-0 rounded-full bg-emerald-100 text-center text-xs font-bold leading-5 text-emerald-700">{'\u2713'}</span>
             <div>
               <p className="text-sm font-medium text-zinc-900">AUTH: All operations require authenticated Supabase client + RLS</p>
-              <p className="text-xs text-zinc-500">supabase.auth.getUser() checks in seedAssets, loadAssets (for mortgages), handleSave, ValuationModal. RLS policies enforce user_id = auth.uid() at database level.</p>
+              <p className="text-xs text-zinc-500">supabase.auth.getUser() checks in loadAssets (for mortgages), handleSave, ValuationModal. RLS policies enforce user_id = auth.uid() at database level.</p>
             </div>
           </div>
         </div>

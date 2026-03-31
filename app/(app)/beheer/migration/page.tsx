@@ -278,7 +278,6 @@ export default function MigrationPage() {
             {!schemaStatus.profile_columns?.onboarding_idempotency_key && <p>-- supabase/migrations/20260319000001_add_budgets_user_slug_parent_unique.sql</p>}
             {!schemaStatus.rpc?.save_onboarding_data && <p>-- supabase/migrations/20260319000002_create_save_onboarding_rpc.sql</p>}
             {!schemaStatus.profile_columns?.withdrawal_strategy && <p>-- supabase/migrations/20260318000001_add_withdrawal_strategy_columns.sql</p>}
-            {!schemaStatus.profile_columns?.invulfase_active && <p>-- supabase/migrations/20260319000003_add_invulfase_active_to_profiles.sql</p>}
           </div>
         </div>
       )}

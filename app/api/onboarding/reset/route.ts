@@ -14,8 +14,8 @@ export async function POST() {
     await deleteAllUserData(supabase, user.id)
 
     // Reset profile — core fields first (always exist)
-    // last_known_phase must be null so needsActivation = true (hides Wil/Horizon)
-    // feature_preferences cleared so invulfase can be re-activated by onboarding save
+    // last_known_phase is set to null so phase is recomputed on next load
+    // feature_preferences cleared for clean restart
     const { error: coreErr } = await supabase
       .from('profiles')
       .update({
@@ -29,6 +29,7 @@ export async function POST() {
         number_of_children: 0,
         children_ages: [],
         last_known_phase: null,
+        active_modules: null,
         feature_preferences: {},
         updated_at: new Date().toISOString(),
       })

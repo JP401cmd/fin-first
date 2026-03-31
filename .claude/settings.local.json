@@ -98,7 +98,13 @@
       "Bash(ls -la '/c/Users/janpa/cd/development/fin/app/\\(app\\)/')",
       "Bash(2)",
       "Bash(find \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\\\\core\" -type d)",
-      "Bash(find /c/Users/janpa/cd/development/fin -type f \\\\\\(-name *.d.ts -o -name *.ts \\\\\\) -path *types* -not -path *node_modules*)"
+      "Bash(find /c/Users/janpa/cd/development/fin -type f \\\\\\(-name *.d.ts -o -name *.ts \\\\\\) -path *types* -not -path *node_modules*)",
+      "Bash(find /c/Users/janpa/cd/development/fin/app -maxdepth 2 -type d -name \"\\(app\\)\" -o -maxdepth 2 -type d)",
+      "Bash(ls -la /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/beheer/)",
+      "Bash(ls \"C:/Users/janpa/cd/development/fin/app/\\(app\\)/beheer/nudges/\")",
+      "Bash(find \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\" -name \"page.tsx\" -type f)",
+      "Bash(find \"/c/Users/janpa/cd/development/fin/app/\\(onboarding\\)\" -type f -name \"*.tsx\" -o -name \"*.ts\")",
+      "Bash(find /c/Users/janpa/cd/development/fin/app -type f \\\\\\(-name *asset*.tsx -o -name *debt*.tsx \\\\\\))"
     ]
   },
   "enableAllProjectMcpServers": true,

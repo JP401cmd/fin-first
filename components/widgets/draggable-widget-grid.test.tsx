@@ -28,7 +28,7 @@ vi.mock('@/lib/hooks/use-display-size', () => ({
 
 // Mock useFeatureAccess — all features enabled by default
 vi.mock('@/components/app/feature-access-provider', () => ({
-  useFeatureAccess: () => ({ features: {}, phase: 'mastery', level: 6, netWorth: 100000, monthlyExpenses: 2000, freedomPct: 100, needsActivation: false, newlyUnlockedFeatures: [] }),
+  useFeatureAccess: () => ({ features: {}, phase: 'mastery', level: 6, netWorth: 100000, monthlyExpenses: 2000, freedomPct: 100, newlyUnlockedFeatures: [] }),
 }))
 
 // Mock fetch for save calls

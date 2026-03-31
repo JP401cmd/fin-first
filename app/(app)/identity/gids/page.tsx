@@ -1779,6 +1779,13 @@ export default function GidsPage() {
               allocatiedrift in je holdings.
               <br />
               <br />
+              Na het activeren van een module verschijnen er{" "}
+              <strong>invul-suggesties</strong> in je meldingencentrum. Deze
+              herinneren je eraan welke gegevens je nog kunt invullen per module.
+              Ze verdwijnen automatisch zodra je de actie voltooit, of je kunt ze
+              wegklikken.
+              <br />
+              <br />
               <strong>Instellen:</strong> ga naar Identiteit → Instellingen
               → Notificaties. Schakel per type aan of uit. Kies of je een
               maandelijkse check-in herinnering wilt ontvangen.
@@ -1915,32 +1922,6 @@ export default function GidsPage() {
               "Scroll door je persoonlijke briefing en tik op kaarten voor meer detail",
             ],
             tip: "Check je briefing elke ochtend als financi\u00eble routine \u2014 het kost 30 seconden en houdt je scherp.",
-          }}
-        />
-
-        <GuideTopicCard
-          icon={Sparkles}
-          title="Invulfase"
-          color="var(--ink-2)"
-          valueText="Na de onboarding helpt de invulfase je om alle belangrijke gegevens stap voor stap aan te vullen — zonder druk, op jouw tempo."
-          description={
-            <>
-              Na het voltooien van de onboarding start de <strong>invulfase</strong>: een begeleid proces dat je helpt om je financiële profiel compleet te maken. De onboarding legt de basis (profiel, eventueel budgetten, bezittingen en schulden), maar er is vaak meer data nodig voor nauwkeurige berekeningen.
-              <br /><br />
-              De invulfase toont een <strong>banner</strong> bovenaan je pagina&apos;s met je volgende stap: transacties importeren, budgetten verfijnen, doelen instellen, levensgebeurtenissen toevoegen, of je check-in doen. Elke stap is een link naar het relevante onderdeel — zo weet je altijd wat je nog kunt aanvullen.
-              <br /><br />
-              <strong>Voortgang:</strong> de banner toont hoeveel stappen je hebt voltooid en welke nog open staan. Zodra je alle kerngegevens hebt ingevuld, kun je de invulfase afsluiten via de sluitknop op de banner. De invulfase is volledig <strong>optioneel</strong> — je kunt hem op elk moment wegklikken en later terugkomen.
-            </>
-          }
-          howTo={{
-            steps: [
-              "Na de onboarding verschijnt de invulfase-banner automatisch bovenaan je pagina\u2019s",
-              "Volg de aanbevolen volgende stap — elke stap linkt direct naar het juiste onderdeel (transacties importeren, budgetten, doelen, etc.)",
-              "De voortgangsindicator toont hoeveel stappen je hebt voltooid",
-              "Sluit de invulfase af via de \u00d7-knop als je klaar bent of later wilt verdergaan",
-              "Je kunt altijd data aanvullen via de reguliere pagina\u2019s, ook na het afsluiten van de invulfase",
-            ],
-            tip: "Neem de tijd voor de invulfase. Elke extra datapunt maakt je berekeningen nauwkeuriger \u2014 van FIRE-projectie tot budgetinzichten. Begin met transacties importeren, dat levert de meeste inzichten op.",
           }}
         />
 

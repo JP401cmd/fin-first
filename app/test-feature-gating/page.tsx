@@ -56,7 +56,7 @@ export default function TestFeatureGatingPage() {
   const lockedCount = Object.values(featureAccess.features).filter(v => !v.accessible).length
 
   return (
-    <FeatureAccessProvider data={featureAccess} needsActivation={false}>
+    <FeatureAccessProvider data={featureAccess}>
       <div className="min-h-screen bg-zinc-50">
         {/* Hero */}
         <div className={`bg-gradient-to-br ${PHASE_BG[featureAccess.phase]} px-6 py-10 text-white`}>

@@ -46,7 +46,7 @@ export const INITIAL_HORIZON_DATA: HorizonData = {
 // ── Strategy definitions ────────────────────────────────────
 
 interface StrategyDef {
-  id: Extract<FireEndStrategy, 'deplete' | 'legacy' | 'perpetual'>
+  id: FireEndStrategy
   name: string
   description: string
   emoji: string
@@ -70,6 +70,12 @@ const STRATEGIES: StrategyDef[] = [
     name: 'Eeuwigdurend',
     description: 'Je vermogen blijft behouden en groeit mee met inflatie. Maximale zekerheid.',
     emoji: '\u267E\uFE0F', // infinity
+  },
+  {
+    id: 'pensioen',
+    name: 'Pensioenleeftijd',
+    description: 'Opbouw tot AOW-leeftijd, daarna vaste onttrekking. Restant als nalatenschap.',
+    emoji: '\uD83C\uDF3F', // seedling
   },
 ]
 
@@ -135,6 +141,7 @@ function getSpeechText(strategy: FireEndStrategy): string {
     deplete: 'Met deze strategie gebruik je je vermogen volledig. Ik bereken wanneer je genoeg hebt om comfortabel te leven tot de gekozen leeftijd.',
     legacy: 'Je wilt iets nalaten \u2014 mooi. Ik reken uit hoeveel extra vermogen je nodig hebt bovenop je eigen uitgaven.',
     perpetual: 'De meest conservatieve strategie. Je vermogen blijft intact en groeit mee met inflatie. Dit vereist het meeste startkapitaal.',
+    pensioen: 'Je bouwt vermogen op tot je AOW-leeftijd en onttrekt daarna een vast bedrag. Wat overblijft is je nalatenschap.',
   }
   return map[strategy] ?? 'Kies een eindstrategie om te beginnen. Dit bepaalt hoe ik je vrijheidsdoel bereken.'
 }

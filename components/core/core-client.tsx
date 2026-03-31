@@ -19,7 +19,7 @@ import type { NetWorthSnapshot, EntityBalanceHistory } from '@/lib/net-worth-dat
 import {
   TrendingUp, Wallet, ShoppingCart, BarChart3,
   PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Flag,
-  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus, Pencil, Sparkles,
+  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus, Pencil,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
@@ -41,8 +41,6 @@ import { buildSegments, typeColors, childTypeColors } from '@/components/app/bud
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { InvulfaseChecklist } from '@/components/app/invulfase-checklist'
-import { WelcomeKrant } from '@/components/app/welcome-krant'
 import dynamic from 'next/dynamic'
 
 const DynBudgetsPage = dynamic(() => import('@/components/app/budgets-client'), {
@@ -155,7 +153,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   // Household & partner perspective
   const { perspective, partnerName } = usePerspective()
   const featureAccess = useFeatureAccess()
-  const needsActivation = featureAccess.needsActivation
   const { activeModules } = featureAccess
   const hasVermogen = activeModules.includes('vermogensregistratie')
   const hasToekomst = activeModules.includes('toekomstplannen')
@@ -1099,46 +1096,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-8">
-      {/* === 0a. Welcome Krant (one-time popup) === */}
-      <WelcomeKrant />
-
-      {/* === 0b. Invulfase Checklist === */}
-      <InvulfaseChecklist />
-
       {/* === 1. Hero (Gradient) === */}
       <section data-testid="kern-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-kern-500" />
 
         <div className="p-4 sm:p-6 md:p-8">
-          {needsActivation ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowNetWorthReceipt(true)}
-                className="mb-3 sm:mb-5 cursor-pointer text-left transition-opacity hover:opacity-80"
-              >
-                <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
-                  {formatCurrency(heroAmount)}
-                </span>
-                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">{heroLabel}</span>
-              </button>
-
-              <p className="mb-3 text-sm text-[var(--ink-3)]">
-                Welkom bij De Kern — je financiele fundament. Neem de tijd om je gegevens te verkennen. Wanneer je klaar bent, activeer je routekaart om De Wil en De Horizon te ontgrendelen.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => setShowRoadmap(true)}
-                className="mb-4 sm:mb-6 flex w-full items-center justify-center gap-2 rounded-[var(--r)] border-2 border-dashed border-kern-300 bg-kern-50/50 px-4 py-3 text-sm font-medium text-kern-700 transition-all hover:border-kern-400 hover:bg-kern-50 hover:shadow-[var(--s1)]"
-              >
-                <Sparkles className="h-4 w-4" />
-                Ontdek je routekaart
-              </button>
-            </>
-          ) : (
-            <>
-              <button
+          <button
                 type="button"
                 onClick={() => setShowNetWorthReceipt(true)}
                 className="mb-3 sm:mb-5 cursor-pointer text-left transition-opacity hover:opacity-80"
@@ -1237,8 +1200,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   </div>
                 </button>
               )}
-            </>
-          )}
 
           {/* Compact 2-stat row — mobile only */}
           <div className={`flex gap-3 sm:hidden mb-3 ${isVermogenOnly ? 'grid grid-cols-3' : ''}`}>

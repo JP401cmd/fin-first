@@ -217,12 +217,10 @@ POST /api/onboarding/save-own-data
   ↓
 Success → team introduction → "Ontdek je dashboard" → /dashboard
   ↓
-App Layout: last_known_phase=null → needsActivation=true
-  → Shows ActivationButton (sparkle FAB)
-  ↓
-POST /api/activate
-  → computeFeatureAccess() → computeSovereigntyLevel()
-  → Sets last_known_phase = phase
+App Layout: last_known_phase=recovery (set during onboarding save)
+  → User is immediately fully active
+  → Phase transition detection runs on each load
+  → Module nudges appear in notification center
   ↓
 Dashboard renders:
   ├── De Kern: netWorth, freedom%, budgets

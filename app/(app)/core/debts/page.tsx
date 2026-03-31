@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Plus, CheckCircle2, TrendingDown, Wallet, Target, Scale,
 } from 'lucide-react'
@@ -13,7 +13,6 @@ import {
   DEBT_TYPE_LABELS,
   DEBT_TYPE_ICONS,
   DEBT_SUBTYPE_LABELS,
-  getDefaultDebts,
   simulatePayoff,
   payoffSummary,
   debtProjection,
@@ -55,7 +54,6 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [userAssets, setUserAssets] = useState<Asset[]>([])
   const [dailyExpenses, setDailyExpenses] = useState(0)
-  const seedingRef = useRef(false)
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
   const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
@@ -172,13 +170,8 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
       if (fetchError) throw fetchError
 
       if (!data || data.length === 0) {
-        if (seedingRef.current) return
-        seedingRef.current = true
-        // Double-check: count to prevent race conditions
-        const { count } = await supabase.from('debts').select('id', { count: 'exact', head: true })
-        if (signal?.aborted) return
-        if (count && count > 0) { seedingRef.current = false; await loadDebts(signal); return }
-        await seedDebts(supabase)
+        setDebts([])
+        setLoading(false)
         return
       }
 
@@ -209,36 +202,6 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
       if (!signal?.aborted) setLoading(false)
     }
   }, [perspective])
-
-  async function seedDebts(supabase: ReturnType<typeof createClient>) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const defaults = getDefaultDebts()
-    const rows = defaults.map((d, i) => ({
-      user_id: user.id,
-      name: d.name,
-      debt_type: d.debt_type,
-      original_amount: d.original_amount,
-      current_balance: d.current_balance,
-      interest_rate: d.interest_rate,
-      minimum_payment: d.minimum_payment,
-      monthly_payment: d.monthly_payment,
-      start_date: d.start_date,
-      creditor: d.creditor,
-      sort_order: i,
-      subtype: d.subtype || null,
-      is_tax_deductible: d.is_tax_deductible ?? null,
-      fixed_rate_end_date: d.fixed_rate_end_date || null,
-      nhg: d.nhg ?? null,
-      credit_limit: d.credit_limit ?? null,
-      repayment_type: d.repayment_type || null,
-      draagkrachtmeting_date: d.draagkrachtmeting_date || null,
-    }))
-
-    await supabase.from('debts').insert(rows)
-    await loadDebts()
-  }
 
   const loadValuations = useCallback(async (debtId: string) => {
     const supabase = createClient()
@@ -750,8 +713,15 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
         {debts.length === 0 && (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
             <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
-            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen schulden geregistreerd</p>
+            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Nog geen schulden toegevoegd</p>
             <p className="mt-1 text-xs text-[var(--ink-3)]">Voeg een schuld toe om je aflosplan te starten.</p>
+            <button
+              onClick={() => { setEditDebt(null); setShowForm(true) }}
+              className="mt-4 inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+            >
+              <Plus className="h-4 w-4" />
+              Schuld toevoegen
+            </button>
           </div>
         )}
       </section>

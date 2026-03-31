@@ -28,6 +28,7 @@ const MODULE_MAP: Record<NotificationType, ModuleInfo> = {
   partner_transaction: { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
   horizon:             { label: 'DE HORIZON', colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
   holding_alert:       { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+  module_nudge:        { label: 'INVULLEN',   colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
 }
 
 function formatTime(dateStr: string): string {
@@ -47,7 +48,23 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
   const router = useRouter()
   const { openWithMessage } = useChatContext()
   const [showLevelUp, setShowLevelUp] = useState(false)
-  const module = MODULE_MAP[notification.type]
+  let module = MODULE_MAP[notification.type]
+
+  // Dynamic module label for nudges
+  if (notification.type === 'module_nudge' && notification.metadata?.moduleId) {
+    const nudgeModuleId = notification.metadata.moduleId as string
+    const navColors: Record<string, Pick<ModuleInfo, 'label' | 'colorVar' | 'textVar' | 'lightVar' | 'mediumVar'>> = {
+      budgetteren:          { label: 'DE KERN',    colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+      vermogensregistratie: { label: 'DE KERN',    colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+      aandelenregistratie:  { label: 'DE KERN',    colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+      inzicht_acties:       { label: 'DE WIL',     colorVar: 'var(--will)', textVar: 'var(--will-t)', lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
+      toekomstplannen:      { label: 'DE HORIZON', colorVar: 'var(--hor)',  textVar: 'var(--hor-t)',  lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
+    }
+    const nudgeColors = navColors[nudgeModuleId]
+    if (nudgeColors) {
+      module = { ...module, ...nudgeColors }
+    }
+  }
 
   const handleClick = useCallback(() => {
     onRead(notification.id)

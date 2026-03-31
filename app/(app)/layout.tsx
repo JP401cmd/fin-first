@@ -85,19 +85,21 @@ export default async function AppLayout({
 
   // ── Phase transition detection ──────────────────────────
   const lastKnownPhase = profile?.last_known_phase as string | null
-  const needsActivation = lastKnownPhase === null
   let phaseTransition: { oldPhase: string; newPhase: string } | null = null
 
-  if (!needsActivation && lastKnownPhase !== featureAccess.phase) {
-    const phaseIds = PHASES.map(p => p.id)
-    const oldIndex = phaseIds.indexOf(lastKnownPhase)
-    const newIndex = phaseIds.indexOf(featureAccess.phase)
+  if (lastKnownPhase !== featureAccess.phase) {
+    if (lastKnownPhase !== null) {
+      // Genuine phase change (not first load) — check direction
+      const phaseIds = PHASES.map(p => p.id)
+      const oldIndex = phaseIds.indexOf(lastKnownPhase)
+      const newIndex = phaseIds.indexOf(featureAccess.phase)
 
-    if (newIndex > oldIndex) {
-      // Upward transition — show celebration modal
-      phaseTransition = { oldPhase: lastKnownPhase, newPhase: featureAccess.phase }
+      if (newIndex > oldIndex) {
+        // Upward transition — show celebration modal
+        phaseTransition = { oldPhase: lastKnownPhase, newPhase: featureAccess.phase }
+      }
     }
-    // Update DB regardless (upward or downward)
+    // Update DB regardless (first store, upward, or downward)
     supabase.from('profiles').update({ last_known_phase: featureAccess.phase }).eq('id', user.id).then(() => {})
   }
 
@@ -121,10 +123,6 @@ export default async function AppLayout({
     key: `last_sovereignty_level_${user.id}`,
     value: JSON.stringify(featureAccess.level),
   }, { onConflict: 'key' }).then(() => {})
-
-  // ── Invulfase detection ───────────────────────────────
-  const featurePrefs = (profile?.feature_preferences as Record<string, unknown>) ?? {}
-  const invulfaseActive = featurePrefs._invulfase_active === true
 
   // ── Active modules ────────────────────────────────────
   const activeModules: ModuleId[] = (profile?.active_modules as ModuleId[]) ?? [...ALL_MODULES]
@@ -170,7 +168,7 @@ export default async function AppLayout({
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
                   <DashboardTypeProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
-                      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation} activeModules={activeModules}>
+                      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} activeModules={activeModules}>
                         <ChatLayoutWrapper>
                           <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
                           <DailyExpenseProvider>

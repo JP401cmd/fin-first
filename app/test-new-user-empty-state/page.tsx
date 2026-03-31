@@ -88,12 +88,12 @@ export default function TestNewUserEmptyStatePage() {
               <p>Dashboard shows all metrics as zero: €0 net worth, 0.0% freedom, 0 budgets, 0 actions, FIRE projection shows &quot;-&quot;. All calculations use safe defaults (?? []) to prevent errors.</p>
             </div>
             <div>
-              <h3 className="font-medium text-zinc-800">3. Assets (Empty → Auto-Seed)</h3>
-              <p>If no assets exist, page shows &quot;Geen assets geregistreerd&quot; empty state, then auto-seeds a default portfolio using seedAssets(). Race conditions prevented via seedingRef.</p>
+              <h3 className="font-medium text-zinc-800">3. Assets (Empty State)</h3>
+              <p>If no assets exist, page shows a friendly empty state with &quot;Nog geen bezittingen toegevoegd&quot; message and a prominent add button. No example data is seeded.</p>
             </div>
             <div>
-              <h3 className="font-medium text-zinc-800">4. Debts (Empty → Auto-Seed)</h3>
-              <p>If no debts exist, page shows &quot;Geen schulden geregistreerd&quot; empty state, then auto-seeds default debts using seedDebts(). Race conditions prevented via seedingRef.</p>
+              <h3 className="font-medium text-zinc-800">4. Debts (Empty State)</h3>
+              <p>If no debts exist, page shows a friendly empty state with &quot;Nog geen schulden toegevoegd&quot; message and a prominent add button. No example data is seeded.</p>
             </div>
           </div>
         </div>
