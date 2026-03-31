@@ -37,7 +37,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
       if (!user) return { data: null }
       return supabase
         .from('profiles')
-        .select('full_name, temporal_balance, household_type, date_of_birth, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active')
+        .select('full_name, temporal_balance, household_type, date_of_birth, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, financial_context')
         .eq('id', user.id)
         .single()
     }),
@@ -140,7 +140,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Budgettering: ${profile?.budgeting_active !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
   ]
 
-  return identitySection + section('FINANCIEEL OVERZICHT', (lines.filter(Boolean) as string[]).join('\n'))
+  // Add supplementary context from free-text financial description (news-only onboarding)
+  const contextSection = profile?.financial_context
+    ? '\n' + section('AANVULLENDE CONTEXT', profile.financial_context)
+    : ''
+
+  return identitySection + section('FINANCIEEL OVERZICHT', (lines.filter(Boolean) as string[]).join('\n')) + contextSection
 }
 
 /** Get a date string N months ago in YYYY-MM-DD format (UTC, no timezone shift) */
