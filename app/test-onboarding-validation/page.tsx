@@ -11,15 +11,6 @@ export default function TestOnboardingValidation() {
     number_of_children: 0,
     net_monthly_income: '',
     estimated_monthly_expenses: '',
-    budgettering_mode: '',
-    expected_return: 0.07,
-    inflation_rate: 0.02,
-    retirement_expense_method: 'essential_budgets',
-    retirement_custom_amount: '',
-    fire_end_strategy: 'deplete',
-    fire_legacy_amount: '',
-    fire_end_age: 90,
-    temporal_balance: 3,
   })
   const [step, setStep] = useState<'form' | 'success'>('form')
   const [testResults, setTestResults] = useState<{ label: string; pass: boolean }[]>([])
@@ -87,15 +78,6 @@ export default function TestOnboardingValidation() {
               number_of_children: 0,
               net_monthly_income: '',
               estimated_monthly_expenses: '',
-              budgettering_mode: '',
-              expected_return: 0.07,
-              inflation_rate: 0.02,
-              retirement_expense_method: 'essential_budgets',
-              retirement_custom_amount: '',
-              fire_end_strategy: 'deplete',
-              fire_legacy_amount: '',
-              fire_end_age: 90,
-              temporal_balance: 3,
             })
           }}
           className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white"
