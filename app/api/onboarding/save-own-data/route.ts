@@ -35,6 +35,8 @@ function buildRpcPayload(
   widgetPrefs: z.infer<typeof bodySchema>['widgetPrefs'],
   aowTargetAge: number,
   idempotencyKey: string | undefined,
+  horizonData: z.infer<typeof bodySchema>['horizonData'],
+  newsDescription: z.infer<typeof bodySchema>['newsDescription'],
 ) {
   const defaults = getDefaultBudgets()
 
@@ -98,14 +100,16 @@ function buildRpcPayload(
       number_of_children: identity.number_of_children,
       net_monthly_income: identity.net_monthly_income,
       estimated_monthly_expenses: identity.estimated_monthly_expenses ?? null,
+      // FIRE params — from horizonData if provided, else from identity (backwards compat), else defaults
       expected_return: identity.expected_return ?? null,
       inflation_rate: identity.inflation_rate ?? null,
-      retirement_expense_method: identity.retirement_expense_method ?? null,
-      retirement_expense_custom_amount: identity.retirement_custom_amount ?? null,
-      fire_end_strategy: identity.fire_end_strategy ?? 'deplete',
-      fire_legacy_amount: identity.fire_legacy_amount ?? null,
-      fire_end_age: identity.fire_end_age ?? 90,
-      temporal_balance: identity.temporal_balance ?? null,
+      retirement_expense_method: horizonData?.retirement_expense_method ?? identity.retirement_expense_method ?? 'current_income',
+      retirement_expense_custom_amount: horizonData?.retirement_custom_amount ?? identity.retirement_custom_amount ?? null,
+      fire_end_strategy: horizonData?.fire_end_strategy ?? identity.fire_end_strategy ?? 'deplete',
+      fire_legacy_amount: horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null,
+      fire_end_age: horizonData?.fire_end_age ?? identity.fire_end_age ?? 90,
+      temporal_balance: horizonData?.temporal_balance ?? identity.temporal_balance ?? 3,
+      news_description: newsDescription ?? null,
     },
     budget_amounts: budgetAmounts,
     budgettering_mode: budgetteringMode ?? 'manual',
@@ -216,6 +220,25 @@ const bodySchema = z.object({
     'toekomstplannen',
     'nieuws',
   ])).optional(),
+  horizonData: z.object({
+    fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete']).optional(),
+    fire_end_age: z.number().int().min(60).max(120).optional(),
+    fire_legacy_amount: z.number().positive().optional(),
+    retirement_expense_method: z.enum(['essential_budgets', 'custom_amount', 'current_income']).optional(),
+    retirement_custom_amount: z.number().min(0).optional(),
+    temporal_balance: z.number().int().min(1).max(5).optional(),
+    life_events: z.array(z.object({
+      name: z.string(),
+      event_type: z.string(),
+      target_age: z.number().int().min(18).max(120),
+      monthly_income_change: z.number().optional(),
+      monthly_cost_change: z.number().optional(),
+      one_time_cost: z.number().optional(),
+      duration_months: z.number().int().optional(),
+      is_active: z.boolean(),
+    })).optional(),
+  }).optional(),
+  newsDescription: z.string().max(500).optional(),
 })
 
 export async function POST(req: Request) {
@@ -233,7 +256,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Ongeldige invoer', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { identity, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey, activeModules } = parsed.data
+  const { identity, horizonData, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey, activeModules, newsDescription } = parsed.data
 
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
@@ -289,6 +312,7 @@ export async function POST(req: Request) {
       identity, budgetAmounts, budgetteringMode,
       bankAccounts, assets, debts, widgetPrefs,
       aowTargetAge, idempotencyKey,
+      horizonData, newsDescription,
     )
 
     const { data: rpcResult, error: rpcError } = await supabase
@@ -363,15 +387,16 @@ export async function POST(req: Request) {
     }
     // Add estimated monthly expenses if provided
     if (identity.estimated_monthly_expenses != null) profileData.estimated_monthly_expenses = identity.estimated_monthly_expenses
-    // Add FIRE parameters if provided
+    // Add FIRE parameters — horizonData takes priority, then identity (backwards compat)
     if (identity.expected_return != null) profileData.expected_return = identity.expected_return
     if (identity.inflation_rate != null) profileData.inflation_rate = identity.inflation_rate
-    if (identity.retirement_expense_method) profileData.retirement_expense_method = identity.retirement_expense_method
-    if (identity.retirement_custom_amount != null) profileData.retirement_expense_custom_amount = identity.retirement_custom_amount
-    if (identity.fire_end_strategy) profileData.fire_end_strategy = identity.fire_end_strategy
-    if (identity.fire_legacy_amount != null) profileData.fire_legacy_amount = identity.fire_legacy_amount
-    if (identity.fire_end_age != null) profileData.fire_end_age = identity.fire_end_age
-    if (identity.temporal_balance != null) profileData.temporal_balance = identity.temporal_balance
+    profileData.retirement_expense_method = horizonData?.retirement_expense_method ?? identity.retirement_expense_method ?? 'current_income'
+    profileData.retirement_expense_custom_amount = horizonData?.retirement_custom_amount ?? identity.retirement_custom_amount ?? null
+    profileData.fire_end_strategy = horizonData?.fire_end_strategy ?? identity.fire_end_strategy ?? 'deplete'
+    profileData.fire_legacy_amount = horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null
+    profileData.fire_end_age = horizonData?.fire_end_age ?? identity.fire_end_age ?? 90
+    profileData.temporal_balance = horizonData?.temporal_balance ?? identity.temporal_balance ?? 3
+    profileData.news_description = newsDescription ?? null
     if (widgetPrefs) profileData.widget_prefs = widgetPrefs
 
     const { error: profileErr } = await supabase
@@ -611,6 +636,32 @@ export async function POST(req: Request) {
       sort_order: 0,
       metadata: { leefsituatie: 'alleenstaand', jarenBuitenNL: 0 },
     })
+
+    // 6b. Insert user-created life events from horizon step (non-AOW)
+    if (horizonData?.life_events && horizonData.life_events.length > 0) {
+      const userEvents = horizonData.life_events
+        .filter((e) => e.event_type !== 'aow') // AOW already handled above
+        .map((e, i) => ({
+          user_id: user.id,
+          name: e.name,
+          event_type: e.event_type,
+          target_age: e.target_age,
+          monthly_income_change: e.monthly_income_change ?? 0,
+          monthly_cost_change: e.monthly_cost_change ?? 0,
+          one_time_cost: e.one_time_cost ?? 0,
+          duration_months: e.duration_months ?? 0,
+          is_active: e.is_active,
+          sort_order: i + 1,
+          icon: 'Calendar',
+        }))
+
+      if (userEvents.length > 0) {
+        const { error: eventsError } = await supabase
+          .from('life_events')
+          .insert(userEvents)
+        if (eventsError) console.error('Life events insert error:', eventsError)
+      }
+    }
 
     // 7. Mark onboarding as completed LAST — only after all data is saved successfully
     // This ensures the idempotency guard doesn't block retries after partial failures
