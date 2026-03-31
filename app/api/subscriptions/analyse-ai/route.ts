@@ -1,0 +1,197 @@
+import { generateObject } from 'ai'
+import { z } from 'zod'
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { getModel, AIConfigError } from '@/lib/ai/config'
+import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-detection'
+
+/** Maximum number of candidates to send to the AI model to avoid token waste. */
+const MAX_AI_CANDIDATES = 50
+
+/**
+ * POST /api/subscriptions/analyse-ai
+ *
+ * Analyzes all detected recurring expense patterns using AI and classifies each as:
+ * - 'subscription' (abonnement): streaming, apps, memberships, donations, phone plans
+ * - 'vaste_kosten' (fixed cost): rent, mortgage, energy, insurance, taxes, childcare, loans
+ * - 'skip' (not a fixed cost): groceries, fuel, restaurants, variable shopping
+ *
+ * Returns suggestions for the user to review and confirm.
+ */
+export async function POST() {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    }
+
+    const now = new Date()
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+    const startDateStr = startDate.toISOString().split('T')[0]
+
+    const [txResult, recurringResult, budgetResult] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
+        .gte('date', startDateStr)
+        .order('date', { ascending: true }),
+      supabase
+        .from('recurring_transactions')
+        .select('id, counterparty_name, amount, name, frequency')
+        .eq('is_active', true),
+      supabase
+        .from('budgets')
+        .select('id, name, parent_id, budget_type')
+        .order('sort_order', { ascending: true }),
+    ])
+
+    const transactions = txResult.data ?? []
+    const existingRecurrings = recurringResult.data ?? []
+    const budgets = budgetResult.data ?? []
+
+    function toMonthly(amount: number, frequency: string): number {
+      const abs = Math.abs(amount)
+      switch (frequency) {
+        case 'weekly': return (abs * 52) / 12
+        case 'quarterly': return abs / 3
+        case 'yearly': return abs / 12
+        default: return abs
+      }
+    }
+
+    if (transactions.length < 3) {
+      return NextResponse.json({
+        suggestions: [],
+        analysedCount: 0,
+        skippedCount: 0,
+      })
+    }
+
+    // Run detection on ALL categories — pre-filter to expenses only
+    const allDetected = detectRecurringTransactions(
+      transactions
+        .filter(t => !(t.is_income ?? false))
+        .map(t => ({
+          id: t.id,
+          date: t.date,
+          amount: Number(t.amount),
+          description: t.description ?? '',
+          counterparty_name: t.counterparty_name ?? null,
+          is_income: false,
+          budget_id: t.budget_id ?? null,
+          transaction_type: t.transaction_type ?? null,
+        })),
+      existingRecurrings,
+      budgets,
+    )
+
+    // Filter: medium+ confidence, not already confirmed, expenses only
+    const confirmedKeys = new Set(
+      existingRecurrings.map(r => (r.counterparty_name ?? '').toLowerCase().trim())
+    )
+    const candidates = allDetected.filter(
+      d =>
+        d.confidence !== 'low' &&
+        !d.alreadyExists &&
+        !confirmedKeys.has((d.counterpartyName ?? '').toLowerCase().trim()),
+    )
+
+    if (candidates.length === 0) {
+      return NextResponse.json({
+        suggestions: [],
+        analysedCount: 0,
+        skippedCount: 0,
+      })
+    }
+
+    // Cap candidates to avoid excessive token usage
+    const cappedCandidates = candidates.slice(0, MAX_AI_CANDIDATES)
+
+    // Prepare AI model
+    let model
+    try {
+      model = await getModel(supabase)
+    } catch (err) {
+      if (err instanceof AIConfigError) {
+        return NextResponse.json({ error: err.message }, { status: 422 })
+      }
+      return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+    }
+
+    // Build the pattern list with auto-detected category as context for the AI
+    const patternList = cappedCandidates
+      .map((d, i) => {
+        const name = d.counterpartyName || d.commonDescription
+        const categoryLabel = CATEGORY_LABELS[d.suggestedCategory]
+        return `${i}: ${name} | ${d.frequency} | €${Math.abs(d.averageAmount).toFixed(2)}/keer | ${d.occurrences}x gezien | auto-categorie: ${categoryLabel}`
+      })
+      .join('\n')
+
+    const responseSchema = z.object({
+      classifications: z.array(z.object({
+        index: z.number().describe('Index uit de lijst'),
+        classification: z.enum(['subscription', 'vaste_kosten', 'skip']).describe(
+          'subscription = abonnement (streaming, apps, lidmaatschap, donatie, telefoon), vaste_kosten = vaste kosten (huur, hypotheek, energie, verzekering, belasting, kinderopvang, lening), skip = geen vaste kost'
+        ),
+        reason: z.string().describe('Korte reden voor de classificatie in het Nederlands'),
+      })),
+    })
+
+    const systemPrompt = `Je bent een financieel assistent die terugkerende betalingen classificeert.
+
+Classificeer elke betaling als:
+- "subscription" (abonnement): streamingdiensten, apps, software, lidmaatschappen, clubs, donaties/goede doelen, telefoon/internet, krantabonnementen, maaltijdboxen, fashion subscriptions
+- "vaste_kosten" (vaste kosten): huur, hypotheek, energierekening, water, verzekeringen, gemeentebelasting, kinderopvang, studielening, lease, VVE/servicekosten, apotheek/zorgkosten
+- "skip" (overslaan): boodschappen, tanken, restaurants, winkelen, horeca, eenmalige aankopen die toevallig terugkeren
+
+Wees nauwkeurig. Twijfelgevallen: als het bedrag elke keer exact hetzelfde is EN maandelijks, is het waarschijnlijk een vaste kost of abonnement. Als het bedrag sterk varieert, is het waarschijnlijk variabele uitgave (skip).
+
+Je krijgt ook de auto-categorie mee als hint. Gebruik die als aanvullende context, maar vertrouw op je eigen oordeel.`
+
+    const { object } = await generateObject({
+      model,
+      schema: responseSchema,
+      system: systemPrompt,
+      prompt: `Classificeer elk van deze terugkerende betalingen als subscription, vaste_kosten of skip:\n\n${patternList}`,
+      maxRetries: 1,
+    })
+
+    // Build a lookup from AI classifications by index
+    const classificationMap = new Map<number, { classification: 'subscription' | 'vaste_kosten' | 'skip'; reason: string }>()
+    for (const c of object.classifications) {
+      if (c.index >= 0 && c.index < cappedCandidates.length) {
+        classificationMap.set(c.index, { classification: c.classification, reason: c.reason })
+      }
+    }
+
+    // Build suggestion list — include all classified items (including skipped, for transparency)
+    const suggestions = cappedCandidates.map((d, i) => {
+      const ai = classificationMap.get(i)
+      return {
+        id: d.key,
+        name: d.counterpartyName || d.commonDescription,
+        monthlyAmount: toMonthly(d.averageAmount, d.frequency),
+        frequency: d.frequency,
+        occurrences: d.occurrences,
+        autoCategory: d.suggestedCategory,
+        autoCategoryLabel: CATEGORY_LABELS[d.suggestedCategory],
+        aiClassification: ai?.classification ?? 'skip' as const,
+        aiReason: ai?.reason ?? 'Geen classificatie ontvangen van AI',
+        confidence: d.confidence,
+      }
+    })
+
+    // Non-skipped items are the actionable suggestions; skipped items are counted separately
+    const skippedCount = suggestions.filter(s => s.aiClassification === 'skip').length
+
+    return NextResponse.json({
+      suggestions,
+      analysedCount: suggestions.length,
+      skippedCount,
+    })
+  } catch (err) {
+    console.error('[/api/subscriptions/analyse-ai]', err)
+    return NextResponse.json({ error: 'Interne fout' }, { status: 500 })
+  }
+}

@@ -2,6 +2,8 @@
  * Recurring transaction types and helpers.
  */
 
+export type RecurringCategoryOverride = 'subscription' | 'vaste_kosten' | 'excluded'
+
 export type RecurringTransaction = {
   id: string
   user_id: string
@@ -20,6 +22,8 @@ export type RecurringTransaction = {
   last_generated: string | null
   sort_order: number
   created_at: string
+  /** User override for category: null = auto-detect */
+  category_override: RecurringCategoryOverride | null
 }
 
 export const FREQUENCY_LABELS: Record<string, string> = {

@@ -31,7 +31,7 @@ export async function GET() {
         .order('date', { ascending: true }),
       supabase
         .from('recurring_transactions')
-        .select('id, counterparty_name, amount, name, frequency')
+        .select('id, counterparty_name, amount, name, frequency, category_override')
         .eq('is_active', true),
       supabase
         .from('budgets')
@@ -55,24 +55,34 @@ export async function GET() {
     }
 
     // Build confirmed recurring items from DB (expenses only: amount < 0)
-    const confirmedItems = existingRecurrings.filter(r => Number(r.amount) < 0).map(r => {
-      const name = r.name || r.counterparty_name || 'Onbekend'
-      const category = detectCategory(r.counterparty_name ?? '', name, false)
-      return {
-        id: r.id,
-        name,
-        averageAmount: Math.abs(Number(r.amount)),
-        monthlyAmount: toMonthly(Number(r.amount), r.frequency ?? 'monthly'),
-        frequency: (r.frequency ?? 'monthly') as 'monthly' | 'weekly' | 'quarterly' | 'yearly',
-        nextDate: null as string | null,
-        confidence: 'high' as const,
-        isVariableAmount: false,
-        occurrences: null as number | null,
-        alreadyConfirmed: true,
-        category,
-        categoryLabel: CATEGORY_LABELS[category],
-      }
-    })
+    // Exclude items explicitly marked as 'excluded' by the user
+    const confirmedItems = existingRecurrings
+      .filter(r => Number(r.amount) < 0 && r.category_override !== 'excluded')
+      .map(r => {
+        const name = r.name || r.counterparty_name || 'Onbekend'
+        const autoCategory = detectCategory(r.counterparty_name ?? '', name, false)
+        // If user has overridden the classification, use that instead
+        const category: RecurringCategory = r.category_override === 'subscription'
+          ? 'subscription'
+          : r.category_override === 'vaste_kosten'
+            ? 'other_expense' // Map vaste_kosten override to a non-subscription category
+            : autoCategory
+        return {
+          id: r.id,
+          name,
+          averageAmount: Math.abs(Number(r.amount)),
+          monthlyAmount: toMonthly(Number(r.amount), r.frequency ?? 'monthly'),
+          frequency: (r.frequency ?? 'monthly') as 'monthly' | 'weekly' | 'quarterly' | 'yearly',
+          nextDate: null as string | null,
+          confidence: 'high' as const,
+          isVariableAmount: false,
+          occurrences: null as number | null,
+          alreadyConfirmed: true,
+          category,
+          categoryLabel: CATEGORY_LABELS[category],
+          categoryOverride: r.category_override ?? null,
+        }
+      })
 
     if (transactions.length < 3) {
       const subs = confirmedItems.filter(i => SUBSCRIPTION_CATEGORIES.includes(i.category))
@@ -136,6 +146,7 @@ export async function GET() {
       alreadyConfirmed: d.alreadyExists,
       category: d.suggestedCategory,
       categoryLabel: CATEGORY_LABELS[d.suggestedCategory],
+      categoryOverride: null as string | null,
     }))
 
     // Merge: confirmed first, then new auto-detections that aren't already confirmed
@@ -145,8 +156,15 @@ export async function GET() {
       ...newDetections,
     ]
 
-    const subscriptions = allItems.filter(i => SUBSCRIPTION_CATEGORIES.includes(i.category))
-    const vasteKosten = allItems.filter(i => VASTE_KOSTEN_CATEGORIES.includes(i.category) || i.category === 'other_expense')
+    // User overrides take precedence over auto-detected categories
+    const subscriptions = allItems.filter(i =>
+      i.categoryOverride === 'subscription' ||
+      (!i.categoryOverride && SUBSCRIPTION_CATEGORIES.includes(i.category))
+    )
+    const vasteKosten = allItems.filter(i =>
+      i.categoryOverride === 'vaste_kosten' ||
+      (!i.categoryOverride && (VASTE_KOSTEN_CATEGORIES.includes(i.category) || i.category === 'other_expense'))
+    )
     const totalSubs = subscriptions.reduce((s, i) => s + i.monthlyAmount, 0)
     const totalVK = vasteKosten.reduce((s, i) => s + i.monthlyAmount, 0)
 
