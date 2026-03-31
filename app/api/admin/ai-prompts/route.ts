@@ -8,6 +8,7 @@ import { HORIZON_PROMPT } from '@/lib/ai/dna/horizon'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildBriefingSystemPrompt } from '@/lib/ai/dna/briefing'
 import { getDefaultFullPrompt } from '@/lib/ai/dna'
+import { DEFAULT_EXTRACTION_PROMPT } from '@/lib/ai/extraction-system-prompt'
 
 export async function GET() {
   const supabase = await createClient()
@@ -112,6 +113,16 @@ export async function GET() {
       domain: null,
       dynamic: true,
       charCount: briefingContent.length,
+    },
+    {
+      id: 'extraction',
+      label: 'Extractie',
+      description: 'Systeem prompt voor het extraheren van gestructureerde financiële data uit vrije tekst.',
+      content: DEFAULT_EXTRACTION_PROMPT,
+      source: 'lib/ai/extraction-system-prompt.ts',
+      domain: 'nieuws',
+      dynamic: false,
+      charCount: DEFAULT_EXTRACTION_PROMPT.length,
     },
   ]
 

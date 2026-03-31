@@ -18,6 +18,7 @@ const DOMAIN_BADGE: Record<string, { bg: string; text: string; label: string }> 
   kern: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Kern' },
   wil: { bg: 'bg-teal-100', text: 'text-teal-700', label: 'Wil' },
   horizon: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Horizon' },
+  nieuws: { bg: 'bg-sky-100', text: 'text-sky-700', label: 'Nieuws' },
 }
 const SHARED_BADGE = { bg: 'bg-zinc-100', text: 'text-zinc-600', label: 'Gedeeld' }
 
