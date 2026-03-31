@@ -140,6 +140,7 @@ export function OnboardingExtras({
       } as AssetEntry,
     ])
     setShowHoldingsModal(false)
+    onNext()
   }
 
   return (
