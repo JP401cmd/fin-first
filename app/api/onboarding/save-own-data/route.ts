@@ -240,6 +240,32 @@ const bodySchema = z.object({
     })).optional(),
   }).optional(),
   newsDescription: z.string().max(500).optional(),
+  /** Pre-extracted data from client-side review (avoids re-running AI extraction) */
+  extractionData: z.object({
+    assets: z.array(z.object({
+      name: z.string(),
+      asset_type: z.string(),
+      estimated_value: z.number(),
+    })).optional(),
+    debts: z.array(z.object({
+      name: z.string(),
+      debt_type: z.string(),
+      estimated_balance: z.number(),
+    })).optional(),
+    life_events: z.array(z.object({
+      name: z.string(),
+      event_type: z.string(),
+      target_age: z.number().nullable(),
+      one_time_cost: z.number().optional(),
+      monthly_cost_change: z.number().optional(),
+      monthly_income_change: z.number().optional(),
+      duration_months: z.number().optional(),
+      icon: z.string().optional(),
+    })).optional(),
+    monthly_income_estimate: z.number().nullable().optional(),
+    monthly_expenses_estimate: z.number().nullable().optional(),
+    financial_context_remainder: z.string().optional(),
+  }).optional(),
 })
 
 export async function POST(req: Request) {
@@ -257,7 +283,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Ongeldige invoer', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { identity, horizonData, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey, activeModules, newsDescription } = parsed.data
+  const { identity, horizonData, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey, activeModules, newsDescription, extractionData } = parsed.data
 
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
@@ -329,46 +355,85 @@ export async function POST(req: Request) {
     let aiIncomeEstimate: number | null = null
     let aiExpensesEstimate: number | null = null
 
-    if (isNewsOnly && newsDescription) {
-      const dob = new Date(identity.date_of_birth)
-      const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    if (isNewsOnly && (extractionData || newsDescription)) {
+      if (extractionData) {
+        // Client already ran extraction and user reviewed/edited the results — use directly
+        extractedAssets = (extractionData.assets ?? []).map((a) => ({
+          name: a.name,
+          asset_type: a.asset_type,
+          current_value: a.estimated_value,
+          expected_return: 0,
+          monthly_contribution: 0,
+          is_liquid: true,
+          subtype: null,
+          source: 'ai_extracted' as const,
+        }))
 
-      const extraction = await extractFinancialData(supabase, newsDescription, {
-        age,
-        householdType: identity.household_type,
-        monthlyIncome: identity.net_monthly_income,
-        monthlyExpenses: identity.estimated_monthly_expenses,
-      })
+        extractedDebts = (extractionData.debts ?? []).map((d) => ({
+          name: d.name,
+          debt_type: d.debt_type,
+          current_balance: d.estimated_balance,
+          interest_rate: 0,
+          monthly_payment: 0,
+          is_tax_deductible: null,
+          subtype: null,
+          source: 'ai_extracted' as const,
+        }))
 
-      extractedAssets = extraction.assets.map((a) => ({
-        name: a.name,
-        asset_type: a.asset_type,
-        current_value: a.estimated_value,
-        expected_return: a.expected_return,
-        monthly_contribution: a.monthly_contribution,
-        is_liquid: a.is_liquid,
-        subtype: a.subtype,
-        source: 'ai_extracted' as const,
-      }))
+        extractedLifeEvents = (extractionData.life_events ?? []).map((e) => ({
+          name: e.name,
+          event_type: e.event_type,
+          target_age: e.target_age,
+          one_time_cost: e.one_time_cost ?? 0,
+          monthly_cost_change: e.monthly_cost_change ?? 0,
+          monthly_income_change: e.monthly_income_change ?? 0,
+          duration_months: e.duration_months ?? 0,
+          icon: e.icon ?? 'Calendar',
+        }))
 
-      extractedDebts = extraction.debts.map((d) => ({
-        name: d.name,
-        debt_type: d.debt_type,
-        current_balance: d.estimated_balance,
-        interest_rate: d.interest_rate,
-        monthly_payment: d.monthly_payment,
-        is_tax_deductible: d.is_tax_deductible,
-        subtype: d.subtype,
-        source: 'ai_extracted' as const,
-      }))
+        financialContext = extractionData.financial_context_remainder || null
+        aiIncomeEstimate = extractionData.monthly_income_estimate ?? null
+        aiExpensesEstimate = extractionData.monthly_expenses_estimate ?? null
+      } else if (newsDescription) {
+        // Fallback: run extraction server-side (backwards compatibility)
+        const dob = new Date(identity.date_of_birth)
+        const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
 
-      extractedLifeEvents = extraction.life_events
+        const extraction = await extractFinancialData(supabase, newsDescription, {
+          age,
+          householdType: identity.household_type,
+          monthlyIncome: identity.net_monthly_income,
+          monthlyExpenses: identity.estimated_monthly_expenses,
+        })
 
-      financialContext = extraction.financial_context_remainder || null
+        extractedAssets = extraction.assets.map((a) => ({
+          name: a.name,
+          asset_type: a.asset_type,
+          current_value: a.estimated_value,
+          expected_return: a.expected_return,
+          monthly_contribution: a.monthly_contribution,
+          is_liquid: a.is_liquid,
+          subtype: a.subtype,
+          source: 'ai_extracted' as const,
+        }))
 
-      // Capture AI income/expenses estimates for profile update
-      aiIncomeEstimate = extraction.monthly_income_estimate ?? null
-      aiExpensesEstimate = extraction.monthly_expenses_estimate ?? null
+        extractedDebts = extraction.debts.map((d) => ({
+          name: d.name,
+          debt_type: d.debt_type,
+          current_balance: d.estimated_balance,
+          interest_rate: d.interest_rate,
+          monthly_payment: d.monthly_payment,
+          is_tax_deductible: d.is_tax_deductible,
+          subtype: d.subtype,
+          source: 'ai_extracted' as const,
+        }))
+
+        extractedLifeEvents = extraction.life_events
+
+        financialContext = extraction.financial_context_remainder || null
+        aiIncomeEstimate = extraction.monthly_income_estimate ?? null
+        aiExpensesEstimate = extraction.monthly_expenses_estimate ?? null
+      }
     }
 
     // Derive completed onboarding steps from active modules

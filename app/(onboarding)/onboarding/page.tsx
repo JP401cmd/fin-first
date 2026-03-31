@@ -19,7 +19,7 @@ import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
 import { OnboardingPreferences, INITIAL_PREFERENCES, buildWidgetPrefsFromPreferences } from '@/components/onboarding/onboarding-preferences'
 import { OnboardingModules } from '@/components/onboarding/onboarding-persona'
 import { OnboardingHorizon, INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
-import { OnboardingNieuwsOnly } from '@/components/onboarding/onboarding-nieuws-only'
+import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
 import { type PersonaId, type ModuleId, PERSONA_MODULE_PRESETS, getHomePath } from '@/lib/module-registry'
 
@@ -95,6 +95,7 @@ interface State {
   selectedModules: ModuleId[]
   horizon: HorizonData
   newsDescription: string
+  extraction: ExtractionResult | null
   budgetAmounts: Record<string, number>
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -109,6 +110,7 @@ interface PersistedData {
   selectedModules: ModuleId[]
   horizon?: HorizonData
   newsDescription?: string
+  extraction?: ExtractionResult | null
   budgetAmounts: Record<string, number>
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
@@ -125,6 +127,7 @@ type Action =
   | { type: 'TOGGLE_MODULE'; moduleId: ModuleId; enabled: boolean }
   | { type: 'SET_HORIZON'; data: HorizonData }
   | { type: 'SET_NEWS_DESCRIPTION'; value: string }
+  | { type: 'SET_EXTRACTION'; data: ExtractionResult | null }
   | { type: 'SET_BUDGET_AMOUNTS'; amounts: Record<string, number> }
   | { type: 'SET_BANK_ACCOUNTS'; items: BankAccountEntry[] }
   | { type: 'SET_ASSETS'; items: AssetEntry[] }
@@ -147,6 +150,7 @@ const initialState: State = {
   },
   horizon: INITIAL_HORIZON_DATA,
   newsDescription: '',
+  extraction: null,
   budgetAmounts: {},
   bankAccounts: [],
   assets: [],
@@ -180,6 +184,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, horizon: action.data }
     case 'SET_NEWS_DESCRIPTION':
       return { ...state, newsDescription: action.value }
+    case 'SET_EXTRACTION':
+      return { ...state, extraction: action.data }
     case 'SET_BUDGET_AMOUNTS':
       return { ...state, budgetAmounts: action.amounts }
     case 'SET_BANK_ACCOUNTS':
@@ -203,6 +209,7 @@ function reducer(state: State, action: Action): State {
         selectedModules: action.data.selectedModules ?? [],
         horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
         newsDescription: action.data.newsDescription ?? '',
+        extraction: action.data.extraction ?? null,
         budgetAmounts: action.data.budgetAmounts,
         bankAccounts: action.data.bankAccounts,
         assets: action.data.assets,
@@ -238,6 +245,7 @@ function saveToLocalStorage(state: State) {
       selectedModules: state.selectedModules,
       horizon: state.horizon,
       newsDescription: state.newsDescription,
+      extraction: state.extraction,
       budgetAmounts: state.budgetAmounts,
       bankAccounts: state.bankAccounts,
       assets: state.assets,
@@ -295,6 +303,7 @@ function loadFromLocalStorage(): PersistedData | null {
       selectedModules: Array.isArray(parsed.selectedModules) ? parsed.selectedModules : [],
       horizon,
       newsDescription: parsed.newsDescription,
+      extraction: parsed.extraction ?? null,
       budgetAmounts: parsed.budgetAmounts && typeof parsed.budgetAmounts === 'object' ? parsed.budgetAmounts : {},
       bankAccounts: Array.isArray(parsed.bankAccounts) ? parsed.bankAccounts : [],
       assets: Array.isArray(parsed.assets) ? parsed.assets : [],
@@ -469,6 +478,11 @@ export default function OnboardingPage() {
       // Add news description if present
       if (state.newsDescription) {
         body.newsDescription = state.newsDescription
+      }
+
+      // Add user-reviewed extraction data if present (avoids re-running extraction server-side)
+      if (state.extraction) {
+        body.extractionData = state.extraction
       }
 
       // Derive budgettering mode from modules
@@ -751,6 +765,16 @@ export default function OnboardingPage() {
               onChange={(value) => dispatch({ type: 'SET_NEWS_DESCRIPTION', value })}
               onNext={handleSaveOwnData}
               onBack={goToBack}
+              extraction={state.extraction}
+              onExtractionChange={(data) => dispatch({ type: 'SET_EXTRACTION', data })}
+              profileContext={{
+                age: state.identity.date_of_birth
+                  ? Math.floor((Date.now() - new Date(state.identity.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+                  : undefined,
+                householdType: state.identity.household_type,
+                monthlyIncome: state.identity.net_monthly_income ? Number(state.identity.net_monthly_income) : undefined,
+                monthlyExpenses: state.identity.estimated_monthly_expenses ? Number(state.identity.estimated_monthly_expenses) : undefined,
+              }}
             />
           )}
 
@@ -781,7 +805,7 @@ export default function OnboardingPage() {
             <OnboardingSuccess
               onDashboard={() => {
                 clearLocalStorage()
-                router.push(getHomePath(state.selectedModules))
+                router.push(getHomePath(state.selectedModules) + '?welcome=1')
               }}
               activeModules={state.selectedModules}
             />
