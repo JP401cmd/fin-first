@@ -5,6 +5,15 @@ import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.extras'
 
+// ── Module types (matches lib/module-registry.ts) ──────────────────────────
+type ModuleId =
+  | 'budgetteren'
+  | 'vermogensregistratie'
+  | 'aandelenregistratie'
+  | 'toekomstplannen'
+  | 'inzicht_acties'
+  | 'nieuws'
+
 // ── Type mirrors (match mini-form interfaces) ───────────────────────────────
 
 interface BankAccountEntry {
@@ -40,6 +49,7 @@ interface AssetEntry {
   kvk_number: string
   ownership_percentage: string
   annual_dividend: string
+  has_holdings_tracking?: boolean
 }
 
 interface DebtEntry {
@@ -158,7 +168,6 @@ const tests: TestCase[] = [
       assert(!openSections.assets, 'Assets sectie na 2e toggle: dicht')
 
       // Button text changes based on data presence
-      // hasData = false → "Overslaan", hasData = true → "Volgende"
       const buttonLabel = hasData ? 'Volgende' : 'Overslaan'
       assertEqual(buttonLabel, 'Overslaan', 'Zonder data: Overslaan knop')
     },
@@ -214,11 +223,6 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // MiniBankForm doesn't have a save gate (unlike asset/debt forms)
-      // Items are directly in the array, so validation is implicit:
-      // empty fields produce useless data that won't be saved to DB
-
-      // Verify the entry interface has all expected fields
       const entry: BankAccountEntry = { name: 'Test', bank_name: 'ING', account_type: 'checking', balance: '1000', has_budget_tracking: true }
       assert(!!entry.name, 'name is gevuld')
       assert(!!entry.bank_name, 'bank_name is gevuld')
@@ -385,7 +389,6 @@ const tests: TestCase[] = [
       assertEqual(pensioen.is_liquid, false, 'Niet vrij opneembaar')
       assertEqual(pensioen.institution, 'ABP', 'Institution ABP')
 
-      // retirement_provider_type is in interface
       assertEqual(EMPTY_ASSET.retirement_provider_type, '', 'Default provider type leeg')
     },
   },
@@ -520,7 +523,7 @@ const tests: TestCase[] = [
       assertEqual(banks[1].name, 'Spaar ASN', 'Bank 2 naam')
       assertEqual(banks[2].name, 'Gezamenlijk', 'Bank 3 naam')
 
-      // 3+ assets (using AssetEntry directly)
+      // 3+ assets
       const assets: AssetEntry[] = [
         { ...EMPTY_ASSET, name: 'Spaarrekening', asset_type: 'savings', current_value: '20000' },
         { ...EMPTY_ASSET, name: 'DEGIRO Portfolio', asset_type: 'investment', current_value: '80000' },
@@ -596,45 +599,106 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 12: Budget tracking validation ─────────────────────────────────────
+  // ── Step 12: Budget tracking validation (module-driven) ──────────────────
   {
     id: 'ob-ext-budget-tracking-validation',
-    name: 'Budget tracking validatie: minstens 1 bank met has_budget_tracking bij actief budgetteren',
+    name: 'Budget tracking validatie: minstens 1 bank met has_budget_tracking bij activeModules.includes(budgetteren)',
     category: CAT,
-    description: 'Wanneer budgettering actief is, moet minstens 1 bankrekening has_budget_tracking=true hebben',
+    description: 'Wanneer budgetteren actief is in modules, moet minstens 1 bankrekening has_budget_tracking=true hebben',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // Validation function: when budgeting is active, at least one bank must track budgets
-      function validateBudgetTracking(banks: BankAccountEntry[], budgetteringActive: boolean): boolean {
-        if (!budgetteringActive) return true // No validation needed when budgeting is off
+      // Validation function: uses activeModules instead of budgetteringMode string
+      function validateBudgetTracking(banks: BankAccountEntry[], activeModules: ModuleId[]): boolean {
+        const budgetteringActive = activeModules.includes('budgetteren')
+        if (!budgetteringActive) return true // No validation needed when budgeting module is off
         if (banks.length === 0) return true // No banks added yet is fine
         return banks.some((b) => b.has_budget_tracking)
       }
 
-      // Budgeting active, one bank with tracking: valid
+      // Budgeting module active, one bank with tracking: valid
       const banksWithTracking: BankAccountEntry[] = [
         { ...EMPTY_BANK, name: 'ING', bank_name: 'ING', balance: '2500', has_budget_tracking: true },
       ]
-      assert(validateBudgetTracking(banksWithTracking, true), 'Budgettering actief + bank met tracking: geldig')
+      assert(validateBudgetTracking(banksWithTracking, ['budgetteren', 'vermogensregistratie']), 'Budgetteren actief + bank met tracking: geldig')
 
-      // Budgeting active, all banks without tracking: invalid
+      // Budgeting module active, all banks without tracking: invalid
       const banksNoTracking: BankAccountEntry[] = [
         { ...EMPTY_BANK, name: 'ING', bank_name: 'ING', balance: '2500', has_budget_tracking: false },
         { ...EMPTY_BANK, name: 'Rabo', bank_name: 'Rabo', balance: '1000', has_budget_tracking: false },
       ]
-      assert(!validateBudgetTracking(banksNoTracking, true), 'Budgettering actief + geen tracking: ongeldig')
+      assert(!validateBudgetTracking(banksNoTracking, ['budgetteren']), 'Budgetteren actief + geen tracking: ongeldig')
 
-      // Budgeting inactive: always valid regardless of tracking state
-      assert(validateBudgetTracking(banksNoTracking, false), 'Budgettering inactief: altijd geldig')
-      assert(validateBudgetTracking([], false), 'Budgettering inactief + geen banken: geldig')
+      // Budgeting module inactive: always valid regardless of tracking state
+      assert(validateBudgetTracking(banksNoTracking, ['vermogensregistratie']), 'Budgetteren inactief: altijd geldig')
+      assert(validateBudgetTracking([], ['vermogensregistratie']), 'Budgetteren inactief + geen banken: geldig')
 
-      // Budgeting active, no banks: valid (banks are optional)
-      assert(validateBudgetTracking([], true), 'Budgettering actief + geen banken: geldig')
+      // Budgeting module active, no banks: valid (banks are optional)
+      assert(validateBudgetTracking([], ['budgetteren']), 'Budgetteren actief + geen banken: geldig')
     },
   },
 
-  // ── Step 13: Auto-create checking account ──────────────────────────────────
+  // ── Step 13: Holdings tracking validation (module-driven) ─────────────────
+  {
+    id: 'ob-ext-holdings-tracking-validation',
+    name: 'Holdings tracking validatie: investment asset met has_holdings_tracking bij aandelenregistratie module',
+    category: CAT,
+    description: 'Wanneer aandelenregistratie actief is in modules, moet minstens 1 investment asset has_holdings_tracking=true hebben',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      // Validation function: when aandelenregistratie is active, at least one investment
+      // asset must have has_holdings_tracking = true
+      function validateHoldingsTracking(assets: AssetEntry[], activeModules: ModuleId[]): boolean {
+        const holdingsActive = activeModules.includes('aandelenregistratie')
+        if (!holdingsActive) return true
+        const investmentAssets = assets.filter((a) => a.asset_type === 'investment')
+        if (investmentAssets.length === 0) return true // No investment assets yet is fine
+        return investmentAssets.some((a) => a.has_holdings_tracking === true)
+      }
+
+      // Aandelenregistratie active, investment with tracking: valid
+      const assetsWithTracking: AssetEntry[] = [
+        { ...EMPTY_ASSET, name: 'DEGIRO', asset_type: 'investment', current_value: '50000', has_holdings_tracking: true },
+      ]
+      assert(
+        validateHoldingsTracking(assetsWithTracking, ['vermogensregistratie', 'aandelenregistratie']),
+        'Aandelenregistratie actief + investment met tracking: geldig',
+      )
+
+      // Aandelenregistratie active, investment without tracking: invalid
+      const assetsNoTracking: AssetEntry[] = [
+        { ...EMPTY_ASSET, name: 'DEGIRO', asset_type: 'investment', current_value: '50000', has_holdings_tracking: false },
+      ]
+      assert(
+        !validateHoldingsTracking(assetsNoTracking, ['vermogensregistratie', 'aandelenregistratie']),
+        'Aandelenregistratie actief + investment zonder tracking: ongeldig',
+      )
+
+      // Aandelenregistratie inactive: always valid
+      assert(
+        validateHoldingsTracking(assetsNoTracking, ['vermogensregistratie']),
+        'Aandelenregistratie inactief: altijd geldig',
+      )
+
+      // Aandelenregistratie active, no investment assets (only savings): valid
+      const savingsOnly: AssetEntry[] = [
+        { ...EMPTY_ASSET, name: 'Spaarrekening', asset_type: 'savings', current_value: '10000' },
+      ]
+      assert(
+        validateHoldingsTracking(savingsOnly, ['vermogensregistratie', 'aandelenregistratie']),
+        'Aandelenregistratie actief + geen investment assets: geldig',
+      )
+
+      // Aandelenregistratie active, no assets at all: valid
+      assert(
+        validateHoldingsTracking([], ['vermogensregistratie', 'aandelenregistratie']),
+        'Aandelenregistratie actief + geen assets: geldig',
+      )
+    },
+  },
+
+  // ── Step 14: Auto-create checking account ──────────────────────────────────
   {
     id: 'ob-ext-auto-create-checking',
     name: 'Auto-create betaalrekening: handleAutoCreate maakt Lopende rekening met budget tracking',
@@ -671,7 +735,7 @@ const tests: TestCase[] = [
     id: 'ob-ext-route-accessible',
     name: 'Onboarding extras: route bereikbaar',
     category: CAT,
-    description: 'Onboarding pagina is bereikbaar (extras stap geladen via stap-navigatie)',
+    description: 'Onboarding pagina is bereikbaar (bezittingen stap geladen via stap-navigatie)',
     priority: 'high',
     estimatedDurationMs: 1000,
     async fn() {
@@ -685,8 +749,8 @@ const tests: TestCase[] = [
 export function register(): void {
   registerCategory({
     id: CAT,
-    label: 'Onboarding — Extras',
-    description: 'Onboarding stap 3: optionele data — bezittingen (incl. bankrekeningen), schulden',
+    label: 'Onboarding \u2014 Bezittingen',
+    description: 'Onboarding bezittingen-stap: optionele data \u2014 bezittingen (incl. bankrekeningen), schulden, module-driven enforcement',
     icon: 'PlusCircle',
     testCount: 0,
   })

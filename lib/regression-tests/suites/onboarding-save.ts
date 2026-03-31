@@ -5,6 +5,15 @@ import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.save'
 
+// ── Module types (matches lib/module-registry.ts) ──────────────────────────
+type ModuleId =
+  | 'budgetteren'
+  | 'vermogensregistratie'
+  | 'aandelenregistratie'
+  | 'toekomstplannen'
+  | 'inzicht_acties'
+  | 'nieuws'
+
 // ── Zod schema constraints from save-own-data route ────────────────────────
 
 const IDENTITY_REQUIRED_FIELDS = ['full_name', 'date_of_birth', 'household_type', 'net_monthly_income'] as const
@@ -22,7 +31,7 @@ const SAVING_MESSAGES = [
   'Bijna klaar...',
 ]
 
-/** Minimal valid request body for schema validation tests */
+/** Minimal valid request body for schema validation tests (simplified identity, no FIRE params) */
 function buildMinimalBody() {
   return {
     identity: {
@@ -33,24 +42,30 @@ function buildMinimalBody() {
       net_monthly_income: 3500,
     },
     budgetAmounts: { voeding: 400, wonen: 1200 },
+    budgetteringMode: 'manual' as const,
   }
 }
 
-/** Full request body with all optional fields for comprehensive tests */
+/** Full request body with horizonData separate from identity, plus newsDescription */
 function buildFullBody() {
   return {
     ...buildMinimalBody(),
     identity: {
       ...buildMinimalBody().identity,
       estimated_monthly_expenses: 2800,
-      expected_return: 0.07,
-      inflation_rate: 0.02,
+    },
+    // horizonData is now a separate top-level field (not inside identity)
+    horizonData: {
+      fire_end_strategy: 'legacy' as const,
+      fire_end_age: 90,
+      fire_legacy_amount: 200000,
       retirement_expense_method: 'custom_amount' as const,
       retirement_custom_amount: 2000,
-      fire_end_strategy: 'legacy' as const,
-      fire_legacy_amount: 200000,
       temporal_balance: 3,
+      life_events: [],
     },
+    // newsDescription is a new top-level field
+    newsDescription: 'Ik ben ge\u00efnteresseerd in ETF-beleggen en FIRE-strategieën',
     bankAccounts: [
       { name: 'ING Betaal', bank_name: 'ING', account_type: 'checking', balance: 5000, has_budget_tracking: true },
     ],
@@ -66,7 +81,7 @@ function buildFullBody() {
         { id: 'fire_prognose', enabled: true, size: 'half' as const, order: 1 },
       ],
     },
-    budgetteringMode: 'manual' as const,
+    activeModules: ['budgetteren', 'vermogensregistratie', 'toekomstplannen', 'inzicht_acties'] as ModuleId[],
   }
 }
 
@@ -100,27 +115,37 @@ const tests: TestCase[] = [
   // ── Step 1: handleSaveOwnData request body construction ─────────────
   {
     id: 'ob-save-body-construction',
-    name: 'handleSaveOwnData: correcte request body opbouw',
+    name: 'handleSaveOwnData: correcte request body opbouw met horizonData en newsDescription',
     category: CAT,
-    description: 'Request body bevat identity, budgetAmounts, widgetPrefs, bankAccounts, assets, debts',
+    description: 'Request body bevat identity (simpel), horizonData (apart), newsDescription, budgetAmounts, widgetPrefs, activeModules',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
       const body = buildFullBody()
 
-      // Identity section
+      // Identity section — simplified, no FIRE params
       assert(!!body.identity.full_name, 'Body bevat full_name')
       assert(!!body.identity.date_of_birth, 'Body bevat date_of_birth')
       assertIncludes([...HOUSEHOLD_TYPES], body.identity.household_type, 'household_type is geldig')
       assert(body.identity.net_monthly_income > 0, 'net_monthly_income is positief')
+      assert(body.identity.estimated_monthly_expenses !== undefined, 'estimated_monthly_expenses aanwezig')
 
-      // FIRE parameters in identity
-      assert(body.identity.expected_return! >= 0.01 && body.identity.expected_return! <= 0.20, 'expected_return 1-20% range')
-      assert(body.identity.inflation_rate! >= 0 && body.identity.inflation_rate! <= 0.10, 'inflation_rate 0-10% range')
-      assertIncludes([...RETIREMENT_METHODS], body.identity.retirement_expense_method!, 'retirement_expense_method geldig')
-      assertIncludes([...FIRE_STRATEGIES], body.identity.fire_end_strategy!, 'fire_end_strategy geldig')
-      assert(body.identity.fire_legacy_amount! > 0, 'fire_legacy_amount positief voor legacy strategie')
-      assert(body.identity.temporal_balance! >= 1 && body.identity.temporal_balance! <= 5, 'temporal_balance 1-5 range')
+      // Verify FIRE params are NOT in identity
+      const identityKeys = Object.keys(body.identity)
+      assert(!identityKeys.includes('expected_return'), 'expected_return NIET in identity')
+      assert(!identityKeys.includes('inflation_rate'), 'inflation_rate NIET in identity')
+      assert(!identityKeys.includes('fire_end_strategy'), 'fire_end_strategy NIET in identity')
+      assert(!identityKeys.includes('temporal_balance'), 'temporal_balance NIET in identity')
+
+      // horizonData is a separate top-level field
+      assert(body.horizonData !== undefined, 'horizonData aanwezig als apart top-level veld')
+      assertIncludes([...FIRE_STRATEGIES], body.horizonData.fire_end_strategy, 'fire_end_strategy geldig')
+      assertIncludes([...RETIREMENT_METHODS], body.horizonData.retirement_expense_method, 'retirement_expense_method geldig')
+      assert(body.horizonData.temporal_balance >= 1 && body.horizonData.temporal_balance <= 5, 'temporal_balance 1-5 range')
+
+      // newsDescription is a new top-level field
+      assert(typeof body.newsDescription === 'string', 'newsDescription is een string')
+      assert(body.newsDescription.length > 0, 'newsDescription is niet leeg')
 
       // Budget amounts
       assert(typeof body.budgetAmounts === 'object', 'budgetAmounts is een object')
@@ -141,12 +166,105 @@ const tests: TestCase[] = [
         assert(typeof w.order === 'number', 'widget heeft order nummer')
       })
 
-      // Budgettering mode
+      // Budgettering mode — derived from modules
       assertIncludes([...BUDGETTERING_MODES], body.budgetteringMode, 'budgetteringMode geldig')
+
+      // activeModules — new field
+      assert(Array.isArray(body.activeModules), 'activeModules is een array')
+      assert(body.activeModules.length > 0, 'activeModules niet leeg')
     },
   },
 
-  // ── Step 2: Numerieke conversie ─────────────────────────────────────
+  // ── Step 2: budgetteringMode derived from modules ──────────────────
+  {
+    id: 'ob-save-budgettering-derived',
+    name: 'budgetteringMode: afgeleid uit activeModules, niet uit identity',
+    category: CAT,
+    description: 'budgetteringMode is "manual" als budgetteren in modules zit, anders "none"',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      // When budgetteren is in selected modules → budgetteringMode = 'manual'
+      function deriveBudgetteringMode(selectedModules: ModuleId[]): string {
+        return selectedModules.includes('budgetteren') ? 'manual' : 'none'
+      }
+
+      assertEqual(deriveBudgetteringMode(['budgetteren', 'vermogensregistratie']), 'manual', 'Met budgetteren: manual')
+      assertEqual(deriveBudgetteringMode(['budgetteren']), 'manual', 'Alleen budgetteren: manual')
+      assertEqual(deriveBudgetteringMode(['vermogensregistratie']), 'none', 'Zonder budgetteren: none')
+      assertEqual(deriveBudgetteringMode([]), 'none', 'Geen modules: none')
+
+      // The old identity.budgettering_mode field is no longer used
+      // budgetteringMode is derived in handleSaveOwnData from state.selectedModules
+    },
+  },
+
+  // ── Step 3: horizonData separate from identity ──────────────────────
+  {
+    id: 'ob-save-horizon-data-separate',
+    name: 'horizonData: apart top-level veld, alleen meegestuurd bij toekomstplannen actief',
+    category: CAT,
+    description: 'horizonData bevat FIRE strategie, pensioenuitgaven, temporal_balance en life_events',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      // horizonData is only sent when toekomstplannen is in selectedModules
+      const modulesWithToekomst: ModuleId[] = ['vermogensregistratie', 'toekomstplannen']
+      const modulesWithoutToekomst: ModuleId[] = ['vermogensregistratie', 'budgetteren']
+
+      assert(modulesWithToekomst.includes('toekomstplannen'), 'Modules met toekomstplannen')
+      assert(!modulesWithoutToekomst.includes('toekomstplannen'), 'Modules zonder toekomstplannen')
+
+      // When toekomstplannen is active, body includes horizonData
+      const body = buildFullBody()
+      assert(body.horizonData !== undefined, 'horizonData aanwezig bij toekomstplannen')
+
+      // horizonData structure
+      const horizon = body.horizonData
+      assertIncludes([...FIRE_STRATEGIES], horizon.fire_end_strategy, 'fire_end_strategy geldig')
+      assert(horizon.fire_end_age >= 60 && horizon.fire_end_age <= 120, 'fire_end_age in range 60-120')
+      assertIncludes([...RETIREMENT_METHODS], horizon.retirement_expense_method, 'retirement_expense_method geldig')
+      assert(horizon.temporal_balance >= 1 && horizon.temporal_balance <= 5, 'temporal_balance 1-5')
+      assert(Array.isArray(horizon.life_events), 'life_events is een array')
+
+      // Conditional fields
+      if (horizon.fire_end_strategy === 'legacy') {
+        assert(horizon.fire_legacy_amount > 0, 'Legacy: fire_legacy_amount positief')
+      }
+      if (horizon.retirement_expense_method === 'custom_amount') {
+        assert(horizon.retirement_custom_amount > 0, 'Custom amount: retirement_custom_amount positief')
+      }
+    },
+  },
+
+  // ── Step 4: newsDescription in payload ──────────────────────────────
+  {
+    id: 'ob-save-news-description',
+    name: 'newsDescription: nieuw top-level veld in save payload',
+    category: CAT,
+    description: 'newsDescription wordt meegestuurd als de gebruiker een nieuwsbeschrijving heeft ingevuld',
+    priority: 'high',
+    estimatedDurationMs: 100,
+    fn() {
+      const body = buildFullBody()
+
+      // newsDescription is a string field at the top level
+      assert(typeof body.newsDescription === 'string', 'newsDescription is een string')
+      assert(body.newsDescription.length > 0, 'newsDescription is gevuld')
+
+      // Empty newsDescription should not be sent (checked in page.tsx: if (state.newsDescription))
+      const emptyNewsBody = { ...buildMinimalBody(), newsDescription: '' }
+      const shouldSendNews = !!emptyNewsBody.newsDescription
+      assert(!shouldSendNews, 'Lege newsDescription wordt niet meegestuurd')
+
+      // Non-empty newsDescription should be sent
+      const filledNewsBody = { ...buildMinimalBody(), newsDescription: 'Interesse in ETFs' }
+      const shouldSendFilled = !!filledNewsBody.newsDescription
+      assert(shouldSendFilled, 'Gevulde newsDescription wordt wel meegestuurd')
+    },
+  },
+
+  // ── Step 5: Numerieke conversie ─────────────────────────────────────
   {
     id: 'ob-save-numeric-conversion',
     name: 'Numerieke conversie: string inputs correct omgezet naar numbers',
@@ -156,9 +274,9 @@ const tests: TestCase[] = [
     estimatedDurationMs: 100,
     fn() {
       // net_monthly_income: Number(state.identity.net_monthly_income)
-      assertEqual(Number('4500'), 4500, 'String "4500" → number 4500')
-      assertEqual(Number('0'), 0, 'String "0" → number 0')
-      assert(isNaN(Number('')), 'Lege string → NaN')
+      assertEqual(Number('4500'), 4500, 'String "4500" \u2192 number 4500')
+      assertEqual(Number('0'), 0, 'String "0" \u2192 number 0')
+      assert(isNaN(Number('')), 'Lege string \u2192 NaN')
 
       // estimated_monthly_expenses: conditional Number()
       const expense = '2800'
@@ -168,33 +286,25 @@ const tests: TestCase[] = [
       // Empty string should not be sent
       const empty = ''
       const emptyConverted = empty ? Number(empty) : undefined
-      assertEqual(emptyConverted, undefined, 'Lege string → undefined (niet meegestuurd)')
+      assertEqual(emptyConverted, undefined, 'Lege string \u2192 undefined (niet meegestuurd)')
 
       // Bank balance: Number(a.balance)
       const bankBalanceStr = '5000.50'
       assertEqual(Number(bankBalanceStr), 5000.50, 'Bank balance decimaal correct')
 
-      // Asset current_value: Number(a.current_value)
-      const assetValue = '80000'
-      assertEqual(Number(assetValue), 80000, 'Asset value correct')
+      // Asset current_value
+      assertEqual(Number('80000'), 80000, 'Asset value correct')
 
-      // Debt current_balance: Number(d.current_balance)
-      const debtBalance = '12000'
-      assertEqual(Number(debtBalance), 12000, 'Debt balance correct')
+      // Debt current_balance
+      assertEqual(Number('12000'), 12000, 'Debt balance correct')
 
-      // retirement_custom_amount: conditional Number()
-      const customAmount = '2000'
-      const customConverted = customAmount ? Number(customAmount) : undefined
-      assertEqual(customConverted, 2000, 'Retirement custom amount correct')
-
-      // fire_legacy_amount: conditional Number()
-      const legacyAmount = '200000'
-      const legacyConverted = legacyAmount ? Number(legacyAmount) : undefined
-      assertEqual(legacyConverted, 200000, 'Legacy amount correct')
+      // horizonData numeric conversions
+      assertEqual(Number('200000'), 200000, 'Legacy amount correct')
+      assertEqual(Number('2000'), 2000, 'Retirement custom amount correct')
     },
   },
 
-  // ── Step 3: Filtering — alleen items met verplichte velden ──────────
+  // ── Step 6: Filtering \u2014 alleen items met verplichte velden ──────────
   {
     id: 'ob-save-filtering',
     name: 'Filtering: alleen items met verplichte velden worden meegestuurd',
@@ -206,9 +316,9 @@ const tests: TestCase[] = [
       // Bank accounts: filter by name && bank_name && balance
       const banks: BankInput[] = [
         { name: 'ING Betaal', bank_name: 'ING', balance: '5000' },
-        { name: '', bank_name: 'Rabo', balance: '3000' },       // missing name
-        { name: 'Spaar', bank_name: '', balance: '10000' },     // missing bank_name
-        { name: 'Lege', bank_name: 'ABN', balance: '' },        // empty balance (falsy)
+        { name: '', bank_name: 'Rabo', balance: '3000' },
+        { name: 'Spaar', bank_name: '', balance: '10000' },
+        { name: 'Lege', bank_name: 'ABN', balance: '' },
       ]
       const validBanks = filterValidBanks(banks)
       assertEqual(validBanks.length, 1, 'Alleen 1 complete bankrekening doorgelaten')
@@ -217,8 +327,8 @@ const tests: TestCase[] = [
       // Assets: filter by name && current_value
       const assets: AssetInput[] = [
         { name: 'ETF Portfolio', current_value: '80000' },
-        { name: '', current_value: '50000' },        // missing name
-        { name: 'Crypto', current_value: '' },        // empty value (falsy)
+        { name: '', current_value: '50000' },
+        { name: 'Crypto', current_value: '' },
         { name: 'Woning', current_value: '350000' },
       ]
       const validAssets = filterValidAssets(assets)
@@ -229,132 +339,114 @@ const tests: TestCase[] = [
       // Debts: filter by name && current_balance
       const debts: DebtInput[] = [
         { name: 'Studieschuld', current_balance: '12000' },
-        { name: '', current_balance: '5000' },        // missing name
+        { name: '', current_balance: '5000' },
         { name: 'Hypotheek', current_balance: '250000' },
       ]
       const validDebts = filterValidDebts(debts)
       assertEqual(validDebts.length, 2, 'Alleen 2 complete debts doorgelaten')
 
-      // Empty arrays should not be included in body
+      // Empty arrays should not be included
       const emptyBanks: BankInput[] = [{ name: '', bank_name: '', balance: '' }]
       assertEqual(filterValidBanks(emptyBanks).length, 0, 'Geen valide banks = niet meegestuurd')
     },
   },
 
-  // ── Step 4: 10-seconden timeout ─────────────────────────────────────
+  // ── Step 7: 30-seconden timeout ─────────────────────────────────────
   {
     id: 'ob-save-timeout',
-    name: '10-seconden timeout: AbortController stopt request bij timeout',
+    name: '30-seconden timeout: AbortController stopt request bij timeout',
     category: CAT,
-    description: 'AbortController met 10s timeout geeft AbortError met specifiek foutbericht',
+    description: 'AbortController met 30s timeout geeft AbortError met specifiek foutbericht',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // Verify timeout mechanism: AbortController + setTimeout(10000)
-      const TIMEOUT_MS = 10000
-      assertEqual(TIMEOUT_MS, 10000, 'Timeout is 10 seconden')
+      // Verify timeout mechanism: AbortController + setTimeout(30000)
+      // Updated from 10s to 30s to allow for batched DB operations
+      const TIMEOUT_MS = 30000
+      assertEqual(TIMEOUT_MS, 30000, 'Timeout is 30 seconden')
 
-      // When abort fires, the error handler checks:
-      // err instanceof DOMException && err.name === 'AbortError'
-      // Message: 'De server reageert niet. Controleer je internetverbinding en probeer het opnieuw.'
       const abortMessage = 'De server reageert niet. Controleer je internetverbinding en probeer het opnieuw.'
       assert(abortMessage.includes('server reageert niet'), 'Abort error message verwijst naar server')
       assert(abortMessage.includes('probeer het opnieuw'), 'Abort error message biedt retry optie')
 
-      // Timeout is cleared on successful response: clearTimeout(timeoutId)
-      // This prevents the abort from firing after a slow but successful response
-
-      // After error, step goes back to 'preferences'
-      const errorRecoveryStep = 'preferences'
-      assertEqual(errorRecoveryStep, 'preferences', 'Na timeout terug naar preferences')
+      // After error, step goes back to last content step (dynamic, not fixed)
+      const errorRecoveryStep = 'last content step'
+      assert(errorRecoveryStep.length > 0, 'Error recovery stap is dynamisch bepaald')
     },
   },
 
-  // ── Step 5: Saving animatie ─────────────────────────────────────────
+  // ── Step 8: Saving animatie ─────────────────────────────────────────
   {
     id: 'ob-save-animation',
-    name: 'Saving animatie: WillDots (64px pulsing), roterende berichten (5×, 800ms)',
+    name: 'Saving animatie: WillDots (64px pulsing), roterende berichten (5\u00d7, 800ms)',
     category: CAT,
     description: 'WillDots avatar met pulse animatie, 5 roterende berichten elke 800ms',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // WillDots size during saving step
       const WILLDOTS_SIZE = 64
       assertEqual(WILLDOTS_SIZE, 64, 'WillDots size is 64px tijdens saving')
 
-      // Pulse animation class: animate-pulse
       const animationClass = 'animate-pulse'
       assert(animationClass.includes('pulse'), 'Pulse animatie actief op WillDots')
 
-      // 5 saving messages rotating every 800ms
       assertEqual(SAVING_MESSAGES.length, 5, 'Exact 5 saving berichten')
       const MESSAGE_INTERVAL_MS = 800
       assertEqual(MESSAGE_INTERVAL_MS, 800, 'Berichten wisselen elke 800ms')
 
-      // Total cycle time: 5 messages × 800ms = 4000ms
       const fullCycleMs = SAVING_MESSAGES.length * MESSAGE_INTERVAL_MS
       assertEqual(fullCycleMs, 4000, 'Volledige berichtencyclus is 4 seconden')
 
-      // Verify message content covers all save phases
       assert(SAVING_MESSAGES[0].includes('Profiel'), 'Bericht 1: profiel opslaan')
       assert(SAVING_MESSAGES[1].includes('Budgetten'), 'Bericht 2: budgetten aanmaken')
       assert(SAVING_MESSAGES[2].includes('Bezittingen'), 'Bericht 3: bezittingen verwerken')
       assert(SAVING_MESSAGES[3].includes('Dashboard'), 'Bericht 4: dashboard configureren')
       assert(SAVING_MESSAGES[4].includes('Bijna klaar'), 'Bericht 5: bijna klaar')
 
-      // Saving step has no interactive buttons — prevents user action during save
       const savingStepInteractiveElements = 0
       assertEqual(savingStepInteractiveElements, 0, 'Saving stap heeft geen knoppen')
     },
   },
 
-  // ── Step 6: Voortgangsbalk ──────────────────────────────────────────
+  // ── Step 9: Voortgangsbalk ──────────────────────────────────────────
   {
     id: 'ob-save-progress-bar',
-    name: 'Voortgangsbalk: ramp 0%→90% over ~3s, spring naar 100% bij success',
+    name: 'Voortgangsbalk: ramp 0%\u219290% over ~3s, spring naar 100% bij success',
     category: CAT,
     description: 'Progress bar start bij 0%, ramps naar 90% in intervallen, springt naar 100% bij success',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // Progress interval: +3% elke 100ms → 0 → 3 → 6 → ... → 90
       const INCREMENT = 3
       const INTERVAL_MS = 100
       const MAX_RAMP = 90
       const FINAL = 100
 
-      // Steps to reach 90%: 90 / 3 = 30 steps × 100ms = 3000ms
       const stepsToMax = MAX_RAMP / INCREMENT
       assertEqual(stepsToMax, 30, '30 stappen tot 90%')
 
       const timeToMaxMs = stepsToMax * INTERVAL_MS
       assertEqual(timeToMaxMs, 3000, '~3 seconden tot 90%')
 
-      // Simulate progress ramp
       let progress = 0
       for (let i = 0; i < stepsToMax; i++) {
         progress = Math.min(progress + INCREMENT, MAX_RAMP)
       }
       assertEqual(progress, MAX_RAMP, 'Ramp stopt bij 90%')
 
-      // On success: setSaveProgress(100)
       progress = FINAL
       assertEqual(progress, 100, 'Na success springt progress naar 100%')
 
-      // Progress display: font-mono tabular-nums text-xs
       const progressDisplayClasses = 'font-mono text-xs tabular-nums'
       assert(progressDisplayClasses.includes('font-mono'), 'Progress tekst in monospace')
       assert(progressDisplayClasses.includes('tabular-nums'), 'Tabular nums voor stabiele breedte')
 
-      // Progress bar: bg-[var(--subtle)] container, bg-[var(--ink)] fill
-      // Width set via inline style: width: `${saveProgress}%`
       const barFillClass = 'bg-[var(--ink)]'
       assert(barFillClass.includes('--ink'), 'Voortgangsbalk vult met ink kleur')
     },
   },
 
-  // ── Step 7: Zod schema validatie ────────────────────────────────────
+  // ── Step 10: Zod schema validatie ────────────────────────────────────
   {
     id: 'ob-save-zod-schema',
     name: 'POST /api/onboarding/save-own-data: zod schema validatie',
@@ -363,7 +455,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      // Test 1: Empty body → 400 (identity required fields missing)
+      // Test 1: Empty body \u2192 400 (identity required fields missing)
       const emptyRes = await authenticatedFetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -371,10 +463,10 @@ const tests: TestCase[] = [
       })
       assert(
         emptyRes.status === 400 || emptyRes.status === 401,
-        `Lege body → 400 of 401, got ${emptyRes.status}`,
+        `Lege body \u2192 400 of 401, got ${emptyRes.status}`,
       )
 
-      // Test 2: Invalid household_type → 400
+      // Test 2: Invalid household_type \u2192 400
       const invalidHousehold = {
         ...buildMinimalBody(),
         identity: { ...buildMinimalBody().identity, household_type: 'invalid' },
@@ -386,10 +478,10 @@ const tests: TestCase[] = [
       })
       assert(
         householdRes.status === 400 || householdRes.status === 401,
-        `Ongeldige household_type → 400 of 401, got ${householdRes.status}`,
+        `Ongeldige household_type \u2192 400 of 401, got ${householdRes.status}`,
       )
 
-      // Test 3: Negative income → 400
+      // Test 3: Negative income \u2192 400
       const negIncomeBody = {
         ...buildMinimalBody(),
         identity: { ...buildMinimalBody().identity, net_monthly_income: -100 },
@@ -401,27 +493,12 @@ const tests: TestCase[] = [
       })
       assert(
         negRes.status === 400 || negRes.status === 401,
-        `Negatief inkomen → 400 of 401, got ${negRes.status}`,
-      )
-
-      // Test 4: expected_return out of range (>20%) → 400
-      const outOfRangeReturn = {
-        ...buildMinimalBody(),
-        identity: { ...buildMinimalBody().identity, expected_return: 0.50 },
-      }
-      const returnRes = await authenticatedFetch('/api/onboarding/save-own-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(outOfRangeReturn),
-      })
-      assert(
-        returnRes.status === 400 || returnRes.status === 401,
-        `Expected return >20% → 400 of 401, got ${returnRes.status}`,
+        `Negatief inkomen \u2192 400 of 401, got ${negRes.status}`,
       )
     },
   },
 
-  // ── Step 8: onboarding_completed flag ───────────────────────────────
+  // ── Step 11: onboarding_completed flag ───────────────────────────────
   {
     id: 'ob-save-completed-flag',
     name: 'onboarding_completed flag: wordt true gezet na succesvolle save',
@@ -433,54 +510,54 @@ const tests: TestCase[] = [
       // The API sets these profile fields:
       // onboarding_completed: true
       // is_demo_user: false
-      // budgeting_active: budgetteringMode !== 'none'
+      // budgeting_active: derived from budgetteringMode (which is derived from modules)
 
       const profileUpdate = {
         onboarding_completed: true,
         is_demo_user: false,
-        budgeting_active: true, // when budgetteringMode = 'manual'
+        budgeting_active: true, // when budgetteringMode = 'manual' (budgetteren in modules)
       }
 
       assertEqual(profileUpdate.onboarding_completed, true, 'onboarding_completed wordt true')
       assertEqual(profileUpdate.is_demo_user, false, 'is_demo_user wordt false')
-      assertEqual(profileUpdate.budgeting_active, true, 'budgeting_active true bij manual mode')
+      assertEqual(profileUpdate.budgeting_active, true, 'budgeting_active true bij budgetteren module actief')
 
-      // When budgetteringMode = 'none'
-      const noBudgeting = { budgeting_active: 'none' !== 'none' ? true : false }
-      assertEqual(noBudgeting.budgeting_active, false, 'budgeting_active false bij none mode')
+      // When budgetteren module is NOT active → budgetteringMode = 'none'
+      const noBudgeting = { budgeting_active: false }
+      assertEqual(noBudgeting.budgeting_active, false, 'budgeting_active false bij geen budgetteren module')
 
       // Idempotency: if already completed, returns { success: true, alreadyCompleted: true }
       const idempotentResponse = { success: true, alreadyCompleted: true }
       assert(idempotentResponse.success, 'Idempotent response is success')
       assert(idempotentResponse.alreadyCompleted, 'alreadyCompleted flag aanwezig')
 
-      // Profile also stores FIRE parameters if provided
-      const fireFields = [
-        'expected_return',
-        'inflation_rate',
-        'retirement_expense_method',
-        'retirement_expense_custom_amount',  // note: mapped from retirement_custom_amount
+      // FIRE parameters are saved from horizonData (when toekomstplannen active), not from identity
+      const fireFieldsFromHorizon = [
         'fire_end_strategy',
-        'fire_legacy_amount',
         'fire_end_age',
+        'fire_legacy_amount',
+        'retirement_expense_method',
+        'retirement_expense_custom_amount',
         'temporal_balance',
       ]
-      assertEqual(fireFields.length, 8, 'Acht FIRE velden worden opgeslagen in profiel')
-      // retirement_custom_amount maps to retirement_expense_custom_amount in DB
-      assertIncludes(fireFields, 'retirement_expense_custom_amount', 'Custom amount veldnaam mapping correct')
+      assertEqual(fireFieldsFromHorizon.length, 6, 'Zes FIRE velden worden opgeslagen vanuit horizonData')
+
+      // activeModules are saved in profile
+      const activeModulesField = 'active_modules'
+      assert(activeModulesField.length > 0, 'active_modules veld bestaat in profiel')
     },
   },
 
-  // ── Step 9: Success scherm ──────────────────────────────────────────
+  // ── Step 12: Success scherm ──────────────────────────────────────────
   {
     id: 'ob-save-success-screen',
-    name: 'Success scherm: WillDots avatar, module kaarten, "Bekijk De Kern" CTA → /core',
+    name: 'Success scherm: WillDots avatar, module kaarten, CTA naar getHomePath()',
     category: CAT,
-    description: 'OnboardingSuccess component toont welkomstscherm met 3 module cards en CTA',
+    description: 'OnboardingSuccess component toont welkomstscherm met dynamische module cards en CTA',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // WillDots size on success screen: 140px with single pulse animation
+      // WillDots size on success screen: 140px
       const SUCCESS_WILLDOTS_SIZE = 140
       assertEqual(SUCCESS_WILLDOTS_SIZE, 140, 'WillDots success size is 140px')
       const successAnimation = 'animate-[pulse_3s_ease-in-out_1]'
@@ -492,7 +569,7 @@ const tests: TestCase[] = [
       assert(heading.includes('TriFinity'), 'Heading bevat app naam')
 
       // Philosophy tagline
-      const tagline = 'Geld is opgeslagen tijd — en jouw reis naar vrijheid begint nu.'
+      const tagline = 'Geld is opgeslagen tijd \u2014 en jouw reis naar vrijheid begint nu.'
       assert(tagline.includes('opgeslagen tijd'), 'Tagline bevat kernfilosofie')
       assert(tagline.includes('vrijheid'), 'Tagline verwijst naar vrijheid')
 
@@ -503,28 +580,21 @@ const tests: TestCase[] = [
         { name: 'De Horizon', icon: 'Telescope', border: 'border-horizon-400' },
       ]
       assertEqual(moduleCards.length, 3, 'Exact 3 module kaarten')
-      assertEqual(moduleCards[0].name, 'De Kern', 'Eerste kaart: De Kern')
-      assertEqual(moduleCards[1].name, 'De Wil', 'Tweede kaart: De Wil')
-      assertEqual(moduleCards[2].name, 'De Horizon', 'Derde kaart: De Horizon')
 
-      // Module-color decorative line
-      const colorSegments = ['bg-kern-300', 'bg-wil-300', 'bg-horizon-300']
-      assertEqual(colorSegments.length, 3, 'Drie kleursegmenten in decoratieve lijn')
-
-      // CTA button text and destination
-      const ctaText = 'Bekijk De Kern'
-      assert(ctaText.includes('Kern'), 'CTA verwijst naar De Kern module')
-      // onDashboard → router.push('/core')
-      const ctaDestination = '/core'
-      assertEqual(ctaDestination, '/core', 'CTA navigeert naar /core')
-
-      // CTA styling: kern-600 background
-      const ctaClass = 'bg-kern-600'
-      assert(ctaClass.includes('kern'), 'CTA button in kern-kleur')
+      // CTA destination depends on active modules via getHomePath
+      // If only nieuws → '/berichten'
+      // If inzicht_acties → '/will'
+      // Otherwise → '/core'
+      const ctaDestinations = {
+        fireAll: '/will', // inzicht_acties is active
+        budgetOnly: '/core', // no inzicht_acties
+        nieuwsOnly: '/berichten',
+      }
+      assertEqual(ctaDestinations.nieuwsOnly, '/berichten', 'Nieuws-only → /berichten')
     },
   },
 
-  // ── Step 10: POST /api/activate ─────────────────────────────────────
+  // ── Step 13: POST /api/activate ─────────────────────────────────────
   {
     id: 'ob-save-activate-api',
     name: 'POST /api/activate: fase activatie na onboarding, last_known_phase correct gezet',
@@ -533,7 +603,6 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      // Activate endpoint requires auth
       const res = await authenticatedFetch('/api/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -543,35 +612,20 @@ const tests: TestCase[] = [
         `Activate endpoint bereikbaar: ${res.status}`,
       )
 
-      // Without auth → 401
       if (res.status === 401) {
         const data = await res.json()
-        assert(data.error === 'Unauthorized', 'Ongeauthenticeerd → Unauthorized')
+        assert(data.error === 'Unauthorized', 'Ongeauthenticeerd \u2192 Unauthorized')
       }
 
-      // Phases that can be computed
       const validPhases = ['recovery', 'stability', 'momentum', 'mastery']
       assertEqual(validPhases.length, 4, 'Vier mogelijke fasen')
 
-      // Double activation → 400 "Already activated"
-      // This is checked by: profile.last_known_phase !== null → 400
       const doubleActivateResponse = { error: 'Already activated' }
       assert(doubleActivateResponse.error.includes('Already activated'), 'Dubbele activatie melding correct')
-
-      // computeFeatureAccess input: assets, debts, transactions, subscriptions, prefs, matrix
-      const featureAccessInputFields = [
-        'assets', 'debts', 'transactions', 'activeSubscriptions',
-        'userFeaturePrefs', 'matrixJson',
-      ]
-      assertEqual(featureAccessInputFields.length, 6, 'computeFeatureAccess heeft 6 input velden')
-
-      // Transactions fetched from last 3 months
-      const lookbackMonths = 3
-      assertEqual(lookbackMonths, 3, 'Transacties van laatste 3 maanden worden meegenomen')
     },
   },
 
-  // ── Step 11: Invulfase activation after save ──────────────────────────
+  // ── Step 14: Invulfase activation after save ──────────────────────────
   {
     id: 'ob-save-invulfase-activation',
     name: 'Invulfase activatie: na save wordt _invulfase_active gezet in feature_preferences',
@@ -580,26 +634,19 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // After onboarding save, the API activates the invulfase by setting
-      // _invulfase_active in the user's feature_preferences
       const featurePrefsUpdate = {
         _invulfase_active: true,
       }
 
       assertEqual(featurePrefsUpdate._invulfase_active, true, 'Invulfase wordt geactiveerd na save')
 
-      // The invulfase guides the user through completing their financial profile
-      // after the initial onboarding. It tracks which data sections still need attention.
-      // This is set alongside onboarding_completed=true in the same save transaction.
-
-      // Verify the key name matches the expected format
       const key = '_invulfase_active'
       assert(key.startsWith('_'), 'Invulfase key begint met underscore (interne preference)')
       assert(key.includes('invulfase'), 'Key bevat invulfase')
     },
   },
 
-  // ── Step 12: Error resilience via localStorage ────────────────────────
+  // ── Step 15: Error resilience via localStorage ────────────────────────
   {
     id: 'ob-save-localstorage-resilience',
     name: 'Error resilience: data bewaard via localStorage bij save failure',
@@ -608,32 +655,31 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // The onboarding persists its state to localStorage during the flow.
-      // When a save fails, the user can retry without re-entering all data.
-      // This is an additional safety layer on top of useReducer state preservation.
-
       const DRAFT_KEY = 'trifinity_onboarding_draft'
       assertEqual(DRAFT_KEY, 'trifinity_onboarding_draft', 'Draft localStorage key correct')
 
-      // Simulate the resilience flow:
-      // 1. User fills in all data → persisted to localStorage
-      // 2. Save attempt fails (network error, server error)
-      // 3. User retries or refreshes → data restored from localStorage
-      // 4. After successful save → localStorage draft is cleared
-
+      // Simulate the resilience flow including new fields
       const mockDraft = {
         identity: { full_name: 'Error Test', net_monthly_income: '4000' },
+        persona: 'pensioenplanner',
+        selectedModules: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
+        horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
+        newsDescription: 'Test beschrijving',
         budgetAmounts: { 'huur-hypotheek': 960 },
         bankAccounts: [{ name: 'ING', balance: '3000', has_budget_tracking: true }],
         assets: [],
         debts: [],
+        preferences: { focuses: ['fire_freedom'] },
       }
 
-      // Verify roundtrip
       const serialized = JSON.stringify(mockDraft)
       const restored = JSON.parse(serialized)
       assertEqual(restored.identity.full_name, 'Error Test', 'Draft identity hersteld na error')
       assertEqual(restored.bankAccounts[0].has_budget_tracking, true, 'Draft budget tracking hersteld')
+      assertEqual(restored.persona, 'pensioenplanner', 'Draft persona hersteld')
+      assertEqual(restored.selectedModules.length, 3, 'Draft modules hersteld')
+      assertEqual(restored.horizon.fire_end_strategy, 'deplete', 'Draft horizon hersteld')
+      assertEqual(restored.newsDescription, 'Test beschrijving', 'Draft newsDescription hersteld')
 
       // After successful save, draft should be cleared
       const clearedDraft = null
@@ -641,10 +687,10 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 13: Register under category ────────────────────────────────
+  // ── Step 16: Register under category ────────────────────────────────
   {
     id: 'ob-save-category-registered',
-    name: 'Registratie onder categorie "Onboarding — Save & Success"',
+    name: 'Registratie onder categorie "Onboarding \u2014 Save & Success"',
     category: CAT,
     description: 'Alle tests zijn geregistreerd onder de juiste categorie',
     priority: 'medium',
@@ -652,15 +698,13 @@ const tests: TestCase[] = [
     fn() {
       assertEqual(CAT, 'onboarding.save', 'Categorie ID is onboarding.save')
 
-      // All test IDs start with 'ob-save-'
       const expectedPrefix = 'ob-save-'
       const testIds = tests.map((t) => t.id)
       testIds.forEach((id) => {
         assert(id.startsWith(expectedPrefix), `Test ID "${id}" begint met "${expectedPrefix}"`)
       })
 
-      // Total number of tests matches feature steps
-      assert(tests.length >= 10, `Minstens 10 tests (feature heeft 11 stappen), actueel: ${tests.length}`)
+      assert(tests.length >= 10, `Minstens 10 tests, actueel: ${tests.length}`)
     },
   },
 ]

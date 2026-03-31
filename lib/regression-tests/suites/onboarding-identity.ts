@@ -1,15 +1,14 @@
 import { registerCategory, registerTests } from '../test-registry'
-import { assert, assertEqual, assertNotNull, assertGreaterThanOrEqual, assertLessThanOrEqual } from '../assert'
+import { assert, assertEqual, assertNotNull } from '../assert'
 import type { TestCase } from '../test-types'
 import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.identity'
 
 // ── IdentityData interface mirror (matches components/onboarding/onboarding-identity.tsx) ──
+// Simplified: FIRE params, budgettering_mode, temporal_balance removed (moved to horizon step)
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
-type RetirementExpenseMethod = 'essential_budgets' | 'current_income' | 'custom_amount'
-type FireEndStrategy = 'perpetual' | 'legacy' | 'deplete'
 
 interface IdentityData {
   full_name: string
@@ -18,18 +17,9 @@ interface IdentityData {
   number_of_children: number
   net_monthly_income: string
   estimated_monthly_expenses: string
-  budgettering_mode: 'none' | 'yes' | ''
-  expected_return: number
-  inflation_rate: number
-  retirement_expense_method: RetirementExpenseMethod
-  retirement_custom_amount: string
-  fire_end_strategy: FireEndStrategy
-  fire_legacy_amount: string
-  fire_end_age: number
-  temporal_balance: number
 }
 
-type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income' | 'number_of_children' | 'retirement_custom_amount' | 'fire_legacy_amount' | 'fire_end_age'
+type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income' | 'number_of_children'
 
 // ── Validation logic mirror (must match getFieldErrors in onboarding-identity.tsx) ──
 
@@ -85,39 +75,6 @@ function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
     }
   }
 
-  // Custom retirement amount: required if method is custom_amount
-  if (data.retirement_expense_method === 'custom_amount') {
-    const amt = Number(data.retirement_custom_amount)
-    if (!data.retirement_custom_amount) {
-      errors.retirement_custom_amount = 'Voer een jaarbedrag in'
-    } else if (isNaN(amt) || amt <= 0) {
-      errors.retirement_custom_amount = 'Bedrag moet hoger dan \u20AC0 zijn'
-    } else if (amt > 10000000) {
-      errors.retirement_custom_amount = 'Voer een realistisch bedrag in'
-    }
-  }
-
-  // Legacy amount: required if strategy is legacy
-  if (data.fire_end_strategy === 'legacy') {
-    const amt = Number(data.fire_legacy_amount)
-    if (!data.fire_legacy_amount) {
-      errors.fire_legacy_amount = 'Voer een gewenst nalatenschap-bedrag in'
-    } else if (isNaN(amt) || amt <= 0) {
-      errors.fire_legacy_amount = 'Bedrag moet hoger dan \u20AC0 zijn'
-    } else if (amt > 100000000) {
-      errors.fire_legacy_amount = 'Voer een realistisch bedrag in'
-    }
-  }
-
-  // End age: required if strategy is deplete, 60-120
-  if (data.fire_end_strategy === 'deplete') {
-    if (data.fire_end_age < 60) {
-      errors.fire_end_age = 'Eind-leeftijd moet minimaal 60 zijn'
-    } else if (data.fire_end_age > 120) {
-      errors.fire_end_age = 'Eind-leeftijd moet maximaal 120 zijn'
-    }
-  }
-
   return errors
 }
 
@@ -131,15 +88,6 @@ function validData(): IdentityData {
     number_of_children: 0,
     net_monthly_income: '3500',
     estimated_monthly_expenses: '',
-    budgettering_mode: 'yes',
-    expected_return: 0.07,
-    inflation_rate: 0.02,
-    retirement_expense_method: 'essential_budgets',
-    retirement_custom_amount: '',
-    fire_end_strategy: 'deplete',
-    fire_legacy_amount: '',
-    fire_end_age: 90,
-    temporal_balance: 3,
   }
 }
 
@@ -225,7 +173,7 @@ const tests: TestCase[] = [
     id: 'ob-id-required-net-monthly-income',
     name: 'Verplicht veld: net_monthly_income (>0)',
     category: CAT,
-    description: 'Maandinkomen moet numeriek en >0 zijn, max €1.000.000',
+    description: 'Maandinkomen moet numeriek en >0 zijn, max \u20AC1.000.000',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
@@ -253,9 +201,9 @@ const tests: TestCase[] = [
       const d6 = { ...validData(), net_monthly_income: '3500' }
       assertEqual(getFieldErrors(d6).net_monthly_income, undefined, 'Geldig inkomen')
 
-      // Edge: exactly €1
+      // Edge: exactly \u20AC1
       const d7 = { ...validData(), net_monthly_income: '1' }
-      assertEqual(getFieldErrors(d7).net_monthly_income, undefined, '€1 is geldig')
+      assertEqual(getFieldErrors(d7).net_monthly_income, undefined, '\u20AC1 is geldig')
     },
   },
 
@@ -302,250 +250,87 @@ const tests: TestCase[] = [
   // ── Step 3: Geschatte maanduitgaven ───────────────────────────────────────
   {
     id: 'ob-id-estimated-monthly-expenses',
-    name: 'Geschatte maanduitgaven: numeriek veld bij budgettering_mode none',
+    name: 'Geschatte maanduitgaven: optioneel veld, altijd getoond',
     category: CAT,
-    description: 'estimated_monthly_expenses is optioneel en verschijnt bij budgettering_mode === none',
+    description: 'estimated_monthly_expenses is optioneel en altijd zichtbaar (niet meer afhankelijk van budgettering_mode)',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // The estimated_monthly_expenses field is shown when budgettering_mode === 'none'
-      // and hidden when budgettering_mode === 'yes'
-      // It is NOT validated in getFieldErrors (it's optional)
-      const dNone = { ...validData(), budgettering_mode: 'none' as const, estimated_monthly_expenses: '2000' }
-      const errNone = getFieldErrors(dNone)
-      // No validation error for estimated_monthly_expenses (not in FieldKey)
-      assertEqual(Object.keys(errNone).length, 0, 'Geen fouten bij mode=none met schatting')
+      // estimated_monthly_expenses is always visible and optional
+      // It is NOT validated in getFieldErrors
+      const dWithExpenses = { ...validData(), estimated_monthly_expenses: '2000' }
+      const errWith = getFieldErrors(dWithExpenses)
+      assertEqual(Object.keys(errWith).length, 0, 'Geen fouten bij ingevulde schatting')
 
       // Even empty is fine (optional field)
-      const dEmpty = { ...validData(), budgettering_mode: 'none' as const, estimated_monthly_expenses: '' }
+      const dEmpty = { ...validData(), estimated_monthly_expenses: '' }
       const errEmpty = getFieldErrors(dEmpty)
-      assertEqual(Object.keys(errEmpty).length, 0, 'Geen fouten bij mode=none zonder schatting')
-
-      // budgettering_mode 'yes' means expenses field hidden
-      const dYes = { ...validData(), budgettering_mode: 'yes' as const }
-      const errYes = getFieldErrors(dYes)
-      assertEqual(Object.keys(errYes).length, 0, 'Geen fouten bij mode=yes')
-
-      // Verify mode options are limited to 'none', 'yes', ''
-      const modes = ['none', 'yes', ''] as const
-      assertEqual(modes.length, 3, 'Budgettering modes: none, yes, leeg')
+      assertEqual(Object.keys(errEmpty).length, 0, 'Geen fouten bij lege schatting')
     },
   },
 
-  // ── Step 4: Budgetteringsmode ─────────────────────────────────────────────
+  // ── Step 4: Simplified identity — 6 fields only ──────────────────────────
   {
-    id: 'ob-id-budgettering-mode',
-    name: 'Budgetteringsmode: actief/passief selectie',
+    id: 'ob-id-simplified-fields',
+    name: 'Vereenvoudigde identity: exact 6 velden',
     category: CAT,
-    description: 'budgettering_mode keuze bepaalt of budget-stap wordt getoond',
-    priority: 'high',
-    estimatedDurationMs: 100,
-    fn() {
-      // 'yes' means user will set up budgets in next step
-      const dYes = { ...validData(), budgettering_mode: 'yes' as const }
-      assertEqual(dYes.budgettering_mode, 'yes', 'Mode yes geselecteerd')
-
-      // 'none' means skip budgets, show estimated expenses instead
-      const dNone = { ...validData(), budgettering_mode: 'none' as const }
-      assertEqual(dNone.budgettering_mode, 'none', 'Mode none geselecteerd')
-
-      // Neither mode causes validation errors on its own
-      assertEqual(Object.keys(getFieldErrors(dYes)).length, 0, 'Mode yes: geen fouten')
-      assertEqual(Object.keys(getFieldErrors(dNone)).length, 0, 'Mode none: geen fouten')
-    },
-  },
-
-  // ── Step 5: FIRE parameters ──────────────────────────────────────────────
-  {
-    id: 'ob-id-fire-parameters',
-    name: 'FIRE parameters: return, inflatie, methode, strategie',
-    category: CAT,
-    description: 'FIRE parameters hebben correcte defaults en opties',
+    description: 'Identity bevat nu alleen: full_name, date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
+      // Verify the interface has exactly 6 fields
       const d = validData()
+      const fields = Object.keys(d)
+      assertEqual(fields.length, 6, 'Identity heeft exact 6 velden')
+      assert(fields.includes('full_name'), 'Bevat full_name')
+      assert(fields.includes('date_of_birth'), 'Bevat date_of_birth')
+      assert(fields.includes('household_type'), 'Bevat household_type')
+      assert(fields.includes('number_of_children'), 'Bevat number_of_children')
+      assert(fields.includes('net_monthly_income'), 'Bevat net_monthly_income')
+      assert(fields.includes('estimated_monthly_expenses'), 'Bevat estimated_monthly_expenses')
 
-      // Default expected_return = 7%
-      assertEqual(d.expected_return, 0.07, 'Default verwacht rendement 7%')
-
-      // Default inflation = 2%
-      assertEqual(d.inflation_rate, 0.02, 'Default inflatie 2%')
-
-      // Retirement expense methods: 3 options
-      const methods: RetirementExpenseMethod[] = ['essential_budgets', 'current_income', 'custom_amount']
-      assertEqual(methods.length, 3, '3 pensioenuitgaven methoden')
-
-      // FIRE end strategies: 3 options (NO fixed_age)
-      const strategies: FireEndStrategy[] = ['perpetual', 'legacy', 'deplete']
-      assertEqual(strategies.length, 3, '3 FIRE strategieën')
-
-      // Default strategy is deplete
-      assertEqual(d.fire_end_strategy, 'deplete', 'Default strategie is deplete')
-
-      // Default end age for deplete is 90
-      assertEqual(d.fire_end_age, 90, 'Default eind-leeftijd 90')
-
-      // Default retirement method
-      assertEqual(d.retirement_expense_method, 'essential_budgets', 'Default methode is essential_budgets')
-
-      // Each method with valid data produces no errors
-      for (const m of methods) {
-        const data = {
-          ...validData(),
-          retirement_expense_method: m,
-          retirement_custom_amount: m === 'custom_amount' ? '30000' : '',
-        }
-        const errs = getFieldErrors(data)
-        assertEqual(errs.retirement_custom_amount, undefined, `Methode ${m}: geen custom amount fout`)
-      }
-
-      // Each strategy with valid data produces no errors
-      for (const s of strategies) {
-        const data = {
-          ...validData(),
-          fire_end_strategy: s,
-          fire_legacy_amount: s === 'legacy' ? '200000' : '',
-          fire_end_age: s === 'deplete' ? 90 : 90,
-        }
-        const errs = getFieldErrors(data)
-        assertEqual(errs.fire_legacy_amount, undefined, `Strategie ${s}: geen legacy fout`)
-        assertEqual(errs.fire_end_age, undefined, `Strategie ${s}: geen end age fout`)
-      }
+      // Verify FIRE params are NOT in identity anymore
+      const identityKeys = Object.keys(d)
+      assert(!identityKeys.includes('expected_return'), 'expected_return niet in identity (verplaatst naar horizon)')
+      assert(!identityKeys.includes('inflation_rate'), 'inflation_rate niet in identity (verplaatst naar horizon)')
+      assert(!identityKeys.includes('fire_end_strategy'), 'fire_end_strategy niet in identity (verplaatst naar horizon)')
+      assert(!identityKeys.includes('fire_legacy_amount'), 'fire_legacy_amount niet in identity (verplaatst naar horizon)')
+      assert(!identityKeys.includes('fire_end_age'), 'fire_end_age niet in identity (verplaatst naar horizon)')
+      assert(!identityKeys.includes('retirement_expense_method'), 'retirement_expense_method niet in identity (verplaatst naar horizon)')
+      assert(!identityKeys.includes('retirement_custom_amount'), 'retirement_custom_amount niet in identity (verplaatst naar horizon)')
+      assert(!identityKeys.includes('temporal_balance'), 'temporal_balance niet in identity (verplaatst naar horizon)')
+      assert(!identityKeys.includes('budgettering_mode'), 'budgettering_mode niet in identity (afgeleid uit modules)')
     },
   },
 
-  // ── Step 6: fire_end_strategy conditionele velden ─────────────────────────
-  {
-    id: 'ob-id-fire-strategy-conditional-fields',
-    name: 'FIRE strategie: conditionele velden (legacy_amount, fire_end_age)',
-    category: CAT,
-    description: 'legacy_amount alleen bij legacy, fire_end_age alleen bij deplete',
-    priority: 'critical',
-    estimatedDurationMs: 100,
-    fn() {
-      // Legacy: missing amount
-      const dLegacyEmpty = { ...validData(), fire_end_strategy: 'legacy' as const, fire_legacy_amount: '' }
-      assertNotNull(getFieldErrors(dLegacyEmpty).fire_legacy_amount, 'Legacy: lege amount moet fout geven')
-
-      // Legacy: zero amount
-      const dLegacyZero = { ...validData(), fire_end_strategy: 'legacy' as const, fire_legacy_amount: '0' }
-      assertNotNull(getFieldErrors(dLegacyZero).fire_legacy_amount, 'Legacy: €0 moet fout geven')
-
-      // Legacy: valid amount
-      const dLegacyValid = { ...validData(), fire_end_strategy: 'legacy' as const, fire_legacy_amount: '200000' }
-      assertEqual(getFieldErrors(dLegacyValid).fire_legacy_amount, undefined, 'Legacy: €200K is geldig')
-
-      // Legacy: over max
-      const dLegacyMax = { ...validData(), fire_end_strategy: 'legacy' as const, fire_legacy_amount: '200000000' }
-      assertNotNull(getFieldErrors(dLegacyMax).fire_legacy_amount, 'Legacy: >100M moet fout geven')
-
-      // Perpetual: legacy_amount NOT validated
-      const dPerpetual = { ...validData(), fire_end_strategy: 'perpetual' as const, fire_legacy_amount: '' }
-      assertEqual(getFieldErrors(dPerpetual).fire_legacy_amount, undefined, 'Perpetual: geen legacy validatie')
-
-      // Deplete: end age too low
-      const dDepleteLow = { ...validData(), fire_end_strategy: 'deplete' as const, fire_end_age: 50 }
-      assertNotNull(getFieldErrors(dDepleteLow).fire_end_age, 'Deplete: leeftijd 50 moet fout geven')
-      assertEqual(getFieldErrors(dDepleteLow).fire_end_age, 'Eind-leeftijd moet minimaal 60 zijn', 'Deplete: te laag melding')
-
-      // Deplete: end age too high
-      const dDepleteHigh = { ...validData(), fire_end_strategy: 'deplete' as const, fire_end_age: 130 }
-      assertNotNull(getFieldErrors(dDepleteHigh).fire_end_age, 'Deplete: leeftijd 130 moet fout geven')
-      assertEqual(getFieldErrors(dDepleteHigh).fire_end_age, 'Eind-leeftijd moet maximaal 120 zijn', 'Deplete: te hoog melding')
-
-      // Deplete: valid end age
-      const dDepleteValid = { ...validData(), fire_end_strategy: 'deplete' as const, fire_end_age: 90 }
-      assertEqual(getFieldErrors(dDepleteValid).fire_end_age, undefined, 'Deplete: 90 is geldig')
-
-      // Deplete: edge cases
-      assertEqual(getFieldErrors({ ...validData(), fire_end_strategy: 'deplete' as const, fire_end_age: 60 }).fire_end_age, undefined, 'Deplete: 60 is geldig (ondergrens)')
-      assertEqual(getFieldErrors({ ...validData(), fire_end_strategy: 'deplete' as const, fire_end_age: 120 }).fire_end_age, undefined, 'Deplete: 120 is geldig (bovengrens)')
-
-      // Perpetual: fire_end_age NOT validated
-      const dPerpAge = { ...validData(), fire_end_strategy: 'perpetual' as const, fire_end_age: 50 }
-      assertEqual(getFieldErrors(dPerpAge).fire_end_age, undefined, 'Perpetual: geen end age validatie')
-    },
-  },
-
-  // ── Step 7: Temporal balance ──────────────────────────────────────────────
-  {
-    id: 'ob-id-temporal-balance',
-    name: 'Temporal balance: slider 1-5 met level beschrijving',
-    category: CAT,
-    description: 'temporal_balance is een slider van 1 tot 5 met 5 unieke levels',
-    priority: 'high',
-    estimatedDurationMs: 100,
-    fn() {
-      // 5 temporal levels exist (imported from identity-constants)
-      // We verify the contract: slider range 1-5, each maps to a named level
-      const TEMPORAL_LEVEL_NAMES = [
-        'De Levensgenieter',  // level 1
-        'De Reiziger',        // level 2
-        'De Architect',       // level 3
-        // levels 4, 5 exist too (De Strateeg, De Asceet or similar)
-      ]
-
-      // Default is 3 (De Architect)
-      const d = validData()
-      assertEqual(d.temporal_balance, 3, 'Default temporal balance is 3')
-
-      // Valid range: 1-5
-      assertGreaterThanOrEqual(d.temporal_balance, 1, 'Minimum 1')
-      assertLessThanOrEqual(d.temporal_balance, 5, 'Maximum 5')
-
-      // temporal_balance is not validated in getFieldErrors (it's optional, always in range via slider)
-      for (let level = 1; level <= 5; level++) {
-        const data = { ...validData(), temporal_balance: level }
-        const errs = getFieldErrors(data)
-        assertEqual(Object.keys(errs).length, 0, `Level ${level}: geen fouten`)
-      }
-
-      // First 3 levels have known Dutch names
-      assertEqual(TEMPORAL_LEVEL_NAMES[0], 'De Levensgenieter', 'Level 1 naam')
-      assertEqual(TEMPORAL_LEVEL_NAMES[1], 'De Reiziger', 'Level 2 naam')
-      assertEqual(TEMPORAL_LEVEL_NAMES[2], 'De Architect', 'Level 3 naam')
-    },
-  },
-
-  // ── Step 8: SpeechBubble guidance ─────────────────────────────────────────
+  // ── Step 5: SpeechBubble guidance ─────────────────────────────────────────
   {
     id: 'ob-id-speech-bubble-guidance',
-    name: 'SpeechBubble: Will guidance tekst bij elk veld-groep',
+    name: 'SpeechBubble: Will guidance tekst bij persoonlijke gegevens',
     category: CAT,
-    description: '3 SpeechBubble secties met WillDots avatar aanwezig',
+    description: 'SpeechBubble met WillDots avatar aanwezig voor identity velden',
     priority: 'high',
     estimatedDurationMs: 500,
     async fn() {
-      // The onboarding identity form has 3 SpeechBubble instances:
-      // 1. "Om je pad naar vrijheid te berekenen..." (personal data intro)
-      // 2. "Hoe wil je dat we je financiële toekomst berekenen?..." (FIRE section)
-      // 3. "Hoeveel van je huidige tijd wil je investeren..." (temporal balance)
-
-      // Verify by fetching the onboarding page and checking for the speech bubble content
+      // The simplified identity form has fewer SpeechBubble instances
+      // since FIRE section and temporal balance are moved to horizon step
       const res = await authenticatedFetch('/onboarding', { redirect: 'follow' })
       if (res.status === 200) {
         const html = await res.text()
-        // Check for SpeechBubble markers or Will guidance text
-        // The page may render step 1 (intro) first, so SpeechBubble content may
-        // not be in initial HTML — but the component module is loaded
         assert(
           html.includes('onboarding') || html.includes('Onboarding') || html.includes('will-dots'),
           'Onboarding pagina bevat verwachte componenten',
         )
       }
-      // If auth redirect, that's expected — the structural test still holds:
-      // 3 SpeechBubble sections per component code analysis
+      // The personal data speech bubble remains
       const speechBubbleTexts = [
         'Om je pad naar vrijheid te berekenen',
-        'Hoe wil je dat we je financiële toekomst berekenen',
-        'Hoeveel van je huidige tijd wil je investeren',
       ]
-      assertEqual(speechBubbleTexts.length, 3, '3 SpeechBubble secties verwacht')
+      assert(speechBubbleTexts.length >= 1, 'Minstens 1 SpeechBubble sectie verwacht')
     },
   },
 
-  // ── Step 9: Validatie foutmeldingen ───────────────────────────────────────
+  // ── Step 6: Validatie foutmeldingen ───────────────────────────────────────
   {
     id: 'ob-id-validation-error-display',
     name: 'Validatie foutmeldingen: rode border en tekst bij ongeldige invoer',
@@ -562,15 +347,6 @@ const tests: TestCase[] = [
         number_of_children: 0,
         net_monthly_income: '',
         estimated_monthly_expenses: '',
-        budgettering_mode: '',
-        expected_return: 0.07,
-        inflation_rate: 0.02,
-        retirement_expense_method: 'essential_budgets',
-        retirement_custom_amount: '',
-        fire_end_strategy: 'deplete',
-        fire_legacy_amount: '',
-        fire_end_age: 90,
-        temporal_balance: 3,
       }
 
       const errors = getFieldErrors(invalid)
@@ -582,10 +358,6 @@ const tests: TestCase[] = [
 
       // No errors for optional/conditional fields
       assertEqual(errors.number_of_children, undefined, 'Solo: geen children fout')
-      assertEqual(errors.retirement_custom_amount, undefined, 'essential_budgets: geen custom amount fout')
-      assertEqual(errors.fire_legacy_amount, undefined, 'deplete: geen legacy fout')
-      // fire_end_age 90 is valid for deplete
-      assertEqual(errors.fire_end_age, undefined, 'deplete + 90: geen end age fout')
 
       // isValid should be false
       const isValid = Object.keys(errors).length === 0
@@ -597,54 +369,43 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 10: Doorgang naar stap 3 ─────────────────────────────────────────
+  // ── Step 7: Doorgang naar volgende stap ───────────────────────────────────
   {
     id: 'ob-id-step-progression',
-    name: 'Doorgang naar stap 3: alleen bij geldige verplichte velden',
+    name: 'Doorgang naar volgende stap: alleen bij geldige verplichte velden',
     category: CAT,
     description: 'handleNext blokkeert bij ongeldige velden, gaat door bij geldige',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // Valid data: isValid = true → handleNext calls onNext()
+      // Valid data: isValid = true
       const dValid = validData()
       const errorsValid = getFieldErrors(dValid)
       const isValidPass = Object.keys(errorsValid).length === 0
-      assert(isValidPass, 'Geldige data staat doorgang naar stap 3 toe')
+      assert(isValidPass, 'Geldige data staat doorgang toe')
 
-      // Invalid data: isValid = false → handleNext sets submitted=true, scrolls to error
+      // Invalid data: isValid = false
       const dInvalid = { ...validData(), full_name: '' }
       const errorsInvalid = getFieldErrors(dInvalid)
       const isValidFail = Object.keys(errorsInvalid).length === 0
-      assert(!isValidFail, 'Ongeldige data blokkeert doorgang naar stap 3')
+      assert(!isValidFail, 'Ongeldige data blokkeert doorgang')
 
       // Gezin without children blocks progression
       const dGezinNoKids = { ...validData(), household_type: 'gezin' as const, number_of_children: 0 }
       assert(Object.keys(getFieldErrors(dGezinNoKids)).length > 0, 'Gezin zonder kinderen blokkeert')
 
-      // Legacy without amount blocks progression
-      const dLegacyNoAmt = { ...validData(), fire_end_strategy: 'legacy' as const, fire_legacy_amount: '' }
-      assert(Object.keys(getFieldErrors(dLegacyNoAmt)).length > 0, 'Legacy zonder bedrag blokkeert')
-
-      // Custom amount without value blocks progression
-      const dCustomNoAmt = { ...validData(), retirement_expense_method: 'custom_amount' as const, retirement_custom_amount: '' }
-      assert(Object.keys(getFieldErrors(dCustomNoAmt)).length > 0, 'Custom amount zonder bedrag blokkeert')
-
-      // FIELD_IDS mapping: verifies scroll-to-error targets exist
+      // FIELD_IDS mapping: simplified (no more FIRE fields)
       const fieldIds: Record<FieldKey, string> = {
         full_name: 'ob-name',
         date_of_birth: 'ob-dob',
         net_monthly_income: 'ob-income',
         number_of_children: 'ob-children',
-        retirement_custom_amount: 'ob-custom-amount',
-        fire_legacy_amount: 'ob-legacy-amount',
-        fire_end_age: 'ob-end-age',
       }
-      assertEqual(Object.keys(fieldIds).length, 7, '7 velden met scroll-to-error ID mapping')
+      assertEqual(Object.keys(fieldIds).length, 4, '4 velden met scroll-to-error ID mapping')
     },
   },
 
-  // ── Step 11: Onboarding route accessible ──────────────────────────────────
+  // ── Step 8: Onboarding route accessible ──────────────────────────────────
   {
     id: 'ob-id-route-accessible',
     name: 'Onboarding route: /onboarding bereikbaar',
@@ -659,7 +420,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Bonus: Full form validation integration ───────────────────────────────
+  // ── Step 9: Full form validation integration ─────────────────────────────
   {
     id: 'ob-id-full-validation-integration',
     name: 'Volledige validatie: alle conditionele paden correct',
@@ -668,39 +429,31 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // Gezin + legacy + custom_amount: all conditionals active
-      const dAll: IdentityData = {
+      // Gezin with children: conditional fields active
+      const dGezin: IdentityData = {
         full_name: 'Test Gezin',
         date_of_birth: '1985-03-20',
         household_type: 'gezin',
         number_of_children: 2,
         net_monthly_income: '5000',
-        estimated_monthly_expenses: '',
-        budgettering_mode: 'yes',
-        expected_return: 0.07,
-        inflation_rate: 0.02,
-        retirement_expense_method: 'custom_amount',
-        retirement_custom_amount: '35000',
-        fire_end_strategy: 'legacy',
-        fire_legacy_amount: '150000',
-        fire_end_age: 90,
-        temporal_balance: 4,
+        estimated_monthly_expenses: '3500',
       }
-      const errAll = getFieldErrors(dAll)
-      assertEqual(Object.keys(errAll).length, 0, 'Alle conditionele velden ingevuld: geen fouten')
+      const errGezin = getFieldErrors(dGezin)
+      assertEqual(Object.keys(errGezin).length, 0, 'Gezin met kinderen: geen fouten')
 
-      // Same but with empty conditional fields → should have errors
-      const dAllEmpty: IdentityData = {
-        ...dAll,
+      // Same but with 0 children → should have error
+      const dGezinEmpty: IdentityData = {
+        ...dGezin,
         number_of_children: 0,
-        retirement_custom_amount: '',
-        fire_legacy_amount: '',
       }
-      const errAllEmpty = getFieldErrors(dAllEmpty)
-      assertNotNull(errAllEmpty.number_of_children, 'Gezin + 0 kinderen: fout')
-      assertNotNull(errAllEmpty.retirement_custom_amount, 'Custom amount leeg: fout')
-      assertNotNull(errAllEmpty.fire_legacy_amount, 'Legacy amount leeg: fout')
-      assertEqual(Object.keys(errAllEmpty).length, 3, 'Precies 3 conditionele fouten')
+      const errGezinEmpty = getFieldErrors(dGezinEmpty)
+      assertNotNull(errGezinEmpty.number_of_children, 'Gezin + 0 kinderen: fout')
+      assertEqual(Object.keys(errGezinEmpty).length, 1, 'Precies 1 conditionele fout')
+
+      // Solo is simplest — no conditional fields at all
+      const dSolo = validData()
+      const errSolo = getFieldErrors(dSolo)
+      assertEqual(Object.keys(errSolo).length, 0, 'Solo: simpelste pad, geen fouten')
     },
   },
 ]
@@ -708,8 +461,8 @@ const tests: TestCase[] = [
 export function register(): void {
   registerCategory({
     id: CAT,
-    label: 'Onboarding — Identity',
-    description: 'Onboarding stap 2: identity gegevens, FIRE parameters, validatie',
+    label: 'Onboarding \u2014 Identity',
+    description: 'Onboarding stap 2: identity gegevens (vereenvoudigd, 6 velden), validatie',
     icon: 'UserCheck',
     testCount: 0,
   })

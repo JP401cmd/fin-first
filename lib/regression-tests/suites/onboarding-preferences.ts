@@ -5,6 +5,15 @@ import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.preferences'
 
+// ── Module types (matches lib/module-registry.ts) ──────────────────────────
+type ModuleId =
+  | 'budgetteren'
+  | 'vermogensregistratie'
+  | 'aandelenregistratie'
+  | 'toekomstplannen'
+  | 'inzicht_acties'
+  | 'nieuws'
+
 // ── Mirror of constants from onboarding-preferences.tsx ─────────────────────
 
 type FocusChoice = 'budget_cashflow' | 'assets_investments' | 'fire_freedom' | 'goals_actions' | 'overview'
@@ -20,7 +29,7 @@ const ALL_FOCUS_OPTIONS: { id: FocusChoice; label: string; description: string }
   { id: 'budget_cashflow', label: 'Budgetten & cashflow', description: 'Grip op inkomsten, uitgaven en abonnementen' },
   { id: 'assets_investments', label: 'Vermogen & beleggen', description: 'Bezittingen, portefeuille en rendement' },
   { id: 'fire_freedom', label: 'FIRE & vrijheid', description: 'Vrijheidsprojecties, simulaties en mijlpalen' },
-  { id: 'goals_actions', label: 'Doelen & acties', description: 'Financiële doelen en concrete stappen' },
+  { id: 'goals_actions', label: 'Doelen & acties', description: 'Financi\u00eble doelen en concrete stappen' },
   { id: 'overview', label: 'Totaaloverzicht', description: 'Een breed dashboard met de belangrijkste metrics' },
 ]
 
@@ -34,10 +43,104 @@ const FOCUS_WIDGET_BOOST: Record<FocusChoice, string[]> = {
   overview: ['netto_vermogen', 'cash_flow', 'fire_prognose', 'acties', 'spaarquote', 'vrijheidsvoortgang', 'jouw_pad', 'maandoverzicht'],
 }
 
+// ── Focus filtering based on active modules ─────────────────────────────────
+
+/**
+ * Filter focus options based on which modules are active.
+ * budget_cashflow: only when 'budgetteren' is active
+ * fire_freedom: only when 'toekomstplannen' is active
+ * assets_investments: only when 'vermogensregistratie' is active
+ * goals_actions: only when 'inzicht_acties' is active
+ * overview: always available
+ */
+function getVisibleFocusOptions(activeModules: ModuleId[]): FocusChoice[] {
+  return ALL_FOCUS_OPTIONS
+    .map((o) => o.id)
+    .filter((id) => {
+      if (id === 'budget_cashflow') return activeModules.includes('budgetteren')
+      if (id === 'fire_freedom') return activeModules.includes('toekomstplannen')
+      if (id === 'assets_investments') return activeModules.includes('vermogensregistratie')
+      if (id === 'goals_actions') return activeModules.includes('inzicht_acties')
+      return true // overview is always available
+    })
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 const tests: TestCase[] = [
-  // ── Step 1: Dashboard focus opties ────────────────────────────
+  // ── Step 1: Preferences only shown when inzicht_acties active ────
+  {
+    id: 'ob-pref-conditional-display',
+    name: 'Preferences stap: alleen getoond als inzicht_acties actief is',
+    category: CAT,
+    description: 'De preferences stap wordt overgeslagen als inzicht_acties niet in de geselecteerde modules zit',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      // computeStepOrder only includes 'preferences' when inzicht_acties is active
+      // We verify the condition conceptually here (computeStepOrder is tested in onboarding-flow)
+
+      // Modules with inzicht_acties → preferences step should be present
+      const modulesWithActies: ModuleId[] = ['vermogensregistratie', 'inzicht_acties']
+      assert(modulesWithActies.includes('inzicht_acties'), 'Modules bevatten inzicht_acties')
+
+      // Modules without inzicht_acties → preferences step absent
+      const modulesWithoutActies: ModuleId[] = ['vermogensregistratie', 'budgetteren']
+      assert(!modulesWithoutActies.includes('inzicht_acties'), 'Modules bevatten GEEN inzicht_acties')
+
+      // FIRE Fighter (all modules) includes inzicht_acties
+      const fireModules: ModuleId[] = ['budgetteren', 'vermogensregistratie', 'aandelenregistratie', 'toekomstplannen', 'inzicht_acties', 'nieuws']
+      assert(fireModules.includes('inzicht_acties'), 'FIRE Fighter bevat inzicht_acties')
+
+      // Budgetteerder does NOT include inzicht_acties
+      const budgetModules: ModuleId[] = ['budgetteren']
+      assert(!budgetModules.includes('inzicht_acties'), 'Budgetteerder bevat geen inzicht_acties')
+    },
+  },
+
+  // ── Step 2: Focus options filtered by active modules ─────────────
+  {
+    id: 'ob-pref-focus-options-filtered',
+    name: 'Focus opties: gefilterd op basis van actieve modules',
+    category: CAT,
+    description: 'budget_cashflow alleen bij budgetteren, fire_freedom alleen bij toekomstplannen, etc.',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      // All modules active: all 5 options visible
+      const allModules: ModuleId[] = ['budgetteren', 'vermogensregistratie', 'toekomstplannen', 'inzicht_acties']
+      const allOptions = getVisibleFocusOptions(allModules)
+      assertEqual(allOptions.length, 5, 'Alle modules actief: 5 focus opties')
+
+      // Only vermogensregistratie + inzicht_acties: assets_investments, goals_actions, overview
+      const vermogenActies: ModuleId[] = ['vermogensregistratie', 'inzicht_acties']
+      const vaOptions = getVisibleFocusOptions(vermogenActies)
+      assert(vaOptions.includes('assets_investments'), 'Vermogensregistratie → assets_investments zichtbaar')
+      assert(vaOptions.includes('goals_actions'), 'Inzicht_acties → goals_actions zichtbaar')
+      assert(vaOptions.includes('overview'), 'Overview altijd zichtbaar')
+      assert(!vaOptions.includes('budget_cashflow'), 'Geen budgetteren → budget_cashflow verborgen')
+      assert(!vaOptions.includes('fire_freedom'), 'Geen toekomstplannen → fire_freedom verborgen')
+
+      // Only inzicht_acties: just goals_actions + overview
+      const actiesOnly: ModuleId[] = ['inzicht_acties']
+      const aoOptions = getVisibleFocusOptions(actiesOnly)
+      assertEqual(aoOptions.length, 2, 'Alleen inzicht_acties: 2 focus opties')
+      assert(aoOptions.includes('goals_actions'), 'goals_actions zichtbaar')
+      assert(aoOptions.includes('overview'), 'overview zichtbaar')
+
+      // Pensioenplanner (vermogensregistratie + toekomstplannen + inzicht_acties)
+      const pensioenModules: ModuleId[] = ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties']
+      const pensioenOptions = getVisibleFocusOptions(pensioenModules)
+      assertEqual(pensioenOptions.length, 4, 'Pensioenplanner: 4 focus opties')
+      assert(pensioenOptions.includes('assets_investments'), 'Pensioen: assets_investments')
+      assert(pensioenOptions.includes('fire_freedom'), 'Pensioen: fire_freedom')
+      assert(pensioenOptions.includes('goals_actions'), 'Pensioen: goals_actions')
+      assert(pensioenOptions.includes('overview'), 'Pensioen: overview')
+      assert(!pensioenOptions.includes('budget_cashflow'), 'Pensioen: geen budget_cashflow')
+    },
+  },
+
+  // ── Step 3: All 5 focus options with labels and descriptions ─────
   {
     id: 'ob-pref-focus-options',
     name: 'Dashboard focus opties: 5 keuzes beschikbaar',
@@ -62,13 +165,10 @@ const tests: TestCase[] = [
         assert(boost !== undefined, `Focus '${id}' heeft widget boost lijst`)
         assert(boost.length > 0, `Focus '${id}' boost lijst is niet leeg`)
       }
-
-      // Max 2 focuses selectable (enforced by component)
-      // Verified: handleToggleFocus checks data.focuses.length < 2
     },
   },
 
-  // ── Step 2: buildWidgetPrefsFromPreferences ───────────────────
+  // ── Step 4: buildWidgetPrefsFromPreferences ───────────────────
   {
     id: 'ob-pref-build-widget-prefs',
     name: 'buildWidgetPrefsFromPreferences: correcte widget set per gekozen focus',
@@ -77,17 +177,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // buildWidgetPrefsFromPreferences creates AutoDashboardAnswers with:
-      // - focuses from prefs
-      // - modulePreference: 'balanced'
-      // - gridSize: 'medium' (16 cells)
-      // - detailLevel: 'balanced'
-      // - selectedBudgetFavIds: []
-
-      // Then calls buildDashboardLayout(answers, WIDGET_CATALOG, {}, [])
-      // Returns { widgets: WidgetPref[] } with ALL catalog widgets (enabled + disabled)
-
-      // Verify the focus → widget boost mapping is complete
+      // Verify the focus -> widget boost mapping is complete
       const budgetWidgets = FOCUS_WIDGET_BOOST['budget_cashflow']
       assert(budgetWidgets.includes('budgetten'), 'Budget focus bevat budgetten widget')
       assert(budgetWidgets.includes('cash_flow'), 'Budget focus bevat cash_flow widget')
@@ -114,7 +204,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 3: INITIAL_PREFERENCES ───────────────────────────────
+  // ── Step 5: INITIAL_PREFERENCES ───────────────────────────────
   {
     id: 'ob-pref-initial-values',
     name: 'INITIAL_PREFERENCES: default waarden correct',
@@ -123,17 +213,14 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // INITIAL_PREFERENCES: empty focuses (user hasn't chosen yet)
       assert(Array.isArray(INITIAL_PREFERENCES.focuses), 'INITIAL_PREFERENCES.focuses is array')
       assertEqual(INITIAL_PREFERENCES.focuses.length, 0, 'INITIAL_PREFERENCES heeft lege focuses')
 
-      // DEFAULT_PREFERENCES: overview as default (used for skip-defaults path)
       assert(Array.isArray(DEFAULT_PREFERENCES.focuses), 'DEFAULT_PREFERENCES.focuses is array')
       assertEqual(DEFAULT_PREFERENCES.focuses.length, 1, 'DEFAULT_PREFERENCES heeft 1 focus')
       assertEqual(DEFAULT_PREFERENCES.focuses[0], 'overview', 'DEFAULT_PREFERENCES default is overview')
 
       // When focuses is empty, buildWidgetPrefsFromPreferences falls back to ['overview']
-      // This ensures a valid dashboard is always generated
       const fallbackFocuses = INITIAL_PREFERENCES.focuses.length > 0
         ? INITIAL_PREFERENCES.focuses
         : ['overview' as FocusChoice]
@@ -141,7 +228,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 4: buildDashboardLayout integratie ───────────────────
+  // ── Step 6: buildDashboardLayout integratie ───────────────────
   {
     id: 'ob-pref-dashboard-layout-integration',
     name: 'buildDashboardLayout integratie: layout past bij gekozen focus',
@@ -150,7 +237,6 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // buildWidgetPrefsFromPreferences constructs AutoDashboardAnswers:
       const answers = {
         focuses: ['fire_freedom' as FocusChoice],
         modulePreference: 'balanced' as const,
@@ -159,26 +245,18 @@ const tests: TestCase[] = [
         selectedBudgetFavIds: [] as string[],
       }
 
-      // Verify the grid target for medium = 16 cells
       const GRID_TARGET_CELLS = { small: 12, medium: 16, large: 20 }
       assertEqual(GRID_TARGET_CELLS[answers.gridSize], 16, 'Medium grid = 16 target cells')
 
-      // The builder scores widgets and the focus-boosted ones should rank higher
-      // FIRE focus boosts: fire_prognose, monte_carlo, vrijheidsscenarios, etc.
       const boostedWidgets = FOCUS_WIDGET_BOOST[answers.focuses[0]]
       assert(boostedWidgets.length >= 5, `FIRE focus boosted minstens 5 widgets (was ${boostedWidgets.length})`)
 
-      // After building, result has enabled + disabled widgets = total catalog
-      // All widgets get order 0..N sequentially
-      // Enabled widgets come first, disabled widgets follow
-
-      // Verify medium grid target
       assertEqual(answers.gridSize, 'medium', 'Onboarding gebruikt medium grid')
       assertEqual(answers.detailLevel, 'balanced', 'Onboarding gebruikt balanced detail')
     },
   },
 
-  // ── Step 5: Voorkeuren doorwerken naar dashboard ──────────────
+  // ── Step 7: Voorkeuren doorwerken naar dashboard ──────────────
   {
     id: 'ob-pref-affects-dashboard',
     name: 'Voorkeuren doorwerken naar uiteindelijke dashboard weergave',
@@ -187,24 +265,16 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // The flow: onboarding-preferences.tsx → buildWidgetPrefsFromPreferences
-      // → saves to profile.widget_prefs via /api/onboarding/save-own-data
-      // → dashboard reads widget_prefs from profile → DraggableWidgetGrid renders
-
-      // Different focuses produce different widget sets
       const budgetBoosted = new Set(FOCUS_WIDGET_BOOST['budget_cashflow'])
       const fireBoosted = new Set(FOCUS_WIDGET_BOOST['fire_freedom'])
       const goalsBoosted = new Set(FOCUS_WIDGET_BOOST['goals_actions'])
 
-      // Budget focus: budgetten, cash_flow, spaarquote prominent
       assert(budgetBoosted.has('budgetten'), 'Budget focus: budgetten widget geboost')
       assert(budgetBoosted.has('cash_flow'), 'Budget focus: cash_flow widget geboost')
 
-      // Fire focus: fire_prognose, sim_vermogenspad prominent
       assert(fireBoosted.has('fire_prognose'), 'FIRE focus: fire_prognose widget geboost')
       assert(fireBoosted.has('sim_vermogenspad'), 'FIRE focus: sim_vermogenspad widget geboost')
 
-      // Goals focus: acties, doelen, voorstellen prominent
       assert(goalsBoosted.has('acties'), 'Goals focus: acties widget geboost')
       assert(goalsBoosted.has('doelen'), 'Goals focus: doelen widget geboost')
       assert(goalsBoosted.has('voorstellen'), 'Goals focus: voorstellen widget geboost')
@@ -221,46 +291,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 6: Conditional hiding of budget_cashflow when budgeting is none ──
-  {
-    id: 'ob-pref-budget-cashflow-hidden',
-    name: 'budget_cashflow focus optie verborgen wanneer budgettering_mode === none',
-    category: CAT,
-    description: 'Wanneer gebruiker geen budgettering heeft gekozen, wordt budget_cashflow focus optie niet getoond',
-    priority: 'high',
-    estimatedDurationMs: 100,
-    fn() {
-      // When budgettering_mode is 'none', the budget_cashflow option should be hidden
-      // because there are no budgets to track
-      type BudgetteringMode = 'none' | 'yes' | 'template' | 'manual'
-
-      function getVisibleFocusOptions(budgetteringMode: BudgetteringMode): FocusChoice[] {
-        const all = ALL_FOCUS_OPTIONS.map((o) => o.id)
-        if (budgetteringMode === 'none') {
-          return all.filter((id) => id !== 'budget_cashflow')
-        }
-        return all
-      }
-
-      // Mode none: budget_cashflow hidden, 4 options visible
-      const noneOptions = getVisibleFocusOptions('none')
-      assertEqual(noneOptions.length, 4, 'Mode none: 4 focus opties zichtbaar')
-      assert(!noneOptions.includes('budget_cashflow'), 'Mode none: budget_cashflow niet zichtbaar')
-      assert(noneOptions.includes('assets_investments'), 'Mode none: assets_investments wel zichtbaar')
-      assert(noneOptions.includes('fire_freedom'), 'Mode none: fire_freedom wel zichtbaar')
-      assert(noneOptions.includes('goals_actions'), 'Mode none: goals_actions wel zichtbaar')
-      assert(noneOptions.includes('overview'), 'Mode none: overview wel zichtbaar')
-
-      // Mode yes/template/manual: all 5 options visible
-      for (const mode of ['yes', 'template', 'manual'] as BudgetteringMode[]) {
-        const options = getVisibleFocusOptions(mode)
-        assertEqual(options.length, 5, `Mode ${mode}: 5 focus opties zichtbaar`)
-        assert(options.includes('budget_cashflow'), `Mode ${mode}: budget_cashflow zichtbaar`)
-      }
-    },
-  },
-
-  // ── Step 7: Route accessible ──────────────────────────────────
+  // ── Step 8: Route accessible ──────────────────────────────────
   {
     id: 'ob-pref-route-accessible',
     name: '/onboarding route bereikbaar (voorkeuren stap is onderdeel van onboarding)',

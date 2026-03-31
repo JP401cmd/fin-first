@@ -7,17 +7,58 @@ const CAT = 'onboarding.flow'
 
 // ── Constants derived from onboarding page.tsx ──────────────────────────────
 
-const FULL_STEP_ORDER = ['intro', 'identity', 'extras', 'budgets', 'preferences', 'saving', 'success'] as const
-type Step = (typeof FULL_STEP_ORDER)[number]
-type Direction = 'forward' | 'back'
-type BudgetteringMode = 'none' | 'yes' | 'template' | 'manual'
+/**
+ * Module IDs matching lib/module-registry.ts.
+ * The onboarding step order is dynamic based on which modules the user selected.
+ */
+type ModuleId =
+  | 'budgetteren'
+  | 'vermogensregistratie'
+  | 'aandelenregistratie'
+  | 'toekomstplannen'
+  | 'inzicht_acties'
+  | 'nieuws'
 
-/** Dynamic step order: when budgettering_mode is 'none', budgets step is skipped */
-function getStepOrder(mode: BudgetteringMode): Step[] {
-  if (mode === 'none') {
-    return FULL_STEP_ORDER.filter((s) => s !== 'budgets') as Step[]
+type Step =
+  | 'intro'
+  | 'identity'
+  | 'modules'
+  | 'bezittingen'
+  | 'budgets'
+  | 'horizon'
+  | 'preferences'
+  | 'nieuws_only'
+  | 'saving'
+  | 'success'
+
+type Direction = 'forward' | 'back'
+
+/**
+ * Replicate the dynamic step computation from page.tsx.
+ * Steps are only included when the corresponding module is active.
+ * Special case: if only 'nieuws' is selected, show a single nieuws_only step.
+ */
+function computeStepOrder(selectedModules: ModuleId[]): Step[] {
+  const steps: Step[] = ['intro', 'identity', 'modules']
+  const has = (m: ModuleId) => selectedModules.includes(m)
+  const isNewsOnly = selectedModules.length === 1 && has('nieuws')
+
+  if (isNewsOnly) {
+    steps.push('nieuws_only')
+  } else {
+    if (has('vermogensregistratie') || has('budgetteren')) steps.push('bezittingen')
+    if (has('budgetteren')) steps.push('budgets')
+    if (has('toekomstplannen')) steps.push('horizon')
+    if (has('inzicht_acties')) steps.push('preferences')
   }
-  return [...FULL_STEP_ORDER]
+
+  steps.push('saving', 'success')
+  return steps
+}
+
+/** Compute direction from old step to new step within a given step order */
+function getDirection(stepOrder: Step[], from: Step, to: Step): Direction {
+  return stepOrder.indexOf(to) >= stepOrder.indexOf(from) ? 'forward' : 'back'
 }
 
 /** localStorage key for onboarding draft persistence */
@@ -28,14 +69,15 @@ interface State {
   step: Step
   direction: Direction
   identity: Record<string, unknown>
+  persona: string | null
+  selectedModules: ModuleId[]
+  horizon: Record<string, unknown>
+  newsDescription: string
   budgetAmounts: Record<string, number>
   bankAccounts: unknown[]
   assets: unknown[]
   debts: unknown[]
-}
-
-function getDirection(from: Step, to: Step): Direction {
-  return FULL_STEP_ORDER.indexOf(to) >= FULL_STEP_ORDER.indexOf(from) ? 'forward' : 'back'
+  preferences: Record<string, unknown>
 }
 
 const SAVING_MESSAGES = [
@@ -46,67 +88,199 @@ const SAVING_MESSAGES = [
   'Bijna klaar...',
 ]
 
+/** Persona module presets matching lib/module-registry.ts */
+const PERSONA_MODULE_PRESETS: Record<string, ModuleId[]> = {
+  budgetteerder: ['budgetteren'],
+  vermogensverdeler: ['vermogensregistratie', 'inzicht_acties'],
+  pensioenplanner: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
+  fire_fighter: ['budgetteren', 'vermogensregistratie', 'aandelenregistratie', 'toekomstplannen', 'inzicht_acties', 'nieuws'],
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 const tests: TestCase[] = [
-  // ── Step 1: Step ordering ─────────────────────────────────────────
+  // ── Step 1: FIRE Fighter — all content steps ─────────────────
   {
-    id: 'ob-flow-step-order',
-    name: 'Stap volgorde: intro → identity → extras → budgets → preferences → saving → success',
+    id: 'ob-flow-fire-fighter-steps',
+    name: 'FIRE Fighter: alle 6 content stappen (bezittingen, budgets, horizon, preferences)',
     category: CAT,
-    description: 'Onboarding doorloopt exact 7 stappen in de juiste volgorde',
+    description: 'FIRE Fighter selecteert alle modules → alle content stappen worden getoond',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      assertEqual(FULL_STEP_ORDER.length, 7, 'Totaal aantal stappen')
-      assertEqual(FULL_STEP_ORDER[0], 'intro', 'Eerste stap')
-      assertEqual(FULL_STEP_ORDER[1], 'identity', 'Tweede stap')
-      assertEqual(FULL_STEP_ORDER[2], 'extras', 'Derde stap')
-      assertEqual(FULL_STEP_ORDER[3], 'budgets', 'Vierde stap')
-      assertEqual(FULL_STEP_ORDER[4], 'preferences', 'Vijfde stap')
-      assertEqual(FULL_STEP_ORDER[5], 'saving', 'Zesde stap')
-      assertEqual(FULL_STEP_ORDER[6], 'success', 'Zevende stap')
+      const modules = PERSONA_MODULE_PRESETS.fire_fighter
+      const steps = computeStepOrder(modules)
+
+      // intro + identity + modules + bezittingen + budgets + horizon + preferences + saving + success = 9
+      assertEqual(steps.length, 9, 'FIRE Fighter: 9 stappen totaal')
+      assertEqual(steps[0], 'intro', 'Stap 1: intro')
+      assertEqual(steps[1], 'identity', 'Stap 2: identity')
+      assertEqual(steps[2], 'modules', 'Stap 3: modules')
+      assertEqual(steps[3], 'bezittingen', 'Stap 4: bezittingen')
+      assertEqual(steps[4], 'budgets', 'Stap 5: budgets')
+      assertEqual(steps[5], 'horizon', 'Stap 6: horizon')
+      assertEqual(steps[6], 'preferences', 'Stap 7: preferences')
+      assertEqual(steps[7], 'saving', 'Stap 8: saving')
+      assertEqual(steps[8], 'success', 'Stap 9: success')
+
+      // Verify all content steps are present
+      assert(steps.includes('bezittingen'), 'bevat bezittingen')
+      assert(steps.includes('budgets'), 'bevat budgets')
+      assert(steps.includes('horizon'), 'bevat horizon')
+      assert(steps.includes('preferences'), 'bevat preferences')
+      assert(!steps.includes('nieuws_only'), 'geen nieuws_only (niet nieuws-only)')
     },
   },
 
-  // ── Step 2: useReducer state preservation on forward/back navigation ──
+  // ── Step 2: Nieuws-only — only nieuws_only step ───────────────
+  {
+    id: 'ob-flow-nieuws-only-steps',
+    name: 'Nieuws-only: alleen nieuws_only stap',
+    category: CAT,
+    description: 'Alleen nieuws module → enkele nieuws_only content stap',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const modules: ModuleId[] = ['nieuws']
+      const steps = computeStepOrder(modules)
+
+      // intro + identity + modules + nieuws_only + saving + success = 6
+      assertEqual(steps.length, 6, 'Nieuws-only: 6 stappen totaal')
+      assertEqual(steps[3], 'nieuws_only', 'Stap 4: nieuws_only')
+
+      assert(!steps.includes('bezittingen'), 'geen bezittingen')
+      assert(!steps.includes('budgets'), 'geen budgets')
+      assert(!steps.includes('horizon'), 'geen horizon')
+      assert(!steps.includes('preferences'), 'geen preferences')
+      assert(steps.includes('nieuws_only'), 'bevat nieuws_only')
+    },
+  },
+
+  // ── Step 3: Budgetteerder — bezittingen + budgets ─────────────
+  {
+    id: 'ob-flow-budgetteerder-steps',
+    name: 'Budgetteerder: bezittingen + budgets alleen',
+    category: CAT,
+    description: 'Budgetteerder selecteert alleen budgetteren → bezittingen + budgets stappen',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const modules = PERSONA_MODULE_PRESETS.budgetteerder
+      assertEqual(modules.length, 1, 'Budgetteerder: 1 module')
+      assertEqual(modules[0], 'budgetteren', 'Budgetteerder: budgetteren module')
+
+      const steps = computeStepOrder(modules)
+
+      // intro + identity + modules + bezittingen + budgets + saving + success = 7
+      assertEqual(steps.length, 7, 'Budgetteerder: 7 stappen totaal')
+      assert(steps.includes('bezittingen'), 'bevat bezittingen (budgetteren triggert ook bezittingen)')
+      assert(steps.includes('budgets'), 'bevat budgets')
+      assert(!steps.includes('horizon'), 'geen horizon')
+      assert(!steps.includes('preferences'), 'geen preferences')
+      assert(!steps.includes('nieuws_only'), 'geen nieuws_only')
+    },
+  },
+
+  // ── Step 4: Pensioenplanner — bezittingen + horizon + preferences ─
+  {
+    id: 'ob-flow-pensioenplanner-steps',
+    name: 'Pensioenplanner: bezittingen + horizon + preferences',
+    category: CAT,
+    description: 'Pensioenplanner selecteert vermogensregistratie + toekomstplannen + inzicht_acties',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const modules = PERSONA_MODULE_PRESETS.pensioenplanner
+      assertEqual(modules.length, 3, 'Pensioenplanner: 3 modules')
+      assert(modules.includes('vermogensregistratie'), 'bevat vermogensregistratie')
+      assert(modules.includes('toekomstplannen'), 'bevat toekomstplannen')
+      assert(modules.includes('inzicht_acties'), 'bevat inzicht_acties')
+
+      const steps = computeStepOrder(modules)
+
+      // intro + identity + modules + bezittingen + horizon + preferences + saving + success = 8
+      assertEqual(steps.length, 8, 'Pensioenplanner: 8 stappen totaal')
+      assert(steps.includes('bezittingen'), 'bevat bezittingen')
+      assert(!steps.includes('budgets'), 'geen budgets (budgetteren niet actief)')
+      assert(steps.includes('horizon'), 'bevat horizon')
+      assert(steps.includes('preferences'), 'bevat preferences (inzicht_acties actief)')
+    },
+  },
+
+  // ── Step 5: Vermogensverdeler — bezittingen + preferences ─────
+  {
+    id: 'ob-flow-vermogensverdeler-steps',
+    name: 'Vermogensverdeler: bezittingen + preferences',
+    category: CAT,
+    description: 'Vermogensverdeler selecteert vermogensregistratie + inzicht_acties',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const modules = PERSONA_MODULE_PRESETS.vermogensverdeler
+      assertEqual(modules.length, 2, 'Vermogensverdeler: 2 modules')
+      assert(modules.includes('vermogensregistratie'), 'bevat vermogensregistratie')
+      assert(modules.includes('inzicht_acties'), 'bevat inzicht_acties')
+
+      const steps = computeStepOrder(modules)
+
+      // intro + identity + modules + bezittingen + preferences + saving + success = 7
+      assertEqual(steps.length, 7, 'Vermogensverdeler: 7 stappen totaal')
+      assert(steps.includes('bezittingen'), 'bevat bezittingen')
+      assert(!steps.includes('budgets'), 'geen budgets')
+      assert(!steps.includes('horizon'), 'geen horizon')
+      assert(steps.includes('preferences'), 'bevat preferences (inzicht_acties actief)')
+      assert(!steps.includes('nieuws_only'), 'geen nieuws_only')
+    },
+  },
+
+  // ── Step 6: State preservation on forward/back navigation ─────
   {
     id: 'ob-flow-state-preservation',
     name: 'State behoud bij voor/achteruit navigeren',
     category: CAT,
-    description: 'useReducer bewaart alle velden bij stap wissels',
+    description: 'useReducer bewaart alle velden bij stap wissels, inclusief horizon en newsDescription',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
+      const modules: ModuleId[] = ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties']
+      const stepOrder = computeStepOrder(modules)
+
       // Simulate reducer behavior: setting identity data, then navigating away and back
       const state: State = {
-        step: 'intro',
+        step: 'identity',
         direction: 'forward',
         identity: { full_name: 'Test Gebruiker', date_of_birth: '1990-01-15' },
-        budgetAmounts: { voeding: 400, wonen: 1200 },
+        persona: 'pensioenplanner',
+        selectedModules: modules,
+        horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
+        newsDescription: '',
+        budgetAmounts: {},
         bankAccounts: [{ name: 'ING Betaal', balance: 5000 }],
         assets: [{ name: 'ETF Portfolio', current_value: 50000 }],
         debts: [],
+        preferences: { focuses: [] },
       }
 
-      // Navigate forward to extras
-      const newDirection = getDirection('identity', 'extras')
+      // Navigate forward to bezittingen
+      const newDirection = getDirection(stepOrder, 'identity', 'bezittingen')
       assertEqual(newDirection, 'forward', 'Navigatie vooruit geeft forward direction')
 
       // Navigate back to identity
-      const backDirection = getDirection('extras', 'identity')
+      const backDirection = getDirection(stepOrder, 'bezittingen', 'identity')
       assertEqual(backDirection, 'back', 'Navigatie achteruit geeft back direction')
 
       // State should be preserved (spread operator in reducer)
       assertEqual(state.identity.full_name, 'Test Gebruiker', 'Naam bewaard na navigatie')
       assertEqual(state.identity.date_of_birth, '1990-01-15', 'Geboortedatum bewaard')
-      assertEqual(state.budgetAmounts.voeding, 400, 'Budget bewaard na navigatie')
+      assertEqual(state.persona, 'pensioenplanner', 'Persona bewaard na navigatie')
+      assertEqual(state.selectedModules.length, 3, 'Modules bewaard na navigatie')
       assertEqual(state.bankAccounts.length, 1, 'Bankrekeningen bewaard')
       assertEqual(state.assets.length, 1, 'Assets bewaard')
+      assertEqual((state.horizon as Record<string, unknown>).fire_end_strategy, 'deplete', 'Horizon data bewaard')
     },
   },
 
-  // ── Step 3: StepTransition animation classes ──────────────────────
+  // ── Step 7: StepTransition animation classes ──────────────────
   {
     id: 'ob-flow-step-transition-classes',
     name: 'StepTransition: step-enter-forward en step-enter-back CSS classes',
@@ -115,25 +289,31 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // Verify direction logic for all possible navigation patterns
+      // Use FIRE Fighter step order (all steps) for comprehensive coverage
+      const modules = PERSONA_MODULE_PRESETS.fire_fighter
+      const stepOrder = computeStepOrder(modules)
+
       // Forward navigations
-      assertEqual(getDirection('intro', 'identity'), 'forward', 'intro → identity = forward')
-      assertEqual(getDirection('identity', 'extras'), 'forward', 'identity → extras = forward')
-      assertEqual(getDirection('extras', 'budgets'), 'forward', 'extras → budgets = forward')
-      assertEqual(getDirection('budgets', 'preferences'), 'forward', 'budgets → preferences = forward')
-      assertEqual(getDirection('preferences', 'saving'), 'forward', 'preferences → saving = forward')
-      assertEqual(getDirection('saving', 'success'), 'forward', 'saving → success = forward')
+      assertEqual(getDirection(stepOrder, 'intro', 'identity'), 'forward', 'intro → identity = forward')
+      assertEqual(getDirection(stepOrder, 'identity', 'modules'), 'forward', 'identity → modules = forward')
+      assertEqual(getDirection(stepOrder, 'modules', 'bezittingen'), 'forward', 'modules → bezittingen = forward')
+      assertEqual(getDirection(stepOrder, 'bezittingen', 'budgets'), 'forward', 'bezittingen → budgets = forward')
+      assertEqual(getDirection(stepOrder, 'budgets', 'horizon'), 'forward', 'budgets → horizon = forward')
+      assertEqual(getDirection(stepOrder, 'horizon', 'preferences'), 'forward', 'horizon → preferences = forward')
+      assertEqual(getDirection(stepOrder, 'preferences', 'saving'), 'forward', 'preferences → saving = forward')
+      assertEqual(getDirection(stepOrder, 'saving', 'success'), 'forward', 'saving → success = forward')
 
       // Back navigations
-      assertEqual(getDirection('identity', 'intro'), 'back', 'identity → intro = back')
-      assertEqual(getDirection('extras', 'identity'), 'back', 'extras → identity = back')
-      assertEqual(getDirection('budgets', 'extras'), 'back', 'budgets → extras = back')
-      assertEqual(getDirection('preferences', 'budgets'), 'back', 'preferences → budgets = back')
+      assertEqual(getDirection(stepOrder, 'identity', 'intro'), 'back', 'identity → intro = back')
+      assertEqual(getDirection(stepOrder, 'modules', 'identity'), 'back', 'modules → identity = back')
+      assertEqual(getDirection(stepOrder, 'bezittingen', 'modules'), 'back', 'bezittingen → modules = back')
+      assertEqual(getDirection(stepOrder, 'budgets', 'bezittingen'), 'back', 'budgets → bezittingen = back')
+      assertEqual(getDirection(stepOrder, 'horizon', 'budgets'), 'back', 'horizon → budgets = back')
 
       // Same step = forward (newIdx >= oldIdx)
-      assertEqual(getDirection('identity', 'identity'), 'forward', 'Zelfde stap = forward')
+      assertEqual(getDirection(stepOrder, 'identity', 'identity'), 'forward', 'Zelfde stap = forward')
 
-      // CSS class mapping: forward → step-enter-forward, back → step-enter-back
+      // CSS class mapping
       function directionToClass(dir: Direction): string {
         return dir === 'forward' ? 'step-enter-forward' : 'step-enter-back'
       }
@@ -142,7 +322,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 4: Auth guard — no user → redirect to /login ─────────────
+  // ── Step 8: Auth guard — no user → redirect to /login ─────────
   {
     id: 'ob-flow-auth-guard',
     name: 'Auth guard: geen gebruiker → redirect naar /login',
@@ -151,13 +331,11 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 1000,
     async fn() {
-      // The onboarding page is behind auth middleware — unauthenticated should redirect
       const res = await unauthenticatedFetch('/onboarding', { redirect: 'manual' })
       assert(
         res.status === 200 || (res.status >= 300 && res.status < 400),
         `Expected 200 or redirect for /onboarding, got ${res.status}`,
       )
-      // If redirect, should go to login
       if (res.status >= 300 && res.status < 400) {
         const location = res.headers.get('location') ?? ''
         assert(
@@ -168,7 +346,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 5: onboarding_completed guard → redirect to /core ────────
+  // ── Step 9: onboarding_completed guard → redirect to /core ────
   {
     id: 'ob-flow-completed-guard',
     name: 'Onboarding voltooid guard: al voltooid → redirect naar /core',
@@ -177,25 +355,9 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // The guard logic in the page.tsx:
-      // 1. Fetch user via supabase.auth.getUser()
-      // 2. If no user → redirect /login
-      // 3. Fetch profile.onboarding_completed
-      // 4. If true → router.replace('/core')
-      // 5. If false → setLoading(false) (show onboarding)
-      //
-      // Additionally, app/(app)/layout.tsx checks:
-      // if (profile && !profile.onboarding_completed) redirect('/onboarding')
-      //
-      // Verify the bidirectional guard exists by checking the API endpoint
-      // save-own-data also has server-side idempotency:
-      // if existingProfile?.onboarding_completed → return { success: true, alreadyCompleted: true }
-
-      // Verify the API endpoint exists and is protected
-      // (Without a valid session, should return 401)
       const guardConditions = [
         'Client: getUser() null → /login',
-        'Client: onboarding_completed true → /core',
+        'Client: onboarding_completed true → /core (via getHomePath)',
         'Layout: !onboarding_completed → /onboarding',
         'API: onboarding_completed → alreadyCompleted: true',
       ]
@@ -203,7 +365,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 6: Loading state — spinner visible during auth check ─────
+  // ── Step 10: Loading state — spinner ──────────────────────────
   {
     id: 'ob-flow-loading-spinner',
     name: 'Loading state: spinner zichtbaar tijdens auth/onboarding check',
@@ -212,16 +374,11 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // The page renders a spinner when loading=true (initial state):
-      // <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-ed)] border-t-[var(--ink)]" />
-      // Loading is set to false only after auth check completes
-      // Verify the expected classes exist
       const spinnerClasses = 'h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-ed)] border-t-[var(--ink)]'
       assert(spinnerClasses.includes('animate-spin'), 'Spinner heeft animate-spin class')
       assert(spinnerClasses.includes('rounded-full'), 'Spinner is rond')
       assert(spinnerClasses.includes('border-2'), 'Spinner heeft border styling')
 
-      // Container centers the spinner
       const containerClasses = 'flex min-h-screen items-center justify-center'
       assert(containerClasses.includes('min-h-screen'), 'Container vult scherm')
       assert(containerClasses.includes('items-center'), 'Spinner is verticaal gecentreerd')
@@ -229,7 +386,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 7: Error handling — sticky error banner ──────────────────
+  // ── Step 11: Error handling — sticky error banner ─────────────
   {
     id: 'ob-flow-error-banner',
     name: 'Error handling: sticky error banner bij save failure',
@@ -238,15 +395,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // Error banner structure from page.tsx lines 334-371:
-      // - Fixed inset-x-0 top-0 z-50 — sticky at top
-      // - role="alert" aria-live="assertive" — accessible
-      // - "Er ging iets mis" heading
-      // - Dynamic error message from saveError state
-      // - "Opnieuw proberen" button (calls handleSaveOwnData)
-      // - Dismiss button with aria-label="Sluiten"
-
-      // Verify error types are handled:
+      // Verify error types are handled
       const errorTypes = {
         abort: 'De server reageert niet. Controleer je internetverbinding en probeer het opnieuw.',
         fetchFail: 'Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.',
@@ -257,36 +406,49 @@ const tests: TestCase[] = [
       assert(errorTypes.fetchFail.includes('Geen internetverbinding'), 'Fetch fail message correct')
       assert(errorTypes.generic.includes('Onbekende fout'), 'Generic error message correct')
 
-      // After error, step goes back to preferences (line 312)
-      const errorRecoveryStep: Step = 'preferences'
-      assertIncludes([...FULL_STEP_ORDER], errorRecoveryStep, 'Error recovery stap is een geldige stap')
+      // After error, step goes back to last content step (dynamic, not fixed 'preferences')
+      // The page.tsx uses: contentSteps[contentSteps.length - 1]
+      // For FIRE Fighter that would be 'preferences', for budgetteerder that would be 'budgets'
+      const ffModules = PERSONA_MODULE_PRESETS.fire_fighter
+      const ffSteps = computeStepOrder(ffModules)
+      const ffContentSteps = ffSteps.filter((s) => !['saving', 'success'].includes(s))
+      assertEqual(ffContentSteps[ffContentSteps.length - 1], 'preferences', 'FIRE Fighter: error recovery naar preferences')
 
-      // saving state is reset in finally block (line 314)
-      // This ensures retry is possible
+      const budgetModules = PERSONA_MODULE_PRESETS.budgetteerder
+      const budgetSteps = computeStepOrder(budgetModules)
+      const budgetContentSteps = budgetSteps.filter((s) => !['saving', 'success'].includes(s))
+      assertEqual(budgetContentSteps[budgetContentSteps.length - 1], 'budgets', 'Budgetteerder: error recovery naar budgets')
     },
   },
 
-  // ── Step 8: Data preservation after error ─────────────────────────
+  // ── Step 12: Data preservation after error ─────────────────────
   {
     id: 'ob-flow-data-after-error',
-    name: 'Data behoud bij error: terug naar preferences met alle data intact',
+    name: 'Data behoud bij error: terug naar laatste content stap met alle data intact',
     category: CAT,
-    description: 'Na save failure gaat flow terug naar preferences stap, alle useReducer state intact',
+    description: 'Na save failure gaat flow terug naar laatste content stap, alle useReducer state intact',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // The error handling dispatches SET_STEP back to 'preferences' (line 312)
-      // useReducer state is immutable — only step and direction change, all data fields preserved
-      // Verify this by simulating the reducer logic:
+      const modules: ModuleId[] = ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties']
+      const stepOrder = computeStepOrder(modules)
+      const contentSteps = stepOrder.filter((s) => !['saving', 'success'].includes(s))
+      const lastContentStep = contentSteps[contentSteps.length - 1]
+      assertEqual(lastContentStep, 'preferences', 'Laatste content stap is preferences')
 
       const stateBeforeSave: State = {
         step: 'preferences',
         direction: 'forward',
         identity: { full_name: 'Jan Jansen', net_monthly_income: '4500' },
-        budgetAmounts: { voeding: 350, wonen: 1100, vervoer: 200 },
+        persona: null,
+        selectedModules: modules,
+        horizon: { fire_end_strategy: 'legacy', fire_legacy_amount: '200000' },
+        newsDescription: '',
+        budgetAmounts: {},
         bankAccounts: [{ name: 'ING Betaal', balance: '3000' }],
         assets: [{ name: 'Vanguard ETF', current_value: '80000' }],
         debts: [{ name: 'Studieschuld', current_balance: '12000' }],
+        preferences: { focuses: ['fire_freedom'] },
       }
 
       // Save initiated → step goes to 'saving'
@@ -294,52 +456,47 @@ const tests: TestCase[] = [
       assertEqual(savingState.step, 'saving', 'Stap gaat naar saving')
       assertEqual(savingState.identity.full_name, 'Jan Jansen', 'Identity intact tijdens saving')
 
-      // Save fails → step goes back to 'preferences'
-      const errorState = { ...savingState, step: 'preferences' as Step, direction: 'back' as Direction }
+      // Save fails → step goes back to last content step
+      const errorState = { ...savingState, step: lastContentStep, direction: 'back' as Direction }
       assertEqual(errorState.step, 'preferences', 'Stap terug naar preferences na error')
       assertEqual(errorState.identity.full_name, 'Jan Jansen', 'Identity intact na error')
-      assertEqual(errorState.budgetAmounts.voeding, 350, 'Budget intact na error')
+      assertEqual(errorState.selectedModules.length, 3, 'Modules intact na error')
+      assertEqual((errorState.horizon as Record<string, unknown>).fire_end_strategy, 'legacy', 'Horizon intact na error')
       assertEqual(errorState.bankAccounts.length, 1, 'Bankrekeningen intact na error')
       assertEqual(errorState.assets.length, 1, 'Assets intact na error')
       assertEqual(errorState.debts.length, 1, 'Debts intact na error')
     },
   },
 
-  // ── Step 9: Logout function ───────────────────────────────────────
+  // ── Step 13: Logout function ──────────────────────────────────
   {
     id: 'ob-flow-logout',
     name: 'Logout: supabase.auth.signOut() → redirect naar /login',
     category: CAT,
-    description: 'Uitloggen op onboarding pagina maakt gebruik van supabase signOut en redirect',
+    description: 'Uitloggen op onboarding pagina beschikbaar op alle interactieve stappen',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // Logout handler at line 168-171:
-      // const handleLogout = useCallback(async () => {
-      //   await supabase.auth.signOut()
-      //   window.location.href = '/login'
-      // }, [supabase])
-      //
-      // Logout is available in two places:
-      // 1. OnboardingIntro: onLogout prop → ghost text "Uitloggen" (line 391)
-      // 2. Header: when showHeader is true (!['intro', 'success', 'saving'].includes(step))
-      //    "Uitloggen" button in top-right (line 380-385)
-
-      const headerVisibleSteps = FULL_STEP_ORDER.filter(
+      // showHeader = !['intro', 'success', 'saving'].includes(step)
+      // Header with logout visible on all interactive steps
+      const modules = PERSONA_MODULE_PRESETS.fire_fighter
+      const allSteps = computeStepOrder(modules)
+      const headerVisibleSteps = allSteps.filter(
         (s) => !['intro', 'success', 'saving'].includes(s),
       )
-      assertEqual(headerVisibleSteps.length, 4, 'Header met logout zichtbaar op 4 stappen')
-      assertIncludes([...headerVisibleSteps], 'identity', 'Header zichtbaar op identity')
-      assertIncludes([...headerVisibleSteps], 'extras', 'Header zichtbaar op extras')
-      assertIncludes([...headerVisibleSteps], 'budgets', 'Header zichtbaar op budgets')
-      assertIncludes([...headerVisibleSteps], 'preferences', 'Header zichtbaar op preferences')
 
-      // Intro has its own logout via onLogout prop
-      // So logout is available on all user-interactive steps
+      // identity, modules, bezittingen, budgets, horizon, preferences = 6 steps with header
+      assertEqual(headerVisibleSteps.length, 6, 'Header met logout zichtbaar op 6 stappen')
+      assertIncludes([...headerVisibleSteps], 'identity', 'Header zichtbaar op identity')
+      assertIncludes([...headerVisibleSteps], 'modules', 'Header zichtbaar op modules')
+      assertIncludes([...headerVisibleSteps], 'bezittingen', 'Header zichtbaar op bezittingen')
+      assertIncludes([...headerVisibleSteps], 'budgets', 'Header zichtbaar op budgets')
+      assertIncludes([...headerVisibleSteps], 'horizon', 'Header zichtbaar op horizon')
+      assertIncludes([...headerVisibleSteps], 'preferences', 'Header zichtbaar op preferences')
     },
   },
 
-  // ── Step 10: Save API endpoint structure ──────────────────────────
+  // ── Step 14: Save API endpoint structure ──────────────────────
   {
     id: 'ob-flow-save-api-exists',
     name: 'Save API endpoint /api/onboarding/save-own-data bereikbaar',
@@ -348,7 +505,6 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 1000,
     async fn() {
-      // Without auth, should return 401
       const res = await unauthenticatedFetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -361,7 +517,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 11: Saving messages rotation ─────────────────────────────
+  // ── Step 15: Saving messages rotation ─────────────────────────
   {
     id: 'ob-flow-saving-messages',
     name: 'Saving stap: 5 roterende berichten',
@@ -379,7 +535,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 12: Double-submit protection ─────────────────────────────
+  // ── Step 16: Double-submit protection ─────────────────────────
   {
     id: 'ob-flow-double-submit-guard',
     name: 'Double-submit bescherming: 4-laags guard',
@@ -388,11 +544,6 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // Layer 1: Client-side guard — if (saving) return
-      // Layer 2: Disabled buttons — disabled={saving}
-      // Layer 3: UI replacement — step changes to 'saving', buttons removed from DOM
-      // Layer 4: Server-side — if onboarding_completed → return alreadyCompleted
-
       const layers = [
         'saving state guard',
         'disabled buttons',
@@ -401,87 +552,144 @@ const tests: TestCase[] = [
       ]
       assertEqual(layers.length, 4, 'Vier beschermingslagen')
 
-      // Verify saving step removes interactive elements
-      const savingStepHasButtons = false // In saving step, no buttons are rendered
+      const savingStepHasButtons = false
       assertEqual(savingStepHasButtons, false, 'Saving stap heeft geen knoppen')
     },
   },
 
-  // ── Step 13: Dynamic step order based on budgettering_mode ──────
+  // ── Step 17: Dynamic step order — module-driven ────────────────
   {
     id: 'ob-flow-dynamic-step-order',
-    name: 'Dynamic step order: budgettering_mode bepaalt of budgets stap getoond wordt',
+    name: 'Dynamic step order: modules bepalen welke content stappen getoond worden',
     category: CAT,
-    description: 'getStepOrder("none") retourneert 6 stappen (budgets overgeslagen), andere modes 7 stappen',
+    description: 'computeStepOrder genereert stappen op basis van geselecteerde modules',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // Mode 'none': budgets step is skipped, 6 steps remain
-      const noneSteps = getStepOrder('none')
-      assertEqual(noneSteps.length, 6, 'Mode none: 6 stappen (budgets overgeslagen)')
-      assert(!noneSteps.includes('budgets'), 'Mode none: budgets stap niet aanwezig')
-      assertEqual(noneSteps[0], 'intro', 'Mode none: intro eerste')
-      assertEqual(noneSteps[1], 'identity', 'Mode none: identity tweede')
-      assertEqual(noneSteps[2], 'extras', 'Mode none: extras derde')
-      assertEqual(noneSteps[3], 'preferences', 'Mode none: preferences vierde (budgets overgeslagen)')
-      assertEqual(noneSteps[4], 'saving', 'Mode none: saving vijfde')
-      assertEqual(noneSteps[5], 'success', 'Mode none: success zesde')
+      // Empty modules: only fixed steps (no content steps between modules and saving)
+      const emptySteps = computeStepOrder([])
+      assertEqual(emptySteps.length, 5, 'Geen modules: 5 stappen (intro, identity, modules, saving, success)')
+      assert(!emptySteps.includes('bezittingen'), 'Geen modules: geen bezittingen')
+      assert(!emptySteps.includes('budgets'), 'Geen modules: geen budgets')
+      assert(!emptySteps.includes('horizon'), 'Geen modules: geen horizon')
+      assert(!emptySteps.includes('preferences'), 'Geen modules: geen preferences')
 
-      // Mode 'yes': all 7 steps
-      const yesSteps = getStepOrder('yes')
-      assertEqual(yesSteps.length, 7, 'Mode yes: 7 stappen')
-      assert(yesSteps.includes('budgets'), 'Mode yes: budgets stap aanwezig')
+      // Only vermogensregistratie: bezittingen only
+      const vermogenSteps = computeStepOrder(['vermogensregistratie'])
+      assert(vermogenSteps.includes('bezittingen'), 'vermogensregistratie → bezittingen')
+      assert(!vermogenSteps.includes('budgets'), 'geen budgetteren → geen budgets')
+      assert(!vermogenSteps.includes('horizon'), 'geen toekomstplannen → geen horizon')
+      assert(!vermogenSteps.includes('preferences'), 'geen inzicht_acties → geen preferences')
 
-      // Mode 'template': all 7 steps
-      const templateSteps = getStepOrder('template')
-      assertEqual(templateSteps.length, 7, 'Mode template: 7 stappen')
-      assert(templateSteps.includes('budgets'), 'Mode template: budgets stap aanwezig')
+      // Only toekomstplannen: horizon only
+      const toekomstSteps = computeStepOrder(['toekomstplannen'])
+      assert(!toekomstSteps.includes('bezittingen'), 'alleen toekomstplannen → geen bezittingen')
+      assert(toekomstSteps.includes('horizon'), 'toekomstplannen → horizon')
 
-      // Mode 'manual': all 7 steps
-      const manualSteps = getStepOrder('manual')
-      assertEqual(manualSteps.length, 7, 'Mode manual: 7 stappen')
-      assert(manualSteps.includes('budgets'), 'Mode manual: budgets stap aanwezig')
+      // budgetteren implies bezittingen
+      const budgetSteps = computeStepOrder(['budgetteren'])
+      assert(budgetSteps.includes('bezittingen'), 'budgetteren triggert ook bezittingen')
+      assert(budgetSteps.includes('budgets'), 'budgetteren → budgets')
 
-      // Verify step order is preserved in all modes
-      for (const mode of ['yes', 'template', 'manual'] as BudgetteringMode[]) {
-        const steps = getStepOrder(mode)
-        assertEqual(steps.indexOf('extras') < steps.indexOf('budgets'), true, `Mode ${mode}: extras voor budgets`)
-        assertEqual(steps.indexOf('budgets') < steps.indexOf('preferences'), true, `Mode ${mode}: budgets voor preferences`)
-      }
+      // Step order is preserved: bezittingen always before budgets, budgets before horizon, etc.
+      const allModules: ModuleId[] = ['budgetteren', 'vermogensregistratie', 'toekomstplannen', 'inzicht_acties']
+      const fullSteps = computeStepOrder(allModules)
+      assert(fullSteps.indexOf('bezittingen') < fullSteps.indexOf('budgets'), 'bezittingen vóór budgets')
+      assert(fullSteps.indexOf('budgets') < fullSteps.indexOf('horizon'), 'budgets vóór horizon')
+      assert(fullSteps.indexOf('horizon') < fullSteps.indexOf('preferences'), 'horizon vóór preferences')
     },
   },
 
-  // ── Step 14: localStorage draft persistence ─────────────────────
+  // ── Step 18: localStorage draft persistence ────────────────────
   {
     id: 'ob-flow-localstorage-persistence',
     name: 'localStorage draft persistence: key trifinity_onboarding_draft',
     category: CAT,
-    description: 'Onboarding data wordt opgeslagen in localStorage onder trifinity_onboarding_draft voor draft recovery',
+    description: 'Onboarding data wordt opgeslagen in localStorage inclusief modules, horizon en newsDescription',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // The onboarding persists its reducer state to localStorage for crash/tab-close recovery
       assertEqual(LOCALSTORAGE_DRAFT_KEY, 'trifinity_onboarding_draft', 'localStorage key correct')
 
-      // Draft data structure mirrors the reducer State interface
-      const draftFields = ['step', 'direction', 'identity', 'budgetAmounts', 'bankAccounts', 'assets', 'debts']
-      assertEqual(draftFields.length, 7, 'Draft bevat 7 velden (volledige reducer state)')
+      // Draft data structure mirrors the PersistedData interface
+      const draftFields = [
+        'identity', 'persona', 'selectedModules', 'horizon', 'newsDescription',
+        'budgetAmounts', 'bankAccounts', 'assets', 'debts', 'preferences', 'lastStep',
+      ]
+      assertEqual(draftFields.length, 11, 'Draft bevat 11 velden (volledige PersistedData)')
 
       // Simulate serialization/deserialization roundtrip
-      const mockState: State = {
-        step: 'extras',
-        direction: 'forward',
+      const mockState = {
         identity: { full_name: 'Draft Test', net_monthly_income: '3000' },
+        persona: 'pensioenplanner',
+        selectedModules: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
+        horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
+        newsDescription: '',
         budgetAmounts: { 'huur-hypotheek': 840 },
         bankAccounts: [{ name: 'ING', balance: '2500' }],
         assets: [],
         debts: [],
+        preferences: { focuses: [] },
+        lastStep: 'bezittingen',
       }
       const serialized = JSON.stringify(mockState)
       const deserialized = JSON.parse(serialized)
-      assertEqual(deserialized.step, 'extras', 'Draft step hersteld na serialize/deserialize')
       assertEqual(deserialized.identity.full_name, 'Draft Test', 'Draft identity hersteld')
+      assertEqual(deserialized.persona, 'pensioenplanner', 'Draft persona hersteld')
+      assertEqual(deserialized.selectedModules.length, 3, 'Draft modules hersteld')
+      assertEqual(deserialized.horizon.fire_end_strategy, 'deplete', 'Draft horizon hersteld')
+      assertEqual(deserialized.lastStep, 'bezittingen', 'Draft lastStep hersteld')
       assertEqual(deserialized.bankAccounts.length, 1, 'Draft bankAccounts hersteld')
+    },
+  },
+
+  // ── Step 19: Persona clears on manual toggle ──────────────────
+  {
+    id: 'ob-flow-persona-clears-on-toggle',
+    name: 'Persona selectie: handmatig togglen wist persona naar null',
+    category: CAT,
+    description: 'Wanneer een module handmatig gewijzigd wordt, verdwijnt de persona-highlight',
+    priority: 'high',
+    estimatedDurationMs: 100,
+    fn() {
+      // Simulate: select persona → sets modules and persona
+      let state = {
+        persona: 'fire_fighter' as string | null,
+        selectedModules: [...PERSONA_MODULE_PRESETS.fire_fighter],
+      }
+      assertEqual(state.persona, 'fire_fighter', 'Persona geselecteerd')
+      assertEqual(state.selectedModules.length, 6, 'Alle 6 modules actief')
+
+      // Simulate: toggle a module off → persona becomes null
+      state = {
+        persona: null,
+        selectedModules: state.selectedModules.filter((m) => m !== 'nieuws'),
+      }
+      assertEqual(state.persona, null, 'Persona wordt null na handmatige toggle')
+      assertEqual(state.selectedModules.length, 5, 'Module verwijderd')
+      assert(!state.selectedModules.includes('nieuws'), 'Nieuws module uitgeschakeld')
+    },
+  },
+
+  // ── Step 20: Nieuws-only special case ─────────────────────────
+  {
+    id: 'ob-flow-nieuws-only-special-case',
+    name: 'Nieuws-only: nieuws + andere module is geen nieuws-only',
+    category: CAT,
+    description: 'nieuws_only stap verschijnt alleen als exact 1 module (nieuws) is geselecteerd',
+    priority: 'high',
+    estimatedDurationMs: 100,
+    fn() {
+      // Only nieuws → nieuws_only
+      const nieuwsOnly = computeStepOrder(['nieuws'])
+      assert(nieuwsOnly.includes('nieuws_only'), 'Alleen nieuws → nieuws_only stap')
+      assert(!nieuwsOnly.includes('bezittingen'), 'Alleen nieuws → geen bezittingen')
+
+      // Nieuws + another module → NOT nieuws_only
+      const nieuwsPlus = computeStepOrder(['nieuws', 'budgetteren'])
+      assert(!nieuwsPlus.includes('nieuws_only'), 'Nieuws + budgetteren → geen nieuws_only')
+      assert(nieuwsPlus.includes('bezittingen'), 'Nieuws + budgetteren → bezittingen')
+      assert(nieuwsPlus.includes('budgets'), 'Nieuws + budgetteren → budgets')
     },
   },
 ]
