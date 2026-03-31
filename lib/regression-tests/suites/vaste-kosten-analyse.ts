@@ -34,8 +34,8 @@ registerCategory({
 // ── Constants (mirroring API route) ──────────────────────────────────────────
 
 const SUBSCRIPTION_CATEGORIES: RecurringCategory[] = ['subscription']
-const VASTE_KOSTEN_CATEGORIES: RecurringCategory[] = ['rent', 'mortgage', 'utility', 'insurance', 'transport']
-const EXCLUDED_CATEGORIES: RecurringCategory[] = ['salary', 'savings', 'other_income', 'other_expense']
+const VASTE_KOSTEN_CATEGORIES: RecurringCategory[] = ['rent', 'mortgage', 'utility', 'insurance', 'transport', 'taxes', 'childcare', 'housing_other', 'healthcare', 'donation', 'loan']
+const EXCLUDED_CATEGORIES: RecurringCategory[] = ['salary', 'savings', 'other_income']
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -143,8 +143,8 @@ const tests: TestCase[] = [
   },
   {
     id: 'vaste-kosten-excluded-categories',
-    name: 'Uitsluiting: salary, savings, other_income, other_expense niet in analyse',
-    description: 'Income and savings categories are excluded from both columns',
+    name: 'Uitsluiting: salary, savings, other_income niet in analyse',
+    description: 'Income and savings categories are excluded from both columns; other_expense goes to vaste kosten',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
@@ -161,6 +161,12 @@ const tests: TestCase[] = [
       assertEqual(salary, 'salary', 'Salary correctly detected')
       assert(!SUBSCRIPTION_CATEGORIES.includes(salary), 'Salary not in subscriptions')
       assert(!VASTE_KOSTEN_CATEGORIES.includes(salary), 'Salary not in vaste kosten')
+
+      // other_expense is NOT in VASTE_KOSTEN_CATEGORIES but is included via fallback
+      // in the API route as "overige vaste lasten" when confidence is medium+
+      const otherExp = detectCategory('Onbekende Partij', 'onbekend', false)
+      assertEqual(otherExp, 'other_expense', 'Unknown expense = other_expense')
+      assert(!SUBSCRIPTION_CATEGORIES.includes(otherExp), 'other_expense not in subscriptions')
     },
   },
   {

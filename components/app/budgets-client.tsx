@@ -194,6 +194,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     }
     return 'tree'
   })
+  const [periodMode, setPeriodMode] = useState<'maand' | 'ytd' | '12m'>('maand')
   const [monthDate, setMonthDate] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -213,8 +214,38 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const [uncategorizedCount, setUncategorizedCount] = useState(initialData?.uncategorizedCount ?? 0)
   const [uncategorizedTotal, setUncategorizedTotal] = useState(initialData?.uncategorizedTotal ?? 0)
 
-  const monthStart = localDateStr(monthDate)
-  const monthEnd = localDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))
+  // Compute date range + month count based on period mode
+  const { periodStart, periodEnd, periodMonthCount } = useMemo(() => {
+    const now = new Date()
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    if (periodMode === 'ytd') {
+      const yearStart = new Date(monthDate.getFullYear(), 0, 1)
+      const months = monthDate.getMonth() + 1 // Jan=1, Feb=2, etc.
+      return {
+        periodStart: localDateStr(yearStart),
+        periodEnd: localDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1)),
+        periodMonthCount: months,
+      }
+    }
+    if (periodMode === '12m') {
+      const twelveMonthsAgo = new Date(currentMonthEnd.getFullYear(), currentMonthEnd.getMonth() - 12, 1)
+      return {
+        periodStart: localDateStr(twelveMonthsAgo),
+        periodEnd: localDateStr(currentMonthEnd),
+        periodMonthCount: 12,
+      }
+    }
+    // Default: single month
+    return {
+      periodStart: localDateStr(monthDate),
+      periodEnd: localDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1)),
+      periodMonthCount: 1,
+    }
+  }, [monthDate, periodMode])
+
+  // Aliases so the rest of the file continues to work without renaming every reference
+  const monthStart = periodStart
+  const monthEnd = periodEnd
 
   const loadSpending = useCallback(async (signal?: AbortSignal) => {
     const supabase = createClient()
@@ -667,6 +698,12 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       ? Number(applicable[0].amount)
       : Number(budget.default_limit)
 
+    // For multi-month modes, scale the base limit by the number of months.
+    // Rollovers only apply to single-month view — they don't make sense across periods.
+    if (periodMonthCount > 1) {
+      return baseLimit * periodMonthCount
+    }
+
     return baseLimit + carry
   }
 
@@ -883,21 +920,47 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       {/* Month selector */}
       <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-6">
         <div className="mb-3 sm:mb-6 flex items-center justify-between gap-2">
-          <button
-            onClick={prevMonth}
-            className="rounded-lg p-1.5 sm:p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
+          {periodMode === 'maand' && (
+            <button
+              onClick={prevMonth}
+              className="rounded-lg p-1.5 sm:p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          )}
           <h2 className="text-base sm:text-lg font-semibold capitalize text-[var(--ink)]">
-            {monthLabel}
+            {periodMode === 'ytd'
+              ? `${monthDate.getFullYear()} YTD`
+              : periodMode === '12m'
+                ? 'Afgelopen 12 maanden'
+                : monthLabel}
           </h2>
-          <button
-            onClick={nextMonth}
-            className="rounded-lg p-1.5 sm:p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
+          {periodMode === 'maand' && (
+            <button
+              onClick={nextMonth}
+              className="rounded-lg p-1.5 sm:p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          )}
+
+          {/* Period toggle pill */}
+          <div className="flex items-center gap-0.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
+            {(['maand', 'ytd', '12m'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setPeriodMode(mode)}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                  periodMode === mode
+                    ? 'bg-zinc-900 text-white'
+                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                {mode === 'maand' ? 'Maand' : mode === 'ytd' ? 'YTD' : '12 mnd'}
+              </button>
+            ))}
+          </div>
+
           <div className="ml-auto hidden sm:flex items-center gap-2">
             <button
               type="button"
@@ -907,20 +970,22 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               <FileText className="h-3 w-3" />
               Rapport
             </button>
-            <button
-              type="button"
-              onClick={copyFromLastMonth}
-              disabled={copyingMonth}
-              title="Kopieer budgetbedragen van vorige maand"
-              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
-            >
-              {copyingMonth ? (
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
-              Kopieer vorige maand
-            </button>
+            {periodMode === 'maand' && (
+              <button
+                type="button"
+                onClick={copyFromLastMonth}
+                disabled={copyingMonth}
+                title="Kopieer budgetbedragen van vorige maand"
+                className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
+              >
+                {copyingMonth ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Kopieer vorige maand
+              </button>
+            )}
           </div>
         </div>
 
@@ -950,9 +1015,9 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           </div>
         </div>
 
-        {/* Te Verdelen + Dekkingsgraad */}
+        {/* Te Verdelen + Dekkingsgraad — only shown in single-month mode (allocation is per-month) */}
         {/* FeatureGate: budget_optimalisatie — Te Verdelen allocatie bar + tools */}
-        <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
+        {periodMode === 'maand' && <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
           <div className={`mt-3 sm:mt-4 flex items-center justify-between gap-2 sm:gap-3 rounded-lg border px-3 sm:px-4 py-2 sm:py-3 ${teVerdelen >= 0 ? 'border-positive/20 bg-positive/10' : 'border-negative/20 bg-negative/10'}`}>
             <div>
               <p className={`text-[10px] font-semibold uppercase tracking-wider ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>Te Verdelen</p>
@@ -985,7 +1050,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               </button>
             </div>
           </div>
-        </FeatureGate>
+        </FeatureGate>}
 
         <UncategorizedTransactionsBanner
           count={uncategorizedCount}
@@ -1313,6 +1378,78 @@ function BudgetAllocationModal({
   })
 
   const [saving, setSaving] = useState(false)
+  const [averages, setAverages] = useState<Record<string, number>>({})
+  const [averagesLoading, setAveragesLoading] = useState(true)
+
+  // Fetch 12-month average spending per budget on mount
+  useEffect(() => {
+    async function loadAverages() {
+      setAveragesLoading(true)
+      try {
+        const supabase = createClient()
+        const now = new Date()
+        const startDate = localDateStr(new Date(now.getFullYear(), now.getMonth() - 11, 1))
+        const endDate = localDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 1))
+        const budgetIds = Object.keys(localLimits)
+        if (budgetIds.length === 0) { setAveragesLoading(false); return }
+
+        const [{ data: txData }, { data: splitTxInRange }] = await Promise.all([
+          supabase.from('transactions')
+            .select('budget_id, amount, date')
+            .in('budget_id', budgetIds)
+            .gte('date', startDate)
+            .lt('date', endDate),
+          supabase.from('transactions')
+            .select('id, date')
+            .gte('date', startDate)
+            .lt('date', endDate)
+            .eq('is_split', true),
+        ])
+
+        // Fetch split rows for these budgets
+        const splitTxIds = (splitTxInRange ?? []).map(t => t.id)
+        const splitDateMap: Record<string, string> = {}
+        for (const t of (splitTxInRange ?? [])) splitDateMap[t.id] = t.date
+        let splitRows: { budget_id: string; amount: number }[] = []
+        if (splitTxIds.length > 0) {
+          const { data: splitData } = await supabase
+            .from('transaction_splits')
+            .select('budget_id, amount, transaction_id')
+            .in('budget_id', budgetIds)
+            .in('transaction_id', splitTxIds)
+          if (splitData) {
+            splitRows = splitData
+              .filter(s => s.budget_id)
+              .map(s => ({ budget_id: s.budget_id!, amount: Number(s.amount) }))
+          }
+        }
+
+        // Compute totals per budget
+        const totals: Record<string, number> = {}
+        for (const t of (txData ?? [])) {
+          if (t.budget_id) {
+            totals[t.budget_id] = (totals[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+          }
+        }
+        for (const s of splitRows) {
+          totals[s.budget_id] = (totals[s.budget_id] ?? 0) + Math.abs(s.amount)
+        }
+
+        // Divide by 12 for monthly average
+        const result: Record<string, number> = {}
+        for (const [id, total] of Object.entries(totals)) {
+          result[id] = Math.round(total / 12)
+        }
+        setAverages(result)
+      } catch {
+        // Silently fail — averages are a non-critical enhancement
+      } finally {
+        setAveragesLoading(false)
+      }
+    }
+    loadAverages()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Rollovers are automatic carry-overs that already count as allocated on the main page.
   // Include them here so that "te verdelen" matches the main page calculation.
@@ -1354,6 +1491,13 @@ function BudgetAllocationModal({
             <p className="font-mono text-base font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
           </div>
 
+          {/* Column headers */}
+          <div className="flex items-center gap-3">
+            <span className="min-w-0 flex-1" />
+            <span className="w-20 text-right text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Gem. 12m</span>
+            <span className="w-28 text-right text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Budget</span>
+          </div>
+
           {/* Per budget-groep */}
           {(['expense', 'savings', 'debt'] as const).map(type => {
             const groups = budgets.filter(b => b.budget_type === type)
@@ -1367,6 +1511,13 @@ function BudgetAllocationModal({
                   return items.map(b => (
                     <div key={b.id} className="flex items-center gap-3">
                       <span className="min-w-0 flex-1 truncate text-sm text-[var(--ink-2)]">{b.name}</span>
+                      <span className="w-20 text-right font-mono text-xs tabular-nums text-[var(--ink-3)]">
+                        {averagesLoading
+                          ? <span className="inline-block animate-pulse">···</span>
+                          : averages[b.id]
+                            ? `€\u00A0${averages[b.id].toLocaleString('nl-NL')}`
+                            : '—'}
+                      </span>
                       <div className="relative w-28">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
                         <input
@@ -1395,6 +1546,24 @@ function BudgetAllocationModal({
             </span>
           </div>
           <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setLocalLimits(prev => {
+                  const next = { ...prev }
+                  for (const [id, avg] of Object.entries(averages)) {
+                    if (avg > 0 && next[id] !== undefined) {
+                      next[id] = String(avg)
+                    }
+                  }
+                  return next
+                })
+              }}
+              disabled={Object.keys(averages).length === 0}
+              className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50"
+            >
+              Gem. overnemen
+            </button>
             <button
               type="button"
               onClick={onClose}

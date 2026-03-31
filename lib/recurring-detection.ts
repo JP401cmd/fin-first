@@ -64,6 +64,12 @@ export type RecurringCategory =
   | 'insurance'
   | 'savings'
   | 'transport'
+  | 'taxes'
+  | 'childcare'
+  | 'housing_other'
+  | 'healthcare'
+  | 'donation'
+  | 'loan'
   | 'other_income'
   | 'other_expense'
 
@@ -77,6 +83,12 @@ export const CATEGORY_LABELS: Record<RecurringCategory, string> = {
   insurance: 'Verzekering',
   savings: 'Sparen',
   transport: 'Vervoer',
+  taxes: 'Belasting',
+  childcare: 'Kinderopvang',
+  housing_other: 'Woonlasten',
+  healthcare: 'Zorg',
+  donation: 'Donatie',
+  loan: 'Lening',
   other_income: 'Overig inkomen',
   other_expense: 'Overige uitgave',
 }
@@ -91,6 +103,12 @@ export const CATEGORY_ICONS: Record<RecurringCategory, string> = {
   insurance: 'shield',
   savings: 'piggy-bank',
   transport: 'car',
+  taxes: 'landmark',
+  childcare: 'baby',
+  housing_other: 'building-2',
+  healthcare: 'heart-pulse',
+  donation: 'heart-handshake',
+  loan: 'receipt',
   other_income: 'plus-circle',
   other_expense: 'minus-circle',
 }
@@ -126,6 +144,34 @@ const CATEGORY_PATTERNS: { patterns: RegExp[]; category: RecurringCategory }[] =
       /icloud/i, /google.*one/i, /github/i, /notion/i,
       /abonnement/i, /subscription/i, /lidmaatschap/i,
       /sportschool/i, /gym/i, /fitness/i, /basicfit/i, /basic-fit/i,
+      // Kranten/media
+      /nrc/i, /volkskrant/i, /ad\.nl/i, /telegraaf/i, /trouw/i,
+      /parool/i, /blendle/i, /de correspondent/i,
+      // Maaltijdboxen
+      /hellofresh/i, /marley spoon/i, /crisp/i,
+      // Bezorgdiensten
+      /thuisbezorgd/i, /gorillas/i, /getir/i, /flink/i,
+      // Gaming/cloud
+      /nintendo/i, /steam/i, /playstation.*plus/i, /xbox.*game.*pass/i,
+      /chatgpt/i, /openai/i, /claude/i, /midjourney/i,
+      // Overig
+      /bol\.com.*select/i, /amazon(?!.*prime)/i, /audible/i, /kobo/i,
+      /storytel/i, /tidal/i, /deezer/i, /viaplay/i, /videoland/i,
+      // Dieren
+      /huisdier.*verzekering/i, /petplan/i, /figo/i,
+      // Streaming/media
+      /npo/i,
+      // Loterij
+      /postcode.*loterij/i, /staatsloterij/i, /loterij/i, /vriendenloterij/i,
+      // Smart home / IoT
+      /ring\s+llc/i, /ring\.com/i,
+      // Ondergoed/fashion subscriptions
+      /on that ass/i, /oddity/i,
+      // Sport/zwembad
+      /sportbedrijf/i, /zwembad/i,
+      // Clubs & verenigingen
+      /golfclub/i, /bridgeclub/i, /tennisclub/i, /voetbalvereniging/i,
+      /vereniging/i, /rotary/i, /lions\s*club/i,
     ],
     category: 'subscription',
   },
@@ -136,6 +182,12 @@ const CATEGORY_PATTERNS: { patterns: RegExp[]; category: RecurringCategory }[] =
       /vitens/i, /waternet/i, /dunea/i, /pwn/i,
       /ziggo/i, /kpn/i, /t-mobile/i, /tele2/i, /vodafone/i,
       /internet/i, /glasvezel/i, /provider/i,
+      // Extra energieleveranciers
+      /budgetenergie/i, /vandebron/i, /pure.*energie/i, /coolblue.*energie/i,
+      // Extra telecom
+      /odido/i, /youfone/i, /simyo/i, /hollandsnieuwe/i, /lebara/i, /lyca/i, /ben\b/i,
+      // Extra internet/fiber
+      /delta.*fiber/i, /solcon/i, /tweak/i, /freedom/i,
     ],
     category: 'utility',
   },
@@ -146,13 +198,21 @@ const CATEGORY_PATTERNS: { patterns: RegExp[]; category: RecurringCategory }[] =
       /nn.*group/i, /aegon/i, /unive/i, /zilveren.*kruis/i,
       /menzis/i, /vgz/i, /cz/i, /ohra/i, /inshared/i,
       /autoverzekering/i, /inboedelverzekering/i, /woonverzekering/i,
+      // Extra verzekeraars
+      /ditzo/i, /fbto/i, /a\.s\.r/i, /asr/i, /allianz/i, /anwb.*verzekering/i,
+      /kinginsurance/i, /lemonade/i, /just.*verzekering/i,
+      // Aanvullende verzekeringen
+      /tandarts.*verzekering/i, /aanvullende.*verzekering/i,
+      // Leven/overlijden
+      /uitvaartverzekering/i, /overlijdensrisico/i, /levensverzekering/i,
     ],
     category: 'insurance',
   },
   {
     patterns: [
-      /spaarrekening/i, /spaargeld/i, /sparen/i, /beleggen/i,
+      /spaarrekening/i, /spaargeld/i, /sparen/i, /spaar\b/i, /beleggen/i,
       /deposito/i, /vermogen/i,
+      /meesman/i, /degiro/i, /brand new day/i, /flatex/i,
     ],
     category: 'savings',
   },
@@ -161,8 +221,70 @@ const CATEGORY_PATTERNS: { patterns: RegExp[]; category: RecurringCategory }[] =
       /ns\.nl/i, /ns\b/i, /ov-chipkaart/i, /translink/i,
       /gvb/i, /ret/i, /htm/i, /arriva/i, /connexxion/i,
       /qbuzz/i, /swapfiets/i, /anwb/i,
+      // Lease/autohuur
+      /justlease/i, /private.*lease/i, /autolease/i, /leaseplan/i, /athlon/i,
+      // Deelauto
+      /greenwheels/i, /mywheels/i, /sixt/i, /share.*now/i,
+      // Parkeren & wegenwacht
+      /q-park/i, /parkeervergunning/i, /parkeer/i, /anwb.*wegenwacht/i,
     ],
     category: 'transport',
+  },
+  {
+    patterns: [
+      /gemeente.*belasting/i, /^gemeente\b/i, /waterschaps/i, /afvalstoffenheffing/i,
+      /rioolheffing/i, /onroerende.*zaak/i, /ozb/i, /woz/i,
+      /belasting.*samenwerking/i, /bsob/i, /cocensus/i, /sabewa/i, /gblt/i,
+      /belastingsamenwerking/i,
+      // Regionale belastingsamenwerkingen
+      /mswg/i, /svhw/i, /bsgr/i, /hefpunt/i,
+    ],
+    category: 'taxes',
+  },
+  {
+    patterns: [
+      /kinderopvang/i, /kinderdagverblijf/i, /buitenschoolse.*opvang/i,
+      /bso/i, /gastouder/i, /peuterspeelzaal/i, /naschoolse.*opvang/i,
+    ],
+    category: 'childcare',
+  },
+  {
+    patterns: [
+      /vve/i, /servicekosten/i, /erfpacht/i, /opstalrecht/i,
+      /gemeente.*heffing/i, /duo/i, /studiefinanciering/i, /studielening/i,
+    ],
+    category: 'housing_other',
+  },
+  {
+    patterns: [
+      /tandarts/i, /orthodont/i, /fysiotherap/i, /huisarts/i,
+      /apotheek/i, /psycho.*therap/i, /ggz/i, /ziekenhuis/i,
+      /mondhygiën/i, /mondzorg/i, /infomedics/i,
+    ],
+    category: 'healthcare',
+  },
+  {
+    patterns: [
+      /unhcr/i, /unicef/i, /save the children/i, /kinderfonds/i,
+      /rode kruis/i, /artsen zonder grenzen/i, /msf/i,
+      /amnesty/i, /greenpeace/i, /wwf/i, /oxfam/i,
+      /goede doelen/i, /donatie/i, /stichting\s+(?:kinder|hulp|steun)/i,
+      /kika/i, /hartstichting/i, /kankerbestrijding/i,
+      /nierstichting/i, /longfonds/i, /cliniclowns/i,
+      /dierenbescherming/i, /natuurmonumenten/i,
+      /vluchtelingenwerk/i, /leger des heils/i,
+      /war child/i, /plan\s+international/i, /cordaid/i,
+    ],
+    category: 'donation',
+  },
+  {
+    patterns: [
+      /santander/i, /santander.*consumer/i,
+      /financiering/i, /persoonlijke.*lening/i, /doorlopend.*krediet/i,
+      /wehkamp.*financ/i, /internationale.*card.*services/i, /ics\b/i,
+      /afterpay/i, /klarna/i, /riverty/i, /in3/i,
+    ],
+    category: 'loan',
   },
 ]
 
@@ -314,6 +436,14 @@ export function detectFrequency(
     }
   }
 
+  // Bi-weekly: 12-18 days median — treat as monthly (biweekly ~= 2x/month, we normalize anyway)
+  if (medianInterval >= 12 && medianInterval <= 18) {
+    return {
+      frequency: 'monthly', // approximation — biweekly ≈ 2x/month
+      confidence: cv < 0.15 ? 'medium' : 'low',
+    }
+  }
+
   // Monthly: 25-35 days median
   if (medianInterval >= 25 && medianInterval <= 35) {
     return {
@@ -327,6 +457,14 @@ export function detectFrequency(
     return {
       frequency: 'quarterly',
       confidence: cv < 0.2 ? 'high' : cv < 0.4 ? 'medium' : 'low',
+    }
+  }
+
+  // Semi-annual: 160-200 days median — treat as yearly approximation
+  if (medianInterval >= 160 && medianInterval <= 200) {
+    return {
+      frequency: 'yearly', // approximation — semi-annual, normalize as yearly/2 equivalent
+      confidence: cv < 0.15 ? 'medium' : 'low',
     }
   }
 
@@ -447,7 +585,7 @@ export function detectRecurringTransactions(
       let confidence: 'high' | 'medium' | 'low'
       if (freqConfidence === 'high' && amountCV < 0.15 && subGroup.length >= 5) {
         confidence = 'high'
-      } else if (freqConfidence !== 'low' && amountCV < 0.35 && subGroup.length >= 3) {
+      } else if (freqConfidence !== 'low' && amountCV < 0.50 && subGroup.length >= 3) {
         confidence = 'medium'
       } else {
         confidence = 'low'

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { detectRecurringTransactions, detectCategory, CATEGORY_LABELS, type RecurringCategory } from '@/lib/recurring-detection'
 
 const SUBSCRIPTION_CATEGORIES: RecurringCategory[] = ['subscription']
-const VASTE_KOSTEN_CATEGORIES: RecurringCategory[] = ['rent', 'mortgage', 'utility', 'insurance', 'transport']
+const VASTE_KOSTEN_CATEGORIES: RecurringCategory[] = ['rent', 'mortgage', 'utility', 'insurance', 'transport', 'taxes', 'childcare', 'housing_other', 'healthcare', 'donation', 'loan']
 
 /**
  * GET /api/subscriptions
@@ -76,7 +76,7 @@ export async function GET() {
 
     if (transactions.length < 3) {
       const subs = confirmedItems.filter(i => SUBSCRIPTION_CATEGORIES.includes(i.category))
-      const vk = confirmedItems.filter(i => VASTE_KOSTEN_CATEGORIES.includes(i.category))
+      const vk = confirmedItems.filter(i => VASTE_KOSTEN_CATEGORIES.includes(i.category) || i.category === 'other_expense')
       const totalSubs = subs.reduce((s, i) => s + i.monthlyAmount, 0)
       const totalVK = vk.reduce((s, i) => s + i.monthlyAmount, 0)
       return NextResponse.json({
@@ -114,7 +114,16 @@ export async function GET() {
         d.confidence !== 'low',
     )
 
-    const detectedItems = detected.map(d => ({
+    // Also include other_expense with medium+ confidence — these are likely fixed costs
+    // that don't match any keyword pattern but have clear recurring patterns
+    const detectedOther = allDetected.filter(
+      d =>
+        d.suggestedCategory === 'other_expense' &&
+        !d.isIncome &&
+        d.confidence !== 'low',
+    )
+
+    const detectedItems = [...detected, ...detectedOther].map(d => ({
       id: d.key,
       name: d.counterpartyName || d.commonDescription,
       averageAmount: Math.abs(d.averageAmount),
@@ -131,10 +140,13 @@ export async function GET() {
 
     // Merge: confirmed first, then new auto-detections that aren't already confirmed
     const newDetections = detectedItems.filter(s => !s.alreadyConfirmed)
-    const allItems = [...confirmedItems.filter(i => relevantCategories.includes(i.category)), ...newDetections]
+    const allItems = [
+      ...confirmedItems.filter(i => relevantCategories.includes(i.category) || i.category === 'other_expense'),
+      ...newDetections,
+    ]
 
     const subscriptions = allItems.filter(i => SUBSCRIPTION_CATEGORIES.includes(i.category))
-    const vasteKosten = allItems.filter(i => VASTE_KOSTEN_CATEGORIES.includes(i.category))
+    const vasteKosten = allItems.filter(i => VASTE_KOSTEN_CATEGORIES.includes(i.category) || i.category === 'other_expense')
     const totalSubs = subscriptions.reduce((s, i) => s + i.monthlyAmount, 0)
     const totalVK = vasteKosten.reduce((s, i) => s + i.monthlyAmount, 0)
 

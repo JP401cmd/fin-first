@@ -2400,7 +2400,8 @@ function AssetForm({
         }, { onConflict: 'entity_id,valuation_date' })
       }
     } else {
-      const { data: inserted } = await supabase.from('assets').insert(row).select('id').single()
+      const { data: inserted, error: insertErr } = await supabase.from('assets').insert(row).select('id').single()
+      if (insertErr) { console.error('ASSET INSERT FAILED:', insertErr); setValidationError('Opslaan mislukt: ' + insertErr.message); setSaving(false); return }
       assetId = inserted?.id
     }
 

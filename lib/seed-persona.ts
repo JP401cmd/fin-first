@@ -21,8 +21,8 @@ function daysAgo(days: number): string {
 
 function monthsAgoDate(months: number): string {
   const d = new Date()
+  d.setDate(1) // Set day to 1st BEFORE changing month to avoid overflow (e.g. Mar 31 → Feb 31 → Mar 3)
   d.setMonth(d.getMonth() - months)
-  d.setDate(1)
   return d.toISOString().split('T')[0]
 }
 

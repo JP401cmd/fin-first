@@ -460,13 +460,15 @@ const tests: TestCase[] = [
     fn() {
       const expectedCategories: RecurringCategory[] = [
         'salary', 'rent', 'mortgage', 'subscription', 'utility',
-        'insurance', 'savings', 'transport', 'other_income', 'other_expense',
+        'insurance', 'savings', 'transport', 'taxes', 'childcare',
+        'housing_other', 'healthcare', 'donation', 'loan',
+        'other_income', 'other_expense',
       ]
       for (const cat of expectedCategories) {
         assertNotNull(CATEGORY_LABELS[cat], `Label for ${cat}`)
         assertGreaterThan(CATEGORY_LABELS[cat].length, 0, `Non-empty label for ${cat}`)
       }
-      assertEqual(Object.keys(CATEGORY_LABELS).length, 10, '10 category labels')
+      assertEqual(Object.keys(CATEGORY_LABELS).length, 16, '16 category labels')
     },
   },
 
