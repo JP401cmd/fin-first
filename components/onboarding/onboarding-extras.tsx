@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { WillDots } from '@/components/app/will-dots'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { SpeechBubble } from './speech-bubble'
@@ -60,6 +60,54 @@ export function OnboardingExtras({
 
   const hasBudgetteren = activeModules.includes('budgetteren')
   const hasAandelenregistratie = activeModules.includes('aandelenregistratie')
+
+  // Auto-seed defaults on mount: ensure required accounts exist for active modules
+  useEffect(() => {
+    if (hasBudgetteren && !bankAccounts.some((a) => a.has_budget_tracking)) {
+      onBankChange([
+        ...bankAccounts,
+        {
+          name: 'Lopende rekening',
+          bank_name: '',
+          account_type: 'checking',
+          balance: '0',
+          has_budget_tracking: true,
+        },
+      ])
+    }
+    if (hasAandelenregistratie && !assets.some((a) => a.asset_type === 'investment')) {
+      onAssetChange([
+        ...assets,
+        {
+          name: 'Beleggingsrekening',
+          asset_type: 'investment',
+          current_value: '0',
+          purchase_value: '0',
+          expected_return: '0.07',
+          monthly_contribution: '0',
+          institution: '',
+          subtype: 'etf',
+          risk_profile: 'middel',
+          tax_benefit: false,
+          is_liquid: true,
+          lock_end_date: '',
+          ticker_symbol: '',
+          rental_income: '',
+          woz_value: '',
+          retirement_provider_type: '',
+          depreciation_rate: '',
+          address_postcode: '',
+          address_house_number: '',
+          expiry_date: '',
+          beneficiary: '',
+          kvk_number: '',
+          ownership_percentage: '',
+          annual_dividend: '',
+        } as AssetEntry,
+      ])
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /**
    * Validate module-specific requirements before proceeding.
