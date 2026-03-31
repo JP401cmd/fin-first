@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bell, Users } from 'lucide-react'
-import { useFeatureAccess, useModuleAccess } from '@/components/app/feature-access-provider'
+import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { getActiveNavModules, getHomePath } from '@/lib/module-registry'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -34,18 +34,13 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const { needsActivation } = useFeatureAccess()
   const { activeModules } = useModuleAccess()
   const { perspective, isHousehold, partnerName } = usePerspective()
   const { unreadCount, openModal } = useNotifications()
 
   // Derive which nav tabs to show from active modules.
-  // During the invulfase (needsActivation), only De Kern is shown so the user
-  // can complete onboarding before accessing the other modules.
   const activeNavModules = getActiveNavModules(activeModules)
-  const navItems = needsActivation
-    ? activeNavModules.filter(m => m === 'kern').map(m => navConfig[m])
-    : activeNavModules.map(m => navConfig[m])
+  const navItems = activeNavModules.map(m => navConfig[m])
 
   // Close dropdown on click outside or Escape
   useEffect(() => {
