@@ -283,6 +283,17 @@ export async function POST(req: Request) {
     }
 
     if (existingProfile?.onboarding_completed) {
+      // Onboarding already completed — skip data creation but still update modules
+      // so re-running onboarding picks up the new module selection
+      if (activeModules && activeModules.length > 0) {
+        await supabase
+          .from('profiles')
+          .update({
+            active_modules: activeModules,
+            budgeting_active: (activeModules as ModuleId[]).includes('budgetteren'),
+          })
+          .eq('id', user.id)
+      }
       return Response.json({ success: true, alreadyCompleted: true })
     }
 
@@ -311,9 +322,9 @@ export async function POST(req: Request) {
     // description instead of filling in asset/debt/budget forms. We use AI
     // to extract structured financial data from that description.
     const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
-    let extractedAssets: Array<{ name: string; asset_type: string; current_value: number; source: string }> = []
-    let extractedDebts: Array<{ name: string; debt_type: string; current_balance: number; source: string }> = []
-    let extractedLifeEvents: Array<{ name: string; event_type: string; target_age: number | null; description?: string }> = []
+    let extractedAssets: Array<{ name: string; asset_type: string; current_value: number; expected_return: number; monthly_contribution: number; is_liquid: boolean; subtype: string | null; source: string }> = []
+    let extractedDebts: Array<{ name: string; debt_type: string; current_balance: number; interest_rate: number; monthly_payment: number; is_tax_deductible: boolean | null; subtype: string | null; source: string }> = []
+    let extractedLifeEvents: Array<{ name: string; event_type: string; target_age: number | null; description?: string; one_time_cost: number; monthly_cost_change: number; monthly_income_change: number; duration_months: number; icon: string }> = []
     let financialContext: string | null = null
     let aiIncomeEstimate: number | null = null
     let aiExpensesEstimate: number | null = null
@@ -333,6 +344,10 @@ export async function POST(req: Request) {
         name: a.name,
         asset_type: a.asset_type,
         current_value: a.estimated_value,
+        expected_return: a.expected_return,
+        monthly_contribution: a.monthly_contribution,
+        is_liquid: a.is_liquid,
+        subtype: a.subtype,
         source: 'ai_extracted' as const,
       }))
 
@@ -340,6 +355,10 @@ export async function POST(req: Request) {
         name: d.name,
         debt_type: d.debt_type,
         current_balance: d.estimated_balance,
+        interest_rate: d.interest_rate,
+        monthly_payment: d.monthly_payment,
+        is_tax_deductible: d.is_tax_deductible,
+        subtype: d.subtype,
         source: 'ai_extracted' as const,
       }))
 
@@ -382,16 +401,10 @@ export async function POST(req: Request) {
       if (result.error) {
         throw new Error(result.error)
       }
-      // Activate invulfase (not included in the RPC function) and persist active modules
+      // Set initial phase and persist active modules
       if (!result.already_completed) {
-        const { data: fpProfile } = await supabase
-          .from('profiles')
-          .select('feature_preferences')
-          .eq('id', user.id)
-          .single()
-        const fpPrefs = (fpProfile?.feature_preferences as Record<string, unknown>) ?? {}
         const profileUpdates: Record<string, unknown> = {
-          feature_preferences: { ...fpPrefs, _invulfase_active: true },
+          last_known_phase: 'recovery',
           completed_onboarding_steps: completedSteps,
         }
         // Persist selected modules when provided by the persona step
@@ -422,9 +435,11 @@ export async function POST(req: Request) {
               asset_type: a.asset_type,
               current_value: a.current_value,
               purchase_value: a.current_value,
-              expected_return: 0,
-              monthly_contribution: 0,
+              expected_return: a.expected_return / 100, // Convert % to decimal
+              monthly_contribution: a.monthly_contribution,
               is_active: true,
+              is_liquid: a.is_liquid,
+              subtype: a.subtype,
               sort_order: i,
               source: 'ai_extracted',
             }))
@@ -439,11 +454,13 @@ export async function POST(req: Request) {
               debt_type: d.debt_type,
               original_amount: d.current_balance,
               current_balance: d.current_balance,
-              interest_rate: 0,
-              monthly_payment: 0,
-              minimum_payment: 0,
+              interest_rate: d.interest_rate / 100, // Convert % to decimal
+              monthly_payment: d.monthly_payment,
+              minimum_payment: d.monthly_payment,
               start_date: new Date().toISOString().split('T')[0],
               is_active: true,
+              is_tax_deductible: d.is_tax_deductible,
+              subtype: d.subtype,
               sort_order: i,
               source: 'ai_extracted',
             }))
@@ -457,13 +474,13 @@ export async function POST(req: Request) {
               name: e.name,
               event_type: e.event_type,
               target_age: e.target_age,
-              monthly_income_change: 0,
-              monthly_cost_change: 0,
-              one_time_cost: 0,
-              duration_months: 0,
+              monthly_income_change: e.monthly_income_change,
+              monthly_cost_change: e.monthly_cost_change,
+              one_time_cost: e.one_time_cost,
+              duration_months: e.duration_months,
               is_active: true,
               sort_order: i + 1, // 0 is reserved for AOW
-              icon: 'Calendar',
+              icon: e.icon || 'Calendar',
             }))
             const { error } = await supabase.from('life_events').insert(rows)
             if (error) console.error('AI-extracted life events insert error:', error)
@@ -803,9 +820,11 @@ export async function POST(req: Request) {
         asset_type: a.asset_type,
         current_value: a.current_value,
         purchase_value: a.current_value,
-        expected_return: 0,
-        monthly_contribution: 0,
+        expected_return: a.expected_return / 100, // Convert % to decimal
+        monthly_contribution: a.monthly_contribution,
         is_active: true,
+        is_liquid: a.is_liquid,
+        subtype: a.subtype,
         sort_order: i,
         source: 'ai_extracted',
       }))
@@ -820,11 +839,13 @@ export async function POST(req: Request) {
         debt_type: d.debt_type,
         original_amount: d.current_balance,
         current_balance: d.current_balance,
-        interest_rate: 0,
-        monthly_payment: 0,
-        minimum_payment: 0,
+        interest_rate: d.interest_rate / 100, // Convert % to decimal
+        monthly_payment: d.monthly_payment,
+        minimum_payment: d.monthly_payment,
         start_date: new Date().toISOString().split('T')[0],
         is_active: true,
+        is_tax_deductible: d.is_tax_deductible,
+        subtype: d.subtype,
         sort_order: i,
         source: 'ai_extracted',
       }))
@@ -838,13 +859,13 @@ export async function POST(req: Request) {
         name: e.name,
         event_type: e.event_type,
         target_age: e.target_age,
-        monthly_income_change: 0,
-        monthly_cost_change: 0,
-        one_time_cost: 0,
-        duration_months: 0,
+        monthly_income_change: e.monthly_income_change,
+        monthly_cost_change: e.monthly_cost_change,
+        one_time_cost: e.one_time_cost,
+        duration_months: e.duration_months,
         is_active: true,
         sort_order: i + 1, // 0 is reserved for AOW
-        icon: 'Calendar',
+        icon: e.icon || 'Calendar',
       }))
       const { error } = await supabase.from('life_events').insert(rows)
       if (error) console.error('AI-extracted life events insert error:', error)
@@ -858,17 +879,10 @@ export async function POST(req: Request) {
       .eq('id', user.id)
     if (completeErr) throw new Error(`Onboarding afronden mislukt: ${completeErr.message}`)
 
-    // 8. Activate invulfase — guides user to fill in remaining data after onboarding
-    // Store in feature_preferences JSONB under '_invulfase_active' key
-    const { data: fpProfile } = await supabase
-      .from('profiles')
-      .select('feature_preferences')
-      .eq('id', user.id)
-      .single()
-    const fpPrefs = (fpProfile?.feature_preferences as Record<string, unknown>) ?? {}
+    // 8. Set initial phase so user is immediately fully active
     await supabase
       .from('profiles')
-      .update({ feature_preferences: { ...fpPrefs, _invulfase_active: true } })
+      .update({ last_known_phase: 'recovery' })
       .eq('id', user.id)
 
     return Response.json({ success: true })

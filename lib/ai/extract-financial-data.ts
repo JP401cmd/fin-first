@@ -36,6 +36,10 @@ const extractionSchema = z.object({
         ])
         .describe('Type bezitting, kies de meest passende categorie'),
       estimated_value: z.number().describe('Geschatte waarde in euro'),
+      expected_return: z.number().describe('Verwacht jaarlijks rendement in %, bijv. 7 voor aandelen, 2.5 voor sparen, 3.5 voor eigen huis'),
+      monthly_contribution: z.number().describe('Maandelijkse inleg in euro, 0 als niet genoemd'),
+      is_liquid: z.boolean().describe('Is de bezitting liquide (snel beschikbaar)?'),
+      subtype: z.string().nullable().describe('Subtype als van toepassing, bijv. "checking" voor cash, "savings_account" voor spaarrekening'),
     }),
   ),
   debts: z.array(
@@ -56,6 +60,10 @@ const extractionSchema = z.object({
         ])
         .describe('Type schuld, kies de meest passende categorie'),
       estimated_balance: z.number().describe('Geschat openstaand saldo in euro'),
+      interest_rate: z.number().describe('Jaarlijkse rente in %, gebruik standaard marktrente als niet genoemd'),
+      monthly_payment: z.number().describe('Geschatte maandelijkse aflossing in euro, gebruik standaard als niet genoemd'),
+      is_tax_deductible: z.boolean().nullable().describe('Is de rente fiscaal aftrekbaar? true voor hypotheek, null als onbekend'),
+      subtype: z.string().nullable().describe('Subtype als van toepassing, bijv. "annuiteit" voor hypotheek, "nieuw_stelsel" voor DUO'),
     }),
   ),
   life_events: z.array(
@@ -64,6 +72,11 @@ const extractionSchema = z.object({
       event_type: z.string().describe('Type-slug zoals huis_kopen, kind, pensioen, aow, sabbatical, emigratie'),
       target_age: z.number().nullable().describe('Leeftijd waarop dit gepland is, of null als onbekend'),
       description: z.string().describe('Korte beschrijving van het plan'),
+      one_time_cost: z.number().describe('Geschatte eenmalige kosten in euro, 0 als niet van toepassing'),
+      monthly_cost_change: z.number().describe('Geschatte maandelijkse kostenwijziging in euro (positief = hogere kosten)'),
+      monthly_income_change: z.number().describe('Geschatte maandelijkse inkomenswijziging in euro (positief = meer inkomen, negatief = minder)'),
+      duration_months: z.number().describe('Duur in maanden, 0 = permanent'),
+      icon: z.string().describe('Lucide icon naam, bijv. Baby voor kind, Home voor huis, GraduationCap voor studie, Plane voor emigratie, Heart voor trouwen'),
     }),
   ),
   monthly_income_estimate: z
