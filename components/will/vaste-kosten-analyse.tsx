@@ -289,7 +289,7 @@ export function VasteKostenAnalyse({
             className="flex min-h-[44px] items-center gap-1.5 px-3 text-sm text-wil-600 transition-colors hover:text-wil-700 dark:text-wil-400 dark:hover:text-wil-300"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            AI analyse vaste kosten
+            Laat Will analyseren
           </button>
         </div>
       </div>

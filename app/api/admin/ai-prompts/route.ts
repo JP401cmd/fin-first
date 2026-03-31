@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { BASE_SYSTEM_PROMPT } from '@/lib/ai/dna/base'
-import { WIL_PROMPT, WHATIF_PROMPT } from '@/lib/ai/dna/wil'
+import { WIL_PROMPT, WHATIF_PROMPT, VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 import { KERN_PROMPT } from '@/lib/ai/dna/kern'
 import { HORIZON_PROMPT } from '@/lib/ai/dna/horizon'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
@@ -73,6 +73,16 @@ export async function GET() {
       domain: 'wil',
       dynamic: false,
       charCount: WHATIF_PROMPT.length,
+    },
+    {
+      id: 'vaste-kosten-analyse',
+      label: 'Will Vaste Kosten Analyse',
+      description: 'Prompt voor Will\'s AI-classificatie van terugkerende betalingen als abonnement, vaste kosten of overslaan.',
+      content: VASTE_KOSTEN_ANALYSE_PROMPT,
+      source: 'lib/ai/dna/wil.ts',
+      domain: 'wil',
+      dynamic: false,
+      charCount: VASTE_KOSTEN_ANALYSE_PROMPT.length,
     },
     {
       id: 'kern',

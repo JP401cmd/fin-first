@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-detection'
+import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 
 /** Maximum number of candidates to send to the AI model to avoid token waste. */
 const MAX_AI_CANDIDATES = 50
@@ -88,7 +89,10 @@ export async function POST() {
 
     // Filter: medium+ confidence, not already confirmed, expenses only
     const confirmedKeys = new Set(
-      existingRecurrings.map(r => (r.counterparty_name ?? '').toLowerCase().trim())
+      existingRecurrings.flatMap(r => [
+        (r.counterparty_name ?? '').toLowerCase().trim(),
+        (r.name ?? '').toLowerCase().trim(),
+      ].filter(Boolean))
     )
     const candidates = allDetected.filter(
       d =>
@@ -138,16 +142,7 @@ export async function POST() {
       })),
     })
 
-    const systemPrompt = `Je bent een financieel assistent die terugkerende betalingen classificeert.
-
-Classificeer elke betaling als:
-- "subscription" (abonnement): streamingdiensten, apps, software, lidmaatschappen, clubs, donaties/goede doelen, telefoon/internet, krantabonnementen, maaltijdboxen, fashion subscriptions
-- "vaste_kosten" (vaste kosten): huur, hypotheek, energierekening, water, verzekeringen, gemeentebelasting, kinderopvang, studielening, lease, VVE/servicekosten, apotheek/zorgkosten
-- "skip" (overslaan): boodschappen, tanken, restaurants, winkelen, horeca, eenmalige aankopen die toevallig terugkeren
-
-Wees nauwkeurig. Twijfelgevallen: als het bedrag elke keer exact hetzelfde is EN maandelijks, is het waarschijnlijk een vaste kost of abonnement. Als het bedrag sterk varieert, is het waarschijnlijk variabele uitgave (skip).
-
-Je krijgt ook de auto-categorie mee als hint. Gebruik die als aanvullende context, maar vertrouw op je eigen oordeel.`
+    const systemPrompt = VASTE_KOSTEN_ANALYSE_PROMPT
 
     const { object } = await generateObject({
       model,

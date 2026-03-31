@@ -197,7 +197,7 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
   // ── Render ────────────────────────────────────────────────
 
   return (
-    <BottomSheet open={open} onClose={handleClose} title="AI Vaste Kosten Analyse" size="md">
+    <BottomSheet open={open} onClose={handleClose} title="Will analyseert je vaste kosten" size="md">
 
       {/* ── Loading ── */}
       {phase === 'loading' && (
