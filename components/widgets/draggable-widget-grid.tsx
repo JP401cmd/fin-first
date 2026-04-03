@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import {
   DndContext,
@@ -21,7 +22,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, Layers, CalendarClock, PieChart, Wallet, Flame } from 'lucide-react'
+import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, ChevronDown, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
 import { AutoDashboardWizard } from './auto-dashboard-wizard'
@@ -228,6 +229,10 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const [showAddPicker, setShowAddPicker] = useState(false)
   const [showAutoWizard, setShowAutoWizard] = useState(false)
   const [selectedPreset, setSelectedPreset] = useState<WidgetPreset | null>(null)
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('dashboard-collapsed') === 'true'
+  })
 
   // ── API-loaded presets (fallback to hardcoded) ──────────────
   const [apiPresets, setApiPresets] = useState<WidgetPreset[]>(WIDGET_PRESETS)
@@ -481,15 +486,26 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     })
   }, [])
 
+  const toggleCollapsed = useCallback(() => {
+    setIsCollapsed(prev => {
+      const next = !prev
+      localStorage.setItem('dashboard-collapsed', String(next))
+      return next
+    })
+  }, [])
+
   const activePref = activeId ? activeWidgets.find(p => p.id === activeId) ?? null : null
   const ids = activeWidgets.map(p => p.id)
 
   const gridContent = (
     <div>
       {/* Section header with edit mode toggle */}
-      <div className="mb-4 flex items-center justify-between border-b border-[var(--border-ed)] pb-2">
-        <h2 className="label-editorial text-[var(--ink-2)]">Mijn Dashboard</h2>
-        <div className="flex items-center gap-2">
+      <div className={`flex items-center justify-between border-b border-[var(--border-ed)] pb-2 ${isCollapsed ? 'mb-0' : 'mb-4'}`}>
+        <button type="button" onClick={toggleCollapsed} className="flex items-center gap-1.5">
+          <ChevronDown className={`h-3.5 w-3.5 text-[var(--ink-3)] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+          <h2 className="label-editorial text-[var(--ink-2)]">Mijn Dashboard</h2>
+        </button>
+        {!isCollapsed && <div className="flex items-center gap-2">
           {/* Dashboard type pill toggle */}
           {showDashboardTypeToggle && (
             <div className="flex rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] p-0.5">
@@ -541,9 +557,10 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                       : 'Modify'}
             </span>
           </button>
-        </div>
+        </div>}
       </div>
 
+      {!isCollapsed && (<>
       {/* Briefing content toggles — only visible when dashboard type is briefing */}
       {showDashboardTypeToggle && dashboardType === 'briefing' && (
         <div className="mb-3 flex items-center gap-4 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-2">
@@ -584,6 +601,68 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
 
       {/* Widget content — hidden when briefing mode is active */}
       {!(showDashboardTypeToggle && dashboardType === 'briefing') && (<>
+
+      {activeWidgets.length === 0 && !isEditMode ? (
+        <div className="py-12 flex flex-col items-center text-center">
+          <div className="mb-4 rounded-2xl bg-[var(--subtle)] p-4">
+            <LayoutDashboard className="h-7 w-7 text-[var(--ink-4)]" />
+          </div>
+          <h3 className="text-sm font-semibold text-[var(--ink-2)] mb-1">Je dashboard is leeg</h3>
+          <p className="text-xs text-[var(--ink-3)] max-w-[280px] mb-8 leading-relaxed">
+            Stel je persoonlijke dashboard samen — handmatig, met een preset, of laat het automatisch opbouwen.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 mb-8">
+            <button
+              type="button"
+              onClick={() => { setIsEditMode(true); setShowAddPicker(true) }}
+              className="flex items-center gap-2 rounded-[var(--r-sm)] border border-[var(--border-md)] px-4 py-2.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Handmatig selecteren
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAutoWizard(true)}
+              className="flex items-center gap-2 rounded-[var(--r-sm)] border border-dashed border-horizon-300 px-4 py-2.5 text-xs font-medium text-horizon-600 hover:bg-horizon-50/50 transition-colors"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              Automatisch samenstellen
+            </button>
+          </div>
+          <div className="w-full max-w-md">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)] mb-3">Of kies een preset</p>
+            <div className="grid grid-cols-2 gap-2">
+              {apiPresets.map(preset => {
+                const PresetIcon = preset.id === 'pensioenplanner' ? CalendarClock
+                  : preset.id === 'vermogensverdeler' ? PieChart
+                  : preset.id === 'budgetteerder' ? Wallet
+                  : Flame
+                const colors = preset.module === 'horizon' ? 'border-l-horizon-500 hover:bg-horizon-50/30'
+                  : preset.module === 'kern' ? 'border-l-kern-500 hover:bg-kern-50/30'
+                  : 'border-l-wil-500 hover:bg-wil-50/30'
+                const iconColor = preset.module === 'horizon' ? 'text-horizon-500'
+                  : preset.module === 'kern' ? 'text-kern-500'
+                  : 'text-wil-500'
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setSelectedPreset(preset)}
+                    className={`text-left p-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] border-l-3 ${colors} transition-colors cursor-pointer`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <PresetIcon className={`h-3.5 w-3.5 shrink-0 ${iconColor}`} />
+                      <span className="text-xs font-semibold text-[var(--ink)]">{preset.name}</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--ink-3)] line-clamp-2">{preset.description}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      ) : (<>
+
       {/* Instruction banner / error banner */}
       {isEditMode && !saveError && (
         <div className="mb-3 rounded-[var(--r-sm)] border border-dashed border-kern-200 bg-kern-50/50 px-3 py-2 text-xs text-kern-700">
@@ -672,6 +751,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         </div>
       )}
 
+      </>)}
+      </>)}
       </>)}
 
       {/* Wizard rendered outside conditional/DndContext to avoid fixed-positioning issues from transforms */}
@@ -773,7 +854,7 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
   }
 
   return (
-    <div className="relative">
+    <>
       <button
         type="button"
         onClick={onToggle}
@@ -783,113 +864,129 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
         Widget toevoegen
       </button>
 
-      {showPicker && (
+      {showPicker && createPortal(
         <>
-          {/* Backdrop to close picker on click outside */}
-          <div className="fixed inset-0 z-10" onClick={onClose} />
-
-          <div className="absolute left-0 bottom-full mb-2 w-72 max-h-80 overflow-y-auto rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s2)] z-20">
-            {grouped.length === 0 ? (
-              <div className="px-3 py-4 text-xs text-[var(--ink-4)] text-center">
-                Alle widgets zijn al actief
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
+          {/* Centered modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-md max-h-[80vh] flex flex-col rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)]">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-ed)]">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Widget toevoegen</h3>
+                <button type="button" onClick={onClose} className="text-[var(--ink-4)] hover:text-[var(--ink-2)] transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            ) : (
-              grouped.map(g => {
-                const isOpen = openModules.has(g.module)
-                return (
-                  <div key={g.module}>
-                    <button
-                      type="button"
-                      onClick={() => toggleModule(g.module)}
-                      aria-expanded={isOpen}
-                      className="w-full flex items-center gap-1.5 px-3 py-1.5 border-b border-[var(--border-ed)] hover:bg-[var(--subtle)] transition-colors cursor-pointer"
-                    >
-                      <ChevronRight
-                        className={`h-3 w-3 text-[var(--ink-4)] transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
-                      />
-                      <span className={`h-1.5 w-1.5 rounded-full ${MODULE_DOT_COLORS[g.module]}`} />
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-                        {MODULE_LABELS[g.module]}
-                      </span>
-                      <span className="text-[10px] text-[var(--ink-4)] ml-auto">
-                        ({g.widgets.length})
-                      </span>
-                    </button>
-                    <div
-                      className="overflow-hidden transition-[max-height,opacity] duration-200 ease-in-out"
-                      style={{
-                        maxHeight: isOpen ? `${g.widgets.length * 52}px` : '0px',
-                        opacity: isOpen ? 1 : 0,
-                      }}
-                    >
-                      {g.widgets.map(w => {
-                        const accessible = isWidgetAccessible(w.id, features)
-                        return (
-                          <button
-                            key={w.id}
-                            type="button"
-                            onClick={() => accessible && onAdd(w.id)}
-                            disabled={!accessible}
-                            className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--subtle)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between gap-2 transition-colors"
-                          >
-                            <div className="min-w-0">
-                              <div className="font-medium text-[var(--ink-2)] truncate">{w.name}</div>
-                              <div className="text-[var(--ink-4)] truncate">{w.description}</div>
-                            </div>
-                            {!accessible && (
-                              <div className="flex items-center gap-1 shrink-0 text-[var(--ink-4)]">
-                                <Lock className="h-3 w-3" />
-                                {w.requiredPhase && (
-                                  <span className="text-[10px]">{w.requiredPhase}</span>
-                                )}
-                              </div>
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
+
+              {/* Scrollable content */}
+              <div className="overflow-y-auto flex-1">
+                {grouped.length === 0 ? (
+                  <div className="px-4 py-8 text-xs text-[var(--ink-4)] text-center">
+                    Alle widgets zijn al actief
                   </div>
-                )
-              })
-            )}
+                ) : (
+                  grouped.map(g => {
+                    const isOpen = openModules.has(g.module)
+                    return (
+                      <div key={g.module}>
+                        <button
+                          type="button"
+                          onClick={() => toggleModule(g.module)}
+                          aria-expanded={isOpen}
+                          className="w-full flex items-center gap-1.5 px-4 py-2 border-b border-[var(--border-ed)] hover:bg-[var(--subtle)] transition-colors cursor-pointer"
+                        >
+                          <ChevronRight
+                            className={`h-3 w-3 text-[var(--ink-4)] transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
+                          />
+                          <span className={`h-1.5 w-1.5 rounded-full ${MODULE_DOT_COLORS[g.module]}`} />
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                            {MODULE_LABELS[g.module]}
+                          </span>
+                          <span className="text-[10px] text-[var(--ink-4)] ml-auto">
+                            ({g.widgets.length})
+                          </span>
+                        </button>
+                        <div
+                          className="overflow-hidden transition-[max-height,opacity] duration-200 ease-in-out"
+                          style={{
+                            maxHeight: isOpen ? `${g.widgets.length * 52}px` : '0px',
+                            opacity: isOpen ? 1 : 0,
+                          }}
+                        >
+                          {g.widgets.map(w => {
+                            const accessible = isWidgetAccessible(w.id, features)
+                            return (
+                              <button
+                                key={w.id}
+                                type="button"
+                                onClick={() => accessible && onAdd(w.id)}
+                                disabled={!accessible}
+                                className="w-full text-left px-4 py-2 text-xs hover:bg-[var(--subtle)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between gap-2 transition-colors"
+                              >
+                                <div className="min-w-0">
+                                  <div className="font-medium text-[var(--ink-2)] truncate">{w.name}</div>
+                                  <div className="text-[var(--ink-4)] truncate">{w.description}</div>
+                                </div>
+                                {!accessible && (
+                                  <div className="flex items-center gap-1 shrink-0 text-[var(--ink-4)]">
+                                    <Lock className="h-3 w-3" />
+                                    {w.requiredPhase && (
+                                      <span className="text-[10px]">{w.requiredPhase}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
 
-            {/* ── Persona presets section ──────────────────── */}
-            <div className="border-t border-[var(--border-md)] bg-[var(--subtle)]/40">
-              <div className="flex items-center gap-1.5 px-3 py-2">
-                <Layers className="h-3 w-3 text-[var(--ink-3)]" />
-                <span className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-                  Persona presets
-                </span>
+                {/* ── Persona presets section ──────────────────── */}
+                <div className="border-t border-[var(--border-md)] bg-[var(--subtle)]/40">
+                  <div className="flex items-center gap-1.5 px-4 py-2">
+                    <Layers className="h-3 w-3 text-[var(--ink-3)]" />
+                    <span className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                      Persona presets
+                    </span>
+                  </div>
+                  {presets.map(preset => {
+                    const isHorizon = preset.module === 'horizon'
+                    const isKern = preset.module === 'kern'
+                    const borderColor = isHorizon ? 'border-horizon-500' : isKern ? 'border-kern-500' : 'border-wil-500'
+                    const hoverBg = isHorizon ? 'hover:bg-horizon-50/50' : isKern ? 'hover:bg-kern-50/50' : 'hover:bg-wil-50/50'
+                    const iconColor = isHorizon ? 'text-horizon-500' : isKern ? 'text-kern-500' : 'text-wil-500'
+                    const PresetIcon = preset.id === 'pensioenplanner' ? CalendarClock
+                      : preset.id === 'vermogensverdeler' ? PieChart
+                      : preset.id === 'budgetteerder' ? Wallet
+                      : Flame
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => { onPresetSelect(preset); onClose() }}
+                        className={`w-full text-left px-4 py-2.5 text-xs flex items-center gap-2.5 transition-colors cursor-pointer border-l-3 ${borderColor} ${hoverBg}`}
+                      >
+                        <PresetIcon className={`h-4 w-4 shrink-0 ${iconColor}`} />
+                        <div className="min-w-0">
+                          <div className="font-semibold text-[var(--ink)] truncate">{preset.name}</div>
+                          <div className="text-[11px] text-[var(--ink-3)] truncate">{preset.description}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              {presets.map(preset => {
-                const isHorizon = preset.module === 'horizon'
-                const isKern = preset.module === 'kern'
-                const borderColor = isHorizon ? 'border-horizon-500' : isKern ? 'border-kern-500' : 'border-wil-500'
-                const hoverBg = isHorizon ? 'hover:bg-horizon-50/50' : isKern ? 'hover:bg-kern-50/50' : 'hover:bg-wil-50/50'
-                const iconColor = isHorizon ? 'text-horizon-500' : isKern ? 'text-kern-500' : 'text-wil-500'
-                const PresetIcon = preset.id === 'pensioenplanner' ? CalendarClock
-                  : preset.id === 'vermogensverdeler' ? PieChart
-                  : preset.id === 'budgetteerder' ? Wallet
-                  : Flame
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => { onPresetSelect(preset); onClose() }}
-                    className={`w-full text-left px-3 py-2.5 text-xs flex items-center gap-2.5 transition-colors cursor-pointer border-l-3 ${borderColor} ${hoverBg}`}
-                  >
-                    <PresetIcon className={`h-4 w-4 shrink-0 ${iconColor}`} />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-[var(--ink)] truncate">{preset.name}</div>
-                      <div className="text-[11px] text-[var(--ink-3)] truncate">{preset.description}</div>
-                    </div>
-                  </button>
-                )
-              })}
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
-    </div>
+    </>
   )
 }
+
+

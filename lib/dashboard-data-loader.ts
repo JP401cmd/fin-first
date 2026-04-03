@@ -42,7 +42,7 @@ import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/b
 import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import type { Asset } from '@/lib/asset-data'
-import type { Debt } from '@/lib/debt-data'
+import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
@@ -129,7 +129,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
-    supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id, interest_rate, repayment_type, remaining_term_months, monthly_payment').eq('is_active', true),
+    supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id, interest_rate, repayment_type, remaining_term_months, monthly_payment, start_date, end_date, original_amount, include_aflossing_in_savings, custom_aflossing_amount').eq('is_active', true),
     supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
@@ -452,8 +452,20 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const extExpenses6 = dataMonths6 < 6 ? (expenses6m / dataMonths6) * 6 : expenses6m
   const extSavingsBudget6 = dataMonths6 < 6 ? (savingsBudgetSpent6m / dataMonths6) * 6 : savingsBudgetSpent6m
 
+  // Compute debt aflossing total (only debts with include_aflossing_in_savings, weighted by net_worth_inclusion_pct)
+  let debtAflossingMonthly = 0
+  for (const d of debtsResult.data ?? []) {
+    if (!(d as any).include_aflossing_in_savings) continue
+    const customAfl = (d as any).custom_aflossing_amount
+    const aflossing = customAfl != null
+      ? Number(customAfl)
+      : (computeRenteAflossingsSplit(d as unknown as Debt)?.currentAflossing ?? 0)
+    debtAflossingMonthly += aflossing * ((d as any).net_worth_inclusion_pct ?? 100) / 100
+  }
+  const debtAflossing6m = debtAflossingMonthly * 6
+
   let savingsRate6m = extIncome6 > 0
-    ? ((extIncome6 - extExpenses6 + extSavingsBudget6) / extIncome6) * 100
+    ? ((extIncome6 - extExpenses6 + extSavingsBudget6 + debtAflossing6m) / extIncome6) * 100
     : 0
 
   // Fallback savings rate from profile estimates for users without transactions

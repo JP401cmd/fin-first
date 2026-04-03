@@ -93,6 +93,7 @@ export default function InstellingenPage() {
   // ─ Module onboarding state (progressive onboarding for new modules) ─
   const [completedSteps, setCompletedSteps] = useState<string[]>([])
   const [pendingModuleId, setPendingModuleId] = useState<ModuleId | null>(null)
+  const [forcedMissingSteps, setForcedMissingSteps] = useState<string[]>([])  // Steps to re-show even if completed
   const [userNetIncome, setUserNetIncome] = useState<number>(2500)
 
   // ─ Section: Financiële toelichting ─
@@ -805,7 +806,14 @@ export default function InstellingenPage() {
                     className="flex items-start justify-between rounded-xl border border-[var(--border-ed)] px-4 py-3 gap-3"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[var(--ink)]">{mod.label}</p>
+                      <p className="text-sm font-medium text-[var(--ink)]">
+                        {mod.label}
+                        {mod.inDevelopment && (
+                          <span className="ml-1.5 inline-flex align-middle text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                            In ontwikkeling
+                          </span>
+                        )}
+                      </p>
                       <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-snug">{mod.description}</p>
                       {hasDependency && dependencyLabel && (
                         <p className="mt-1 text-[11px] text-[var(--ink-4)]">{dependencyLabel}</p>
@@ -822,8 +830,24 @@ export default function InstellingenPage() {
                         // When enabling a module, check if required onboarding steps are completed
                         if (!isActive) {
                           const requiredSteps = MODULE_REQUIRED_STEPS[mod.id as ModuleId] ?? []
-                          const missing = requiredSteps.filter((s) => !completedSteps.includes(s))
+                          let missing = requiredSteps.filter((s) => !completedSteps.includes(s))
+                          // For budgetteren: also check if user has any bank accounts
+                          // Even if bezittingen was completed for another module, the user may
+                          // not have created bank accounts — force the step if none exist
+                          let forced: string[] = []
+                          if (mod.id === 'budgetteren' && !missing.includes('bezittingen')) {
+                            const supabase = createClient()
+                            const { count } = await supabase
+                              .from('bank_accounts')
+                              .select('*', { count: 'exact', head: true })
+                              .eq('is_active', true)
+                            if (!count || count === 0) {
+                              missing = ['bezittingen', ...missing]
+                              forced = ['bezittingen']
+                            }
+                          }
                           if (missing.length > 0) {
+                            setForcedMissingSteps(forced)
                             setPendingModuleId(mod.id as ModuleId)
                             return
                           }
@@ -2478,9 +2502,9 @@ export default function InstellingenPage() {
       {pendingModuleId && (
         <ModuleActivationModal
           moduleId={pendingModuleId}
-          completedSteps={completedSteps}
+          completedSteps={completedSteps.filter((s) => !forcedMissingSteps.includes(s))}
           open={!!pendingModuleId}
-          onClose={() => setPendingModuleId(null)}
+          onClose={() => { setPendingModuleId(null); setForcedMissingSteps([]) }}
           activeModules={activeModuleToggles}
           netIncome={userNetIncome}
           onComplete={async (newSteps) => {

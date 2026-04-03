@@ -76,6 +76,9 @@ export interface Debt {
   partner_split_pct: number | null // 0–100, per-debt split override (null = use household default)
   // Net worth inclusion
   net_worth_inclusion_pct: number // 0–100, default 100
+  // Aflossing in spaarquote
+  include_aflossing_in_savings: boolean
+  custom_aflossing_amount: number | null // null = berekend, getal = eigen bedrag p/m
 }
 
 export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
@@ -308,6 +311,184 @@ export function interestOnlySchedule(
   }
 
   return rows
+}
+
+// ── Verwachte restschuld ─────────────────────────────────────
+
+export interface ExpectedBalance {
+  expectedBalance: number
+  monthsElapsed: number
+  totalTermMonths: number
+  totalInterestPaid: number
+}
+
+/**
+ * Bereken de verwachte restschuld op basis van het aflossingsschema
+ * vanaf de startdatum, ervan uitgaande dat alle maandbetalingen zijn gedaan
+ * zonder extra aflossingen.
+ * Returnt null als onvoldoende data (geen original_amount, start_date of end_date).
+ */
+export function computeExpectedBalance(debt: Debt): ExpectedBalance | null {
+  const original = Number(debt.original_amount)
+  const rate = Number(debt.interest_rate)
+  if (original <= 0 || !debt.start_date || !debt.end_date) return null
+
+  const startDate = new Date(debt.start_date)
+  const endDate = new Date(debt.end_date)
+  const now = new Date()
+
+  const totalTermMonths = Math.max(1, Math.round(
+    (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+  ))
+  const monthsElapsed = Math.max(0, Math.round(
+    (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+  ))
+
+  // Niet gestart of voorbij einddatum
+  if (monthsElapsed <= 0) {
+    return { expectedBalance: original, monthsElapsed: 0, totalTermMonths, totalInterestPaid: 0 }
+  }
+
+  const rt = debt.repayment_type ?? 'annuiteit'
+
+  // Aflossingsvrij: saldo blijft gelijk
+  if (rt === 'aflossingsvrij') {
+    const monthlyRate = rate / 100 / 12
+    return {
+      expectedBalance: original,
+      monthsElapsed,
+      totalTermMonths,
+      totalInterestPaid: Math.round(original * monthlyRate * monthsElapsed * 100) / 100,
+    }
+  }
+
+  // Lineair
+  if (rt === 'lineair') {
+    const elapsed = Math.min(monthsElapsed, totalTermMonths)
+    const schedule = linearAmortization(original, rate, totalTermMonths, startDate)
+    const row = schedule[elapsed - 1]
+    const totalInterest = schedule.slice(0, elapsed).reduce((s, r) => s + r.interest, 0)
+    return {
+      expectedBalance: row ? row.balance : 0,
+      monthsElapsed: elapsed,
+      totalTermMonths,
+      totalInterestPaid: Math.round(totalInterest * 100) / 100,
+    }
+  }
+
+  // Annuïteit (default)
+  const monthlyRate = rate / 100 / 12
+  let pmt: number
+  if (rate === 0) {
+    pmt = original / totalTermMonths
+  } else {
+    const factor = Math.pow(1 + monthlyRate, totalTermMonths)
+    pmt = original * (monthlyRate * factor) / (factor - 1)
+  }
+  const elapsed = Math.min(monthsElapsed, totalTermMonths)
+  const schedule = amortizationSchedule(original, rate, pmt, startDate)
+  const row = schedule[elapsed - 1]
+  const totalInterest = schedule.slice(0, elapsed).reduce((s, r) => s + r.interest, 0)
+  return {
+    expectedBalance: row ? row.balance : 0,
+    monthsElapsed: elapsed,
+    totalTermMonths,
+    totalInterestPaid: Math.round(totalInterest * 100) / 100,
+  }
+}
+
+// ── Rente / aflossing split ──────────────────────────────────
+
+export interface RenteAflossingsSplit {
+  monthlyPayment: number
+  currentRente: number
+  currentAflossing: number
+  rentePercentage: number   // 0-100
+  remainingMonths: number
+}
+
+/**
+ * Bereken de maandelijkse rente/aflossing-uitsplitsing voor een schuld.
+ * Afleiding op basis van current_balance, interest_rate, repayment_type en dates.
+ * Returnt null als onvoldoende data beschikbaar is.
+ */
+export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | null {
+  const balance = Number(debt.current_balance)
+  const rate = Number(debt.interest_rate)
+  const payment = Number(debt.monthly_payment)
+
+  if (balance <= 0) return null
+
+  const monthlyRate = rate / 100 / 12
+  const currentRente = balance * monthlyRate
+
+  // Aflossingsvrij: 100% rente, 0% aflossing
+  if (debt.repayment_type === 'aflossingsvrij') {
+    const monthlyPayment = Math.round(currentRente * 100) / 100
+    return {
+      monthlyPayment,
+      currentRente: monthlyPayment,
+      currentAflossing: 0,
+      rentePercentage: 100,
+      remainingMonths: debt.end_date
+        ? Math.max(1, Math.round((new Date(debt.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44)))
+        : 360,
+    }
+  }
+
+  // Bereken resterende maanden uit einddatum
+  let remainingMonths: number | null = null
+  if (debt.end_date) {
+    remainingMonths = Math.max(1, Math.round(
+      (new Date(debt.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44),
+    ))
+  }
+
+  // Lineair: vaste aflossing per maand
+  if (debt.repayment_type === 'lineair') {
+    if (!remainingMonths && payment <= 0) return null
+    const n = remainingMonths ?? (payment > currentRente ? Math.ceil(balance / (payment - currentRente)) : null)
+    if (!n || n <= 0) return null
+    const aflossing = Math.round((balance / n) * 100) / 100
+    const rente = Math.round(currentRente * 100) / 100
+    const monthlyPayment = Math.round((aflossing + rente) * 100) / 100
+    return {
+      monthlyPayment,
+      currentRente: rente,
+      currentAflossing: aflossing,
+      rentePercentage: monthlyPayment > 0 ? Math.round((rente / monthlyPayment) * 10000) / 100 : 0,
+      remainingMonths: n,
+    }
+  }
+
+  // Annuïteit (default): PMT formule of fallback op monthly_payment
+  let monthlyPayment: number
+  if (remainingMonths && rate > 0) {
+    // PMT = P × r(1+r)^n / ((1+r)^n - 1)
+    const factor = Math.pow(1 + monthlyRate, remainingMonths)
+    monthlyPayment = balance * (monthlyRate * factor) / (factor - 1)
+  } else if (remainingMonths && rate === 0) {
+    monthlyPayment = balance / remainingMonths
+  } else if (payment > 0) {
+    // Fallback: gebruik opgeslagen monthly_payment
+    monthlyPayment = payment
+  } else {
+    return null
+  }
+
+  monthlyPayment = Math.round(monthlyPayment * 100) / 100
+  const rente = Math.round(currentRente * 100) / 100
+  const aflossing = Math.round(Math.max(0, monthlyPayment - rente) * 100) / 100
+
+  return {
+    monthlyPayment,
+    currentRente: rente,
+    currentAflossing: aflossing,
+    rentePercentage: monthlyPayment > 0 ? Math.round((rente / monthlyPayment) * 10000) / 100 : 0,
+    remainingMonths: remainingMonths ?? (payment > currentRente
+      ? Math.ceil(Math.log(payment / (payment - balance * monthlyRate)) / Math.log(1 + monthlyRate))
+      : 0),
+  }
 }
 
 /**

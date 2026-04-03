@@ -219,24 +219,8 @@ BEGIN
     )
     RETURNING id INTO v_bank_id;
 
-    -- Companion cash asset for each bank account
-    INSERT INTO assets (
-      user_id, name, asset_type, current_value, purchase_value,
-      purchase_date, expected_return, monthly_contribution,
-      is_active, sort_order, linked_bank_account_id
-    ) VALUES (
-      v_user_id,
-      v_bank_rec.value->>'name',
-      'cash',
-      (v_bank_rec.value->>'balance')::numeric,
-      (v_bank_rec.value->>'balance')::numeric,
-      CURRENT_DATE,
-      0,
-      0,
-      true,
-      COALESCE((v_bank_rec.value->>'sort_order')::int, 0),
-      v_bank_id
-    );
+    -- Companion cash asset with correct bidirectional linking
+    PERFORM ensure_companion_cash_asset(v_bank_id, true, true);
   END LOOP;
 
   -- 7. Assets (delete existing user assets if new ones provided)

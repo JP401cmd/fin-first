@@ -133,6 +133,15 @@ export async function PUT(req: Request) {
         .eq('asset_type', 'cash')
         .eq('is_active', true)
         .in('id', savedIds)
+    } else {
+      // First-time activation: no snapshot exists — enable tracking on all cash assets
+      // This is the fallback for users who had bank accounts but never activated budgetteren
+      await supabase
+        .from('assets')
+        .update({ has_budget_tracking: true })
+        .eq('user_id', user.id)
+        .eq('asset_type', 'cash')
+        .eq('is_active', true)
     }
 
     // Clear snapshot and set budgeting_active

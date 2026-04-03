@@ -33,7 +33,7 @@ import { BucketProjectionTable } from '@/components/app/bucket-projection-table'
 import { type BucketProjectionResult } from '@/lib/bucket-projection'
 import { runUnifiedProjection, unifiedToBucketResult, toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import type { Asset } from '@/lib/asset-data'
-import type { Debt } from '@/lib/debt-data'
+import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
 import { SnapshotComparisonView } from '@/components/app/snapshot-comparison-view'
 import { BalanceHistoryChart } from '@/components/app/balance-history-chart'
@@ -129,6 +129,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [savingsReceiptData, setSavingsReceiptData] = useState<{extHalfYearIncome: number; extHalfYearExpenses: number; halfYearSavings: number; rawIncome6m: number; rawExpenses6m: number}>({extHalfYearIncome: 0, extHalfYearExpenses: 0, halfYearSavings: 0, rawIncome6m: 0, rawExpenses6m: 0})
   const [savingsBreakdown, setSavingsBreakdown] = useState<{name: string; icon: string; budgetType: string; amount6m: number}[]>([])
   const [savingsBudgetTotal6m, setSavingsBudgetTotal6m] = useState(0)
+  const [debtAflossingTotal6m, setDebtAflossingTotal6m] = useState(0)
   // Net worth kassabon state
   const [showNetWorthReceipt, setShowNetWorthReceipt] = useState(false)
   const [showFreeDaysReceipt, setShowFreeDaysReceipt] = useState(false)
@@ -195,6 +196,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     setSavingsReceiptData(initialData.savingsReceiptData)
     setSavingsBreakdown(initialData.savingsBreakdown)
     setSavingsBudgetTotal6m(initialData.savingsBudgetTotal6m)
+    setDebtAflossingTotal6m(initialData.debtAflossingTotal6m)
     setAssetsList(initialData.assetsList)
     setDebtsList(initialData.debtsList)
     setNonCashAssets(initialData.nonCashAssets)
@@ -499,7 +501,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         supabase.from('budgets').select('*').limit(500),
         supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true }).limit(24),
-        supabase.from('debts').select('current_balance, original_amount').eq('is_active', true),
+        supabase.from('debts').select('current_balance, original_amount, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('is_active', true),
         supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
         supabase.from('goals').select('id').limit(1),
         supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd),
@@ -586,11 +588,25 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             .reduce((s, b) => s + b.amount6m, 0)
           setSavingsBudgetTotal6m(sbTotal6m)
 
-          // Compute corrected savings rate (savings budgets count as saving, not expense)
+          // Compute debt aflossing total (only debts with include_aflossing_in_savings, weighted by net_worth_inclusion_pct)
+          let aflTotal6m = 0
+          if (debtFullResult.data) {
+            for (const d of debtFullResult.data as Debt[]) {
+              if (!d.is_active || !d.include_aflossing_in_savings) continue
+              const aflossing = d.custom_aflossing_amount != null
+                ? Number(d.custom_aflossing_amount)
+                : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
+              aflTotal6m += aflossing * (d.net_worth_inclusion_pct / 100)
+            }
+            aflTotal6m *= 6
+          }
+          setDebtAflossingTotal6m(aflTotal6m)
+
+          // Compute corrected savings rate (savings budgets + debt aflossing count as saving, not expense)
           const extSb6m = savingsRateDataMonths < 6
             ? (sbTotal6m / savingsRateDataMonths) * 6
             : sbTotal6m
-          const correctedHalfYearSavings = extHalfYearIncome - extHalfYearExpenses + extSb6m
+          const correctedHalfYearSavings = extHalfYearIncome - extHalfYearExpenses + extSb6m + aflTotal6m
           const computedRate = extHalfYearIncome > 0 ? (correctedHalfYearSavings / extHalfYearIncome) * 100 : 0
           if (computedRate === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
             setSavingsRate6m(Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100))
@@ -2071,22 +2087,21 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             ))}
           </div>
 
-          {/* Uitgaven (expense + debt als aftrekposten) */}
-          {(['expense', 'debt'] as const).map(type => {
-            const items = savingsBreakdown.filter(b => b.budgetType === type)
-            if (items.length === 0) return null
-            const typeLabel = type === 'expense' ? 'Uitgaven' : 'Aflossingen'
-            const typeTotal = items.reduce((s, b) => s + b.amount6m, 0)
+          {/* Uitgaven */}
+          {(() => {
+            const expenseItems = savingsBreakdown.filter(b => b.budgetType === 'expense')
+            if (expenseItems.length === 0) return null
+            const expTotal = expenseItems.reduce((s, b) => s + b.amount6m, 0)
             return (
-              <div key={type} className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2">
+              <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2">
                 <div className="flex justify-between py-0.5">
-                  <span className="font-medium text-[var(--ink-2)]">{typeLabel}</span>
-                  <span className="tabular-nums font-medium text-negative">- {formatCurrency(typeTotal)}</span>
+                  <span className="font-medium text-[var(--ink-2)]">Uitgaven</span>
+                  <span className="tabular-nums font-medium text-negative">- {formatCurrency(expTotal)}</span>
                 </div>
-                {items.map(b => (
+                {expenseItems.map(b => (
                   <div key={b.name} className="flex items-center justify-between py-0.5 pl-2 text-[11px]">
                     <span className="flex items-center gap-1.5 text-[var(--ink-3)]">
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors(type).bg }}>
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors('expense').bg }}>
                         <BudgetIcon name={b.icon} className="h-2.5 w-2.5" />
                       </span>
                       {b.name}
@@ -2096,16 +2111,53 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 ))}
               </div>
             )
-          })}
+          })()}
+
+          {/* Schulden — gesplitst in rente (kosten) en aflossing (vermogensopbouw) */}
+          {(() => {
+            const debtItems = savingsBreakdown.filter(b => b.budgetType === 'debt')
+            if (debtItems.length === 0) return null
+            const debtTotal = debtItems.reduce((s, b) => s + b.amount6m, 0)
+            // Bereken rente/aflossing verhouding op basis van actieve schulden
+            const renteTotal6m = debtTotal - debtAflossingTotal6m
+            return (
+              <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2">
+                <div className="flex justify-between py-0.5">
+                  <span className="font-medium text-[var(--ink-2)]">Schulden</span>
+                  <span className="tabular-nums font-medium text-[var(--ink-3)]">- {formatCurrency(debtTotal)}</span>
+                </div>
+                {debtItems.map(b => (
+                  <div key={b.name} className="flex items-center justify-between py-0.5 pl-2 text-[11px]">
+                    <span className="flex items-center gap-1.5 text-[var(--ink-3)]">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors('debt').bg }}>
+                        <BudgetIcon name={b.icon} className="h-2.5 w-2.5" />
+                      </span>
+                      {b.name}
+                    </span>
+                    <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(b.amount6m)}</span>
+                  </div>
+                ))}
+                {/* Uitsplitsing rente vs aflossing */}
+                <div className="mt-1.5 pt-1.5 border-t border-dotted border-[var(--border-ed)] space-y-0.5">
+                  <div className="flex justify-between pl-2 text-[11px]">
+                    <span className="text-[var(--ink-3)]">waarvan rente (kosten)</span>
+                    <span className="tabular-nums text-negative">- {formatCurrency(Math.max(0, renteTotal6m))}</span>
+                  </div>
+                  <div className="flex justify-between pl-2 text-[11px]">
+                    <span className="text-[var(--ink-3)]">waarvan aflossing (vermogensopbouw)</span>
+                    <span className="tabular-nums text-positive">+ {formatCurrency(debtAflossingTotal6m)}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Resterend subtotaal */}
           {(() => {
-            const expenseTotal = savingsBreakdown.filter(b => b.budgetType === 'expense').reduce((s, b) => s + b.amount6m, 0)
-            const debtTotal = savingsBreakdown.filter(b => b.budgetType === 'debt').reduce((s, b) => s + b.amount6m, 0)
             const savingsItems = savingsBreakdown.filter(b => b.budgetType === 'savings')
             const savingsTotal = savingsItems.reduce((s, b) => s + b.amount6m, 0)
             const remaining = savingsReceiptData.extHalfYearIncome - savingsReceiptData.extHalfYearExpenses + savingsTotal
-            const totalSaved = remaining + savingsTotal
+            const totalSaved = remaining + savingsTotal + debtAflossingTotal6m
             return (
               <>
                 <div className="flex justify-between py-1">
@@ -2136,6 +2188,19 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   </div>
                 )}
 
+                {/* Aflossing als vermogensopbouw */}
+                {debtAflossingTotal6m > 0 && (
+                  <div className="border-t border-dashed border-[var(--border-ed)] mt-2 pt-2 mb-2 pb-2 border-b">
+                    <div className="flex justify-between py-0.5">
+                      <span className="font-medium text-[var(--ink-2)]">Vermogensopbouw via aflossing</span>
+                      <span className="tabular-nums font-medium text-positive">+ {formatCurrency(debtAflossingTotal6m)}</span>
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-[var(--ink-4)] leading-relaxed">
+                      Het aflossing-deel van je schulden verlaagt je schuld en bouwt vermogen op.
+                    </p>
+                  </div>
+                )}
+
                 {/* Totaal bespaard */}
                 <div className="flex justify-between py-1">
                   <span className="font-medium text-[var(--ink-2)]">Totaal bespaard 6 mnd</span>
@@ -2162,8 +2227,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           )}
 
           <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
-            <p><strong className="text-[var(--ink-3)]">Formule:</strong> (inkomen − uitgaven − aflossingen) / inkomen × 100%</p>
-            <p className="mt-1">Bewust sparen telt mee als besparing, niet als uitgave. Een spaarquote van 50% betekent dat je voor elke gewerkte dag ook één dag vrijheid opbouwt.</p>
+            <p><strong className="text-[var(--ink-3)]">Formule:</strong> (inkomen − uitgaven − rente + bewust gespaard + aflossing) / inkomen × 100%</p>
+            <p className="mt-1">Bewust sparen en het aflossing-deel van schulden tellen mee als vermogensopbouw. Alleen het rente-deel is een echte kostenpost. Een spaarquote van 50% betekent dat je voor elke gewerkte dag ook één dag vrijheid opbouwt.</p>
           </div>
 
           <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van werkelijke transacties</p>

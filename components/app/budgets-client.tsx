@@ -1292,6 +1292,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         <BudgetEditModal
           budget={selectedBudget}
           isParent={selectedParent?.id === selectedBudget.id && (selectedParent?.children.length ?? 0) > 0}
+          allBudgets={budgets}
           childrenLimitSum={
             selectedParent?.id === selectedBudget.id && (selectedParent?.children.length ?? 0) > 0
               ? selectedParent!.children.reduce((sum, c) => sum + Number(c.default_limit), 0)
@@ -3044,12 +3045,14 @@ function BudgetDetailModal({
 function BudgetEditModal({
   budget,
   isParent = false,
+  allBudgets = [],
   childrenLimitSum,
   onClose,
   onSaved,
 }: {
   budget: Budget
   isParent?: boolean
+  allBudgets?: BudgetWithChildren[]
   childrenLimitSum?: number
   onClose: () => void
   onSaved: () => void
@@ -3086,6 +3089,10 @@ function BudgetEditModal({
   >([])
   const [showCreateGoal, setShowCreateGoal] = useState(false)
   const [isFavorite, setIsFavorite] = useState(budget.is_favorite ?? false)
+  // Parent selector for sub-budgets
+  const isChild = !!budget.parent_id
+  const [parentId, setParentId] = useState(budget.parent_id ?? '')
+  const parentOptions = allBudgets.filter(b => b.id !== budget.id)
 
   // Track dirty state
   const isDirty = useMemo(() => {
@@ -3108,9 +3115,10 @@ function BudgetEditModal({
       goalAmount !== (budget.goal_amount ? String(budget.goal_amount) : '') ||
       goalDate !== (budget.goal_date ?? '') ||
       goalFrequency !== (budget.goal_frequency ?? '') ||
-      isFavorite !== (budget.is_favorite ?? false)
+      isFavorite !== (budget.is_favorite ?? false) ||
+      parentId !== (budget.parent_id ?? '')
     )
-  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, ownership, goalType, goalAmount, goalDate, goalFrequency, isFavorite, budget])
+  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, ownership, goalType, goalAmount, goalDate, goalFrequency, isFavorite, parentId, budget])
 
   // beforeunload warning for page refresh
   useEffect(() => {
@@ -3215,6 +3223,7 @@ function BudgetEditModal({
         description: description.trim() || null,
         default_limit: newLimit,
         budget_type: budgetType,
+        parent_id: isChild ? (parentId || null) : budget.parent_id,
         interval,
         rollover_type: rolloverType,
         limit_type: limitType,
@@ -3392,6 +3401,18 @@ function BudgetEditModal({
             hasHousehold={hasHousehold}
             compact
           />
+
+          {/* Parent selector for sub-budgets */}
+          {isChild && parentOptions.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Hoofdbudget</label>
+              <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={inputCls}>
+                {parentOptions.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Financial row: Type + Limit + Interval */}
           <div className="grid grid-cols-3 gap-3">

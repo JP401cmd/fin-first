@@ -39,6 +39,8 @@ export interface ModuleDef {
   requiresOneOf?: ModuleId[]
   /** Which navigation tab this module belongs to (undefined = no tab) */
   navModule?: NavModule
+  /** Module exists but is not fully built yet */
+  inDevelopment?: boolean
 }
 
 // ── Module Catalog ───────────────────────────────────────────────────────────
@@ -67,6 +69,7 @@ export const MODULE_CATALOG: ModuleDef[] = [
     standalone: false,
     requires: ['vermogensregistratie'],
     navModule: 'kern',
+    inDevelopment: true,
   },
   {
     id: 'inzicht_acties',

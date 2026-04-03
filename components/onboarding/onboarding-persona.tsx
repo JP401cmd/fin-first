@@ -282,6 +282,11 @@ export function OnboardingModules({
                 <div className="min-w-0 flex-1">
                   <span className={`text-sm font-bold ${isActive ? 'text-wil-900' : 'text-[var(--ink)]'}`}>
                     {mod.label}
+                    {mod.inDevelopment && (
+                      <span className="ml-1.5 inline-flex align-middle text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                        In ontwikkeling
+                      </span>
+                    )}
                   </span>
                   <p className="mt-0.5 text-xs leading-snug text-[var(--ink-3)]">
                     {mod.description}

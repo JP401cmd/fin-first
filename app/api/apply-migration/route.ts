@@ -169,6 +169,57 @@ const MIGRATION_STATEMENTS = [
   `DROP INDEX IF EXISTS idx_budgets_user_slug`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_budgets_user_slug_parent ON budgets (user_id, slug, COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'::uuid))`,
 
+  // ── 20260403000001: ensure_companion_cash_asset function ────────────
+  // Must be defined BEFORE save_onboarding_data which calls it
+  `CREATE OR REPLACE FUNCTION ensure_companion_cash_asset(
+  p_bank_account_id UUID,
+  p_has_budget_tracking BOOLEAN DEFAULT false,
+  p_skip_auth_check BOOLEAN DEFAULT false
+) RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $fn$
+DECLARE
+  v_ba RECORD;
+  v_existing_asset_id UUID;
+  v_new_asset_id UUID;
+BEGIN
+  SELECT * INTO v_ba FROM bank_accounts WHERE id = p_bank_account_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'bank_account % not found', p_bank_account_id;
+  END IF;
+  IF NOT p_skip_auth_check AND v_ba.user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'bank_account % does not belong to current user', p_bank_account_id;
+  END IF;
+  IF v_ba.linked_asset_id IS NOT NULL THEN
+    IF p_has_budget_tracking THEN
+      UPDATE assets SET has_budget_tracking = true WHERE id = v_ba.linked_asset_id;
+    END IF;
+    RETURN v_ba.linked_asset_id;
+  END IF;
+  SELECT id INTO v_existing_asset_id
+    FROM assets WHERE linked_bank_account_id = p_bank_account_id AND asset_type = 'cash' LIMIT 1;
+  IF v_existing_asset_id IS NOT NULL THEN
+    UPDATE bank_accounts SET linked_asset_id = v_existing_asset_id WHERE id = p_bank_account_id;
+    IF p_has_budget_tracking THEN
+      UPDATE assets SET has_budget_tracking = true WHERE id = v_existing_asset_id;
+    END IF;
+    RETURN v_existing_asset_id;
+  END IF;
+  INSERT INTO assets (user_id, name, asset_type, current_value, purchase_value,
+    expected_return, monthly_contribution, institution, is_active, sort_order,
+    ownership, household_id, net_worth_inclusion_pct, is_liquid, subtype,
+    has_budget_tracking, linked_bank_account_id)
+  VALUES (v_ba.user_id, v_ba.name, 'cash', v_ba.balance, v_ba.balance,
+    0, 0, v_ba.bank_name, v_ba.is_active, v_ba.sort_order,
+    COALESCE(v_ba.ownership, 'personal'), v_ba.household_id,
+    100, true, v_ba.account_type, p_has_budget_tracking, p_bank_account_id)
+  RETURNING id INTO v_new_asset_id;
+  UPDATE bank_accounts SET linked_asset_id = v_new_asset_id WHERE id = p_bank_account_id;
+  RETURN v_new_asset_id;
+END;
+$fn$`,
+
   // ── 20260319000002: Save onboarding RPC + idempotency key column ────
   `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS onboarding_idempotency_key TEXT`,
   `CREATE OR REPLACE FUNCTION save_onboarding_data(payload JSONB)
@@ -345,16 +396,7 @@ BEGIN
       '', true, COALESCE((v_bank_rec.value->>'sort_order')::int, 0)
     ) RETURNING id INTO v_bank_id;
 
-    INSERT INTO assets (
-      user_id, name, asset_type, current_value, purchase_value,
-      purchase_date, expected_return, monthly_contribution,
-      is_active, sort_order, linked_bank_account_id
-    ) VALUES (
-      v_user_id, v_bank_rec.value->>'name', 'cash',
-      (v_bank_rec.value->>'balance')::numeric, (v_bank_rec.value->>'balance')::numeric,
-      CURRENT_DATE, 0, 0, true,
-      COALESCE((v_bank_rec.value->>'sort_order')::int, 0), v_bank_id
-    );
+    PERFORM ensure_companion_cash_asset(v_bank_id, true, true);
   END LOOP;
 
   IF jsonb_array_length(v_assets) > 0 THEN

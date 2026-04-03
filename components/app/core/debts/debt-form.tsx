@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { AlertTriangle, Building2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
@@ -13,6 +13,7 @@ import {
   DEBT_SUBTYPE_DEFAULTS,
   DEBT_TYPE_FIELDS,
   REPAYMENT_TYPE_LABELS,
+  computeExpectedBalance,
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
@@ -44,6 +45,9 @@ export function DebtForm({
   const [creditor, setCreditor] = useState(debt?.creditor ?? '')
   const [notes, setNotes] = useState(debt?.notes ?? '')
   const [netWorthInclusionPct, setNetWorthInclusionPct] = useState(debt?.net_worth_inclusion_pct ?? 100)
+  const [includeAflossingInSavings, setIncludeAflossingInSavings] = useState(debt?.include_aflossing_in_savings ?? false)
+  const [useCustomAflossing, setUseCustomAflossing] = useState(debt?.custom_aflossing_amount != null)
+  const [customAflossingAmount, setCustomAflossingAmount] = useState(String(debt?.custom_aflossing_amount ?? ''))
   const [saving, setSaving] = useState(false)
   // Type-specific state
   const [subtype, setSubtype] = useState(debt?.subtype ?? '')
@@ -66,9 +70,66 @@ export function DebtForm({
   // Per-debt partner split override
   const [useCustomSplit, setUseCustomSplit] = useState(debt?.partner_split_pct != null)
   const [partnerSplitPct, setPartnerSplitPct] = useState(debt?.partner_split_pct ?? 50)
+  // Berekend vs eigen maandbedrag — standaard altijd berekend
+  const [useCalculatedPayment, setUseCalculatedPayment] = useState(true)
+  // Berekend vs eigen saldo
+  const [useCalculatedBalance, setUseCalculatedBalance] = useState(true)
 
   const subtypeOptions = DEBT_SUBTYPE_LABELS[debtType]
   const visibleFields = DEBT_TYPE_FIELDS[debtType]
+
+  // Bereken de verwachte restschuld op basis van origineel bedrag + aflossingsschema
+  const calculatedBalance = useMemo(() => {
+    const orig = Number(originalAmount)
+    const rate = Number(interestRate)
+    if (orig <= 0 || !startDate || !endDate) return null
+
+    const rt = repaymentType || 'annuiteit'
+    const result = computeExpectedBalance({
+      original_amount: orig,
+      interest_rate: rate,
+      start_date: startDate,
+      end_date: endDate,
+      repayment_type: rt,
+    } as Debt)
+    return result ? result.expectedBalance : null
+  }, [originalAmount, interestRate, startDate, endDate, repaymentType])
+
+  // Bereken het verwachte maandbedrag op basis van saldo, rente, looptijd en type
+  const calculatedPayment = useMemo(() => {
+    const bal = useCalculatedBalance && calculatedBalance != null ? calculatedBalance : Number(currentBalance)
+    const rate = Number(interestRate)
+    if (bal <= 0) return null
+
+    const monthlyRate = rate / 100 / 12
+
+    // Bereken resterende maanden uit einddatum
+    let months: number | null = null
+    if (endDate) {
+      months = Math.max(1, Math.round(
+        (new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44),
+      ))
+    }
+
+    const rt = repaymentType || 'annuiteit'
+
+    if (rt === 'aflossingsvrij') {
+      return Math.round(bal * monthlyRate * 100) / 100
+    }
+
+    if (!months) return null
+
+    if (rt === 'lineair') {
+      const principal = bal / months
+      const interest = bal * monthlyRate
+      return Math.round((principal + interest) * 100) / 100
+    }
+
+    // Annuïteit (default)
+    if (rate === 0) return Math.round((bal / months) * 100) / 100
+    const factor = Math.pow(1 + monthlyRate, months)
+    return Math.round(bal * (monthlyRate * factor) / (factor - 1) * 100) / 100
+  }, [currentBalance, interestRate, endDate, repaymentType, useCalculatedBalance, calculatedBalance])
 
   function handleTypeChange(type: DebtType) {
     setDebtType(type)
@@ -159,10 +220,10 @@ export function DebtForm({
       name,
       debt_type: debtType,
       original_amount: Number(originalAmount) || 0,
-      current_balance: Number(currentBalance) || 0,
+      current_balance: useCalculatedBalance && calculatedBalance != null ? calculatedBalance : (Number(currentBalance) || 0),
       interest_rate: Number(interestRate) || 0,
       minimum_payment: Number(minimumPayment) || 0,
-      monthly_payment: Number(monthlyPayment) || 0,
+      monthly_payment: useCalculatedPayment && calculatedPayment != null ? calculatedPayment : (Number(monthlyPayment) || 0),
       start_date: startDate,
       end_date: endDate || null,
       creditor: creditor || null,
@@ -186,6 +247,8 @@ export function DebtForm({
       partner_split_pct: ownership === 'shared' && useCustomSplit ? partnerSplitPct : null,
       // Net worth inclusion
       net_worth_inclusion_pct: netWorthInclusionPct,
+      include_aflossing_in_savings: includeAflossingInSavings,
+      custom_aflossing_amount: includeAflossingInSavings && useCustomAflossing ? (Number(customAflossingAmount) || null) : null,
     }
 
     if (isEdit && debt) {
@@ -322,12 +385,37 @@ export function DebtForm({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
-              <input
-                type="number"
-                value={currentBalance}
-                onChange={(e) => setCurrentBalance(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
+              {/* Toggle: berekend vs eigen */}
+              {calculatedBalance != null && (
+                <div className="mb-1.5 flex rounded-full border border-[var(--border-ed)] p-0.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setUseCalculatedBalance(true)}
+                    className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${useCalculatedBalance ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
+                  >
+                    Berekend
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseCalculatedBalance(false)}
+                    className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${!useCalculatedBalance ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
+                  >
+                    Eigen invoer
+                  </button>
+                </div>
+              )}
+              {useCalculatedBalance && calculatedBalance != null ? (
+                <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
+                  <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatCurrency(calculatedBalance)}</span>
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  value={currentBalance}
+                  onChange={(e) => setCurrentBalance(e.target.value)}
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                />
+              )}
             </div>
           </div>
 
@@ -358,13 +446,40 @@ export function DebtForm({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Werkelijke betaling p/m</label>
-              <input
-                type="number"
-                value={monthlyPayment}
-                onChange={(e) => setMonthlyPayment(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Maandbedrag</label>
+              {/* Toggle: berekend vs eigen */}
+              {calculatedPayment != null && (
+                <div className="mb-1.5 flex rounded-full border border-[var(--border-ed)] p-0.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setUseCalculatedPayment(true)}
+                    className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${useCalculatedPayment ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
+                  >
+                    Berekend
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseCalculatedPayment(false)}
+                    className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${!useCalculatedPayment ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
+                  >
+                    Eigen bedrag
+                  </button>
+                </div>
+              )}
+              {useCalculatedPayment && calculatedPayment != null ? (
+                <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
+                  <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatCurrency(calculatedPayment)}</span>
+                  <span className="text-[10px] text-[var(--ink-4)]">p/m</span>
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  value={monthlyPayment}
+                  onChange={(e) => setMonthlyPayment(e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                />
+              )}
             </div>
           </div>
 
@@ -664,6 +779,79 @@ export function DebtForm({
               </p>
             )}
           </div>
+
+          {/* Aflossing in spaarquote */}
+          {(() => {
+            const bal = useCalculatedBalance && calculatedBalance != null ? calculatedBalance : Number(currentBalance)
+            const rate = Number(interestRate)
+            const payment = calculatedPayment ?? Number(monthlyPayment)
+            const monthlyRente = bal * (rate / 100 / 12)
+            const berekendAflossing = payment > monthlyRente ? Math.max(0, payment - monthlyRente) : 0
+            if (bal <= 0 || (payment <= 0 && !useCustomAflossing)) return null
+            const effectiefAflossing = useCustomAflossing ? (Number(customAflossingAmount) || 0) : berekendAflossing
+            const gewogenAflossing = effectiefAflossing * netWorthInclusionPct / 100
+            return (
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeAflossingInSavings}
+                    onChange={(e) => setIncludeAflossingInSavings(e.target.checked)}
+                    className="rounded border-[var(--border-md)] accent-kern-600"
+                  />
+                  <span className="text-xs font-medium text-[var(--ink-2)]">Aflossing meetellen in spaarquote</span>
+                </label>
+                <p className="mt-1 ml-6 text-[10px] text-[var(--ink-3)] leading-relaxed">
+                  Het aflossing-deel van je betaling bouwt vermogen op. Vink aan om dit als besparing mee te tellen in je spaarquote.
+                </p>
+                {includeAflossingInSavings && (
+                  <div className="mt-2 ml-6">
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aflossing per maand</label>
+                    {/* Toggle: berekend vs eigen */}
+                    {berekendAflossing > 0 && (
+                      <div className="mb-1.5 flex rounded-full border border-[var(--border-ed)] p-0.5 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setUseCustomAflossing(false)}
+                          className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${!useCustomAflossing ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
+                        >
+                          Berekend
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUseCustomAflossing(true)}
+                          className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${useCustomAflossing ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
+                        >
+                          Eigen bedrag
+                        </button>
+                      </div>
+                    )}
+                    {!useCustomAflossing && berekendAflossing > 0 ? (
+                      <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
+                        <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatCurrency(berekendAflossing)}</span>
+                        <span className="text-[10px] text-[var(--ink-4)]">p/m</span>
+                      </div>
+                    ) : (
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={customAflossingAmount}
+                        onChange={(e) => { setCustomAflossingAmount(e.target.value); setUseCustomAflossing(true) }}
+                        placeholder="0"
+                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                      />
+                    )}
+                    {gewogenAflossing > 0 && (
+                      <p className="mt-1.5 font-mono text-[11px] tabular-nums text-positive">
+                        +{formatCurrency(gewogenAflossing)} p/m in spaarquote{netWorthInclusionPct < 100 ? ` (${netWorthInclusionPct}% van ${formatCurrency(effectiefAflossing)})` : ''}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>

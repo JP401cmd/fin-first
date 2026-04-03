@@ -9,7 +9,7 @@ import type { SparklineDataPoint } from '@/components/app/budget-sparkline'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import type { Asset } from '@/lib/asset-data'
-import type { Debt } from '@/lib/debt-data'
+import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireParams } from '@/lib/fire-params'
 import { type SavingsRateMethod, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
@@ -43,6 +43,7 @@ export interface CorePageData {
   }
   savingsBreakdown: { name: string; icon: string; budgetType: string; amount6m: number }[]
   savingsBudgetTotal6m: number
+  debtAflossingTotal6m: number
 
   // Expenses & FIRE params
   mustExpenseItems: { name: string; monthlyAmount: number; annualAmount: number; interval: string }[]
@@ -131,7 +132,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .eq('is_active', true),
     supabase
       .from('debts')
-      .select('id, name, current_balance, net_worth_inclusion_pct, interest_rate, monthly_payment, repayment_type, end_date, debt_type, is_active, original_amount, minimum_payment, start_date, creditor, subtype, is_tax_deductible, linked_asset_id, nhg')
+      .select('id, name, current_balance, net_worth_inclusion_pct, interest_rate, monthly_payment, repayment_type, end_date, debt_type, is_active, original_amount, minimum_payment, start_date, creditor, subtype, is_tax_deductible, linked_asset_id, nhg, include_aflossing_in_savings, custom_aflossing_amount')
       .eq('is_active', true),
     supabase
       .from('transactions')
@@ -397,6 +398,7 @@ export const loadCoreData = cache(async function loadCoreData(
   let overviewBudgetGroups: BudgetWithChildren[] = []
   let savingsBreakdown: { name: string; icon: string; budgetType: string; amount6m: number }[] = []
   let savingsBudgetTotal6m = 0
+  let debtAflossingTotal6m = 0
   let computedSavingsRate6m = 0
   let savingsRateMethod: SavingsRateMethod = 'estimate'
 
@@ -482,11 +484,25 @@ export const loadCoreData = cache(async function loadCoreData(
         .reduce((s, b) => s + b.amount6m, 0)
       savingsBudgetTotal6m = sbTotal6m
 
-      // Compute corrected savings rate (savings budgets count as saving, not expense)
+      // Compute debt aflossing total (principal repayment = vermogensopbouw)
+      if (debtFullResult.data) {
+        const activeDebts = (debtFullResult.data as Debt[]).filter(d => d.is_active && d.include_aflossing_in_savings)
+        let monthlyAflossing = 0
+        for (const d of activeDebts) {
+          const aflossing = d.custom_aflossing_amount != null
+            ? Number(d.custom_aflossing_amount)
+            : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
+          monthlyAflossing += aflossing * (d.net_worth_inclusion_pct / 100)
+        }
+        debtAflossingTotal6m = monthlyAflossing * 6
+      }
+
+      // Compute corrected savings rate (savings budgets + debt aflossing count as saving, not expense)
       const extSb6m = savingsRateDataMonths < 6
         ? (sbTotal6m / savingsRateDataMonths) * 6
         : sbTotal6m
-      const correctedHalfYearSavings = extHalfYearIncome - extHalfYearExpenses + extSb6m
+      const extAfl6m = debtAflossingTotal6m
+      const correctedHalfYearSavings = extHalfYearIncome - extHalfYearExpenses + extSb6m + extAfl6m
       const rate = extHalfYearIncome > 0 ? (correctedHalfYearSavings / extHalfYearIncome) * 100 : 0
       if (rate === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
         computedSavingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
@@ -694,6 +710,7 @@ export const loadCoreData = cache(async function loadCoreData(
     },
     savingsBreakdown,
     savingsBudgetTotal6m,
+    debtAflossingTotal6m,
 
     mustExpenseItems: expenseItems,
     retirementMethodUsed: activeRetirementMethod,

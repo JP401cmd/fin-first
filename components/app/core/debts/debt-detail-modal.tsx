@@ -12,6 +12,7 @@ import {
   DEBT_SUBTYPE_LABELS,
   REPAYMENT_TYPE_LABELS,
   debtProjection,
+  computeRenteAflossingsSplit,
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
@@ -95,6 +96,7 @@ export function DebtDetailModal({
   const original = Number(debt.original_amount)
   const pct = original > 0 ? ((original - balance) / original) * 100 : 0
   const proj = debtProjection(debt)
+  const split = computeRenteAflossingsSplit(debt)
   const icon = DEBT_TYPE_ICONS[debt.debt_type] ?? 'CircleDot'
   const linkedAsset = debt.linked_asset_id ? userAssets.find((a) => a.id === debt.linked_asset_id) : null
 
@@ -228,8 +230,43 @@ export function DebtDetailModal({
             </div>
             <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3" data-testid="modal-monthly-payment">
               <p className="text-xs text-[var(--ink-3)]">Maandelijkse betaling</p>
-              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{formatCurrency(Number(debt.monthly_payment))}</p>
-              {dailyExpenses > 0 && Number(debt.monthly_payment) > 0 && (
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
+                {formatCurrency(split ? split.monthlyPayment : Number(debt.monthly_payment))}
+              </p>
+              {split && split.monthlyPayment > 0 && (
+                <>
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
+                    <span className="text-[var(--ink-3)]">Rente</span>
+                    <span className="ml-auto font-mono tabular-nums text-[var(--ink-2)]">
+                      {formatCurrency(split.currentRente)}
+                    </span>
+                    <span className="text-[var(--ink-4)]">({split.rentePercentage.toFixed(0)}%)</span>
+                  </div>
+                  {split.currentAflossing > 0 && (
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <span className="text-[var(--ink-3)]">Aflossing</span>
+                      <span className="ml-auto font-mono tabular-nums text-[var(--ink-2)]">
+                        {formatCurrency(split.currentAflossing)}
+                      </span>
+                      <span className="text-[var(--ink-4)]">({(100 - split.rentePercentage).toFixed(0)}%)</span>
+                    </div>
+                  )}
+                  {/* Stacked bar */}
+                  <div className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full">
+                    <div
+                      className="h-full bg-zinc-300 transition-all"
+                      style={{ width: `${split.rentePercentage}%` }}
+                      title={`Rente: ${split.rentePercentage.toFixed(1)}%`}
+                    />
+                    <div
+                      className="h-full bg-kern-500 transition-all"
+                      style={{ width: `${100 - split.rentePercentage}%` }}
+                      title={`Aflossing: ${(100 - split.rentePercentage).toFixed(1)}%`}
+                    />
+                  </div>
+                </>
+              )}
+              {!split && dailyExpenses > 0 && Number(debt.monthly_payment) > 0 && (
                 <p className="mt-0.5 text-[10px] text-kern-600/80" data-testid="modal-payment-freedom-days">
                   je wint {Math.round(Number(debt.monthly_payment) / dailyExpenses)} {Math.round(Number(debt.monthly_payment) / dailyExpenses) === 1 ? 'dag' : 'dagen'} per maand terug
                 </p>

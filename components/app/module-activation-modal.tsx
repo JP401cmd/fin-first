@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useId, type ComponentType } from 'react'
+import { useState, useCallback, useEffect, useId, type ComponentType } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from '@/components/onboarding/speech-bubble'
@@ -22,6 +22,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
+  Check,
   List,
   ListTree,
   LayoutTemplate,
@@ -328,7 +329,7 @@ export function ModuleActivationModal({
       {/* Content flows directly inside BottomSheet's own scroll container */}
       <div className="px-5 py-5 space-y-5">
         {/* Header: icon + module name + summary */}
-        <ModuleHeader info={info} label={moduleLabel} />
+        <ModuleHeader info={info} label={moduleLabel} inDevelopment={moduleDef?.inDevelopment} />
 
         {/* Will's speech bubble */}
         <div className="flex items-start gap-3">
@@ -354,7 +355,7 @@ export function ModuleActivationModal({
 
 // ── Header ──────────────────────────────────────────────────────────────────
 
-function ModuleHeader({ info, label }: { info: ModuleInfo; label: string }) {
+function ModuleHeader({ info, label, inDevelopment }: { info: ModuleInfo; label: string; inDevelopment?: boolean }) {
   const Icon = info.icon
   return (
     <div className="flex items-center gap-3">
@@ -364,7 +365,14 @@ function ModuleHeader({ info, label }: { info: ModuleInfo; label: string }) {
         <Icon className={`h-5 w-5 ${info.iconColor}`} />
       </div>
       <div className="min-w-0">
-        <h3 className="text-base font-semibold text-[var(--ink)] truncate">{label}</h3>
+        <h3 className="text-base font-semibold text-[var(--ink)] truncate">
+          {label}
+          {inDevelopment && (
+            <span className="ml-1.5 inline-flex align-middle text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+              In ontwikkeling
+            </span>
+          )}
+        </h3>
         <p className="text-xs text-[var(--ink-3)] leading-snug">{info.summary}</p>
       </div>
     </div>
@@ -393,10 +401,38 @@ function StepForms({
 
   // ── Bezittingen state (only initialized when step is present) ──
   const hasBezittingen = missingSteps.includes('bezittingen')
+
+  // ── Existing bank accounts (for budgetteren: select or create) ──
+  const [existingAccounts, setExistingAccounts] = useState<
+    { id: string; name: string; bank_name: string | null; account_type: string; balance: number; linked_asset_id: string | null }[]
+  >([])
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
+  const [creatingNew, setCreatingNew] = useState(false)
+
+  useEffect(() => {
+    if (!hasBezittingen || moduleId !== 'budgetteren') return
+    const supabase = createClient()
+    supabase
+      .from('bank_accounts')
+      .select('id, name, bank_name, account_type, balance, linked_asset_id')
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setExistingAccounts(data)
+          // Pre-select first checking account
+          const checking = data.find((a) => a.account_type === 'checking')
+          if (checking) setSelectedAccountId(checking.id)
+        } else {
+          // No accounts — go straight to create form
+          setCreatingNew(true)
+        }
+      })
+  }, [hasBezittingen, moduleId])
+
   const [bankAccounts, setBankAccounts] = useState<BankAccountForm[]>(() => {
     if (!hasBezittingen) return []
     if (moduleId === 'budgetteren') {
-      return [createBankAccount({ has_budget_tracking: true, account_type: 'checking' })]
+      return [createBankAccount({ account_type: 'checking' })]
     }
     if (moduleId === 'vermogensregistratie') {
       return [createBankAccount()]
@@ -485,6 +521,16 @@ function StepForms({
       setError('Kies eerst een budgettemplate.')
       return
     }
+    if (hasBezittingen && moduleId === 'budgetteren') {
+      if (!selectedAccountId && !creatingNew) {
+        setError('Selecteer een rekening of maak een nieuwe aan.')
+        return
+      }
+      if (creatingNew && !bankAccounts.some((b) => b.name.trim())) {
+        setError('Vul de naam van je nieuwe rekening in.')
+        return
+      }
+    }
 
     setSaving(true)
     setError(null)
@@ -498,23 +544,73 @@ function StepForms({
 
       // ── Save bezittingen ──
       if (hasBezittingen) {
-        // Bank accounts
-        const validBanks = bankAccounts.filter((b) => b.name.trim())
-        if (validBanks.length > 0) {
-          const { error: bankErr } = await supabase.from('bank_accounts').insert(
-            validBanks.map((b) => ({
-              user_id: user.id,
-              name: b.name.trim(),
-              bank_name: b.bank_name.trim() || null,
-              account_type: b.account_type,
-              balance: parseFloat(b.balance) || 0,
-              has_budget_tracking: b.has_budget_tracking,
-            })),
-          )
-          if (bankErr) throw bankErr
+        // Budgetteren: either select existing or create new account
+        if (moduleId === 'budgetteren') {
+          if (selectedAccountId && !creatingNew) {
+            // Enable budget tracking on the selected account's companion asset
+            // Use ensure_companion_cash_asset to guarantee the link + tracking
+            const { error: rpcErr } = await supabase.rpc('ensure_companion_cash_asset', {
+              p_bank_account_id: selectedAccountId,
+              p_has_budget_tracking: true,
+            })
+            if (rpcErr) throw rpcErr
+          } else if (creatingNew) {
+            // Insert new bank accounts and create companion cash assets
+            const validBanks = bankAccounts.filter((b) => b.name.trim())
+            if (validBanks.length > 0) {
+              const { data: newBanks, error: bankErr } = await supabase
+                .from('bank_accounts')
+                .insert(
+                  validBanks.map((b) => ({
+                    user_id: user.id,
+                    name: b.name.trim(),
+                    bank_name: b.bank_name.trim() || null,
+                    account_type: b.account_type,
+                    balance: parseFloat(b.balance) || 0,
+                  })),
+                )
+                .select('id')
+              if (bankErr) throw bankErr
+              // Create companion cash assets with budget tracking via DB function
+              await Promise.all(
+                (newBanks ?? []).map((bank) =>
+                  supabase.rpc('ensure_companion_cash_asset', {
+                    p_bank_account_id: bank.id,
+                    p_has_budget_tracking: true,
+                  }),
+                ),
+              )
+            }
+          }
+        } else {
+          // Other modules: insert bank accounts and create companion cash assets
+          const validBanks = bankAccounts.filter((b) => b.name.trim())
+          if (validBanks.length > 0) {
+            const { data: newBanks, error: bankErr } = await supabase
+              .from('bank_accounts')
+              .insert(
+                validBanks.map((b) => ({
+                  user_id: user.id,
+                  name: b.name.trim(),
+                  bank_name: b.bank_name.trim() || null,
+                  account_type: b.account_type,
+                  balance: parseFloat(b.balance) || 0,
+                })),
+              )
+              .select('id')
+            if (bankErr) throw bankErr
+            await Promise.all(
+              (newBanks ?? []).map((bank) =>
+                supabase.rpc('ensure_companion_cash_asset', {
+                  p_bank_account_id: bank.id,
+                  p_has_budget_tracking: false,
+                }),
+              ),
+            )
+          }
         }
 
-        // Assets
+        // Assets (non-budgetteren modules)
         const validAssets = assets.filter((a) => a.name.trim())
         if (validAssets.length > 0) {
           const { error: assetErr } = await supabase.from('assets').insert(
@@ -552,48 +648,55 @@ function StepForms({
 
       // ── Save budgets ──
       if (hasBudgets && selectedTemplate) {
-        const budgets = getDefaultBudgets()
-        const multiplier = BUDGET_TEMPLATES.find((t) => t.id === selectedTemplate)?.multiplier ?? 1
-        const now = new Date().toISOString()
-        const rows: {
-          user_id: string
-          name: string
-          slug: string
-          icon: string
-          description: string
-          default_limit: number
-          budget_type: string
-          is_essential: boolean
-          priority_score: number
-          sort_order: number
-          parent_id: null
-          created_at: string
-          updated_at: string
-        }[] = []
-
-        for (const b of budgets) {
-          const amount = budgetAmounts[b.slug] ?? Math.round(b.default_limit * multiplier)
-          rows.push({
-            user_id: user.id,
-            name: b.name,
-            slug: b.slug,
-            icon: b.icon,
-            description: b.description,
-            default_limit: amount,
-            budget_type: b.budget_type,
-            is_essential: b.is_essential,
-            priority_score: b.priority_score,
-            sort_order: b.sort_order,
-            parent_id: null,
-            created_at: now,
-            updated_at: now,
-          })
-        }
-
-        const { error: budgetErr } = await supabase
+        // Skip if user already has budgets (e.g. from prior setup)
+        const { count } = await supabase
           .from('budgets')
-          .upsert(rows, { onConflict: 'user_id,slug' })
-        if (budgetErr) throw budgetErr
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+
+        if (!count) {
+          const budgets = getDefaultBudgets()
+          const multiplier =
+            BUDGET_TEMPLATES.find((t) => t.id === selectedTemplate)?.multiplier ?? 1
+          const now = new Date().toISOString()
+          const rows: {
+            user_id: string
+            name: string
+            slug: string
+            icon: string
+            description: string
+            default_limit: number
+            budget_type: string
+            is_essential: boolean
+            priority_score: number
+            sort_order: number
+            parent_id: null
+            created_at: string
+            updated_at: string
+          }[] = []
+
+          for (const b of budgets) {
+            const amount = budgetAmounts[b.slug] ?? Math.round(b.default_limit * multiplier)
+            rows.push({
+              user_id: user.id,
+              name: b.name,
+              slug: b.slug,
+              icon: b.icon,
+              description: b.description,
+              default_limit: amount,
+              budget_type: b.budget_type,
+              is_essential: b.is_essential,
+              priority_score: b.priority_score,
+              sort_order: b.sort_order,
+              parent_id: null,
+              created_at: now,
+              updated_at: now,
+            })
+          }
+
+          const { error: budgetErr } = await supabase.from('budgets').insert(rows)
+          if (budgetErr) throw budgetErr
+        }
       }
 
       // ── Save horizon settings ──
@@ -645,12 +748,19 @@ function StepForms({
       // All saves succeeded — mark steps as complete
       onComplete(missingSteps)
     } catch (err) {
-      console.error('Module activation save error:', err)
-      setError(err instanceof Error ? err.message : 'Er ging iets mis bij het opslaan')
+      console.error('Module activation save error:', JSON.stringify(err, null, 2), err)
+      setError(
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? (err as { message: string }).message
+            : 'Er ging iets mis bij het opslaan',
+      )
     } finally {
       setSaving(false)
     }
   }, [
+    moduleId,
     hasBezittingen,
     hasBudgets,
     hasHorizon,
@@ -662,6 +772,9 @@ function StepForms({
     horizon,
     missingSteps,
     onComplete,
+    selectedAccountId,
+    creatingNew,
+    existingAccounts,
   ])
 
   // ── Skip handler ──
@@ -685,6 +798,11 @@ function StepForms({
             setDebts={setDebts}
             openSections={openSections}
             toggleSection={toggleSection}
+            existingAccounts={existingAccounts}
+            selectedAccountId={selectedAccountId}
+            onSelectAccount={setSelectedAccountId}
+            creatingNew={creatingNew}
+            onSetCreatingNew={setCreatingNew}
           />
         )}
 
@@ -751,6 +869,11 @@ function BezittingenStep({
   setDebts,
   openSections,
   toggleSection,
+  existingAccounts = [],
+  selectedAccountId,
+  onSelectAccount,
+  creatingNew = false,
+  onSetCreatingNew,
 }: {
   moduleId: ModuleId
   bankAccounts: BankAccountForm[]
@@ -761,27 +884,106 @@ function BezittingenStep({
   setDebts: React.Dispatch<React.SetStateAction<DebtForm[]>>
   openSections: Record<string, boolean>
   toggleSection: (section: string) => void
+  existingAccounts?: { id: string; name: string; bank_name: string | null; account_type: string; balance: number; linked_asset_id: string | null }[]
+  selectedAccountId?: string | null
+  onSelectAccount?: (id: string | null) => void
+  creatingNew?: boolean
+  onSetCreatingNew?: (v: boolean) => void
 }) {
+  const accountTypeLabel = (t: string) =>
+    t === 'checking' ? 'Betaalrekening' : t === 'savings' ? 'Spaarrekening' : t === 'joint' ? 'Gezamenlijk' : t
+
   return (
     <section className="space-y-3">
       <h4 className="text-sm font-semibold text-[var(--ink)]">Bezittingen & schulden</h4>
 
-      {/* budgetteren: simple bank account form */}
+      {/* budgetteren: select existing or create new */}
       {moduleId === 'budgetteren' && (
         <div className="space-y-3">
           <p className="text-xs text-[var(--ink-3)]">
-            Voeg je lopende rekening toe voor budgettracking.
+            Kies een rekening voor budgettracking, of maak een nieuwe aan.
           </p>
-          {bankAccounts.map((ba, i) => (
-            <MiniBankForm
-              key={i}
-              value={ba}
-              onChange={(updated) => {
-                setBankAccounts((prev) => prev.map((b, j) => (j === i ? updated : b)))
-              }}
-              showBudgetTracking={false}
-            />
-          ))}
+
+          {/* Existing account cards */}
+          {existingAccounts.length > 0 && !creatingNew && (
+            <div className="space-y-2">
+              {existingAccounts.map((acc) => {
+                const selected = selectedAccountId === acc.id
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => onSelectAccount?.(acc.id)}
+                    className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                      selected
+                        ? 'border-kern-500 bg-kern-50 ring-1 ring-kern-500'
+                        : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
+                    }`}
+                  >
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        selected ? 'bg-kern-600 text-white' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
+                      }`}
+                    >
+                      {selected ? <Check className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--ink)] truncate">{acc.name}</p>
+                      <p className="text-xs text-[var(--ink-3)]">
+                        {acc.bank_name ? `${acc.bank_name} · ` : ''}{accountTypeLabel(acc.account_type)}
+                      </p>
+                    </div>
+                    <span className="text-sm font-mono tabular-nums text-[var(--ink-2)]">
+                      €{acc.balance.toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
+                    </span>
+                  </button>
+                )
+              })}
+
+              {/* Option to create new instead */}
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectAccount?.(null)
+                  onSetCreatingNew?.(true)
+                }}
+                className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border-ed)] py-2 text-xs font-medium text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)] active:bg-[var(--subtle)] transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Nieuwe rekening aanmaken
+              </button>
+            </div>
+          )}
+
+          {/* Create new form */}
+          {creatingNew && (
+            <div className="space-y-2">
+              {existingAccounts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetCreatingNew?.(false)
+                    // Re-select first checking account
+                    const checking = existingAccounts.find((a) => a.account_type === 'checking')
+                    onSelectAccount?.(checking?.id ?? existingAccounts[0]?.id ?? null)
+                  }}
+                  className="text-xs text-kern-600 hover:text-kern-700 transition-colors"
+                >
+                  ← Bestaande rekening kiezen
+                </button>
+              )}
+              {bankAccounts.map((ba, i) => (
+                <MiniBankForm
+                  key={i}
+                  value={ba}
+                  onChange={(updated) => {
+                    setBankAccounts((prev) => prev.map((b, j) => (j === i ? updated : b)))
+                  }}
+                  showBudgetTracking={false}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
