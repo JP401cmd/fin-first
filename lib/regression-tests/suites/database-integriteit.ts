@@ -146,6 +146,8 @@ function makeDebt(overrides?: Partial<Debt>): Debt {
     tax_year: null,
     has_payment_plan: false,
     has_written_agreement: false,
+    include_aflossing_in_savings: false,
+    custom_aflossing_amount: null,
     ownership: 'personal',
     household_id: null,
     partner_split_pct: null,

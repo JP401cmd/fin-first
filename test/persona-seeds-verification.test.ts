@@ -36,7 +36,7 @@ const DEBT_DEFAULTS: Omit<Debt, 'id' | 'name' | 'debt_type' | 'original_amount' 
   created_at: '', updated_at: '', subtype: null, is_tax_deductible: null,
   fixed_rate_end_date: null, nhg: null, linked_asset_id: null, credit_limit: null,
   repayment_type: null, draagkrachtmeting_date: null, tax_year: null,
-  has_payment_plan: false, has_written_agreement: false, ownership: 'personal',
+  has_payment_plan: false, has_written_agreement: false, include_aflossing_in_savings: false, custom_aflossing_amount: null, ownership: 'personal',
   household_id: null, partner_split_pct: null, net_worth_inclusion_pct: 100,
 }
 

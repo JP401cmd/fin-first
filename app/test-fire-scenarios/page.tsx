@@ -70,6 +70,7 @@ const FIXTURE_DEBTS: Debt[] = [
     ownership: 'personal',
     household_id: null,
     net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false, has_written_agreement: false,
+    include_aflossing_in_savings: false, custom_aflossing_amount: null,
   },
   {
     id: 'debt-2',
@@ -100,6 +101,7 @@ const FIXTURE_DEBTS: Debt[] = [
     ownership: 'personal',
     household_id: null,
     net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false, has_written_agreement: false,
+    include_aflossing_in_savings: false, custom_aflossing_amount: null,
   },
   {
     id: 'debt-3',
@@ -130,6 +132,7 @@ const FIXTURE_DEBTS: Debt[] = [
     ownership: 'personal',
     household_id: null,
     net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false, has_written_agreement: false,
+    include_aflossing_in_savings: false, custom_aflossing_amount: null,
   },
 ]
 
