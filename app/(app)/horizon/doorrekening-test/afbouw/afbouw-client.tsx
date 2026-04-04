@@ -10,6 +10,8 @@ import { parseFireStrategy, STRATEGY_LABELS, type FireEndStrategy, type FireStra
 import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '@/lib/constants'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { PerpetualStrategyTables } from './perpetual-tables'
+import { LegacyStrategyTables } from './legacy-tables'
+import { PensionStrategyTables } from './pension-tables'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -804,6 +806,105 @@ export function AfbouwClient({
             <Shield className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
             <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
               Geen data beschikbaar voor perpetual-strategieën
+            </p>
+            <p className="mt-1 text-xs text-[var(--ink-4)]">
+              Vul je profiel en financiële gegevens aan.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* ── Section: Legacy — Vermogen deels nalaten ── */}
+      <section>
+        <button
+          onClick={() => setLegacyExpanded(!legacyExpanded)}
+          className="flex w-full items-center gap-2 text-left"
+        >
+          {legacyExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
+          <Gift className="h-4 w-4 text-horizon-500" />
+          <h3 className="text-base font-bold text-[var(--ink)]">Legacy — Vermogen deels nalaten</h3>
+        </button>
+
+        {legacyExpanded && portfolioAtRetirement > 0 && currentAge != null && (
+          <div className="mt-4 space-y-4">
+            {/* Legacy target display / input */}
+            <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Doelvermogen bij leeftijd {displayEndAge}</p>
+                  {strategyConfig.legacyAmount > 0 ? (
+                    <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                      {formatCurrency(legacyTarget)}
+                    </p>
+                  ) : (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-xs text-[var(--ink-3)]">&euro;</span>
+                      <input
+                        type="number"
+                        value={legacyTarget}
+                        onChange={(e) => setLegacyTarget(Math.max(0, Number(e.target.value)))}
+                        className="w-32 rounded border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1 font-mono text-sm tabular-nums text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-horizon-400"
+                        min={0}
+                        step={10000}
+                      />
+                      <span className="text-[11px] text-[var(--ink-4)]">(niet opgeslagen in profiel)</span>
+                    </div>
+                  )}
+                </div>
+                <div className="h-8 w-px bg-[var(--border-ed)]" />
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Startportfolio</p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                    {formatCurrency(portfolioAtRetirement)}
+                  </p>
+                </div>
+                <div className="h-8 w-px bg-[var(--border-ed)]" />
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Duur</p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                    {Math.max(0, displayEndAge - retirementAge)} jaar
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {legacyTarget > 0 && legacyTarget < portfolioAtRetirement ? (
+              <LegacyStrategyTables
+                startPortfolio={portfolioAtRetirement}
+                retirementAge={retirementAge}
+                endAge={displayEndAge}
+                yearlyExpenses={yearlyRetirementExpenses}
+                grossReturn={fireParams.grossReturn}
+                inflationRate={fireParams.inflationRate}
+                hasPartner={hasPartner}
+                legacyAmount={legacyTarget}
+              />
+            ) : legacyTarget >= portfolioAtRetirement ? (
+              <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/50 px-4 py-6 text-center">
+                <AlertTriangle className="mx-auto h-8 w-8 text-amber-500" />
+                <p className="mt-2 text-sm font-medium text-amber-800">
+                  Doelvermogen ({formatCurrency(legacyTarget)}) is gelijk aan of groter dan de startportfolio ({formatCurrency(portfolioAtRetirement)}).
+                </p>
+                <p className="mt-1 text-xs text-amber-700">
+                  Er is geen ruimte voor onttrekkingen. Verlaag het doelvermogen of verhoog je portfolio.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-6 text-center">
+                <Gift className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+                <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
+                  Voer een doelvermogen in om de nalatenschapsstrategieën te berekenen.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {legacyExpanded && (portfolioAtRetirement <= 0 || currentAge == null) && (
+          <div className="mt-4 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-8 text-center">
+            <Gift className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+            <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
+              Geen data beschikbaar voor legacy-strategieën
             </p>
             <p className="mt-1 text-xs text-[var(--ink-4)]">
               Vul je profiel en financiële gegevens aan.

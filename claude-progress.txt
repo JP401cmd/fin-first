@@ -22018,3 +22018,37 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#644, #645)
 - Overall progress: 635/655 passing (96.9%)
+
+## Session 2026-04-04 - Features #642, #643
+
+### Feature #642: Afbouw: maximale leeftijd op 100 jaar - PASSING
+- Added displayEndAge = Math.max(strategyConfig.endAge, 100) to cap at age 100
+- Replaced all table/chart/display references from strategyConfig.endAge to displayEndAge
+- FIRE target formula still uses strategyConfig.endAge for financial calculations
+- Withdrawal table now runs to age 100 (53 years for crossover at 47j)
+- Chart x-axis extends to 100j, crossover table maxAge uses 100
+- Consistent with opbouw tables (also capped at 100)
+- Zero console errors
+- Commit: 81133262
+
+### Feature #643: Afbouw: basistabel noodzakelijke uitgaven met inflatie - PASSING
+- Added computeInflationExpenseSchedule() helper: monthly compound inflation correction
+- New "Uitgaven met inflatie" collapsible section between expenses and strategy sections
+- Columns: Maand, Leeftijd, Basisuitgave, Inflatie-correctie, Gecorrigeerd bedrag
+- Starts from user's monthly retirement expense (€3,500 for test account)
+- Inflation from profile (2.0%/yr) applied monthly
+- Table runs from current age (35j) to 100j = 780 months
+- Sampled display: first 6 months, then January of each year, last 3
+- Footer shows final month values (mnd 780: €3,500 → €12,658 with €9,158 correction)
+- Info strip explains calculation parameters
+- Empty state for missing DOB or missing expense config
+- Fixed pre-existing bugs: opbouw-client.tsx extra closing brace, PerpetualStrategyTables import
+- Zero console errors
+- Commit: c800ba54
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/afbouw/afbouw-client.tsx — displayEndAge cap + inflation table
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — removed extra closing brace
+
+### Current Status
+- 2 features completed this session (#642, #643)

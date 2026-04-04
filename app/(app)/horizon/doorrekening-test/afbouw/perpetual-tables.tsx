@@ -14,6 +14,10 @@ interface PerpetualRow {
   remainder: number
   growth: number
   endBalance: number
+  /** Optional: VPW withdrawal rate for this year (0–1 fraction) */
+  withdrawalRate?: number
+  /** Optional: remaining life expectancy years used for VPW */
+  remainingYears?: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -28,9 +32,9 @@ function samplePerpetualRows(rows: PerpetualRow[]): PerpetualRow[] {
   return result
 }
 
-/** Life expectancy remaining years (simplified Dutch CBS-based). */
-function lifeExpectancyYears(age: number): number {
-  return Math.max(1, 90 - age)
+/** Remaining years until age 100 (VPW planning horizon). */
+function remainingLifeYears(age: number): number {
+  return Math.max(1, 100 - age)
 }
 
 /** Variable Percentage Withdrawal rate based on annuity formula. */
@@ -116,8 +120,8 @@ export function PerpetualStrategyTables({
     let balance = startPortfolio
     for (let y = 0; y < totalYears && balance > 0; y++) {
       const age = retirementAge + y
-      const remainingYears = lifeExpectancyYears(age)
-      const rate = vpwRate(remainingYears, realReturn)
+      const remYears = remainingLifeYears(age)
+      const rate = vpwRate(remYears, realReturn)
       const withdrawal = Math.min(balance * rate, balance)
       const remainder = balance - withdrawal
       const growth = remainder * realReturn
@@ -125,6 +129,8 @@ export function PerpetualStrategyTables({
         year: y + 1, age, startBalance: Math.round(balance),
         withdrawal: Math.round(withdrawal), remainder: Math.round(remainder),
         growth: Math.round(growth), endBalance: Math.round(remainder + growth),
+        withdrawalRate: rate,
+        remainingYears: remYears,
       })
       balance = remainder + growth
     }
@@ -175,15 +181,15 @@ export function PerpetualStrategyTables({
 
   const strategies = [
     { key: 'swr', label: 'SWR (Safe Withdrawal Rate)', subtitle: `Onttrekking = ${(NL_SWR * 100).toFixed(3)}% van portfolio per jaar`, rows: swrRows },
-    { key: 'guardrails', label: 'Guardrails', subtitle: 'Variabele onttrekking met boven- en ondergrenzen (\u00b110%)', rows: guardrailsRows },
-    { key: 'vpw', label: 'VPW (Variable Percentage Withdrawal)', subtitle: 'Jaarlijks herberekend % op basis van resterende levensverwachting', rows: vpwRows },
+    { key: 'guardrails', label: 'Guardrails', subtitle: 'Variabele onttrekking met boven- en ondergrenzen (±10%)', rows: guardrailsRows },
+    { key: 'vpw', label: 'VPW (Variable Percentage Withdrawal)', subtitle: 'Jaarlijks herberekend op basis van resterende jaren tot 100 en verwacht rendement', rows: vpwRows, showVpwColumns: true },
     { key: 'bucket', label: 'Bucket (Emmer-strategie)', subtitle: '3 emmers: cash (2j), obligaties (5j), aandelen (rest)', rows: bucketRows },
   ]
 
   return (
     <>
       {strategies.map((strat) => (
-        <PerpetualSubTable key={strat.key} label={strat.label} subtitle={strat.subtitle} rows={strat.rows} />
+        <PerpetualSubTable key={strat.key} label={strat.label} subtitle={strat.subtitle} rows={strat.rows} showVpwColumns={strat.showVpwColumns} />
       ))}
     </>
   )
@@ -191,7 +197,7 @@ export function PerpetualStrategyTables({
 
 // ── Sub-table Component ──────────────────────────────────────
 
-function PerpetualSubTable({ label, subtitle, rows }: { label: string; subtitle: string; rows: PerpetualRow[] }) {
+function PerpetualSubTable({ label, subtitle, rows, showVpwColumns }: { label: string; subtitle: string; rows: PerpetualRow[]; showVpwColumns?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : samplePerpetualRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
@@ -210,6 +216,12 @@ function PerpetualSubTable({ label, subtitle, rows }: { label: string; subtitle:
               <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
                 <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Jaar</th>
                 <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Leeftijd</th>
+                {showVpwColumns && (
+                  <>
+                    <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Rest. jaren</th>
+                    <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">VPW %</th>
+                  </>
+                )}
                 <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Portfoliowaarde</th>
                 <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Onttrekking</th>
                 <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Restant</th>
@@ -226,6 +238,16 @@ function PerpetualSubTable({ label, subtitle, rows }: { label: string; subtitle:
                 >
                   <td className="px-3 py-1 font-medium text-[var(--ink)]">{row.year}</td>
                   <td className="px-3 py-1 text-[var(--ink)]">{row.age}j</td>
+                  {showVpwColumns && (
+                    <>
+                      <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                        {row.remainingYears ?? '—'}
+                      </td>
+                      <td className="px-3 py-1 text-right font-mono tabular-nums text-horizon-600 font-medium">
+                        {row.withdrawalRate != null ? `${(row.withdrawalRate * 100).toFixed(2)}%` : '—'}
+                      </td>
+                    </>
+                  )}
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
                     {formatCurrency(row.startBalance)}
                   </td>
@@ -243,7 +265,7 @@ function PerpetualSubTable({ label, subtitle, rows }: { label: string; subtitle:
             </tbody>
             <tfoot>
               <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
-                <td colSpan={2} className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal ({rows.length}j)</td>
+                <td colSpan={showVpwColumns ? 4 : 2} className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal ({rows.length}j)</td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
                   {formatCurrency(rows[0]?.startBalance ?? 0)}
                 </td>
