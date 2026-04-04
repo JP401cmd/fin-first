@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState, useCallback } from 'react'
-import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle, CalendarClock } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -141,6 +141,56 @@ function computeWithdrawalSchedule(
   }
 
   return schedule
+}
+
+/** Generate month-by-month expense schedule with inflation correction. */
+interface InflationExpenseRow {
+  month: number
+  age: number
+  ageMonth: number // month within the year (0-11)
+  baseExpense: number
+  inflationCorrection: number
+  adjustedExpense: number
+}
+
+function computeInflationExpenseSchedule(
+  monthlyExpense: number,
+  startAge: number,
+  endAge: number,
+  yearlyInflation: number,
+): InflationExpenseRow[] {
+  if (monthlyExpense <= 0 || endAge <= startAge) return []
+  const totalMonths = (endAge - startAge) * 12
+  const monthlyInflation = Math.pow(1 + yearlyInflation, 1 / 12) - 1
+  const rows: InflationExpenseRow[] = []
+  let adjusted = monthlyExpense
+
+  for (let m = 0; m < totalMonths; m++) {
+    const yearOffset = Math.floor(m / 12)
+    const monthInYear = m % 12
+    const correction = adjusted - monthlyExpense
+    rows.push({
+      month: m + 1,
+      age: startAge + yearOffset,
+      ageMonth: monthInYear,
+      baseExpense: Math.round(monthlyExpense * 100) / 100,
+      inflationCorrection: Math.round(correction * 100) / 100,
+      adjustedExpense: Math.round(adjusted * 100) / 100,
+    })
+    adjusted = adjusted * (1 + monthlyInflation)
+  }
+  return rows
+}
+
+function getDisplayExpenseRows(rows: InflationExpenseRow[]): InflationExpenseRow[] {
+  if (rows.length <= 24) return rows
+  // Sample: first 6 months, then every 12th month (January), last 3
+  const result: InflationExpenseRow[] = rows.slice(0, 6)
+  for (let i = 6; i < rows.length - 3; i++) {
+    if (rows[i].ageMonth === 0) result.push(rows[i]) // January of each year
+  }
+  result.push(...rows.slice(-3))
+  return result
 }
 
 // ── Display helpers ─────────────────────────────────────────

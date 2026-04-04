@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const tabs = [
+const tabs: { label: string; href: string; disabled?: boolean }[] = [
   { label: 'Opbouw', href: '/horizon/doorrekening-test/opbouw' },
-  { label: 'Afbouw', href: '/horizon/doorrekening-test/afbouw', disabled: true },
+  { label: 'Afbouw', href: '/horizon/doorrekening-test/afbouw' },
 ]
 
 export default function DoorrekenigTestLayout({ children }: { children: React.ReactNode }) {
