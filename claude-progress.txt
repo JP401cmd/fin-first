@@ -21960,3 +21960,27 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#641)
 - Overall progress: 630/655 passing (96.2%)
+
+## Session 2026-04-04 - Features #639, #640
+
+### Feature #639: Opbouw: bezittingen-rendement loopt door na kruispunt - PASSING
+- Computed crossover month by simulating individual asset growth until passive income >= annual expenses
+- Modified projectAssetYearly and computeAssetMonthly to accept crossoverMonth parameter
+- Monthly contributions stop after crossover month, returns continue on remaining capital
+- Updated StackedAreaChart, NetWorthMonthlyTable with crossover-aware computations
+- Added crossover info banner and Kruispunt metric in header
+- TotalTable highlights crossover year row, labels rows after as na kruispunt
+- Verified: DEGIRO asset shows inleg before crossover, zero after; growth continues
+- Zero console errors
+- Commit: fe7d0c29
+
+### Feature #640: Opbouw: Box 3 belasting loopt door na kruispunt - PASSING
+- Already implemented by existing code: Box 3 tax computed for all projection years including after crossover
+- computeBox3Tax called for each year using adjustedNet (rawNet - cumulativeTax)
+- Cumulative tax impact flows through to subsequent years tax base calculations
+- TotalTable shows both annual Box 3 tax and cumulative total for all years
+- No code changes needed - feature was already working
+
+### Current Status
+- 2 features completed this session (#639, #640)
+- Overall progress: 631/655 passing (96.3%)
