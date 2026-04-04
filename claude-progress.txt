@@ -1,3 +1,30 @@
+## Session 2026-04-04 - Feature #622
+
+### Feature #622: Bezittingen-tabellen spreadsheet-stijl opmaak - PASSING
+- Applied spreadsheet-style formatting to all 6 table components in opbouw-client.tsx
+- Sticky headers: `<thead className="sticky top-0 z-10">` on all tables
+- Scrollable containers: `overflow-auto max-h-[70vh]` for vertical scroll with sticky headers
+- Alternating row backgrounds: `bg-[var(--subtle)]/30` on odd-indexed rows
+- Compact header rows: `py-2` → `py-1.5` on all `<th>` cells
+- Compact body rows: `py-2` → `py-1` on all `<td>` cells
+- font-mono tabular-nums already present (verified)
+- Right-aligned amounts already present (verified)
+- Also updated 6th table (Netto vermogen per maand) added by concurrent agent
+- Zero console errors, TypeScript compiles clean
+- Verified in browser: all tables render with alternating rows, sticky headers, compact spacing
+- Commit: 32e73d96
+
+### Tables Modified
+1. ProjectionTable — yearly asset/debt projections
+2. AssetMonthlyTable — per-asset monthly detail
+3. SavingsProjectionTable — savings month-by-month
+4. DebtAmortizationTable — debt amortization (including tfoot)
+5. TotalTable — total overview
+6. Net worth per month table (new, from concurrent agent)
+
+### Current Status
+- 1 feature completed this session (#622)
+
 ## Session 2026-04-04 - Features #619, #623
 
 ### Feature #619: Bezittingen laden uit bestaande assets-data - PASSING
@@ -21770,3 +21797,49 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#628)
+
+## Session 2026-04-04 - Features #620, #621
+
+### Feature #620: Doorrekentabel per bezitting met maandelijkse groei - PASSING
+- AssetMonthlyTable component renders per-asset monthly tables
+- Columns: Maand, Startwaarde, Rendement, Inleg, Eindwaarde
+- Monthly compounding: rendement = startwaarde × (jaarrendement / 12)
+- Eindwaarde = startwaarde + rendement + inleg
+- Next month startwaarde = previous month eindwaarde
+- Runs for configurable time horizon (1-60 years)
+- Sampled display for large horizons (first 6 months, then every 6)
+- Zero console errors on fresh page load
+
+### Feature #621: Rendement per bezitting uit asset.expected_return - PASSING
+- Each asset uses its own expected_return field for growth calculation
+- Verified: 7.0%/yr asset shows ~0.58%/month (€292 on €50,003)
+- Verified: 3.5%/yr asset shows correct monthly compounding
+- Verified: 0.0%/yr assets show €0 rendement, constant value
+- Rendement column visible in every asset table
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — chart improvements + verification
+
+### Current Status
+- 2 features completed this session (#620, #621)
+- Commit: 5fec5c7f
+
+## Session 2026-04-04 - Feature #626
+
+### Feature #626: Schulden-tabellen spreadsheet-stijl opmaak - PASSING
+- Updated DebtAmortizationTable to match AssetMonthlyTable spreadsheet styling
+- Sticky header: `thead className="sticky top-0 z-10"` for scroll persistence
+- Alternating row colors: odd rows get `bg-[var(--subtle)]/30`
+- Compact rows: py-1 for body cells, py-1.5 for header/footer (matching asset tables)
+- Green row marking: rows where endBalance ≤ €0.01 get `bg-emerald-50/60` background
+- Paid-off balance shows green text (`text-emerald-600`) + checkmark `✓` instead of red
+- Scrollable container: `overflow-auto max-h-[70vh]` matching asset table pattern
+- Verified on Persoonlijke lening table (55 months to payoff) — green final row with ✓
+- Zero new console errors
+- Commit: 9da27970
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — DebtAmortizationTable styling
+
+### Current Status
+- 1 feature completed this session (#626)
