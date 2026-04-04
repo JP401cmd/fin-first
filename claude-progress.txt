@@ -21984,3 +21984,37 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#639, #640)
 - Overall progress: 631/655 passing (96.3%)
+
+## Session 2026-04-04 - Features #644, #645
+
+### Feature #644: Afbouw: noodzakelijke uitgaven laden uit profiel - PASSING
+- Added reference info strip above expenses table showing:
+  - Maandelijks bedrag (€3,500 from profile)
+  - Jaarlijks bedrag (€42,000)
+  - Inflatievoet (2.0%)
+- Warning icon + "niet ingesteld" shown when expense amount is zero
+- Existing warning banner for missing expenses already present
+- Zero console errors
+
+### Feature #645: Afbouw: eindstrategie Perpetual — alle onttrekkingsstrategieën - PASSING
+- Created perpetual-tables.tsx with PerpetualStrategyTables component
+- Added new "Perpetual — Vermogen blijft intact" collapsible section
+- 4 withdrawal strategy sub-tables implemented:
+  1. SWR: Fixed NL_SWR (2.883%) of portfolio per year
+  2. Guardrails: Variable withdrawal with ±10% floor/ceiling bounds
+  3. VPW: Annuity-based rate recalculated using remaining life expectancy
+  4. Bucket: 3-bucket strategy (cash 2yr, bonds 5yr, stocks rest) with annual rebalancing
+- Each sub-table has columns: Jaar, Leeftijd, Portfoliowaarde, Onttrekking, Restant, Rendement
+- Sampled row display for large tables with expand/collapse toggle
+- Footer row with totals per sub-table
+- Removed placeholder PerpetualStrategyTables function, replaced with import
+- Zero console errors
+- Commit: 5abc47a9
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/afbouw/afbouw-client.tsx — reference strip + perpetual section
+- app/(app)/horizon/doorrekening-test/afbouw/perpetual-tables.tsx — NEW: 4 perpetual strategy table components
+
+### Current Status
+- 2 features completed this session (#644, #645)
+- Overall progress: 635/655 passing (96.9%)
