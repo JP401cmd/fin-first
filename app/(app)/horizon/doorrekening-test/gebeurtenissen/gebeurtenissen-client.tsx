@@ -379,6 +379,49 @@ function StrategyTooltip({ strategy }: { strategy: DistributionStrategy }) {
   )
 }
 
+function IncomeStrategyTooltip({ strategy }: { strategy: IncomeDistributionStrategy }) {
+  const [open, setOpen] = useState(false)
+  const info = INCOME_STRATEGY_INFO[strategy]
+
+  return (
+    <div className="relative inline-block">
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setOpen(!open) } }}
+        className="rounded-full p-0.5 text-[var(--ink-4)] hover:text-[var(--ink-2)] transition-colors cursor-pointer"
+        aria-label={`Info over ${info.label}`}
+      >
+        <Info className="h-3.5 w-3.5" />
+      </span>
+      {open && (
+        <div className="absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 shadow-lg">
+          <p className="text-xs font-semibold text-[var(--ink)]">{info.label}</p>
+          <p className="mt-1 text-[11px] text-[var(--ink-3)]">{info.description}</p>
+          <div className="mt-2 space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Voordelen</p>
+            {info.pros.map((p, i) => (
+              <p key={i} className="text-[11px] text-[var(--ink-2)] pl-2 before:content-['✓_'] before:text-emerald-500">
+                {p}
+              </p>
+            ))}
+          </div>
+          <div className="mt-2 space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">Nadelen</p>
+            {info.cons.map((c, i) => (
+              <p key={i} className="text-[11px] text-[var(--ink-2)] pl-2 before:content-['⚠_'] before:text-amber-500">
+                {c}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Timeline Component ──────────────────────────────────────
 
 function EventTimelineOverview({
@@ -630,7 +673,9 @@ export function GebeurtenissenClient({
   const [eventsExpanded, setEventsExpanded] = useState(true)
   const [cashflowsExpanded, setCashflowsExpanded] = useState(true)
   const [distributionExpanded, setDistributionExpanded] = useState(true)
+  const [incomeDistributionExpanded, setIncomeDistributionExpanded] = useState(true)
   const [selectedStrategy, setSelectedStrategy] = useState<DistributionStrategy>('spreiden')
+  const [selectedIncomeStrategy, setSelectedIncomeStrategy] = useState<IncomeDistributionStrategy>('spreiden')
 
   const dateOfBirth = typeof profile?.date_of_birth === 'string' ? profile.date_of_birth : null
   const currentAge = dateOfBirth
@@ -664,6 +709,31 @@ export function GebeurtenissenClient({
       distribution: computeDistribution(assets, event.one_time_cost, selectedStrategy),
     }))
   }, [expenseEvents, assets, selectedStrategy])
+
+  // Compute income events for income distribution preview
+  // Income events: negative one_time_cost (incoming money) or positive monthly_income_change
+  const incomeEvents = useMemo(() => {
+    return eventsWithImpact.filter(({ event }) => {
+      // Events that bring in money: negative one_time_cost means incoming lump sum
+      return event.one_time_cost < 0 || (event.monthly_income_change > 0 && event.monthly_cost_change === 0)
+    })
+  }, [eventsWithImpact])
+
+  // Income distribution results per income event
+  const incomeDistributionResults = useMemo(() => {
+    return incomeEvents.map(({ event }) => {
+      // For one-time income: use absolute value of negative one_time_cost
+      // For recurring income: use annualized income (monthly_income_change × 12)
+      const amount = event.one_time_cost < 0
+        ? Math.abs(event.one_time_cost)
+        : event.monthly_income_change * 12
+      return {
+        event,
+        amount,
+        distribution: computeIncomeDistribution(assets, amount, selectedIncomeStrategy),
+      }
+    })
+  }, [incomeEvents, assets, selectedIncomeStrategy])
 
   return (
     <div className="space-y-8">
@@ -942,19 +1012,20 @@ export function GebeurtenissenClient({
                   const Icon = info.icon
                   const active = selectedStrategy === key
                   return (
-                    <button
-                      key={key}
-                      onClick={() => setSelectedStrategy(key)}
-                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-                        active
-                          ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-300 hover:text-horizon-600'
-                      }`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {info.label}
+                    <div key={key} className="inline-flex items-center gap-1">
+                      <button
+                        onClick={() => setSelectedStrategy(key)}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                          active
+                            ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-300 hover:text-horizon-600'
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {info.label}
+                      </button>
                       <StrategyTooltip strategy={key} />
-                    </button>
+                    </div>
                   )
                 })}
               </div>
