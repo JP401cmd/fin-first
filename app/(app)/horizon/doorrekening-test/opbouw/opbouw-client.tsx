@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useCallback } from 'react'
+import { ChevronDown, ChevronRight, TrendingUp, Landmark, PiggyBank, BarChart3 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { projectAsset } from '@/lib/asset-data'
 import { ASSET_TYPE_LABELS, type Asset, type AssetType } from '@/lib/asset-data'
@@ -106,9 +107,9 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
   const range = maxVal - minVal || 1
 
   const w = 600
-  const h = 200
-  const px = 40
-  const py = 20
+  const h = 220
+  const px = 48
+  const py = 24
 
   const numPoints = projectionYears
   const toX = (i: number) => px + (i / Math.max(numPoints - 1, 1)) * (w - 2 * px)
@@ -127,8 +128,22 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
     xLabels.push(projectionYears)
   }
 
+  // Area fill under net worth line
+  const makeAreaPath = (values: number[]) => {
+    const line = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
+    const bottomRight = `L${toX(values.length - 1).toFixed(1)},${(h - py).toFixed(1)}`
+    const bottomLeft = `L${toX(0).toFixed(1)},${(h - py).toFixed(1)}`
+    return `${line} ${bottomRight} ${bottomLeft} Z`
+  }
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-2xl" aria-label="Projectie grafiek">
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" aria-label="Projectie grafiek">
+      <defs>
+        <linearGradient id="netAreaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--color-horizon-500)" stopOpacity={0.12} />
+          <stop offset="100%" stopColor="var(--color-horizon-500)" stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
       {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
         const yy = py + frac * (h - 2 * py)
@@ -136,7 +151,7 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
         return (
           <g key={frac}>
             <line x1={px} y1={yy} x2={w - px} y2={yy} stroke="var(--border-ed)" strokeWidth={0.5} />
-            <text x={px - 4} y={yy + 3} textAnchor="end" fontSize={8} fill="var(--ink-4)" className="font-mono">
+            <text x={px - 6} y={yy + 3} textAnchor="end" fontSize={8} fill="var(--ink-4)" className="font-mono">
               {formatCurrency(val)}
             </text>
           </g>
@@ -148,12 +163,22 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
           {yr}j
         </text>
       ))}
+      {/* Area fill under net worth */}
+      <path d={makeAreaPath(netTotals)} fill="url(#netAreaGrad)" />
       {/* Asset line */}
       <path d={makePath(assetTotals)} fill="none" stroke="var(--color-emerald-500)" strokeWidth={2} />
       {/* Debt line */}
-      <path d={makePath(debtTotals)} fill="none" stroke="var(--color-red-400)" strokeWidth={2} />
+      <path d={makePath(debtTotals)} fill="none" stroke="var(--color-red-400)" strokeWidth={1.5} />
       {/* Net line */}
-      <path d={makePath(netTotals)} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2.5} strokeDasharray="6 3" />
+      <path d={makePath(netTotals)} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2.5} />
+      {/* End dots */}
+      {netTotals.length > 0 && (
+        <>
+          <circle cx={toX(netTotals.length - 1)} cy={toY(netTotals[netTotals.length - 1])} r={3.5} fill="var(--color-horizon-500)" />
+          <circle cx={toX(assetTotals.length - 1)} cy={toY(assetTotals[assetTotals.length - 1])} r={3} fill="var(--color-emerald-500)" />
+          <circle cx={toX(debtTotals.length - 1)} cy={toY(debtTotals[debtTotals.length - 1])} r={3} fill="var(--color-red-400)" />
+        </>
+      )}
       {/* Legend */}
       <circle cx={px + 10} cy={12} r={4} fill="var(--color-emerald-500)" />
       <text x={px + 18} y={15} fontSize={9} fill="var(--ink-2)">Bezittingen</text>
@@ -182,22 +207,44 @@ function getDisplayYears(projectionYears: number): number[] {
   return years
 }
 
-function ProjectionTable({ title, columns, color, projectionYears }: {
+function ProjectionTable({ title, columns, color, projectionYears, defaultExpanded }: {
   title: string
   columns: { label: string; rows: YearRow[] }[]
   color: string
   projectionYears: number
+  defaultExpanded?: boolean
 }) {
+  const [expanded, setExpanded] = useState(defaultExpanded ?? true)
+
   if (columns.length === 0) return null
 
   const displayYears = getDisplayYears(projectionYears)
+  const currentTotal = columns.reduce((sum, col) => sum + (col.rows[0]?.value ?? 0), 0)
+  const finalTotal = columns.reduce((sum, col) => sum + (col.rows[projectionYears - 1]?.value ?? 0), 0)
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
-      <div className={`border-b border-[var(--border-ed)] px-4 py-3 ${color}`}>
-        <h3 className="text-sm font-semibold text-[var(--ink)]">{title}</h3>
-      </div>
-      <div className="overflow-x-auto">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className={`flex w-full items-center justify-between border-b border-[var(--border-ed)] px-4 py-3 text-left transition-colors hover:brightness-95 ${color}`}
+      >
+        <div className="flex items-center gap-2">
+          {expanded ? (
+            <ChevronDown className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+          )}
+          <h3 className="text-sm font-semibold text-[var(--ink)]">{title}</h3>
+          <span className="text-[10px] text-[var(--ink-4)]">({columns.length})</span>
+        </div>
+        {!expanded && (
+          <div className="flex items-center gap-3 text-[11px] font-mono tabular-nums">
+            <span className="text-[var(--ink-3)]">Jaar 1: {formatCurrency(currentTotal)}</span>
+            <span className="text-[var(--ink-2)]">Jaar {projectionYears}: {formatCurrency(finalTotal)}</span>
+          </div>
+        )}
+      </button>
+      {expanded && <div className="overflow-x-auto">
         <table className="w-full text-[11px]">
           <thead>
             <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
