@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { formatCurrency } from '@/lib/format'
 import { projectAsset } from '@/lib/asset-data'
 import { ASSET_TYPE_LABELS, type Asset, type AssetType } from '@/lib/asset-data'
@@ -9,8 +9,7 @@ import type { FireParams } from '@/lib/fire-params'
 
 // ── Projection helpers ────────────────────────────────────────
 
-const PROJECTION_YEARS = 30
-const PROJECTION_MONTHS = PROJECTION_YEARS * 12
+const DEFAULT_PROJECTION_YEARS = 30
 
 interface YearRow {
   year: number
@@ -19,16 +18,16 @@ interface YearRow {
   contribution: number
 }
 
-function projectAssetYearly(asset: Asset): YearRow[] {
+function projectAssetYearly(asset: Asset, years: number): YearRow[] {
   const months = projectAsset(
     Number(asset.current_value),
     Number(asset.expected_return),
     Number(asset.monthly_contribution),
-    PROJECTION_MONTHS,
+    years * 12,
   )
 
   const rows: YearRow[] = []
-  for (let y = 1; y <= PROJECTION_YEARS; y++) {
+  for (let y = 1; y <= years; y++) {
     const idx = y * 12 - 1
     const prevIdx = (y - 1) * 12 - 1
     const prev = prevIdx >= 0 ? months[prevIdx].value : Number(asset.current_value)
@@ -44,13 +43,13 @@ function projectAssetYearly(asset: Asset): YearRow[] {
   return rows
 }
 
-function projectDebtYearly(debt: Debt): YearRow[] {
+function projectDebtYearly(debt: Debt, years: number): YearRow[] {
   const monthlyRate = Number(debt.interest_rate) / 100 / 12
   const monthly = Number(debt.monthly_payment)
   let balance = Number(debt.current_balance)
   const rows: YearRow[] = []
 
-  for (let y = 1; y <= PROJECTION_YEARS; y++) {
+  for (let y = 1; y <= years; y++) {
     let yearInterest = 0
     let yearPayment = 0
     for (let m = 0; m < 12; m++) {
@@ -95,10 +94,11 @@ function groupDebtsByType(debts: Debt[]) {
 
 // ── Mini summary chart (SVG) ─────────────────────────────────
 
-function SummaryChart({ assetTotals, debtTotals, netTotals }: {
+function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
   assetTotals: number[]
   debtTotals: number[]
   netTotals: number[]
+  projectionYears: number
 }) {
   const allValues = [...assetTotals, ...debtTotals, ...netTotals]
   const maxVal = Math.max(...allValues, 1)
@@ -110,11 +110,22 @@ function SummaryChart({ assetTotals, debtTotals, netTotals }: {
   const px = 40
   const py = 20
 
-  const toX = (i: number) => px + (i / (PROJECTION_YEARS - 1)) * (w - 2 * px)
+  const numPoints = projectionYears
+  const toX = (i: number) => px + (i / Math.max(numPoints - 1, 1)) * (w - 2 * px)
   const toY = (v: number) => py + (1 - (v - minVal) / range) * (h - 2 * py)
 
   const makePath = (values: number[]) =>
     values.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
+
+  // Generate sensible x-axis labels based on projection years
+  const xLabels: number[] = []
+  const step = projectionYears <= 10 ? 1 : projectionYears <= 20 ? 5 : projectionYears <= 40 ? 5 : 10
+  for (let yr = 0; yr <= projectionYears; yr += step) {
+    xLabels.push(yr)
+  }
+  if (xLabels[xLabels.length - 1] !== projectionYears) {
+    xLabels.push(projectionYears)
+  }
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-2xl" aria-label="Projectie grafiek">
@@ -132,7 +143,7 @@ function SummaryChart({ assetTotals, debtTotals, netTotals }: {
         )
       })}
       {/* X axis labels */}
-      {[0, 5, 10, 15, 20, 25, 30].map((yr) => (
+      {xLabels.map((yr) => (
         <text key={yr} x={toX(yr)} y={h - 4} textAnchor="middle" fontSize={8} fill="var(--ink-4)" className="font-mono">
           {yr}j
         </text>
@@ -156,15 +167,30 @@ function SummaryChart({ assetTotals, debtTotals, netTotals }: {
 
 // ── Data table component ─────────────────────────────────────
 
-function ProjectionTable({ title, columns, color }: {
+function getDisplayYears(projectionYears: number): number[] {
+  if (projectionYears <= 10) {
+    return Array.from({ length: projectionYears }, (_, i) => i + 1)
+  }
+  const years: number[] = [1]
+  const step = projectionYears <= 20 ? 5 : projectionYears <= 40 ? 5 : 10
+  for (let y = step; y <= projectionYears; y += step) {
+    years.push(y)
+  }
+  if (years[years.length - 1] !== projectionYears) {
+    years.push(projectionYears)
+  }
+  return years
+}
+
+function ProjectionTable({ title, columns, color, projectionYears }: {
   title: string
   columns: { label: string; rows: YearRow[] }[]
   color: string
+  projectionYears: number
 }) {
   if (columns.length === 0) return null
 
-  // Show years 1, 5, 10, 15, 20, 25, 30
-  const displayYears = [1, 5, 10, 15, 20, 25, 30]
+  const displayYears = getDisplayYears(projectionYears)
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
@@ -210,27 +236,27 @@ function ProjectionTable({ title, columns, color }: {
 
 // ── Savings rate table ───────────────────────────────────────
 
-function SavingsRateTable({ assets, debts, profile }: {
+function SavingsRateTable({ assets, debts, profileMonthlyIncome, profileSavingsRate }: {
   assets: Asset[]
   debts: Debt[]
-  profile: Record<string, unknown> | null
+  profileMonthlyIncome: number
+  profileSavingsRate: number
 }) {
-  const monthlyIncome = Number(profile?.net_monthly_income ?? 0)
   const totalContributions = assets.reduce((sum, a) => sum + Number(a.monthly_contribution), 0)
   const totalDebtPayments = debts.reduce((sum, d) => sum + Number(d.monthly_payment), 0)
   const monthlySavings = totalContributions + totalDebtPayments
-  const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0
+  const computedRate = profileMonthlyIncome > 0 ? (monthlySavings / profileMonthlyIncome) * 100 : 0
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
       <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
         <h3 className="text-sm font-semibold text-[var(--ink)]">Spaarquote</h3>
       </div>
-      <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-5">
         <div>
           <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Netto inkomen</p>
           <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-            {formatCurrency(monthlyIncome)}
+            {formatCurrency(profileMonthlyIncome)}
           </p>
         </div>
         <div>
@@ -246,9 +272,15 @@ function SavingsRateTable({ assets, debts, profile }: {
           </p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Spaarquote</p>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Berekende spaarquote</p>
           <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-horizon-600">
-            {savingsRate.toFixed(1)}%
+            {computedRate.toFixed(1)}%
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Profiel spaarquote</p>
+          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
+            {profileSavingsRate.toFixed(1)}%
           </p>
         </div>
       </div>
@@ -258,12 +290,13 @@ function SavingsRateTable({ assets, debts, profile }: {
 
 // ── Total overview table ─────────────────────────────────────
 
-function TotalTable({ assetTotals, debtTotals, netTotals }: {
+function TotalTable({ assetTotals, debtTotals, netTotals, projectionYears }: {
   assetTotals: number[]
   debtTotals: number[]
   netTotals: number[]
+  projectionYears: number
 }) {
-  const displayYears = [1, 5, 10, 15, 20, 25, 30]
+  const displayYears = getDisplayYears(projectionYears)
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
@@ -310,6 +343,16 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
   profile: Record<string, unknown> | null
   fireParams: FireParams
 }) {
+  // ── Profile-derived values with safe defaults (feature #628) ──
+  const profileMonthlyIncome = Number(profile?.net_monthly_income ?? 0)
+  const profileSavingsRate = Number(profile?.savings_rate ?? 0)
+
+  const [projectionYears, setProjectionYears] = useState(DEFAULT_PROJECTION_YEARS)
+
+  const handleYearsChange = useCallback((value: number) => {
+    setProjectionYears(Math.max(1, Math.min(60, value)))
+  }, [])
+
   // Group and project
   const assetGroups = useMemo(() => groupAssetsByType(assets), [assets])
   const debtGroups = useMemo(() => groupDebtsByType(debts), [debts])
@@ -322,12 +365,12 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
         label: ASSET_TYPE_LABELS[type],
         columns: group.map((a) => ({
           label: a.name,
-          rows: projectAssetYearly(a),
+          rows: projectAssetYearly(a, projectionYears),
         })),
       })
     }
     return result
-  }, [assetGroups])
+  }, [assetGroups, projectionYears])
 
   const debtProjections = useMemo(() => {
     const result: { type: DebtType; label: string; columns: { label: string; rows: YearRow[] }[] }[] = []
@@ -337,12 +380,12 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
         label: DEBT_TYPE_LABELS[type],
         columns: group.map((d) => ({
           label: d.name,
-          rows: projectDebtYearly(d),
+          rows: projectDebtYearly(d, projectionYears),
         })),
       })
     }
     return result
-  }, [debtGroups])
+  }, [debtGroups, projectionYears])
 
   // Compute yearly totals for summary chart
   const { assetTotals, debtTotals, netTotals } = useMemo(() => {
@@ -350,7 +393,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
     const dTotals: number[] = []
     const nTotals: number[] = []
 
-    for (let yr = 0; yr < PROJECTION_YEARS; yr++) {
+    for (let yr = 0; yr < projectionYears; yr++) {
       let assetSum = 0
       for (const group of assetProjections) {
         for (const col of group.columns) {
@@ -371,7 +414,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
     }
 
     return { assetTotals: aTotals, debtTotals: dTotals, netTotals: nTotals }
-  }, [assetProjections, debtProjections])
+  }, [assetProjections, debtProjections, projectionYears])
 
   const hasAssets = assets.length > 0
   const hasDebts = debts.length > 0
@@ -402,6 +445,18 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
           </p>
         </div>
         <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Netto inkomen</p>
+          <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
+            {formatCurrency(profileMonthlyIncome)}<span className="text-[var(--ink-4)] text-[10px] ml-1">/mnd</span>
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Spaarquote (profiel)</p>
+          <p className="font-mono tabular-nums text-sm font-semibold text-horizon-600">
+            {profileSavingsRate.toFixed(1)}%
+          </p>
+        </div>
+        <div>
           <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Rendement / Inflatie</p>
           <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
             {(fireParams.grossReturn * 100).toFixed(1)}% / {(fireParams.inflationRate * 100).toFixed(1)}%
@@ -409,13 +464,52 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
         </div>
       </div>
 
+      {/* Section: Time horizon selector */}
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+            Tijdshorizon
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={1}
+              max={60}
+              step={1}
+              value={projectionYears}
+              onChange={(e) => handleYearsChange(Number(e.target.value))}
+              className="h-2 w-40 cursor-pointer appearance-none rounded-full bg-[var(--subtle)] accent-horizon-500 sm:w-56"
+            />
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={projectionYears}
+                onChange={(e) => handleYearsChange(Number(e.target.value))}
+                className="w-16 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1.5 text-center font-mono tabular-nums text-sm text-[var(--ink)] focus:border-horizon-500 focus:outline-none focus:ring-1 focus:ring-horizon-500"
+              />
+              <span className="text-sm text-[var(--ink-3)]">jaar</span>
+            </div>
+          </div>
+          {projectionYears !== DEFAULT_PROJECTION_YEARS && (
+            <button
+              onClick={() => setProjectionYears(DEFAULT_PROJECTION_YEARS)}
+              className="text-[11px] text-horizon-600 underline underline-offset-2 hover:text-horizon-700"
+            >
+              Reset naar {DEFAULT_PROJECTION_YEARS} jaar
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Section: Summary chart */}
       {(hasAssets || hasDebts) && (
         <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-            Samenvattende grafiek — 30 jaar projectie
+            Samenvattende grafiek — {projectionYears} jaar projectie
           </h2>
-          <SummaryChart assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} />
+          <SummaryChart assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} projectionYears={projectionYears} />
         </div>
       )}
 
@@ -431,6 +525,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
               title={group.label}
               columns={group.columns}
               color="bg-emerald-50/40"
+              projectionYears={projectionYears}
             />
           ))}
         </div>
@@ -448,17 +543,23 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
               title={group.label}
               columns={group.columns}
               color="bg-red-50/30"
+              projectionYears={projectionYears}
             />
           ))}
         </div>
       )}
 
       {/* Section: Savings rate */}
-      <SavingsRateTable assets={assets} debts={debts} profile={profile} />
+      <SavingsRateTable
+        assets={assets}
+        debts={debts}
+        profileMonthlyIncome={profileMonthlyIncome}
+        profileSavingsRate={profileSavingsRate}
+      />
 
       {/* Section: Total overview */}
       {(hasAssets || hasDebts) && (
-        <TotalTable assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} />
+        <TotalTable assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} projectionYears={projectionYears} />
       )}
 
       {/* Empty state */}
