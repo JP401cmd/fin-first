@@ -617,6 +617,19 @@ export function AfbouwClient({
         </div>
       </div>
 
+      {/* ── Summary Chart: Strategy Comparison ── */}
+      {portfolioAtRetirement > 0 && currentAge != null && (
+        <StrategyComparisonChart
+          startPortfolio={portfolioAtRetirement}
+          retirementAge={retirementAge}
+          endAge={displayEndAge}
+          yearlyExpenses={yearlyRetirementExpenses}
+          grossReturn={fireParams.grossReturn}
+          inflationRate={fireParams.inflationRate}
+          selectedEndStrategy={selectedEndStrategy}
+        />
+      )}
+
       {/* ── Section 1: Noodzakelijke uitgaven ── */}
       <section>
         <button
@@ -1157,6 +1170,49 @@ export function AfbouwClient({
         )}
       </section>
 
+      {/* ── Section: Deplete — Vermogen volledig opgebruiken ── */}
+      <section>
+        <button
+          onClick={() => setDepleteExpanded(!depleteExpanded)}
+          className="flex w-full items-center gap-2 text-left"
+        >
+          {depleteExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
+          <Zap className="h-4 w-4 text-horizon-500" />
+          <h3 className="text-base font-bold text-[var(--ink)]">Deplete — Vermogen volledig opgebruiken</h3>
+        </button>
+
+        {depleteExpanded && portfolioAtRetirement > 0 && currentAge != null && (
+          <div className="mt-4 space-y-4">
+            <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5 text-xs text-[var(--ink-3)]">
+              Vier onttrekkingsmethoden die het vermogen volledig opgebruiken bij leeftijd {displayEndAge}.
+              Annuïtaire onttrekking:{' '}
+              <span className="font-semibold text-[var(--ink-2)]">{formatCurrency(Math.round(annuityWithdrawal))}</span>/jr.
+            </div>
+            <DepleteStrategyTables
+              startPortfolio={portfolioAtRetirement}
+              retirementAge={retirementAge}
+              endAge={displayEndAge}
+              yearlyExpenses={yearlyRetirementExpenses}
+              grossReturn={fireParams.grossReturn}
+              inflationRate={fireParams.inflationRate}
+              hasPartner={hasPartner}
+            />
+          </div>
+        )}
+
+        {depleteExpanded && (portfolioAtRetirement <= 0 || currentAge == null) && (
+          <div className="mt-4 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-8 text-center">
+            <Zap className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+            <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
+              Geen data beschikbaar voor deplete-strategieën
+            </p>
+            <p className="mt-1 text-xs text-[var(--ink-4)]">
+              Vul je profiel en financiële gegevens aan.
+            </p>
+          </div>
+        )}
+      </section>
+
       {/* ── Section: Pensioenstrategie vanaf AOW ── */}
       <section>
         <button
@@ -1467,6 +1523,252 @@ function CrossoverTable({
 }
 
 // ── Decumulation Chart Component ────────────────────────────
+
+// ── Strategy Comparison Chart ──────────────────────────────
+
+/** Compute yearly portfolio balances for a given withdrawal strategy. */
+function computeStrategyPath(
+  startPortfolio: number,
+  retirementAge: number,
+  endAge: number,
+  yearlyExpenses: number,
+  grossReturn: number,
+  inflationRate: number,
+  strategy: 'swr' | 'guardrails' | 'vpw' | 'bucket',
+): { age: number; balance: number }[] {
+  const totalYears = Math.max(0, endAge - retirementAge)
+  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
+  const NL_SWR_LOCAL = 0.02883
+  const points: { age: number; balance: number }[] = [{ age: retirementAge, balance: startPortfolio }]
+
+  if (strategy === 'swr') {
+    let balance = startPortfolio
+    for (let y = 0; y < totalYears && balance > 0; y++) {
+      const withdrawal = Math.min(balance * NL_SWR_LOCAL, balance)
+      const remainder = balance - withdrawal
+      balance = remainder + remainder * realReturn
+      points.push({ age: retirementAge + y + 1, balance: Math.max(0, balance) })
+    }
+  } else if (strategy === 'guardrails') {
+    let balance = startPortfolio
+    let currentWithdrawal = startPortfolio * NL_SWR_LOCAL
+    const upperThreshold = startPortfolio * 1.2
+    const lowerThreshold = startPortfolio * 0.8
+    for (let y = 0; y < totalYears && balance > 0; y++) {
+      if (balance > upperThreshold) currentWithdrawal *= 1.1
+      else if (balance < lowerThreshold) currentWithdrawal *= 0.9
+      const withdrawal = Math.min(currentWithdrawal, balance)
+      const remainder = balance - withdrawal
+      balance = remainder + remainder * realReturn
+      points.push({ age: retirementAge + y + 1, balance: Math.max(0, balance) })
+    }
+  } else if (strategy === 'vpw') {
+    let balance = startPortfolio
+    for (let y = 0; y < totalYears && balance > 0; y++) {
+      const age = retirementAge + y
+      const remYears = Math.max(1, 100 - age)
+      let rate: number
+      if (remYears <= 1) rate = 1
+      else if (realReturn === 0) rate = 1 / remYears
+      else rate = realReturn / (1 - Math.pow(1 + realReturn, -remYears))
+      const withdrawal = Math.min(balance * rate, balance)
+      const remainder = balance - withdrawal
+      balance = remainder + remainder * realReturn
+      points.push({ age: retirementAge + y + 1, balance: Math.max(0, balance) })
+    }
+  } else if (strategy === 'bucket') {
+    const cashBucket = yearlyExpenses * 2
+    const bondBucket = yearlyExpenses * 5
+    let cashBalance = Math.min(cashBucket, startPortfolio)
+    let bondBalance = Math.min(bondBucket, Math.max(0, startPortfolio - cashBucket))
+    let stockBalance = Math.max(0, startPortfolio - cashBucket - bondBucket)
+    const bondReturn = realReturn * 0.3
+    for (let y = 0; y < totalYears; y++) {
+      const totalBalance = cashBalance + bondBalance + stockBalance
+      if (totalBalance <= 0) { points.push({ age: retirementAge + y + 1, balance: 0 }); continue }
+      const withdrawal = Math.min(yearlyExpenses, totalBalance)
+      const fromCash = Math.min(withdrawal, cashBalance)
+      cashBalance -= fromCash
+      const fromBonds = Math.min(withdrawal - fromCash, bondBalance)
+      bondBalance -= fromBonds
+      const fromStocks = withdrawal - fromCash - fromBonds
+      stockBalance = Math.max(0, stockBalance - fromStocks)
+      stockBalance += stockBalance * realReturn
+      bondBalance += bondBalance * bondReturn
+      const cashTarget = Math.min(yearlyExpenses * 2, stockBalance + bondBalance + cashBalance)
+      if (cashBalance < cashTarget && stockBalance > 0) {
+        const refill = Math.min(cashTarget - cashBalance, stockBalance)
+        cashBalance += refill
+        stockBalance -= refill
+      }
+      points.push({ age: retirementAge + y + 1, balance: Math.max(0, cashBalance + bondBalance + stockBalance) })
+    }
+  }
+  return points
+}
+
+const STRATEGY_COLORS: Record<string, { stroke: string; label: string }> = {
+  swr: { stroke: '#6366f1', label: 'SWR (Safe Withdrawal Rate)' },       // indigo
+  guardrails: { stroke: '#f59e0b', label: 'Guardrails (Variabel)' },      // amber
+  vpw: { stroke: '#10b981', label: 'VPW (Variable %)' },                  // emerald
+  bucket: { stroke: '#ef4444', label: 'Bucket (Emmers)' },                // red
+}
+
+function StrategyComparisonChart({
+  startPortfolio,
+  retirementAge,
+  endAge,
+  yearlyExpenses,
+  grossReturn,
+  inflationRate,
+  selectedEndStrategy,
+}: {
+  startPortfolio: number
+  retirementAge: number
+  endAge: number
+  yearlyExpenses: number
+  grossReturn: number
+  inflationRate: number
+  selectedEndStrategy: string
+}) {
+  const strategies = ['swr', 'guardrails', 'vpw', 'bucket'] as const
+
+  const paths = useMemo(() => {
+    return strategies.map((s) => ({
+      key: s,
+      points: computeStrategyPath(startPortfolio, retirementAge, endAge, yearlyExpenses, grossReturn, inflationRate, s),
+    }))
+  }, [startPortfolio, retirementAge, endAge, yearlyExpenses, grossReturn, inflationRate])
+
+  const width = 800
+  const height = 280
+  const margin = { top: 16, right: 16, bottom: 32, left: 68 }
+  const chartW = width - margin.left - margin.right
+  const chartH = height - margin.top - margin.bottom
+
+  // Compute global max/min across all strategies
+  const allBalances = paths.flatMap((p) => p.points.map((pt) => pt.balance))
+  const maxBalance = Math.max(...allBalances, 1)
+  const minBalance = Math.min(...allBalances, 0)
+  const yMin = Math.min(0, minBalance)
+  const yMax = maxBalance
+  const yRange = yMax - yMin || 1
+
+  const scaleX = (age: number) => margin.left + ((age - retirementAge) / Math.max(1, endAge - retirementAge)) * chartW
+  const scaleY = (val: number) => margin.top + chartH - ((val - yMin) / yRange) * chartH
+
+  // X-axis labels
+  const xLabels: number[] = []
+  const totalYears = endAge - retirementAge
+  const step = totalYears <= 20 ? 5 : totalYears <= 40 ? 5 : 10
+  for (let age = retirementAge; age <= endAge; age += step) xLabels.push(age)
+  if (xLabels[xLabels.length - 1] !== endAge) xLabels.push(endAge)
+
+  // Y-axis labels
+  const ySteps = 5
+  const yLabels: number[] = []
+  for (let i = 0; i <= ySteps; i++) yLabels.push(yMin + (yRange / ySteps) * i)
+
+  // Format Y values
+  const fmtY = (v: number) => {
+    if (Math.abs(v) >= 1_000_000) return `€${(v / 1_000_000).toFixed(1)}M`
+    if (Math.abs(v) >= 1_000) return `€${Math.round(v / 1_000)}k`
+    return `€${Math.round(v)}`
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+      <h4 className="text-sm font-semibold text-[var(--ink)] mb-1">Vermogensverloop per onttrekkingsstrategie</h4>
+      <p className="text-[11px] text-[var(--ink-3)] mb-3">
+        Vergelijking van 4 strategieën vanaf {retirementAge}j tot {endAge}j · startportfolio {formatCurrency(startPortfolio)}
+      </p>
+
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMidYMid meet">
+        {/* Grid lines */}
+        {yLabels.map((v, i) => (
+          <line key={i} x1={margin.left} y1={scaleY(v)} x2={width - margin.right} y2={scaleY(v)} stroke="var(--border-ed)" strokeDasharray="3,3" />
+        ))}
+
+        {/* €0 reference line */}
+        {yMin < 0 && (
+          <line x1={margin.left} y1={scaleY(0)} x2={width - margin.right} y2={scaleY(0)} stroke="var(--ink-4)" strokeWidth="1.5" strokeDasharray="6,4" />
+        )}
+        {yMin >= 0 && (
+          <line x1={margin.left} y1={scaleY(0)} x2={width - margin.right} y2={scaleY(0)} stroke="var(--ink-4)" strokeWidth="1" strokeDasharray="6,4" />
+        )}
+
+        {/* Strategy lines */}
+        {paths.map(({ key, points }) => {
+          if (points.length < 2) return null
+          const d = points.map((pt, i) => `${i === 0 ? 'M' : 'L'}${scaleX(pt.age).toFixed(1)},${scaleY(pt.balance).toFixed(1)}`).join(' ')
+          const color = STRATEGY_COLORS[key]
+          const isSelected = selectedEndStrategy === 'perpetual' // all 4 shown for perpetual context
+          return (
+            <path
+              key={key}
+              d={d}
+              fill="none"
+              stroke={color.stroke}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={1}
+            />
+          )
+        })}
+
+        {/* End dots */}
+        {paths.map(({ key, points }) => {
+          if (points.length === 0) return null
+          const last = points[points.length - 1]
+          return (
+            <circle
+              key={`dot-${key}`}
+              cx={scaleX(last.age)}
+              cy={scaleY(last.balance)}
+              r={3.5}
+              fill={STRATEGY_COLORS[key].stroke}
+              stroke="white"
+              strokeWidth={1.5}
+            />
+          )
+        })}
+
+        {/* X-axis labels */}
+        {xLabels.map((age) => (
+          <text key={age} x={scaleX(age)} y={height - 4} textAnchor="middle" className="text-[10px] fill-[var(--ink-4)]">
+            {age}j
+          </text>
+        ))}
+
+        {/* Y-axis labels */}
+        {yLabels.map((v, i) => (
+          <text key={i} x={margin.left - 4} y={scaleY(v) + 3} textAnchor="end" className="text-[10px] fill-[var(--ink-4)]">
+            {fmtY(Math.round(v))}
+          </text>
+        ))}
+
+        {/* Axis lines */}
+        <line x1={margin.left} y1={margin.top} x2={margin.left} y2={margin.top + chartH} stroke="var(--border-ed)" />
+        <line x1={margin.left} y1={margin.top + chartH} x2={width - margin.right} y2={margin.top + chartH} stroke="var(--border-ed)" />
+      </svg>
+
+      {/* Legend */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
+        {strategies.map((s) => (
+          <div key={s} className="flex items-center gap-1.5">
+            <span className="inline-block h-[3px] w-5 rounded-full" style={{ backgroundColor: STRATEGY_COLORS[s].stroke }} />
+            <span className="text-[11px] text-[var(--ink-2)]">{STRATEGY_COLORS[s].label}</span>
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block h-[1px] w-5 border-t border-dashed border-[var(--ink-4)]" />
+          <span className="text-[11px] text-[var(--ink-4)]">€0 referentie</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function DecumulationChart({
   schedule,
