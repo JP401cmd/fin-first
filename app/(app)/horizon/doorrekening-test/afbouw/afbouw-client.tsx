@@ -326,6 +326,7 @@ export function AfbouwClient({
   const [expensesExpanded, setExpensesExpanded] = useState(true)
   const [inflationTableExpanded, setInflationTableExpanded] = useState(false)
   const [strategyExpanded, setStrategyExpanded] = useState(true)
+  const [perpetualExpanded, setPerpetualExpanded] = useState(true)
   const [crossoverExpanded, setCrossoverExpanded] = useState(true)
 
   return (
@@ -659,6 +660,44 @@ export function AfbouwClient({
             {withdrawalSchedule.length > 0 && (
               <DecumulationChart schedule={withdrawalSchedule} endAge={displayEndAge} retirementAge={retirementAge} />
             )}
+          </div>
+        )}
+      </section>
+
+      {/* ── Section: Perpetual — Onttrekkingsstrategieën ── */}
+      <section>
+        <button
+          onClick={() => setPerpetualExpanded(!perpetualExpanded)}
+          className="flex w-full items-center gap-2 text-left"
+        >
+          {perpetualExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
+          <Shield className="h-4 w-4 text-horizon-500" />
+          <h3 className="text-base font-bold text-[var(--ink)]">Perpetual — Vermogen blijft intact</h3>
+        </button>
+
+        {perpetualExpanded && portfolioAtRetirement > 0 && currentAge != null && (
+          <div className="mt-4 space-y-6">
+            <PerpetualStrategyTables
+              startPortfolio={portfolioAtRetirement}
+              retirementAge={retirementAge}
+              endAge={displayEndAge}
+              yearlyExpenses={yearlyRetirementExpenses}
+              grossReturn={fireParams.grossReturn}
+              inflationRate={fireParams.inflationRate}
+              hasPartner={hasPartner}
+            />
+          </div>
+        )}
+
+        {perpetualExpanded && (portfolioAtRetirement <= 0 || currentAge == null) && (
+          <div className="mt-4 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-8 text-center">
+            <Shield className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+            <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
+              Geen data beschikbaar voor perpetual-strategieën
+            </p>
+            <p className="mt-1 text-xs text-[var(--ink-4)]">
+              Vul je profiel en financiële gegevens aan.
+            </p>
           </div>
         )}
       </section>
