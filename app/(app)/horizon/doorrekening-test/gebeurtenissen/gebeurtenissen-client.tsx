@@ -1110,6 +1110,143 @@ export function GebeurtenissenClient({
         )}
       </section>
 
+      {/* ── Section 3b: Income Distribution Strategy ── */}
+      <section data-testid="income-distribution-section">
+        <button
+          onClick={() => setIncomeDistributionExpanded(!incomeDistributionExpanded)}
+          className="flex w-full items-center gap-2 text-left"
+        >
+          {incomeDistributionExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
+          <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+          <h3 className="text-base font-bold text-[var(--ink)]">Verdelingsstrategie voor toename</h3>
+          {incomeEvents.length > 0 && (
+            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              {incomeEvents.length} events
+            </span>
+          )}
+        </button>
+
+        {incomeDistributionExpanded && (
+          <div className="mt-4 space-y-4">
+            {/* Strategy picker */}
+            <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+              <p className="mb-3 text-sm text-[var(--ink-3)]">
+                Kies hoe binnenkomend geld (erfenis, verkoop, bijverdienste) wordt verdeeld over je bezittingen:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(INCOME_STRATEGY_INFO) as IncomeDistributionStrategy[]).map((key) => {
+                  const info = INCOME_STRATEGY_INFO[key]
+                  const Icon = info.icon
+                  const active = selectedIncomeStrategy === key
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setSelectedIncomeStrategy(key)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                        active
+                          ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-emerald-300 hover:text-emerald-600'
+                      }`}
+                      data-testid={`income-strategy-${key}`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {info.label}
+                      <IncomeStrategyTooltip strategy={key} />
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Selected strategy description */}
+              <div className="mt-3 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5 text-xs text-[var(--ink-3)]">
+                <span className="font-semibold text-[var(--ink-2)]">{INCOME_STRATEGY_INFO[selectedIncomeStrategy].label}:</span>{' '}
+                {INCOME_STRATEGY_INFO[selectedIncomeStrategy].description}
+              </div>
+            </div>
+
+            {/* Income distribution results per income event */}
+            {incomeDistributionResults.length > 0 ? (
+              incomeDistributionResults.map(({ event, amount, distribution }) => (
+                <div key={event.id} className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+                  <div className="border-b border-[var(--border-ed)] bg-emerald-50/50 px-4 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>{event.icon || '📌'}</span>
+                        <span className="text-sm font-semibold text-[var(--ink)]">{event.name}</span>
+                        {event.target_age != null && (
+                          <span className="rounded bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+                            {event.target_age}j
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          event.one_time_cost < 0 ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
+                        }`}>
+                          {event.one_time_cost < 0 ? 'Eenmalig' : 'Jaarlijks inkomen'}
+                        </span>
+                      </div>
+                      <span className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
+                        +{formatCurrency(amount)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+                          <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Bezitting</th>
+                          <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Type</th>
+                          <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Huidige waarde</th>
+                          <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Rendement</th>
+                          <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Storting</th>
+                          <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Nieuwe waarde</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {distribution.map((row, idx) => (
+                          <tr
+                            key={row.assetId}
+                            className={`border-b border-[var(--border-ed)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
+                          >
+                            <td className="px-3 py-1 font-medium text-[var(--ink)]">{row.assetName}</td>
+                            <td className="px-3 py-1 text-[var(--ink-3)]">
+                              <span className="rounded bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-medium">
+                                {ASSET_TYPE_LABELS[row.assetType as keyof typeof ASSET_TYPE_LABELS] ?? row.assetType}
+                              </span>
+                            </td>
+                            <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
+                              {formatCurrency(row.currentValue)}
+                            </td>
+                            <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                              {row.expectedReturn.toFixed(1)}%
+                            </td>
+                            <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${row.depositAmount > 0 ? 'text-emerald-600' : 'text-[var(--ink-4)]'}`}>
+                              {row.depositAmount > 0 ? `+${formatCurrency(row.depositAmount)}` : '—'}
+                            </td>
+                            <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
+                              {formatCurrency(row.newValue)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-6 text-center">
+                <ArrowUpRight className="mx-auto h-6 w-6 text-[var(--ink-4)]" />
+                <p className="mt-2 text-sm text-[var(--ink-3)]">
+                  Geen toename-gebeurtenissen gevonden — verdelingsstrategie niet van toepassing.
+                </p>
+                <p className="mt-1 text-xs text-[var(--ink-4)]">
+                  Voeg gebeurtenissen toe met inkomsten (erfenis, verkoop, bijverdienste) om verdelingen te berekenen.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
       {/* ── Section 4: Impact Preview ── */}
       <section>
         <div className="flex items-center gap-2">
@@ -1170,11 +1307,80 @@ export function GebeurtenissenClient({
             </div>
           </div>
 
+          {/* ── Impact preview table ── */}
+          {eventsWithImpact.length > 0 && (
+            <div className="mt-5 border-t border-[var(--border-ed)] pt-4" data-testid="impact-preview-table">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                Impact per gebeurtenis
+              </p>
+              <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+                <div className="overflow-auto max-h-[70vh]">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+                        <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Gebeurtenis</th>
+                        <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Leeftijd</th>
+                        <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Eenmalig</th>
+                        <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Maandelijks</th>
+                        <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Duur</th>
+                        <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Totale impact</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eventsWithImpact.map(({ event, netImpact }, idx) => {
+                        // Net monthly = income change minus cost change
+                        const netMonthly = event.monthly_income_change - event.monthly_cost_change
+                        // One-time cost (negative = expense)
+                        const oneTime = event.one_time_cost !== 0 ? -event.one_time_cost : 0
+                        return (
+                          <tr
+                            key={event.id}
+                            className={`border-b border-[var(--border-ed)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
+                          >
+                            <td className="px-3 py-1 font-medium text-[var(--ink)]">
+                              <div className="flex items-center gap-1.5">
+                                <span>{event.icon || '📌'}</span>
+                                <span className="truncate max-w-[200px]">{event.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
+                              {formatAge(event.target_age)}
+                            </td>
+                            <td className={`px-3 py-1 text-right font-mono tabular-nums ${oneTime !== 0 ? (oneTime > 0 ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-4)]'}`}>
+                              {oneTime !== 0 ? `${oneTime > 0 ? '+' : ''}${formatCurrency(oneTime)}` : '—'}
+                            </td>
+                            <td className={`px-3 py-1 text-right font-mono tabular-nums ${netMonthly !== 0 ? (netMonthly > 0 ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-4)]'}`}>
+                              {netMonthly !== 0 ? `${netMonthly > 0 ? '+' : ''}${formatCurrency(netMonthly)}/mnd` : '—'}
+                            </td>
+                            <td className="px-3 py-1 text-right text-[var(--ink-2)]">
+                              {formatDuration(event.duration_months)}
+                            </td>
+                            <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${netImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {netImpact >= 0 ? '+' : ''}{formatCurrency(netImpact)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
+                        <td colSpan={5} className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal netto impact</td>
+                        <td className={`px-3 py-1.5 text-right font-mono font-bold tabular-nums ${totalNetImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {totalNetImpact >= 0 ? '+' : ''}{formatCurrency(totalNetImpact)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Events impact breakdown bar chart */}
           {eventsWithImpact.length > 0 && (
             <div className="mt-5 border-t border-[var(--border-ed)] pt-4">
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-                Impact per gebeurtenis
+                Visueel overzicht
               </p>
               <div className="space-y-2">
                 {[...eventsWithImpact]
