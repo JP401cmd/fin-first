@@ -18,6 +18,8 @@ interface PerpetualRow {
   withdrawalRate?: number
   /** Optional: remaining life expectancy years used for VPW */
   remainingYears?: number
+  /** Optional: which guardrail is active this period */
+  guardrail?: 'upper' | 'lower' | 'normal'
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -85,29 +87,37 @@ export function PerpetualStrategyTables({
   }, [startPortfolio, totalYears, retirementAge, realReturn])
 
   // ── Guardrails Strategy ──
+  // Portfolio-based triggers: upper at 120% start, lower at 80% start
+  // Withdrawal adjusts ±10% when guardrails hit
   const guardrailsRows = useMemo(() => {
     const rows: PerpetualRow[] = []
     let balance = startPortfolio
-    let baseWithdrawal = startPortfolio * NL_SWR
-    const floor = baseWithdrawal * 0.9
-    const ceiling = baseWithdrawal * 1.1
+    let currentWithdrawal = startPortfolio * NL_SWR
+    const upperThreshold = startPortfolio * 1.2  // portfolio > 120% of start
+    const lowerThreshold = startPortfolio * 0.8  // portfolio < 80% of start
+
     for (let y = 0; y < totalYears && balance > 0; y++) {
       const age = retirementAge + y
-      const impliedWithdrawal = balance * NL_SWR
-      if (impliedWithdrawal > ceiling) {
-        baseWithdrawal = ceiling
-      } else if (impliedWithdrawal < floor) {
-        baseWithdrawal = floor
-      } else {
-        baseWithdrawal = impliedWithdrawal
+      let guardrail: 'upper' | 'lower' | 'normal' = 'normal'
+
+      if (balance > upperThreshold) {
+        // Strong growth: increase withdrawal by 10%
+        currentWithdrawal = currentWithdrawal * 1.1
+        guardrail = 'upper'
+      } else if (balance < lowerThreshold) {
+        // Decline: decrease withdrawal by 10%
+        currentWithdrawal = currentWithdrawal * 0.9
+        guardrail = 'lower'
       }
-      const withdrawal = Math.min(baseWithdrawal, balance)
+
+      const withdrawal = Math.min(currentWithdrawal, balance)
       const remainder = balance - withdrawal
       const growth = remainder * realReturn
       rows.push({
         year: y + 1, age, startBalance: Math.round(balance),
         withdrawal: Math.round(withdrawal), remainder: Math.round(remainder),
         growth: Math.round(growth), endBalance: Math.round(remainder + growth),
+        guardrail,
       })
       balance = remainder + growth
     }
@@ -181,7 +191,7 @@ export function PerpetualStrategyTables({
 
   const strategies = [
     { key: 'swr', label: 'SWR (Safe Withdrawal Rate)', subtitle: `Onttrekking = ${(NL_SWR * 100).toFixed(3)}% van portfolio per jaar`, rows: swrRows },
-    { key: 'guardrails', label: 'Guardrails', subtitle: 'Variabele onttrekking met boven- en ondergrenzen (±10%)', rows: guardrailsRows },
+    { key: 'guardrails', label: 'Guardrails', subtitle: `Basisonttrekking NL SWR (${(NL_SWR * 100).toFixed(2)}%). Portfolio > 120% start → +10%, < 80% → −10%`, rows: guardrailsRows, showGuardrailColumn: true },
     { key: 'vpw', label: 'VPW (Variable Percentage Withdrawal)', subtitle: 'Jaarlijks herberekend op basis van resterende jaren tot 100 en verwacht rendement', rows: vpwRows, showVpwColumns: true },
     { key: 'bucket', label: 'Bucket (Emmer-strategie)', subtitle: '3 emmers: cash (2j), obligaties (5j), aandelen (rest)', rows: bucketRows },
   ]
@@ -189,7 +199,7 @@ export function PerpetualStrategyTables({
   return (
     <>
       {strategies.map((strat) => (
-        <PerpetualSubTable key={strat.key} label={strat.label} subtitle={strat.subtitle} rows={strat.rows} showVpwColumns={strat.showVpwColumns} />
+        <PerpetualSubTable key={strat.key} label={strat.label} subtitle={strat.subtitle} rows={strat.rows} showVpwColumns={strat.showVpwColumns} showGuardrailColumn={strat.showGuardrailColumn} />
       ))}
     </>
   )
@@ -197,7 +207,7 @@ export function PerpetualStrategyTables({
 
 // ── Sub-table Component ──────────────────────────────────────
 
-function PerpetualSubTable({ label, subtitle, rows, showVpwColumns }: { label: string; subtitle: string; rows: PerpetualRow[]; showVpwColumns?: boolean }) {
+function PerpetualSubTable({ label, subtitle, rows, showVpwColumns, showGuardrailColumn }: { label: string; subtitle: string; rows: PerpetualRow[]; showVpwColumns?: boolean; showGuardrailColumn?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : samplePerpetualRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
@@ -226,6 +236,9 @@ function PerpetualSubTable({ label, subtitle, rows, showVpwColumns }: { label: s
                 <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Onttrekking</th>
                 <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Restant</th>
                 <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Rendement</th>
+                {showGuardrailColumn && (
+                  <th className="px-3 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Guardrail</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -260,6 +273,17 @@ function PerpetualSubTable({ label, subtitle, rows, showVpwColumns }: { label: s
                   <td className={`px-3 py-1 text-right font-mono tabular-nums ${row.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {row.growth >= 0 ? '+' : ''}{formatCurrency(row.growth)}
                   </td>
+                  {showGuardrailColumn && (
+                    <td className="px-3 py-1 text-center text-[11px] font-medium">
+                      {row.guardrail === 'upper' ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">▲ +10%</span>
+                      ) : row.guardrail === 'lower' ? (
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">▼ −10%</span>
+                      ) : (
+                        <span className="text-[var(--ink-4)]">—</span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -276,6 +300,7 @@ function PerpetualSubTable({ label, subtitle, rows, showVpwColumns }: { label: s
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
                   +{formatCurrency(rows.reduce((s, r) => s + r.growth, 0))}
                 </td>
+                {showGuardrailColumn && <td className="px-3 py-1.5" />}
               </tr>
             </tfoot>
           </table>

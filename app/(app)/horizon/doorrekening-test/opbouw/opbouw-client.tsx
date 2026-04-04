@@ -1606,6 +1606,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
                   key={asset.id}
                   asset={asset}
                   projectionYears={projectionYears}
+                  crossoverMonth={crossoverMonth}
                 />
               ))}
             </div>
@@ -1670,6 +1671,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
             profileMonthlyIncome={profileMonthlyIncome}
             profileSavingsRate={profileSavingsRate}
             projectionYears={projectionYears}
+            crossoverMonth={crossoverMonth}
           />
         </div>
       </div>

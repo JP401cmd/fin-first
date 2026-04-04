@@ -336,6 +336,14 @@ export function AfbouwClient({
   const [legacyExpanded, setLegacyExpanded] = useState(true)
   const [legacyTarget, setLegacyTarget] = useState(strategyConfig.legacyAmount || 250_000)
   const [crossoverExpanded, setCrossoverExpanded] = useState(true)
+  const [pensionExpanded, setPensionExpanded] = useState(true)
+
+  // Portfolio projected to AOW age (for pension strategy tables)
+  const portfolioAtAow = useMemo(() => {
+    if (currentAge == null) return netWorth
+    const yearsToAow = Math.max(0, NL_AOW_AGE - currentAge)
+    return projectPortfolio(netWorth, annualSavings, fireParams.grossReturn, fireParams.inflationRate, yearsToAow)
+  }, [currentAge, netWorth, annualSavings, fireParams])
 
   return (
     <div className="space-y-8">
@@ -905,6 +913,46 @@ export function AfbouwClient({
             <Gift className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
             <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
               Geen data beschikbaar voor legacy-strategieën
+            </p>
+            <p className="mt-1 text-xs text-[var(--ink-4)]">
+              Vul je profiel en financiële gegevens aan.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* ── Section: Pensioenstrategie vanaf AOW ── */}
+      <section>
+        <button
+          onClick={() => setPensionExpanded(!pensionExpanded)}
+          className="flex w-full items-center gap-2 text-left"
+        >
+          {pensionExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
+          <Landmark className="h-4 w-4 text-horizon-500" />
+          <h3 className="text-base font-bold text-[var(--ink)]">Pensioenstrategie vanaf AOW-leeftijd</h3>
+          <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold text-horizon-700">
+            {NL_AOW_AGE}j → 100j
+          </span>
+        </button>
+
+        {pensionExpanded && portfolioAtAow > 0 && currentAge != null && (
+          <div className="mt-4 space-y-6">
+            <PensionStrategyTables
+              portfolioAtAow={portfolioAtAow}
+              currentAge={currentAge}
+              yearlyExpenses={yearlyRetirementExpenses}
+              grossReturn={fireParams.grossReturn}
+              inflationRate={fireParams.inflationRate}
+              hasPartner={hasPartner}
+            />
+          </div>
+        )}
+
+        {pensionExpanded && (portfolioAtAow <= 0 || currentAge == null) && (
+          <div className="mt-4 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-8 text-center">
+            <Landmark className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+            <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
+              Geen data beschikbaar voor pensioenstrategie
             </p>
             <p className="mt-1 text-xs text-[var(--ink-4)]">
               Vul je profiel en financiële gegevens aan.
