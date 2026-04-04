@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle, CalendarClock, Shield } from 'lucide-react'
+import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle, CalendarClock, Shield, Gift } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -9,6 +9,7 @@ import type { FireParams } from '@/lib/fire-params'
 import { parseFireStrategy, STRATEGY_LABELS, type FireEndStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '@/lib/constants'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { PerpetualStrategyTables } from './perpetual-tables'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ function computeWithdrawalSchedule(
   // Determine annual withdrawal amount based on strategy
   let baseWithdrawal: number
   if (strategy === 'perpetual') {
-    // SWR-based: withdraw effectiveSwr × portfolio (recalculated yearly)
+    // SWR-based: withdraw NL_SWR (2.883%) × portfolio (recalculated yearly with inflation correction)
     baseWithdrawal = startPortfolio * NL_SWR
   } else if (strategy === 'deplete') {
     // Annuity formula: withdraw evenly so portfolio hits 0 at endAge
@@ -112,11 +113,14 @@ function computeWithdrawalSchedule(
     const startBalance = balance
     const aow = age >= NL_AOW_AGE ? aowYearly : 0
 
+    // Inflate yearly expenses for this year
+    const inflatedExpenses = yearlyExpenses * Math.pow(1 + inflationRate, y)
+
     // How much do we need from portfolio?
     let neededFromPortfolio: number
     if (strategy === 'perpetual') {
-      // Variable: SWR of current balance
-      neededFromPortfolio = Math.max(0, Math.min(balance * NL_SWR, yearlyExpenses - aow))
+      // Variable: NL_SWR (2.883%) of current balance, capped at inflation-adjusted expenses minus AOW
+      neededFromPortfolio = Math.max(0, Math.min(balance * NL_SWR, inflatedExpenses - aow))
     } else {
       neededFromPortfolio = Math.max(0, baseWithdrawal - aow)
     }
@@ -327,6 +331,8 @@ export function AfbouwClient({
   const [inflationTableExpanded, setInflationTableExpanded] = useState(false)
   const [strategyExpanded, setStrategyExpanded] = useState(true)
   const [perpetualExpanded, setPerpetualExpanded] = useState(true)
+  const [legacyExpanded, setLegacyExpanded] = useState(true)
+  const [legacyTarget, setLegacyTarget] = useState(strategyConfig.legacyAmount || 250_000)
   const [crossoverExpanded, setCrossoverExpanded] = useState(true)
 
   return (
@@ -496,6 +502,104 @@ export function AfbouwClient({
         )}
       </section>
 
+      {/* ── Section 1b: Noodzakelijke uitgaven met inflatie (maand-op-maand) ── */}
+      <section>
+        <button
+          onClick={() => setInflationTableExpanded(!inflationTableExpanded)}
+          className="flex w-full items-center gap-2 text-left"
+        >
+          {inflationTableExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
+          <CalendarClock className="h-4 w-4 text-horizon-500" />
+          <h3 className="text-base font-bold text-[var(--ink)]">Uitgaven met inflatie</h3>
+          <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold text-horizon-700">
+            {(fireParams.inflationRate * 100).toFixed(1)}% /jr
+          </span>
+        </button>
+
+        {inflationTableExpanded && (
+          <div className="mt-4 space-y-3">
+            {/* Info strip */}
+            <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5 text-xs text-[var(--ink-3)]">
+              Startbedrag {formatCurrency(monthlyRetirementExpenses)}/mnd &times; maandelijkse inflatiecorrectie ({(fireParams.inflationRate * 100).toFixed(1)}%/jr).
+              Tabel loopt van{' '}
+              <span className="font-semibold text-[var(--ink-2)]">{currentAge ?? '?'}j</span> tot{' '}
+              <span className="font-semibold text-[var(--ink-2)]">{displayEndAge}j</span>
+              {' '}({inflationExpenseSchedule.length} maanden).
+              Deze tabel dient als input voor alle eindstrategie-tabellen.
+            </div>
+
+            {inflationExpenseSchedule.length > 0 ? (
+              <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+                <div className="overflow-auto max-h-[70vh]">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+                        <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Maand</th>
+                        <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Leeftijd</th>
+                        <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Basisuitgave</th>
+                        <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Inflatie-correctie</th>
+                        <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">Gecorrigeerd bedrag</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayExpenseRows.map((row, idx) => (
+                        <tr
+                          key={row.month}
+                          className={`border-b border-[var(--border-ed)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
+                        >
+                          <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink)]">{row.month}</td>
+                          <td className="px-3 py-1 text-[var(--ink)]">
+                            {row.age}j
+                            {row.ageMonth > 0 && <span className="text-[var(--ink-4)]">+{row.ageMonth}m</span>}
+                          </td>
+                          <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
+                            {formatCurrency(row.baseExpense)}
+                          </td>
+                          <td className={`px-3 py-1 text-right font-mono tabular-nums ${row.inflationCorrection > 0 ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
+                            {row.inflationCorrection > 0 ? `+${formatCurrency(row.inflationCorrection)}` : '\u2014'}
+                          </td>
+                          <td className="px-3 py-1 text-right font-mono font-semibold tabular-nums text-[var(--ink)]">
+                            {formatCurrency(row.adjustedExpense)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
+                        <td colSpan={2} className="px-3 py-1.5 font-bold text-[var(--ink)]">
+                          Laatste maand (mnd {inflationExpenseSchedule.length})
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-mono tabular-nums text-[var(--ink-3)]">
+                          {formatCurrency(monthlyRetirementExpenses)}
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-500">
+                          +{formatCurrency(inflationExpenseSchedule[inflationExpenseSchedule.length - 1]?.inflationCorrection ?? 0)}
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
+                          {formatCurrency(inflationExpenseSchedule[inflationExpenseSchedule.length - 1]?.adjustedExpense ?? 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-8 text-center">
+                <CalendarClock className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+                <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
+                  Geen uitgaventabel beschikbaar
+                </p>
+                <p className="mt-1 text-xs text-[var(--ink-4)]">
+                  {currentAge == null
+                    ? 'Stel je geboortedatum in via Identiteit → Profiel.'
+                    : 'Stel je pensioenuitgaven in via Identiteit → Instellingen → FIRE Instellingen.'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
       {/* ── Section 2: Eindstrategie-tabellen ── */}
       <section>
         <button
@@ -523,6 +627,11 @@ export function AfbouwClient({
                   <p className="text-[11px] text-[var(--ink-3)]">
                     {STRATEGY_LABELS[strategyConfig.strategy]?.subtitle}
                   </p>
+                  {(strategyConfig.strategy === 'perpetual' || strategyConfig.strategy === 'pensioen') && (
+                    <p className="mt-0.5 font-mono text-[11px] font-medium text-horizon-600">
+                      Vast (NL SWR {(NL_SWR * 100).toFixed(2).replace('.', ',')}%)
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Vermogen bij start</p>
@@ -673,6 +782,7 @@ export function AfbouwClient({
           {perpetualExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
           <Shield className="h-4 w-4 text-horizon-500" />
           <h3 className="text-base font-bold text-[var(--ink)]">Perpetual — Vermogen blijft intact</h3>
+          <span className="ml-1 font-mono text-[11px] text-horizon-600">Vast (NL SWR {(NL_SWR * 100).toFixed(2).replace('.', ',')}%)</span>
         </button>
 
         {perpetualExpanded && portfolioAtRetirement > 0 && currentAge != null && (
