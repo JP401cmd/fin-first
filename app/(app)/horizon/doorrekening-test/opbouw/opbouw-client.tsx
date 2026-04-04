@@ -480,6 +480,154 @@ function SavingsProjectionTable({ profileMonthlyIncome, profileSavingsRate, proj
   )
 }
 
+// ── Per-debt amortization table (month-by-month) ────────────
+
+interface AmortizationRow {
+  month: number
+  startBalance: number
+  interest: number
+  repayment: number
+  endBalance: number
+}
+
+function computeAmortization(debt: Debt, maxMonths: number): AmortizationRow[] {
+  const monthlyRate = Number(debt.interest_rate) / 100 / 12
+  const monthly = Number(debt.monthly_payment)
+  let balance = Number(debt.current_balance)
+  const rows: AmortizationRow[] = []
+
+  for (let m = 1; m <= maxMonths; m++) {
+    if (balance <= 0.005) break
+    const interest = balance * monthlyRate
+    const payment = Math.min(monthly, balance + interest)
+    const repayment = payment - interest
+    const endBalance = Math.max(0, balance - repayment)
+
+    rows.push({
+      month: m,
+      startBalance: Math.round(balance * 100) / 100,
+      interest: Math.round(interest * 100) / 100,
+      repayment: Math.round(repayment * 100) / 100,
+      endBalance: Math.round(endBalance * 100) / 100,
+    })
+
+    balance = endBalance
+  }
+  return rows
+}
+
+function getAmortizationDisplayMonths(rows: AmortizationRow[]): number[] {
+  const total = rows.length
+  if (total <= 24) {
+    return rows.map((r) => r.month)
+  }
+  // Show first 3 months, then every 6 months, plus last month
+  const months: number[] = [1, 2, 3]
+  for (let m = 6; m <= total; m += 6) {
+    if (!months.includes(m)) months.push(m)
+  }
+  if (!months.includes(total)) months.push(total)
+  return months.sort((a, b) => a - b)
+}
+
+function DebtAmortizationTable({ debt, projectionYears }: {
+  debt: Debt
+  projectionYears: number
+}) {
+  const maxMonths = projectionYears * 12
+  const rows = useMemo(() => computeAmortization(debt, maxMonths), [debt, maxMonths])
+  const displayMonths = useMemo(() => getAmortizationDisplayMonths(rows), [rows])
+
+  if (rows.length === 0) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
+        <div className="border-b border-[var(--border-ed)] bg-red-50/30 px-4 py-3">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">{debt.name}</h3>
+        </div>
+        <div className="p-4 text-center text-sm text-[var(--ink-3)]">
+          Deze schuld is al afgelost.
+        </div>
+      </div>
+    )
+  }
+
+  const totalInterest = rows.reduce((s, r) => s + r.interest, 0)
+  const totalRepayment = rows.reduce((s, r) => s + r.repayment, 0)
+  const paidOff = rows[rows.length - 1].endBalance <= 0.01
+  const paidOffMonth = paidOff ? rows.length : null
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
+      <div className="border-b border-[var(--border-ed)] bg-red-50/30 px-4 py-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">{debt.name}</h3>
+          <div className="flex items-center gap-3 text-[10px] text-[var(--ink-4)]">
+            <span>Saldo: <span className="font-mono tabular-nums font-semibold text-red-500">{formatCurrency(Number(debt.current_balance))}</span></span>
+            <span>Rente: <span className="font-mono tabular-nums">{Number(debt.interest_rate).toFixed(2)}%</span></span>
+            <span>Betaling: <span className="font-mono tabular-nums">{formatCurrency(Number(debt.monthly_payment))}/mnd</span></span>
+            {paidOffMonth && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700 font-medium">
+                Afgelost in {paidOffMonth} mnd
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+              <th className="px-3 py-2 text-left font-medium text-[var(--ink-3)]">Maand</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Restant</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Rente</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Aflossing</th>
+              <th className="px-3 py-2 text-right font-medium text-red-500">Nieuw restant</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayMonths.map((month) => {
+              const row = rows.find((r) => r.month === month)
+              if (!row) return null
+              return (
+                <tr key={month} className="border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50">
+                  <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink-3)]">{month}</td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                    {formatCurrency(row.startBalance)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-3)]">
+                    {formatCurrency(row.interest)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-emerald-600">
+                    {formatCurrency(row.repayment)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-red-500">
+                    {formatCurrency(row.endBalance)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/50">
+              <td className="px-3 py-2 font-medium text-[var(--ink-3)]">Totaal</td>
+              <td className="px-3 py-2" />
+              <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-[var(--ink-3)]">
+                {formatCurrency(totalInterest)}
+              </td>
+              <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-emerald-600">
+                {formatCurrency(totalRepayment)}
+              </td>
+              <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-red-500">
+                {formatCurrency(rows[rows.length - 1].endBalance)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ── Total overview table ─────────────────────────────────────
 
 function TotalTable({ assetTotals, debtTotals, netTotals, projectionYears }: {
@@ -753,6 +901,18 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
               color="bg-red-50/30"
               projectionYears={projectionYears}
             />
+          ))}
+        </div>
+      )}
+
+      {/* Section: Per-debt amortization tables (month-by-month) */}
+      {hasDebts && (
+        <div className="space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-red-500">
+            Doorrekening per schuld — maand-op-maand
+          </h2>
+          {debts.map((debt) => (
+            <DebtAmortizationTable key={debt.id} debt={debt} projectionYears={projectionYears} />
           ))}
         </div>
       )}

@@ -21722,3 +21722,51 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#617)
 - Overall progress: 616/635 passing (97.0%)
+
+## Session 2026-04-04 - Features #618, #627
+
+### Feature #618: Configureerbare tijdshorizon op opbouw-pagina - PASSING
+- Added slider (range 1-60) + number input for projection years
+- Default value: 30 years
+- All tables, chart, and totals dynamically recalculate when horizon changes
+- X-axis labels adapt to selected range (step 1 for ≤10yr, step 5 for ≤40yr, step 10 for >40yr)
+- "Reset naar 30 jaar" button appears when not at default
+- getDisplayYears() helper generates sensible table row intervals
+- Zero console errors
+- Commit: dcbea554
+
+### Feature #627: Spaarquote doorrekentabel maand-op-maand - PASSING
+- Added SavingsProjectionTable component below SavingsRateTable
+- Monthly savings = profileMonthlyIncome × (profileSavingsRate / 100)
+- Columns: Maand, Inkomen (mnd), Spaarquote %, Spaarbedrag, Cumulatief
+- Cumulative grows linearly each month
+- Sampled rows for horizons > 24 months (first 3, then every 6 months)
+- Empty state when income or savings rate is 0
+- Respects configurable time horizon from feature #618
+- Zero console errors
+- Commit: 42b6a79c
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — time horizon control + savings projection table
+
+### Current Status
+- 2 features completed this session (#618, #627)
+
+## Session 2026-04-04 - Feature #628
+
+### Feature #628: Spaarquote en inkomen uit profiel laden - PASSING
+- Extracted profileMonthlyIncome (default €0) and profileSavingsRate (default 0%) from profile
+- Added "Netto inkomen" and "Spaarquote (profiel)" to the summary header as reference values
+- Updated SavingsRateTable to show both computed savings rate and profile savings rate side-by-side
+- Grid changed from sm:grid-cols-4 to sm:grid-cols-5 to accommodate new column
+- All values correctly loaded from user profile (net_monthly_income, savings_rate)
+- Missing values default safely: savings_rate → 0%, net_monthly_income → €0
+- Zero console errors, TypeScript compiles clean
+- Verified end-to-end: regression test account shows €3,500/mnd income, 0.0% savings rate
+- Commit: 4b1877c8
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — profile values in header + savings rate table
+
+### Current Status
+- 1 feature completed this session (#628)
