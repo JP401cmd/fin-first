@@ -288,6 +288,94 @@ function SavingsRateTable({ assets, debts, profileMonthlyIncome, profileSavingsR
   )
 }
 
+// ── Savings projection table (month-by-month) ───────────────
+
+function SavingsProjectionTable({ profileMonthlyIncome, profileSavingsRate, projectionYears }: {
+  profileMonthlyIncome: number
+  profileSavingsRate: number
+  projectionYears: number
+}) {
+  const totalMonths = projectionYears * 12
+  const savingsRateFrac = profileSavingsRate / 100
+  const monthlySavings = profileMonthlyIncome * savingsRateFrac
+
+  // For large horizons, show sampled rows instead of every month
+  const displayMonths: number[] = useMemo(() => {
+    if (totalMonths <= 24) {
+      // Show every month for ≤2 years
+      return Array.from({ length: totalMonths }, (_, i) => i + 1)
+    }
+    // Show first 3 months, then every 6 months, plus last month
+    const months: number[] = [1, 2, 3]
+    for (let m = 6; m <= totalMonths; m += 6) {
+      if (!months.includes(m)) months.push(m)
+    }
+    if (!months.includes(totalMonths)) months.push(totalMonths)
+    return months.sort((a, b) => a - b)
+  }, [totalMonths])
+
+  if (profileMonthlyIncome <= 0 || profileSavingsRate <= 0) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
+        <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">Spaarquote doorrekening — maand-op-maand</h3>
+        </div>
+        <div className="p-4 text-center text-sm text-[var(--ink-3)]">
+          Vul je netto inkomen en spaarquote in bij je profiel om de doorrekening te zien.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
+      <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">
+          Spaarquote doorrekening — maand-op-maand
+        </h3>
+        <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+          {formatCurrency(monthlySavings)}/mnd bij {profileSavingsRate.toFixed(1)}% spaarquote
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+              <th className="px-3 py-2 text-left font-medium text-[var(--ink-3)]">Maand</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Inkomen (mnd)</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Spaarquote %</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Spaarbedrag</th>
+              <th className="px-3 py-2 text-right font-medium text-horizon-600">Cumulatief</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayMonths.map((month) => {
+              const cumulative = monthlySavings * month
+              return (
+                <tr key={month} className="border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50">
+                  <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink-3)]">{month}</td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                    {formatCurrency(profileMonthlyIncome)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                    {profileSavingsRate.toFixed(1)}%
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-emerald-600">
+                    {formatCurrency(monthlySavings)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-horizon-600">
+                    {formatCurrency(cumulative)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ── Total overview table ─────────────────────────────────────
 
 function TotalTable({ assetTotals, debtTotals, netTotals, projectionYears }: {
@@ -555,6 +643,13 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
         debts={debts}
         profileMonthlyIncome={profileMonthlyIncome}
         profileSavingsRate={profileSavingsRate}
+      />
+
+      {/* Section: Savings projection month-by-month */}
+      <SavingsProjectionTable
+        profileMonthlyIncome={profileMonthlyIncome}
+        profileSavingsRate={profileSavingsRate}
+        projectionYears={projectionYears}
       />
 
       {/* Section: Total overview */}
