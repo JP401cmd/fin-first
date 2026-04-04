@@ -1,3 +1,28 @@
+## Session 2026-04-04 - Features #619, #623
+
+### Feature #619: Bezittingen laden uit bestaande assets-data - PASSING
+- Server component loads all active assets from Supabase: select('*').eq('is_active', true)
+- Per asset: name, current_value, expected_return, monthly_contribution all available
+- Assets without expected_return default to 0% (Number(null) = 0)
+- Assets used as input for projection tables (projectAssetYearly function)
+- Fixed stale build error: PROJECTION_YEARS renamed to DEFAULT_PROJECTION_YEARS by concurrent agent
+- 6 asset categories displayed: Cash, Beleggingen, Pensioen, Eigen woning, Vastgoed, Voertuig
+
+### Feature #623: Schulden laden uit bestaande debts-data - PASSING
+- Server component loads all active debts from Supabase: select('*').eq('is_active', true)
+- Per debt: name, current_balance, interest_rate, monthly_payment all available
+- Debts used as input for projection tables (projectDebtYearly function)
+- 3 debt categories displayed: Hypotheek, Persoonlijke lening, Studielening
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — configurable time horizon (1-60 years)
+- components/app/horizon/horizon-client.tsx — doorrekening-test navigation card added
+
+### Current Status
+- 2 features completed this session (#619, #623)
+- Commit: 1f4db980
+- Overall progress: 617/635 passing (97.2%)
+
 ## Session 2026-04-04 - Feature #493 (re-verification)
 
 ### Feature #493: Fase 1e — runUnifiedProjection() orchestratiefunctie - ALREADY PASSING
