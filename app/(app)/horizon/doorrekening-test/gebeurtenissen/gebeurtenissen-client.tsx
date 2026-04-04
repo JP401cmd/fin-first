@@ -160,6 +160,180 @@ function computeDistribution(
   return results
 }
 
+// ── Income Distribution Strategy Types & Logic ──────────────
+
+export type IncomeDistributionStrategy = 'spreiden' | 'cash_first' | 'hoogste_rendement_first'
+
+interface IncomeDistributionResult {
+  assetId: string
+  assetName: string
+  assetType: string
+  currentValue: number
+  expectedReturn: number
+  depositAmount: number
+  newValue: number
+}
+
+const INCOME_STRATEGY_INFO: Record<IncomeDistributionStrategy, {
+  label: string
+  icon: typeof Layers
+  description: string
+  pros: string[]
+  cons: string[]
+}> = {
+  spreiden: {
+    label: 'Spreiden',
+    icon: Layers,
+    description: 'Proportioneel verdelen over alle bezittingen naar waarde-aandeel, zodat de bestaande allocatie behouden blijft.',
+    pros: [
+      'Asset-allocatie blijft intact',
+      'Risicospreiding wordt behouden',
+      'Geen overconcentratie in één bezitting',
+    ],
+    cons: [
+      'Lage-rendement bezittingen groeien mee',
+      'Niet optimaal voor rendement-maximalisatie',
+    ],
+  },
+  cash_first: {
+    label: 'Cash first',
+    icon: Banknote,
+    description: 'Eerst storten op bezittingen met het laagste verwacht rendement (cash/spaarrekening). Bouwt liquiditeitsbuffer op.',
+    pros: [
+      'Liquiditeitsbuffer groeit snel',
+      'Zekerheid voor noodgevallen',
+      'Laag risico op korte termijn',
+    ],
+    cons: [
+      'Laag rendement op gestort bedrag',
+      'Opportunity cost: geld groeit langzamer',
+    ],
+  },
+  hoogste_rendement_first: {
+    label: 'Hoogste rendement first',
+    icon: TrendingUp,
+    description: 'Alles storten op de bezitting met het hoogste verwacht rendement. Maximaal samengesteld rendement op lange termijn.',
+    pros: [
+      'Maximaal rendement op het gestorte bedrag',
+      'Samengesteld effect werkt het hardst',
+      'Optimaal voor langetermijngroei',
+    ],
+    cons: [
+      'Concentratierisico neemt toe',
+      'Asset-allocatie raakt scheef',
+      'Hoger risico bij marktdalingen',
+    ],
+  },
+}
+
+function computeIncomeDistribution(
+  assets: Asset[],
+  amount: number,
+  strategy: IncomeDistributionStrategy,
+): IncomeDistributionResult[] {
+  if (amount <= 0 || assets.length === 0) return []
+
+  const liquidAssets = assets.filter(a => a.current_value >= 0)
+  if (liquidAssets.length === 0) return []
+
+  const results: IncomeDistributionResult[] = []
+
+  if (strategy === 'spreiden') {
+    const totalValue = liquidAssets.reduce((s, a) => s + a.current_value, 0)
+    if (totalValue <= 0) {
+      const share = amount / liquidAssets.length
+      for (const asset of liquidAssets) {
+        results.push({
+          assetId: asset.id,
+          assetName: asset.name,
+          assetType: asset.asset_type,
+          currentValue: asset.current_value,
+          expectedReturn: asset.expected_return,
+          depositAmount: share,
+          newValue: asset.current_value + share,
+        })
+      }
+    } else {
+      for (const asset of liquidAssets) {
+        const share = asset.current_value / totalValue
+        const deposit = share * amount
+        results.push({
+          assetId: asset.id,
+          assetName: asset.name,
+          assetType: asset.asset_type,
+          currentValue: asset.current_value,
+          expectedReturn: asset.expected_return,
+          depositAmount: deposit,
+          newValue: asset.current_value + deposit,
+        })
+      }
+    }
+  } else if (strategy === 'cash_first') {
+    const sorted = [...liquidAssets].sort((a, b) => a.expected_return - b.expected_return)
+    let remaining = amount
+    for (const asset of sorted) {
+      const deposit = remaining > 0 ? remaining : 0
+      remaining = 0
+      results.push({
+        assetId: asset.id,
+        assetName: asset.name,
+        assetType: asset.asset_type,
+        currentValue: asset.current_value,
+        expectedReturn: asset.expected_return,
+        depositAmount: deposit,
+        newValue: asset.current_value + deposit,
+      })
+      if (deposit > 0) break
+    }
+    for (const asset of sorted) {
+      if (!results.find(r => r.assetId === asset.id)) {
+        results.push({
+          assetId: asset.id,
+          assetName: asset.name,
+          assetType: asset.asset_type,
+          currentValue: asset.current_value,
+          expectedReturn: asset.expected_return,
+          depositAmount: 0,
+          newValue: asset.current_value,
+        })
+      }
+    }
+  } else {
+    // hoogste_rendement_first
+    const sorted = [...liquidAssets].sort((a, b) => b.expected_return - a.expected_return)
+    let remaining = amount
+    for (const asset of sorted) {
+      const deposit = remaining > 0 ? remaining : 0
+      remaining = 0
+      results.push({
+        assetId: asset.id,
+        assetName: asset.name,
+        assetType: asset.asset_type,
+        currentValue: asset.current_value,
+        expectedReturn: asset.expected_return,
+        depositAmount: deposit,
+        newValue: asset.current_value + deposit,
+      })
+      if (deposit > 0) break
+    }
+    for (const asset of sorted) {
+      if (!results.find(r => r.assetId === asset.id)) {
+        results.push({
+          assetId: asset.id,
+          assetName: asset.name,
+          assetType: asset.asset_type,
+          currentValue: asset.current_value,
+          expectedReturn: asset.expected_return,
+          depositAmount: 0,
+          newValue: asset.current_value,
+        })
+      }
+    }
+  }
+
+  return results
+}
+
 // ── Tooltip Component ────────────────────────────────────────
 
 function StrategyTooltip({ strategy }: { strategy: DistributionStrategy }) {
@@ -168,15 +342,17 @@ function StrategyTooltip({ strategy }: { strategy: DistributionStrategy }) {
 
   return (
     <div className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
-        className="rounded-full p-0.5 text-[var(--ink-4)] hover:text-[var(--ink-2)] transition-colors"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setOpen(!open) } }}
+        className="rounded-full p-0.5 text-[var(--ink-4)] hover:text-[var(--ink-2)] transition-colors cursor-pointer"
         aria-label={`Info over ${info.label}`}
       >
         <Info className="h-3.5 w-3.5" />
-      </button>
+      </span>
       {open && (
         <div className="absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 shadow-lg">
           <p className="text-xs font-semibold text-[var(--ink)]">{info.label}</p>
