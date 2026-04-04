@@ -538,7 +538,7 @@ export function AfbouwClient({
   }, [currentAge, netWorth, annualSavings, fireParams, yearlyRetirementExpenses, displayEndAge, selectedEndStrategy, selectedWithdrawalStrategy, hasPartner, strategyConfig.legacyAmount])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* ── Summary header ── */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
         <h2 className="text-lg font-bold text-[var(--ink)]">Afbouw — Decumulatiefase</h2>
@@ -698,7 +698,7 @@ export function AfbouwClient({
                   </tr>
 
                   {/* Retirement expenses */}
-                  <tr className="border-b border-[var(--border-ed)]/50 odd:bg-[var(--subtle)]/30">
+                  <tr className="border-b border-[var(--border-ed)]/50 odd:bg-[var(--subtle)]/30 hover:bg-[var(--subtle)]/50">
                     <td className="px-3 py-1 font-medium text-[var(--ink)]">Levensonderhoud</td>
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
                       {formatCurrency(monthlyRetirementExpenses)}
@@ -710,7 +710,7 @@ export function AfbouwClient({
                   </tr>
 
                   {/* AOW income offset */}
-                  <tr className="border-b border-[var(--border-ed)]/50 odd:bg-[var(--subtle)]/30">
+                  <tr className="border-b border-[var(--border-ed)]/50 odd:bg-[var(--subtle)]/30 hover:bg-[var(--subtle)]/50">
                     <td className="px-3 py-1 font-medium text-emerald-700">AOW-uitkering (aftrek)</td>
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
                       -{formatCurrency(hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY)}
@@ -802,10 +802,10 @@ export function AfbouwClient({
                       {displayExpenseRows.map((row, idx) => (
                         <tr
                           key={row.month}
-                          className={`border-b border-[var(--border-ed)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
+                          className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
                         >
                           <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink)]">{row.month}</td>
-                          <td className="px-3 py-1 text-[var(--ink)]">
+                          <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink)]">
                             {row.age}j
                             {row.ageMonth > 0 && <span className="text-[var(--ink-4)]">+{row.ageMonth}m</span>}
                           </td>
@@ -936,16 +936,21 @@ export function AfbouwClient({
                       {displayRows.map((row, idx) => (
                         <tr
                           key={row.age}
-                          className={`border-b border-[var(--border-ed)]/50 ${
+                          className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${
                             row.endBalance <= 0
                               ? 'bg-emerald-50/60'
-                              : idx % 2 === 1
-                                ? 'bg-[var(--subtle)]/30'
-                                : ''
+                              : row.age === retirementAge
+                                ? 'bg-horizon-50/60'
+                                : idx % 2 === 1
+                                  ? 'bg-[var(--subtle)]/30'
+                                  : ''
                           }`}
                         >
-                          <td className="px-3 py-1 font-medium text-[var(--ink)]">
+                          <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">
                             {row.age}j
+                            {row.age === retirementAge && (
+                              <span className="ml-1 inline-flex items-center rounded-full bg-horizon-500 px-1.5 py-0.5 text-[9px] font-bold text-white">⚡ KRUISPUNT</span>
+                            )}
                             {row.age === NL_AOW_AGE && (
                               <span className="ml-1 text-[10px] text-emerald-600 font-medium">AOW</span>
                             )}
@@ -1477,7 +1482,7 @@ function CrossoverTable({
               return (
                 <tr
                   key={row.age}
-                  className={`border-b border-[var(--border-ed)]/50 ${
+                  className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${
                     isCrossoverRow
                       ? 'bg-horizon-50/60 ring-1 ring-inset ring-horizon-300'
                       : row.reached
@@ -1489,7 +1494,7 @@ function CrossoverTable({
                             : ''
                   }`}
                 >
-                  <td className="px-3 py-1 font-medium text-[var(--ink)]">
+                  <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">
                     {row.age}j
                     {isCrossoverRow && (
                       <span className="ml-1 inline-flex items-center rounded-full bg-horizon-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
@@ -1736,14 +1741,14 @@ function StrategyComparisonChart({
 
         {/* X-axis labels */}
         {xLabels.map((age) => (
-          <text key={age} x={scaleX(age)} y={height - 4} textAnchor="middle" className="text-[10px] fill-[var(--ink-4)]">
+          <text key={age} x={scaleX(age)} y={height - 4} textAnchor="middle" className="text-[10px] fill-[var(--ink-4)] font-mono">
             {age}j
           </text>
         ))}
 
         {/* Y-axis labels */}
         {yLabels.map((v, i) => (
-          <text key={i} x={margin.left - 4} y={scaleY(v) + 3} textAnchor="end" className="text-[10px] fill-[var(--ink-4)]">
+          <text key={i} x={margin.left - 4} y={scaleY(v) + 3} textAnchor="end" className="text-[10px] fill-[var(--ink-4)] font-mono">
             {fmtY(Math.round(v))}
           </text>
         ))}
@@ -1847,7 +1852,7 @@ function DecumulationChart({
             x={scaleX(age)}
             y={height - 4}
             textAnchor="middle"
-            className="text-[10px] fill-[var(--ink-4)]"
+            className="text-[10px] fill-[var(--ink-4)] font-mono"
           >
             {age}j
           </text>
@@ -1860,9 +1865,9 @@ function DecumulationChart({
             x={margin.left - 4}
             y={scaleY(v) + 3}
             textAnchor="end"
-            className="text-[10px] fill-[var(--ink-4)]"
+            className="text-[10px] fill-[var(--ink-4)] font-mono"
           >
-            {v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : v}
+            {v >= 1000000 ? `€${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `€${Math.round(v / 1000)}k` : `€${v}`}
           </text>
         ))}
       </svg>
