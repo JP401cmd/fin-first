@@ -1464,235 +1464,265 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
   const netWorth = totalAssetValue - totalDebtValue
 
   return (
-    <div className="space-y-8">
-      {/* Section: Summary header */}
-      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Huidige bezittingen</p>
-          <p className="font-mono tabular-nums text-lg font-bold text-emerald-600">
-            {formatCurrency(assets.reduce((s, a) => s + Number(a.current_value), 0))}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Huidige schulden</p>
-          <p className="font-mono tabular-nums text-lg font-bold text-red-500">
-            {formatCurrency(debts.reduce((s, d) => s + Number(d.current_balance), 0))}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Netto vermogen</p>
-          <p className="font-mono tabular-nums text-lg font-bold text-horizon-600">
-            {formatCurrency(
-              assets.reduce((s, a) => s + Number(a.current_value), 0) -
-              debts.reduce((s, d) => s + Number(d.current_balance), 0)
-            )}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Netto inkomen</p>
-          <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-            {formatCurrency(profileMonthlyIncome)}<span className="text-[var(--ink-4)] text-[10px] ml-1">/mnd</span>
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Spaarquote (profiel)</p>
-          <p className="font-mono tabular-nums text-sm font-semibold text-horizon-600">
-            {profileSavingsRate.toFixed(1)}%
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Rendement / Inflatie</p>
-          <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
-            {(fireParams.grossReturn * 100).toFixed(1)}% / {(fireParams.inflationRate * 100).toFixed(1)}%
-          </p>
-        </div>
-        {crossoverYear != null && (
+    <div className="space-y-6">
+      {/* Section 1: Summary header card with time horizon */}
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Kruispunt</p>
-            <p className="font-mono tabular-nums text-sm font-semibold text-horizon-600">
-              Jaar {crossoverYear}
-              {currentAge != null && <span className="text-[var(--ink-4)] text-[10px] ml-1">(leeftijd {currentAge + crossoverYear})</span>}
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              Huidige bezittingen
+            </p>
+            <p className="font-mono tabular-nums text-lg font-bold text-emerald-600">
+              {formatCurrency(totalAssetValue)}
             </p>
           </div>
-        )}
-      </div>
-
-      {/* Crossover info banner */}
-      {crossoverYear != null && (
-        <div className="rounded-xl border border-horizon-200 bg-horizon-50/40 px-4 py-3">
-          <p className="text-xs text-horizon-700">
-            <span className="font-semibold">⚡ Kruispunt bereikt in jaar {crossoverYear}</span>
-            {currentAge != null && <span> (leeftijd {currentAge + crossoverYear})</span>}
-            {' — '}Na dit punt stoppen maandelijkse inleg, maar rendement op vermogen loopt door.
-          </p>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              Huidige schulden
+            </p>
+            <p className="font-mono tabular-nums text-lg font-bold text-red-500">
+              {formatCurrency(totalDebtValue)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              Netto vermogen
+            </p>
+            <p className="font-mono tabular-nums text-xl font-bold text-horizon-600">
+              {formatCurrency(netWorth)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              Netto inkomen
+            </p>
+            <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
+              {formatCurrency(profileMonthlyIncome)}
+              <span className="ml-1 text-[10px] text-[var(--ink-4)]">
+                /mnd
+              </span>
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              Spaarquote (profiel)
+            </p>
+            <p className="font-mono tabular-nums text-sm font-semibold text-horizon-600">
+              {profileSavingsRate.toFixed(1)}%
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              Rendement / Inflatie
+            </p>
+            <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
+              {(fireParams.grossReturn * 100).toFixed(1)}% /{" "}
+              {(fireParams.inflationRate * 100).toFixed(1)}%
+            </p>
+          </div>
         </div>
-      )}
 
-      {/* Section: Time horizon selector */}
-      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-            Tijdshorizon
-          </label>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={1}
-              max={maxProjectionYears}
-              step={1}
-              value={projectionYears}
-              onChange={(e) => handleYearsChange(Number(e.target.value))}
-              className="h-2 w-40 cursor-pointer appearance-none rounded-full bg-[var(--subtle)] accent-horizon-500 sm:w-56"
-            />
-            <div className="flex items-center gap-1">
+        {/* Time horizon selector inside the summary card */}
+        <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+              Tijdshorizon
+            </label>
+            <div className="flex items-center gap-3">
               <input
-                type="number"
+                type="range"
                 min={1}
-                max={maxProjectionYears}
+                max={60}
+                step={1}
                 value={projectionYears}
                 onChange={(e) => handleYearsChange(Number(e.target.value))}
-                className="w-16 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1.5 text-center font-mono tabular-nums text-sm text-[var(--ink)] focus:border-horizon-500 focus:outline-none focus:ring-1 focus:ring-horizon-500"
+                className="h-2 w-40 cursor-pointer appearance-none rounded-full bg-[var(--subtle)] accent-horizon-500 sm:w-56"
               />
-              <span className="text-sm text-[var(--ink-3)]">jaar</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={projectionYears}
+                  onChange={(e) => handleYearsChange(Number(e.target.value))}
+                  className="w-16 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1.5 text-center font-mono tabular-nums text-sm text-[var(--ink)] focus:border-horizon-500 focus:outline-none focus:ring-1 focus:ring-horizon-500"
+                />
+                <span className="text-sm text-[var(--ink-3)]">jaar</span>
+              </div>
             </div>
+            {projectionYears !== DEFAULT_PROJECTION_YEARS && (
+              <button
+                onClick={() => setProjectionYears(DEFAULT_PROJECTION_YEARS)}
+                className="text-[11px] text-horizon-600 underline underline-offset-2 hover:text-horizon-700"
+              >
+                Reset naar {DEFAULT_PROJECTION_YEARS} jaar
+              </button>
+            )}
           </div>
-          {currentAge != null && (
-            <span className="text-[11px] text-[var(--ink-4)]">
-              Leeftijd nu: {currentAge} · tot {currentAge + projectionYears} jaar{projectionYears === maxProjectionYears ? ' (max 100)' : ''}
-            </span>
-          )}
-          {projectionYears !== defaultYears && (
-            <button
-              onClick={() => setProjectionYears(defaultYears)}
-              className="text-[11px] text-horizon-600 underline underline-offset-2 hover:text-horizon-700"
-            >
-              Reset naar {defaultYears} jaar
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Section: Summary chart */}
+      {/* Section 2: Summary chart */}
       {(hasAssets || hasDebts) && (
         <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-            Vermogensopbouw — {projectionYears} jaar projectie
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Vermogensprojectie — {projectionYears} jaar
           </h2>
-          <StackedAreaChart
-            assets={assets}
-            debts={debts}
-            profileMonthlyIncome={profileMonthlyIncome}
-            profileSavingsRate={profileSavingsRate}
+          <SummaryChart
+            assetTotals={assetTotals}
+            debtTotals={debtTotals}
+            netTotals={netTotals}
             projectionYears={projectionYears}
-            crossoverMonth={crossoverMonth}
           />
         </div>
       )}
 
-      {/* Section: Asset tables by type */}
+      {/* Section 3: Bezittingen (collapsible) */}
       {hasAssets && (
         <div className="space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-            Bezittingen per categorie
-          </h2>
-          {assetProjections.map((group) => (
-            <ProjectionTable
-              key={group.type}
-              title={group.label}
-              columns={group.columns}
-              color="bg-emerald-50/40"
-              projectionYears={projectionYears}
-            />
-          ))}
+          <SectionHeader
+            icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
+            title="Bezittingen"
+            subtitle={`${formatCurrency(totalAssetValue)} huidige waarde`}
+            color="bg-emerald-50/30"
+            count={assets.length}
+            expanded={assetsExpanded}
+            onToggle={() => setAssetsExpanded(!assetsExpanded)}
+          />
+          {assetsExpanded && (
+            <div className="space-y-4 pl-2">
+              {assetProjections.map((group) => (
+                <ProjectionTable
+                  key={group.type}
+                  title={group.label}
+                  columns={group.columns}
+                  color="bg-emerald-50/40"
+                  projectionYears={projectionYears}
+                  defaultExpanded={assetProjections.length <= 3}
+                />
+              ))}
+              {assets.map((asset) => (
+                <AssetMonthlyTable
+                  key={asset.id}
+                  asset={asset}
+                  projectionYears={projectionYears}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Section: Per-asset monthly tables */}
-      {hasAssets && (
-        <div className="space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-            Doorrekening per bezitting — maand-op-maand
-          </h2>
-          {assets.map((asset) => (
-            <AssetMonthlyTable
-              key={asset.id}
-              asset={asset}
-              projectionYears={projectionYears}
-              crossoverMonth={crossoverMonth}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Section: Debt tables by type */}
+      {/* Section 4: Schulden (collapsible) */}
       {hasDebts && (
         <div className="space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-red-500">
-            Schulden per categorie
-          </h2>
-          {debtProjections.map((group) => (
-            <ProjectionTable
-              key={group.type}
-              title={group.label}
-              columns={group.columns}
-              color="bg-red-50/30"
-              projectionYears={projectionYears}
-            />
-          ))}
+          <SectionHeader
+            icon={<Landmark className="h-4 w-4 text-red-500" />}
+            title="Schulden"
+            subtitle={`${formatCurrency(totalDebtValue)} openstaand`}
+            color="bg-red-50/20"
+            count={debts.length}
+            expanded={debtsExpanded}
+            onToggle={() => setDebtsExpanded(!debtsExpanded)}
+          />
+          {debtsExpanded && (
+            <div className="space-y-4 pl-2">
+              {debtProjections.map((group) => (
+                <ProjectionTable
+                  key={group.type}
+                  title={group.label}
+                  columns={group.columns}
+                  color="bg-red-50/30"
+                  projectionYears={projectionYears}
+                  defaultExpanded={debtProjections.length <= 3}
+                />
+              ))}
+              {debts.map((debt) => (
+                <DebtAmortizationTable
+                  key={debt.id}
+                  debt={debt}
+                  projectionYears={projectionYears}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Section: Per-debt amortization tables (month-by-month) */}
-      {hasDebts && (
-        <div className="space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-red-500">
-            Doorrekening per schuld — maand-op-maand
+      {/* Section 5: Spaarquote */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 px-1">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-horizon-50/40">
+            <PiggyBank className="h-4 w-4 text-horizon-600" />
+          </span>
+          <h2 className="text-sm font-semibold text-[var(--ink)]">
+            Spaarquote
           </h2>
-          {debts.map((debt) => (
-            <DebtAmortizationTable key={debt.id} debt={debt} projectionYears={projectionYears} />
-          ))}
         </div>
-      )}
+        <div className="space-y-4 pl-2">
+          <SavingsRateTable
+            assets={assets}
+            debts={debts}
+            profileMonthlyIncome={profileMonthlyIncome}
+            profileSavingsRate={profileSavingsRate}
+          />
+          <SavingsProjectionTable
+            profileMonthlyIncome={profileMonthlyIncome}
+            profileSavingsRate={profileSavingsRate}
+            projectionYears={projectionYears}
+          />
+        </div>
+      </div>
 
-      {/* Section: Savings rate */}
-      <SavingsRateTable
-        assets={assets}
-        debts={debts}
-        profileMonthlyIncome={profileMonthlyIncome}
-        profileSavingsRate={profileSavingsRate}
-      />
-
-      {/* Section: Savings projection month-by-month */}
-      <SavingsProjectionTable
-        profileMonthlyIncome={profileMonthlyIncome}
-        profileSavingsRate={profileSavingsRate}
-        projectionYears={projectionYears}
-        crossoverMonth={crossoverMonth}
-      />
-
-      {/* Section: Net worth monthly overview (feature #629) */}
-      <NetWorthMonthlyTable
-        assets={assets}
-        debts={debts}
-        profileMonthlyIncome={profileMonthlyIncome}
-        profileSavingsRate={profileSavingsRate}
-        projectionYears={projectionYears}
-        crossoverMonth={crossoverMonth}
-      />
-
-      {/* Section: Total overview */}
+      {/* Section 6: Totaal Netto Vermogen */}
       {(hasAssets || hasDebts) && (
-        <TotalTable assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} box3Taxes={box3Taxes} projectionYears={projectionYears} crossoverYear={crossoverYear} />
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 px-1">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-horizon-50/40">
+              <BarChart3 className="h-4 w-4 text-horizon-600" />
+            </span>
+            <h2 className="text-sm font-semibold text-[var(--ink)]">
+              Totaal Netto Vermogen
+            </h2>
+          </div>
+          <div className="space-y-4 pl-2">
+            <NetWorthMonthlyTable
+              assets={assets}
+              debts={debts}
+              profileMonthlyIncome={profileMonthlyIncome}
+              profileSavingsRate={profileSavingsRate}
+              projectionYears={projectionYears}
+            />
+            <TotalTable
+              assetTotals={assetTotals}
+              debtTotals={debtTotals}
+              netTotals={netTotals}
+              projectionYears={projectionYears}
+            />
+          </div>
+        </div>
       )}
 
       {/* Empty state */}
       {!hasAssets && !hasDebts && (
         <div className="rounded-xl border border-dashed border-[var(--border-md)] p-8 text-center">
           <p className="text-sm text-[var(--ink-3)]">
-            Nog geen bezittingen of schulden gevonden. Voeg eerst je financiële gegevens toe via{' '}
-            <a href="/core/assets" className="text-horizon-600 underline underline-offset-2">Bezittingen</a>{' '}
-            of{' '}
-            <a href="/core/debts" className="text-horizon-600 underline underline-offset-2">Schulden</a>.
+            Nog geen bezittingen of schulden gevonden. Voeg eerst je
+            financi\u00eble gegevens toe via{" "}
+            <a
+              href="/core/assets"
+              className="text-horizon-600 underline underline-offset-2"
+            >
+              Bezittingen
+            </a>{" "}
+            of{" "}
+            <a
+              href="/core/debts"
+              className="text-horizon-600 underline underline-offset-2"
+            >
+              Schulden
+            </a>
+            .
           </p>
         </div>
       )}
