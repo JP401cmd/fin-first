@@ -98,6 +98,22 @@ function groupDebtsByType(debts: Debt[]) {
   return groups
 }
 
+// ── Box 3 belasting berekening ───────────────────────────────
+
+/**
+ * Bereken Box 3 belasting op basis van netto vermogen (peildatum 1 januari).
+ * Fictief rendement × tarief, na aftrek heffingsvrij vermogen.
+ */
+function computeBox3Tax(netWorth: number, hasPartner: boolean): number {
+  const heffingsvrij = hasPartner ? HEFFINGSVRIJ_PARTNER : HEFFINGSVRIJ_SINGLE
+  // Grondslag = netto vermogen minus heffingsvrij, minimaal 0
+  const grondslag = Math.max(0, netWorth - heffingsvrij)
+  // Fictief rendement over de grondslag
+  const fictief = grondslag * NL_FICTIEF_BELEGGINGEN
+  // Belasting = fictief rendement × tarief
+  return Math.round(fictief * BOX3_TARIEF)
+}
+
 
 // ── Stacked area chart (feature #633) ───────────────────────
 
@@ -1175,18 +1191,31 @@ function NetWorthMonthlyTable({
 
 // ── Total overview table ─────────────────────────────────────
 
-function TotalTable({ assetTotals, debtTotals, netTotals, projectionYears }: {
+function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionYears }: {
   assetTotals: number[]
   debtTotals: number[]
   netTotals: number[]
+  box3Taxes: number[]
   projectionYears: number
 }) {
   const displayYears = getDisplayYears(projectionYears)
+  const cumulativeTax = useMemo(() => {
+    const cum: number[] = []
+    let total = 0
+    for (const t of box3Taxes) {
+      total += t
+      cum.push(total)
+    }
+    return cum
+  }, [box3Taxes])
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
       <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
         <h3 className="text-sm font-semibold text-[var(--ink)]">Totaaloverzicht</h3>
+        <p className="text-[10px] text-[var(--ink-4)] mt-0.5">
+          Box 3: fictief rendement {(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}% × tarief {(BOX3_TARIEF * 100).toFixed(0)}%, heffingsvrij vermogen afgetrokken
+        </p>
       </div>
       <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-[11px]">
@@ -1196,6 +1225,8 @@ function TotalTable({ assetTotals, debtTotals, netTotals, projectionYears }: {
               <th className="px-3 py-1.5 text-right font-medium text-emerald-600">Bezittingen</th>
               <th className="px-3 py-1.5 text-right font-medium text-red-500">Schulden</th>
               <th className="px-3 py-1.5 text-right font-medium text-horizon-600">Netto vermogen</th>
+              <th className="px-3 py-1.5 text-right font-medium text-amber-600">Box 3 belasting</th>
+              <th className="px-3 py-1.5 text-right font-medium text-amber-500">Cumulatief Box 3</th>
             </tr>
           </thead>
           <tbody>
@@ -1210,6 +1241,12 @@ function TotalTable({ assetTotals, debtTotals, netTotals, projectionYears }: {
                 </td>
                 <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-horizon-600">
                   {formatCurrency(netTotals[yr - 1])}
+                </td>
+                <td className="px-3 py-1 text-right font-mono tabular-nums text-amber-600">
+                  {box3Taxes[yr - 1] > 0 ? formatCurrency(box3Taxes[yr - 1]) : '—'}
+                </td>
+                <td className="px-3 py-1 text-right font-mono tabular-nums text-amber-500">
+                  {cumulativeTax[yr - 1] > 0 ? formatCurrency(cumulativeTax[yr - 1]) : '—'}
                 </td>
               </tr>
             ))}
@@ -1231,6 +1268,8 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
   // ── Profile-derived values with safe defaults (feature #628) ──
   const profileMonthlyIncome = Number(profile?.net_monthly_income ?? 0)
   const profileSavingsRate = Number(profile?.savings_rate ?? 0)
+  const householdType = String(profile?.household_type ?? 'solo')
+  const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
 
   const [projectionYears, setProjectionYears] = useState(DEFAULT_PROJECTION_YEARS)
   const [assetsExpanded, setAssetsExpanded] = useState(true)
@@ -1302,6 +1341,11 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
 
     return { assetTotals: aTotals, debtTotals: dTotals, netTotals: nTotals }
   }, [assetProjections, debtProjections, projectionYears])
+
+  // Compute Box 3 tax per year (peildatum = netto vermogen begin jaar)
+  const box3Taxes = useMemo(() => {
+    return netTotals.map((nw) => computeBox3Tax(nw, hasPartner))
+  }, [netTotals, hasPartner])
 
   const hasAssets = assets.length > 0
   const hasDebts = debts.length > 0
@@ -1499,7 +1543,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
 
       {/* Section: Total overview */}
       {(hasAssets || hasDebts) && (
-        <TotalTable assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} projectionYears={projectionYears} />
+        <TotalTable assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} box3Taxes={box3Taxes} projectionYears={projectionYears} />
       )}
 
       {/* Empty state */}
