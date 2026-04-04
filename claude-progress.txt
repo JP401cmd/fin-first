@@ -1,3 +1,34 @@
+## Session 2026-04-04 - Features #650, #651
+
+### Feature #650: Afbouw: VPW onttrekkingsstrategie berekening - PASSING
+- Fixed remainingLifeYears to use 100 (was 90) as VPW planning horizon
+- Added Rest. jaren and VPW % columns to VPW strategy table
+- VPW rate uses annuity formula: r / (1 - (1+r)^-n)
+- Verified: age 47 shows 53 remaining years, 5.32% rate; percentage increases with age
+- Withdrawal = portfolio x VPW%, recalculated each year on actual portfolio value
+- Zero console errors
+
+### Feature #651: Afbouw: Bucket onttrekkingsstrategie berekening - PASSING
+- Replaced yearly bucket table with dedicated monthly BucketStrategyTable component
+- Monthly per-bucket columns: Cash (amber), Obligaties (blue), Aandelen (green)
+- Cash bucket: 2x yearly expenses, 0% return
+- Bond bucket: 5x yearly expenses, ~2% annual return (BOND_ANNUAL_RETURN constant)
+- Stock bucket: remainder, profile return rate
+- Monthly withdrawal primarily from cash bucket (overflow to bonds, then stocks)
+- Yearly refill cascade at month 12: stocks -> bonds -> cash (bonds refill from stocks too)
+- Hervulling column shows refill amounts (e.g. "C+42.000 O+37.800")
+- Per maand / Per jaar toggle (yearly view uses PerpetualRow format)
+- Sampled display for large datasets (first 6 months, then every 6th)
+- Zero console errors
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/afbouw/perpetual-tables.tsx - VPW columns + monthly bucket table
+- app/(app)/horizon/doorrekening-test/afbouw/afbouw-client.tsx - minor formatting changes
+
+### Current Status
+- 2 features completed this session (#650, #651)
+- Commit: 2047673e
+
 ## Session 2026-04-04 - Feature #622
 
 ### Feature #622: Bezittingen-tabellen spreadsheet-stijl opmaak - PASSING
