@@ -1,3 +1,37 @@
+## Session 2026-04-05 - Features #659, #660
+
+### Feature #659: Gebeurtenissen: tijdlijn overzicht per leeftijd - PASSING
+- Added EventTimelineOverview component to gebeurtenissen-client.tsx
+- Events sorted chronologically by target_age (ascending)
+- Per event: icon circle (color-coded), name, age label, type badge (Doorlopend/Eenmalig)
+- Financial impact: one-time as amount, recurring as monthly × duration
+- Color coding: green (emerald) for income, red for expenses
+- Indexed events show purple "Geïndexeerd" badge with TrendingUp icon
+- Events without target_age shown in separate "Zonder leeftijd" section
+- Legend at bottom with all visual indicators
+- Zero console errors
+
+### Feature #660: Gebeurtenissen: verdelingsstrategie-keuze voor toename - PASSING
+- Added income distribution strategy system (IncomeDistributionStrategy type)
+- Three strategies: Spreiden, Cash first, Hoogste rendement first
+- Each with INCOME_STRATEGY_INFO containing label, icon, description, pros, cons
+- computeIncomeDistribution() computes allocation per strategy
+- IncomeStrategyTooltip component shows pros/cons popup per strategy
+- Income events detected: negative one_time_cost or positive monthly_income_change
+- Distribution table per income event: asset name, type, current value, return %, deposit, new value
+- Spreiden: proportional by value share
+- Cash first: all to lowest expected_return asset
+- Hoogste rendement first: all to highest expected_return asset
+- Verified all 3 strategies work correctly with AOW event (€11,280/yr)
+- Zero console errors
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/gebeurtenissen/gebeurtenissen-client.tsx — timeline + income distribution
+
+### Current Status
+- 2 features completed this session (#659, #660)
+- Overall progress: 655/683 passing (95.9%)
+
 ## Session 2026-04-04 - Features #650, #651
 
 ### Feature #650: Afbouw: VPW onttrekkingsstrategie berekening - PASSING
