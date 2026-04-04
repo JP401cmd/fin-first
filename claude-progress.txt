@@ -21843,3 +21843,34 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#626)
+
+## Session 2026-04-04 - Features #629, #633
+
+### Feature #629: Totaaltabel netto vermogen per maand - PASSING
+- Added NetWorthMonthlyTable component to opbouw-client.tsx
+- Per-month columns for each individual asset (endValue) and debt (endBalance)
+- Subtotal columns: sum Bezittingen, sum Schulden
+- Cumulative savings column (from profile savings rate x income)
+- Netto vermogen = assets - debts + savings
+- Horizontally scrollable with sticky Maand column
+- Sampled display months for large horizons (getDisplayMonths)
+- Respects configurable time horizon
+- Zero console errors
+
+### Feature #633: Samenvattende opbouwgrafiek met individuele bezittingen en schulden - PASSING
+- Added StackedAreaChart component replacing simple SummaryChart
+- Each asset as separate positive stacked area layer (emerald/teal/green palette)
+- Each debt as negative stacked area below zero line (red/rose palette)
+- Savings accumulation as separate amber layer (when savings rate > 0)
+- Net worth overlay line (horizon-500, 2.5px)
+- Legend with all individual assets, debts, and net worth
+- X-axis: years (0j-30j), Y-axis: euro amounts with grid
+- Zero line dashed when debts present
+- Zero console errors
+- Commit: a45f31f4
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — NetWorthMonthlyTable + StackedAreaChart
+
+### Current Status
+- 2 features completed this session (#629, #633)
