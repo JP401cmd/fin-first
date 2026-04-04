@@ -822,10 +822,11 @@ function SavingsRateTable({ assets, debts, profileMonthlyIncome, profileSavingsR
 
 // ── Savings projection table (month-by-month) ───────────────
 
-function SavingsProjectionTable({ profileMonthlyIncome, profileSavingsRate, projectionYears }: {
+function SavingsProjectionTable({ profileMonthlyIncome, profileSavingsRate, projectionYears, crossoverMonth }: {
   profileMonthlyIncome: number
   profileSavingsRate: number
   projectionYears: number
+  crossoverMonth: number | null
 }) {
   const totalMonths = projectionYears * 12
   const savingsRateFrac = profileSavingsRate / 100
@@ -882,18 +883,28 @@ function SavingsProjectionTable({ profileMonthlyIncome, profileSavingsRate, proj
           </thead>
           <tbody>
             {displayMonths.map((month, idx) => {
-              const cumulative = monthlySavings * month
+              const isAfterCrossover = crossoverMonth != null && month > crossoverMonth
+              const isCrossoverMonth = crossoverMonth != null && month === crossoverMonth
+              // Cumulative: grows until crossover, then stays flat
+              const effectiveMonths = crossoverMonth != null ? Math.min(month, crossoverMonth) : month
+              const cumulative = monthlySavings * effectiveMonths
+              const effectiveSavings = isAfterCrossover ? 0 : monthlySavings
+              const effectiveRate = isAfterCrossover ? 0 : profileSavingsRate
+              const effectiveIncome = isAfterCrossover ? 0 : profileMonthlyIncome
               return (
-                <tr key={month} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
-                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{month}</td>
-                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(profileMonthlyIncome)}
+                <tr key={month} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${isCrossoverMonth ? 'bg-horizon-50/60' : isAfterCrossover ? 'bg-[var(--subtle)]/15' : idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
+                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">
+                    {month}
+                    {isCrossoverMonth && <span className="ml-1 text-[9px] font-semibold text-horizon-600">⚡ kruispunt</span>}
                   </td>
-                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {profileSavingsRate.toFixed(1)}%
+                  <td className={`px-3 py-1 text-right font-mono tabular-nums ${isAfterCrossover ? 'text-[var(--ink-4)]' : 'text-[var(--ink-2)]'}`}>
+                    {formatCurrency(effectiveIncome)}
                   </td>
-                  <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
-                    {formatCurrency(monthlySavings)}
+                  <td className={`px-3 py-1 text-right font-mono tabular-nums ${isAfterCrossover ? 'text-[var(--ink-4)]' : 'text-[var(--ink-2)]'}`}>
+                    {effectiveRate.toFixed(1)}%
+                  </td>
+                  <td className={`px-3 py-1 text-right font-mono tabular-nums ${isAfterCrossover ? 'text-[var(--ink-4)]' : 'text-emerald-600'}`}>
+                    {formatCurrency(effectiveSavings)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-horizon-600">
                     {formatCurrency(cumulative)}
@@ -1415,6 +1426,8 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
     const aTotals: number[] = []
     const dTotals: number[] = []
     const nTotals: number[] = []
+    const taxes: number[] = []
+    let cumulativeTax = 0
 
     for (let yr = 0; yr < projectionYears; yr++) {
       let assetSum = 0
@@ -1431,9 +1444,15 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
         }
       }
 
+      const rawNet = assetSum - debtSum
+      const adjustedNet = rawNet - cumulativeTax
+      const yearTax = computeBox3Tax(adjustedNet, hasPartner)
+      cumulativeTax += yearTax
+
       aTotals.push(assetSum)
       dTotals.push(debtSum)
-      nTotals.push(assetSum - debtSum)
+      nTotals.push(rawNet - cumulativeTax)
+      taxes.push(yearTax)
     }
 
     return { assetTotals: aTotals, debtTotals: dTotals, netTotals: nTotals, box3Taxes: taxes }
@@ -1488,7 +1507,27 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
             {(fireParams.grossReturn * 100).toFixed(1)}% / {(fireParams.inflationRate * 100).toFixed(1)}%
           </p>
         </div>
+        {crossoverYear != null && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Kruispunt</p>
+            <p className="font-mono tabular-nums text-sm font-semibold text-horizon-600">
+              Jaar {crossoverYear}
+              {currentAge != null && <span className="text-[var(--ink-4)] text-[10px] ml-1">(leeftijd {currentAge + crossoverYear})</span>}
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Crossover info banner */}
+      {crossoverYear != null && (
+        <div className="rounded-xl border border-horizon-200 bg-horizon-50/40 px-4 py-3">
+          <p className="text-xs text-horizon-700">
+            <span className="font-semibold">⚡ Kruispunt bereikt in jaar {crossoverYear}</span>
+            {currentAge != null && <span> (leeftijd {currentAge + crossoverYear})</span>}
+            {' — '}Na dit punt stoppen maandelijkse inleg, maar rendement op vermogen loopt door.
+          </p>
+        </div>
+      )}
 
       {/* Section: Time horizon selector */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
@@ -1638,6 +1677,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
         profileMonthlyIncome={profileMonthlyIncome}
         profileSavingsRate={profileSavingsRate}
         projectionYears={projectionYears}
+        crossoverMonth={crossoverMonth}
       />
 
       {/* Section: Total overview */}
