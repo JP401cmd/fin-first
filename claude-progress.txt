@@ -22085,3 +22085,99 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#642, #643)
+
+## Session 2026-04-04 - Feature #636
+
+### Feature #636: Opbouw-pagina algehele layout en hierarchie - PASSING
+- Restructured the opbouw-client.tsx main component return JSX for clear visual hierarchy
+- Summary header consolidated into a rounded-xl card with border, bg-paper, tracking-[0.08em] labels
+- Netto vermogen uses text-xl (most prominent), assets/debts use text-lg
+- Time horizon selector moved inside the summary card (after border-t divider)
+- Chart renamed from "Samenvattende grafiek" to "Vermogensprojectie" with improved SVG (area gradient, end dots)
+- Bezittingen section: collapsible SectionHeader with TrendingUp icon, count badge, expand/collapse via ChevronDown/Right
+- Schulden section: collapsible SectionHeader with Landmark icon, same pattern
+- ProjectionTable now individually collapsible per table (defaultExpanded based on group count)
+- When collapsed, tables show compact Jaar 1 and Jaar N summaries
+- Spaarquote section with PiggyBank icon header, groups SavingsRateTable + SavingsProjectionTable
+- Totaal Netto Vermogen section with BarChart3 icon header, groups NetWorthMonthlyTable + TotalTable
+- Overall spacing reduced from space-y-8 to space-y-6 for tighter layout
+- All spacing and colors follow design tokens: var(--ink), var(--border-ed), var(--subtle), var(--paper)
+- Added lucide-react imports: ChevronDown, ChevronRight, TrendingUp, Landmark, PiggyBank, BarChart3
+- Zero console errors on opbouw page (afbouw errors are from concurrent agent work)
+- Verified with browser automation: login, visual inspection, collapsible interaction test
+- Commit: 44afa4d3
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — full layout restructure
+
+### Current Status
+- 1 feature completed this session (#636)
+- Overall progress: 616/635 passing (97.0%)
+
+## Session 2026-04-04 - Features #646, #647
+
+### Feature #646: Afbouw: eindstrategie Legacy — alle onttrekkingsstrategieën - PASSING
+- Created Legacy section with 4 withdrawal strategy sub-tables
+- Sub-tables: SWR (fixed withdrawal preserving legacy), Guardrails (±20% bands), VPW (variable percentage), Bucket (with legacy buffer)
+- Configurable legacy target amount (defaults to €250,000 if not set in profile)
+- Also created PerpetualStrategyTables component (was referenced but missing)
+- New files: legacy-tables.tsx, perpetual-tables.tsx
+- Zero console errors
+- Committed as part of multi-agent batch
+
+### Feature #647: Afbouw: eindstrategie Deplete — alle onttrekkingsstrategieën - PASSING
+- Created Deplete section targeting portfolio = €0 at age 100
+- Sub-tables: Annuity (fixed withdrawal using annuity formula), Guardrails (variable with bands), VPW (balance/remaining years), Bucket (without legacy buffer)
+- Info strip shows computed annuity withdrawal amount
+- New file: deplete-tables.tsx
+- Zero console errors
+- Commit: f68fe00a
+
+### Files Created
+- app/(app)/horizon/doorrekening-test/afbouw/legacy-tables.tsx
+- app/(app)/horizon/doorrekening-test/afbouw/perpetual-tables.tsx
+- app/(app)/horizon/doorrekening-test/afbouw/deplete-tables.tsx
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/afbouw/afbouw-client.tsx — Added Legacy + Deplete sections
+
+### Current Status
+- 2 features completed this session (#646, #647)
+
+## Session 2026-04-04 - Features #652, #653
+
+### Feature #652: Afbouw: pensioenstrategie-tabel vanaf AOW-leeftijd - PASSING
+- Created pension-tables.tsx with PensionStrategyTables component
+- 4 withdrawal strategy sub-tables: SWR, Guardrails, VPW, Bucket
+- Tables start at AOW age (67, NL_AOW_AGE) and project forward to age 100
+- Each table computes: withdrawal = inflation-adjusted expenses minus AOW income
+- Info strip shows: start age (67), end age (100), portfolio at AOW, AOW yearly income
+- Columns: Jaar, Leeftijd, Uitgaven, Onttrekking, Portfoliowaarde, Restant
+- VPW sub-table has additional columns: Rest. jaren, VPW %
+- activeWithdrawalStrategy prop highlights selected strategy with "Actief" badge
+- New section added between Legacy and Kruispuntbepaling sections
+- Zero console errors
+
+### Feature #653: Kruispuntbepaling: moment van stoppen met werken - PASSING
+- Enhanced kruispuntbepaling with strategy selectors:
+  - End strategy buttons: Behouden van vermogen, Erfenis, Portfolio opteren, Pensioenleeftijd
+  - Withdrawal strategy buttons: SWR, Guardrails, VPW, Bucket
+- Monthly crossover computation (computeMonthlyCrossover):
+  - Computes on monthly basis with monthly compound returns
+  - Returns ageYears + ageMonths precision (e.g., 46j + 8m)
+  - Computes required portfolio per strategy (computeRequiredPortfolio)
+- Crossover shown as age + months in header badge and metrics
+- "Stoppen met werken" indicator shows when savings stop
+- CrossoverTable enhanced: savings -> €0 after crossover (savingsActive flag)
+- Rows after crossover show "inleg €0" label
+- Interactive: changing strategy recalculates crossover instantly
+- Zero console errors
+
+### Files Created/Modified
+- app/(app)/horizon/doorrekening-test/afbouw/pension-tables.tsx — NEW: pension strategy tables
+- app/(app)/horizon/doorrekening-test/afbouw/afbouw-client.tsx — pension section + enhanced crossover
+- app/(app)/horizon/doorrekening-test/afbouw/perpetual-tables.tsx — linter updates
+- app/(app)/horizon/doorrekening-test/afbouw/legacy-tables.tsx — linter updates
+
+### Current Status
+- 2 features completed this session (#652, #653)
