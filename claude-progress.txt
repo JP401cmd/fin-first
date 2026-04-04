@@ -22212,3 +22212,102 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#652, #653)
+
+## Session 2026-04-04 - Feature #655
+
+### Feature #655: Afbouw: samenvattende grafiek vermogensverloop - PASSING
+- Added StrategyComparisonChart SVG component to afbouw-client.tsx
+- Chart placed at top of afbouw page, right after summary header card
+- 4 withdrawal strategy lines with distinct colors:
+  - SWR (indigo #6366f1), Guardrails (amber #f59e0b), VPW (emerald #10b981), Bucket (red #ef4444)
+- X-axis: age (from retirement age to 100j), Y-axis: portfolio value in euros
+- €0 reference line (dashed) as visual anchor
+- Legend with all 4 strategies + €0 referentie label
+- computeStrategyPath() helper inlined in chart — mirrors perpetual-tables.tsx simulation logic
+- End dots on each strategy line for visual clarity
+- Subtitle shows age range and start portfolio amount
+- Chart only renders when portfolioAtRetirement > 0 and currentAge != null
+- Verified end-to-end: regression test account shows €1,482,297 portfolio, 4 diverging lines from 47j to 100j
+- Zero console errors
+- Changes committed as part of concurrent agent commit 2047673e
+
+### Current Status
+- 1 feature completed this session (#655)
+
+## Session 2026-04-05 - Features #661, #662
+
+### Feature #661: Gebeurtenissen: verdelingsstrategie-keuze voor afname - PASSING
+- Distribution strategy section already implemented (Section 3 on Gebeurtenissen page)
+- Three strategies: Spreiden (proportional), Cash first (lowest return first), Laagste rendement first
+- computeDistribution() logic handles all three strategies with cascade on insufficient balance
+- StrategyTooltip component with pros/cons per strategy
+- Fixed hydration error: nested <button> inside <button> - moved StrategyTooltip outside strategy button
+- Zero console errors after fix
+- Commit: 884b1fa5
+
+### Feature #662: Gebeurtenissen: impact preview tabel - PASSING
+- Added spreadsheet-style Impact Preview Table to Section 4
+- Columns: Gebeurtenis, Leeftijd, Eenmalig, Maandelijks, Duur, Totale impact
+- Eenmalige events show one-time cost in Eenmalig column
+- Doorlopende events show net monthly (income - costs) in Maandelijks column
+- Totaalrij at bottom with sum of all net impacts
+- Spreadsheet styling: sticky header, alternating rows, consistent with opbouw/afbouw tables
+- Renamed bar chart section label from "Impact per gebeurtenis" to "Visueel overzicht"
+- Zero console errors
+- Commit: c4cd6b13
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/gebeurtenissen/gebeurtenissen-client.tsx
+
+### Current Status
+- 2 features completed this session (#661, #662)
+
+## Session 2026-04-05 - Features #657, #671
+
+### Feature #657: Subpagina /horizon/doorrekening-test/gebeurtenissen - PASSING
+- Completed the gebeurtenissen page with all required sections
+- Added distribution strategy section (Spreiden/Cash first/Laagste rendement first)
+  - Strategy picker with info tooltips (pros/cons)
+  - Per-expense-event distribution tables showing asset allocation
+  - Empty state when no one-time costs found
+- Added impact preview section
+  - 6 financial metrics: huidig netto vermogen, na alle gebeurtenissen, verschil, jaarlijkse spaarcapaciteit, impact in spaartijd, maandelijkse uitgaven
+  - Per-event impact bar chart sorted by absolute magnitude
+- Fixed button-in-button hydration error in StrategyTooltip (changed inner button to span with role="button")
+- Timeline overview and events table were already created by another agent
+- Zero console errors
+- Commit: 3cae521e
+
+### Feature #671: Subpagina /horizon/doorrekening-test/overzicht - PASSING
+- Created new /horizon/doorrekening-test/overzicht subpage
+- Added "Overzicht" tab to layout sub-navigation (4th tab)
+- Settings panel with 6 configurable parameters:
+  - Bruto rendement (0-15% slider)
+  - Inflatie (0-10% slider)
+  - Projectiejaren (1-maxYears slider, defaults to 100-currentAge)
+  - Netto inkomen (number input)
+  - Spaarquote (0-100% slider)
+  - Maandelijkse uitgaven (number input)
+- Quick summary strip: reëel rendement, SWR, Box 3 druk, bezittingen count, schulden count, levensgebeurtenissen count
+- Reset to profile button when settings deviate from profile values
+- Projection chart (SVG):
+  - Net worth line (purple), assets line (green dashed), debts line (red dashed)
+  - Area fill under net worth
+  - Zero line reference when debts present
+  - Grid lines with euro labels
+  - Age-based x-axis labels
+- Key metrics: start net worth, end net worth, total assets at end, cumulative Box 3 tax
+- Fixed debt projection bug (interest_rate stored as percentage, not decimal)
+- Zero console errors
+- Commit: a146d69f
+
+### Files Created
+- app/(app)/horizon/doorrekening-test/overzicht/page.tsx — server component
+- app/(app)/horizon/doorrekening-test/overzicht/overzicht-client.tsx — client component
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/layout.tsx — added Overzicht tab
+- app/(app)/horizon/doorrekening-test/gebeurtenissen/gebeurtenissen-client.tsx — distribution strategy + impact preview + tooltip fix
+
+### Current Status
+- 2 features completed this session (#657, #671)
