@@ -93,6 +93,298 @@ function groupDebtsByType(debts: Debt[]) {
   return groups
 }
 
+
+// ── Stacked area chart (feature #633) ───────────────────────
+
+const ASSET_COLORS = [
+  'var(--color-emerald-500)',
+  'var(--color-emerald-400)',
+  'var(--color-emerald-300)',
+  'var(--color-teal-500)',
+  'var(--color-teal-400)',
+  'var(--color-teal-300)',
+  'var(--color-green-500)',
+  'var(--color-green-400)',
+]
+const DEBT_COLORS = [
+  'var(--color-red-500)',
+  'var(--color-red-400)',
+  'var(--color-red-300)',
+  'var(--color-rose-500)',
+  'var(--color-rose-400)',
+]
+const SAVINGS_COLOR = 'var(--color-amber-400)'
+
+interface StackedSeries {
+  label: string
+  values: number[]
+  color: string
+  side: 'asset' | 'debt' | 'savings'
+}
+
+function StackedAreaChart({
+  assets,
+  debts,
+  profileMonthlyIncome,
+  profileSavingsRate,
+  projectionYears,
+}: {
+  assets: Asset[]
+  debts: Debt[]
+  profileMonthlyIncome: number
+  profileSavingsRate: number
+  projectionYears: number
+}) {
+  const totalMonths = projectionYears * 12
+  const monthlySavings = profileMonthlyIncome * (profileSavingsRate / 100)
+
+  // Build series data
+  const series: StackedSeries[] = useMemo(() => {
+    const result: StackedSeries[] = []
+
+    // Asset series
+    assets.forEach((a, idx) => {
+      const monthlyRows = computeAssetMonthly(a, totalMonths)
+      result.push({
+        label: a.name,
+        values: monthlyRows.map((r) => r.endValue),
+        color: ASSET_COLORS[idx % ASSET_COLORS.length],
+        side: 'asset',
+      })
+    })
+
+    // Savings series
+    if (monthlySavings > 0) {
+      result.push({
+        label: 'Spaargeld',
+        values: Array.from({ length: totalMonths }, (_, i) => monthlySavings * (i + 1)),
+        color: SAVINGS_COLOR,
+        side: 'savings',
+      })
+    }
+
+    // Debt series (shown as negative)
+    debts.forEach((d, idx) => {
+      const rows = computeAmortization(d, totalMonths)
+      const values: number[] = []
+      for (let m = 1; m <= totalMonths; m++) {
+        const row = rows.find((r) => r.month === m)
+        values.push(row?.endBalance ?? 0)
+      }
+      result.push({
+        label: d.name,
+        values,
+        color: DEBT_COLORS[idx % DEBT_COLORS.length],
+        side: 'debt',
+      })
+    })
+
+    return result
+  }, [assets, debts, totalMonths, monthlySavings])
+
+  // Use yearly sample points for readability
+  const samplePoints = useMemo(() => {
+    const points: number[] = []
+    const step = projectionYears <= 10 ? 3 : projectionYears <= 20 ? 6 : 12
+    for (let m = step; m <= totalMonths; m += step) {
+      points.push(m - 1) // zero-indexed
+    }
+    if (points.length === 0) points.push(totalMonths - 1)
+    if (points[points.length - 1] !== totalMonths - 1) points.push(totalMonths - 1)
+    return points
+  }, [totalMonths, projectionYears])
+
+  const numPts = samplePoints.length
+
+  // Compute stacked positive and negative values
+  const assetSeries = series.filter((s) => s.side === 'asset' || s.side === 'savings')
+  const debtSeries = series.filter((s) => s.side === 'debt')
+
+  // Compute max/min for scale
+  let maxVal = 0
+  let minVal = 0
+  for (const pt of samplePoints) {
+    let posStack = 0
+    for (const s of assetSeries) posStack += s.values[pt] ?? 0
+    if (posStack > maxVal) maxVal = posStack
+
+    let negStack = 0
+    for (const s of debtSeries) negStack += s.values[pt] ?? 0
+    if (negStack > minVal) minVal = negStack
+  }
+  // Debts shown below zero
+  minVal = -minVal
+  const range = (maxVal - minVal) || 1
+
+  const w = 700
+  const h = 300
+  const px = 56
+  const py = 28
+
+  const toX = (i: number) => px + (i / Math.max(numPts - 1, 1)) * (w - 2 * px)
+  const toY = (v: number) => py + (1 - (v - minVal) / range) * (h - 2 * py)
+
+  // Build stacked area paths for positive series (assets + savings)
+  const posAreaPaths = useMemo(() => {
+    const stackedBottoms = samplePoints.map(() => 0)
+    const paths: { path: string; color: string; label: string }[] = []
+
+    for (const s of assetSeries) {
+      const tops = samplePoints.map((pt, i) => {
+        const val = stackedBottoms[i] + (s.values[pt] ?? 0)
+        return val
+      })
+
+      // Build area: top line forward, bottom line backward
+      let topLine = ''
+      let bottomLine = ''
+      for (let i = 0; i < numPts; i++) {
+        const x = toX(i).toFixed(1)
+        topLine += `${i === 0 ? 'M' : 'L'}${x},${toY(tops[i]).toFixed(1)} `
+        bottomLine = `L${x},${toY(stackedBottoms[i]).toFixed(1)} ` + bottomLine
+      }
+      bottomLine = bottomLine.replace(/^L/, 'L')
+
+      paths.push({
+        path: topLine + bottomLine + 'Z',
+        color: s.color,
+        label: s.label,
+      })
+
+      // Update bottoms
+      for (let i = 0; i < numPts; i++) {
+        stackedBottoms[i] = tops[i]
+      }
+    }
+
+    return paths
+  }, [assetSeries, samplePoints, numPts])
+
+  // Build stacked area paths for negative series (debts)
+  const negAreaPaths = useMemo(() => {
+    const stackedBottoms = samplePoints.map(() => 0)
+    const paths: { path: string; color: string; label: string }[] = []
+
+    for (const s of debtSeries) {
+      const tops = samplePoints.map((pt, i) => {
+        const val = stackedBottoms[i] + (s.values[pt] ?? 0)
+        return val
+      })
+
+      let topLine = ''
+      let bottomLine = ''
+      for (let i = 0; i < numPts; i++) {
+        const x = toX(i).toFixed(1)
+        topLine += `${i === 0 ? 'M' : 'L'}${x},${toY(-tops[i]).toFixed(1)} `
+        bottomLine = `L${x},${toY(-stackedBottoms[i]).toFixed(1)} ` + bottomLine
+      }
+      bottomLine = bottomLine.replace(/^L/, 'L')
+
+      paths.push({
+        path: topLine + bottomLine + 'Z',
+        color: s.color,
+        label: s.label,
+      })
+
+      for (let i = 0; i < numPts; i++) {
+        stackedBottoms[i] = tops[i]
+      }
+    }
+
+    return paths
+  }, [debtSeries, samplePoints, numPts])
+
+  // Net worth line
+  const netLine = useMemo(() => {
+    return samplePoints
+      .map((pt, i) => {
+        let pos = 0
+        for (const s of assetSeries) pos += s.values[pt] ?? 0
+        let neg = 0
+        for (const s of debtSeries) neg += s.values[pt] ?? 0
+        const net = pos - neg
+        return `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(net).toFixed(1)}`
+      })
+      .join(' ')
+  }, [assetSeries, debtSeries, samplePoints])
+
+  // X-axis labels (years)
+  const xLabels: { x: number; label: string }[] = useMemo(() => {
+    const labels: { x: number; label: string }[] = []
+    const step = projectionYears <= 10 ? 1 : projectionYears <= 20 ? 5 : projectionYears <= 40 ? 5 : 10
+    for (let yr = 0; yr <= projectionYears; yr += step) {
+      // Find closest sample point
+      const targetMonth = yr * 12 - 1
+      const closestIdx = samplePoints.reduce((best, pt, i) =>
+        Math.abs(pt - targetMonth) < Math.abs(samplePoints[best] - targetMonth) ? i : best, 0)
+      labels.push({ x: toX(closestIdx), label: `${yr}j` })
+    }
+    // Ensure last year
+    if (labels.length === 0 || labels[labels.length - 1].label !== `${projectionYears}j`) {
+      labels.push({ x: toX(numPts - 1), label: `${projectionYears}j` })
+    }
+    return labels
+  }, [projectionYears, samplePoints, numPts])
+
+  // Y-axis grid
+  const yGridLines = [0, 0.25, 0.5, 0.75, 1].map((frac) => ({
+    y: py + frac * (h - 2 * py),
+    val: maxVal - frac * range,
+  }))
+
+  // Legend items
+  const legendItems = [
+    ...assetSeries.map((s) => ({ label: s.label, color: s.color })),
+    ...debtSeries.map((s) => ({ label: s.label, color: s.color })),
+    { label: 'Netto vermogen', color: 'var(--color-horizon-500)' },
+  ]
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" aria-label="Stacked area grafiek">
+        {/* Grid lines */}
+        {yGridLines.map(({ y, val }) => (
+          <g key={val}>
+            <line x1={px} y1={y} x2={w - px} y2={y} stroke="var(--border-ed)" strokeWidth={0.5} />
+            <text x={px - 6} y={y + 3} textAnchor="end" fontSize={7} fill="var(--ink-4)" className="font-mono">
+              {formatCurrency(val)}
+            </text>
+          </g>
+        ))}
+        {/* Zero line */}
+        {minVal < 0 && (
+          <line x1={px} y1={toY(0)} x2={w - px} y2={toY(0)} stroke="var(--ink-3)" strokeWidth={0.75} strokeDasharray="4 2" />
+        )}
+        {/* X axis labels */}
+        {xLabels.map(({ x, label }) => (
+          <text key={label} x={x} y={h - 4} textAnchor="middle" fontSize={8} fill="var(--ink-4)" className="font-mono">
+            {label}
+          </text>
+        ))}
+        {/* Positive stacked areas (assets + savings) */}
+        {posAreaPaths.map(({ path, color, label }) => (
+          <path key={`pos-${label}`} d={path} fill={color} fillOpacity={0.35} stroke={color} strokeWidth={0.5} />
+        ))}
+        {/* Negative stacked areas (debts) */}
+        {negAreaPaths.map(({ path, color, label }) => (
+          <path key={`neg-${label}`} d={path} fill={color} fillOpacity={0.3} stroke={color} strokeWidth={0.5} />
+        ))}
+        {/* Net worth line */}
+        <path d={netLine} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2.5} />
+      </svg>
+      {/* Legend */}
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-2">
+        {legendItems.map(({ label, color }) => (
+          <div key={label} className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color, opacity: label === 'Netto vermogen' ? 1 : 0.6 }} />
+            <span className="truncate max-w-[120px]">{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Mini summary chart (SVG) ─────────────────────────────────
 
 function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
@@ -244,31 +536,31 @@ function ProjectionTable({ title, columns, color, projectionYears, defaultExpand
           </div>
         )}
       </button>
-      {expanded && <div className="overflow-x-auto">
+      {expanded && <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-[11px]">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
-              <th className="px-3 py-2 text-left font-medium text-[var(--ink-3)]">Jaar</th>
+              <th className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">Jaar</th>
               {columns.map((col) => (
-                <th key={col.label} className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">
+                <th key={col.label} className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">
                   {col.label}
                 </th>
               ))}
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-2)]">Totaal</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-2)]">Totaal</th>
             </tr>
           </thead>
           <tbody>
-            {displayYears.map((yr) => {
+            {displayYears.map((yr, idx) => {
               const total = columns.reduce((sum, col) => sum + (col.rows[yr - 1]?.value ?? 0), 0)
               return (
-                <tr key={yr} className="border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50">
-                  <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink-3)]">{yr}</td>
+                <tr key={yr} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
+                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{yr}</td>
                   {columns.map((col) => (
-                    <td key={col.label} className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                    <td key={col.label} className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                       {formatCurrency(col.rows[yr - 1]?.value ?? 0)}
                     </td>
                   ))}
-                  <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-[var(--ink)]">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-[var(--ink)]">
                     {formatCurrency(total)}
                   </td>
                 </tr>
@@ -276,7 +568,7 @@ function ProjectionTable({ title, columns, color, projectionYears, defaultExpand
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
     </div>
   )
 }
@@ -345,34 +637,34 @@ function AssetMonthlyTable({ asset, projectionYears }: {
           Startwaarde {formatCurrency(Number(asset.current_value))} · Rendement {annualReturn.toFixed(1)}%/jr · Inleg {formatCurrency(Number(asset.monthly_contribution))}/mnd
         </p>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-[11px]">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
-              <th className="px-3 py-2 text-left font-medium text-[var(--ink-3)]">Maand</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Startwaarde</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Rendement</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Inleg</th>
-              <th className="px-3 py-2 text-right font-medium text-emerald-600">Eindwaarde</th>
+              <th className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">Maand</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Startwaarde</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Rendement</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Inleg</th>
+              <th className="px-3 py-1.5 text-right font-medium text-emerald-600">Eindwaarde</th>
             </tr>
           </thead>
           <tbody>
-            {displayMonths.map((m) => {
+            {displayMonths.map((m, idx) => {
               const row = rows[m - 1]
               if (!row) return null
               return (
-                <tr key={m} className="border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50">
-                  <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink-3)]">{m}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                <tr key={m} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
+                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{m}</td>
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                     {formatCurrency(row.startValue)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                     {formatCurrency(row.rendement)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                     {formatCurrency(row.inleg)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-emerald-600">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-emerald-600">
                     {formatCurrency(row.endValue)}
                   </td>
                 </tr>
@@ -385,7 +677,46 @@ function AssetMonthlyTable({ asset, projectionYears }: {
   )
 }
 
-// ── Savings rate table ───────────────────────────────────────
+// ── Collapsible section header ──────────────────────────────
+
+function SectionHeader({ icon, title, subtitle, color, count, expanded, onToggle }: {
+  icon: React.ReactNode
+  title: string
+  subtitle?: string
+  color: string
+  count: number
+  expanded: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex w-full items-center gap-3 rounded-xl border border-[var(--border-ed)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50 ${color}`}
+    >
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--paper)]">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-[var(--ink)]">{title}</h2>
+          <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+            {count}
+          </span>
+        </div>
+        {subtitle && (
+          <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">{subtitle}</p>
+        )}
+      </div>
+      {expanded ? (
+        <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
+      ) : (
+        <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />
+      )}
+    </button>
+  )
+}
+
+// ── Savings rate section ───────────────────────────────────────
 
 function SavingsRateTable({ assets, debts, profileMonthlyIncome, profileSavingsRate }: {
   assets: Asset[]
@@ -488,33 +819,33 @@ function SavingsProjectionTable({ profileMonthlyIncome, profileSavingsRate, proj
           {formatCurrency(monthlySavings)}/mnd bij {profileSavingsRate.toFixed(1)}% spaarquote
         </p>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-[11px]">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
-              <th className="px-3 py-2 text-left font-medium text-[var(--ink-3)]">Maand</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Inkomen (mnd)</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Spaarquote %</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Spaarbedrag</th>
-              <th className="px-3 py-2 text-right font-medium text-horizon-600">Cumulatief</th>
+              <th className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">Maand</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Inkomen (mnd)</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Spaarquote %</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Spaarbedrag</th>
+              <th className="px-3 py-1.5 text-right font-medium text-horizon-600">Cumulatief</th>
             </tr>
           </thead>
           <tbody>
-            {displayMonths.map((month) => {
+            {displayMonths.map((month, idx) => {
               const cumulative = monthlySavings * month
               return (
-                <tr key={month} className="border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50">
-                  <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink-3)]">{month}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                <tr key={month} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
+                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{month}</td>
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                     {formatCurrency(profileMonthlyIncome)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                     {profileSavingsRate.toFixed(1)}%
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-emerald-600">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
                     {formatCurrency(monthlySavings)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-horizon-600">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-horizon-600">
                     {formatCurrency(cumulative)}
                   </td>
                 </tr>
@@ -620,35 +951,37 @@ function DebtAmortizationTable({ debt, projectionYears }: {
           </div>
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-[11px]">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
-              <th className="px-3 py-2 text-left font-medium text-[var(--ink-3)]">Maand</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Restant</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Rente</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Aflossing</th>
-              <th className="px-3 py-2 text-right font-medium text-red-500">Nieuw restant</th>
+              <th className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">Maand</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Restant</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Rente</th>
+              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Aflossing</th>
+              <th className="px-3 py-1.5 text-right font-medium text-red-500">Nieuw restant</th>
             </tr>
           </thead>
           <tbody>
-            {displayMonths.map((month) => {
+            {displayMonths.map((month, idx) => {
               const row = rows.find((r) => r.month === month)
               if (!row) return null
+              const isZeroBalance = row.endBalance <= 0.01
               return (
-                <tr key={month} className="border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50">
-                  <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink-3)]">{month}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                <tr key={month} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${isZeroBalance ? 'bg-emerald-50/60' : idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
+                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{month}</td>
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                     {formatCurrency(row.startBalance)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-3)]">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
                     {formatCurrency(row.interest)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-emerald-600">
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
                     {formatCurrency(row.repayment)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-red-500">
+                  <td className={`px-3 py-1 text-right font-mono tabular-nums font-semibold ${isZeroBalance ? 'text-emerald-600' : 'text-red-500'}`}>
                     {formatCurrency(row.endBalance)}
+                    {isZeroBalance && <span className="ml-1 text-[9px]">✓</span>}
                   </td>
                 </tr>
               )
@@ -656,19 +989,179 @@ function DebtAmortizationTable({ debt, projectionYears }: {
           </tbody>
           <tfoot>
             <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/50">
-              <td className="px-3 py-2 font-medium text-[var(--ink-3)]">Totaal</td>
-              <td className="px-3 py-2" />
-              <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-[var(--ink-3)]">
+              <td className="px-3 py-1 font-medium text-[var(--ink-3)]">Totaal</td>
+              <td className="px-3 py-1" />
+              <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-[var(--ink-3)]">
                 {formatCurrency(totalInterest)}
               </td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-emerald-600">
+              <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-emerald-600">
                 {formatCurrency(totalRepayment)}
               </td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-red-500">
+              <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-red-500">
                 {formatCurrency(rows[rows.length - 1].endBalance)}
               </td>
             </tr>
           </tfoot>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+
+// ── Net worth monthly table (feature #629) ──────────────────
+
+function NetWorthMonthlyTable({
+  assets,
+  debts,
+  profileMonthlyIncome,
+  profileSavingsRate,
+  projectionYears,
+}: {
+  assets: Asset[]
+  debts: Debt[]
+  profileMonthlyIncome: number
+  profileSavingsRate: number
+  projectionYears: number
+}) {
+  const totalMonths = projectionYears * 12
+  const monthlySavings = profileMonthlyIncome * (profileSavingsRate / 100)
+
+  const assetMonthlyData = useMemo(
+    () => assets.map((a) => ({ name: a.name, rows: computeAssetMonthly(a, totalMonths) })),
+    [assets, totalMonths],
+  )
+
+  const debtMonthlyData = useMemo(
+    () => debts.map((d) => ({ name: d.name, rows: computeAmortization(d, totalMonths) })),
+    [debts, totalMonths],
+  )
+
+  const displayMonths = useMemo(() => getDisplayMonths(totalMonths), [totalMonths])
+
+  const hasAssets = assets.length > 0
+  const hasDebts = debts.length > 0
+  const hasSavings = monthlySavings > 0
+
+  if (!hasAssets && !hasDebts && !hasSavings) return null
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
+      <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">Netto vermogen per maand</h3>
+        <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+          Bezittingen − schulden + cumulatief spaargeld = netto vermogen
+        </p>
+      </div>
+      <div className="overflow-auto max-h-[70vh]">
+        <table className="w-full text-[11px]">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+              <th className="sticky left-0 z-20 bg-[var(--subtle)] px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">
+                Maand
+              </th>
+              {assetMonthlyData.map((a) => (
+                <th
+                  key={`asset-${a.name}`}
+                  className="whitespace-nowrap px-3 py-1.5 text-right font-medium text-emerald-600"
+                >
+                  {a.name}
+                </th>
+              ))}
+              {hasAssets && (
+                <th className="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-emerald-700 bg-emerald-50/40">
+                  ∑ Bezittingen
+                </th>
+              )}
+              {debtMonthlyData.map((d) => (
+                <th
+                  key={`debt-${d.name}`}
+                  className="whitespace-nowrap px-3 py-1.5 text-right font-medium text-red-500"
+                >
+                  {d.name}
+                </th>
+              ))}
+              {hasDebts && (
+                <th className="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-red-600 bg-red-50/30">
+                  ∑ Schulden
+                </th>
+              )}
+              {hasSavings && (
+                <th className="whitespace-nowrap px-3 py-1.5 text-right font-medium text-amber-600">
+                  Spaargeld
+                </th>
+              )}
+              <th className="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-horizon-600 bg-horizon-50/30">
+                Netto vermogen
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayMonths.map((month, idx) => {
+              let assetTotal = 0
+              const assetValues = assetMonthlyData.map((a) => {
+                const val = a.rows[month - 1]?.endValue ?? 0
+                assetTotal += val
+                return val
+              })
+
+              let debtTotal = 0
+              const debtValues = debtMonthlyData.map((d) => {
+                const row = d.rows.find((r) => r.month === month)
+                const val = row?.endBalance ?? 0
+                debtTotal += val
+                return val
+              })
+
+              const savings = hasSavings ? monthlySavings * month : 0
+              const netWorth = assetTotal - debtTotal + savings
+
+              return (
+                <tr
+                  key={month}
+                  className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
+                >
+                  <td className="sticky left-0 z-10 bg-inherit px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">
+                    {month}
+                  </td>
+                  {assetValues.map((val, i) => (
+                    <td
+                      key={`a-${i}`}
+                      className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]"
+                    >
+                      {formatCurrency(val)}
+                    </td>
+                  ))}
+                  {hasAssets && (
+                    <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-emerald-700 bg-emerald-50/20">
+                      {formatCurrency(assetTotal)}
+                    </td>
+                  )}
+                  {debtValues.map((val, i) => (
+                    <td
+                      key={`d-${i}`}
+                      className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]"
+                    >
+                      {formatCurrency(val)}
+                    </td>
+                  ))}
+                  {hasDebts && (
+                    <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-red-600 bg-red-50/20">
+                      {formatCurrency(debtTotal)}
+                    </td>
+                  )}
+                  {hasSavings && (
+                    <td className="px-3 py-1 text-right font-mono tabular-nums text-amber-600">
+                      {formatCurrency(savings)}
+                    </td>
+                  )}
+                  <td className="px-3 py-1 text-right font-mono tabular-nums font-bold text-horizon-600 bg-horizon-50/15">
+                    {formatCurrency(netWorth)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
         </table>
       </div>
     </div>
@@ -690,27 +1183,27 @@ function TotalTable({ assetTotals, debtTotals, netTotals, projectionYears }: {
       <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
         <h3 className="text-sm font-semibold text-[var(--ink)]">Totaaloverzicht</h3>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-[11px]">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
-              <th className="px-3 py-2 text-left font-medium text-[var(--ink-3)]">Jaar</th>
-              <th className="px-3 py-2 text-right font-medium text-emerald-600">Bezittingen</th>
-              <th className="px-3 py-2 text-right font-medium text-red-500">Schulden</th>
-              <th className="px-3 py-2 text-right font-medium text-horizon-600">Netto vermogen</th>
+              <th className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">Jaar</th>
+              <th className="px-3 py-1.5 text-right font-medium text-emerald-600">Bezittingen</th>
+              <th className="px-3 py-1.5 text-right font-medium text-red-500">Schulden</th>
+              <th className="px-3 py-1.5 text-right font-medium text-horizon-600">Netto vermogen</th>
             </tr>
           </thead>
           <tbody>
-            {displayYears.map((yr) => (
-              <tr key={yr} className="border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50">
-                <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink-3)]">{yr}</td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-emerald-600">
+            {displayYears.map((yr, idx) => (
+              <tr key={yr} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
+                <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{yr}</td>
+                <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
                   {formatCurrency(assetTotals[yr - 1])}
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-red-500">
+                <td className="px-3 py-1 text-right font-mono tabular-nums text-red-500">
                   {formatCurrency(debtTotals[yr - 1])}
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-horizon-600">
+                <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-horizon-600">
                   {formatCurrency(netTotals[yr - 1])}
                 </td>
               </tr>
@@ -735,6 +1228,8 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
   const profileSavingsRate = Number(profile?.savings_rate ?? 0)
 
   const [projectionYears, setProjectionYears] = useState(DEFAULT_PROJECTION_YEARS)
+  const [assetsExpanded, setAssetsExpanded] = useState(true)
+  const [debtsExpanded, setDebtsExpanded] = useState(true)
 
   const handleYearsChange = useCallback((value: number) => {
     setProjectionYears(Math.max(1, Math.min(60, value)))
@@ -805,6 +1300,9 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
 
   const hasAssets = assets.length > 0
   const hasDebts = debts.length > 0
+  const totalAssetValue = assets.reduce((s, a) => s + Number(a.current_value), 0)
+  const totalDebtValue = debts.reduce((s, d) => s + Number(d.current_balance), 0)
+  const netWorth = totalAssetValue - totalDebtValue
 
   return (
     <div className="space-y-8">
@@ -894,9 +1392,15 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
       {(hasAssets || hasDebts) && (
         <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-            Samenvattende grafiek — {projectionYears} jaar projectie
+            Vermogensopbouw — {projectionYears} jaar projectie
           </h2>
-          <SummaryChart assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} projectionYears={projectionYears} />
+          <StackedAreaChart
+            assets={assets}
+            debts={debts}
+            profileMonthlyIncome={profileMonthlyIncome}
+            profileSavingsRate={profileSavingsRate}
+            projectionYears={projectionYears}
+          />
         </div>
       )}
 
@@ -974,6 +1478,15 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
 
       {/* Section: Savings projection month-by-month */}
       <SavingsProjectionTable
+        profileMonthlyIncome={profileMonthlyIncome}
+        profileSavingsRate={profileSavingsRate}
+        projectionYears={projectionYears}
+      />
+
+      {/* Section: Net worth monthly overview (feature #629) */}
+      <NetWorthMonthlyTable
+        assets={assets}
+        debts={debts}
         profileMonthlyIncome={profileMonthlyIncome}
         profileSavingsRate={profileSavingsRate}
         projectionYears={projectionYears}
