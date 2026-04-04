@@ -3068,6 +3068,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </div>
           </button>
         </FeatureGate>
+        <Link
+          href="/horizon/doorrekening-test"
+          className="group flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
+          data-testid="doorrekening-test-card"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
+            <TableProperties className="h-5 w-5 text-horizon-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-[var(--ink-3)]">Doorrekening Test</p>
+            <p className="text-lg font-bold text-[var(--ink)]">Opbouw &amp; Projectie</p>
+            <p className="text-xs text-[var(--ink-4)]">
+              Bekijk jaar-op-jaar tabellen van je vermogensopbouw
+            </p>
+          </div>
+        </Link>
       </section>
 
       {/* === 9. Acties (Primary Content) === */}

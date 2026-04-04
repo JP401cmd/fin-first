@@ -1,3 +1,17 @@
+## Session 2026-04-04 - Feature #493 (re-verification)
+
+### Feature #493: Fase 1e — runUnifiedProjection() orchestratiefunctie - ALREADY PASSING
+- Re-verified: all implementation exists and all tests pass
+- 52 parity tests pass (including all 10 personas within tolerance)
+- 59 unit tests pass
+- Horizon page renders correctly with FIRE projections
+- Only console errors are pre-existing net_worth_snapshots 400s (known issue)
+- Feature was already marked as passing from previous session
+
+### Current Status
+- Feature #493 confirmed passing, no code changes needed
+- Overall progress: 612/635 passing (96.4%)
+
 ## Session 2026-03-23 - Feature #612
 
 ### Feature #612: Bugfix: dashboard widgets laden niet volledig — diagnose en fix rendering failures - PASSING
@@ -21632,3 +21646,34 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#577)
 - Overall progress: 604/608 passing (99.3%)
+
+## Session 2026-04-04 - Features #615, #616
+
+### Feature #615: Pagina /horizon/doorrekening-test met subnavigatie - PASSING
+- Created layout.tsx with "Doorrekening Test" title and purple Horizon theme
+- Sub-navigation with Opbouw (active link) and Afbouw (disabled placeholder)
+- /horizon/doorrekening-test redirects to /horizon/doorrekening-test/opbouw
+- Follows ModuleNav styling patterns (border-b-2, uppercase, tracking)
+
+### Feature #616: Subpagina /horizon/doorrekening-test/opbouw - PASSING
+- Server component loads assets, debts, profile from Supabase
+- resolveFireParams for FIRE parameters (grossReturn, inflationRate)
+- OpbouwClient with:
+  - Summary header: current assets, debts, net worth, return/inflation
+  - SVG summary chart: 30-year projection (assets, debts, net worth lines)
+  - Asset tables by type: Cash, Beleggingen, Pensioen, Eigen woning, Vastgoed, Voertuig
+  - Debt tables by type: Hypotheek, Persoonlijke lening, Studielening
+  - Savings rate section: income, contributions, debt payments, rate %
+  - Total overview table: yearly bezittingen/schulden/netto vermogen
+- All data from real database (regression test account)
+- Zero console errors
+
+### Files Created
+- app/(app)/horizon/doorrekening-test/layout.tsx — layout with sub-navigation tabs
+- app/(app)/horizon/doorrekening-test/page.tsx — redirect to /opbouw
+- app/(app)/horizon/doorrekening-test/opbouw/page.tsx — server component data loader
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — client component with tables/chart
+
+### Current Status
+- 2 features completed this session (#615, #616)
+- Commit: abc98bc3
