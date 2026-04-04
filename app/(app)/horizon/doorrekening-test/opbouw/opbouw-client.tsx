@@ -135,7 +135,7 @@ function computeBox3Tax(netWorth: number, hasPartner: boolean): number {
 
 // ── Withdrawal strategy for life event impacts (features #665, #666) ────
 
-type WithdrawalStrategy = 'spreiden' | 'cash_first' | 'laagste_rendement'
+type AllocationStrategy = 'spreiden' | 'cash_first' | 'hoogste_rendement'
 
 /**
  * Apply a withdrawal from assets using the chosen strategy.
@@ -146,7 +146,7 @@ function applyWithdrawal(
   values: number[],
   assets: Asset[],
   amount: number,
-  strategy: WithdrawalStrategy,
+  strategy: AllocationStrategy,
 ) {
   let remaining = amount
 
@@ -169,12 +169,23 @@ function applyWithdrawal(
         if (remaining <= 0.01) break
       }
     }
-  } else {
-    // cash_first and laagste_rendement: sort by expected_return ascending,
-    // withdraw from lowest-returning asset first, cascade if insufficient
+  } else if (strategy === 'cash_first') {
+    // Cash first: withdraw from lowest-returning asset first
     const indices = assets.map((_, i) => i)
     indices.sort(
       (a, b) => Number(assets[a].expected_return) - Number(assets[b].expected_return),
+    )
+    for (const idx of indices) {
+      if (remaining <= 0.01) break
+      const withdraw = Math.min(values[idx], remaining)
+      values[idx] -= withdraw
+      remaining -= withdraw
+    }
+  } else {
+    // hoogste_rendement: withdraw from highest-returning asset first
+    const indices = assets.map((_, i) => i)
+    indices.sort(
+      (a, b) => Number(assets[b].expected_return) - Number(assets[a].expected_return),
     )
     for (const idx of indices) {
       if (remaining <= 0.01) break
@@ -186,12 +197,54 @@ function applyWithdrawal(
 }
 
 /**
+ * Apply a deposit (positive cashflow) to assets using the chosen strategy.
+ * Mutates the `values` array in-place.
+ */
+function applyDeposit(
+  values: number[],
+  assets: Asset[],
+  amount: number,
+  strategy: AllocationStrategy,
+) {
+  if (values.length === 0) return
+
+  if (strategy === 'spreiden') {
+    // Proportional: distribute across assets by current value share
+    const total = values.reduce((s, v) => s + v, 0)
+    if (total > 0) {
+      for (let i = 0; i < values.length; i++) {
+        values[i] += amount * (values[i] / total)
+      }
+    } else {
+      // All zero: distribute equally
+      const share = amount / values.length
+      for (let i = 0; i < values.length; i++) {
+        values[i] += share
+      }
+    }
+  } else if (strategy === 'cash_first') {
+    // Cash first: add to lowest-returning asset first
+    const indices = assets.map((_, i) => i)
+    indices.sort(
+      (a, b) => Number(assets[a].expected_return) - Number(assets[b].expected_return),
+    )
+    values[indices[0]] += amount
+  } else {
+    // laagste_rendement: for positive cashflows, add to lowest-returning asset first
+    const indices = assets.map((_, i) => i)
+    indices.sort(
+      (a, b) => Number(assets[a].expected_return) - Number(assets[b].expected_return),
+    )
+    values[indices[0]] += amount
+  }
+}
+
+/**
  * Run a joint month-by-month asset simulation that applies life event
- * cashflows each month via the chosen withdrawal strategy.
+ * cashflows each month via the chosen allocation strategy.
  *
- * Positive cashflows (income events) are distributed proportionally across
- * assets by current value share.  Negative cashflows (expense events) are
- * withdrawn using `applyWithdrawal`.
+ * Positive cashflows (income events) are deposited using `applyDeposit`.
+ * Negative cashflows (expense events) are withdrawn using `applyWithdrawal`.
  *
  * Returns yearly snapshots (end of each 12-month period) per asset.
  */
@@ -199,7 +252,7 @@ function simulateAssetsWithEvents(
   assets: Asset[],
   totalMonths: number,
   yearlyEventCashflows: number[],
-  strategy: WithdrawalStrategy,
+  strategy: AllocationStrategy,
   crossoverMonth: number | null,
 ): { yearlyAssetValues: number[][] /* [assetIdx][year] */ } {
   // Initialize per-asset values
@@ -234,21 +287,14 @@ function simulateAssetsWithEvents(
       values[i] += contribs[i]
     }
 
-    // 3. Apply event cashflows
+    // 3. Apply event cashflows using the chosen allocation strategy
     const cf = monthlyEventCf.get(m)
     if (cf != null && cf < 0) {
       // Negative cashflow = need to withdraw from assets
       applyWithdrawal(values, assets, -cf, strategy)
     } else if (cf != null && cf > 0) {
-      // Positive cashflow = add to assets proportionally by value
-      const total = values.reduce((s, v) => s + v, 0)
-      if (total > 0) {
-        for (let i = 0; i < values.length; i++) {
-          values[i] += cf * (values[i] / total)
-        }
-      } else if (values.length > 0) {
-        values[0] += cf // fallback: add to first asset
-      }
+      // Positive cashflow = deposit into assets via strategy
+      applyDeposit(values, assets, cf, strategy)
     }
 
     // Ensure no negative values
@@ -1492,7 +1538,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
   const [projectionYears, setProjectionYears] = useState(defaultYears)
   const [assetsExpanded, setAssetsExpanded] = useState(true)
   const [debtsExpanded, setDebtsExpanded] = useState(true)
-  const [withdrawalStrategy, setWithdrawalStrategy] = useState<WithdrawalStrategy>('spreiden')
+  const [allocationStrategy, setAllocationStrategy] = useState<AllocationStrategy>('spreiden')
 
   const handleYearsChange = useCallback((value: number) => {
     setProjectionYears(Math.max(1, Math.min(maxProjectionYears, value)))
@@ -1624,10 +1670,10 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
       assets,
       projectionYears * 12,
       yearlyEventCashflows,
-      withdrawalStrategy,
+      allocationStrategy,
       crossoverMonth,
     )
-  }, [assets, projectionYears, yearlyEventCashflows, withdrawalStrategy, crossoverMonth, hasEvents])
+  }, [assets, projectionYears, yearlyEventCashflows, allocationStrategy, crossoverMonth, hasEvents])
 
   // Compute yearly totals with Box 3 tax impact on net worth.
   // When events exist, asset totals come from the event-adjusted simulation
@@ -1785,7 +1831,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
           <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
             <div className="flex flex-wrap items-center gap-4">
               <label className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Afname-strategie
+                Toename-strategie
               </label>
               <div className="flex gap-2">
                 {([
@@ -1795,9 +1841,9 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
                 ] as const).map(({ key, label }) => (
                   <button
                     key={key}
-                    onClick={() => setWithdrawalStrategy(key)}
+                    onClick={() => setAllocationStrategy(key)}
                     className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors ${
-                      withdrawalStrategy === key
+                      allocationStrategy === key
                         ? 'bg-horizon-600 text-white'
                         : 'bg-[var(--subtle)] text-[var(--ink-3)] hover:bg-[var(--subtle)]/80'
                     }`}
@@ -1809,9 +1855,9 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
             </div>
             <p className="mt-2 text-[10px] text-[var(--ink-4)]">
               {lifeEvents.length} levensgebeurtenis{lifeEvents.length !== 1 ? 'sen' : ''} be{'\u00EF'}nvloeden de projectie
-              {withdrawalStrategy === 'spreiden' && ' \u2014 kosten worden proportioneel verdeeld over bezittingen'}
-              {withdrawalStrategy === 'cash_first' && ' \u2014 kosten worden eerst onttrokken uit laagst-renderend bezit'}
-              {withdrawalStrategy === 'laagste_rendement' && ' \u2014 kosten worden onttrokken vanaf laagste rendement'}
+              {allocationStrategy === 'spreiden' && ' \u2014 bedragen worden proportioneel verdeeld over bezittingen'}
+              {allocationStrategy === 'cash_first' && ' \u2014 bedragen gaan eerst naar bezitting met laagste rendement'}
+              {allocationStrategy === 'laagste_rendement' && ' \u2014 kosten worden onttrokken vanaf laagste rendement, doorschuiven bij onvoldoende'}
             </p>
           </div>
         )}

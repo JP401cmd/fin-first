@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { resolveFireParams } from '@/lib/fire-params'
+import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { OpbouwClient } from './opbouw-client'
 
@@ -20,6 +21,7 @@ export default async function OpbouwPage() {
   ])
 
   const fireParams = resolveFireParams(profile ?? {})
+  const cashflows = lifeEventsToCashflows((lifeEvents ?? []) as LifeEvent[])
 
   return (
     <OpbouwClient
@@ -27,6 +29,7 @@ export default async function OpbouwPage() {
       debts={debts ?? []}
       profile={profile}
       fireParams={fireParams}
+      cashflows={cashflows}
       lifeEvents={(lifeEvents ?? []) as LifeEvent[]}
     />
   )
