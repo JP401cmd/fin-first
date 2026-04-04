@@ -2252,6 +2252,39 @@ Current status: 403/407 features passing (99.0%)
 - Zero TypeScript errors, zero mock data patterns
 - Commit: 383fda49
 
+## Session 2026-04-04 - Features #648, #649
+
+### Feature #648: Afbouw: SWR-strategie gebruikt NL_SWR (2.883%) - PASSING
+- Verified NL_SWR already imported and used in afbouw-client.tsx for perpetual withdrawal
+- Added inflation correction: yearly expenses now inflated by (1 + inflationRate)^year
+- Perpetual withdrawal: min(balance x NL_SWR, inflatedExpenses - AOW)
+- Added "Vast (NL SWR 2,88%)" label in strategy info box and perpetual section header
+- PerpetualStrategyTables in perpetual-tables.tsx also uses NL_SWR correctly (2.883%)
+- Zero console errors
+- Commit: 85a62871
+
+### Feature #649: Afbouw: Guardrails onttrekkingsstrategie berekening - PASSING
+- Updated guardrails calculation to use portfolio-based triggers:
+  - Upper guardrail: portfolio > 120% of start, increase withdrawal by 10%
+  - Decrease guardrail: portfolio < 80% of start, reduce withdrawal by 10%
+- Added guardrail field to PerpetualRow type ('upper' | 'normal' | reduce)
+- Added Guardrail column to table showing active status per year
+  - Up arrow +10% (emerald badge) for upper guardrail
+  - Down arrow -10% (red badge) for reduce guardrail
+  - Dash for normal
+- Updated subtitle with NL SWR base rate and trigger thresholds
+- Verified: upper triggers at age 67 (portfolio 1.9M > 120% x 1.48M), reduce at age 77
+- Zero console errors
+- Commit: b98e98ea
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/afbouw/afbouw-client.tsx - inflation correction + SWR labels
+- app/(app)/horizon/doorrekening-test/afbouw/perpetual-tables.tsx - guardrails strategy + column
+
+### Current Status
+- 2 features completed this session (#648, #649)
+- Overall progress: 640/667 passing (95.9%)
+
 ### Current Status
 - 1 feature completed this session (#321)
 - Overall progress: 321/330 (97.3%)
