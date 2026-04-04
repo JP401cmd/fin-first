@@ -3,7 +3,6 @@
 import { useMemo, useState, useCallback } from 'react'
 import { ChevronDown, ChevronRight, TrendingUp, Landmark, PiggyBank, BarChart3 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import { projectAsset } from '@/lib/asset-data'
 import { ASSET_TYPE_LABELS, type Asset, type AssetType } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS, type Debt, type DebtType } from '@/lib/debt-data'
 import type { FireParams } from '@/lib/fire-params'
@@ -843,9 +842,13 @@ function SavingsProjectionTable({ profileMonthlyIncome, profileSavingsRate, proj
     for (let m = 6; m <= totalMonths; m += 6) {
       if (!months.includes(m)) months.push(m)
     }
+    // Always include crossover month so the kruispunt row is visible
+    if (crossoverMonth != null && crossoverMonth >= 1 && crossoverMonth <= totalMonths && !months.includes(crossoverMonth)) {
+      months.push(crossoverMonth)
+    }
     if (!months.includes(totalMonths)) months.push(totalMonths)
     return months.sort((a, b) => a - b)
-  }, [totalMonths])
+  }, [totalMonths, crossoverMonth])
 
   if (profileMonthlyIncome <= 0 || profileSavingsRate <= 0) {
     return (
@@ -1350,39 +1353,27 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
     const annualExpenses = monthlyExpenses * 12
     if (annualExpenses <= 0 || profileMonthlyIncome <= 0) return null // No meaningful crossover
 
-    // Simulate net worth month-by-month to find crossover
+    // Simulate each asset individually with its own return rate
     const totalMonths = projectionYears * 12
-    const monthlyGrossReturn = fireParams.grossReturn / 12
-
-    // Start values
-    let totalAssetValue = assets.reduce((s, a) => s + Number(a.current_value), 0)
-    let totalDebtBalance = debts.reduce((s, d) => s + Number(d.current_balance), 0)
+    const aVals = assets.map((a) => Number(a.current_value))
+    const aRates = assets.map((a) => Number(a.expected_return) / 100 / 12)
+    const aContribs = assets.map((a) => Number(a.monthly_contribution))
+    const dBals = debts.map((d) => Number(d.current_balance))
+    const dRates = debts.map((d) => Number(d.interest_rate) / 100 / 12)
+    const dPays = debts.map((d) => Number(d.monthly_payment))
 
     for (let m = 1; m <= totalMonths; m++) {
-      // Grow each asset
-      let assetGrowth = 0
-      let assetContributions = 0
-      for (const a of assets) {
-        // Approximate: use each asset's own return
-        assetGrowth += (Number(a.current_value) > 0 ? totalAssetValue : 0) * 0 // simplified below
+      for (let i = 0; i < aVals.length; i++) {
+        aVals[i] = Math.max(0, aVals[i] + aVals[i] * aRates[i] + aContribs[i])
       }
-      // Simplified: grow total assets at gross return, add total contributions
-      assetGrowth = totalAssetValue * monthlyGrossReturn
-      assetContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
-      totalAssetValue += assetGrowth + assetContributions
-
-      // Shrink debts
-      for (const d of debts) {
-        const monthlyRate = Number(d.interest_rate) / 100 / 12
-        const interest = totalDebtBalance * monthlyRate
-        const payment = Math.min(Number(d.monthly_payment), totalDebtBalance + interest)
-        totalDebtBalance = Math.max(0, totalDebtBalance + interest - payment)
+      for (let i = 0; i < dBals.length; i++) {
+        if (dBals[i] <= 0) continue
+        const interest = dBals[i] * dRates[i]
+        dBals[i] = Math.max(0, dBals[i] + interest - Math.min(dPays[i], dBals[i] + interest))
       }
-
-      const netWorth = totalAssetValue - totalDebtBalance
-      const passiveIncome = netWorth * fireParams.effectiveSwr
-      if (passiveIncome >= annualExpenses) {
-        return m // Crossover month found
+      const nw = aVals.reduce((s, v) => s + v, 0) - dBals.reduce((s, v) => s + v, 0)
+      if (nw * fireParams.effectiveSwr >= annualExpenses) {
+        return m
       }
     }
     return null // Not reached within projection horizon
@@ -1668,6 +1659,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
         profileMonthlyIncome={profileMonthlyIncome}
         profileSavingsRate={profileSavingsRate}
         projectionYears={projectionYears}
+        crossoverMonth={crossoverMonth}
       />
 
       {/* Section: Net worth monthly overview (feature #629) */}
