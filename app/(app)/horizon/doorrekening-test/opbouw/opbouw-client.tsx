@@ -1694,12 +1694,15 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
               profileMonthlyIncome={profileMonthlyIncome}
               profileSavingsRate={profileSavingsRate}
               projectionYears={projectionYears}
+              crossoverMonth={crossoverMonth}
             />
             <TotalTable
               assetTotals={assetTotals}
               debtTotals={debtTotals}
               netTotals={netTotals}
+              box3Taxes={box3Taxes}
               projectionYears={projectionYears}
+              crossoverYear={crossoverYear}
             />
           </div>
         </div>
