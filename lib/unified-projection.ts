@@ -15,7 +15,7 @@
  */
 
 import type { Asset, AssetType } from '@/lib/asset-data'
-import { ASSET_TYPE_LABELS, ASSET_TYPE_COLORS, ASSET_TYPE_ICONS } from '@/lib/asset-data'
+import { ASSET_TYPE_LABELS, ASSET_TYPE_COLORS, ASSET_TYPE_ICONS, resolveDepreciation } from '@/lib/asset-data'
 import type { Debt, DebtType, RepaymentType, AmortizationRow } from '@/lib/debt-data'
 import {
   amortizationSchedule,
@@ -332,6 +332,7 @@ interface RunningBucket {
   annualContribution: number // jaarlijkse inleg
   rawDragRate: number        // ongecorrigeerd Box 3 drag percentage
   category: Box3Category     // Box 3 classificatie
+  annualDepreciation: number // lineaire afschrijving per jaar
 }
 
 /**
@@ -348,21 +349,26 @@ function initRunningBuckets(
   const activeAssets = assets.filter(a => a.is_active)
 
   // Groepeer per asset type
-  const typeMap = new Map<AssetType, { totalValue: number; weightedReturnSum: number; totalContribution: number; category: Box3Category; rawDragRate: number }>()
+  const typeMap = new Map<AssetType, { totalValue: number; weightedReturnSum: number; totalContribution: number; category: Box3Category; rawDragRate: number; totalAnnualDepreciation: number }>()
 
   for (const asset of activeAssets) {
     const type = asset.asset_type as AssetType
     const inclPct = (Number(asset.net_worth_inclusion_pct ?? 100) / 100)
     const value = Number(asset.current_value) * inclPct
-    const ret = Number(asset.expected_return) / 100 || fallbackReturn
     const contrib = Number(asset.monthly_contribution) * 12
     const { dragRate, category } = computeAssetBox3DragRate(asset, box3Method)
+
+    // Detect depreciation via shared utility (handles explicit rate + vehicle migration)
+    const depInfo = resolveDepreciation(asset)
+    const ret = depInfo ? 0 : (Number(asset.expected_return) / 100 || fallbackReturn)
+    const annualDep = depInfo ? depInfo.baseValue * (depInfo.rate / 100) : 0
 
     const existing = typeMap.get(type)
     if (existing) {
       existing.weightedReturnSum += value * ret
       existing.totalValue += value
       existing.totalContribution += contrib
+      existing.totalAnnualDepreciation += annualDep
       // Use weighted average drag rate (will be recalculated with heffingsvrij)
       existing.rawDragRate = existing.totalValue > 0
         ? (existing.rawDragRate * (existing.totalValue - value) + dragRate * value) / existing.totalValue
@@ -376,6 +382,7 @@ function initRunningBuckets(
         totalContribution: contrib,
         category,
         rawDragRate: dragRate,
+        totalAnnualDepreciation: annualDep,
       })
     }
   }
@@ -392,6 +399,7 @@ function initRunningBuckets(
       annualContribution: data.totalContribution,
       rawDragRate: data.rawDragRate,
       category: data.category,
+      annualDepreciation: data.totalAnnualDepreciation,
     })
   }
 
@@ -460,8 +468,11 @@ export function computeYearlyAssetGrowth(
     // Box 3 drag (al gecorrigeerd voor heffingsvrij)
     const box3Drag = effectiveDragAmounts[i]
 
-    // Eindwaarde: compound doorrekening — drag vermindert de running value
-    const endValue = startValue + growth + contributions - box3Drag
+    // Lineaire afschrijving: maximaal tot aan restwaarde (nooit negatief)
+    const depAmount = Math.min(bucket.annualDepreciation, Math.max(0, startValue + growth + contributions - box3Drag))
+
+    // Eindwaarde: compound doorrekening — drag en afschrijving verminderen de running value
+    const endValue = startValue + growth + contributions - box3Drag - depAmount
 
     result[bucket.assetType] = {
       startValue: Math.round(startValue),
@@ -472,7 +483,10 @@ export function computeYearlyAssetGrowth(
     }
 
     // Update running value voor volgend jaar (compound!)
-    bucket.value = endValue
+    bucket.value = bucket.annualDepreciation > 0 ? Math.max(0, endValue) : endValue
+
+    // Stop afschrijving als asset volledig is afgeschreven
+    if (endValue <= 0 && bucket.annualDepreciation > 0) bucket.annualDepreciation = 0
 
     // Reset surplus-contribution terug naar basis (surplus is eenmalig per jaar)
     // Dit wordt opnieuw gezet bij de volgende jaarlijkse aanroep
@@ -1292,6 +1306,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         annualContribution: 0,
         rawDragRate: 0,
         category: 'spaargeld' as Box3Category,
+        annualDepreciation: 0,
       })
     }
   }
@@ -1362,6 +1377,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
         annualContribution: 0,
         rawDragRate: 0,
         category: 'spaargeld' as Box3Category,
+        annualDepreciation: 0,
       })
     }
   }

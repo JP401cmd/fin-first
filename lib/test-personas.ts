@@ -1108,7 +1108,7 @@ const lisaData: PersonaData = {
     { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 42000, purchase_value: 33600, purchase_date: '2020-03-01', expected_return: 7, monthly_contribution: 400, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT', has_holdings_tracking: true },
     { name: 'NT World Custom ESG Kinderbelegging', asset_type: 'investment', current_value: 8000, purchase_value: 7140, purchase_date: '2023-12-01', expected_return: 7, monthly_contribution: 0, institution: 'Northern Trust', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'NL0011225305', has_holdings_tracking: true },
     { name: 'Woning Utrecht', asset_type: 'eigen_huis', current_value: 385000, purchase_value: 285000, purchase_date: '2015-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 385000, address_postcode: '3581 KP', address_house_number: '24' },
-    { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: -12, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
+    { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
   ],
   debts: [
     { name: 'Hypotheek woning Utrecht', debt_type: 'mortgage', original_amount: 385000, current_balance: 350000, interest_rate: 2.9, minimum_payment: 1100, monthly_payment: 1100, start_date: '2015-06-01', creditor: 'Rabobank', subtype: 'annuiteit', is_tax_deductible: true, nhg: false, linked_asset_name: 'Woning Utrecht', repayment_type: 'annuiteit' },
@@ -1412,7 +1412,7 @@ const willemData: PersonaData = {
     { name: 'Pensioenfonds ABP', asset_type: 'retirement', current_value: 285000, purchase_value: 0, purchase_date: '1995-01-01', expected_return: 5.5, monthly_contribution: 0, institution: 'ABP', subtype: 'uitkeringsregeling', risk_profile: 'laag', tax_benefit: true, retirement_provider_type: 'bedrijfspensioenfonds' },
     { name: 'Woning Wassenaar', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 380000, purchase_date: '2002-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 720000, address_postcode: '2242 PJ', address_house_number: '8' },
     { name: 'Garage (verhuurd)', asset_type: 'real_estate', current_value: 35000, purchase_value: 18000, purchase_date: '2010-01-01', expected_return: 3, monthly_contribution: 0, institution: '', subtype: 'beleggingspand', rental_income: 500 },
-    { name: 'BMW 3-serie', asset_type: 'vehicle', current_value: 22000, purchase_value: 45000, purchase_date: '2023-01-01', expected_return: -15, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },
+    { name: 'BMW 3-serie', asset_type: 'vehicle', current_value: 22000, purchase_value: 45000, purchase_date: '2023-01-01', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },
   ],
   debts: [],
   budgets: makeBudgets({
@@ -1696,7 +1696,7 @@ const rashidData: PersonaData = {
   assets: [
     { name: 'Beleggingsrekening DEGIRO', asset_type: 'investment', current_value: 170000, purchase_value: 130000, purchase_date: '2016-01-01', expected_return: 7, monthly_contribution: 800, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel', has_holdings_tracking: true },
     { name: 'Eigen woning', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 630000, purchase_date: '2023-03-01', expected_return: 3, monthly_contribution: 0, institution: '' },
-    { name: 'Auto (Audi A4)', asset_type: 'vehicle', current_value: 24000, purchase_value: 38000, purchase_date: '2022-06-01', expected_return: -15, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },
+    { name: 'Auto (Audi A4)', asset_type: 'vehicle', current_value: 24000, purchase_value: 38000, purchase_date: '2022-06-01', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },
   ],
   debts: [
     {

@@ -41,7 +41,7 @@ import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-s
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
-import type { Asset } from '@/lib/asset-data'
+import { resolveDepreciation, type Asset } from '@/lib/asset-data'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
@@ -217,7 +217,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       if (!acc[type]) acc[type] = { type, value: 0, purchaseValue: 0, weightedReturn: 0 }
       acc[type].value += Number(a.current_value)
       acc[type].purchaseValue += Number((a as { purchase_value?: number | null }).purchase_value ?? 0)
-      acc[type].weightedReturn += Number(a.current_value) * Number((a as { expected_return?: number | null }).expected_return ?? 0)
+      const assetReturn = resolveDepreciation(a as Asset) ? 0 : Number((a as { expected_return?: number | null }).expected_return ?? 0)
+      acc[type].weightedReturn += Number(a.current_value) * assetReturn
       return acc
     }, {} as Record<string, { type: string; value: number; purchaseValue: number; weightedReturn: number }>)
   ).map(g => ({ ...g, expectedReturn: g.value > 0 ? g.weightedReturn / g.value : 0 }))

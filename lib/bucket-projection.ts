@@ -11,7 +11,7 @@
  * Behouden als referentie en fallback. De Kern pagina gebruikt nu de unified engine.
  */
 
-import { projectAsset, type Asset, type AssetType, ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, ASSET_TYPE_ICONS } from './asset-data'
+import { projectAsset, resolveDepreciation, type Asset, type AssetType, ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, ASSET_TYPE_ICONS } from './asset-data'
 import {
   amortizationSchedule,
   linearAmortization,
@@ -284,7 +284,8 @@ export function computeBucketProjection(input: BucketProjectionInput): BucketPro
     const ret = Number(a.expected_return)
     const contrib = Number(a.monthly_contribution)
     const inclusionPct = Number(a.net_worth_inclusion_pct ?? 100) / 100
-    const rows = projectAsset(value, ret, contrib, months)
+    const depreciation = resolveDepreciation(a)
+    const rows = projectAsset(value, depreciation ? 0 : ret, contrib, months, undefined, depreciation)
     return { asset: a, rows, inclusionPct }
   })
 

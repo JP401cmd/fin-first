@@ -2259,6 +2259,13 @@ function AssetForm({
       setRiskProfile('')
       setTaxBenefit(false)
       setIsLiquid(true)
+      // Default depreciation for vehicle; clear for non-depreciating types
+      if (type === 'vehicle') {
+        setDepreciationRate('15')
+        setExpectedReturn('0')
+      } else if (type !== 'physical') {
+        setDepreciationRate('')
+      }
     }
   }
 
@@ -2348,7 +2355,7 @@ function AssetForm({
       current_value: Number(currentValue) || 0,
       purchase_value: isCashType ? Number(currentValue) || 0 : Number(purchaseValue) || 0,
       purchase_date: isCashType ? null : purchaseDate || null,
-      expected_return: isCashType ? 0 : Number(expectedReturn) || 0,
+      expected_return: isCashType ? 0 : (depreciationRate && Number(depreciationRate) > 0 ? 0 : Number(expectedReturn) || 0),
       monthly_contribution: isCashType ? 0 : Number(monthlyContribution) || 0,
       institution: institution || null,
       account_number: isCashType ? (iban || null) : null,
@@ -2619,6 +2626,7 @@ function AssetForm({
               </div>
 
               <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
+                {!(visibleFields.includes('depreciation_rate') && depreciationRate && Number(depreciationRate) > 0) && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{assetType === 'vordering' ? 'Rente (% p.j.)' : 'Rendement (% p.j.)'}</label>
                   <input
@@ -2629,6 +2637,7 @@ function AssetForm({
                     className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
                   />
                 </div>
+                )}
                 {assetType !== 'eigen_huis' && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">

@@ -7,7 +7,7 @@
  * withdrawals over liquid categories.
  */
 
-import { type Asset, type AssetType, ASSET_TYPE_COLORS } from './asset-data'
+import { type Asset, type AssetType, ASSET_TYPE_COLORS, resolveDepreciation } from './asset-data'
 import {
   type Debt,
   type RepaymentType,
@@ -96,7 +96,21 @@ function projectAssetByYear(
   expectedReturn: number,   // annual decimal, e.g. 0.07
   monthlyContribution: number,
   years: number,
+  depreciation?: { rate: number; baseValue: number } | null,
 ): number[] {
+  // Linear depreciation path: fixed annual write-off based on purchase value
+  if (depreciation && depreciation.rate > 0) {
+    const annualDep = depreciation.baseValue * (depreciation.rate / 100)
+    const values: number[] = []
+    let value = currentValue
+    for (let y = 0; y <= years; y++) {
+      values.push(Math.max(0, value))
+      value = value - annualDep + monthlyContribution * 12
+      if (value < 0) value = 0
+    }
+    return values
+  }
+
   const values: number[] = []
   for (let y = 0; y <= years; y++) {
     const compounded = currentValue * Math.pow(1 + expectedReturn, y)
@@ -221,15 +235,19 @@ export function projectWealthComposition(
   const activeDebts = debts.filter(d => d.is_active && Number(d.current_balance) > 0)
 
   // Project each asset year-by-year
-  const assetProjections = activeAssets.map(a => ({
-    group: WEALTH_GROUPS[a.asset_type],
-    values: projectAssetByYear(
-      Number(a.current_value),
-      Number(a.expected_return) / 100,
-      Number(a.monthly_contribution),
-      years,
-    ),
-  }))
+  const assetProjections = activeAssets.map(a => {
+    const depreciation = resolveDepreciation(a)
+    return {
+      group: WEALTH_GROUPS[a.asset_type],
+      values: projectAssetByYear(
+        Number(a.current_value),
+        depreciation ? 0 : Number(a.expected_return) / 100,
+        Number(a.monthly_contribution),
+        years,
+        depreciation,
+      ),
+    }
+  })
 
   // Project each debt year-by-year
   const debtProjections = activeDebts.map(d => projectDebtByYear(d, years))

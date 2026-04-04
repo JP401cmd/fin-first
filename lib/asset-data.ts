@@ -153,7 +153,7 @@ export const TYPICAL_RETURNS: Record<AssetType, number> = {
   eigen_huis: 3.5,
   real_estate: 3.5,
   crypto: 0, // too volatile to estimate
-  vehicle: -15, // depreciates
+  vehicle: 0, // uses depreciation_rate for linear depreciation
   physical: 0,
   deelneming: 0, // waarde is intrinsiek — handmatige waardering
   levensverzekering: 1.5, // conservatief rendement op opbouwwaarde
@@ -307,7 +307,7 @@ export const ASSET_TYPE_FIELDS: Record<AssetType, string[]> = {
   real_estate: ['subtype', 'rental_income', 'woz_value'],
   crypto: ['subtype', 'risk_profile', 'ticker_symbol'],
   vehicle: ['subtype', 'depreciation_rate'],
-  physical: ['subtype'],
+  physical: ['subtype', 'depreciation_rate'],
   deelneming: ['subtype', 'institution', 'kvk_number', 'ownership_percentage', 'annual_dividend', 'risk_profile'],
   levensverzekering: ['subtype', 'risk_profile', 'is_liquid', 'expiry_date', 'beneficiary'],
   vordering: ['subtype', 'institution', 'lock_end_date'],
@@ -325,10 +325,30 @@ export interface ProjectionMonth {
 }
 
 /**
+ * Resolve depreciation info for an asset. Returns a depreciation descriptor
+ * when linear depreciation should be used, or null for standard compound growth.
+ *
+ * Handles migration: vehicles with negative expected_return and no depreciation_rate
+ * are treated as if depreciation_rate = |expected_return|.
+ */
+export function resolveDepreciation(a: Asset): { rate: number; baseValue: number } | null {
+  const depRate = Number(a.depreciation_rate)
+  const hasNegReturn = Number(a.expected_return) < 0 && a.asset_type === 'vehicle'
+  const effectiveDepRate = depRate > 0 ? depRate : (hasNegReturn ? Math.abs(Number(a.expected_return)) : 0)
+  return effectiveDepRate > 0
+    ? { rate: effectiveDepRate, baseValue: Number(a.purchase_value) || Number(a.current_value) }
+    : null
+}
+
+/**
  * Project an asset's value into the future, accounting for:
- * - Monthly compounding of expected return
+ * - Monthly compounding of expected return (for appreciating assets)
+ * - Linear depreciation based on purchase value (when depreciation param provided)
  * - Monthly contributions
  * Returns month-by-month for `months` months.
+ *
+ * When `depreciation` is provided with rate > 0, linear depreciation is used:
+ * monthly decline = baseValue × (rate / 100) / 12, clamped to 0.
  */
 export function projectAsset(
   currentValue: number,
@@ -336,14 +356,25 @@ export function projectAsset(
   monthlyContribution: number,
   months: number,
   startDate: Date = new Date(),
+  depreciation?: { rate: number; baseValue: number } | null,
 ): ProjectionMonth[] {
-  const monthlyRate = annualReturn / 100 / 12
   const rows: ProjectionMonth[] = []
   let value = currentValue
 
+  const useLinearDepreciation = depreciation && depreciation.rate > 0
+  const monthlyDepreciation = useLinearDepreciation
+    ? depreciation.baseValue * (depreciation.rate / 100) / 12
+    : 0
+  const monthlyRate = annualReturn / 100 / 12
+
   for (let m = 1; m <= months; m++) {
-    const growth = value * monthlyRate
-    value = value + growth + monthlyContribution
+    let growth: number
+    if (useLinearDepreciation) {
+      growth = value > 0 ? -Math.min(monthlyDepreciation, value) : 0
+    } else {
+      growth = value * monthlyRate
+    }
+    value = Math.max(0, value + growth) + monthlyContribution
 
     const date = new Date(startDate)
     date.setMonth(date.getMonth() + m)
@@ -370,15 +401,20 @@ export function projectPortfolio(
   const activeAssets = assets.filter((a) => a.is_active)
   if (activeAssets.length === 0) return []
 
-  const projections = activeAssets.map((a) => ({
-    asset: a,
-    rows: projectAsset(
-      Number(a.current_value),
-      Number(a.expected_return),
-      Number(a.monthly_contribution),
-      months,
-    ),
-  }))
+  const projections = activeAssets.map((a) => {
+    const depreciation = resolveDepreciation(a)
+    return {
+      asset: a,
+      rows: projectAsset(
+        Number(a.current_value),
+        depreciation ? 0 : Number(a.expected_return),
+        Number(a.monthly_contribution),
+        months,
+        undefined,
+        depreciation,
+      ),
+    }
+  })
 
   const now = new Date()
   const result: { month: number; date: string; total: number; byType: Record<AssetType, number> }[] = []
