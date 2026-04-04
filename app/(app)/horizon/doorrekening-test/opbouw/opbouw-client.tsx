@@ -1244,7 +1244,15 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
   projectionYears: number
   crossoverYear: number | null
 }) {
-  const displayYears = getDisplayYears(projectionYears)
+  const displayYears = useMemo(() => {
+    const years = getDisplayYears(projectionYears)
+    // Always include the crossover year in the display
+    if (crossoverYear != null && !years.includes(crossoverYear)) {
+      years.push(crossoverYear)
+      years.sort((a, b) => a - b)
+    }
+    return years
+  }, [projectionYears, crossoverYear])
   const cumulativeTax = useMemo(() => {
     const cum: number[] = []
     let total = 0

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle, CalendarClock } from 'lucide-react'
+import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle, CalendarClock, Shield } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -309,8 +309,22 @@ export function AfbouwClient({
   const displayRows = useMemo(() => getDisplayRows(withdrawalSchedule), [withdrawalSchedule])
   const depleted = withdrawalSchedule.length > 0 && withdrawalSchedule[withdrawalSchedule.length - 1].endBalance <= 0
 
+  // Inflation-adjusted expense schedule (month-by-month from current age to 100)
+  const inflationExpenseSchedule = useMemo(() => {
+    if (currentAge == null || monthlyRetirementExpenses <= 0) return []
+    return computeInflationExpenseSchedule(
+      monthlyRetirementExpenses,
+      currentAge,
+      displayEndAge,
+      fireParams.inflationRate,
+    )
+  }, [currentAge, monthlyRetirementExpenses, displayEndAge, fireParams.inflationRate])
+
+  const displayExpenseRows = useMemo(() => getDisplayExpenseRows(inflationExpenseSchedule), [inflationExpenseSchedule])
+
   // ── Section state ──
   const [expensesExpanded, setExpensesExpanded] = useState(true)
+  const [inflationTableExpanded, setInflationTableExpanded] = useState(false)
   const [strategyExpanded, setStrategyExpanded] = useState(true)
   const [crossoverExpanded, setCrossoverExpanded] = useState(true)
 

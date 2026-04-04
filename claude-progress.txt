@@ -21874,3 +21874,89 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#629, #633)
+
+## Session 2026-04-04 - Features #631, #632
+
+### Feature #631: Box 3 belasting berekenen op jaarbasis - PASSING
+- Added computeBox3Tax() helper using NL_FICTIEF_BELEGGINGEN (5.88%) × BOX3_TARIEF (36%)
+- Subtracts heffingsvrij vermogen (€59,357 single / €118,714 partner) before calculating
+- Added Box 3 belasting and Cumulatief Box 3 columns to TotalTable
+- Descriptive subtitle shows formula parameters
+- Dash (—) shown when tax is 0
+- Partner-aware via profile.household_type
+- Commit: 8d0342db
+
+### Feature #632: Box 3 belasting impact op netto vermogen - PASSING
+- Integrated Box 3 tax into the yearly totals computation loop
+- Each year's tax is calculated on adjusted net worth (after cumulative prior taxes)
+- Net worth column now reflects cumulative Box 3 taxes paid
+- Chart (SummaryChart) also uses tax-adjusted net worth
+- Math verified: Year 1 raw net €907,547 → tax €17,954 → adjusted €889,593
+- Zero console errors
+- Commit: da408071
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — Box 3 tax computation + integration
+
+### Current Status
+- 2 features completed this session (#631, #632)
+
+## Session 2026-04-04 - Features #637, #638
+
+### Feature #637: Opbouw: maximale leeftijd op 100 jaar - PASSING
+- Reads date_of_birth from profile to calculate current age
+- Default projection years = 100 - currentAge (65 for age 35)
+- Slider and number input max capped at years-to-100 (no longer hardcoded 60)
+- Shows age label: "Leeftijd nu: 35 · tot 100 jaar (max 100)"
+- Reset button adapts to age-based default instead of hardcoded 30
+- Fallback: if no birthdate, max stays at 60 years with 30-year default
+- Zero console errors
+- Commit: f91021e7
+
+### Feature #638: Opbouw: spaarquote stopt bij kruispunt (stoppen met werken) - PASSING
+- Added crossoverMonth prop to SavingsProjectionTable
+- After crossover: income shows €0, savings rate 0%, spaarbedrag €0
+- Cumulative savings stays flat after crossover (effectiveMonths = min(month, crossoverMonth))
+- Crossover row gets bg-horizon-50/60 background + ⚡ kruispunt label
+- Post-crossover rows get dimmed text (text-[var(--ink-4)])
+- Crossover month always included in displayMonths sampling (even for large horizons)
+- TotalTable already showed "na kruispunt" markers (pre-existing)
+- Zero console errors
+- Commit: 5f89a136
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — age-based projection + savings crossover
+
+### Current Status
+- 2 features completed this session (#637, #638)
+- Overall progress: 631/655 passing (96.3%)
+
+## Session 2026-04-04 - Feature #641
+
+### Feature #641: Subpagina /horizon/doorrekening-test/afbouw - PASSING
+- Created /horizon/doorrekening-test/afbouw subpage with full decumulation analysis
+- Enabled Afbouw tab in layout (was disabled), added proper TypeScript typing for tab disabled prop
+- Three main sections:
+  1. Noodzakelijke uitgaven: retirement expenses table with levensonderhoud, AOW offset, netto uit vermogen
+  2. Eindstrategie-tabellen: withdrawal schedule based on user's FIRE strategy (perpetual/deplete/legacy)
+     - Columns: leeftijd, startbalans, onttrekking, AOW, rendement, eindbalans
+     - AOW kicks in at age 67, reduces portfolio withdrawal
+     - Decumulation SVG chart showing wealth path during drawdown
+  3. Kruispuntbepaling: crossover age where portfolio meets FIRE target
+     - Key metrics: current age, crossover age, years to crossover, portfolio at crossover
+     - Year-by-year table comparing projected portfolio vs FIRE target
+- Server component loads assets, debts, profile, budgets from Supabase
+- Uses real profile data: retirement expense method, FIRE strategy, gross return, inflation
+- Verified: regression test account shows €834.703 net worth, €1.456.715 FIRE target, crossover at 47j
+- Tab navigation works both ways (Opbouw <-> Afbouw)
+- Zero console errors on fresh page load
+- Commit: 841e50fd
+
+### Files Created/Modified
+- app/(app)/horizon/doorrekening-test/afbouw/page.tsx — server component data loader
+- app/(app)/horizon/doorrekening-test/afbouw/afbouw-client.tsx — client component with all 3 sections
+- app/(app)/horizon/doorrekening-test/layout.tsx — enabled Afbouw tab, typed disabled prop
+
+### Current Status
+- 1 feature completed this session (#641)
+- Overall progress: 630/655 passing (96.2%)
