@@ -280,19 +280,28 @@ function WithdrawalSubTable({
   label,
   subtitle,
   rows,
+  isActive,
 }: {
   label: string
   subtitle: string
   rows: WithdrawalRow[]
+  isActive?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : sampleRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
 
   return (
-    <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-      <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5">
-        <h4 className="text-sm font-bold text-[var(--ink)]">{label}</h4>
+    <div className={`rounded-xl border bg-[var(--paper)] overflow-hidden ${isActive ? 'border-horizon-400 ring-2 ring-horizon-200' : 'border-[var(--border-ed)]'}`}>
+      <div className={`border-b px-4 py-2.5 ${isActive ? 'border-horizon-300 bg-horizon-50/60' : 'border-[var(--border-ed)] bg-[var(--subtle)]/50'}`}>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-bold text-[var(--ink)]">{label}</h4>
+          {isActive && (
+            <span className="rounded-full bg-horizon-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+              Actief
+            </span>
+          )}
+        </div>
         <p className="text-[11px] text-[var(--ink-3)]">{subtitle}</p>
       </div>
 
@@ -385,19 +394,28 @@ function BucketSubTable({
   label,
   subtitle,
   rows,
+  isActive,
 }: {
   label: string
   subtitle: string
   rows: BucketRow[]
+  isActive?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : sampleRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
 
   return (
-    <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-      <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5">
-        <h4 className="text-sm font-bold text-[var(--ink)]">{label}</h4>
+    <div className={`rounded-xl border bg-[var(--paper)] overflow-hidden ${isActive ? 'border-horizon-400 ring-2 ring-horizon-200' : 'border-[var(--border-ed)]'}`}>
+      <div className={`border-b px-4 py-2.5 ${isActive ? 'border-horizon-300 bg-horizon-50/60' : 'border-[var(--border-ed)] bg-[var(--subtle)]/50'}`}>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-bold text-[var(--ink)]">{label}</h4>
+          {isActive && (
+            <span className="rounded-full bg-horizon-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+              Actief
+            </span>
+          )}
+        </div>
         <p className="text-[11px] text-[var(--ink-3)]">{subtitle}</p>
       </div>
 
@@ -484,6 +502,7 @@ export function LegacyStrategyTables({
   inflationRate,
   hasPartner,
   legacyAmount,
+  activeWithdrawalStrategy,
 }: {
   startPortfolio: number
   retirementAge: number
@@ -493,6 +512,7 @@ export function LegacyStrategyTables({
   inflationRate: number
   hasPartner: boolean
   legacyAmount: number
+  activeWithdrawalStrategy?: string
 }) {
   const totalYears = Math.max(0, endAge - retirementAge)
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
@@ -541,24 +561,28 @@ export function LegacyStrategyTables({
         label="A. SWR — Vaste onttrekking (met nalatenschap)"
         subtitle={`Jaarlijkse onttrekking: (portfolio \u2212 CW nalatenschap) \u00d7 SWR (${(NL_SWR * 100).toFixed(2)}%) = ${formatCurrency(Math.round(swrAnnual))}/jr`}
         rows={swrRows}
+        isActive={activeWithdrawalStrategy === 'swr'}
       />
 
       <WithdrawalSubTable
         label="B. Guardrails — Variabele onttrekking met bandbreedte"
         subtitle={`Start met SWR op beschikbaar deel, met \u00b1${Math.round(GUARDRAIL_BAND * 100)}% bandbreedte. Past automatisch aan bij marktuitslagen.`}
         rows={guardrailsRows}
+        isActive={activeWithdrawalStrategy === 'guardrails'}
       />
 
       <WithdrawalSubTable
         label="C. VPW — Variabele percentage-onttrekking"
         subtitle="Elk jaar: (portfolio \u2212 CW resterende nalatenschap) / resterende jaren. Meer beschikbaar naarmate einddatum nadert."
         rows={vpwRows}
+        isActive={activeWithdrawalStrategy === 'vpw'}
       />
 
       <BucketSubTable
         label="D. Bucket — Emmerstrategie (met nalatenschapsbuffer)"
         subtitle={`Drie emmers + buffer van ${formatCurrency(legacyAmount)} in aandelen. Cash (2j, 0%), Obligaties (5j, ${(BOND_RETURN * 100).toFixed(0)}%), Aandelen (rest).`}
         rows={bucketRows}
+        isActive={activeWithdrawalStrategy === 'bucket'}
       />
     </>
   )

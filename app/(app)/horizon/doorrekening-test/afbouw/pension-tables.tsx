@@ -61,6 +61,7 @@ export function PensionStrategyTables({
   grossReturn,
   inflationRate,
   hasPartner,
+  activeWithdrawalStrategy,
 }: {
   /** Portfolio value projected to AOW age */
   portfolioAtAow: number
@@ -69,6 +70,7 @@ export function PensionStrategyTables({
   grossReturn: number
   inflationRate: number
   hasPartner: boolean
+  activeWithdrawalStrategy?: string
 }) {
   const aowAge = NL_AOW_AGE
   const endAge = 100
@@ -265,6 +267,7 @@ export function PensionStrategyTables({
           subtitle={strat.subtitle}
           rows={strat.rows}
           showVpwColumns={strat.showVpwColumns}
+          isActive={strat.key === activeWithdrawalStrategy}
         />
       ))}
     </>
@@ -278,20 +281,29 @@ function PensionSubTable({
   subtitle,
   rows,
   showVpwColumns,
+  isActive,
 }: {
   label: string
   subtitle: string
   rows: PensionRow[]
   showVpwColumns?: boolean
+  isActive?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => (expanded ? rows : sampleRows(rows)), [rows, expanded])
   const hasTooMany = rows.length > 20
 
   return (
-    <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-      <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5">
-        <h4 className="text-sm font-bold text-[var(--ink)]">{label}</h4>
+    <div className={`rounded-xl border bg-[var(--paper)] overflow-hidden ${isActive ? 'border-horizon-400 ring-2 ring-horizon-200' : 'border-[var(--border-ed)]'}`}>
+      <div className={`border-b px-4 py-2.5 ${isActive ? 'border-horizon-300 bg-horizon-50/60' : 'border-[var(--border-ed)] bg-[var(--subtle)]/50'}`}>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-bold text-[var(--ink)]">{label}</h4>
+          {isActive && (
+            <span className="rounded-full bg-horizon-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+              Actief
+            </span>
+          )}
+        </div>
         <p className="text-[11px] text-[var(--ink-3)]">{subtitle}</p>
       </div>
 

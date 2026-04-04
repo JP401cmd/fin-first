@@ -55,6 +55,7 @@ export function PerpetualStrategyTables({
   yearlyExpenses,
   grossReturn,
   inflationRate,
+  activeWithdrawalStrategy,
 }: {
   startPortfolio: number
   retirementAge: number
@@ -63,6 +64,7 @@ export function PerpetualStrategyTables({
   grossReturn: number
   inflationRate: number
   hasPartner: boolean
+  activeWithdrawalStrategy?: string
 }) {
   const totalYears = Math.max(0, endAge - retirementAge)
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
@@ -199,7 +201,7 @@ export function PerpetualStrategyTables({
   return (
     <>
       {strategies.map((strat) => (
-        <PerpetualSubTable key={strat.key} label={strat.label} subtitle={strat.subtitle} rows={strat.rows} showVpwColumns={strat.showVpwColumns} showGuardrailColumn={strat.showGuardrailColumn} />
+        <PerpetualSubTable key={strat.key} label={strat.label} subtitle={strat.subtitle} rows={strat.rows} showVpwColumns={strat.showVpwColumns} showGuardrailColumn={strat.showGuardrailColumn} isActive={strat.key === activeWithdrawalStrategy} />
       ))}
     </>
   )
@@ -207,15 +209,22 @@ export function PerpetualStrategyTables({
 
 // ── Sub-table Component ──────────────────────────────────────
 
-function PerpetualSubTable({ label, subtitle, rows, showVpwColumns, showGuardrailColumn }: { label: string; subtitle: string; rows: PerpetualRow[]; showVpwColumns?: boolean; showGuardrailColumn?: boolean }) {
+function PerpetualSubTable({ label, subtitle, rows, showVpwColumns, showGuardrailColumn, isActive }: { label: string; subtitle: string; rows: PerpetualRow[]; showVpwColumns?: boolean; showGuardrailColumn?: boolean; isActive?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : samplePerpetualRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
 
   return (
-    <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-      <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5">
-        <h4 className="text-sm font-bold text-[var(--ink)]">{label}</h4>
+    <div className={`rounded-xl border bg-[var(--paper)] overflow-hidden ${isActive ? 'border-horizon-400 ring-2 ring-horizon-200' : 'border-[var(--border-ed)]'}`}>
+      <div className={`border-b px-4 py-2.5 ${isActive ? 'border-horizon-300 bg-horizon-50/60' : 'border-[var(--border-ed)] bg-[var(--subtle)]/50'}`}>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-bold text-[var(--ink)]">{label}</h4>
+          {isActive && (
+            <span className="rounded-full bg-horizon-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+              Actief
+            </span>
+          )}
+        </div>
         <p className="text-[11px] text-[var(--ink-3)]">{subtitle}</p>
       </div>
 
