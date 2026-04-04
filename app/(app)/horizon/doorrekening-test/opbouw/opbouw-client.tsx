@@ -24,21 +24,38 @@ interface YearRow {
   contribution: number
 }
 
-function projectAssetYearly(asset: Asset, years: number): YearRow[] {
-  const months = projectAsset(
-    Number(asset.current_value),
-    Number(asset.expected_return),
-    Number(asset.monthly_contribution),
-    years * 12,
-  )
+/**
+ * Project an asset yearly, optionally stopping monthly contributions after
+ * the crossover month (kruispunt). Returns continue after crossover.
+ */
+function projectAssetYearly(asset: Asset, years: number, crossoverMonth?: number | null): YearRow[] {
+  const monthlyRate = Number(asset.expected_return) / 100 / 12
+  const monthlyContrib = Number(asset.monthly_contribution)
+  const totalMonths = years * 12
+  let value = Number(asset.current_value)
+
+  // Month-by-month simulation with crossover-aware contributions
+  const monthlyValues: number[] = []
+  for (let m = 1; m <= totalMonths; m++) {
+    const growth = value * monthlyRate
+    // Stop contributions after crossover month (if set), but keep returns
+    const contrib = (crossoverMonth != null && m > crossoverMonth) ? 0 : monthlyContrib
+    value = Math.max(0, value + growth + contrib)
+    monthlyValues.push(value)
+  }
 
   const rows: YearRow[] = []
   for (let y = 1; y <= years; y++) {
     const idx = y * 12 - 1
     const prevIdx = (y - 1) * 12 - 1
-    const prev = prevIdx >= 0 ? months[prevIdx].value : Number(asset.current_value)
-    const curr = months[idx]?.value ?? prev
-    const yearContrib = Number(asset.monthly_contribution) * 12
+    const prev = prevIdx >= 0 ? monthlyValues[prevIdx] : Number(asset.current_value)
+    const curr = monthlyValues[idx] ?? prev
+    // Sum actual contributions for this year
+    let yearContrib = 0
+    for (let m = (y - 1) * 12 + 1; m <= y * 12; m++) {
+      if (crossoverMonth != null && m > crossoverMonth) continue
+      yearContrib += monthlyContrib
+    }
     rows.push({
       year: y,
       value: Math.round(curr),
@@ -604,7 +621,7 @@ interface MonthRow {
   endValue: number
 }
 
-function computeAssetMonthly(asset: Asset, totalMonths: number): MonthRow[] {
+function computeAssetMonthly(asset: Asset, totalMonths: number, crossoverMonth?: number | null): MonthRow[] {
   const monthlyRate = Number(asset.expected_return) / 100 / 12
   const monthlyContrib = Number(asset.monthly_contribution)
   let value = Number(asset.current_value)
@@ -613,7 +630,8 @@ function computeAssetMonthly(asset: Asset, totalMonths: number): MonthRow[] {
   for (let m = 1; m <= totalMonths; m++) {
     const startValue = value
     const rendement = startValue * monthlyRate
-    const inleg = monthlyContrib
+    // Stop contributions after crossover month, returns continue
+    const inleg = (crossoverMonth != null && m > crossoverMonth) ? 0 : monthlyContrib
     const endValue = startValue + rendement + inleg
     rows.push({
       month: m,
@@ -1271,13 +1289,21 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
   const householdType = String(profile?.household_type ?? 'solo')
   const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
 
-  const [projectionYears, setProjectionYears] = useState(DEFAULT_PROJECTION_YEARS)
+  // ── Age-based projection limit (feature #637) ──
+  const dateOfBirth = typeof profile?.date_of_birth === 'string' ? profile.date_of_birth : null
+  const currentAge = dateOfBirth
+    ? Math.floor((Date.now() - new Date(dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null
+  const maxProjectionYears = currentAge != null ? Math.max(1, 100 - currentAge) : 60
+  const defaultYears = currentAge != null ? maxProjectionYears : DEFAULT_PROJECTION_YEARS
+
+  const [projectionYears, setProjectionYears] = useState(defaultYears)
   const [assetsExpanded, setAssetsExpanded] = useState(true)
   const [debtsExpanded, setDebtsExpanded] = useState(true)
 
   const handleYearsChange = useCallback((value: number) => {
-    setProjectionYears(Math.max(1, Math.min(60, value)))
-  }, [])
+    setProjectionYears(Math.max(1, Math.min(maxProjectionYears, value)))
+  }, [maxProjectionYears])
 
   // Group and project
   const assetGroups = useMemo(() => groupAssetsByType(assets), [assets])
@@ -1408,7 +1434,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
             <input
               type="range"
               min={1}
-              max={60}
+              max={maxProjectionYears}
               step={1}
               value={projectionYears}
               onChange={(e) => handleYearsChange(Number(e.target.value))}
@@ -1418,7 +1444,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
               <input
                 type="number"
                 min={1}
-                max={60}
+                max={maxProjectionYears}
                 value={projectionYears}
                 onChange={(e) => handleYearsChange(Number(e.target.value))}
                 className="w-16 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1.5 text-center font-mono tabular-nums text-sm text-[var(--ink)] focus:border-horizon-500 focus:outline-none focus:ring-1 focus:ring-horizon-500"
@@ -1426,12 +1452,17 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
               <span className="text-sm text-[var(--ink-3)]">jaar</span>
             </div>
           </div>
-          {projectionYears !== DEFAULT_PROJECTION_YEARS && (
+          {currentAge != null && (
+            <span className="text-[11px] text-[var(--ink-4)]">
+              Leeftijd nu: {currentAge} · tot {currentAge + projectionYears} jaar{projectionYears === maxProjectionYears ? ' (max 100)' : ''}
+            </span>
+          )}
+          {projectionYears !== defaultYears && (
             <button
-              onClick={() => setProjectionYears(DEFAULT_PROJECTION_YEARS)}
+              onClick={() => setProjectionYears(defaultYears)}
               className="text-[11px] text-horizon-600 underline underline-offset-2 hover:text-horizon-700"
             >
-              Reset naar {DEFAULT_PROJECTION_YEARS} jaar
+              Reset naar {defaultYears} jaar
             </button>
           )}
         </div>
