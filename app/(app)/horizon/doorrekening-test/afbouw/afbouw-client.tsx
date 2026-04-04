@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle, CalendarClock, Shield, Gift } from 'lucide-react'
+import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle, CalendarClock, Shield, Gift, Zap } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -12,6 +12,18 @@ import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/b
 import { PerpetualStrategyTables } from './perpetual-tables'
 import { LegacyStrategyTables } from './legacy-tables'
 import { PensionStrategyTables } from './pension-tables'
+import { DepleteStrategyTables } from './deplete-tables'
+
+// ── Withdrawal strategy types ─────────────────────────────────
+
+export type WithdrawalStrategyType = 'swr' | 'guardrails' | 'vpw' | 'bucket'
+
+export const WITHDRAWAL_STRATEGY_LABELS: Record<WithdrawalStrategyType, { name: string; subtitle: string }> = {
+  swr: { name: 'Vast (SWR)', subtitle: 'Vaste onttrekking op basis van NL SWR' },
+  guardrails: { name: 'Guardrails', subtitle: 'Variabel met vloer- en plafondgrenzen' },
+  vpw: { name: 'VPW', subtitle: 'Variabel op basis van resterende levensverwachting' },
+  bucket: { name: 'Bucket', subtitle: '3-emmers: cash, obligaties, aandelen' },
+}
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -50,6 +62,153 @@ function computeCrossoverAge(
   for (let y = 0; y <= maxAge - currentAge; y++) {
     if (portfolio >= fireTarget) return currentAge + y
     portfolio = portfolio * (1 + realReturn) + annualSavings
+  }
+  return null
+}
+
+// ── Withdrawal strategy types for crossover ──
+
+type WithdrawalStrategy = 'swr' | 'guardrails' | 'vpw' | 'bucket'
+
+const WITHDRAWAL_LABELS: Record<WithdrawalStrategy, { name: string; desc: string }> = {
+  swr: { name: 'SWR', desc: 'Safe Withdrawal Rate' },
+  guardrails: { name: 'Guardrails', desc: 'Variabele met bandbreedte' },
+  vpw: { name: 'VPW', desc: 'Variable Percentage Withdrawal' },
+  bucket: { name: 'Bucket', desc: 'Emmer-strategie' },
+}
+
+/**
+ * Compute the minimum portfolio needed to sustain a given withdrawal strategy
+ * from startAge to endAge, covering yearlyExpenses (with inflation), minus AOW from 67.
+ */
+function computeRequiredPortfolio(
+  yearlyExpenses: number,
+  startAge: number,
+  endAge: number,
+  grossReturn: number,
+  inflationRate: number,
+  strategy: FireEndStrategy,
+  withdrawalStrategy: WithdrawalStrategy,
+  hasPartner: boolean,
+  legacyAmount: number,
+): number {
+  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
+  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
+  const totalYears = Math.max(1, endAge - startAge)
+
+  // For each strategy, compute what initial portfolio is required
+  if (strategy === 'perpetual') {
+    // SWR: portfolio × SWR ≥ expenses − AOW => portfolio ≥ (expenses − AOW) / SWR
+    // For perpetual, required portfolio is expenses / SWR (pre-AOW), reduced after AOW kicks in
+    // Simplified: max withdrawal needed / SWR
+    const maxNeeded = startAge >= NL_AOW_AGE
+      ? Math.max(0, yearlyExpenses - aowYearly)
+      : yearlyExpenses
+    return maxNeeded / NL_SWR
+  }
+
+  if (strategy === 'deplete') {
+    // Annuity formula: PV of expenses stream from startAge to endAge
+    // accounting for AOW offset from age 67
+    if (realReturn === 0) {
+      let total = 0
+      for (let y = 0; y < totalYears; y++) {
+        const age = startAge + y
+        const aow = age >= NL_AOW_AGE ? aowYearly : 0
+        total += Math.max(0, yearlyExpenses - aow)
+      }
+      return total
+    }
+    let pv = 0
+    for (let y = 0; y < totalYears; y++) {
+      const age = startAge + y
+      const aow = age >= NL_AOW_AGE ? aowYearly : 0
+      const needed = Math.max(0, yearlyExpenses - aow)
+      pv += needed / Math.pow(1 + realReturn, y)
+    }
+    return pv
+  }
+
+  if (strategy === 'legacy') {
+    // Like deplete but preserve legacyAmount at endAge
+    const pvLegacy = legacyAmount / Math.pow(1 + realReturn, totalYears)
+    let pv = pvLegacy
+    for (let y = 0; y < totalYears; y++) {
+      const age = startAge + y
+      const aow = age >= NL_AOW_AGE ? aowYearly : 0
+      const needed = Math.max(0, yearlyExpenses - aow)
+      pv += needed / Math.pow(1 + realReturn, y === 0 ? 1 : y)
+    }
+    return pv
+  }
+
+  // pensioen: same as perpetual from AOW age
+  const maxNeeded = Math.max(0, yearlyExpenses - aowYearly)
+  return maxNeeded / NL_SWR
+}
+
+/** Monthly crossover result */
+interface MonthlyCrossover {
+  ageYears: number
+  ageMonths: number
+  portfolioAtCrossover: number
+  requiredPortfolio: number
+}
+
+/**
+ * Compute crossover on a monthly basis.
+ * For each month, compare accumulation portfolio vs required portfolio for chosen strategy.
+ */
+function computeMonthlyCrossover(
+  currentAge: number,
+  currentNetWorth: number,
+  annualSavings: number,
+  grossReturn: number,
+  inflationRate: number,
+  yearlyExpenses: number,
+  endAge: number,
+  strategy: FireEndStrategy,
+  withdrawalStrategy: WithdrawalStrategy,
+  hasPartner: boolean,
+  legacyAmount: number,
+  maxAge: number = 100,
+): MonthlyCrossover | null {
+  const monthlyReturn = Math.pow(1 + grossReturn, 1 / 12) - 1
+  const monthlyInflation = Math.pow(1 + inflationRate, 1 / 12) - 1
+  const monthlyRealReturn = (1 + monthlyReturn) / (1 + monthlyInflation) - 1
+  const monthlySavings = annualSavings / 12
+  const totalMonths = (maxAge - currentAge) * 12
+
+  let portfolio = currentNetWorth
+
+  for (let m = 0; m <= totalMonths; m++) {
+    const ageYears = currentAge + Math.floor(m / 12)
+    const ageMonths = m % 12
+
+    // Compute required portfolio at this age for the chosen end strategy
+    const displayEnd = strategy === 'perpetual' || strategy === 'pensioen' ? 100 : endAge
+    const requiredPortfolio = computeRequiredPortfolio(
+      yearlyExpenses,
+      ageYears,
+      displayEnd,
+      grossReturn,
+      inflationRate,
+      strategy,
+      withdrawalStrategy,
+      hasPartner,
+      legacyAmount,
+    )
+
+    if (portfolio >= requiredPortfolio) {
+      return {
+        ageYears,
+        ageMonths,
+        portfolioAtCrossover: Math.round(portfolio),
+        requiredPortfolio: Math.round(requiredPortfolio),
+      }
+    }
+
+    portfolio = portfolio * (1 + monthlyRealReturn) + monthlySavings
   }
   return null
 }
@@ -240,8 +399,18 @@ export function AfbouwClient({
   const retirementMethod = (profile?.retirement_expense_method as RetirementExpenseMethod) ?? 'essential_budgets'
   const retirementCustomAmount = Number(profile?.retirement_expense_custom_amount ?? 0)
 
-  // FIRE strategy
-  const strategyConfig: FireStrategyConfig = parseFireStrategy(profile ?? {})
+  // FIRE strategy (from profile as initial default)
+  const profileStrategyConfig: FireStrategyConfig = parseFireStrategy(profile ?? {})
+
+  // ── User-selectable strategy overrides ──
+  const [selectedEndStrategy, setSelectedEndStrategy] = useState<FireEndStrategy>(profileStrategyConfig.strategy)
+  const [selectedWithdrawalStrategy, setSelectedWithdrawalStrategy] = useState<WithdrawalStrategyType>('swr')
+
+  // Build effective strategyConfig from user selection
+  const strategyConfig: FireStrategyConfig = useMemo(() => ({
+    ...profileStrategyConfig,
+    strategy: selectedEndStrategy,
+  }), [profileStrategyConfig, selectedEndStrategy])
 
   // ── Computed values ──
   const totalAssets = assets.reduce((s, a) => s + Number(a.current_value ?? 0), 0)
@@ -335,8 +504,10 @@ export function AfbouwClient({
   const [perpetualExpanded, setPerpetualExpanded] = useState(true)
   const [legacyExpanded, setLegacyExpanded] = useState(true)
   const [legacyTarget, setLegacyTarget] = useState(strategyConfig.legacyAmount || 250_000)
+  const [depleteExpanded, setDepleteExpanded] = useState(true)
   const [crossoverExpanded, setCrossoverExpanded] = useState(true)
   const [pensionExpanded, setPensionExpanded] = useState(true)
+  // NOTE: selectedEndStrategy and selectedWithdrawalStrategy are defined above (lines ~405-406)
 
   // Portfolio projected to AOW age (for pension strategy tables)
   const portfolioAtAow = useMemo(() => {
@@ -344,6 +515,27 @@ export function AfbouwClient({
     const yearsToAow = Math.max(0, NL_AOW_AGE - currentAge)
     return projectPortfolio(netWorth, annualSavings, fireParams.grossReturn, fireParams.inflationRate, yearsToAow)
   }, [currentAge, netWorth, annualSavings, fireParams])
+
+  // Annuity withdrawal for deplete strategy info strip
+  const annuityWithdrawal = useMemo(() => {
+    const totalYears = Math.max(0, displayEndAge - retirementAge)
+    if (totalYears <= 0 || portfolioAtRetirement <= 0) return 0
+    const realReturn = (1 + fireParams.grossReturn) / (1 + fireParams.inflationRate) - 1
+    if (realReturn === 0) return portfolioAtRetirement / totalYears
+    return portfolioAtRetirement * realReturn / (1 - Math.pow(1 + realReturn, -totalYears))
+  }, [portfolioAtRetirement, retirementAge, displayEndAge, fireParams])
+
+  // Monthly crossover computation (for enhanced kruispuntbepaling)
+  const monthlyCrossoverResult = useMemo(() => {
+    if (currentAge == null || yearlyRetirementExpenses <= 0) return null
+    return computeMonthlyCrossover(
+      currentAge, netWorth, annualSavings,
+      fireParams.grossReturn, fireParams.inflationRate,
+      yearlyRetirementExpenses, displayEndAge,
+      selectedEndStrategy, selectedWithdrawalStrategy,
+      hasPartner, strategyConfig.legacyAmount,
+    )
+  }, [currentAge, netWorth, annualSavings, fireParams, yearlyRetirementExpenses, displayEndAge, selectedEndStrategy, selectedWithdrawalStrategy, hasPartner, strategyConfig.legacyAmount])
 
   return (
     <div className="space-y-8">
@@ -353,6 +545,48 @@ export function AfbouwClient({
         <p className="mt-1 text-sm text-[var(--ink-3)]">
           Hoe je vermogen wordt opgebruikt na financiele onafhankelijkheid
         </p>
+
+        {/* Strategy selectors */}
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="end-strategy-select" className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">
+              Eindstrategie
+            </label>
+            <select
+              id="end-strategy-select"
+              value={selectedEndStrategy}
+              onChange={(e) => setSelectedEndStrategy(e.target.value as FireEndStrategy)}
+              className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-semibold text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-horizon-400"
+            >
+              {(Object.keys(STRATEGY_LABELS) as FireEndStrategy[]).map((key) => (
+                <option key={key} value={key}>{STRATEGY_LABELS[key].name}</option>
+              ))}
+            </select>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">
+              {STRATEGY_LABELS[selectedEndStrategy]?.subtitle}
+            </p>
+          </div>
+          <div>
+            <label htmlFor="withdrawal-strategy-select" className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">
+              Onttrekkingsstrategie
+            </label>
+            <select
+              id="withdrawal-strategy-select"
+              value={selectedWithdrawalStrategy}
+              onChange={(e) => setSelectedWithdrawalStrategy(e.target.value as WithdrawalStrategyType)}
+              className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-semibold text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-horizon-400"
+            >
+              {(Object.keys(WITHDRAWAL_STRATEGY_LABELS) as WithdrawalStrategyType[]).map((key) => (
+                <option key={key} value={key}>{WITHDRAWAL_STRATEGY_LABELS[key].name}</option>
+              ))}
+            </select>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">
+              {WITHDRAWAL_STRATEGY_LABELS[selectedWithdrawalStrategy]?.subtitle}
+            </p>
+          </div>
+        </div>
+
+        {/* Key metrics */}
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Huidig netto vermogen</p>
@@ -367,9 +601,9 @@ export function AfbouwClient({
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Eindstrategie</p>
-            <p className="mt-0.5 text-base font-semibold text-[var(--ink)]">
-              {STRATEGY_LABELS[strategyConfig.strategy]?.name ?? strategyConfig.strategy}
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Actieve combinatie</p>
+            <p className="mt-0.5 text-sm font-semibold text-horizon-600">
+              {STRATEGY_LABELS[selectedEndStrategy]?.name} + {WITHDRAWAL_STRATEGY_LABELS[selectedWithdrawalStrategy]?.name}
             </p>
           </div>
           <div>
@@ -805,6 +1039,7 @@ export function AfbouwClient({
               grossReturn={fireParams.grossReturn}
               inflationRate={fireParams.inflationRate}
               hasPartner={hasPartner}
+              activeWithdrawalStrategy={selectedEndStrategy === 'perpetual' ? selectedWithdrawalStrategy : undefined}
             />
           </div>
         )}
@@ -886,6 +1121,7 @@ export function AfbouwClient({
                 inflationRate={fireParams.inflationRate}
                 hasPartner={hasPartner}
                 legacyAmount={legacyTarget}
+                activeWithdrawalStrategy={selectedEndStrategy === 'legacy' ? selectedWithdrawalStrategy : undefined}
               />
             ) : legacyTarget >= portfolioAtRetirement ? (
               <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/50 px-4 py-6 text-center">
@@ -944,6 +1180,7 @@ export function AfbouwClient({
               grossReturn={fireParams.grossReturn}
               inflationRate={fireParams.inflationRate}
               hasPartner={hasPartner}
+              activeWithdrawalStrategy={selectedEndStrategy === 'pensioen' ? selectedWithdrawalStrategy : undefined}
             />
           </div>
         )}
@@ -970,6 +1207,11 @@ export function AfbouwClient({
           {crossoverExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
           <Target className="h-4 w-4 text-horizon-500" />
           <h3 className="text-base font-bold text-[var(--ink)]">Kruispuntbepaling</h3>
+          {monthlyCrossoverResult && (
+            <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold text-horizon-700">
+              {monthlyCrossoverResult.ageYears}j{monthlyCrossoverResult.ageMonths > 0 ? `+${monthlyCrossoverResult.ageMonths}m` : ''}
+            </span>
+          )}
         </button>
 
         {crossoverExpanded && (
@@ -984,7 +1226,56 @@ export function AfbouwClient({
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Key metrics */}
+                  {/* Strategy selectors */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {/* End strategy selector */}
+                    <div>
+                      <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)] mb-1.5">
+                        Eindstrategie
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(['perpetual', 'legacy', 'deplete', 'pensioen'] as FireEndStrategy[]).map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => setSelectedEndStrategy(s)}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                              selectedEndStrategy === s
+                                ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
+                                : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-300 hover:text-[var(--ink-2)]'
+                            }`}
+                          >
+                            {STRATEGY_LABELS[s].name}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[11px] text-[var(--ink-4)]">{STRATEGY_LABELS[selectedEndStrategy].subtitle}</p>
+                    </div>
+
+                    {/* Withdrawal strategy selector */}
+                    <div>
+                      <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)] mb-1.5">
+                        Onttrekkingsstrategie
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(['swr', 'guardrails', 'vpw', 'bucket'] as WithdrawalStrategy[]).map((ws) => (
+                          <button
+                            key={ws}
+                            onClick={() => setSelectedWithdrawalStrategy(ws)}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                              selectedWithdrawalStrategy === ws
+                                ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
+                                : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-300 hover:text-[var(--ink-2)]'
+                            }`}
+                          >
+                            {WITHDRAWAL_LABELS[ws].name}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[11px] text-[var(--ink-4)]">{WITHDRAWAL_LABELS[selectedWithdrawalStrategy].desc}</p>
+                    </div>
+                  </div>
+
+                  {/* Monthly crossover result */}
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
                       <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Huidige leeftijd</p>
@@ -994,27 +1285,46 @@ export function AfbouwClient({
                     </div>
                     <div>
                       <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Kruispuntleeftijd</p>
-                      <p className={`mt-0.5 font-mono text-lg font-bold tabular-nums ${crossoverAge != null ? 'text-horizon-600' : 'text-amber-600'}`}>
-                        {crossoverAge != null ? `${crossoverAge}j` : 'Niet bereikt'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Jaren tot kruispunt</p>
-                      <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-                        {crossoverAge != null ? `${crossoverAge - currentAge}j` : '-'}
+                      <p className={`mt-0.5 font-mono text-lg font-bold tabular-nums ${monthlyCrossoverResult != null ? 'text-horizon-600' : 'text-amber-600'}`}>
+                        {monthlyCrossoverResult != null
+                          ? `${monthlyCrossoverResult.ageYears}j${monthlyCrossoverResult.ageMonths > 0 ? ` + ${monthlyCrossoverResult.ageMonths}m` : ''}`
+                          : 'Niet bereikt'}
                       </p>
                     </div>
                     <div>
                       <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Vermogen bij kruispunt</p>
                       <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-                        {crossoverAge != null
-                          ? formatCurrency(projectPortfolio(
-                              netWorth, annualSavings, fireParams.grossReturn, fireParams.inflationRate, crossoverAge - currentAge
-                            ))
+                        {monthlyCrossoverResult != null
+                          ? formatCurrency(monthlyCrossoverResult.portfolioAtCrossover)
                           : '-'}
                       </p>
                     </div>
+                    <div>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Benodigd vermogen</p>
+                      <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-[var(--ink-2)]">
+                        {monthlyCrossoverResult != null
+                          ? formatCurrency(monthlyCrossoverResult.requiredPortfolio)
+                          : formatCurrency(computeRequiredPortfolio(
+                              yearlyRetirementExpenses, currentAge, displayEndAge,
+                              fireParams.grossReturn, fireParams.inflationRate,
+                              selectedEndStrategy, selectedWithdrawalStrategy,
+                              hasPartner, strategyConfig.legacyAmount,
+                            ))}
+                      </p>
+                    </div>
                   </div>
+
+                  {/* Spaarquote stops indicator */}
+                  {monthlyCrossoverResult && (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-4 py-2.5 text-xs text-emerald-800">
+                      <p className="font-semibold">
+                        Stoppen met werken: {monthlyCrossoverResult.ageYears}j{monthlyCrossoverResult.ageMonths > 0 ? ` + ${monthlyCrossoverResult.ageMonths} maanden` : ''}
+                      </p>
+                      <p className="mt-0.5 text-emerald-700">
+                        Vanaf dit punt worden inleg en spaarquote &rarr; &euro;0. Je vermogen draagt zichzelf via de {WITHDRAWAL_LABELS[selectedWithdrawalStrategy].name}-strategie ({STRATEGY_LABELS[selectedEndStrategy].name}).
+                      </p>
+                    </div>
+                  )}
 
                   {/* Projection table: net worth vs FIRE target per year */}
                   <CrossoverTable
@@ -1026,6 +1336,7 @@ export function AfbouwClient({
                     fireTarget={fireTarget}
                     crossoverAge={crossoverAge}
                     maxAge={displayEndAge}
+                    monthlyCrossover={monthlyCrossoverResult}
                   />
                 </div>
               )}
@@ -1048,6 +1359,7 @@ function CrossoverTable({
   fireTarget,
   crossoverAge,
   maxAge,
+  monthlyCrossover,
 }: {
   currentAge: number
   netWorth: number
@@ -1057,34 +1369,39 @@ function CrossoverTable({
   fireTarget: number
   crossoverAge: number | null
   maxAge: number
+  monthlyCrossover?: MonthlyCrossover | null
 }) {
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
   const displayMaxAge = Math.min(maxAge, currentAge + 50)
+  const monthlyCrossoverAge = monthlyCrossover?.ageYears ?? crossoverAge
 
   const rows = useMemo(() => {
-    const result: { age: number; portfolio: number; target: number; gap: number; reached: boolean }[] = []
+    const result: { age: number; portfolio: number; target: number; gap: number; reached: boolean; savingsActive: boolean }[] = []
     let portfolio = netWorth
     for (let age = currentAge; age <= displayMaxAge; age++) {
       const gap = portfolio - fireTarget
-      result.push({ age, portfolio: Math.round(portfolio), target: Math.round(fireTarget), gap: Math.round(gap), reached: gap >= 0 })
-      portfolio = portfolio * (1 + realReturn) + annualSavings
+      const savingsActive = monthlyCrossoverAge == null || age < monthlyCrossoverAge
+      result.push({ age, portfolio: Math.round(portfolio), target: Math.round(fireTarget), gap: Math.round(gap), reached: gap >= 0, savingsActive })
+      // After crossover, savings → €0 (step 6: spaarquote → €0 from kruispunt)
+      const effectiveSavings = savingsActive ? annualSavings : 0
+      portfolio = portfolio * (1 + realReturn) + effectiveSavings
     }
     return result
-  }, [currentAge, netWorth, annualSavings, realReturn, fireTarget, displayMaxAge])
+  }, [currentAge, netWorth, annualSavings, realReturn, fireTarget, displayMaxAge, monthlyCrossoverAge])
 
   // Sample for display
   const displayRows = useMemo(() => {
     if (rows.length <= 15) return rows
     const result = [rows[0]]
-    // Show every 5 years, plus crossover year +/- 1
+    const xAge = monthlyCrossoverAge ?? crossoverAge
     for (let i = 1; i < rows.length; i++) {
-      const isCrossover = crossoverAge != null && Math.abs(rows[i].age - crossoverAge) <= 1
+      const isCrossover = xAge != null && Math.abs(rows[i].age - xAge) <= 1
       const isInterval = i % 5 === 0
       const isLast = i === rows.length - 1
       if (isCrossover || isInterval || isLast) result.push(rows[i])
     }
     return result
-  }, [rows, crossoverAge])
+  }, [rows, crossoverAge, monthlyCrossoverAge])
 
   return (
     <div className="rounded-lg border border-[var(--border-ed)] overflow-hidden">
@@ -1099,41 +1416,49 @@ function CrossoverTable({
             </tr>
           </thead>
           <tbody>
-            {displayRows.map((row, idx) => (
-              <tr
-                key={row.age}
-                className={`border-b border-[var(--border-ed)]/50 ${
-                  crossoverAge != null && row.age === crossoverAge
-                    ? 'bg-horizon-50/60 ring-1 ring-inset ring-horizon-300'
-                    : row.reached
-                      ? 'bg-emerald-50/30'
-                      : idx % 2 === 1
-                        ? 'bg-[var(--subtle)]/30'
-                        : ''
-                }`}
-              >
-                <td className="px-3 py-1 font-medium text-[var(--ink)]">
-                  {row.age}j
-                  {crossoverAge != null && row.age === crossoverAge && (
-                    <span className="ml-1 inline-flex items-center rounded-full bg-horizon-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                      KRUISPUNT
-                    </span>
-                  )}
-                  {row.age === currentAge && (
-                    <span className="ml-1 text-[10px] text-[var(--ink-3)] font-medium">nu</span>
-                  )}
-                </td>
-                <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                  {formatCurrency(row.portfolio)}
-                </td>
-                <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
-                  {formatCurrency(row.target)}
-                </td>
-                <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${row.gap >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {row.gap >= 0 ? '+' : ''}{formatCurrency(row.gap)}
-                </td>
-              </tr>
-            ))}
+            {displayRows.map((row, idx) => {
+              const isCrossoverRow = monthlyCrossoverAge != null && row.age === monthlyCrossoverAge
+              return (
+                <tr
+                  key={row.age}
+                  className={`border-b border-[var(--border-ed)]/50 ${
+                    isCrossoverRow
+                      ? 'bg-horizon-50/60 ring-1 ring-inset ring-horizon-300'
+                      : row.reached
+                        ? 'bg-emerald-50/30'
+                        : !row.savingsActive
+                          ? 'bg-amber-50/20'
+                          : idx % 2 === 1
+                            ? 'bg-[var(--subtle)]/30'
+                            : ''
+                  }`}
+                >
+                  <td className="px-3 py-1 font-medium text-[var(--ink)]">
+                    {row.age}j
+                    {isCrossoverRow && (
+                      <span className="ml-1 inline-flex items-center rounded-full bg-horizon-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                        KRUISPUNT
+                      </span>
+                    )}
+                    {row.age === currentAge && (
+                      <span className="ml-1 text-[10px] text-[var(--ink-3)] font-medium">nu</span>
+                    )}
+                    {!row.savingsActive && !isCrossoverRow && (
+                      <span className="ml-1 text-[10px] text-amber-600 font-medium">inleg €0</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
+                    {formatCurrency(row.portfolio)}
+                  </td>
+                  <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
+                    {formatCurrency(row.target)}
+                  </td>
+                  <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${row.gap >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {row.gap >= 0 ? '+' : ''}{formatCurrency(row.gap)}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
