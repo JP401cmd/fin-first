@@ -7,6 +7,11 @@ import { projectAsset } from '@/lib/asset-data'
 import { ASSET_TYPE_LABELS, type Asset, type AssetType } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS, type Debt, type DebtType } from '@/lib/debt-data'
 import type { FireParams } from '@/lib/fire-params'
+import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/constants'
+
+// Heffingsvrij vermogen 2026 (single / partner)
+const HEFFINGSVRIJ_SINGLE = 59_357
+const HEFFINGSVRIJ_PARTNER = 118_714
 
 // ── Projection helpers ────────────────────────────────────────
 
