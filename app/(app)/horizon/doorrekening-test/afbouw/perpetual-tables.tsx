@@ -463,7 +463,7 @@ function BucketStrategyTable({
                     return (
                       <tr
                         key={row.month}
-                        className={`border-b border-[var(--border-ed)]/50 ${
+                        className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${
                           isRefillMonth
                             ? "bg-horizon-50/40"
                             : row.totalBalance <= 0
@@ -473,10 +473,10 @@ function BucketStrategyTable({
                                 : ""
                         }`}
                       >
-                        <td className="px-2 py-1 font-medium text-[var(--ink)]">
+                        <td className="px-2 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">
                           {row.month}
                         </td>
-                        <td className="px-2 py-1 text-[var(--ink)]">{row.age}j</td>
+                        <td className="px-2 py-1 font-mono tabular-nums text-[var(--ink)]">{row.age}j</td>
                         <td className="px-2 py-1 text-right font-mono tabular-nums text-red-600">
                           -{formatCurrency(row.withdrawal)}
                         </td>
@@ -598,7 +598,7 @@ function YearlyBucketView({ rows }: { rows: PerpetualRow[] }) {
               {displayRows.map((row, idx) => (
                 <tr
                   key={row.year}
-                  className={`border-b border-[var(--border-ed)]/50 ${
+                  className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${
                     row.endBalance <= 0
                       ? "bg-amber-50/50"
                       : idx % 2 === 1
@@ -606,8 +606,8 @@ function YearlyBucketView({ rows }: { rows: PerpetualRow[] }) {
                         : ""
                   }`}
                 >
-                  <td className="px-3 py-1 font-medium text-[var(--ink)]">{row.year}</td>
-                  <td className="px-3 py-1 text-[var(--ink)]">{row.age}j</td>
+                  <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">{row.year}</td>
+                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink)]">{row.age}j</td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
                     {formatCurrency(row.startBalance)}
                   </td>
@@ -738,7 +738,7 @@ function PerpetualSubTable({
               {displayRows.map((row, idx) => (
                 <tr
                   key={row.year}
-                  className={`border-b border-[var(--border-ed)]/50 ${
+                  className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${
                     row.endBalance <= 0
                       ? "bg-amber-50/50"
                       : idx % 2 === 1
@@ -746,8 +746,8 @@ function PerpetualSubTable({
                         : ""
                   }`}
                 >
-                  <td className="px-3 py-1 font-medium text-[var(--ink)]">{row.year}</td>
-                  <td className="px-3 py-1 text-[var(--ink)]">{row.age}j</td>
+                  <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">{row.year}</td>
+                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink)]">{row.age}j</td>
                   {showVpwColumns && (
                     <>
                       <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">

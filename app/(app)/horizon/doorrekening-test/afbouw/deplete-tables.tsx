@@ -330,9 +330,9 @@ function WithdrawalSubTable({
               {displayRows.map((row, idx) => (
                 <tr
                   key={row.year}
-                  className={`border-b border-[var(--border-ed)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
+                  className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
                 >
-                  <td className="px-3 py-1 font-medium text-[var(--ink)]">
+                  <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">
                     {row.age}j
                     {row.age === NL_AOW_AGE && (
                       <span className="ml-1 text-[10px] text-emerald-600 font-medium">AOW</span>
@@ -437,9 +437,9 @@ function VpwSubTable({
               {displayRows.map((row, idx) => (
                 <tr
                   key={row.year}
-                  className={`border-b border-[var(--border-ed)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
+                  className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
                 >
-                  <td className="px-3 py-1 font-medium text-[var(--ink)]">
+                  <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">
                     {row.age}j
                     {row.age === NL_AOW_AGE && (
                       <span className="ml-1 text-[10px] text-emerald-600 font-medium">AOW</span>
@@ -549,9 +549,9 @@ function BucketSubTable({
               {displayRows.map((row, idx) => (
                 <tr
                   key={row.year}
-                  className={`border-b border-[var(--border-ed)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
+                  className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}
                 >
-                  <td className="px-3 py-1 font-medium text-[var(--ink)]">
+                  <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">
                     {row.age}j
                     {row.age === NL_AOW_AGE && (
                       <span className="ml-1 text-[10px] text-emerald-600 font-medium">AOW</span>

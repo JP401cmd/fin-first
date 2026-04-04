@@ -330,12 +330,12 @@ function PensionSubTable({
               {displayRows.map((row, idx) => (
                 <tr
                   key={row.year}
-                  className={`border-b border-[var(--border-ed)]/50 ${
+                  className={`border-b border-[var(--border-ed)]/50 hover:bg-[var(--subtle)]/50 ${
                     row.endBalance <= 0 ? 'bg-amber-50/50' : idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''
                   }`}
                 >
-                  <td className="px-3 py-1 font-medium text-[var(--ink)]">{row.year}</td>
-                  <td className="px-3 py-1 text-[var(--ink)]">{row.age}j</td>
+                  <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">{row.year}</td>
+                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink)]">{row.age}j</td>
                   {showVpwColumns && (
                     <>
                       <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
