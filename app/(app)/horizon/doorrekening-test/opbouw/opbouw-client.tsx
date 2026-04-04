@@ -234,6 +234,110 @@ function ProjectionTable({ title, columns, color, projectionYears }: {
   )
 }
 
+// ── Per-asset monthly detail table ───────────────────────────
+
+interface MonthRow {
+  month: number
+  startValue: number
+  rendement: number
+  inleg: number
+  endValue: number
+}
+
+function computeAssetMonthly(asset: Asset, totalMonths: number): MonthRow[] {
+  const monthlyRate = Number(asset.expected_return) / 100 / 12
+  const monthlyContrib = Number(asset.monthly_contribution)
+  let value = Number(asset.current_value)
+  const rows: MonthRow[] = []
+
+  for (let m = 1; m <= totalMonths; m++) {
+    const startValue = value
+    const rendement = startValue * monthlyRate
+    const inleg = monthlyContrib
+    const endValue = startValue + rendement + inleg
+    rows.push({
+      month: m,
+      startValue: Math.round(startValue * 100) / 100,
+      rendement: Math.round(rendement * 100) / 100,
+      inleg: Math.round(inleg * 100) / 100,
+      endValue: Math.round(endValue * 100) / 100,
+    })
+    value = endValue
+  }
+  return rows
+}
+
+function getDisplayMonths(totalMonths: number): number[] {
+  if (totalMonths <= 24) {
+    return Array.from({ length: totalMonths }, (_, i) => i + 1)
+  }
+  // Show first 6 months, then every 6 months, plus the last month
+  const months: number[] = [1, 2, 3, 4, 5, 6]
+  for (let m = 12; m <= totalMonths; m += 6) {
+    if (!months.includes(m)) months.push(m)
+  }
+  if (!months.includes(totalMonths)) months.push(totalMonths)
+  return months.sort((a, b) => a - b)
+}
+
+function AssetMonthlyTable({ asset, projectionYears }: {
+  asset: Asset
+  projectionYears: number
+}) {
+  const totalMonths = projectionYears * 12
+  const rows = useMemo(() => computeAssetMonthly(asset, totalMonths), [asset, totalMonths])
+  const displayMonths = useMemo(() => getDisplayMonths(totalMonths), [totalMonths])
+
+  const annualReturn = Number(asset.expected_return)
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
+      <div className="border-b border-[var(--border-ed)] bg-emerald-50/40 px-4 py-3">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">{asset.name}</h3>
+        <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+          Startwaarde {formatCurrency(Number(asset.current_value))} · Rendement {annualReturn.toFixed(1)}%/jr · Inleg {formatCurrency(Number(asset.monthly_contribution))}/mnd
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+              <th className="px-3 py-2 text-left font-medium text-[var(--ink-3)]">Maand</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Startwaarde</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Rendement</th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--ink-3)]">Inleg</th>
+              <th className="px-3 py-2 text-right font-medium text-emerald-600">Eindwaarde</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayMonths.map((m) => {
+              const row = rows[m - 1]
+              if (!row) return null
+              return (
+                <tr key={m} className="border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50">
+                  <td className="px-3 py-2 font-mono tabular-nums text-[var(--ink-3)]">{m}</td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                    {formatCurrency(row.startValue)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                    {formatCurrency(row.rendement)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                    {formatCurrency(row.inleg)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-emerald-600">
+                    {formatCurrency(row.endValue)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ── Savings rate table ───────────────────────────────────────
 
 function SavingsRateTable({ assets, debts, profileMonthlyIncome, profileSavingsRate }: {
@@ -613,6 +717,22 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
               title={group.label}
               columns={group.columns}
               color="bg-emerald-50/40"
+              projectionYears={projectionYears}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Section: Per-asset monthly tables */}
+      {hasAssets && (
+        <div className="space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
+            Doorrekening per bezitting — maand-op-maand
+          </h2>
+          {assets.map((asset) => (
+            <AssetMonthlyTable
+              key={asset.id}
+              asset={asset}
               projectionYears={projectionYears}
             />
           ))}
