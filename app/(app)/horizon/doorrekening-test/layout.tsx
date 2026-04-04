@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation'
 const tabs: { label: string; href: string; disabled?: boolean }[] = [
   { label: 'Opbouw', href: '/horizon/doorrekening-test/opbouw' },
   { label: 'Afbouw', href: '/horizon/doorrekening-test/afbouw' },
+  { label: 'Gebeurtenissen', href: '/horizon/doorrekening-test/gebeurtenissen' },
+  { label: 'Overzicht', href: '/horizon/doorrekening-test/overzicht' },
 ]
 
 export default function DoorrekenigTestLayout({ children }: { children: React.ReactNode }) {
