@@ -21702,3 +21702,23 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#615, #616)
 - Commit: abc98bc3
+
+## Session 2026-04-04 - Feature #617
+
+### Feature #617: Link naar Doorrekening Test vanuit Horizon-overzicht - PASSING
+- Added a link card in the "Verken-kaarten" (Explore Cards) section of the Horizon overview page
+- Card uses same styling pattern as Opnamestrategie and Financiële Gezondheid cards
+- Icon: TableProperties (from lucide-react, already imported)
+- Title: "Doorrekening Test", Value: "Opbouw & Projectie", Subtitle: "Bekijk jaar-op-jaar tabellen van je vermogensopbouw"
+- Link navigates to /horizon/doorrekening-test (which redirects to /opbouw sub-page)
+- data-testid="doorrekening-test-card" added for test targeting
+- Verified end-to-end: card visible on /horizon, click navigates to doorrekening-test page
+- Zero new console errors (only pre-existing net_worth_snapshots 400)
+- Code committed as part of 1f4db980
+
+### Files Modified
+- components/app/horizon/horizon-client.tsx — doorrekening-test Link card added
+
+### Current Status
+- 1 feature completed this session (#617)
+- Overall progress: 616/635 passing (97.0%)
