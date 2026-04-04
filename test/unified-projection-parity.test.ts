@@ -417,6 +417,10 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
       willem: 1,    // large portfolio (1.46M), heffingsvrij negligible
       rashid: 1,    // unreachable in both engines
       marijke: 1,   // pensioen mode, forcedFireAge
+      ronald: 2,    // near-retirement, large portfolio, pensioen + beleggingen
+      bas: 3,       // moderate portfolio (~100K), mixed asset types
+      leo: 5,       // diverse portfolio, per-asset Box 3 differences
+      jochen: 5,    // varied portfolio, Box 3 heffingsvrij effects
     }
 
     for (const key of PERSONA_KEYS) {
@@ -652,6 +656,10 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
       willem: 15,   // Large diverse portfolio (1.46M) — per-asset returns differ from flat 7%
       rashid: 5,    // No-budget persona, moderate portfolio
       marijke: 5,   // Pensioen strategy, diverse assets (eigen_huis, investment, physical)
+      ronald: 5,    // Near-retirement, large portfolio with pensioen + beleggingen
+      bas: 15,      // Moderate portfolio (~100K), mixed asset types — per-asset returns diverge significantly from flat grossReturn
+      leo: 10,      // Diverse portfolio, per-asset returns differ from flat rate
+      jochen: 10,   // Varied portfolio, Box 3 and asset-type differences
     }
 
     for (const key of PERSONA_KEYS) {
