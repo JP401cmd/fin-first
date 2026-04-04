@@ -1,3 +1,26 @@
+## Session 2026-04-05 - Features #665, #666
+
+### Feature #665: Opbouw totaaltabel: events impact op bezittingen via afname-strategie - PASSING
+- Loaded life events from Supabase in opbouw page.tsx, converted to SimCashflow via lifeEventsToCashflows
+- Added AllocationStrategy type: spreiden | cash_first | laagste_rendement
+- applyWithdrawal(): spreiden (proportional), cash_first (lowest return first), laagste_rendement (lowest return, cascade)
+- simulateAssetsWithEvents(): joint month-by-month simulation with event cashflows
+- TotalTable uses event-adjusted asset totals; strategy selector UI with 3 toggle buttons
+- Events column in TotalTable shows per-year cashflow impact
+- Zero console errors
+
+### Feature #666: Box 3 reflecteert event-aangepaste vermogenswaarden - PASSING
+- computeBox3Tax automatically uses event-adjusted net worth from the simulation
+- Verified: events reduce/increase Box 3 grondslag correctly
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/page.tsx — load life_events, pass cashflows+lifeEvents
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — allocation strategy, event simulation, TotalTable events column
+
+### Current Status
+- 2 features completed this session (#665, #666)
+- Commit: 4cb1e6a7
+
 ## Session 2026-04-05 - Features #659, #660
 
 ### Feature #659: Gebeurtenissen: tijdlijn overzicht per leeftijd - PASSING
