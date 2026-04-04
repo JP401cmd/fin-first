@@ -166,12 +166,14 @@ function StackedAreaChart({
   profileMonthlyIncome,
   profileSavingsRate,
   projectionYears,
+  crossoverMonth,
 }: {
   assets: Asset[]
   debts: Debt[]
   profileMonthlyIncome: number
   profileSavingsRate: number
   projectionYears: number
+  crossoverMonth: number | null
 }) {
   const totalMonths = projectionYears * 12
   const monthlySavings = profileMonthlyIncome * (profileSavingsRate / 100)
@@ -182,7 +184,7 @@ function StackedAreaChart({
 
     // Asset series
     assets.forEach((a, idx) => {
-      const monthlyRows = computeAssetMonthly(a, totalMonths)
+      const monthlyRows = computeAssetMonthly(a, totalMonths, crossoverMonth)
       result.push({
         label: a.name,
         values: monthlyRows.map((r) => r.endValue),
@@ -191,11 +193,19 @@ function StackedAreaChart({
       })
     })
 
-    // Savings series
+    // Savings series (stops accumulating after crossover)
     if (monthlySavings > 0) {
+      const savingsValues: number[] = []
+      let cumSavings = 0
+      for (let m = 1; m <= totalMonths; m++) {
+        if (crossoverMonth == null || m <= crossoverMonth) {
+          cumSavings += monthlySavings
+        }
+        savingsValues.push(cumSavings)
+      }
       result.push({
         label: 'Spaargeld',
-        values: Array.from({ length: totalMonths }, (_, i) => monthlySavings * (i + 1)),
+        values: savingsValues,
         color: SAVINGS_COLOR,
         side: 'savings',
       })
@@ -218,7 +228,7 @@ function StackedAreaChart({
     })
 
     return result
-  }, [assets, debts, totalMonths, monthlySavings])
+  }, [assets, debts, totalMonths, monthlySavings, crossoverMonth])
 
   // Use yearly sample points for readability
   const samplePoints = useMemo(() => {
@@ -658,12 +668,13 @@ function getDisplayMonths(totalMonths: number): number[] {
   return months.sort((a, b) => a - b)
 }
 
-function AssetMonthlyTable({ asset, projectionYears }: {
+function AssetMonthlyTable({ asset, projectionYears, crossoverMonth }: {
   asset: Asset
   projectionYears: number
+  crossoverMonth: number | null
 }) {
   const totalMonths = projectionYears * 12
-  const rows = useMemo(() => computeAssetMonthly(asset, totalMonths), [asset, totalMonths])
+  const rows = useMemo(() => computeAssetMonthly(asset, totalMonths, crossoverMonth), [asset, totalMonths, crossoverMonth])
   const displayMonths = useMemo(() => getDisplayMonths(totalMonths), [totalMonths])
 
   const annualReturn = Number(asset.expected_return)
@@ -1056,19 +1067,21 @@ function NetWorthMonthlyTable({
   profileMonthlyIncome,
   profileSavingsRate,
   projectionYears,
+  crossoverMonth,
 }: {
   assets: Asset[]
   debts: Debt[]
   profileMonthlyIncome: number
   profileSavingsRate: number
   projectionYears: number
+  crossoverMonth: number | null
 }) {
   const totalMonths = projectionYears * 12
   const monthlySavings = profileMonthlyIncome * (profileSavingsRate / 100)
 
   const assetMonthlyData = useMemo(
-    () => assets.map((a) => ({ name: a.name, rows: computeAssetMonthly(a, totalMonths) })),
-    [assets, totalMonths],
+    () => assets.map((a) => ({ name: a.name, rows: computeAssetMonthly(a, totalMonths, crossoverMonth) })),
+    [assets, totalMonths, crossoverMonth],
   )
 
   const debtMonthlyData = useMemo(
@@ -1209,12 +1222,13 @@ function NetWorthMonthlyTable({
 
 // ── Total overview table ─────────────────────────────────────
 
-function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionYears }: {
+function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionYears, crossoverYear }: {
   assetTotals: number[]
   debtTotals: number[]
   netTotals: number[]
   box3Taxes: number[]
   projectionYears: number
+  crossoverYear: number | null
 }) {
   const displayYears = getDisplayYears(projectionYears)
   const cumulativeTax = useMemo(() => {
@@ -1248,9 +1262,16 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
             </tr>
           </thead>
           <tbody>
-            {displayYears.map((yr, idx) => (
-              <tr key={yr} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
-                <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{yr}</td>
+            {displayYears.map((yr, idx) => {
+              const isCrossover = crossoverYear != null && yr === crossoverYear
+              const isAfterCrossover = crossoverYear != null && yr > crossoverYear
+              return (
+              <tr key={yr} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${isCrossover ? 'bg-horizon-50/60 ring-1 ring-inset ring-horizon-300' : idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
+                <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">
+                  {yr}
+                  {isCrossover && <span className="ml-1 text-[9px] font-semibold text-horizon-600">⚡ kruispunt</span>}
+                  {isAfterCrossover && <span className="ml-1 text-[9px] text-[var(--ink-4)]">na kruispunt</span>}
+                </td>
                 <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
                   {formatCurrency(assetTotals[yr - 1])}
                 </td>
@@ -1267,7 +1288,8 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
                   {cumulativeTax[yr - 1] > 0 ? formatCurrency(cumulativeTax[yr - 1]) : '—'}
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -1309,6 +1331,55 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
   const assetGroups = useMemo(() => groupAssetsByType(assets), [assets])
   const debtGroups = useMemo(() => groupDebtsByType(debts), [debts])
 
+  // ── Kruispunt (crossover month) berekening ──
+  // The month at which passive income >= expenses — contributions stop after this point.
+  // Annual expenses = income - savings. Passive income = netWorth × effectiveSwr.
+  const crossoverMonth = useMemo(() => {
+    const monthlyExpenses = profileMonthlyIncome * (1 - profileSavingsRate / 100)
+    const annualExpenses = monthlyExpenses * 12
+    if (annualExpenses <= 0 || profileMonthlyIncome <= 0) return null // No meaningful crossover
+
+    // Simulate net worth month-by-month to find crossover
+    const totalMonths = projectionYears * 12
+    const monthlyGrossReturn = fireParams.grossReturn / 12
+
+    // Start values
+    let totalAssetValue = assets.reduce((s, a) => s + Number(a.current_value), 0)
+    let totalDebtBalance = debts.reduce((s, d) => s + Number(d.current_balance), 0)
+
+    for (let m = 1; m <= totalMonths; m++) {
+      // Grow each asset
+      let assetGrowth = 0
+      let assetContributions = 0
+      for (const a of assets) {
+        // Approximate: use each asset's own return
+        assetGrowth += (Number(a.current_value) > 0 ? totalAssetValue : 0) * 0 // simplified below
+      }
+      // Simplified: grow total assets at gross return, add total contributions
+      assetGrowth = totalAssetValue * monthlyGrossReturn
+      assetContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
+      totalAssetValue += assetGrowth + assetContributions
+
+      // Shrink debts
+      for (const d of debts) {
+        const monthlyRate = Number(d.interest_rate) / 100 / 12
+        const interest = totalDebtBalance * monthlyRate
+        const payment = Math.min(Number(d.monthly_payment), totalDebtBalance + interest)
+        totalDebtBalance = Math.max(0, totalDebtBalance + interest - payment)
+      }
+
+      const netWorth = totalAssetValue - totalDebtBalance
+      const passiveIncome = netWorth * fireParams.effectiveSwr
+      if (passiveIncome >= annualExpenses) {
+        return m // Crossover month found
+      }
+    }
+    return null // Not reached within projection horizon
+  }, [assets, debts, profileMonthlyIncome, profileSavingsRate, fireParams, projectionYears])
+
+  // Crossover year for display purposes
+  const crossoverYear = crossoverMonth != null ? Math.ceil(crossoverMonth / 12) : null
+
   const assetProjections = useMemo(() => {
     const result: { type: AssetType; label: string; columns: { label: string; rows: YearRow[] }[] }[] = []
     for (const [type, group] of assetGroups) {
@@ -1317,12 +1388,12 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
         label: ASSET_TYPE_LABELS[type],
         columns: group.map((a) => ({
           label: a.name,
-          rows: projectAssetYearly(a, projectionYears),
+          rows: projectAssetYearly(a, projectionYears, crossoverMonth),
         })),
       })
     }
     return result
-  }, [assetGroups, projectionYears])
+  }, [assetGroups, projectionYears, crossoverMonth])
 
   const debtProjections = useMemo(() => {
     const result: { type: DebtType; label: string; columns: { label: string; rows: YearRow[] }[] }[] = []
@@ -1339,8 +1410,8 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
     return result
   }, [debtGroups, projectionYears])
 
-  // Compute yearly totals for summary chart
-  const { assetTotals, debtTotals, netTotals } = useMemo(() => {
+  // Compute yearly totals with Box 3 tax impact on net worth
+  const { assetTotals, debtTotals, netTotals, box3Taxes } = useMemo(() => {
     const aTotals: number[] = []
     const dTotals: number[] = []
     const nTotals: number[] = []
@@ -1365,13 +1436,8 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
       nTotals.push(assetSum - debtSum)
     }
 
-    return { assetTotals: aTotals, debtTotals: dTotals, netTotals: nTotals }
-  }, [assetProjections, debtProjections, projectionYears])
-
-  // Compute Box 3 tax per year (peildatum = netto vermogen begin jaar)
-  const box3Taxes = useMemo(() => {
-    return netTotals.map((nw) => computeBox3Tax(nw, hasPartner))
-  }, [netTotals, hasPartner])
+    return { assetTotals: aTotals, debtTotals: dTotals, netTotals: nTotals, box3Taxes: taxes }
+  }, [assetProjections, debtProjections, projectionYears, hasPartner])
 
   const hasAssets = assets.length > 0
   const hasDebts = debts.length > 0
@@ -1480,6 +1546,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
             profileMonthlyIncome={profileMonthlyIncome}
             profileSavingsRate={profileSavingsRate}
             projectionYears={projectionYears}
+            crossoverMonth={crossoverMonth}
           />
         </div>
       )}
@@ -1513,6 +1580,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
               key={asset.id}
               asset={asset}
               projectionYears={projectionYears}
+              crossoverMonth={crossoverMonth}
             />
           ))}
         </div>
@@ -1574,7 +1642,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams }: {
 
       {/* Section: Total overview */}
       {(hasAssets || hasDebts) && (
-        <TotalTable assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} box3Taxes={box3Taxes} projectionYears={projectionYears} />
+        <TotalTable assetTotals={assetTotals} debtTotals={debtTotals} netTotals={netTotals} box3Taxes={box3Taxes} projectionYears={projectionYears} crossoverYear={crossoverYear} />
       )}
 
       {/* Empty state */}
