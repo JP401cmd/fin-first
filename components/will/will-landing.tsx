@@ -83,6 +83,10 @@ export function WillLanding({
     setOpzegTarget(metadata)
   }, [])
 
+  const handleDataChanged = useCallback(() => {
+    router.refresh()
+  }, [router])
+
   const { kpiData, recommendations, actions, goals, goalProgresses, goalAssets, goalDebts, partnerInfo, currentUserId, completedGoalCount, totalGoalCount, userProfile } = willData
 
   // Compute average goal progress for KPI card
@@ -142,6 +146,7 @@ export function WillLanding({
             partnerInfo={partnerInfo}
             currentUserId={currentUserId}
             onCancellationOpen={handleCancellationOpen}
+            onDataChanged={handleDataChanged}
             openRecommendationCount={kpiData.allPendingRecs.length}
             openActionCount={kpiData.openActions.length}
             avgGoalProgress={avgGoalProgress}

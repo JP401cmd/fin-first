@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 export interface GesprekStarterData {
@@ -67,7 +68,7 @@ export async function GET() {
     income6mRes, expense6mRes,
   ] = await Promise.all([
     supabase.from('assets').select('current_value').eq('user_id', user.id),
-    supabase.from('debts').select('current_balance, name, debt_type').eq('user_id', user.id),
+    supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', user.id),
     supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', monthStart).lt('date', monthEnd),
     supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', false).gte('date', monthStart).lt('date', monthEnd),
     supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', prevMonthStart).lt('date', prevMonthEnd),
@@ -94,10 +95,19 @@ export async function GET() {
   const prevMonthlySavings = prevMonthIncome - prevMonthExpenses
   const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
 
-  // 6-month rolling average savings rate
+  // 6-month rolling average savings rate (including debt aflossing as vermogensopbouw)
   const income6m = (income6mRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const expenses6m = (expense6mRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const savingsRate = income6m > 0 ? ((income6m - expenses6m) / income6m) * 100 : 0
+  let debtAflossing6m = 0
+  for (const d of (debtsRes.data || []) as Debt[]) {
+    if (!d.is_active || !d.include_aflossing_in_savings) continue
+    const aflossing = d.custom_aflossing_amount != null
+      ? Number(d.custom_aflossing_amount)
+      : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
+    debtAflossing6m += aflossing * ((d.net_worth_inclusion_pct ?? 100) / 100)
+  }
+  debtAflossing6m *= 6
+  const savingsRate = income6m > 0 ? ((income6m - expenses6m + debtAflossing6m) / income6m) * 100 : 0
 
   const goals = goalsRes.data || []
   const activeGoals = goals.filter(g => !g.is_completed)

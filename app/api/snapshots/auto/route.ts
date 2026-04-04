@@ -6,6 +6,7 @@ import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { SWR } from '@/lib/constants'
 
 /**
@@ -60,7 +61,7 @@ export async function GET() {
       .eq('is_active', true),
     supabase
       .from('debts')
-      .select('id, name, debt_type, current_balance, net_worth_inclusion_pct')
+      .select('id, name, debt_type, current_balance, net_worth_inclusion_pct, interest_rate, monthly_payment, repayment_type, end_date, start_date, include_aflossing_in_savings, custom_aflossing_amount')
       .eq('user_id', user.id)
       .eq('is_active', true),
     supabase
@@ -141,9 +142,19 @@ export async function GET() {
   const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPercentage, hasConsumerDebt)
 
+  // Compute debt aflossing total for savings rate correction
+  let debtAflossing6m = 0
+  for (const d of debts as Debt[]) {
+    if (!d.include_aflossing_in_savings) continue
+    const aflossing = d.custom_aflossing_amount != null
+      ? Number(d.custom_aflossing_amount)
+      : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
+    debtAflossing6m += aflossing * ((d.net_worth_inclusion_pct ?? 100) / 100)
+  }
+
   // Compute 6-pillar health score (replaces old 4-pillar resilience)
   const savingsRate6m = monthlyIncome > 0
-    ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
+    ? ((monthlyIncome - monthlyExpenses + debtAflossing6m) / monthlyIncome) * 100
     : 0
   const emergencyFundMonths = monthlyExpenses > 0 ? totalAssets * 0.3 / monthlyExpenses : 0
   const assetTypes = new Set(assets.map((a: { asset_type?: string }) => a.asset_type).filter(Boolean))

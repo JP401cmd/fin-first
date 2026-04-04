@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { CollapsibleSection } from '@/components/app/collapsible-section'
+import { useState, useEffect } from 'react'
 import { formatCurrency } from '@/lib/format'
 import { CATEGORY_LABELS, type RecurringCategory } from '@/lib/recurring-detection'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
@@ -21,6 +20,7 @@ import {
   Car,
   HelpCircle,
   ChevronRight,
+  ChevronDown,
   Ban,
   RefreshCw,
   Sparkles,
@@ -97,7 +97,24 @@ export function VasteKostenAnalyse({
   const [scanning, setScanning] = useState(false)
   const [classifyItem, setClassifyItem] = useState<ClassifyItemData | null>(null)
   const [aiSheetOpen, setAiSheetOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'abonnementen' | 'vaste-kosten'>('abonnementen')
+  const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const totalCount = subscriptions.length + vasteKosten.length
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('collapsible_will-vaste-kosten-analyse')
+      if (stored !== null) setIsOpen(stored === 'true')
+    } catch { /* localStorage not available */ }
+    setMounted(true)
+  }, [])
+
+  function toggleOpen() {
+    const next = !isOpen
+    setIsOpen(next)
+    try { localStorage.setItem('collapsible_will-vaste-kosten-analyse', String(next)) } catch { /* */ }
+  }
 
   const handleScan = async () => {
     setScanning(true)
@@ -138,21 +155,80 @@ export function VasteKostenAnalyse({
   }
 
   return (
-    <CollapsibleSection
-      storageKey="will-vaste-kosten-analyse"
-      title={`Vaste Kosten Analyse (${totalCount})`}
-      summary={`${formatCurrency(totalMonthly)}/mnd`}
-      defaultOpen={false}
-    >
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+      {/* ── Accent bar ── */}
+      <div className="h-[3px] w-full bg-wil-500" />
+
+      {/* ── Header (clickable toggle) ── */}
+      <button
+        type="button"
+        onClick={toggleOpen}
+        aria-expanded={isOpen}
+        className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+      >
+        <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <div className="flex min-w-0 flex-1 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4 text-wil-500" />
+            <h3 className="label-editorial text-[var(--ink-2)]">Vaste Kosten Analyse</h3>
+            <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+              {totalCount}
+            </span>
+          </div>
+          <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+            {formatCurrency(totalMonthly)}/mnd
+          </p>
+        </div>
+      </button>
+
+      {/* ── Collapsible content ── */}
+      <div className={`transition-all duration-300 ease-in-out ${
+        isOpen && mounted ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+      }`}>
+
+      {/* ── Mobile tab bar (< md) ── */}
+      <div className="border-b border-[var(--border-ed)] px-5 pb-3 pt-3 md:hidden">
+        <div className="flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1" role="tablist">
+          <button
+            onClick={() => setActiveTab('abonnementen')}
+            role="tab"
+            aria-selected={activeTab === 'abonnementen'}
+            className={`flex-1 rounded-[var(--r-sm)] px-2 py-2 text-[11px] font-semibold transition-colors ${
+              activeTab === 'abonnementen'
+                ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+            }`}
+          >
+            Abonnementen ({subscriptions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('vaste-kosten')}
+            role="tab"
+            aria-selected={activeTab === 'vaste-kosten'}
+            className={`flex-1 rounded-[var(--r-sm)] px-2 py-2 text-[11px] font-semibold transition-colors ${
+              activeTab === 'vaste-kosten'
+                ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+            }`}
+          >
+            Vaste Kosten ({vasteKosten.length})
+          </button>
+        </div>
+      </div>
+
+      {/* ── Content grid — tabs on mobile, 2-col on desktop ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2">
 
         {/* ── Linker kolom: Abonnementen ── */}
-        <div>
+        <div className={`p-5 md:border-r md:border-[var(--border-ed)] ${
+          activeTab !== 'abonnementen' ? 'hidden md:block' : ''
+        }`}>
           <div className="mb-3 flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-wil-500" />
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
-              Abonnementen ({subscriptions.length})
-            </h4>
+            <h4 className="label-editorial text-[var(--ink-2)]">Abonnementen</h4>
+            <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+              {subscriptions.length}
+            </span>
           </div>
 
           {subscriptions.length === 0 ? (
@@ -208,12 +284,15 @@ export function VasteKostenAnalyse({
         </div>
 
         {/* ── Rechter kolom: Vaste Kosten ── */}
-        <div>
+        <div className={`p-5 ${
+          activeTab !== 'vaste-kosten' ? 'hidden md:block' : ''
+        }`}>
           <div className="mb-3 flex items-center gap-2">
             <Home className="h-4 w-4 text-wil-500" />
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
-              Vaste Kosten ({vasteKosten.length})
-            </h4>
+            <h4 className="label-editorial text-[var(--ink-2)]">Vaste Kosten</h4>
+            <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+              {vasteKosten.length}
+            </span>
           </div>
 
           {vasteKosten.length === 0 ? (
@@ -260,7 +339,7 @@ export function VasteKostenAnalyse({
       </div>
 
       {/* ── Grand total + Nu scannen ── */}
-      <div className="mt-6 border-t border-[var(--border-md)] pt-4">
+      <div className="border-t border-[var(--border-ed)] px-5 py-4">
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold text-[var(--ink)]">Totaal vaste lasten</span>
           <div className="text-right">
@@ -293,6 +372,9 @@ export function VasteKostenAnalyse({
           </button>
         </div>
       </div>
+
+      </div> {/* end collapsible content */}
+
       {/* ── Classify sheet ──────────────────────────────── */}
       <RecurringClassifySheet
         open={!!classifyItem}
@@ -312,6 +394,6 @@ export function VasteKostenAnalyse({
           onRefresh?.()
         }}
       />
-    </CollapsibleSection>
+    </div>
   )
 }

@@ -20,9 +20,11 @@ type ActionBoardProps = {
   currentUserId?: string | null
   /** Increment to trigger showing the add form from parent */
   addTrigger?: number
+  /** Called after any mutation so parent can refresh server data */
+  onDataChanged?: () => void
 }
 
-export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, currentUserId, addTrigger }: ActionBoardProps) {
+export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, currentUserId, addTrigger, onDataChanged }: ActionBoardProps) {
   const [actions, setActions] = useState<Action[]>(initialActions)
   useEffect(() => { setActions(initialActions) }, [initialActions])
   const [showForm, setShowForm] = useState(false)
@@ -130,6 +132,8 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
         triggerAnimation(freedomDays)
       }
     }
+
+    onDataChanged?.()
   }
 
   async function handleUpdateAction(id: string, data: Record<string, unknown>) {
@@ -166,6 +170,7 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
     const { action } = await res.json()
     setActions((prev) => [{ ...action, source: 'manual', recommendation: null }, ...prev])
     setShowForm(false)
+    onDataChanged?.()
   }
 
   const cardProps = {
@@ -182,12 +187,13 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   if (!hasAnyActions && !showForm) {
     return (
       <div className="space-y-4">
-        <div className="py-6 text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-wil-50">
-            <CheckCircle className="h-5 w-5 text-wil-400" />
+        <div className="flex flex-col items-center py-8 text-center">
+          <div className="mb-3 rounded-2xl bg-[var(--subtle)] p-3">
+            <CheckCircle className="h-6 w-6 text-[var(--ink-4)]" />
           </div>
-          <p className="mb-4 font-serif text-sm text-[var(--ink-3)]">
-            Nog geen acties — maak er een aan of accepteer een voorstel.
+          <h4 className="mb-1 text-sm font-semibold text-[var(--ink-2)]">Nog geen acties</h4>
+          <p className="mb-5 max-w-[240px] text-xs leading-relaxed text-[var(--ink-3)]">
+            Maak zelf een actie aan, accepteer een voorstel of bespreek je wensen met Will.
           </p>
           <button
             type="button"
@@ -218,9 +224,25 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
           ))}
         </div>
       ) : (
-        <p className="py-2 text-center text-xs text-[var(--ink-3)]">
-          Geen openstaande acties{completedActions.length > 0 ? ` — ${completedActions.length} afgerond` : ''}
-        </p>
+        <div className="flex flex-col items-center py-8 text-center">
+          <div className="mb-3 rounded-2xl bg-[var(--subtle)] p-3">
+            <CheckCircle className="h-6 w-6 text-[var(--ink-4)]" />
+          </div>
+          <h4 className="mb-1 text-sm font-semibold text-[var(--ink-2)]">Geen openstaande acties</h4>
+          <p className="mb-5 max-w-[240px] text-xs leading-relaxed text-[var(--ink-3)]">
+            {completedActions.length > 0
+              ? `${completedActions.length} actie${completedActions.length !== 1 ? 's' : ''} afgerond. Maak een nieuwe actie aan, accepteer een voorstel of bespreek je wensen met Will.`
+              : 'Maak zelf een actie aan, accepteer een voorstel of bespreek je wensen met Will.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nieuwe actie
+          </button>
+        </div>
       )}
 
       {/* Partner-assigned preview */}

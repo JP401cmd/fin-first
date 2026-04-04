@@ -17,9 +17,11 @@ type RecommendationListProps = {
   hideHeader?: boolean
   /** Increment to trigger generation from parent */
   generateTrigger?: number
+  /** Called after any mutation so parent can refresh server data */
+  onDataChanged?: () => void
 }
 
-export function RecommendationList({ initialRecommendations, hideHeader, generateTrigger }: RecommendationListProps) {
+export function RecommendationList({ initialRecommendations, hideHeader, generateTrigger, onDataChanged }: RecommendationListProps) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>(initialRecommendations)
   useEffect(() => { setRecommendations(initialRecommendations) }, [initialRecommendations])
   const [error, setError] = useState<string | null>(null)
@@ -41,6 +43,7 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
 
   function handleNewRecommendations(recs: Recommendation[]) {
     setRecommendations((prev) => [...recs, ...prev])
+    onDataChanged?.()
   }
 
   async function handleDecide(id: string, action: 'accept' | 'reject' | 'postpone', data?: Record<string, unknown>) {
@@ -69,6 +72,7 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
     )
 
     setSelectedRec(null)
+    onDataChanged?.()
   }
 
   const pending = recommendations.filter(
@@ -112,12 +116,13 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
     return (
       <div className="space-y-4">
         {!hideHeader && header}
-        <div className="py-6 text-center">
-          <div className="mx-auto mb-3 flex justify-center">
-            <WillDots size={40} />
+        <div className="flex flex-col items-center py-8 text-center">
+          <div className="mb-3 rounded-2xl bg-[var(--subtle)] p-3">
+            <Sparkles className="h-6 w-6 text-[var(--ink-4)]" />
           </div>
-          <p className="mb-4 font-serif text-sm text-[var(--ink-3)]">
-            Will analyseert je profiel en ontdekt verborgen vrijheidsdagen.
+          <h4 className="mb-1 text-sm font-semibold text-[var(--ink-2)]">Nog geen voorstellen</h4>
+          <p className="mb-5 max-w-[240px] text-xs leading-relaxed text-[var(--ink-3)]">
+            Will analyseert je profiel en ontdekt verborgen vrijheidsdagen. Start een analyse om je eerste voorstellen te ontvangen.
           </p>
           {error && (
             <p className="mb-3 text-xs text-red-600">{error}</p>

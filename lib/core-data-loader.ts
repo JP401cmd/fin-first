@@ -9,7 +9,7 @@ import type { SparklineDataPoint } from '@/components/app/budget-sparkline'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import type { Asset } from '@/lib/asset-data'
-import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import { type Debt, computeRenteAflossingsSplit, DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireParams } from '@/lib/fire-params'
 import { type SavingsRateMethod, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
@@ -44,6 +44,7 @@ export interface CorePageData {
   savingsBreakdown: { name: string; icon: string; budgetType: string; amount6m: number }[]
   savingsBudgetTotal6m: number
   debtAflossingTotal6m: number
+  debtAflossingItems: { name: string; icon: string; amount6m: number }[]
 
   // Expenses & FIRE params
   mustExpenseItems: { name: string; monthlyAmount: number; annualAmount: number; interval: string }[]
@@ -399,6 +400,7 @@ export const loadCoreData = cache(async function loadCoreData(
   let savingsBreakdown: { name: string; icon: string; budgetType: string; amount6m: number }[] = []
   let savingsBudgetTotal6m = 0
   let debtAflossingTotal6m = 0
+  let debtAflossingItems: { name: string; icon: string; amount6m: number }[] = []
   let computedSavingsRate6m = 0
   let savingsRateMethod: SavingsRateMethod = 'estimate'
 
@@ -485,16 +487,26 @@ export const loadCoreData = cache(async function loadCoreData(
       savingsBudgetTotal6m = sbTotal6m
 
       // Compute debt aflossing total (principal repayment = vermogensopbouw)
-      if (debtFullResult.data) {
-        const activeDebts = (debtFullResult.data as Debt[]).filter(d => d.is_active && d.include_aflossing_in_savings)
+      if (debtsResult.data) {
+        const activeDebts = (debtsResult.data as Debt[]).filter(d => d.is_active && d.include_aflossing_in_savings)
+        const items: typeof debtAflossingItems = []
         let monthlyAflossing = 0
         for (const d of activeDebts) {
           const aflossing = d.custom_aflossing_amount != null
             ? Number(d.custom_aflossing_amount)
             : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
-          monthlyAflossing += aflossing * (d.net_worth_inclusion_pct / 100)
+          const adjusted = aflossing * (d.net_worth_inclusion_pct / 100)
+          monthlyAflossing += adjusted
+          if (adjusted > 0) {
+            items.push({
+              name: d.name,
+              icon: DEBT_TYPE_ICONS[d.debt_type] ?? 'CircleDot',
+              amount6m: adjusted * 6,
+            })
+          }
         }
         debtAflossingTotal6m = monthlyAflossing * 6
+        debtAflossingItems = items.sort((a, b) => b.amount6m - a.amount6m)
       }
 
       // Compute corrected savings rate (savings budgets + debt aflossing count as saving, not expense)
@@ -711,6 +723,7 @@ export const loadCoreData = cache(async function loadCoreData(
     savingsBreakdown,
     savingsBudgetTotal6m,
     debtAflossingTotal6m,
+    debtAflossingItems,
 
     mustExpenseItems: expenseItems,
     retirementMethodUsed: activeRetirementMethod,

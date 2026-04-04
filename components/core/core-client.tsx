@@ -33,7 +33,7 @@ import { BucketProjectionTable } from '@/components/app/bucket-projection-table'
 import { type BucketProjectionResult } from '@/lib/bucket-projection'
 import { runUnifiedProjection, unifiedToBucketResult, toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import type { Asset } from '@/lib/asset-data'
-import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import { type Debt, computeRenteAflossingsSplit, DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
 import { SnapshotComparisonView } from '@/components/app/snapshot-comparison-view'
 import { BalanceHistoryChart } from '@/components/app/balance-history-chart'
@@ -130,6 +130,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [savingsBreakdown, setSavingsBreakdown] = useState<{name: string; icon: string; budgetType: string; amount6m: number}[]>([])
   const [savingsBudgetTotal6m, setSavingsBudgetTotal6m] = useState(0)
   const [debtAflossingTotal6m, setDebtAflossingTotal6m] = useState(0)
+  const [debtAflossingItems, setDebtAflossingItems] = useState<{name: string; icon: string; amount6m: number}[]>([])
   // Net worth kassabon state
   const [showNetWorthReceipt, setShowNetWorthReceipt] = useState(false)
   const [showFreeDaysReceipt, setShowFreeDaysReceipt] = useState(false)
@@ -197,6 +198,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     setSavingsBreakdown(initialData.savingsBreakdown)
     setSavingsBudgetTotal6m(initialData.savingsBudgetTotal6m)
     setDebtAflossingTotal6m(initialData.debtAflossingTotal6m)
+    setDebtAflossingItems(initialData.debtAflossingItems)
     setAssetsList(initialData.assetsList)
     setDebtsList(initialData.debtsList)
     setNonCashAssets(initialData.nonCashAssets)
@@ -501,7 +503,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         supabase.from('budgets').select('*').limit(500),
         supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true }).limit(24),
-        supabase.from('debts').select('current_balance, original_amount, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('is_active', true),
+        supabase.from('debts').select('name, debt_type, current_balance, original_amount, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('is_active', true),
         supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
         supabase.from('goals').select('id').limit(1),
         supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd),
@@ -588,19 +590,29 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             .reduce((s, b) => s + b.amount6m, 0)
           setSavingsBudgetTotal6m(sbTotal6m)
 
-          // Compute debt aflossing total (only debts with include_aflossing_in_savings, weighted by net_worth_inclusion_pct)
+          // Compute debt aflossing total + per-debt items (only debts with include_aflossing_in_savings, weighted by net_worth_inclusion_pct)
           let aflTotal6m = 0
+          const aflItems: { name: string; icon: string; amount6m: number }[] = []
           if (debtFullResult.data) {
             for (const d of debtFullResult.data as Debt[]) {
               if (!d.is_active || !d.include_aflossing_in_savings) continue
               const aflossing = d.custom_aflossing_amount != null
                 ? Number(d.custom_aflossing_amount)
                 : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
-              aflTotal6m += aflossing * (d.net_worth_inclusion_pct / 100)
+              const adjusted = aflossing * (d.net_worth_inclusion_pct / 100)
+              aflTotal6m += adjusted
+              if (adjusted > 0) {
+                aflItems.push({
+                  name: d.name,
+                  icon: DEBT_TYPE_ICONS[d.debt_type as keyof typeof DEBT_TYPE_ICONS] ?? 'CircleDot',
+                  amount6m: adjusted * 6,
+                })
+              }
             }
             aflTotal6m *= 6
           }
           setDebtAflossingTotal6m(aflTotal6m)
+          setDebtAflossingItems(aflItems.sort((a, b) => b.amount6m - a.amount6m))
 
           // Compute corrected savings rate (savings budgets + debt aflossing count as saving, not expense)
           const extSb6m = savingsRateDataMonths < 6
@@ -2195,6 +2207,17 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                       <span className="font-medium text-[var(--ink-2)]">Vermogensopbouw via aflossing</span>
                       <span className="tabular-nums font-medium text-positive">+ {formatCurrency(debtAflossingTotal6m)}</span>
                     </div>
+                    {debtAflossingItems.map(d => (
+                      <div key={d.name} className="flex items-center justify-between py-0.5 pl-2 text-[11px]">
+                        <span className="flex items-center gap-1.5 text-[var(--ink-3)]">
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors('debt').bg }}>
+                            <BudgetIcon name={d.icon} className="h-2.5 w-2.5" />
+                          </span>
+                          {d.name}
+                        </span>
+                        <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(d.amount6m)}</span>
+                      </div>
+                    ))}
                     <p className="mt-0.5 text-[10px] text-[var(--ink-4)] leading-relaxed">
                       Het aflossing-deel van je schulden verlaagt je schuld en bouwt vermogen op.
                     </p>

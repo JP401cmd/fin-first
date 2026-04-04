@@ -37,6 +37,8 @@ interface ActionCenterProps {
   currentUserId: string | null
   onGoalsChanged?: () => void
   onCancellationOpen?: (metadata: CancellationMetadata) => void
+  /** Called after any child mutation so parent can refresh server data */
+  onDataChanged?: () => void
   /** KPI counts for stat cards */
   openRecommendationCount?: number
   openActionCount?: number
@@ -56,6 +58,7 @@ export function ActionCenter({
   currentUserId,
   onGoalsChanged,
   onCancellationOpen,
+  onDataChanged,
   openRecommendationCount,
   openActionCount,
   avgGoalProgress,
@@ -86,6 +89,7 @@ export function ActionCenter({
 
   const handleGoalsChanged = () => {
     onGoalsChanged?.()
+    onDataChanged?.()
   }
 
   // --- Pipeline metrics ---
@@ -222,7 +226,7 @@ export function ActionCenter({
                 <span className="hidden sm:inline">Analyseren</span>
               </button>
             </div>
-            <RecommendationList initialRecommendations={recommendations} hideHeader generateTrigger={generateTrigger} />
+            <RecommendationList initialRecommendations={recommendations} hideHeader generateTrigger={generateTrigger} onDataChanged={onDataChanged} />
           </div>
 
           {/* Column 2: Actie */}
@@ -254,6 +258,7 @@ export function ActionCenter({
               currentUserId={currentUserId}
               onCancellationOpen={onCancellationOpen}
               addTrigger={addTrigger}
+              onDataChanged={onDataChanged}
             />
           </div>
 
@@ -320,10 +325,22 @@ export function ActionCenter({
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-6 text-center">
-                    <p className="text-sm text-[var(--ink-3)]">
-                      Nog geen doelen. Klik op &ldquo;Nieuw doel&rdquo; om te starten.
+                  <div className="flex flex-col items-center py-8 text-center">
+                    <div className="mb-3 rounded-2xl bg-[var(--subtle)] p-3">
+                      <Target className="h-6 w-6 text-[var(--ink-4)]" />
+                    </div>
+                    <h4 className="mb-1 text-sm font-semibold text-[var(--ink-2)]">Nog geen doelen</h4>
+                    <p className="mb-5 max-w-[240px] text-xs leading-relaxed text-[var(--ink-3)]">
+                      Stel een financieel doel in om je voortgang bij te houden — zoals een noodfonds, aflossing of spaardoel.
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowGoalForm(true)}
+                      className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Nieuw doel
+                    </button>
                   </div>
                 )}
               </div>
