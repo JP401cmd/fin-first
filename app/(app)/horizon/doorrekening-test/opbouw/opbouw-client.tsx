@@ -8,7 +8,7 @@ import { DEBT_TYPE_LABELS, type Debt, type DebtType } from '@/lib/debt-data'
 import type { FireParams } from '@/lib/fire-params'
 import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
-import type { LifeEvent } from '@/lib/horizon-data'
+import { computeLifeEventNetImpact, type LifeEvent } from '@/lib/horizon-data'
 
 // Heffingsvrij vermogen 2026 (single / partner)
 const HEFFINGSVRIJ_SINGLE = 59_357
@@ -230,10 +230,10 @@ function applyDeposit(
     )
     values[indices[0]] += amount
   } else {
-    // laagste_rendement: for positive cashflows, add to lowest-returning asset first
+    // hoogste_rendement: add to highest-returning asset first
     const indices = assets.map((_, i) => i)
     indices.sort(
-      (a, b) => Number(assets[a].expected_return) - Number(assets[b].expected_return),
+      (a, b) => Number(assets[b].expected_return) - Number(assets[a].expected_return),
     )
     values[indices[0]] += amount
   }
@@ -616,25 +616,30 @@ function StackedAreaChart({
 
 // ── Mini summary chart (SVG) ─────────────────────────────────
 
-function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
+function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears, lifeEvents, currentAge }: {
   assetTotals: number[]
   debtTotals: number[]
   netTotals: number[]
   projectionYears: number
+  lifeEvents: LifeEvent[]
+  currentAge: number | null
 }) {
+  const [hoveredEvent, setHoveredEvent] = useState<string | null>(null)
+
   const allValues = [...assetTotals, ...debtTotals, ...netTotals]
   const maxVal = Math.max(...allValues, 1)
   const minVal = Math.min(...allValues, 0)
   const range = maxVal - minVal || 1
 
   const w = 600
-  const h = 220
+  const h = 250 // Increased height to accommodate event labels at bottom
   const px = 48
   const py = 24
+  const bottomPadding = 46 // Extra space for event labels below x-axis
 
   const numPoints = projectionYears
   const toX = (i: number) => px + (i / Math.max(numPoints - 1, 1)) * (w - 2 * px)
-  const toY = (v: number) => py + (1 - (v - minVal) / range) * (h - 2 * py)
+  const toY = (v: number) => py + (1 - (v - minVal) / range) * (h - 2 * py - bottomPadding + py)
 
   const makePath = (values: number[]) =>
     values.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
@@ -652,10 +657,49 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
   // Area fill under net worth line
   const makeAreaPath = (values: number[]) => {
     const line = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
-    const bottomRight = `L${toX(values.length - 1).toFixed(1)},${(h - py).toFixed(1)}`
-    const bottomLeft = `L${toX(0).toFixed(1)},${(h - py).toFixed(1)}`
+    const chartBottom = toY(minVal)
+    const bottomRight = `L${toX(values.length - 1).toFixed(1)},${chartBottom.toFixed(1)}`
+    const bottomLeft = `L${toX(0).toFixed(1)},${chartBottom.toFixed(1)}`
     return `${line} ${bottomRight} ${bottomLeft} Z`
   }
+
+  // Compute life event markers within projection range
+  const eventMarkers = useMemo(() => {
+    if (currentAge == null || lifeEvents.length === 0) return []
+    return lifeEvents
+      .filter((e) => e.is_active && e.target_age != null)
+      .map((e) => {
+        const yearIndex = e.target_age! - currentAge
+        if (yearIndex < 0 || yearIndex > projectionYears) return null
+        const netImpact = computeLifeEventNetImpact(e)
+        const isPositive = netImpact > 0
+        const durationYears = e.duration_months > 0 ? e.duration_months / 12 : 0
+        const endYearIndex = durationYears > 0 ? Math.min(yearIndex + durationYears, projectionYears) : yearIndex
+        return {
+          id: e.id,
+          name: e.name,
+          icon: e.icon,
+          yearIndex,
+          endYearIndex,
+          isPositive,
+          netImpact,
+          hasDuration: durationYears > 0,
+          targetAge: e.target_age!,
+          durationMonths: e.duration_months,
+          oneTimeCost: e.one_time_cost,
+          monthlyIncome: e.monthly_income_change,
+          monthlyCost: e.monthly_cost_change,
+        }
+      })
+      .filter(Boolean) as {
+        id: string; name: string; icon: string; yearIndex: number; endYearIndex: number;
+        isPositive: boolean; netImpact: number; hasDuration: boolean; targetAge: number;
+        durationMonths: number; oneTimeCost: number; monthlyIncome: number; monthlyCost: number;
+      }[]
+  }, [lifeEvents, currentAge, projectionYears])
+
+  const chartBottom = toY(minVal)
+  const chartTop = toY(maxVal)
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" aria-label="Projectie grafiek">
@@ -667,7 +711,7 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
       </defs>
       {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
-        const yy = py + frac * (h - 2 * py)
+        const yy = chartTop + frac * (chartBottom - chartTop)
         const val = maxVal - frac * range
         return (
           <g key={frac}>
@@ -680,10 +724,25 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
       })}
       {/* X axis labels */}
       {xLabels.map((yr) => (
-        <text key={yr} x={toX(yr)} y={h - 4} textAnchor="middle" fontSize={8} fill="var(--ink-4)" className="font-mono">
+        <text key={yr} x={toX(yr)} y={chartBottom + 14} textAnchor="middle" fontSize={8} fill="var(--ink-4)" className="font-mono">
           {yr}j
         </text>
       ))}
+
+      {/* Life event duration ranges (hatched background) */}
+      {eventMarkers.filter((m) => m.hasDuration).map((marker) => (
+        <rect
+          key={`range-${marker.id}`}
+          x={toX(marker.yearIndex)}
+          y={chartTop}
+          width={Math.max(0, toX(marker.endYearIndex) - toX(marker.yearIndex))}
+          height={chartBottom - chartTop}
+          fill={marker.isPositive ? 'var(--color-emerald-500)' : 'var(--color-amber-500)'}
+          opacity={hoveredEvent === marker.id ? 0.12 : 0.06}
+          rx={2}
+        />
+      ))}
+
       {/* Area fill under net worth */}
       <path d={makeAreaPath(netTotals)} fill="url(#netAreaGrad)" />
       {/* Asset line */}
@@ -692,6 +751,133 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears }: {
       <path d={makePath(debtTotals)} fill="none" stroke="var(--color-red-400)" strokeWidth={1.5} />
       {/* Net line */}
       <path d={makePath(netTotals)} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2.5} />
+
+      {/* Life event vertical marker lines + labels */}
+      {eventMarkers.map((marker, idx) => {
+        const x = toX(marker.yearIndex)
+        const isHovered = hoveredEvent === marker.id
+        const markerColor = marker.isPositive ? 'var(--color-emerald-600)' : 'var(--color-amber-600)'
+        // Stagger labels vertically to avoid overlap
+        const labelY = chartBottom + 26 + (idx % 2) * 12
+
+        return (
+          <g
+            key={marker.id}
+            onMouseEnter={() => setHoveredEvent(marker.id)}
+            onMouseLeave={() => setHoveredEvent(null)}
+            style={{ cursor: 'default' }}
+          >
+            {/* Vertical marker line */}
+            <line
+              x1={x} y1={chartTop} x2={x} y2={chartBottom}
+              stroke={markerColor}
+              strokeWidth={isHovered ? 1.5 : 1}
+              strokeDasharray={marker.hasDuration ? '4 2' : '3 3'}
+              opacity={isHovered ? 0.9 : 0.5}
+            />
+
+            {/* Arrow indicator: upward for positive, downward for negative */}
+            {marker.isPositive ? (
+              <polygon
+                points={`${x},${chartTop + 4} ${x - 4},${chartTop + 12} ${x + 4},${chartTop + 12}`}
+                fill={markerColor}
+                opacity={isHovered ? 1 : 0.7}
+              />
+            ) : (
+              <polygon
+                points={`${x},${chartBottom - 4} ${x - 4},${chartBottom - 12} ${x + 4},${chartBottom - 12}`}
+                fill={markerColor}
+                opacity={isHovered ? 1 : 0.7}
+              />
+            )}
+
+            {/* Icon + name label below x-axis */}
+            <text
+              x={x}
+              y={labelY}
+              textAnchor="middle"
+              fontSize={7}
+              fill={isHovered ? markerColor : 'var(--ink-3)'}
+              fontWeight={isHovered ? 600 : 400}
+            >
+              {marker.icon} {marker.name.length > 14 ? marker.name.slice(0, 12) + '\u2026' : marker.name}
+            </text>
+
+            {/* Hover hitbox (invisible wider area for easier hover) */}
+            <rect
+              x={x - 12}
+              y={chartTop}
+              width={24}
+              height={chartBottom - chartTop + 40}
+              fill="transparent"
+              onMouseEnter={() => setHoveredEvent(marker.id)}
+              onMouseLeave={() => setHoveredEvent(null)}
+            />
+
+            {/* Tooltip on hover */}
+            {isHovered && (
+              <g>
+                {/* Tooltip background */}
+                <rect
+                  x={Math.min(x - 70, w - px - 145)}
+                  y={chartTop - 4}
+                  width={140}
+                  height={marker.hasDuration ? 52 : 40}
+                  rx={4}
+                  fill="var(--paper)"
+                  stroke="var(--border-md)"
+                  strokeWidth={0.5}
+                  filter="drop-shadow(0 1px 3px rgba(0,0,0,0.08))"
+                />
+                {/* Event name */}
+                <text
+                  x={Math.min(x - 70, w - px - 145) + 8}
+                  y={chartTop + 10}
+                  fontSize={8}
+                  fontWeight={600}
+                  fill="var(--ink)"
+                >
+                  {marker.icon} {marker.name.length > 18 ? marker.name.slice(0, 16) + '\u2026' : marker.name}
+                </text>
+                {/* Age */}
+                <text
+                  x={Math.min(x - 70, w - px - 145) + 8}
+                  y={chartTop + 22}
+                  fontSize={7}
+                  fill="var(--ink-3)"
+                >
+                  Leeftijd: {marker.targetAge}j
+                  {marker.hasDuration && ` \u2014 ${Math.round(marker.durationMonths / 12 * 10) / 10}j duur`}
+                </text>
+                {/* Financial impact */}
+                <text
+                  x={Math.min(x - 70, w - px - 145) + 8}
+                  y={chartTop + 33}
+                  fontSize={7}
+                  fill={marker.isPositive ? 'var(--color-emerald-600)' : 'var(--color-amber-600)'}
+                  fontWeight={500}
+                >
+                  {marker.isPositive ? '\u25B2' : '\u25BC'} {formatCurrency(Math.abs(marker.netImpact))} netto impact
+                </text>
+                {/* Details line for duration events */}
+                {marker.hasDuration && (
+                  <text
+                    x={Math.min(x - 70, w - px - 145) + 8}
+                    y={chartTop + 44}
+                    fontSize={7}
+                    fill="var(--ink-4)"
+                  >
+                    {marker.oneTimeCost > 0 && `Eenmalig: ${formatCurrency(marker.oneTimeCost)}`}
+                    {marker.monthlyCost > 0 && ` Mnd: -${formatCurrency(marker.monthlyCost)}`}
+                    {marker.monthlyIncome > 0 && ` Mnd: +${formatCurrency(marker.monthlyIncome)}`}
+                  </text>
+                )}
+              </g>
+            )}
+          </g>
+        )
+      })}
+
       {/* End dots */}
       {netTotals.length > 0 && (
         <>
@@ -1837,7 +2023,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
                 {([
                   { key: 'spreiden' as const, label: 'Spreiden' },
                   { key: 'cash_first' as const, label: 'Cash first' },
-                  { key: 'laagste_rendement' as const, label: 'Laagste rendement' },
+                  { key: 'hoogste_rendement' as const, label: 'Hoogste rendement' },
                 ] as const).map(({ key, label }) => (
                   <button
                     key={key}
@@ -1857,7 +2043,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
               {lifeEvents.length} levensgebeurtenis{lifeEvents.length !== 1 ? 'sen' : ''} be{'\u00EF'}nvloeden de projectie
               {allocationStrategy === 'spreiden' && ' \u2014 bedragen worden proportioneel verdeeld over bezittingen'}
               {allocationStrategy === 'cash_first' && ' \u2014 bedragen gaan eerst naar bezitting met laagste rendement'}
-              {allocationStrategy === 'laagste_rendement' && ' \u2014 kosten worden onttrokken vanaf laagste rendement, doorschuiven bij onvoldoende'}
+              {allocationStrategy === 'hoogste_rendement' && ' \u2014 bedragen gaan eerst naar bezitting met hoogste rendement'}
             </p>
           </div>
         )}
@@ -1874,6 +2060,8 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
             debtTotals={debtTotals}
             netTotals={netTotals}
             projectionYears={projectionYears}
+            lifeEvents={lifeEvents}
+            currentAge={currentAge}
           />
         </div>
       )}
