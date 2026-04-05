@@ -565,19 +565,30 @@ function StackedAreaChart({
     return paths
   }, [debtSeries, samplePoints, numPts])
 
-  // Net worth line
+  // Net worth line (weighted by net_worth_inclusion_pct per asset)
   const netLine = useMemo(() => {
+    // Build inclusion weight per asset series (savings always 100%)
+    const assetWeights = assets.map(a => (a.net_worth_inclusion_pct ?? 100) / 100)
     return samplePoints
       .map((pt, i) => {
         let pos = 0
-        for (const s of assetSeries) pos += s.values[pt] ?? 0
+        let assetIdx = 0
+        for (const s of assetSeries) {
+          const val = s.values[pt] ?? 0
+          if (s.side === 'asset') {
+            pos += val * (assetWeights[assetIdx] ?? 1)
+            assetIdx++
+          } else {
+            pos += val // savings at 100%
+          }
+        }
         let neg = 0
         for (const s of debtSeries) neg += s.values[pt] ?? 0
         const net = pos - neg
         return `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(net).toFixed(1)}`
       })
       .join(' ')
-  }, [assetSeries, debtSeries, samplePoints])
+  }, [assetSeries, debtSeries, samplePoints, assets])
 
   // X-axis labels (years)
   const xLabels: { x: number; label: string }[] = useMemo(() => {
@@ -640,10 +651,17 @@ function StackedAreaChart({
     const items: { label: string; value: number; color: string; side: 'asset' | 'debt' | 'savings' }[] = []
     let totalAssets = 0
     let totalDebts = 0
+    let assetIdx = 0
     for (const s of series) {
       const val = s.values[pt] ?? 0
       items.push({ label: s.label, value: val, color: s.color, side: s.side })
-      if (s.side === 'asset' || s.side === 'savings') totalAssets += val
+      if (s.side === 'asset') {
+        const weight = (assets[assetIdx]?.net_worth_inclusion_pct ?? 100) / 100
+        totalAssets += val * weight
+        assetIdx++
+      } else if (s.side === 'savings') {
+        totalAssets += val
+      }
       if (s.side === 'debt') totalDebts += val
     }
     return { year, month, items, totalAssets, totalDebts, netWorth: totalAssets - totalDebts }
@@ -1246,7 +1264,12 @@ function AssetMonthlyTable({ asset, projectionYears, crossoverMonth }: {
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
       <div className="border-b border-[var(--border-ed)] bg-emerald-50/40 px-4 py-3">
-        <h3 className="text-sm font-semibold text-[var(--ink)]">{asset.name}</h3>
+        <h3 className="text-sm font-semibold text-[var(--ink)]">
+          {asset.name}
+          {(asset.net_worth_inclusion_pct ?? 100) < 100 && (
+            <span className="ml-2 text-[10px] font-normal text-[var(--ink-4)]">({asset.net_worth_inclusion_pct}% meegeteld in netto vermogen)</span>
+          )}
+        </h3>
         <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
           Startwaarde {formatCurrency(Number(asset.current_value))} · Rendement {annualReturn.toFixed(1)}%/jr · Inleg {formatCurrency(Number(asset.monthly_contribution))}/mnd
         </p>
@@ -1691,14 +1714,17 @@ function NetWorthMonthlyTable({
               <th className="sticky left-0 z-20 bg-[var(--subtle)] px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">
                 Maand
               </th>
-              {assetMonthlyData.map((a) => (
+              {assetMonthlyData.map((a, aIdx) => {
+                const pct = assets[aIdx]?.net_worth_inclusion_pct ?? 100
+                return (
                 <th
                   key={`asset-${a.name}`}
                   className="whitespace-nowrap px-3 py-1.5 text-right font-medium text-emerald-600"
                 >
-                  {a.name}
+                  {a.name}{pct < 100 && <span className="ml-1 text-[9px] text-[var(--ink-4)]">({pct}%)</span>}
                 </th>
-              ))}
+                )
+              })}
               {hasAssets && (
                 <th className="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-emerald-700 bg-emerald-50/40">
                   ∑ Bezittingen
@@ -1730,9 +1756,10 @@ function NetWorthMonthlyTable({
           <tbody>
             {displayMonths.map((month, idx) => {
               let assetTotal = 0
-              const assetValues = assetMonthlyData.map((a) => {
+              const assetValues = assetMonthlyData.map((a, aIdx) => {
                 const val = a.rows[month - 1]?.endValue ?? 0
-                assetTotal += val
+                const weight = (assets[aIdx]?.net_worth_inclusion_pct ?? 100) / 100
+                assetTotal += val * weight
                 return val
               })
 
@@ -2098,10 +2125,13 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
       result.push({
         type,
         label: ASSET_TYPE_LABELS[type],
-        columns: group.map((a) => ({
-          label: a.name,
-          rows: projectAssetYearly(a, projectionYears, crossoverMonth),
-        })),
+        columns: group.map((a) => {
+          const pct = a.net_worth_inclusion_pct ?? 100
+          return {
+            label: pct < 100 ? `${a.name} (${pct}%)` : a.name,
+            rows: projectAssetYearly(a, projectionYears, crossoverMonth),
+          }
+        }),
       })
     }
     return result
@@ -2148,18 +2178,23 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
     const taxes: number[] = []
     let cumulativeTax = 0
 
+    // Build a flat list of inclusion weights matching the asset order
+    const inclusionWeights = assets.map(a => (a.net_worth_inclusion_pct ?? 100) / 100)
+
     for (let yr = 0; yr < projectionYears; yr++) {
       let assetSum = 0
       if (eventAdjustedAssets) {
-        // Use event-adjusted per-asset values
+        // Use event-adjusted per-asset values, weighted by inclusion pct
         for (let i = 0; i < assets.length; i++) {
-          assetSum += eventAdjustedAssets.yearlyAssetValues[i]?.[yr] ?? 0
+          assetSum += (eventAdjustedAssets.yearlyAssetValues[i]?.[yr] ?? 0) * inclusionWeights[i]
         }
       } else {
-        // Original: sum from independent projections
+        // Original: sum from independent projections, weighted by inclusion pct
+        let flatIdx = 0
         for (const group of assetProjections) {
           for (const col of group.columns) {
-            assetSum += col.rows[yr]?.value ?? 0
+            assetSum += (col.rows[yr]?.value ?? 0) * inclusionWeights[flatIdx]
+            flatIdx++
           }
         }
       }
@@ -2187,7 +2222,8 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
 
   const hasAssets = assets.length > 0
   const hasDebts = debts.length > 0
-  const totalAssetValue = assets.reduce((s, a) => s + Number(a.current_value), 0)
+  const totalAssetValueRaw = assets.reduce((s, a) => s + Number(a.current_value), 0)
+  const totalAssetValue = assets.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
   const totalDebtValue = debts.reduce((s, d) => s + Number(d.current_balance), 0)
   const netWorth = totalAssetValue - totalDebtValue
 
@@ -2374,7 +2410,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
           <SectionHeader
             icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
             title="Bezittingen"
-            subtitle={`${formatCurrency(totalAssetValue)} huidige waarde`}
+            subtitle={`${formatCurrency(totalAssetValueRaw)} huidige waarde`}
             color="bg-emerald-50/30"
             count={assets.length}
             expanded={assetsExpanded}
