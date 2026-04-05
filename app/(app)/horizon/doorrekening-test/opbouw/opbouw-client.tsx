@@ -239,6 +239,19 @@ function applyDeposit(
   }
 }
 
+/** Per-event allocation record: how an event's cashflow was distributed across assets in a given year */
+interface EventAssetAllocation {
+  /** Amount allocated to each asset (positive = deposit, negative = withdrawal) */
+  perAsset: number[]
+}
+
+/** Result from simulateAssetsWithEvents including per-event allocation tracking */
+interface EventSimulationResult {
+  yearlyAssetValues: number[][] /* [assetIdx][year] */
+  /** Per-event per-year allocation details: [eventIdx][year] */
+  yearlyEventAllocations: EventAssetAllocation[][]
+}
+
 /**
  * Run a joint month-by-month asset simulation that applies life event
  * cashflows each month via the chosen allocation strategy.
@@ -246,34 +259,45 @@ function applyDeposit(
  * Positive cashflows (income events) are deposited using `applyDeposit`.
  * Negative cashflows (expense events) are withdrawn using `applyWithdrawal`.
  *
- * Returns yearly snapshots (end of each 12-month period) per asset.
+ * Returns yearly snapshots (end of each 12-month period) per asset,
+ * plus per-event allocation tracking for the TotalTable.
  */
 function simulateAssetsWithEvents(
   assets: Asset[],
   totalMonths: number,
-  yearlyEventCashflows: number[],
+  perEventYearlyCashflows: number[][],
   strategy: AllocationStrategy,
   crossoverMonth: number | null,
-): { yearlyAssetValues: number[][] /* [assetIdx][year] */ } {
+): EventSimulationResult {
+  const numEvents = perEventYearlyCashflows.length
   // Initialize per-asset values
   const values = assets.map((a) => Number(a.current_value))
   const rates = assets.map((a) => Number(a.expected_return) / 100 / 12)
   const contribs = assets.map((a) => Number(a.monthly_contribution))
 
-  // Convert yearly event cashflows to monthly by dividing evenly across 12 months.
-  // This avoids large one-month spikes and keeps the simulation smooth.
-  const monthlyEventCf = new Map<number, number>()
-  for (let yr = 0; yr < yearlyEventCashflows.length; yr++) {
-    const annual = yearlyEventCashflows[yr]
-    if (annual === 0) continue
-    const monthly = annual / 12
-    for (let m = yr * 12 + 1; m <= (yr + 1) * 12 && m <= totalMonths; m++) {
-      monthlyEventCf.set(m, (monthlyEventCf.get(m) ?? 0) + monthly)
+  // Convert per-event yearly cashflows to monthly by dividing evenly across 12 months.
+  // monthlyPerEvent: Map<month, number[]> where number[] is per-event monthly cashflow
+  const monthlyPerEvent = new Map<number, number[]>()
+  for (let ei = 0; ei < numEvents; ei++) {
+    const yearlyCf = perEventYearlyCashflows[ei]
+    for (let yr = 0; yr < yearlyCf.length; yr++) {
+      const annual = yearlyCf[yr]
+      if (annual === 0) continue
+      const monthly = annual / 12
+      for (let m = yr * 12 + 1; m <= (yr + 1) * 12 && m <= totalMonths; m++) {
+        let arr = monthlyPerEvent.get(m)
+        if (!arr) { arr = new Array(numEvents).fill(0); monthlyPerEvent.set(m, arr) }
+        arr[ei] += monthly
+      }
     }
   }
 
   // Track yearly snapshots (end of each 12-month period)
   const yearlyValues: number[][] = assets.map(() => [])
+  // Track per-event per-year cumulative allocations per asset
+  // yearlyAllocAccum[eventIdx][assetIdx] accumulates within the current year
+  const yearlyAllocAccum: number[][] = Array.from({ length: numEvents }, () => new Array(assets.length).fill(0))
+  const yearlyEventAllocations: EventAssetAllocation[][] = Array.from({ length: numEvents }, () => [])
 
   for (let m = 1; m <= totalMonths; m++) {
     // 1. Apply returns
@@ -287,14 +311,24 @@ function simulateAssetsWithEvents(
       values[i] += contribs[i]
     }
 
-    // 3. Apply event cashflows using the chosen allocation strategy
-    const cf = monthlyEventCf.get(m)
-    if (cf != null && cf < 0) {
-      // Negative cashflow = need to withdraw from assets
-      applyWithdrawal(values, assets, -cf, strategy)
-    } else if (cf != null && cf > 0) {
-      // Positive cashflow = deposit into assets via strategy
-      applyDeposit(values, assets, cf, strategy)
+    // 3. Apply per-event cashflows using the chosen allocation strategy
+    const evCfs = monthlyPerEvent.get(m)
+    if (evCfs) {
+      for (let ei = 0; ei < numEvents; ei++) {
+        const cf = evCfs[ei]
+        if (cf === 0) continue
+        // Snapshot before applying this event to track per-asset delta
+        const before = values.slice()
+        if (cf < 0) {
+          applyWithdrawal(values, assets, -cf, strategy)
+        } else {
+          applyDeposit(values, assets, cf, strategy)
+        }
+        // Record per-asset delta for this event
+        for (let ai = 0; ai < assets.length; ai++) {
+          yearlyAllocAccum[ei][ai] += values[ai] - before[ai]
+        }
+      }
     }
 
     // Ensure no negative values
@@ -307,10 +341,15 @@ function simulateAssetsWithEvents(
       for (let i = 0; i < values.length; i++) {
         yearlyValues[i].push(Math.round(values[i]))
       }
+      // Record and reset per-event allocation accumulators
+      for (let ei = 0; ei < numEvents; ei++) {
+        yearlyEventAllocations[ei].push({ perAsset: yearlyAllocAccum[ei].map(v => Math.round(v)) })
+        yearlyAllocAccum[ei].fill(0)
+      }
     }
   }
 
-  return { yearlyAssetValues: yearlyValues }
+  return { yearlyAssetValues: yearlyValues, yearlyEventAllocations }
 }
 
 // ── Stacked area chart (feature #633) ───────────────────────
@@ -1604,7 +1643,33 @@ function NetWorthMonthlyTable({
 
 // ── Total overview table ─────────────────────────────────────
 
-function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionYears, crossoverYear, yearlyEventCashflows }: {
+/** Tooltip that shows per-asset allocation for an event cell */
+function EventAllocationTooltip({ allocation, assetNames }: {
+  allocation: EventAssetAllocation
+  assetNames: string[]
+}) {
+  const hasAllocations = allocation.perAsset.some(v => v !== 0)
+  if (!hasAllocations) return null
+
+  return (
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 w-max max-w-[220px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2 shadow-lg text-[10px] pointer-events-none">
+      <p className="font-semibold text-[var(--ink-3)] mb-1">Verdeling over bezittingen:</p>
+      {allocation.perAsset.map((amount, i) => {
+        if (amount === 0) return null
+        return (
+          <div key={i} className="flex justify-between gap-2">
+            <span className="text-[var(--ink-3)] truncate">{assetNames[i]}</span>
+            <span className={`font-mono tabular-nums whitespace-nowrap ${amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              {amount > 0 ? '+' : ''}{formatCurrency(amount)}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionYears, crossoverYear, yearlyEventCashflows, perEventYearlyCashflows, eventGroups, eventAllocations, assetNames }: {
   assetTotals: number[]
   debtTotals: number[]
   netTotals: number[]
@@ -1612,11 +1677,15 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
   projectionYears: number
   crossoverYear: number | null
   yearlyEventCashflows: number[]
+  perEventYearlyCashflows: number[][] // [eventIdx][year]
+  eventGroups: { event: LifeEvent; cashflows: SimCashflow[] }[]
+  eventAllocations: EventAssetAllocation[][] | null // [eventIdx][year]
+  assetNames: string[]
 }) {
   const hasEvents = yearlyEventCashflows.some((v) => v !== 0)
+  const [hoveredCell, setHoveredCell] = useState<string | null>(null)
   const displayYears = useMemo(() => {
     const years = getDisplayYears(projectionYears)
-    // Always include the crossover year in the display
     if (crossoverYear != null && !years.includes(crossoverYear)) {
       years.push(crossoverYear)
       years.sort((a, b) => a - b)
@@ -1639,6 +1708,7 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
         <h3 className="text-sm font-semibold text-[var(--ink)]">Totaaloverzicht</h3>
         <p className="text-[10px] text-[var(--ink-4)] mt-0.5">
           Box 3: fictief rendement {(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}% × tarief {(BOX3_TARIEF * 100).toFixed(0)}%, heffingsvrij vermogen afgetrokken
+          {hasEvents && ' · hover op event-kolom toont verdeling over bezittingen'}
         </p>
       </div>
       <div className="overflow-auto max-h-[70vh]">
@@ -1649,8 +1719,14 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
               <th className="px-3 py-1.5 text-right font-medium text-emerald-600">Bezittingen</th>
               <th className="px-3 py-1.5 text-right font-medium text-red-500">Schulden</th>
               <th className="px-3 py-1.5 text-right font-medium text-horizon-600">Netto vermogen</th>
-              {hasEvents && (
-                <th className="px-3 py-1.5 text-right font-medium text-purple-600">Events</th>
+              {hasEvents && eventGroups.map((g, ei) => (
+                <th key={`ev-${ei}`} className="px-2 py-1.5 text-right font-medium text-purple-600 whitespace-nowrap" title={g.event.name}>
+                  <span className="mr-0.5">{g.event.icon}</span>
+                  <span>{g.event.name.length > 14 ? g.event.name.slice(0, 13) + '\u2026' : g.event.name}</span>
+                </th>
+              ))}
+              {hasEvents && eventGroups.length > 1 && (
+                <th className="px-3 py-1.5 text-right font-medium text-purple-700 border-l border-purple-200/50">{'\u03A3'} Events</th>
               )}
               <th className="px-3 py-1.5 text-right font-medium text-amber-600">Box 3 belasting</th>
               <th className="px-3 py-1.5 text-right font-medium text-amber-500">Cumulatief Box 3</th>
@@ -1664,7 +1740,7 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
               <tr key={yr} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${isCrossover ? 'bg-horizon-50/60 ring-1 ring-inset ring-horizon-300' : idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
                 <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">
                   {yr}
-                  {isCrossover && <span className="ml-1 text-[9px] font-semibold text-horizon-600">⚡ kruispunt</span>}
+                  {isCrossover && <span className="ml-1 text-[9px] font-semibold text-horizon-600">{'\u26A1'} kruispunt</span>}
                   {isAfterCrossover && <span className="ml-1 text-[9px] text-[var(--ink-4)]">na kruispunt</span>}
                 </td>
                 <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
@@ -1676,16 +1752,35 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
                 <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-horizon-600">
                   {formatCurrency(netTotals[yr - 1])}
                 </td>
-                {hasEvents && (
-                  <td className={`px-3 py-1 text-right font-mono tabular-nums ${yearlyEventCashflows[yr - 1] > 0 ? 'text-emerald-600' : yearlyEventCashflows[yr - 1] < 0 ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
-                    {yearlyEventCashflows[yr - 1] !== 0 ? formatCurrency(yearlyEventCashflows[yr - 1]) : '—'}
+                {hasEvents && eventGroups.map((_g, ei) => {
+                  const evVal = perEventYearlyCashflows[ei]?.[yr - 1] ?? 0
+                  const allocation = eventAllocations?.[ei]?.[yr - 1] ?? null
+                  const cellKey = `${ei}-${yr}`
+                  const isHovered = hoveredCell === cellKey
+                  return (
+                    <td
+                      key={`ev-${ei}`}
+                      className={`px-2 py-1 text-right font-mono tabular-nums relative cursor-default ${evVal > 0 ? 'text-emerald-600' : evVal < 0 ? 'text-red-500' : 'text-[var(--ink-4)]'}`}
+                      onMouseEnter={() => allocation && setHoveredCell(cellKey)}
+                      onMouseLeave={() => setHoveredCell(null)}
+                    >
+                      {evVal !== 0 ? formatCurrency(evVal) : '\u2014'}
+                      {allocation && isHovered && (
+                        <EventAllocationTooltip allocation={allocation} assetNames={assetNames} />
+                      )}
+                    </td>
+                  )
+                })}
+                {hasEvents && eventGroups.length > 1 && (
+                  <td className={`px-3 py-1 text-right font-mono tabular-nums border-l border-purple-200/50 font-semibold ${yearlyEventCashflows[yr - 1] > 0 ? 'text-emerald-600' : yearlyEventCashflows[yr - 1] < 0 ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
+                    {yearlyEventCashflows[yr - 1] !== 0 ? formatCurrency(yearlyEventCashflows[yr - 1]) : '\u2014'}
                   </td>
                 )}
                 <td className="px-3 py-1 text-right font-mono tabular-nums text-amber-600">
-                  {box3Taxes[yr - 1] > 0 ? formatCurrency(box3Taxes[yr - 1]) : '—'}
+                  {box3Taxes[yr - 1] > 0 ? formatCurrency(box3Taxes[yr - 1]) : '\u2014'}
                 </td>
                 <td className="px-3 py-1 text-right font-mono tabular-nums text-amber-500">
-                  {cumulativeTax[yr - 1] > 0 ? formatCurrency(cumulativeTax[yr - 1]) : '—'}
+                  {cumulativeTax[yr - 1] > 0 ? formatCurrency(cumulativeTax[yr - 1]) : '\u2014'}
                 </td>
               </tr>
               )
@@ -1771,49 +1866,73 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
   // Crossover year for display purposes
   const crossoverYear = crossoverMonth != null ? Math.ceil(crossoverMonth / 12) : null
 
-  // ── Yearly life-event cashflow impacts (feature #663) ──
-  // For each projection year, compute the net cashflow from all active life events.
-  // Positive = income, negative = expense.
-  const yearlyEventCashflows = useMemo(() => {
-    if (!cashflows.length || currentAge == null) return Array(projectionYears).fill(0) as number[]
+  // ── Per-event yearly cashflow impacts (features #663, #670) ──
+  // Group cashflows by source life event, then compute per-event yearly cashflows.
+  // perEventYearlyCashflows[eventIdx][year] = net cashflow for that event in that year.
+  // yearlyEventCashflows[year] = aggregate across all events (backward compat).
 
+  /** Map each life event to its cashflows */
+  const eventCashflowGroups = useMemo(() => {
+    // Group cashflows by their source event ID (cashflow IDs contain the event ID)
+    const groups: { event: LifeEvent; cashflows: SimCashflow[] }[] = []
+    for (const ev of lifeEvents) {
+      const evCfs = cashflows.filter((cf) => cf.id.includes(ev.id))
+      if (evCfs.length > 0) groups.push({ event: ev, cashflows: evCfs })
+    }
+    // Also catch any cashflows that don't match a known event (defensive)
+    const matchedIds = new Set(groups.flatMap((g) => g.cashflows.map((c) => c.id)))
+    const unmatched = cashflows.filter((cf) => !matchedIds.has(cf.id))
+    if (unmatched.length > 0) {
+      groups.push({ event: { id: '_unmatched', name: 'Overig', icon: '📋' } as LifeEvent, cashflows: unmatched })
+    }
+    return groups
+  }, [lifeEvents, cashflows])
+
+  const perEventYearlyCashflows = useMemo(() => {
+    if (!eventCashflowGroups.length || currentAge == null) return [] as number[][]
     const inflationRate = fireParams.inflationRate
 
-    return Array.from({ length: projectionYears }, (_, yr) => {
-      // Year yr corresponds to ages [currentAge + yr, currentAge + yr + 1)
-      const yearStartAge = currentAge + yr
-      const yearEndAge = currentAge + yr + 1
-      let yearTotal = 0
+    return eventCashflowGroups.map((group) => {
+      return Array.from({ length: projectionYears }, (_, yr) => {
+        const yearStartAge = currentAge + yr
+        const yearEndAge = currentAge + yr + 1
+        let yearTotal = 0
 
-      for (const cf of cashflows) {
-        if (cf.type === 'one_time') {
-          // One-time: appears in the year where fromAge falls
-          if (cf.fromAge >= yearStartAge && cf.fromAge < yearEndAge) {
-            const yearsFromNow = cf.fromAge - currentAge
-            const inflationFactor = cf.indexed ? Math.pow(1 + inflationRate, yearsFromNow) : 1
-            const amount = cf.amount * inflationFactor
-            yearTotal += cf.direction === 'income' ? amount : -amount
-          }
-        } else {
-          // Recurring: active during overlap between [fromAge, toAge) and [yearStartAge, yearEndAge)
-          const cfEnd = cf.toAge ?? 999
-          const overlapStart = Math.max(cf.fromAge, yearStartAge)
-          const overlapEnd = Math.min(cfEnd, yearEndAge)
-          if (overlapStart < overlapEnd) {
-            // Fraction of year this cashflow is active (for partial years)
-            const months = Math.round((overlapEnd - overlapStart) * 12)
-            const yearsFromNow = yr
-            const inflationFactor = cf.indexed ? Math.pow(1 + inflationRate, yearsFromNow) : 1
-            const monthlyAmount = cf.amount * inflationFactor
-            const periodAmount = monthlyAmount * months
-            yearTotal += cf.direction === 'income' ? periodAmount : -periodAmount
+        for (const cf of group.cashflows) {
+          if (cf.type === 'one_time') {
+            if (cf.fromAge >= yearStartAge && cf.fromAge < yearEndAge) {
+              const yearsFromNow = cf.fromAge - currentAge
+              const inflationFactor = cf.indexed ? Math.pow(1 + inflationRate, yearsFromNow) : 1
+              const amount = cf.amount * inflationFactor
+              yearTotal += cf.direction === 'income' ? amount : -amount
+            }
+          } else {
+            const cfEnd = cf.toAge ?? 999
+            const overlapStart = Math.max(cf.fromAge, yearStartAge)
+            const overlapEnd = Math.min(cfEnd, yearEndAge)
+            if (overlapStart < overlapEnd) {
+              const months = Math.round((overlapEnd - overlapStart) * 12)
+              const yearsFromNow = yr
+              const inflationFactor = cf.indexed ? Math.pow(1 + inflationRate, yearsFromNow) : 1
+              const monthlyAmount = cf.amount * inflationFactor
+              const periodAmount = monthlyAmount * months
+              yearTotal += cf.direction === 'income' ? periodAmount : -periodAmount
           }
         }
       }
 
       return Math.round(yearTotal)
+      })
     })
-  }, [cashflows, currentAge, projectionYears, fireParams.inflationRate])
+  }, [eventCashflowGroups, currentAge, projectionYears, fireParams.inflationRate])
+
+  // Aggregate yearly event cashflows (sum across all events per year)
+  const yearlyEventCashflows = useMemo(() => {
+    if (!perEventYearlyCashflows.length) return Array(projectionYears).fill(0) as number[]
+    return Array.from({ length: projectionYears }, (_, yr) =>
+      perEventYearlyCashflows.reduce((sum, evCf) => sum + (evCf[yr] ?? 0), 0)
+    )
+  }, [perEventYearlyCashflows, projectionYears])
 
   const assetProjections = useMemo(() => {
     const result: { type: AssetType; label: string; columns: { label: string; rows: YearRow[] }[] }[] = []
@@ -1855,11 +1974,11 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
     return simulateAssetsWithEvents(
       assets,
       projectionYears * 12,
-      yearlyEventCashflows,
+      perEventYearlyCashflows,
       allocationStrategy,
       crossoverMonth,
     )
-  }, [assets, projectionYears, yearlyEventCashflows, allocationStrategy, crossoverMonth, hasEvents])
+  }, [assets, projectionYears, perEventYearlyCashflows, allocationStrategy, crossoverMonth, hasEvents])
 
   // Compute yearly totals with Box 3 tax impact on net worth.
   // When events exist, asset totals come from the event-adjusted simulation
@@ -2193,6 +2312,10 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
               projectionYears={projectionYears}
               crossoverYear={crossoverYear}
               yearlyEventCashflows={yearlyEventCashflows}
+              perEventYearlyCashflows={perEventYearlyCashflows}
+              eventGroups={eventCashflowGroups}
+              eventAllocations={eventAdjustedAssets?.yearlyEventAllocations ?? null}
+              assetNames={assets.map(a => a.name)}
             />
           </div>
         </div>
