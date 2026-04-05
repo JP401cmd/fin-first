@@ -766,13 +766,36 @@ function ProjectionChart({
           <line x1={padL} x2={width - padR} y1={y(0)} y2={y(0)} stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="6,3" />
         )}
 
-        {/* Crossover marker line */}
+        {/* Crossover marker line with label */}
         {crossoverIndex != null && (
-          <line
-            x1={x(crossoverIndex)} x2={x(crossoverIndex)}
-            y1={padT} y2={padT + chartH}
-            stroke="#8b5cf6" strokeWidth="1" strokeDasharray="4,4" opacity="0.5"
-          />
+          <g>
+            <line
+              x1={x(crossoverIndex)} x2={x(crossoverIndex)}
+              y1={padT} y2={padT + chartH}
+              stroke="#8b5cf6" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.7"
+            />
+            {/* Crossover dot on net worth line */}
+            <circle
+              cx={x(crossoverIndex)}
+              cy={y(data[crossoverIndex].netWorth)}
+              r="5" fill="#8b5cf6" stroke="white" strokeWidth="2"
+            />
+            {/* Crossover label */}
+            <g transform={`translate(${x(crossoverIndex)}, ${padT + 4})`}>
+              <rect
+                x="-40" y="-2" width="80" height="26" rx="4"
+                fill="var(--horizon-500, #8b5cf6)" opacity="0.9"
+              />
+              <text x="0" y="9" textAnchor="middle" className="fill-white text-[9px] font-bold">
+                {data[crossoverIndex].age != null ? `${data[crossoverIndex].age}j` : `Jaar ${data[crossoverIndex].year}`}
+              </text>
+              <text x="0" y="19" textAnchor="middle" className="fill-white text-[8px]" opacity="0.85">
+                {data[crossoverIndex].netWorth >= 1000000
+                  ? `€${(data[crossoverIndex].netWorth / 1000000).toFixed(1)}M`
+                  : `€${(data[crossoverIndex].netWorth / 1000).toFixed(0)}k`}
+              </text>
+            </g>
+          </g>
         )}
 
         {/* Cumulative savings area (light green, stops at crossover) */}
@@ -818,6 +841,12 @@ function ProjectionChart({
             fill="none" stroke="#10b981" strokeWidth="1.5" opacity="0.6"
           />
         )}
+
+        {/* Cumulative return line (groei) */}
+        <path
+          d={data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.cumulativeReturn).toFixed(1)}`).join(' ')}
+          fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="6,3" opacity="0.6"
+        />
 
         {/* Lines */}
         <path d={assetPath} fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7" />
