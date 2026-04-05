@@ -902,6 +902,51 @@ function ProjectionChart({
               )}
             </div>
 
+            {/* ── Verlies breakdown (color-coded matching area layers) ── */}
+            {hd.totalLoss > 0 && (
+              <div className="mt-1.5 border-t border-[var(--border-ed)] pt-1 space-y-0.5">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-semibold text-[var(--ink-2)]">Verlies dit jaar</span>
+                  <span className="font-mono text-[10px] font-bold tabular-nums text-red-600">
+                    -{formatCurrency(hd.totalLoss)}
+                  </span>
+                </div>
+                {hd.box3Tax > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                      <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: '#ef4444', opacity: 0.7 }} />
+                      Belasting
+                    </span>
+                    <span className="font-mono text-[10px] font-semibold tabular-nums text-red-600">
+                      -{formatCurrency(hd.box3Tax)}
+                    </span>
+                  </div>
+                )}
+                {hd.withdrawal > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                      <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: '#f97316', opacity: 0.7 }} />
+                      Onttrekking
+                    </span>
+                    <span className="font-mono text-[10px] font-semibold tabular-nums text-orange-600">
+                      -{formatCurrency(hd.withdrawal)}
+                    </span>
+                  </div>
+                )}
+                {hd.negativeLifeEvent > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                      <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: '#f59e0b', opacity: 0.7 }} />
+                      Events
+                    </span>
+                    <span className="font-mono text-[10px] font-semibold tabular-nums text-amber-600">
+                      -{formatCurrency(hd.negativeLifeEvent)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Bezittingen / schulden totals */}
             <div className="mt-1.5 border-t border-[var(--border-ed)] pt-1 space-y-0.5">
               <div className="flex items-center justify-between gap-4">
@@ -1177,167 +1222,220 @@ export function OverzichtClient({
             </div>
           </div>
 
-          {/* ── End Strategy Selector (Feature #677 — eindstrategie) ── */}
+          {/* ── Strategy Selectors — compact 2-column card grid (#683) ── */}
           <div className="mt-5 border-t border-[var(--border-ed)] pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Target className="h-3.5 w-3.5 text-horizon-500" />
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                Eindstrategie
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {END_STRATEGY_OPTIONS.map((opt) => {
-                const info = STRATEGY_LABELS[opt.key]
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={() => setEndStrategy(opt.key)}
-                    className={`rounded-lg border px-3 py-2 text-left transition-all ${
-                      endStrategy === opt.key
-                        ? 'border-horizon-400 bg-horizon-50/60 ring-1 ring-horizon-300'
-                        : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
-                    }`}
-                  >
-                    <span className={`block text-xs font-semibold ${
-                      endStrategy === opt.key ? 'text-horizon-700' : 'text-[var(--ink)]'
-                    }`}>
-                      {opt.icon} {info.name}
-                    </span>
-                    <span className="block mt-0.5 text-[10px] text-[var(--ink-4)] leading-tight">
-                      {info.subtitle}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            {endStrategy === 'legacy' && (
-              <div className="mt-3 flex items-center gap-2">
-                <label className="text-[10px] font-semibold text-[var(--ink-3)]">Nalatenschap:</label>
-                <input
-                  type="number"
-                  min={0}
-                  step={10000}
-                  value={legacyAmount}
-                  onChange={(e) => setLegacyAmount(Number(e.target.value))}
-                  className="w-32 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none"
-                />
-                <span className="text-[10px] text-[var(--ink-4)]">euro</span>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+              {/* Card 1: Eindstrategie */}
+              <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3.5">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-horizon-50 text-horizon-600">
+                    <Target className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink)]">Eindstrategie</p>
+                    <p className="text-[9px] text-[var(--ink-4)] leading-tight">Hoe ga je om met je vermogen?</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {END_STRATEGY_OPTIONS.map((opt) => {
+                    const info = STRATEGY_LABELS[opt.key]
+                    const isActive = endStrategy === opt.key
+                    return (
+                      <button
+                        key={opt.key}
+                        onClick={() => setEndStrategy(opt.key)}
+                        className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
+                          isActive
+                            ? 'border-horizon-400 bg-horizon-50/80 ring-1 ring-horizon-300'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                        }`}
+                      >
+                        <span className={`flex items-center gap-1 text-[11px] font-semibold ${
+                          isActive ? 'text-horizon-700' : 'text-[var(--ink)]'
+                        }`}>
+                          {isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-horizon-500" />}
+                          {opt.icon} {info.name}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {endStrategy === 'legacy' && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <label className="text-[10px] font-semibold text-[var(--ink-3)]">Nalatenschap:</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={10000}
+                      value={legacyAmount}
+                      onChange={(e) => setLegacyAmount(Number(e.target.value))}
+                      className="w-28 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1 font-mono text-xs tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-[var(--ink-4)]">€</span>
+                  </div>
+                )}
+                <p className="mt-2 text-[9px] text-[var(--ink-4)] leading-relaxed">
+                  {STRATEGY_LABELS[endStrategy].subtitle}
+                </p>
               </div>
-            )}
-          </div>
 
-          {/* ── Withdrawal Strategy Selector (Feature #673) ── */}
-          <div className="mt-5 border-t border-[var(--border-ed)] pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <ArrowDownRight className="h-3.5 w-3.5 text-horizon-500" />
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                Onttrekkingsstrategie
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {WITHDRAWAL_STRATEGIES.map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => setWithdrawalStrategy(s.key)}
-                  className={`rounded-lg border px-3 py-2 text-left transition-all ${
-                    withdrawalStrategy === s.key
-                      ? 'border-horizon-400 bg-horizon-50/60 ring-1 ring-horizon-300'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
-                  }`}
-                >
-                  <span className={`block text-xs font-semibold ${
-                    withdrawalStrategy === s.key ? 'text-horizon-700' : 'text-[var(--ink)]'
-                  }`}>
-                    {s.name}
-                  </span>
-                  <span className="block mt-0.5 text-[10px] text-[var(--ink-4)] leading-tight">
-                    {s.desc}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-[10px] text-[var(--ink-4)] leading-relaxed">
-              {WITHDRAWAL_STRATEGIES.find((s) => s.key === withdrawalStrategy)?.detail}
-            </p>
-          </div>
+              {/* Card 2: Onttrekkingsstrategie */}
+              <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3.5">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-horizon-50 text-horizon-600">
+                    <ArrowDownRight className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink)]">Onttrekkingsstrategie</p>
+                    <p className="text-[9px] text-[var(--ink-4)] leading-tight">Hoeveel onttrek je per jaar?</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {WITHDRAWAL_STRATEGIES.map((s) => {
+                    const isActive = withdrawalStrategy === s.key
+                    return (
+                      <button
+                        key={s.key}
+                        onClick={() => setWithdrawalStrategy(s.key)}
+                        className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
+                          isActive
+                            ? 'border-horizon-400 bg-horizon-50/80 ring-1 ring-horizon-300'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                        }`}
+                      >
+                        <span className={`flex items-center gap-1 text-[11px] font-semibold ${
+                          isActive ? 'text-horizon-700' : 'text-[var(--ink)]'
+                        }`}>
+                          {isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-horizon-500" />}
+                          {s.name}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-2 text-[9px] text-[var(--ink-4)] leading-relaxed">
+                  {WITHDRAWAL_STRATEGIES.find((s) => s.key === withdrawalStrategy)?.detail}
+                </p>
+              </div>
 
-          {/* ── Outflow Distribution Selector — afname (Feature #675 + #677) ── */}
-          <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Shuffle className="h-3.5 w-3.5 text-amber-500" />
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                Verdelingsstrategie afname
-              </label>
-            </div>
-            <p className="mb-3 text-[10px] text-[var(--ink-4)] leading-relaxed">
-              Hoe wordt uitgaand geld uit levensgebeurtenissen onttrokken uit je bezittingen?
-            </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {OUTFLOW_DISTRIBUTIONS.map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => setOutflowDistribution(s.key)}
-                  className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
-                    outflowDistribution === s.key
-                      ? 'border-amber-400 bg-amber-50/60 ring-1 ring-amber-300'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
-                  }`}
-                >
-                  <span className={`block text-xs font-semibold ${
-                    outflowDistribution === s.key ? 'text-amber-700' : 'text-[var(--ink)]'
-                  }`}>
-                    {s.name}
-                  </span>
-                  <span className="block mt-0.5 text-[10px] text-[var(--ink-4)] leading-tight">
-                    {s.desc}
-                  </span>
-                  <span className={`block mt-1 text-[9px] italic leading-tight ${
-                    outflowDistribution === s.key ? 'text-amber-600' : 'text-[var(--ink-4)]'
-                  }`}>
-                    {s.when}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+              {/* Card 3: Verdeling toename (inflow) */}
+              <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3.5">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink)]">Verdeling toename</p>
+                    <p className="text-[9px] text-[var(--ink-4)] leading-tight">Waar gaat binnenkomend geld naartoe?</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {DISTRIBUTION_STRATEGIES.map((s) => {
+                    const isActive = distributionStrategy === s.key
+                    return (
+                      <button
+                        key={s.key}
+                        onClick={() => setDistributionStrategy(s.key)}
+                        className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
+                          isActive
+                            ? 'border-emerald-400 bg-emerald-50/80 ring-1 ring-emerald-300'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                        }`}
+                      >
+                        <span className={`flex items-center gap-1 text-[11px] font-semibold ${
+                          isActive ? 'text-emerald-700' : 'text-[var(--ink)]'
+                        }`}>
+                          {isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                          {s.name}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-2 text-[9px] text-[var(--ink-4)] leading-relaxed">
+                  {DISTRIBUTION_STRATEGIES.find((s) => s.key === distributionStrategy)?.when}
+                </p>
+              </div>
 
-          {/* ── Withdrawal Order Selector — afbouw (Feature #676) ── */}
-          <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <ListOrdered className="h-3.5 w-3.5 text-red-500" />
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                Onttrekkingsvolgorde na stoppen met werken
-              </label>
-            </div>
-            <p className="mb-3 text-[10px] text-[var(--ink-4)] leading-relaxed">
-              In welke volgorde worden je bezittingen aangesproken tijdens de afbouwfase?
-            </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {WITHDRAWAL_ORDERS.map((o) => (
-                <button
-                  key={o.key}
-                  onClick={() => setWithdrawalOrder(o.key)}
-                  className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
-                    withdrawalOrder === o.key
-                      ? 'border-red-400 bg-red-50/60 ring-1 ring-red-300'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
-                  }`}
-                >
-                  <span className={`block text-xs font-semibold ${
-                    withdrawalOrder === o.key ? 'text-red-700' : 'text-[var(--ink)]'
-                  }`}>
-                    {o.name}
-                  </span>
-                  <span className="block mt-0.5 text-[10px] text-[var(--ink-4)] leading-tight">
-                    {o.desc}
-                  </span>
-                  <span className={`block mt-1 text-[9px] italic leading-tight ${
-                    withdrawalOrder === o.key ? 'text-red-600' : 'text-[var(--ink-4)]'
-                  }`}>
-                    {o.when}
-                  </span>
-                </button>
-              ))}
+              {/* Card 4: Verdeling afname (outflow) */}
+              <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3.5">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                    <Shuffle className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink)]">Verdeling afname</p>
+                    <p className="text-[9px] text-[var(--ink-4)] leading-tight">Waar komt uitgaand geld vandaan?</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {OUTFLOW_DISTRIBUTIONS.map((s) => {
+                    const isActive = outflowDistribution === s.key
+                    return (
+                      <button
+                        key={s.key}
+                        onClick={() => setOutflowDistribution(s.key)}
+                        className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
+                          isActive
+                            ? 'border-amber-400 bg-amber-50/80 ring-1 ring-amber-300'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                        }`}
+                      >
+                        <span className={`flex items-center gap-1 text-[11px] font-semibold ${
+                          isActive ? 'text-amber-700' : 'text-[var(--ink)]'
+                        }`}>
+                          {isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />}
+                          {s.name}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-2 text-[9px] text-[var(--ink-4)] leading-relaxed">
+                  {OUTFLOW_DISTRIBUTIONS.find((s) => s.key === outflowDistribution)?.when}
+                </p>
+              </div>
+
+              {/* Card 5: Onttrekkingsvolgorde — full-width bottom row */}
+              <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3.5 sm:col-span-2">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                    <ListOrdered className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink)]">Onttrekkingsvolgorde</p>
+                    <p className="text-[9px] text-[var(--ink-4)] leading-tight">Welke bezittingen worden eerst aangesproken na stoppen met werken?</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {WITHDRAWAL_ORDERS.map((o) => {
+                    const isActive = withdrawalOrder === o.key
+                    return (
+                      <button
+                        key={o.key}
+                        onClick={() => setWithdrawalOrder(o.key)}
+                        className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
+                          isActive
+                            ? 'border-red-400 bg-red-50/80 ring-1 ring-red-300'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                        }`}
+                      >
+                        <span className={`flex items-center gap-1 text-[11px] font-semibold ${
+                          isActive ? 'text-red-700' : 'text-[var(--ink)]'
+                        }`}>
+                          {isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500" />}
+                          {o.name}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-2 text-[9px] text-[var(--ink-4)] leading-relaxed">
+                  {WITHDRAWAL_ORDERS.find((o) => o.key === withdrawalOrder)?.when}
+                </p>
+              </div>
+
             </div>
           </div>
 
