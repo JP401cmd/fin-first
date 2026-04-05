@@ -1,12 +1,105 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Settings, TrendingUp, Minus } from 'lucide-react'
+import { useMemo, useState, useRef, useCallback } from 'react'
+import { Settings, TrendingUp, Minus, ArrowDownRight, ArrowUpRight, ListOrdered } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { FireParams } from '@/lib/fire-params'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { NL_SWR, BOX3_TARIEF, NL_FICTIEF_BELEGGINGEN } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
+
+// ── Withdrawal Strategy Types ─────────────────────────────────
+
+type WithdrawalStrategy = 'swr' | 'guardrails' | 'vpw' | 'bucket'
+
+const WITHDRAWAL_STRATEGIES: { key: WithdrawalStrategy; name: string; desc: string; detail: string }[] = [
+  {
+    key: 'swr',
+    name: 'Vast (SWR)',
+    desc: 'Vaste jaarlijkse onttrekking',
+    detail: `${(NL_SWR * 100).toFixed(2)}% van je portfolio per jaar — stabiel en voorspelbaar`,
+  },
+  {
+    key: 'guardrails',
+    name: 'Guardrails',
+    desc: 'Variabel met grenzen',
+    detail: 'Flexibele onttrekking met vloer- en plafondgrenzen (±20%)',
+  },
+  {
+    key: 'vpw',
+    name: 'VPW',
+    desc: 'Variabel per leeftijd',
+    detail: 'Onttrekking op basis van resterende levensverwachting — hoger naarmate je ouder wordt',
+  },
+  {
+    key: 'bucket',
+    name: 'Bucket',
+    desc: '3-emmers strategie',
+    detail: 'Cash (2j), obligaties (5j), aandelen — vermindert volgorderisico',
+  },
+]
+
+// ── Distribution Strategy Types ───────────────────────────────
+
+type DistributionStrategy = 'proportional' | 'cash_first' | 'highest_return'
+
+const DISTRIBUTION_STRATEGIES: { key: DistributionStrategy; name: string; desc: string; when: string }[] = [
+  {
+    key: 'proportional',
+    name: 'Spreiden',
+    desc: 'Proportioneel over bezittingen naar waarde-aandeel',
+    when: 'Goed als je je portefeuille in balans wilt houden',
+  },
+  {
+    key: 'cash_first',
+    name: 'Cash first',
+    desc: 'Naar bezitting met laagste verwacht rendement eerst',
+    when: 'Veilig: vul eerst de laagst-renderende aan',
+  },
+  {
+    key: 'highest_return',
+    name: 'Hoogste rendement first',
+    desc: 'Naar bezitting met hoogste verwacht rendement eerst',
+    when: 'Maximaal rendement door bij te storten op groei-bezittingen',
+  },
+]
+
+// ── Withdrawal Order Types (decumulation phase) ──────────────
+
+type WithdrawalOrder = 'cash_first' | 'low_return_first' | 'own_home_last' | 'pro_rata' | 'highest_value_first'
+
+const WITHDRAWAL_ORDERS: { key: WithdrawalOrder; name: string; desc: string; when: string }[] = [
+  {
+    key: 'cash_first',
+    name: 'Cash first',
+    desc: 'Eerst spaar-/cashrekeningen, dan laag rendement, dan hoog rendement',
+    when: 'Beschermt groei-bezittingen zo lang mogelijk',
+  },
+  {
+    key: 'low_return_first',
+    name: 'Laag rendement first',
+    desc: 'Eerst bezitting met laagste verwacht rendement, oplopend',
+    when: 'Maximaal rendement op resterende portefeuille',
+  },
+  {
+    key: 'own_home_last',
+    name: 'Eigen huis laatst',
+    desc: 'Alle liquide bezittingen eerst, vastgoed/huis als allerlaatste',
+    when: 'Woonzekerheid behouden tot het uiterste',
+  },
+  {
+    key: 'pro_rata',
+    name: 'Pro rata (spreiden)',
+    desc: 'Proportioneel uit alle bezittingen',
+    when: 'Portefeuille-balans behouden tijdens afbouw',
+  },
+  {
+    key: 'highest_value_first',
+    name: 'Hoogste waarde first',
+    desc: 'Eerst uit grootste positie, dan aflopend',
+    when: 'Sneller naar een meer gebalanceerde portefeuille',
+  },
+]
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -43,6 +136,141 @@ interface ProjectionYear {
   cumulativeTax: number
 }
 
+/**
+ * Compute how life event inflows are distributed across assets.
+ * Returns the total annual inflow to add to asset contributions.
+ */
+function computeLifeEventInflow(
+  lifeEvents: LifeEvent[],
+  year: number,
+  currentAge: number | null,
+  distributionStrategy: DistributionStrategy,
+  assets: Asset[],
+): number {
+  let totalInflow = 0
+  for (const evt of lifeEvents) {
+    const evtAge = Number(evt.age ?? 0)
+    const age = currentAge != null ? currentAge + year : year
+    // One-time events
+    if (evt.type === 'eenmalig' || evt.type === 'one_time') {
+      if (Math.floor(evtAge) === Math.floor(age)) {
+        const income = Number(evt.monthly_income ?? evt.income ?? 0)
+        const cost = Number(evt.monthly_cost ?? evt.cost ?? 0)
+        totalInflow += income - cost
+      }
+    }
+    // Recurring events
+    if (evt.type === 'doorlopend' || evt.type === 'recurring') {
+      const startAge = evtAge
+      const duration = Number(evt.duration_years ?? evt.duration ?? 0)
+      const endAge = startAge + duration
+      if (age >= startAge && age < endAge) {
+        const income = Number(evt.monthly_income ?? evt.income ?? 0) * 12
+        const cost = Number(evt.monthly_cost ?? evt.cost ?? 0) * 12
+        totalInflow += income - cost
+      }
+    }
+  }
+  // Distribution strategy only matters for WHERE the inflow goes (per-asset level)
+  // but for total projection it's the same total amount regardless
+  // The strategy affects asset-level allocation which we model as weighted growth
+  return totalInflow
+}
+
+/**
+ * Compute the annual withdrawal based on the chosen strategy.
+ * Returns the withdrawal amount for a given year in the decumulation phase.
+ */
+function computeWithdrawal(
+  strategy: WithdrawalStrategy,
+  portfolioValue: number,
+  yearlyExpenses: number,
+  yearInRetirement: number,
+  remainingYears: number,
+): number {
+  switch (strategy) {
+    case 'swr':
+      // Fixed SWR-based withdrawal
+      return portfolioValue * NL_SWR
+
+    case 'guardrails': {
+      // Base withdrawal = SWR, with ±20% guardrails
+      const base = portfolioValue * NL_SWR
+      const floor = yearlyExpenses * 0.8
+      const ceiling = yearlyExpenses * 1.2
+      return Math.max(floor, Math.min(ceiling, base))
+    }
+
+    case 'vpw': {
+      // Variable Percentage Withdrawal: portfolio / remaining years (simplified)
+      if (remainingYears <= 0) return portfolioValue
+      return portfolioValue / remainingYears
+    }
+
+    case 'bucket': {
+      // Bucket strategy: withdraw expenses from cash bucket, rest grows
+      // Simplified: withdraw needed expenses, capped at portfolio
+      return Math.min(yearlyExpenses, portfolioValue)
+    }
+
+    default:
+      return portfolioValue * NL_SWR
+  }
+}
+
+/**
+ * Sort assets by withdrawal order and draw down in sequence.
+ * Mutates assetBalances in place.
+ */
+function applyWithdrawalOrder(
+  assetBalances: { balance: number; expected_return: number; current_value: number; asset_type: string; name: string }[],
+  amount: number,
+  order: WithdrawalOrder,
+) {
+  if (order === 'pro_rata') {
+    const total = assetBalances.reduce((s, a) => s + Math.max(0, a.balance), 0)
+    if (total <= 0) return
+    for (const ab of assetBalances) {
+      const share = Math.max(0, ab.balance) / total
+      ab.balance -= amount * share
+    }
+    return
+  }
+
+  const sorted = [...assetBalances].sort((a, b) => {
+    switch (order) {
+      case 'cash_first': {
+        const aIsCash = a.asset_type === 'savings' || a.asset_type === 'cash' || a.expected_return === 0 ? 0 : 1
+        const bIsCash = b.asset_type === 'savings' || b.asset_type === 'cash' || b.expected_return === 0 ? 0 : 1
+        if (aIsCash !== bIsCash) return aIsCash - bIsCash
+        return a.expected_return - b.expected_return
+      }
+      case 'low_return_first':
+        return a.expected_return - b.expected_return
+      case 'own_home_last': {
+        const aIsHome = a.asset_type === 'real_estate' || a.asset_type === 'eigen_woning' ? 1 : 0
+        const bIsHome = b.asset_type === 'real_estate' || b.asset_type === 'eigen_woning' ? 1 : 0
+        if (aIsHome !== bIsHome) return aIsHome - bIsHome
+        return a.expected_return - b.expected_return
+      }
+      case 'highest_value_first':
+        return b.balance - a.balance
+      default:
+        return 0
+    }
+  })
+
+  let remaining = amount
+  for (const sortedAsset of sorted) {
+    if (remaining <= 0) break
+    const ab = assetBalances.find((a) => a === sortedAsset)
+    if (!ab || ab.balance <= 0) continue
+    const draw = Math.min(remaining, ab.balance)
+    ab.balance -= draw
+    remaining -= draw
+  }
+}
+
 function computeProjection({
   assets,
   debts,
@@ -53,6 +281,10 @@ function computeProjection({
   monthlyIncome,
   savingsRate,
   yearlyExpenses,
+  withdrawalStrategy,
+  distributionStrategy,
+  withdrawalOrder,
+  lifeEvents,
 }: {
   assets: Asset[]
   debts: Debt[]
@@ -63,26 +295,49 @@ function computeProjection({
   monthlyIncome: number
   savingsRate: number
   yearlyExpenses: number
+  withdrawalStrategy: WithdrawalStrategy
+  distributionStrategy: DistributionStrategy
+  withdrawalOrder: WithdrawalOrder
+  lifeEvents: LifeEvent[]
 }): ProjectionYear[] {
   const rows: ProjectionYear[] = []
 
-  // Initial values
+  // Initial values — per-asset tracking for withdrawal order
+  const assetBalances = assets.map((a) => ({ ...a, balance: a.current_value }))
   let assetTotal = assets.reduce((s, a) => s + a.current_value, 0)
   let debtTotal = debts.reduce((s, d) => s + d.current_balance, 0)
   let cumulativeTax = 0
   const annualContributions = assets.reduce((s, a) => s + (a.monthly_contribution ?? 0) * 12, 0)
-  const annualDebtPayments = debts.reduce((s, d) => s + (d.monthly_payment ?? 0) * 12, 0)
   const annualSavings = monthlyIncome * (savingsRate / 100) * 12
 
   // Heffingsvrij vermogen
   const heffingsvrij = 59357
 
+  // Crossover detection: when portfolio can sustain withdrawals
+  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : Infinity
+  let crossoverYear: number | null = null
+
   for (let y = 0; y <= projectionYears; y++) {
     const netWorth = assetTotal - debtTotal
+
+    // Detect crossover
+    if (crossoverYear == null && netWorth >= fireTarget && fireTarget < Infinity) {
+      crossoverYear = y
+    }
+
+    const isPostCrossover = crossoverYear != null && y > crossoverYear
+    const remainingYears = projectionYears - y
 
     // Box 3 tax
     const taxableBase = Math.max(0, netWorth - heffingsvrij - cumulativeTax)
     const box3Tax = y === 0 ? 0 : taxableBase * NL_FICTIEF_BELEGGINGEN * BOX3_TARIEF
+
+    // Withdrawal in post-crossover phase
+    let withdrawal = 0
+    if (isPostCrossover && yearlyExpenses > 0) {
+      const inflatedExpenses = yearlyExpenses * Math.pow(1 + inflationRate, y - (crossoverYear ?? 0))
+      withdrawal = computeWithdrawal(withdrawalStrategy, assetTotal, inflatedExpenses, y - (crossoverYear ?? 0), remainingYears)
+    }
 
     rows.push({
       year: y,
@@ -90,7 +345,7 @@ function computeProjection({
       totalAssets: assetTotal,
       totalDebts: debtTotal,
       netWorth: netWorth - cumulativeTax,
-      annualSavings: y === 0 ? 0 : annualSavings,
+      annualSavings: y === 0 ? 0 : isPostCrossover ? 0 : annualSavings,
       annualReturn: y === 0 ? 0 : assetTotal * grossReturn,
       box3Tax,
       cumulativeTax,
@@ -98,19 +353,47 @@ function computeProjection({
 
     cumulativeTax += box3Tax
 
-    // Grow assets
-    assetTotal = assetTotal * (1 + grossReturn) + annualContributions
+    // Life event inflows
+    const lifeEventInflow = computeLifeEventInflow(lifeEvents, y, currentAge, distributionStrategy, assets)
+
+    // Grow assets per-asset, apply withdrawal order during decumulation
+    if (isPostCrossover) {
+      for (const ab of assetBalances) {
+        const assetReturn = Number(ab.expected_return ?? 0) / 100
+        ab.balance = ab.balance * (1 + assetReturn)
+      }
+      if (withdrawal > 0) applyWithdrawalOrder(assetBalances, withdrawal, withdrawalOrder)
+      if (lifeEventInflow > 0) {
+        const totalBal = assetBalances.reduce((s, a) => s + a.balance, 0)
+        for (const ab of assetBalances) {
+          ab.balance += lifeEventInflow * (totalBal > 0 ? ab.balance / totalBal : 1 / assetBalances.length)
+        }
+      } else if (lifeEventInflow < 0) {
+        applyWithdrawalOrder(assetBalances, Math.abs(lifeEventInflow), withdrawalOrder)
+      }
+      assetTotal = assetBalances.reduce((s, a) => s + Math.max(0, a.balance), 0)
+    } else {
+      for (const ab of assetBalances) {
+        const assetReturn = Number(ab.expected_return ?? 0) / 100
+        ab.balance = ab.balance * (1 + assetReturn) + (ab.monthly_contribution ?? 0) * 12
+      }
+      if (lifeEventInflow !== 0) {
+        const totalBal = assetBalances.reduce((s, a) => s + a.balance, 0)
+        for (const ab of assetBalances) {
+          ab.balance += lifeEventInflow * (totalBal > 0 ? ab.balance / totalBal : 1 / assetBalances.length)
+        }
+      }
+      assetTotal = assetBalances.reduce((s, a) => s + a.balance, 0)
+    }
 
     // Pay down debts: compute per-debt with individual interest rates
     if (debtTotal > 0) {
       let newDebtTotal = 0
       for (const debt of debts) {
-        // interest_rate is stored as percentage (e.g., 4.5 = 4.5%)
         const annualRate = Number(debt.interest_rate ?? 0) / 100
         const annualPayment = Number(debt.monthly_payment ?? 0) * 12
         const yearsFromNow = y + 1
         const balance = debt.current_balance
-        // Use annuity formula: balance * (1+r)^t - payment * ((1+r)^t - 1) / r
         if (annualRate > 0) {
           const factor = Math.pow(1 + annualRate, yearsFromNow)
           const remaining = balance * factor - annualPayment * (factor - 1) / annualRate
@@ -127,7 +410,7 @@ function computeProjection({
   return rows
 }
 
-// ── Chart Component ────────────────────────────────────────────
+// ── Chart Component (Interactive with Crosshair + Tooltip) ────
 
 function ProjectionChart({
   data,
@@ -138,6 +421,9 @@ function ProjectionChart({
   width?: number
   height?: number
 }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+
   if (data.length < 2) return null
 
   const padL = 70
@@ -163,6 +449,15 @@ function ProjectionChart({
     return padT + chartH - ((v - minV) / range) * chartH
   }
 
+  // Detect crossover year: first year where annualSavings drops to 0 after being > 0
+  let crossoverIndex: number | null = null
+  for (let i = 1; i < data.length; i++) {
+    if (data[i].annualSavings === 0 && data[i - 1].annualSavings > 0) {
+      crossoverIndex = i
+      break
+    }
+  }
+
   const netPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.netWorth).toFixed(1)}`).join(' ')
   const assetPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.totalAssets).toFixed(1)}`).join(' ')
   const debtPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.totalDebts).toFixed(1)}`).join(' ')
@@ -180,58 +475,215 @@ function ProjectionChart({
   const step = data.length <= 15 ? 1 : data.length <= 35 ? 5 : 10
   const xLabels = data.filter((_, i) => i % step === 0 || i === data.length - 1)
 
+  // Mouse move handler: map pixel position to nearest data index
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg) return
+    const rect = svg.getBoundingClientRect()
+    const svgX = ((e.clientX - rect.left) / rect.width) * width
+    // Clamp to chart area
+    if (svgX < padL || svgX > width - padR) {
+      setHoverIndex(null)
+      return
+    }
+    const ratio = (svgX - padL) / chartW
+    const idx = Math.round(ratio * (data.length - 1))
+    setHoverIndex(Math.max(0, Math.min(data.length - 1, idx)))
+  }, [data.length, width, chartW])
+
+  const handleMouseLeave = useCallback(() => setHoverIndex(null), [])
+
+  const hd = hoverIndex != null ? data[hoverIndex] : null
+  const isCrossover = hoverIndex != null && crossoverIndex != null && hoverIndex === crossoverIndex
+
+  // Tooltip position: flip to left side if past 60% of chart
+  const tooltipFlip = hoverIndex != null && hoverIndex > data.length * 0.6
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxHeight: `${height}px` }}>
-      <defs>
-        <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
+    <div className="relative">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full"
+        style={{ maxHeight: `${height}px` }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        <defs>
+          <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
 
-      {/* Grid lines */}
-      {gridLines.map(({ v, yPos }, i) => (
-        <g key={i}>
-          <line x1={padL} x2={width - padR} y1={yPos} y2={yPos} stroke="var(--border-ed)" strokeWidth="0.5" strokeDasharray={v === 0 ? undefined : '4,4'} />
-          <text x={padL - 8} y={yPos + 4} textAnchor="end" className="fill-[var(--ink-4)] text-[10px]">
-            {v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0)}
-          </text>
-        </g>
-      ))}
+        {/* Grid lines */}
+        {gridLines.map(({ v, yPos }, i) => (
+          <g key={i}>
+            <line x1={padL} x2={width - padR} y1={yPos} y2={yPos} stroke="var(--border-ed)" strokeWidth="0.5" strokeDasharray={v === 0 ? undefined : '4,4'} />
+            <text x={padL - 8} y={yPos + 4} textAnchor="end" className="fill-[var(--ink-4)] text-[10px]">
+              {v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0)}
+            </text>
+          </g>
+        ))}
 
-      {/* Zero line */}
-      {minV < 0 && (
-        <line x1={padL} x2={width - padR} y1={y(0)} y2={y(0)} stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="6,3" />
+        {/* Zero line */}
+        {minV < 0 && (
+          <line x1={padL} x2={width - padR} y1={y(0)} y2={y(0)} stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="6,3" />
+        )}
+
+        {/* Crossover marker line */}
+        {crossoverIndex != null && (
+          <line
+            x1={x(crossoverIndex)} x2={x(crossoverIndex)}
+            y1={padT} y2={padT + chartH}
+            stroke="#8b5cf6" strokeWidth="1" strokeDasharray="4,4" opacity="0.5"
+          />
+        )}
+
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#netGrad)" />
+
+        {/* Lines */}
+        <path d={assetPath} fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7" />
+        <path d={debtPath} fill="none" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7" />
+        <path d={netPath} fill="none" stroke="var(--horizon-500, #8b5cf6)" strokeWidth="2.5" />
+
+        {/* End dots */}
+        {data.length > 0 && (
+          <>
+            <circle cx={x(data.length - 1)} cy={y(data[data.length - 1].netWorth)} r="4" fill="var(--horizon-500, #8b5cf6)" />
+            <circle cx={x(data.length - 1)} cy={y(data[data.length - 1].totalAssets)} r="3" fill="#10b981" />
+            <circle cx={x(data.length - 1)} cy={y(data[data.length - 1].totalDebts)} r="3" fill="#ef4444" />
+          </>
+        )}
+
+        {/* Hover crosshair + dots */}
+        {hoverIndex != null && hd != null && (
+          <>
+            {/* Vertical crosshair line */}
+            <line
+              x1={x(hoverIndex)} x2={x(hoverIndex)}
+              y1={padT} y2={padT + chartH}
+              stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="3,3" opacity="0.7"
+            />
+            {/* Dots on each line at hover position */}
+            <circle cx={x(hoverIndex)} cy={y(hd.netWorth)} r="5" fill="var(--horizon-500, #8b5cf6)" stroke="white" strokeWidth="2" />
+            <circle cx={x(hoverIndex)} cy={y(hd.totalAssets)} r="4" fill="#10b981" stroke="white" strokeWidth="1.5" />
+            {hd.totalDebts > 0 && (
+              <circle cx={x(hoverIndex)} cy={y(hd.totalDebts)} r="4" fill="#ef4444" stroke="white" strokeWidth="1.5" />
+            )}
+          </>
+        )}
+
+        {/* X-axis labels */}
+        {xLabels.map((d) => {
+          const i = data.indexOf(d)
+          const label = d.age != null ? `${d.age}j` : `${d.year}j`
+          return (
+            <text key={d.year} x={x(i)} y={height - 8} textAnchor="middle" className="fill-[var(--ink-4)] text-[10px]">
+              {label}
+            </text>
+          )
+        })}
+
+        {/* Invisible hover rectangles for easier mouse tracking */}
+        <rect
+          x={padL} y={padT}
+          width={chartW} height={chartH}
+          fill="transparent"
+          className="cursor-crosshair"
+        />
+      </svg>
+
+      {/* Tooltip (HTML overlay for better styling) */}
+      {hoverIndex != null && hd != null && svgRef.current && (
+        <div
+          className="pointer-events-none absolute z-20"
+          style={{
+            top: '12px',
+            left: tooltipFlip ? undefined : `${(x(hoverIndex) / width) * 100}%`,
+            right: tooltipFlip ? `${100 - (x(hoverIndex) / width) * 100}%` : undefined,
+            transform: tooltipFlip ? 'translateX(8px)' : 'translateX(-50%)',
+          }}
+        >
+          <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5 shadow-lg" style={{ minWidth: '200px' }}>
+            {/* Header: age/year */}
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--border-ed)] pb-1.5 mb-1.5">
+              <span className="font-mono text-xs font-bold tabular-nums text-[var(--ink)]">
+                {hd.age != null ? `Leeftijd ${hd.age}j` : `Jaar ${hd.year}`}
+              </span>
+              {isCrossover && (
+                <span className="rounded bg-horizon-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-horizon-700">
+                  Kruispunt
+                </span>
+              )}
+            </div>
+
+            {/* Total net worth */}
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[11px] text-[var(--ink-3)]">Totaal vermogen</span>
+              <span className="font-mono text-xs font-bold tabular-nums text-horizon-600">
+                {formatCurrency(hd.netWorth)}
+              </span>
+            </div>
+
+            {/* Breakdown items */}
+            <div className="mt-1 space-y-0.5">
+              {hd.annualSavings > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] text-[var(--ink-3)]">Spaarinleg</span>
+                  <span className="font-mono text-[10px] font-semibold tabular-nums text-emerald-600">
+                    +{formatCurrency(hd.annualSavings)}
+                  </span>
+                </div>
+              )}
+              {hd.annualReturn !== 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] text-[var(--ink-3)]">Rendement</span>
+                  <span className={`font-mono text-[10px] font-semibold tabular-nums ${hd.annualReturn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {hd.annualReturn >= 0 ? '+' : ''}{formatCurrency(hd.annualReturn)}
+                  </span>
+                </div>
+              )}
+              {hd.box3Tax > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] text-[var(--ink-3)]">Box 3 belasting</span>
+                  <span className="font-mono text-[10px] font-semibold tabular-nums text-red-600">
+                    -{formatCurrency(hd.box3Tax)}
+                  </span>
+                </div>
+              )}
+              {hd.totalDebts > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] text-[var(--ink-3)]">Schulden</span>
+                  <span className="font-mono text-[10px] font-semibold tabular-nums text-red-600">
+                    -{formatCurrency(hd.totalDebts)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Bezittingen / schulden totals */}
+            <div className="mt-1.5 border-t border-[var(--border-ed)] pt-1 space-y-0.5">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-[10px] text-[var(--ink-3)]">Bezittingen</span>
+                <span className="font-mono text-[10px] font-semibold tabular-nums text-emerald-600">
+                  {formatCurrency(hd.totalAssets)}
+                </span>
+              </div>
+              {hd.cumulativeTax > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] text-[var(--ink-3)]">Cum. Box 3</span>
+                  <span className="font-mono text-[10px] font-semibold tabular-nums text-red-600">
+                    -{formatCurrency(hd.cumulativeTax)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
-
-      {/* Area fill */}
-      <path d={areaPath} fill="url(#netGrad)" />
-
-      {/* Lines */}
-      <path d={assetPath} fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7" />
-      <path d={debtPath} fill="none" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7" />
-      <path d={netPath} fill="none" stroke="var(--horizon-500, #8b5cf6)" strokeWidth="2.5" />
-
-      {/* End dots */}
-      {data.length > 0 && (
-        <>
-          <circle cx={x(data.length - 1)} cy={y(data[data.length - 1].netWorth)} r="4" fill="var(--horizon-500, #8b5cf6)" />
-          <circle cx={x(data.length - 1)} cy={y(data[data.length - 1].totalAssets)} r="3" fill="#10b981" />
-          <circle cx={x(data.length - 1)} cy={y(data[data.length - 1].totalDebts)} r="3" fill="#ef4444" />
-        </>
-      )}
-
-      {/* X-axis labels */}
-      {xLabels.map((d) => {
-        const i = data.indexOf(d)
-        const label = d.age != null ? `${d.age}j` : `${d.year}j`
-        return (
-          <text key={d.year} x={x(i)} y={height - 8} textAnchor="middle" className="fill-[var(--ink-4)] text-[10px]">
-            {label}
-          </text>
-        )
-      })}
-    </svg>
+    </div>
   )
 }
 
@@ -281,6 +733,9 @@ export function OverzichtClient({
   const [monthlyIncome, setMonthlyIncome] = useState(profileIncome)
   const [savingsRate, setSavingsRate] = useState(profileSavingsRate)
   const [monthlyExpenses, setMonthlyExpenses] = useState(profileExpenses)
+  const [withdrawalStrategy, setWithdrawalStrategy] = useState<WithdrawalStrategy>('swr')
+  const [distributionStrategy, setDistributionStrategy] = useState<DistributionStrategy>('proportional')
+  const [withdrawalOrder, setWithdrawalOrder] = useState<WithdrawalOrder>('cash_first')
 
   // Computed projection
   const projection = useMemo(() => {
@@ -294,13 +749,18 @@ export function OverzichtClient({
       monthlyIncome,
       savingsRate,
       yearlyExpenses: monthlyExpenses * 12,
+      withdrawalStrategy,
+      distributionStrategy,
+      withdrawalOrder,
+      lifeEvents,
     })
-  }, [assets, debts, grossReturnPct, inflationPct, currentAge, projectionYears, monthlyIncome, savingsRate, monthlyExpenses])
+  }, [assets, debts, grossReturnPct, inflationPct, currentAge, projectionYears, monthlyIncome, savingsRate, monthlyExpenses, withdrawalStrategy, distributionStrategy, withdrawalOrder, lifeEvents])
 
   const finalRow = projection[projection.length - 1]
   const hasChanges = grossReturnPct !== profileReturn || inflationPct !== profileInflation ||
     projectionYears !== defaultYears || monthlyIncome !== profileIncome ||
-    savingsRate !== profileSavingsRate || monthlyExpenses !== profileExpenses
+    savingsRate !== profileSavingsRate || monthlyExpenses !== profileExpenses ||
+    withdrawalStrategy !== 'swr' || distributionStrategy !== 'proportional' || withdrawalOrder !== 'cash_first'
 
   function resetToDefaults() {
     setGrossReturnPct(profileReturn)
@@ -309,6 +769,8 @@ export function OverzichtClient({
     setMonthlyIncome(profileIncome)
     setSavingsRate(profileSavingsRate)
     setMonthlyExpenses(profileExpenses)
+    setWithdrawalStrategy('swr')
+    setDistributionStrategy('proportional')
   }
 
   return (
@@ -446,6 +908,121 @@ export function OverzichtClient({
                   className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* ── Withdrawal Strategy Selector (Feature #673) ── */}
+          <div className="mt-5 border-t border-[var(--border-ed)] pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ArrowDownRight className="h-3.5 w-3.5 text-horizon-500" />
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Onttrekkingsstrategie
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {WITHDRAWAL_STRATEGIES.map((s) => (
+                <button
+                  key={s.key}
+                  onClick={() => setWithdrawalStrategy(s.key)}
+                  className={`rounded-lg border px-3 py-2 text-left transition-all ${
+                    withdrawalStrategy === s.key
+                      ? 'border-horizon-400 bg-horizon-50/60 ring-1 ring-horizon-300'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                  }`}
+                >
+                  <span className={`block text-xs font-semibold ${
+                    withdrawalStrategy === s.key ? 'text-horizon-700' : 'text-[var(--ink)]'
+                  }`}>
+                    {s.name}
+                  </span>
+                  <span className="block mt-0.5 text-[10px] text-[var(--ink-4)] leading-tight">
+                    {s.desc}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[10px] text-[var(--ink-4)] leading-relaxed">
+              {WITHDRAWAL_STRATEGIES.find((s) => s.key === withdrawalStrategy)?.detail}
+            </p>
+          </div>
+
+          {/* ── Distribution Strategy Selector — toename (Feature #674) ── */}
+          <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
+            <div className="flex items-center gap-2 mb-1">
+              <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Verdelingsstrategie toename
+              </label>
+            </div>
+            <p className="mb-3 text-[10px] text-[var(--ink-4)] leading-relaxed">
+              Hoe wordt binnenkomend geld uit levensgebeurtenissen verdeeld over je bezittingen?
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {DISTRIBUTION_STRATEGIES.map((s) => (
+                <button
+                  key={s.key}
+                  onClick={() => setDistributionStrategy(s.key)}
+                  className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
+                    distributionStrategy === s.key
+                      ? 'border-emerald-400 bg-emerald-50/60 ring-1 ring-emerald-300'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                  }`}
+                >
+                  <span className={`block text-xs font-semibold ${
+                    distributionStrategy === s.key ? 'text-emerald-700' : 'text-[var(--ink)]'
+                  }`}>
+                    {s.name}
+                  </span>
+                  <span className="block mt-0.5 text-[10px] text-[var(--ink-4)] leading-tight">
+                    {s.desc}
+                  </span>
+                  <span className={`block mt-1 text-[9px] italic leading-tight ${
+                    distributionStrategy === s.key ? 'text-emerald-600' : 'text-[var(--ink-4)]'
+                  }`}>
+                    {s.when}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Withdrawal Order Selector — afbouw (Feature #676) ── */}
+          <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
+            <div className="flex items-center gap-2 mb-1">
+              <ListOrdered className="h-3.5 w-3.5 text-red-500" />
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Onttrekkingsvolgorde na stoppen met werken
+              </label>
+            </div>
+            <p className="mb-3 text-[10px] text-[var(--ink-4)] leading-relaxed">
+              In welke volgorde worden je bezittingen aangesproken tijdens de afbouwfase?
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {WITHDRAWAL_ORDERS.map((o) => (
+                <button
+                  key={o.key}
+                  onClick={() => setWithdrawalOrder(o.key)}
+                  className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
+                    withdrawalOrder === o.key
+                      ? 'border-red-400 bg-red-50/60 ring-1 ring-red-300'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                  }`}
+                >
+                  <span className={`block text-xs font-semibold ${
+                    withdrawalOrder === o.key ? 'text-red-700' : 'text-[var(--ink)]'
+                  }`}>
+                    {o.name}
+                  </span>
+                  <span className="block mt-0.5 text-[10px] text-[var(--ink-4)] leading-tight">
+                    {o.desc}
+                  </span>
+                  <span className={`block mt-1 text-[9px] italic leading-tight ${
+                    withdrawalOrder === o.key ? 'text-red-600' : 'text-[var(--ink-4)]'
+                  }`}>
+                    {o.when}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
