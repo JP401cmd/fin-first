@@ -1,3 +1,31 @@
+## Session 2026-04-05 - Features #634, #635
+
+### Feature #634: Opbouwgrafiek kleuren en legenda - PASSING
+- Updated color palette from emerald/teal/green to Horizon-harmonic indigo/violet/cyan/teal
+- Added interactive hover with vertical crosshair + tooltip showing per-layer values
+- Tooltip shows: year/month header, net worth, Bezittingen breakdown (per asset with color), Schulden breakdown (per debt with color), totals
+- Tooltip flips to left side when past 60% of chart width
+- Net worth dot (purple) on crosshair at hover position
+- Rendered StackedAreaChart as new "Bezittingen & schulden — individueel" section below SummaryChart
+- Legend with colored squares for all assets, debts, and net worth
+- Zero console errors
+
+### Feature #635: Opbouwgrafiek responsive en interactief - PASSING
+- Charts fill available width on desktop (SVG with w-full class)
+- Mobile: overflow-x-auto wrapper with min-w-[480px] for horizontal scrolling on small screens
+- Hover tooltip with all values per layer already implemented in #634
+- Fixed height via viewBox (300px) doesn't crowd tables below
+- Applied same responsive pattern to both SummaryChart and StackedAreaChart
+- Verified on mobile viewport (375x812) and desktop (1280x800)
+- Zero console errors
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — color palette + tooltip + responsive + StackedAreaChart rendering
+
+### Current Status
+- 2 features completed this session (#634, #635)
+- Overall progress: 680/683 passing (99.6%)
+
 ## Session 2026-04-05 - Features #683, #630
 
 ### Feature #683: Overzicht: instellingenpaneel layout - PASSING
