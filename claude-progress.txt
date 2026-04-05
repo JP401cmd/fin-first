@@ -1,3 +1,33 @@
+## Session 2026-04-05 - Features #673, #674
+
+### Feature #673: Overzicht: instelling onttrekkingsstrategie selector - PASSING
+- Added card-selector with 4 withdrawal strategy options: Vast (SWR 2.88%), Guardrails, VPW, Bucket
+- Each option has name, short description, and detailed explanation
+- Detail text dynamically updates when strategy changes
+- computeWithdrawal() function implements each strategy's math
+- Crossover detection: when net worth >= FIRE target, switches to post-crossover phase
+- Post-crossover: savings stop, withdrawals begin based on selected strategy
+- Chart automatically recalculates on strategy change
+- Zero console errors
+
+### Feature #674: Overzicht: instelling verdelingsstrategie toename - PASSING
+- Added card-selector with 3 distribution options: Spreiden, Cash first, Hoogste rendement first
+- Spreiden: proportional allocation to assets by value share
+- Cash first: to asset with lowest expected return first
+- Hoogste rendement first: to asset with highest expected return first
+- Each option shows description + contextual advice (when to use)
+- Uses emerald color theme to distinguish from withdrawal selector (horizon purple)
+- computeLifeEventInflow() integrates life events into projection
+- Chart automatically recalculates on distribution strategy change
+- Reset naar profiel button resets both selectors to defaults
+- Commit: 5d5cb3f6
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/overzicht/overzicht-client.tsx
+
+### Current Status
+- 2 features completed this session (#673, #674)
+
 ## Session 2026-04-05 - Features #663, #664
 
 ### Feature #663: Opbouw totaaltabel: levensgebeurtenissen kolom toevoegen - PASSING
@@ -22401,3 +22431,35 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#657, #671)
+
+## Session 2026-04-05 - Features #667, #669
+
+### Feature #667: Opbouw samenvattende grafiek: levensgebeurtenissen markers - PASSING
+- Added life event markers to the SummaryChart SVG component
+- Vertical dashed marker lines at target_age of each active event
+- Up arrows (green) for positive-impact events, down arrows (amber) for negative
+- Event icons + truncated names below x-axis, staggered to avoid overlap
+- Duration range shading (hatched rect) for recurring events
+- Hover tooltips showing event name, age, duration, and net financial impact
+- Tooltip detail line for one-time costs and monthly costs/income
+- Increased chart height to accommodate labels (220 → 250px viewBox)
+- Imported computeLifeEventNetImpact from horizon-data for impact classification
+- Zero console errors
+- Commit: 13671387
+
+### Feature #669: Opbouw totaaltabel: per levensgebeurtenis een eigen kolom - PASSING
+- Already implemented by concurrent agent (feature #664 scope)
+- Per-event columns with icon + name as header
+- Per-event yearly cashflows with inflation correction
+- Positive values (green), negative values (red), zero shows dash
+- Σ Events subtotal column when >1 event
+- Event allocation tooltips on hover showing per-asset distribution
+- Horizontal scrollable table via overflow-auto
+- Verified: 2 events (Vervroegd pensioen €-66k, AOW €27-45k indexed) rendering correctly
+- Zero console errors
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — SummaryChart markers
+
+### Current Status
+- 2 features completed this session (#667, #669)
