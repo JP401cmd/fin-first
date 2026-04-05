@@ -1,3 +1,32 @@
+## Session 2026-04-05 - Features #675, #676
+
+### Feature #675: Overzicht: instelling verdelingsstrategie afname - PASSING
+- Added card-selector with 3 options for outflow distribution: Spreiden, Cash first, Laagste rendement first
+- Each option shows description + "when" hint for user guidance
+- Updated OutflowDistribution type to include cash_first (replaces highest_value_first)
+- applyOutflowDistribution handles all 3 strategies: proportional, cash_first (lowest return assets first), lowest_return_first
+- Amber color theme distinguishes from withdrawal strategy (horizon) and withdrawal order (red)
+- Section labeled "Verdelingsstrategie afname" with subtitle explaining outflow context
+- Zero console errors
+
+### Feature #676: Overzicht: instelling onttrekkingsvolgorde na stoppen met werken - PASSING
+- Added card-selector with 5 options for decumulation withdrawal order
+- Options: Cash first, Laag rendement first, Eigen huis laatst, Pro rata (spreiden), Hoogste waarde first
+- Each option includes description + when-hint explaining optimal use case
+- applyWithdrawalOrder helper implements per-asset sequential drawdown with cascade logic
+- Pro rata option uses proportional withdrawal across all assets
+- Own-home-last prioritizes liquid assets, keeping real_estate/eigen_woning for last
+- Red color theme for section, matching the decumulation context
+- Both selectors wired into computeProjection for automatic chart recalculation
+- Zero console errors
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/overzicht/overzicht-client.tsx — distribution strategy + withdrawal order selectors
+
+### Current Status
+- 2 features completed this session (#675, #676)
+- Commit: 6014f347
+
 ## Session 2026-04-05 - Features #670, #672
 
 ### Feature #670: Opbouw totaaltabel: event-kolommen verdeling over bezittingen - PASSING
