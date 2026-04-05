@@ -76,26 +76,26 @@ const DISTRIBUTION_STRATEGIES: { key: DistributionStrategy; name: string; desc: 
 
 // ── Outflow Distribution Types (accumulation phase — life event costs) ──
 
-type OutflowDistribution = 'proportional' | 'lowest_return_first' | 'highest_value_first'
+type OutflowDistribution = 'proportional' | 'cash_first' | 'lowest_return_first'
 
 const OUTFLOW_DISTRIBUTIONS: { key: OutflowDistribution; name: string; desc: string; when: string }[] = [
   {
     key: 'proportional',
     name: 'Spreiden',
     desc: 'Proportioneel uit alle bezittingen naar waarde-aandeel',
-    when: 'Portefeuille-balans behouden',
+    when: 'Goed als je je portefeuille in balans wilt houden',
+  },
+  {
+    key: 'cash_first',
+    name: 'Cash first',
+    desc: 'Eerst uit bezitting met laagste verwacht rendement',
+    when: 'Slim als je renderende bezittingen wilt laten groeien',
   },
   {
     key: 'lowest_return_first',
-    name: 'Laag rendement first',
-    desc: 'Eerst uit bezitting met laagste verwacht rendement',
-    when: 'Beschermt je best-presterende bezittingen',
-  },
-  {
-    key: 'highest_value_first',
-    name: 'Hoogste waarde first',
-    desc: 'Eerst uit bezitting met hoogste actuele waarde',
-    when: 'Sneller naar gebalanceerde portefeuille',
+    name: 'Laagste rendement first',
+    desc: 'Uit laagste rendement bezitting, doorschuiven als leeg',
+    when: 'Maximaal rendement behouden op de langere termijn',
   },
 ]
 
@@ -172,6 +172,12 @@ interface ProjectionYear {
   cumulativeSavings: number
   lifeEventInflow: number
   cumulativeLifeEventInflow: number
+  /** Withdrawal amount in post-crossover (decumulation) phase */
+  withdrawal: number
+  /** Negative life event outflow (absolute value, always >= 0) */
+  negativeLifeEvent: number
+  /** Total loss: box3Tax + withdrawal + negativeLifeEvent */
+  totalLoss: number
 }
 
 /**
@@ -329,8 +335,13 @@ function applyOutflowDistribution(
   }
 
   const sorted = [...assetBalances].sort((a, b) => {
+    if (strategy === 'cash_first') {
+      const aIsCash = a.asset_type === 'savings' || a.asset_type === 'cash' || a.expected_return === 0 ? 0 : 1
+      const bIsCash = b.asset_type === 'savings' || b.asset_type === 'cash' || b.expected_return === 0 ? 0 : 1
+      if (aIsCash !== bIsCash) return aIsCash - bIsCash
+      return a.expected_return - b.expected_return
+    }
     if (strategy === 'lowest_return_first') return a.expected_return - b.expected_return
-    if (strategy === 'highest_value_first') return b.balance - a.balance
     return 0
   })
 
@@ -456,22 +467,34 @@ function computeProjection({
       withdrawal = computeWithdrawal(withdrawalStrategy, assetTotal, inflatedExpenses, y - (crossoverYear ?? 0), remainingYears)
     }
 
+    // Life event inflows (computed before push so chart can use it)
+    const lifeEventInflow = computeLifeEventInflow(lifeEvents, y, currentAge, distributionStrategy, assets)
+    const yearSavings = y === 0 ? 0 : isPostCrossover ? 0 : annualSavings
+    runningCumulativeSavings += yearSavings
+    const positiveLifeEventInflow = Math.max(0, lifeEventInflow)
+    const negativeLifeEvent = Math.abs(Math.min(0, lifeEventInflow))
+    runningCumulativeLifeEventInflow += positiveLifeEventInflow
+    const totalLoss = box3Tax + withdrawal + negativeLifeEvent
+
     rows.push({
       year: y,
       age: currentAge != null ? currentAge + y : null,
       totalAssets: assetTotal,
       totalDebts: debtTotal,
       netWorth: netWorth - cumulativeTax,
-      annualSavings: y === 0 ? 0 : isPostCrossover ? 0 : annualSavings,
+      annualSavings: yearSavings,
       annualReturn: y === 0 ? 0 : assetTotal * grossReturn,
       box3Tax,
       cumulativeTax,
+      cumulativeSavings: runningCumulativeSavings,
+      lifeEventInflow: positiveLifeEventInflow,
+      cumulativeLifeEventInflow: runningCumulativeLifeEventInflow,
+      withdrawal,
+      negativeLifeEvent,
+      totalLoss,
     })
 
     cumulativeTax += box3Tax
-
-    // Life event inflows
-    const lifeEventInflow = computeLifeEventInflow(lifeEvents, y, currentAge, distributionStrategy, assets)
 
     // Grow assets per-asset, apply withdrawal order during decumulation
     if (isPostCrossover) {
@@ -558,7 +581,10 @@ function ProjectionChart({
   const assetValues = data.map((d) => d.totalAssets)
   const debtValues = data.map((d) => d.totalDebts)
 
-  const allValues = [...values, ...assetValues, ...debtValues]
+  const lossValues = data.map((d) => -d.totalLoss)
+  const savingsValues = data.map((d) => d.cumulativeSavings)
+  const lifeEventValues = data.map((d) => d.cumulativeLifeEventInflow)
+  const allValues = [...values, ...assetValues, ...debtValues, ...savingsValues, ...lifeEventValues, ...lossValues]
   const minV = Math.min(0, ...allValues)
   const maxV = Math.max(...allValues)
   const range = maxV - minV || 1
@@ -585,6 +611,38 @@ function ProjectionChart({
 
   // Area under net worth
   const areaPath = `${netPath} L${x(data.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`
+
+  // Loss area: stacked layers below zero line
+  // Layer 1 (bottom): Box 3 belasting — from 0 to -box3Tax
+  // Layer 2 (middle): Onttrekkingen — from -box3Tax to -(box3Tax + withdrawal)
+  // Layer 3 (top): Neg. levensgebeurtenissen — from -(box3Tax + withdrawal) to -totalLoss
+  const hasLoss = data.some((d) => d.totalLoss > 0)
+
+  // Helper: build a filled area between two value-functions (top → bottom → back)
+  function stackedArea(topFn: (d: ProjectionYear) => number, bottomFn: (d: ProjectionYear) => number): string {
+    const forward = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(topFn(d)).toFixed(1)}`).join(' ')
+    const backward = [...data].reverse().map((d, i) => `${i === 0 ? 'L' : 'L'}${x(data.length - 1 - i).toFixed(1)},${y(bottomFn(d)).toFixed(1)}`).join(' ')
+    return `${forward} ${backward} Z`
+  }
+
+  const lossBox3Path = hasLoss ? stackedArea((d) => -d.box3Tax, () => 0) : ''
+  const lossWithdrawalPath = hasLoss ? stackedArea((d) => -(d.box3Tax + d.withdrawal), (d) => -d.box3Tax) : ''
+  const lossEventsPath = hasLoss ? stackedArea((d) => -d.totalLoss, (d) => -(d.box3Tax + d.withdrawal)) : ''
+
+  // Cumulative savings area (stops at crossover)
+  const savingsAreaPoints = data.filter((d, i) => {
+    if (crossoverIndex != null && i > crossoverIndex) return false
+    return true
+  })
+  const savingsAreaPath = savingsAreaPoints.length > 1
+    ? savingsAreaPoints.map((d, i) => {
+        const idx = data.indexOf(d)
+        return `${i === 0 ? 'M' : 'L'}${x(idx).toFixed(1)},${y(d.cumulativeSavings).toFixed(1)}`
+      }).join(' ') + ` L${x(data.indexOf(savingsAreaPoints[savingsAreaPoints.length - 1])).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`
+    : null
+
+  // Positive life event inflow markers (individual year spikes)
+  const lifeEventMarkers = data.filter((d) => d.lifeEventInflow > 0)
 
   // Grid lines (5 steps)
   const gridLines = Array.from({ length: 6 }, (_, i) => {
@@ -635,7 +693,26 @@ function ProjectionChart({
             <stop offset="0%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.2" />
             <stop offset="100%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.02" />
           </linearGradient>
+          <linearGradient id="savingsGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0.05" />
+          </linearGradient>
+          <linearGradient id="eventGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.08" />
+          </linearGradient>
         </defs>
+
+        {/* ── Loss areas (stacked below zero line) ── */}
+        {hasLoss && lossBox3Path && (
+          <path d={lossBox3Path} fill="#ef4444" opacity="0.25" />
+        )}
+        {hasLoss && lossWithdrawalPath && (
+          <path d={lossWithdrawalPath} fill="#f97316" opacity="0.2" />
+        )}
+        {hasLoss && lossEventsPath && (
+          <path d={lossEventsPath} fill="#f59e0b" opacity="0.18" />
+        )}
 
         {/* Grid lines */}
         {gridLines.map(({ v, yPos }, i) => (
@@ -661,8 +738,41 @@ function ProjectionChart({
           />
         )}
 
+        {/* Cumulative savings area (light green, stops at crossover) */}
+        {savingsAreaPath && (
+          <path d={savingsAreaPath} fill="url(#savingsGrad)" />
+        )}
+
+        {/* Positive life event inflow markers (purple spikes) */}
+        {lifeEventMarkers.map((d) => {
+          const idx = data.indexOf(d)
+          const barWidth = Math.max(3, chartW / data.length * 0.6)
+          return (
+            <rect
+              key={`evt-${d.year}`}
+              x={x(idx) - barWidth / 2}
+              y={y(d.lifeEventInflow)}
+              width={barWidth}
+              height={y(0) - y(d.lifeEventInflow)}
+              fill="url(#eventGrad)"
+              rx="1"
+            />
+          )
+        })}
+
         {/* Area fill */}
         <path d={areaPath} fill="url(#netGrad)" />
+
+        {/* Cumulative savings line */}
+        {savingsAreaPath && (
+          <path
+            d={savingsAreaPoints.map((d, i) => {
+              const idx = data.indexOf(d)
+              return `${i === 0 ? 'M' : 'L'}${x(idx).toFixed(1)},${y(d.cumulativeSavings).toFixed(1)}`
+            }).join(' ')}
+            fill="none" stroke="#10b981" strokeWidth="1.5" opacity="0.6"
+          />
+        )}
 
         {/* Lines */}
         <path d={assetPath} fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7" />
@@ -758,19 +868,27 @@ function ProjectionChart({
                   </span>
                 </div>
               )}
+              {hd.cumulativeSavings > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] text-[var(--ink-3)]">Cum. spaarinleg</span>
+                  <span className="font-mono text-[10px] font-semibold tabular-nums text-emerald-600">
+                    {formatCurrency(hd.cumulativeSavings)}
+                  </span>
+                </div>
+              )}
+              {hd.lifeEventInflow > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] text-[var(--ink-3)]">Inkomsten events</span>
+                  <span className="font-mono text-[10px] font-semibold tabular-nums text-purple-600">
+                    +{formatCurrency(hd.lifeEventInflow)}
+                  </span>
+                </div>
+              )}
               {hd.annualReturn !== 0 && (
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-[10px] text-[var(--ink-3)]">Rendement</span>
                   <span className={`font-mono text-[10px] font-semibold tabular-nums ${hd.annualReturn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {hd.annualReturn >= 0 ? '+' : ''}{formatCurrency(hd.annualReturn)}
-                  </span>
-                </div>
-              )}
-              {hd.box3Tax > 0 && (
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] text-[var(--ink-3)]">Box 3 belasting</span>
-                  <span className="font-mono text-[10px] font-semibold tabular-nums text-red-600">
-                    -{formatCurrency(hd.box3Tax)}
                   </span>
                 </div>
               )}
@@ -1143,7 +1261,7 @@ export function OverzichtClient({
             </p>
           </div>
 
-          {/* ── Distribution Strategy Selector — afname (Feature #675) ── */}
+          {/* ── Outflow Distribution Selector — afname (Feature #675 + #677) ── */}
           <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
             <div className="flex items-center gap-2 mb-1">
               <Shuffle className="h-3.5 w-3.5 text-amber-500" />
@@ -1160,13 +1278,13 @@ export function OverzichtClient({
                   key={s.key}
                   onClick={() => setOutflowDistribution(s.key)}
                   className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
-                    distributionStrategy === s.key
+                    outflowDistribution === s.key
                       ? 'border-amber-400 bg-amber-50/60 ring-1 ring-amber-300'
                       : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
                   }`}
                 >
                   <span className={`block text-xs font-semibold ${
-                    distributionStrategy === s.key ? 'text-amber-700' : 'text-[var(--ink)]'
+                    outflowDistribution === s.key ? 'text-amber-700' : 'text-[var(--ink)]'
                   }`}>
                     {s.name}
                   </span>
@@ -1174,7 +1292,7 @@ export function OverzichtClient({
                     {s.desc}
                   </span>
                   <span className={`block mt-1 text-[9px] italic leading-tight ${
-                    distributionStrategy === s.key ? 'text-amber-600' : 'text-[var(--ink-4)]'
+                    outflowDistribution === s.key ? 'text-amber-600' : 'text-[var(--ink-4)]'
                   }`}>
                     {s.when}
                   </span>
@@ -1261,8 +1379,23 @@ export function OverzichtClient({
         </div>
 
         <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
+          {/* Active strategy summary badges */}
+          <div className="mb-4 flex flex-wrap gap-2 text-[10px]">
+            <span className="rounded-full bg-horizon-50 px-2.5 py-0.5 font-medium text-horizon-700">
+              {STRATEGY_LABELS[endStrategy].name}
+            </span>
+            <span className="rounded-full bg-horizon-50 px-2.5 py-0.5 font-medium text-horizon-700">
+              {WITHDRAWAL_STRATEGIES.find((s) => s.key === withdrawalStrategy)?.name}
+            </span>
+            {crossoverRow && (
+              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 font-medium text-emerald-700">
+                Kruispunt: {crossoverRow.age != null ? `${crossoverRow.age}j` : `jaar ${crossoverRow.year}`}
+              </span>
+            )}
+          </div>
+
           {/* Key metrics */}
-          <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-5">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Start netto vermogen</p>
               <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
@@ -1277,6 +1410,14 @@ export function OverzichtClient({
                 finalRow && finalRow.netWorth >= 0 ? 'text-emerald-600' : 'text-red-600'
               }`}>
                 {finalRow ? formatCurrency(finalRow.netWorth) : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Kruispunt</p>
+              <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-horizon-600">
+                {crossoverRow
+                  ? crossoverRow.age != null ? `${crossoverRow.age} jaar` : `jaar ${crossoverRow.year}`
+                  : '—'}
               </p>
             </div>
             <div>
@@ -1297,7 +1438,7 @@ export function OverzichtClient({
           <ProjectionChart data={projection} />
 
           {/* Legend */}
-          <div className="mt-3 flex items-center gap-4 border-t border-[var(--border-ed)] pt-3 text-[11px] text-[var(--ink-3)]">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--border-ed)] pt-3 text-[11px] text-[var(--ink-3)]">
             <span className="flex items-center gap-1.5">
               <Minus className="h-3 w-5 text-[#8b5cf6]" strokeWidth={3} />
               Netto vermogen
@@ -1309,6 +1450,14 @@ export function OverzichtClient({
             <span className="flex items-center gap-1.5">
               <Minus className="h-3 w-5 text-red-500" strokeWidth={1.5} strokeDasharray="4,3" />
               Schulden
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-5 rounded-sm bg-emerald-500/20 border border-emerald-500/40" />
+              Spaarinleg
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-5 rounded-sm bg-purple-400/25 border border-purple-400/40" />
+              Inkomsten events
             </span>
           </div>
         </div>
