@@ -1,3 +1,36 @@
+## Session 2026-04-05 - Features #663, #664
+
+### Feature #663: Opbouw totaaltabel: levensgebeurtenissen kolom toevoegen - PASSING
+- Fetched life events from Supabase in page.tsx, converted to SimCashflow[] via lifeEventsToCashflows
+- Computed yearly net cashflow impact per projection year with inflation indexing
+- Added 'Events' column to TotalTable between Netto vermogen and Box 3 belasting
+- One-time events appear only in the year where target_age falls
+- Recurring events computed with fromAge/toAge overlap per year
+- Green (emerald-600) for positive amounts, red (red-500) for negative, dash for zero
+- Column only shown when any life events produce non-zero cashflows
+- Zero console errors
+
+### Feature #664: Opbouw totaaltabel: events impact op bezittingen via toename-strategie - PASSING
+- Updated AllocationStrategy type to: spreiden | cash_first | hoogste_rendement
+- applyDeposit(): distributes positive cashflows to assets per chosen strategy
+- applyWithdrawal(): withdraws negative cashflows from assets per strategy
+- Spreiden: proportional distribution by current value share
+- Cash first: add/remove from lowest expected_return asset first
+- Hoogste rendement: add/remove from highest expected_return asset first
+- simulateAssetsWithEvents uses both applyDeposit and applyWithdrawal
+- Strategy selector UI with 3 buttons (Spreiden/Cash first/Hoogste rendement)
+- Asset totals in TotalTable reflect event-adjusted values with monthly compounding
+- Verified values change between strategies (e.g., yr 30: €4.858.923 vs €4.845.877)
+- Zero console errors
+- Commits: db7287c1, 195f31cf
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/page.tsx — load life_events, pass cashflows
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — events column, allocation strategy
+
+### Current Status
+- 2 features completed this session (#663, #664)
+
 ## Session 2026-04-05 - Features #665, #666
 
 ### Feature #665: Opbouw totaaltabel: events impact op bezittingen via afname-strategie - PASSING
