@@ -398,6 +398,8 @@ function StackedAreaChart({
 }) {
   const totalMonths = projectionYears * 12
   const monthlySavings = profileMonthlyIncome * (profileSavingsRate / 100)
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   // Build series data
   const series: StackedSeries[] = useMemo(() => {
@@ -508,9 +510,9 @@ function StackedAreaChart({
       let topLine = ''
       let bottomLine = ''
       for (let i = 0; i < numPts; i++) {
-        const x = toX(i).toFixed(1)
-        topLine += `${i === 0 ? 'M' : 'L'}${x},${toY(tops[i]).toFixed(1)} `
-        bottomLine = `L${x},${toY(stackedBottoms[i]).toFixed(1)} ` + bottomLine
+        const xCoord = toX(i).toFixed(1)
+        topLine += `${i === 0 ? 'M' : 'L'}${xCoord},${toY(tops[i]).toFixed(1)} `
+        bottomLine = `L${xCoord},${toY(stackedBottoms[i]).toFixed(1)} ` + bottomLine
       }
       bottomLine = bottomLine.replace(/^L/, 'L')
 
@@ -543,9 +545,9 @@ function StackedAreaChart({
       let topLine = ''
       let bottomLine = ''
       for (let i = 0; i < numPts; i++) {
-        const x = toX(i).toFixed(1)
-        topLine += `${i === 0 ? 'M' : 'L'}${x},${toY(-tops[i]).toFixed(1)} `
-        bottomLine = `L${x},${toY(-stackedBottoms[i]).toFixed(1)} ` + bottomLine
+        const xCoord = toX(i).toFixed(1)
+        topLine += `${i === 0 ? 'M' : 'L'}${xCoord},${toY(-tops[i]).toFixed(1)} `
+        bottomLine = `L${xCoord},${toY(-stackedBottoms[i]).toFixed(1)} ` + bottomLine
       }
       bottomLine = bottomLine.replace(/^L/, 'L')
 
@@ -605,12 +607,54 @@ function StackedAreaChart({
   const legendItems = [
     ...assetSeries.map((s) => ({ label: s.label, color: s.color })),
     ...debtSeries.map((s) => ({ label: s.label, color: s.color })),
-    { label: 'Netto vermogen', color: 'var(--color-horizon-500)' },
+    { label: 'Netto vermogen', color: '#8b5cf6' },
   ]
 
+  // ── Hover handlers ──
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGRectElement>) => {
+    const svg = svgRef.current
+    if (!svg) return
+    const rect = svg.getBoundingClientRect()
+    const mouseX = ((e.clientX - rect.left) / rect.width) * w
+    // Find nearest sample point index
+    let closest = 0
+    let closestDist = Infinity
+    for (let i = 0; i < numPts; i++) {
+      const dist = Math.abs(toX(i) - mouseX)
+      if (dist < closestDist) {
+        closestDist = dist
+        closest = i
+      }
+    }
+    setHoverIdx(closest)
+  }, [numPts, w])
+
+  const handleMouseLeave = useCallback(() => setHoverIdx(null), [])
+
+  // ── Tooltip data for hovered point ──
+  const hoverData = useMemo(() => {
+    if (hoverIdx == null) return null
+    const pt = samplePoints[hoverIdx]
+    const month = pt + 1
+    const year = Math.ceil(month / 12)
+    const items: { label: string; value: number; color: string; side: 'asset' | 'debt' | 'savings' }[] = []
+    let totalAssets = 0
+    let totalDebts = 0
+    for (const s of series) {
+      const val = s.values[pt] ?? 0
+      items.push({ label: s.label, value: val, color: s.color, side: s.side })
+      if (s.side === 'asset' || s.side === 'savings') totalAssets += val
+      if (s.side === 'debt') totalDebts += val
+    }
+    return { year, month, items, totalAssets, totalDebts, netWorth: totalAssets - totalDebts }
+  }, [hoverIdx, samplePoints, series])
+
+  // Tooltip flip (show left of crosshair when past 60%)
+  const tooltipFlip = hoverIdx != null && hoverIdx > numPts * 0.6
+
   return (
-    <div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" aria-label="Stacked area grafiek">
+    <div className="relative">
+      <svg ref={svgRef} viewBox={`0 0 ${w} ${h}`} className="w-full" aria-label="Stacked area grafiek">
         {/* Grid lines */}
         {yGridLines.map(({ y, val }) => (
           <g key={val}>
@@ -639,8 +683,121 @@ function StackedAreaChart({
           <path key={`neg-${label}`} d={path} fill={color} fillOpacity={0.3} stroke={color} strokeWidth={0.5} />
         ))}
         {/* Net worth line */}
-        <path d={netLine} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2.5} />
+        <path d={netLine} fill="none" stroke="#8b5cf6" strokeWidth={2.5} />
+
+        {/* ── Hover crosshair + dots ── */}
+        {hoverIdx != null && hoverData != null && (
+          <>
+            <line
+              x1={toX(hoverIdx)} x2={toX(hoverIdx)}
+              y1={py} y2={h - py}
+              stroke="var(--ink-3)" strokeWidth={0.75} strokeDasharray="3 2"
+            />
+            {/* Net worth dot */}
+            <circle cx={toX(hoverIdx)} cy={toY(hoverData.netWorth)} r={4} fill="#8b5cf6" stroke="white" strokeWidth={1.5} />
+          </>
+        )}
+
+        {/* Invisible hover rect for mouse tracking */}
+        <rect
+          x={px} y={py}
+          width={w - 2 * px} height={h - 2 * py}
+          fill="transparent"
+          className="cursor-crosshair"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        />
       </svg>
+
+      {/* ── Tooltip (HTML overlay) ── */}
+      {hoverIdx != null && hoverData != null && (
+        <div
+          className="pointer-events-none absolute z-20"
+          style={{
+            top: '8px',
+            left: tooltipFlip ? undefined : `${(toX(hoverIdx) / w) * 100}%`,
+            right: tooltipFlip ? `${100 - (toX(hoverIdx) / w) * 100}%` : undefined,
+            transform: tooltipFlip ? 'translateX(8px)' : 'translateX(-50%)',
+          }}
+        >
+          <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5 shadow-lg" style={{ minWidth: '190px' }}>
+            {/* Header */}
+            <div className="border-b border-[var(--border-ed)] pb-1.5 mb-1.5">
+              <span className="font-mono text-xs font-bold tabular-nums text-[var(--ink)]">
+                Jaar {hoverData.year} · mnd {hoverData.month}
+              </span>
+            </div>
+
+            {/* Net worth */}
+            <div className="flex items-center justify-between gap-4">
+              <span className="flex items-center gap-1.5 text-[11px] text-[var(--ink-3)]">
+                <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: '#8b5cf6' }} />
+                Netto vermogen
+              </span>
+              <span className="font-mono text-xs font-bold tabular-nums" style={{ color: '#8b5cf6' }}>
+                {formatCurrency(hoverData.netWorth)}
+              </span>
+            </div>
+
+            {/* Assets breakdown */}
+            {hoverData.items.filter((it) => it.side === 'asset' || it.side === 'savings').length > 0 && (
+              <div className="mt-1.5 space-y-0.5">
+                <div className="text-[9px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Bezittingen</div>
+                {hoverData.items
+                  .filter((it) => it.side === 'asset' || it.side === 'savings')
+                  .map((it) => (
+                    <div key={it.label} className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                        <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: it.color, opacity: 0.8 }} />
+                        <span className="truncate max-w-[100px]">{it.label}</span>
+                      </span>
+                      <span className="font-mono text-[10px] font-semibold tabular-nums text-emerald-600">
+                        {formatCurrency(it.value)}
+                      </span>
+                    </div>
+                  ))}
+                {hoverData.items.filter((it) => it.side === 'asset' || it.side === 'savings').length > 1 && (
+                  <div className="flex items-center justify-between gap-3 border-t border-[var(--border-ed)] pt-0.5">
+                    <span className="text-[10px] font-medium text-[var(--ink-3)]">Totaal</span>
+                    <span className="font-mono text-[10px] font-bold tabular-nums text-emerald-700">
+                      {formatCurrency(hoverData.totalAssets)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Debts breakdown */}
+            {hoverData.items.filter((it) => it.side === 'debt').length > 0 && (
+              <div className="mt-1.5 space-y-0.5">
+                <div className="text-[9px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Schulden</div>
+                {hoverData.items
+                  .filter((it) => it.side === 'debt')
+                  .map((it) => (
+                    <div key={it.label} className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                        <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: it.color, opacity: 0.8 }} />
+                        <span className="truncate max-w-[100px]">{it.label}</span>
+                      </span>
+                      <span className="font-mono text-[10px] font-semibold tabular-nums text-red-600">
+                        -{formatCurrency(it.value)}
+                      </span>
+                    </div>
+                  ))}
+                {hoverData.items.filter((it) => it.side === 'debt').length > 1 && (
+                  <div className="flex items-center justify-between gap-3 border-t border-[var(--border-ed)] pt-0.5">
+                    <span className="text-[10px] font-medium text-[var(--ink-3)]">Totaal</span>
+                    <span className="font-mono text-[10px] font-bold tabular-nums text-red-700">
+                      -{formatCurrency(hoverData.totalDebts)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-2">
         {legendItems.map(({ label, color }) => (
@@ -2175,14 +2332,39 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
             Vermogensprojectie — {projectionYears} jaar
           </h2>
-          <SummaryChart
-            assetTotals={assetTotals}
-            debtTotals={debtTotals}
-            netTotals={netTotals}
-            projectionYears={projectionYears}
-            lifeEvents={lifeEvents}
-            currentAge={currentAge}
-          />
+          <div className="overflow-x-auto -mx-2 px-2">
+            <div className="min-w-[480px]">
+              <SummaryChart
+                assetTotals={assetTotals}
+                debtTotals={debtTotals}
+                netTotals={netTotals}
+                projectionYears={projectionYears}
+                lifeEvents={lifeEvents}
+                currentAge={currentAge}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section 2b: Stacked area chart per bezitting/schuld */}
+      {(hasAssets || hasDebts) && (
+        <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Bezittingen &amp; schulden — individueel
+          </h2>
+          <div className="overflow-x-auto -mx-2 px-2">
+            <div className="min-w-[480px]">
+              <StackedAreaChart
+                assets={assets}
+                debts={debts}
+                profileMonthlyIncome={profileMonthlyIncome}
+                profileSavingsRate={profileSavingsRate}
+                projectionYears={projectionYears}
+                crossoverMonth={crossoverMonth}
+              />
+            </div>
+          </div>
         </div>
       )}
 
