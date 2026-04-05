@@ -1,3 +1,36 @@
+## Session 2026-04-05 - Features #677, #678
+
+### Feature #677: Overzicht: alle instellingen sturen berekeningen aan - PASSING
+- Added eindstrategie selector (perpetual/legacy/deplete/pensioen) with FIRE target calculation per strategy
+- Added verdelingsstrategie toename section for positive life event inflows
+- Rewired verdelingsstrategie afname with new OutflowDistribution type (proportional/lowest_return_first/cash_first)
+- All 5 strategy settings wired into computeProjection via useMemo dependencies
+- Crossover recalculated based on chosen end strategy (different FIRE targets per strategy)
+- Strategy summary badges and crossover metric in projection section
+- Reset naar profiel button restores all 5 settings to profile defaults
+- Legacy amount input shown conditionally when Erfenis strategy selected
+- Zero console errors
+- Commit: 53560779
+
+### Feature #678: Overzicht: samenvattende grafiek met pad, opbouw, groei en verlies - PASSING
+- Split net worth area into opbouw (purple gradient) and afbouw (teal gradient) phases at crossover
+- Added cumulative return (groei) as stacked green area showing portfolio growth over time
+- Verlies negative area with stacked layers: Box 3 tax (red), withdrawals (orange), negative events (amber)
+- Crossover marker with vertical dashed line, dot on net worth line, and labeled badge (age + portfolio value)
+- Updated legend: Pad (netto vermogen), Opbouw, Afbouw, Groei (rendement), Verlies, Bezittingen, Schulden
+- Added cumulativeReturn tracking to ProjectionYear interface and computation loop
+- Tooltip shows cumulative groei with green color-coded swatch
+- X-axis: leeftijd (35j-100j), Y-axis: euro amounts with grid
+- Verified: crossover at 44j with €1.6M portfolio, opbouw/afbouw split visible
+- Zero console errors
+- Commit: 3037cc87
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/overzicht/overzicht-client.tsx — all changes in single file
+
+### Current Status
+- 2 features completed this session (#677, #678)
+
 ## Session 2026-04-05 - Features #675, #676
 
 ### Feature #675: Overzicht: instelling verdelingsstrategie afname - PASSING
@@ -22561,3 +22594,40 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#668, #682)
+
+## Session 2026-04-05 - Feature #684
+
+### Feature #684: Doorrekening Test volledige navigatiestructuur zichtbaar maken - PASSING
+- Already fully implemented by previous sessions — no code changes needed
+- Verified: /horizon/doorrekening-test layout page with tab navigation (redirects to /opbouw)
+- Verified: All 4 tabs visible and clickable (Opbouw, Afbouw, Gebeurtenissen, Overzicht)
+- Verified: Each tab navigates to correct subpage URL
+- Verified: All subpages have full content (not placeholders)
+- Verified: Doorrekening Test link/card exists on /horizon page
+- Verified: Horizon purple theme styling (active tab border-horizon-500)
+- Verified: Zero console errors
+- Overall progress: 674/683 passing (98.7%)
+
+## Session 2026-04-05 - Feature #681
+
+### Feature #681: Overzicht grafiek: verlies-area toont belasting, onttrekkingen en kosten - PASSING
+- Extended ProjectionYear with withdrawal, negativeLifeEvent, totalLoss fields
+- Added stacked loss area below zero line in ProjectionChart SVG:
+  - Layer 1 (red #ef4444): Box 3 belasting
+  - Layer 2 (orange #f97316): Onttrekkingen (post-crossover)
+  - Layer 3 (amber #f59e0b): Negative life events
+- Used stackedArea helper for proper SVG path generation
+- Updated tooltip with "Verlies dit jaar" section showing:
+  - Total loss amount in bold red
+  - Color-coded breakdown with indicator squares matching chart colors
+  - Belasting (red), Onttrekking (orange), Events (amber)
+- Removed duplicate Box 3 belasting line from original tooltip breakdown
+- Loss area scales dynamically with all chart data for proper y-axis range
+- Zero console errors
+- Commit: 6ef61390
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/overzicht/overzicht-client.tsx
+
+### Current Status
+- 1 feature completed this session (#681)
