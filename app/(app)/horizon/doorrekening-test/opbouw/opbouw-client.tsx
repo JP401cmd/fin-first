@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef } from 'react'
 import { ChevronDown, ChevronRight, TrendingUp, Landmark, PiggyBank, BarChart3 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { ASSET_TYPE_LABELS, type Asset, type AssetType } from '@/lib/asset-data'
@@ -354,24 +354,25 @@ function simulateAssetsWithEvents(
 
 // ── Stacked area chart (feature #633) ───────────────────────
 
+// Horizon-purple-harmonieus palet: indigo → violet → cyan → teal
 const ASSET_COLORS = [
-  'var(--color-emerald-500)',
-  'var(--color-emerald-400)',
-  'var(--color-emerald-300)',
-  'var(--color-teal-500)',
-  'var(--color-teal-400)',
-  'var(--color-teal-300)',
-  'var(--color-green-500)',
-  'var(--color-green-400)',
+  '#6366f1', // indigo-500
+  '#8b5cf6', // violet-500
+  '#06b6d4', // cyan-500
+  '#14b8a6', // teal-500
+  '#818cf8', // indigo-400
+  '#a78bfa', // violet-400
+  '#22d3ee', // cyan-400
+  '#2dd4bf', // teal-400
 ]
 const DEBT_COLORS = [
-  'var(--color-red-500)',
-  'var(--color-red-400)',
-  'var(--color-red-300)',
-  'var(--color-rose-500)',
-  'var(--color-rose-400)',
+  '#ef4444', // red-500
+  '#f87171', // red-400
+  '#fca5a5', // red-300
+  '#f43f5e', // rose-500
+  '#fb7185', // rose-400
 ]
-const SAVINGS_COLOR = 'var(--color-amber-400)'
+const SAVINGS_COLOR = '#f59e0b' // amber-500
 
 interface StackedSeries {
   label: string
@@ -1716,9 +1717,9 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
               <th className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">Jaar</th>
-              <th className="px-3 py-1.5 text-right font-medium text-emerald-600">Bezittingen</th>
-              <th className="px-3 py-1.5 text-right font-medium text-red-500">Schulden</th>
-              <th className="px-3 py-1.5 text-right font-medium text-horizon-600">Netto vermogen</th>
+              <th className="px-3 py-1.5 text-right font-medium text-emerald-700 bg-emerald-50/50">Bezittingen</th>
+              <th className="px-3 py-1.5 text-right font-medium text-red-600 bg-red-50/50">Schulden</th>
+              <th className="px-3 py-1.5 text-right font-medium text-horizon-700 bg-horizon-50/60 border-l-2 border-horizon-200">Netto vermogen</th>
               {hasEvents && eventGroups.map((g, ei) => (
                 <th key={`ev-${ei}`} className="px-2 py-1.5 text-right font-medium text-purple-600 whitespace-nowrap" title={g.event.name}>
                   {g.event.name.length > 16 ? g.event.name.slice(0, 15) + '\u2026' : g.event.name}
@@ -1735,20 +1736,21 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
             {displayYears.map((yr, idx) => {
               const isCrossover = crossoverYear != null && yr === crossoverYear
               const isAfterCrossover = crossoverYear != null && yr > crossoverYear
+              const isMilestone = yr % 5 === 0 || yr === projectionYears || isCrossover
               return (
               <tr key={yr} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${isCrossover ? 'bg-horizon-50/60 ring-1 ring-inset ring-horizon-300' : idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
-                <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">
+                <td className={`px-3 py-1 font-mono tabular-nums ${isMilestone ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-3)]'}`}>
                   {yr}
                   {isCrossover && <span className="ml-1 text-[9px] font-semibold text-horizon-600">{'\u26A1'} kruispunt</span>}
                   {isAfterCrossover && <span className="ml-1 text-[9px] text-[var(--ink-4)]">na kruispunt</span>}
                 </td>
-                <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
+                <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600 bg-emerald-50/30">
                   {formatCurrency(assetTotals[yr - 1])}
                 </td>
-                <td className="px-3 py-1 text-right font-mono tabular-nums text-red-500">
+                <td className="px-3 py-1 text-right font-mono tabular-nums text-red-500 bg-red-50/30">
                   {formatCurrency(debtTotals[yr - 1])}
                 </td>
-                <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-horizon-600">
+                <td className="px-3 py-1 text-right font-mono tabular-nums font-bold text-horizon-700 bg-horizon-50/40 border-l-2 border-horizon-200">
                   {formatCurrency(netTotals[yr - 1])}
                 </td>
                 {hasEvents && eventGroups.map((_g, ei) => {
