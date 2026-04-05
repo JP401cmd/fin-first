@@ -1721,8 +1721,7 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
               <th className="px-3 py-1.5 text-right font-medium text-horizon-600">Netto vermogen</th>
               {hasEvents && eventGroups.map((g, ei) => (
                 <th key={`ev-${ei}`} className="px-2 py-1.5 text-right font-medium text-purple-600 whitespace-nowrap" title={g.event.name}>
-                  <span className="mr-0.5">{g.event.icon}</span>
-                  <span>{g.event.name.length > 14 ? g.event.name.slice(0, 13) + '\u2026' : g.event.name}</span>
+                  {g.event.name.length > 16 ? g.event.name.slice(0, 15) + '\u2026' : g.event.name}
                 </th>
               ))}
               {hasEvents && eventGroups.length > 1 && (
