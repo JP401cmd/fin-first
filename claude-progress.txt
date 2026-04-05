@@ -1,3 +1,36 @@
+## Session 2026-04-05 - Features #683, #630
+
+### Feature #683: Overzicht: instellingenpaneel layout - PASSING
+- Restructured 5 strategy selectors from stacked vertical sections into compact 2-column card grid
+- Each card has: icon box (colored per category), bold uppercase label, subtitle description
+- Card 1: Eindstrategie (horizon purple) — 2x2 grid of strategy options
+- Card 2: Onttrekkingsstrategie (horizon purple) — 2x2 grid of strategies
+- Card 3: Verdeling toename (emerald green) — 3 distribution options in flex wrap
+- Card 4: Verdeling afname (amber) — 3 outflow distribution options
+- Card 5: Onttrekkingsvolgorde (red) — 5 withdrawal order options, full-width bottom row
+- Active selections emphasized with colored border, background, and dot indicator
+- Description text updates dynamically based on active selection
+- Legacy amount input conditionally shown when Erfenis strategy selected
+- Responsive: grid-cols-1 on mobile, sm:grid-cols-2 on larger screens
+- Zero console errors
+- Commit: 584bf4ed
+
+### Feature #630: Totaaltabel met duidelijke subtotalen en netto vermogen-kolom - PASSING
+- Bezittingen column: light green header (bg-emerald-50/50) + body cells (bg-emerald-50/30)
+- Schulden column: light red header (bg-red-50/50) + body cells (bg-red-50/30)
+- Netto vermogen column: emphasized with horizon purple bg, bold text, left border separator
+- Milestone rows (every 5th year, last year, crossover year) get bold year label for quick scanning
+- Header text colors strengthened for better contrast (emerald-700, red-600, horizon-700)
+- Zero console errors
+- Commit: fcbdc6b0
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/overzicht/overzicht-client.tsx — card grid layout for strategy selectors
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — TotalTable column coloring + milestone emphasis
+
+### Current Status
+- 2 features completed this session (#683, #630)
+
 ## Session 2026-04-05 - Features #677, #678
 
 ### Feature #677: Overzicht: alle instellingen sturen berekeningen aan - PASSING
@@ -22631,3 +22664,39 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 1 feature completed this session (#681)
+
+## Session 2026-04-05 - Features #679, #680
+
+### Feature #679: Overzicht grafiek: opbouw-area toont spaarinleg en inkomsten - PASSING
+- Extended ProjectionYear interface with cumulativeSavings, lifeEventInflow, cumulativeLifeEventInflow
+- Added runningCumulativeSavings and runningCumulativeLifeEventInflow tracking in computeProjection
+- Moved life event inflow computation before rows.push for chart data availability
+- Added cumulative savings area (green gradient) to ProjectionChart SVG
+  - Stops at crossover point (savingsAreaPoints filter)
+  - savingsGrad gradient: emerald #10b981 with 25%→5% opacity
+- Added positive life event inflow markers (purple bars at event years)
+  - eventGrad gradient: purple #a78bfa with 35%→8% opacity
+- Added savings line (solid emerald) that traces the savings area top
+- Updated tooltip with "Cum. spaarinleg" and "Inkomsten events" entries
+- Updated legend with Spaarinleg (green box) and Inkomsten events (purple box)
+- Zero console errors on fresh page load
+- Verified with browser automation
+
+### Feature #680: Overzicht grafiek: groei-area toont rendement op bezittingen - PASSING
+- cumulativeReturn field added to ProjectionYear by concurrent agent
+- runningCumulativeReturn tracking already in computeProjection
+- groeiAreaPath computed for full projection (continues after crossover)
+- groeiGrad gradient: green #22c55e with 15%→2% opacity
+- Groei area renders as green tint over the full projection timeline
+- Tooltip shows "Rendement" (annual) and "Cum. groei" (cumulative) with color indicator
+- Legend includes "Groei (rendement)" entry with green box
+- Renders correctly alongside opbouw/afbouw/verlies areas
+- Zero console errors on fresh page load
+- Verified with browser automation
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/overzicht/overzicht-client.tsx — savings/return area layers, tooltip, legend
+
+### Current Status
+- 2 features completed this session (#679, #680)
+- Overall progress: 670/683 passing (98.1%)
