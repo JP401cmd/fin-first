@@ -966,6 +966,17 @@ function ProjectionChart({
                   </span>
                 </div>
               )}
+              {hd.cumulativeReturn > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                    <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: '#22c55e', opacity: 0.7 }} />
+                    Cum. groei
+                  </span>
+                  <span className="font-mono text-[10px] font-semibold tabular-nums text-green-600">
+                    {formatCurrency(hd.cumulativeReturn)}
+                  </span>
+                </div>
+              )}
               {hd.totalDebts > 0 && (
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-[10px] text-[var(--ink-3)]">Schulden</span>
@@ -1613,7 +1624,25 @@ export function OverzichtClient({
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--border-ed)] pt-3 text-[11px] text-[var(--ink-3)]">
             <span className="flex items-center gap-1.5">
               <Minus className="h-3 w-5 text-[#8b5cf6]" strokeWidth={3} />
-              Netto vermogen
+              Pad (netto vermogen)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-5 rounded-sm bg-[#8b5cf6]/15 border border-[#8b5cf6]/30" />
+              Opbouw
+            </span>
+            {crossoverRow && (
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-5 rounded-sm bg-teal-500/15 border border-teal-500/30" />
+                Afbouw
+              </span>
+            )}
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-5 rounded-sm bg-green-500/15 border border-green-500/30" />
+              Groei (rendement)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-5 rounded-sm bg-red-500/20 border border-red-500/30" />
+              Verlies
             </span>
             <span className="flex items-center gap-1.5">
               <Minus className="h-3 w-5 text-emerald-500" strokeWidth={1.5} strokeDasharray="4,3" />
@@ -1622,14 +1651,6 @@ export function OverzichtClient({
             <span className="flex items-center gap-1.5">
               <Minus className="h-3 w-5 text-red-500" strokeWidth={1.5} strokeDasharray="4,3" />
               Schulden
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-5 rounded-sm bg-emerald-500/20 border border-emerald-500/40" />
-              Spaarinleg
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-5 rounded-sm bg-purple-400/25 border border-purple-400/40" />
-              Inkomsten events
             </span>
           </div>
         </div>
