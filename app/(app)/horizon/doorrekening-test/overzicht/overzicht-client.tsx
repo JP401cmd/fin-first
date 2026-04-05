@@ -1,12 +1,13 @@
 'use client'
 
 import { useMemo, useState, useRef, useCallback } from 'react'
-import { Settings, TrendingUp, Minus, ArrowDownRight, ArrowUpRight, ListOrdered } from 'lucide-react'
+import { Settings, TrendingUp, Minus, ArrowDownRight, ArrowUpRight, ListOrdered, Shuffle, Target } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { FireParams } from '@/lib/fire-params'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { NL_SWR, BOX3_TARIEF, NL_FICTIEF_BELEGGINGEN } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 
 // ── Withdrawal Strategy Types ─────────────────────────────────
 
@@ -39,28 +40,62 @@ const WITHDRAWAL_STRATEGIES: { key: WithdrawalStrategy; name: string; desc: stri
   },
 ]
 
+// ── End Strategy Descriptions (for overzicht UI) ─────────────
+
+const END_STRATEGY_OPTIONS: { key: FireEndStrategy; icon: string; color: string }[] = [
+  { key: 'perpetual', icon: '∞', color: 'horizon' },
+  { key: 'legacy', icon: '🏛', color: 'horizon' },
+  { key: 'deplete', icon: '📉', color: 'horizon' },
+  { key: 'pensioen', icon: '🧓', color: 'horizon' },
+]
+
 // ── Distribution Strategy Types ───────────────────────────────
 
-type DistributionStrategy = 'proportional' | 'cash_first' | 'highest_return'
+type DistributionStrategy = 'proportional' | 'cash_first' | 'lowest_return'
 
 const DISTRIBUTION_STRATEGIES: { key: DistributionStrategy; name: string; desc: string; when: string }[] = [
   {
     key: 'proportional',
     name: 'Spreiden',
-    desc: 'Proportioneel over bezittingen naar waarde-aandeel',
+    desc: 'Proportioneel uit alle bezittingen naar waarde-aandeel',
     when: 'Goed als je je portefeuille in balans wilt houden',
   },
   {
     key: 'cash_first',
     name: 'Cash first',
-    desc: 'Naar bezitting met laagste verwacht rendement eerst',
-    when: 'Veilig: vul eerst de laagst-renderende aan',
+    desc: 'Eerst uit bezitting met laagste verwacht rendement',
+    when: 'Slim als je renderende bezittingen wilt laten groeien',
   },
   {
-    key: 'highest_return',
-    name: 'Hoogste rendement first',
-    desc: 'Naar bezitting met hoogste verwacht rendement eerst',
-    when: 'Maximaal rendement door bij te storten op groei-bezittingen',
+    key: 'lowest_return',
+    name: 'Laagste rendement first',
+    desc: 'Uit laagste rendement bezitting, doorschuiven als leeg',
+    when: 'Maximaal rendement behouden op de langere termijn',
+  },
+]
+
+// ── Outflow Distribution Types (accumulation phase — life event costs) ──
+
+type OutflowDistribution = 'proportional' | 'lowest_return_first' | 'highest_value_first'
+
+const OUTFLOW_DISTRIBUTIONS: { key: OutflowDistribution; name: string; desc: string; when: string }[] = [
+  {
+    key: 'proportional',
+    name: 'Spreiden',
+    desc: 'Proportioneel uit alle bezittingen naar waarde-aandeel',
+    when: 'Portefeuille-balans behouden',
+  },
+  {
+    key: 'lowest_return_first',
+    name: 'Laag rendement first',
+    desc: 'Eerst uit bezitting met laagste verwacht rendement',
+    when: 'Beschermt je best-presterende bezittingen',
+  },
+  {
+    key: 'highest_value_first',
+    name: 'Hoogste waarde first',
+    desc: 'Eerst uit bezitting met hoogste actuele waarde',
+    when: 'Sneller naar gebalanceerde portefeuille',
   },
 ]
 
@@ -134,6 +169,9 @@ interface ProjectionYear {
   annualReturn: number
   box3Tax: number
   cumulativeTax: number
+  cumulativeSavings: number
+  lifeEventInflow: number
+  cumulativeLifeEventInflow: number
 }
 
 /**
@@ -271,6 +309,42 @@ function applyWithdrawalOrder(
   }
 }
 
+/**
+ * Apply outflow distribution during accumulation phase (life event costs).
+ * Determines which assets get reduced when costs occur.
+ */
+function applyOutflowDistribution(
+  assetBalances: { balance: number; expected_return: number; current_value: number; asset_type: string; name: string }[],
+  amount: number,
+  strategy: OutflowDistribution,
+) {
+  if (strategy === 'proportional') {
+    const total = assetBalances.reduce((s, a) => s + Math.max(0, a.balance), 0)
+    if (total <= 0) return
+    for (const ab of assetBalances) {
+      const share = Math.max(0, ab.balance) / total
+      ab.balance -= amount * share
+    }
+    return
+  }
+
+  const sorted = [...assetBalances].sort((a, b) => {
+    if (strategy === 'lowest_return_first') return a.expected_return - b.expected_return
+    if (strategy === 'highest_value_first') return b.balance - a.balance
+    return 0
+  })
+
+  let remaining = amount
+  for (const sortedAsset of sorted) {
+    if (remaining <= 0) break
+    const ab = assetBalances.find((a) => a === sortedAsset)
+    if (!ab || ab.balance <= 0) continue
+    const draw = Math.min(remaining, ab.balance)
+    ab.balance -= draw
+    remaining -= draw
+  }
+}
+
 function computeProjection({
   assets,
   debts,
@@ -281,8 +355,11 @@ function computeProjection({
   monthlyIncome,
   savingsRate,
   yearlyExpenses,
+  endStrategy,
+  legacyAmount,
   withdrawalStrategy,
   distributionStrategy,
+  outflowDistribution,
   withdrawalOrder,
   lifeEvents,
 }: {
@@ -295,8 +372,11 @@ function computeProjection({
   monthlyIncome: number
   savingsRate: number
   yearlyExpenses: number
+  endStrategy: FireEndStrategy
+  legacyAmount: number
   withdrawalStrategy: WithdrawalStrategy
   distributionStrategy: DistributionStrategy
+  outflowDistribution: OutflowDistribution
   withdrawalOrder: WithdrawalOrder
   lifeEvents: LifeEvent[]
 }): ProjectionYear[] {
@@ -309,12 +389,49 @@ function computeProjection({
   let cumulativeTax = 0
   const annualContributions = assets.reduce((s, a) => s + (a.monthly_contribution ?? 0) * 12, 0)
   const annualSavings = monthlyIncome * (savingsRate / 100) * 12
+  let runningCumulativeSavings = 0
+  let runningCumulativeLifeEventInflow = 0
 
   // Heffingsvrij vermogen
   const heffingsvrij = 59357
 
-  // Crossover detection: when portfolio can sustain withdrawals
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : Infinity
+  // FIRE target depends on end strategy
+  let fireTarget: number
+  const NL_AOW_AGE = 67
+  switch (endStrategy) {
+    case 'perpetual':
+      // Must sustain forever via SWR
+      fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : Infinity
+      break
+    case 'legacy':
+      // Must sustain withdrawals AND leave legacyAmount at endAge
+      fireTarget = yearlyExpenses > 0 ? (yearlyExpenses / NL_SWR) + legacyAmount : Infinity
+      break
+    case 'deplete': {
+      // Can deplete to €0 over remaining years — need less capital
+      const yearsInRetirement = currentAge != null ? 100 - currentAge : projectionYears
+      if (yearlyExpenses > 0 && grossReturn > 0) {
+        // Annuity present value formula
+        const r = grossReturn - inflationRate
+        if (Math.abs(r) < 0.001) {
+          fireTarget = yearlyExpenses * yearsInRetirement
+        } else {
+          fireTarget = yearlyExpenses * (1 - Math.pow(1 + r, -yearsInRetirement)) / r
+        }
+      } else {
+        fireTarget = yearlyExpenses * yearsInRetirement
+      }
+      break
+    }
+    case 'pensioen': {
+      // Target: cover expenses only until AOW age, then AOW supplements
+      const yearsToAOW = currentAge != null ? Math.max(0, NL_AOW_AGE - currentAge) : 30
+      fireTarget = yearlyExpenses > 0 ? yearlyExpenses * yearsToAOW * 0.7 : Infinity // 70% factor for partial coverage
+      break
+    }
+    default:
+      fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : Infinity
+  }
   let crossoverYear: number | null = null
 
   for (let y = 0; y <= projectionYears; y++) {
@@ -377,11 +494,15 @@ function computeProjection({
         const assetReturn = Number(ab.expected_return ?? 0) / 100
         ab.balance = ab.balance * (1 + assetReturn) + (ab.monthly_contribution ?? 0) * 12
       }
-      if (lifeEventInflow !== 0) {
+      if (lifeEventInflow > 0) {
+        // Positive inflows: use distribution strategy (toename)
         const totalBal = assetBalances.reduce((s, a) => s + a.balance, 0)
         for (const ab of assetBalances) {
           ab.balance += lifeEventInflow * (totalBal > 0 ? ab.balance / totalBal : 1 / assetBalances.length)
         }
+      } else if (lifeEventInflow < 0) {
+        // Negative outflows: use outflow distribution strategy (afname)
+        applyOutflowDistribution(assetBalances, Math.abs(lifeEventInflow), outflowDistribution)
       }
       assetTotal = assetBalances.reduce((s, a) => s + a.balance, 0)
     }
@@ -733,11 +854,21 @@ export function OverzichtClient({
   const [monthlyIncome, setMonthlyIncome] = useState(profileIncome)
   const [savingsRate, setSavingsRate] = useState(profileSavingsRate)
   const [monthlyExpenses, setMonthlyExpenses] = useState(profileExpenses)
+
+  // Parse profile's end strategy
+  const profileStrategyConfig = parseFireStrategy(profile ?? {})
+  const profileEndStrategy = profileStrategyConfig.strategy
+  const profileLegacyAmount = profileStrategyConfig.legacyAmount
+
+  // 5 strategy settings that drive all calculations
+  const [endStrategy, setEndStrategy] = useState<FireEndStrategy>(profileEndStrategy)
+  const [legacyAmount, setLegacyAmount] = useState(profileLegacyAmount)
   const [withdrawalStrategy, setWithdrawalStrategy] = useState<WithdrawalStrategy>('swr')
   const [distributionStrategy, setDistributionStrategy] = useState<DistributionStrategy>('proportional')
+  const [outflowDistribution, setOutflowDistribution] = useState<OutflowDistribution>('proportional')
   const [withdrawalOrder, setWithdrawalOrder] = useState<WithdrawalOrder>('cash_first')
 
-  // Computed projection
+  // Computed projection — recalculates when ANY of the 5 strategy settings change
   const projection = useMemo(() => {
     return computeProjection({
       assets,
@@ -749,18 +880,31 @@ export function OverzichtClient({
       monthlyIncome,
       savingsRate,
       yearlyExpenses: monthlyExpenses * 12,
+      endStrategy,
+      legacyAmount,
       withdrawalStrategy,
       distributionStrategy,
+      outflowDistribution,
       withdrawalOrder,
       lifeEvents,
     })
-  }, [assets, debts, grossReturnPct, inflationPct, currentAge, projectionYears, monthlyIncome, savingsRate, monthlyExpenses, withdrawalStrategy, distributionStrategy, withdrawalOrder, lifeEvents])
+  }, [assets, debts, grossReturnPct, inflationPct, currentAge, projectionYears, monthlyIncome, savingsRate, monthlyExpenses, endStrategy, legacyAmount, withdrawalStrategy, distributionStrategy, outflowDistribution, withdrawalOrder, lifeEvents])
 
   const finalRow = projection[projection.length - 1]
+
+  // Detect crossover year for display
+  const crossoverRow = projection.find((r, i) => {
+    if (i === 0) return false
+    const prev = projection[i - 1]
+    return prev.annualSavings > 0 && r.annualSavings === 0
+  })
+
   const hasChanges = grossReturnPct !== profileReturn || inflationPct !== profileInflation ||
     projectionYears !== defaultYears || monthlyIncome !== profileIncome ||
     savingsRate !== profileSavingsRate || monthlyExpenses !== profileExpenses ||
-    withdrawalStrategy !== 'swr' || distributionStrategy !== 'proportional' || withdrawalOrder !== 'cash_first'
+    endStrategy !== profileEndStrategy || withdrawalStrategy !== 'swr' ||
+    distributionStrategy !== 'proportional' || outflowDistribution !== 'proportional' ||
+    withdrawalOrder !== 'cash_first'
 
   function resetToDefaults() {
     setGrossReturnPct(profileReturn)
@@ -769,8 +913,12 @@ export function OverzichtClient({
     setMonthlyIncome(profileIncome)
     setSavingsRate(profileSavingsRate)
     setMonthlyExpenses(profileExpenses)
+    setEndStrategy(profileEndStrategy)
+    setLegacyAmount(profileLegacyAmount)
     setWithdrawalStrategy('swr')
     setDistributionStrategy('proportional')
+    setOutflowDistribution('proportional')
+    setWithdrawalOrder('cash_first')
   }
 
   return (
@@ -911,6 +1059,55 @@ export function OverzichtClient({
             </div>
           </div>
 
+          {/* ── End Strategy Selector (Feature #677 — eindstrategie) ── */}
+          <div className="mt-5 border-t border-[var(--border-ed)] pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="h-3.5 w-3.5 text-horizon-500" />
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                Eindstrategie
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {END_STRATEGY_OPTIONS.map((opt) => {
+                const info = STRATEGY_LABELS[opt.key]
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => setEndStrategy(opt.key)}
+                    className={`rounded-lg border px-3 py-2 text-left transition-all ${
+                      endStrategy === opt.key
+                        ? 'border-horizon-400 bg-horizon-50/60 ring-1 ring-horizon-300'
+                        : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                    }`}
+                  >
+                    <span className={`block text-xs font-semibold ${
+                      endStrategy === opt.key ? 'text-horizon-700' : 'text-[var(--ink)]'
+                    }`}>
+                      {opt.icon} {info.name}
+                    </span>
+                    <span className="block mt-0.5 text-[10px] text-[var(--ink-4)] leading-tight">
+                      {info.subtitle}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            {endStrategy === 'legacy' && (
+              <div className="mt-3 flex items-center gap-2">
+                <label className="text-[10px] font-semibold text-[var(--ink-3)]">Nalatenschap:</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={10000}
+                  value={legacyAmount}
+                  onChange={(e) => setLegacyAmount(Number(e.target.value))}
+                  className="w-32 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none"
+                />
+                <span className="text-[10px] text-[var(--ink-4)]">euro</span>
+              </div>
+            )}
+          </div>
+
           {/* ── Withdrawal Strategy Selector (Feature #673) ── */}
           <div className="mt-5 border-t border-[var(--border-ed)] pt-4">
             <div className="flex items-center gap-2 mb-3">
@@ -946,30 +1143,30 @@ export function OverzichtClient({
             </p>
           </div>
 
-          {/* ── Distribution Strategy Selector — toename (Feature #674) ── */}
+          {/* ── Distribution Strategy Selector — afname (Feature #675) ── */}
           <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
             <div className="flex items-center gap-2 mb-1">
-              <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
+              <Shuffle className="h-3.5 w-3.5 text-amber-500" />
               <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                Verdelingsstrategie toename
+                Verdelingsstrategie afname
               </label>
             </div>
             <p className="mb-3 text-[10px] text-[var(--ink-4)] leading-relaxed">
-              Hoe wordt binnenkomend geld uit levensgebeurtenissen verdeeld over je bezittingen?
+              Hoe wordt uitgaand geld uit levensgebeurtenissen onttrokken uit je bezittingen?
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {DISTRIBUTION_STRATEGIES.map((s) => (
+              {OUTFLOW_DISTRIBUTIONS.map((s) => (
                 <button
                   key={s.key}
-                  onClick={() => setDistributionStrategy(s.key)}
+                  onClick={() => setOutflowDistribution(s.key)}
                   className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
                     distributionStrategy === s.key
-                      ? 'border-emerald-400 bg-emerald-50/60 ring-1 ring-emerald-300'
+                      ? 'border-amber-400 bg-amber-50/60 ring-1 ring-amber-300'
                       : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
                   }`}
                 >
                   <span className={`block text-xs font-semibold ${
-                    distributionStrategy === s.key ? 'text-emerald-700' : 'text-[var(--ink)]'
+                    distributionStrategy === s.key ? 'text-amber-700' : 'text-[var(--ink)]'
                   }`}>
                     {s.name}
                   </span>
@@ -977,7 +1174,7 @@ export function OverzichtClient({
                     {s.desc}
                   </span>
                   <span className={`block mt-1 text-[9px] italic leading-tight ${
-                    distributionStrategy === s.key ? 'text-emerald-600' : 'text-[var(--ink-4)]'
+                    distributionStrategy === s.key ? 'text-amber-600' : 'text-[var(--ink-4)]'
                   }`}>
                     {s.when}
                   </span>
