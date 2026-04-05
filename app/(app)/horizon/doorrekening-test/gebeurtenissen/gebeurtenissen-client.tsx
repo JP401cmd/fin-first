@@ -493,12 +493,19 @@ function EventTimelineOverview({
 
   return (
     <section data-testid="events-timeline">
-      <div className="flex items-center gap-2 mb-4">
-        <Calendar className="h-4 w-4 text-horizon-500" />
-        <h3 className="text-base font-bold text-[var(--ink)]">Tijdlijn per leeftijd</h3>
-        <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold text-horizon-700">
-          {sortedEvents.length} events
+      <div className="mb-4 flex items-center gap-3 rounded-xl border border-[var(--border-ed)] px-4 py-3">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--paper)]">
+          <Calendar className="h-4 w-4 text-horizon-500" />
         </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-[var(--ink)]">Tijdlijn per leeftijd</h2>
+            <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+              {sortedEvents.length}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">Chronologisch overzicht van alle levensgebeurtenissen</p>
+        </div>
       </div>
 
       {/* ── SVG Timeline ── */}
@@ -736,35 +743,31 @@ export function GebeurtenissenClient({
   }, [incomeEvents, assets, selectedIncomeStrategy])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* ── Summary header ── */}
-      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-        <h2 className="text-lg font-bold text-[var(--ink)]">Levensgebeurtenissen &amp; Interventies</h2>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Alle actieve levensgebeurtenissen en hun cashflow-impact op de financiële projectie
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Actieve gebeurtenissen</p>
-            <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Actieve gebeurtenissen</p>
+            <p className="mt-0.5 font-mono text-xl font-bold tabular-nums text-horizon-600">
               {lifeEvents.length}
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Gegenereerde cashflows</p>
-            <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Gegenereerde cashflows</p>
+            <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
               {cashflows.length}
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Netto impact (totaal)</p>
-            <p className={`mt-0.5 font-mono text-base font-semibold tabular-nums ${totalNetImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Netto impact (totaal)</p>
+            <p className={`mt-0.5 font-mono text-lg font-bold tabular-nums ${totalNetImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {totalNetImpact >= 0 ? '+' : ''}{formatCurrency(totalNetImpact)}
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Huidige leeftijd</p>
-            <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
+            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Huidige leeftijd</p>
+            <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
               {currentAge != null ? `${currentAge}j` : '—'}
             </p>
           </div>
@@ -778,14 +781,21 @@ export function GebeurtenissenClient({
       <section>
         <button
           onClick={() => setEventsExpanded(!eventsExpanded)}
-          className="flex w-full items-center gap-2 text-left"
+          className="flex w-full items-center gap-3 rounded-xl border border-[var(--border-ed)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50"
         >
-          {eventsExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
-          <Calendar className="h-4 w-4 text-horizon-500" />
-          <h3 className="text-base font-bold text-[var(--ink)]">Actieve levensgebeurtenissen</h3>
-          <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold text-horizon-700">
-            {lifeEvents.length} events
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--paper)]">
+            <Calendar className="h-4 w-4 text-horizon-500" />
           </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--ink)]">Actieve levensgebeurtenissen</h2>
+              <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+                {lifeEvents.length}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">Alle actieve events en hun financiële impact</p>
+          </div>
+          {eventsExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
         </button>
 
         {eventsExpanded && (
@@ -878,14 +888,21 @@ export function GebeurtenissenClient({
       <section>
         <button
           onClick={() => setCashflowsExpanded(!cashflowsExpanded)}
-          className="flex w-full items-center gap-2 text-left"
+          className="flex w-full items-center gap-3 rounded-xl border border-[var(--border-ed)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50"
         >
-          {cashflowsExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
-          <Zap className="h-4 w-4 text-horizon-500" />
-          <h3 className="text-base font-bold text-[var(--ink)]">Cashflows (SimCashflow[])</h3>
-          <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold text-horizon-700">
-            {cashflows.length} flows
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--paper)]">
+            <Zap className="h-4 w-4 text-horizon-500" />
           </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--ink)]">Cashflows (SimCashflow[])</h2>
+              <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+                {cashflows.length}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">Gegenereerde flows voor de financiële simulatie</p>
+          </div>
+          {cashflowsExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
         </button>
 
         {cashflowsExpanded && (
@@ -992,49 +1009,66 @@ export function GebeurtenissenClient({
       <section>
         <button
           onClick={() => setDistributionExpanded(!distributionExpanded)}
-          className="flex w-full items-center gap-2 text-left"
+          className="flex w-full items-center gap-3 rounded-xl border border-[var(--border-ed)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50"
         >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--paper)]">
+            <Layers className="h-4 w-4 text-horizon-500" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--ink)]">Verdelingsstrategie (afname)</h2>
+              <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+                {expenseEvents.length}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">Hoe eenmalige kosten worden verdeeld over bezittingen</p>
+          </div>
           {distributionExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
-          <Layers className="h-4 w-4 text-horizon-500" />
-          <h3 className="text-base font-bold text-[var(--ink)]">Verdelingsstrategie</h3>
         </button>
 
         {distributionExpanded && (
           <div className="mt-4 space-y-4">
-            {/* Strategy picker */}
-            <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-              <p className="mb-3 text-sm text-[var(--ink-3)]">
-                Kies hoe onttrekkingen (eenmalige kosten van gebeurtenissen) worden verdeeld over je bezittingen:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(STRATEGY_INFO) as DistributionStrategy[]).map((key) => {
-                  const info = STRATEGY_INFO[key]
-                  const Icon = info.icon
-                  const active = selectedStrategy === key
-                  return (
-                    <div key={key} className="inline-flex items-center gap-1">
-                      <button
-                        onClick={() => setSelectedStrategy(key)}
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-                          active
-                            ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
-                            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-300 hover:text-horizon-600'
-                        }`}
-                      >
+            {/* Strategy picker — card-style with radio indicators */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              {(Object.keys(STRATEGY_INFO) as DistributionStrategy[]).map((key) => {
+                const info = STRATEGY_INFO[key]
+                const Icon = info.icon
+                const active = selectedStrategy === key
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedStrategy(key)}
+                    className={`relative flex flex-col rounded-xl border-2 p-4 text-left transition-all ${
+                      active
+                        ? 'border-horizon-400 bg-horizon-50/50 shadow-sm'
+                        : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-horizon-200 hover:bg-[var(--subtle)]/30'
+                    }`}
+                  >
+                    {/* Radio indicator */}
+                    <div className="absolute right-3 top-3">
+                      <div className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                        active ? 'border-horizon-500' : 'border-[var(--border-md)]'
+                      }`}>
+                        {active && <div className="h-2 w-2 rounded-full bg-horizon-500" />}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                        active ? 'bg-horizon-100 text-horizon-600' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
+                      }`}>
                         <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span className={`text-xs font-semibold ${active ? 'text-horizon-700' : 'text-[var(--ink)]'}`}>
                         {info.label}
-                      </button>
+                      </span>
                       <StrategyTooltip strategy={key} />
                     </div>
-                  )
-                })}
-              </div>
-
-              {/* Selected strategy description */}
-              <div className="mt-3 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5 text-xs text-[var(--ink-3)]">
-                <span className="font-semibold text-[var(--ink-2)]">{STRATEGY_INFO[selectedStrategy].label}:</span>{' '}
-                {STRATEGY_INFO[selectedStrategy].description}
-              </div>
+                    <p className="mt-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                      {info.description}
+                    </p>
+                  </button>
+                )
+              })}
             </div>
 
             {/* Distribution results per expense event */}
@@ -1114,54 +1148,67 @@ export function GebeurtenissenClient({
       <section data-testid="income-distribution-section">
         <button
           onClick={() => setIncomeDistributionExpanded(!incomeDistributionExpanded)}
-          className="flex w-full items-center gap-2 text-left"
+          className="flex w-full items-center gap-3 rounded-xl border border-[var(--border-ed)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50"
         >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--paper)]">
+            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--ink)]">Verdelingsstrategie voor toename</h2>
+              <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+                {incomeEvents.length}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">Hoe binnenkomend geld wordt verdeeld over bezittingen</p>
+          </div>
           {incomeDistributionExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
-          <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-          <h3 className="text-base font-bold text-[var(--ink)]">Verdelingsstrategie voor toename</h3>
-          {incomeEvents.length > 0 && (
-            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-              {incomeEvents.length} events
-            </span>
-          )}
         </button>
 
         {incomeDistributionExpanded && (
           <div className="mt-4 space-y-4">
-            {/* Strategy picker */}
-            <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-              <p className="mb-3 text-sm text-[var(--ink-3)]">
-                Kies hoe binnenkomend geld (erfenis, verkoop, bijverdienste) wordt verdeeld over je bezittingen:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(INCOME_STRATEGY_INFO) as IncomeDistributionStrategy[]).map((key) => {
-                  const info = INCOME_STRATEGY_INFO[key]
-                  const Icon = info.icon
-                  const active = selectedIncomeStrategy === key
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setSelectedIncomeStrategy(key)}
-                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-                        active
-                          ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-emerald-300 hover:text-emerald-600'
-                      }`}
-                      data-testid={`income-strategy-${key}`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {info.label}
+            {/* Strategy picker — card-style with radio indicators */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              {(Object.keys(INCOME_STRATEGY_INFO) as IncomeDistributionStrategy[]).map((key) => {
+                const info = INCOME_STRATEGY_INFO[key]
+                const Icon = info.icon
+                const active = selectedIncomeStrategy === key
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedIncomeStrategy(key)}
+                    className={`relative flex flex-col rounded-xl border-2 p-4 text-left transition-all ${
+                      active
+                        ? 'border-emerald-400 bg-emerald-50/50 shadow-sm'
+                        : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-emerald-200 hover:bg-[var(--subtle)]/30'
+                    }`}
+                    data-testid={`income-strategy-${key}`}
+                  >
+                    {/* Radio indicator */}
+                    <div className="absolute right-3 top-3">
+                      <div className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                        active ? 'border-emerald-500' : 'border-[var(--border-md)]'
+                      }`}>
+                        {active && <div className="h-2 w-2 rounded-full bg-emerald-500" />}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                        active ? 'bg-emerald-100 text-emerald-600' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
+                      }`}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span className={`text-xs font-semibold ${active ? 'text-emerald-700' : 'text-[var(--ink)]'}`}>
+                        {info.label}
+                      </span>
                       <IncomeStrategyTooltip strategy={key} />
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Selected strategy description */}
-              <div className="mt-3 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5 text-xs text-[var(--ink-3)]">
-                <span className="font-semibold text-[var(--ink-2)]">{INCOME_STRATEGY_INFO[selectedIncomeStrategy].label}:</span>{' '}
-                {INCOME_STRATEGY_INFO[selectedIncomeStrategy].description}
-              </div>
+                    </div>
+                    <p className="mt-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                      {info.description}
+                    </p>
+                  </button>
+                )
+              })}
             </div>
 
             {/* Income distribution results per income event */}
@@ -1249,16 +1296,17 @@ export function GebeurtenissenClient({
 
       {/* ── Section 4: Impact Preview ── */}
       <section>
-        <div className="flex items-center gap-2">
-          <SnowflakeIcon className="h-4 w-4 text-horizon-500" />
-          <h3 className="text-base font-bold text-[var(--ink)]">Impact preview</h3>
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] px-4 py-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--paper)]">
+            <SnowflakeIcon className="h-4 w-4 text-horizon-500" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold text-[var(--ink)]">Impact preview</h2>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">Samenvatting van de financiële impact op je pad naar vrijheid</p>
+          </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-          <p className="mb-4 text-sm text-[var(--ink-3)]">
-            Samenvatting van de verwachte financiële impact van alle levensgebeurtenissen op je pad naar financiële vrijheid.
-          </p>
-
+        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Huidig netto vermogen</p>
