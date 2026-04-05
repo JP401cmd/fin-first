@@ -178,6 +178,8 @@ interface ProjectionYear {
   negativeLifeEvent: number
   /** Total loss: box3Tax + withdrawal + negativeLifeEvent */
   totalLoss: number
+  /** Cumulative return on assets since year 0 */
+  cumulativeReturn: number
 }
 
 /**
@@ -401,6 +403,7 @@ function computeProjection({
   const annualContributions = assets.reduce((s, a) => s + (a.monthly_contribution ?? 0) * 12, 0)
   const annualSavings = monthlyIncome * (savingsRate / 100) * 12
   let runningCumulativeSavings = 0
+  let runningCumulativeReturn = 0
   let runningCumulativeLifeEventInflow = 0
 
   // Heffingsvrij vermogen
@@ -475,6 +478,8 @@ function computeProjection({
     const negativeLifeEvent = Math.abs(Math.min(0, lifeEventInflow))
     runningCumulativeLifeEventInflow += positiveLifeEventInflow
     const totalLoss = box3Tax + withdrawal + negativeLifeEvent
+    const yearReturn = y === 0 ? 0 : assetTotal * grossReturn
+    runningCumulativeReturn += yearReturn
 
     rows.push({
       year: y,
@@ -483,7 +488,7 @@ function computeProjection({
       totalDebts: debtTotal,
       netWorth: netWorth - cumulativeTax,
       annualSavings: yearSavings,
-      annualReturn: y === 0 ? 0 : assetTotal * grossReturn,
+      annualReturn: yearReturn,
       box3Tax,
       cumulativeTax,
       cumulativeSavings: runningCumulativeSavings,
@@ -492,6 +497,7 @@ function computeProjection({
       withdrawal,
       negativeLifeEvent,
       totalLoss,
+      cumulativeReturn: runningCumulativeReturn,
     })
 
     cumulativeTax += box3Tax
@@ -584,7 +590,8 @@ function ProjectionChart({
   const lossValues = data.map((d) => -d.totalLoss)
   const savingsValues = data.map((d) => d.cumulativeSavings)
   const lifeEventValues = data.map((d) => d.cumulativeLifeEventInflow)
-  const allValues = [...values, ...assetValues, ...debtValues, ...savingsValues, ...lifeEventValues, ...lossValues]
+  const returnValues = data.map((d) => d.cumulativeReturn)
+  const allValues = [...values, ...assetValues, ...debtValues, ...savingsValues, ...lifeEventValues, ...lossValues, ...returnValues]
   const minV = Math.min(0, ...allValues)
   const maxV = Math.max(...allValues)
   const range = maxV - minV || 1
@@ -609,8 +616,26 @@ function ProjectionChart({
   const assetPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.totalAssets).toFixed(1)}`).join(' ')
   const debtPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.totalDebts).toFixed(1)}`).join(' ')
 
-  // Area under net worth
+  // Area under net worth — split into opbouw (purple) and afbouw (teal) at crossover
   const areaPath = `${netPath} L${x(data.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`
+
+  // Split area: opbouw phase (start to crossover)
+  const opbouwEnd = crossoverIndex != null ? crossoverIndex : data.length - 1
+  const opbouwAreaPath = data.slice(0, opbouwEnd + 1).map((d, i) =>
+    `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.netWorth).toFixed(1)}`
+  ).join(' ') + ` L${x(opbouwEnd).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`
+
+  // Split area: afbouw phase (crossover to end)
+  const afbouwAreaPath = crossoverIndex != null && crossoverIndex < data.length - 1
+    ? data.slice(crossoverIndex).map((d, i) =>
+        `${i === 0 ? 'M' : 'L'}${x(crossoverIndex + i).toFixed(1)},${y(d.netWorth).toFixed(1)}`
+      ).join(' ') + ` L${x(data.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(crossoverIndex).toFixed(1)},${y(0).toFixed(1)} Z`
+    : null
+
+  // Groei (cumulative return) area — shows how much of portfolio comes from growth
+  const groeiAreaPath = data.map((d, i) =>
+    `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.cumulativeReturn).toFixed(1)}`
+  ).join(' ') + ` L${x(data.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`
 
   // Loss area: stacked layers below zero line
   // Layer 1 (bottom): Box 3 belasting — from 0 to -box3Tax
@@ -693,6 +718,18 @@ function ProjectionChart({
             <stop offset="0%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.2" />
             <stop offset="100%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.02" />
           </linearGradient>
+          <linearGradient id="opbouwGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="var(--horizon-500, #8b5cf6)" stopOpacity="0.03" />
+          </linearGradient>
+          <linearGradient id="afbouwGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.03" />
+          </linearGradient>
+          <linearGradient id="groeiGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#22c55e" stopOpacity="0.02" />
+          </linearGradient>
           <linearGradient id="savingsGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
             <stop offset="100%" stopColor="#10b981" stopOpacity="0.05" />
@@ -760,8 +797,16 @@ function ProjectionChart({
           )
         })}
 
-        {/* Area fill */}
-        <path d={areaPath} fill="url(#netGrad)" />
+        {/* Opbouw phase area (horizon-purple) */}
+        <path d={opbouwAreaPath} fill="url(#opbouwGrad)" />
+
+        {/* Afbouw phase area (teal) */}
+        {afbouwAreaPath && (
+          <path d={afbouwAreaPath} fill="url(#afbouwGrad)" />
+        )}
+
+        {/* Groei (cumulative return) area */}
+        <path d={groeiAreaPath} fill="url(#groeiGrad)" />
 
         {/* Cumulative savings line */}
         {savingsAreaPath && (
