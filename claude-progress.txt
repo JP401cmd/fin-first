@@ -1,3 +1,33 @@
+## Session 2026-04-05 - Features #670, #672
+
+### Feature #670: Opbouw totaaltabel: event-kolommen verdeling over bezittingen - PASSING
+- Split yearlyEventCashflows into per-event computation grouped by source life event
+- Added eventCashflowGroups memo that maps life events to their SimCashflow groups
+- Enhanced simulateAssetsWithEvents to return per-event per-asset allocation tracking (EventAssetAllocation)
+- TotalTable now shows individual event columns with event name headers
+- Σ Events total column shown when multiple events are present
+- Hover tooltip (EventAllocationTooltip) on event cells shows distribution across assets
+- Strategy changes (spreiden/cash first/hoogste rendement) correctly reflected in tooltips
+- Verified: "spreiden" distributes proportionally, "cash first" sends to lowest-return asset
+- Zero console errors
+- Commit: 03a0dd36
+
+### Feature #672: Overzicht: instelling eindstrategie selector - PASSING
+- Already implemented by previous agent work (Feature #677)
+- Card-selector with 4 options: Perpetual (∞), Legacy (🏛), Deplete (📉), Pensioenleeftijd (🧓)
+- Each card shows name + subtitle description from STRATEGY_LABELS
+- Default from profile via parseFireStrategy(profile)
+- Legacy amount input appears when "Erfenis" selected
+- Graph recalculates on strategy change via computeProjection dependency
+- "Reset naar profiel" button appears when settings deviate from profile defaults
+- Zero console errors
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — per-event TotalTable columns + allocation tracking
+
+### Current Status
+- 2 features completed this session (#670, #672)
+
 ## Session 2026-04-05 - Features #673, #674
 
 ### Feature #673: Overzicht: instelling onttrekkingsstrategie selector - PASSING
@@ -22463,3 +22493,42 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#667, #669)
+
+## Session 2026-04-05 - Features #668, #682
+
+### Feature #668: Gebeurtenissen-pagina layout en Horizon-thema - PASSING
+- Summary header: horizontal flex layout with tracking-[0.08em] labels matching opbouw/afbouw pattern
+- Section headers: card-style with icon box (8x8 rounded-lg), title, subtitle, count badge, chevron toggle
+- Strategy selectors: converted from flat buttons to 3-column card grid with radio indicators
+  - Expense distribution: horizon purple active state with radio dots
+  - Income distribution: emerald green active state with radio dots
+- Timeline header: matching card-style section header with Calendar icon
+- Impact preview: matching section header pattern (non-collapsible)
+- Spacing reduced to space-y-6 matching opbouw page
+- All design tokens: var(--ink), var(--border-ed), var(--subtle), var(--paper), tracking-[0.08em]
+- Zero console errors
+- Commit: acaed49d
+
+### Feature #682: Overzicht grafiek: interactiviteit en hover-tooltips - PASSING
+- Added interactive ProjectionChart with crosshair + tooltip
+- Vertical dashed crosshair line follows mouse position on hover
+- Tooltip shows: Leeftijd (age), Totaal vermogen (net worth in horizon purple)
+- Tooltip breakdown: Spaarinleg (green), Rendement (green/red), Box 3 belasting (red), Schulden (red)
+- Additional section: Bezittingen total (green), Cum. Box 3 (red)
+- Positive items green, negative items red throughout tooltip
+- Crossover detection: finds first year where savings drop to 0
+- Kruispunt badge shown in tooltip when hovering at crossover year
+- Tooltip flips to left side when past 60% of chart width (prevents overflow)
+- Colored dots on each line (net worth, assets, debts) at hover position
+- White-stroke dots for visual clarity against chart background
+- Invisible transparent rect overlay for reliable mouse tracking
+- Fixed pre-existing Shuffle import error (missing from lucide-react import)
+- Zero console errors on clean page load
+- Commit: 7f9ffc73
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/gebeurtenissen/gebeurtenissen-client.tsx — layout + theme + card selectors
+- app/(app)/horizon/doorrekening-test/overzicht/overzicht-client.tsx — interactive chart + tooltip + Shuffle fix
+
+### Current Status
+- 2 features completed this session (#668, #682)
