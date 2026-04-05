@@ -1,3 +1,31 @@
+## Session 2026-04-05 - Feature #685
+
+### Feature #685: Opbouw: net_worth_inclusion_pct per bezitting meenemen in doorrekening - PASSING
+- Per asset, net_worth_inclusion_pct (0-100%, default 100) is now applied to all net worth calculations
+- Individual asset projection tables still show full unweighted value (per spec)
+- TotalTable: assetTotals weighted by inclusion_pct per asset (flat index matching asset order)
+- NetWorthMonthlyTable: assetTotal weighted per asset
+- StackedAreaChart: net worth line + tooltip weighted; area fills still show full values
+- SummaryChart: receives pre-weighted assetTotals
+- Box 3 belasting: computed on weighted net worth
+- Summary header: "Huidige bezittingen" shows weighted total; "Bezittingen" section header shows raw total
+- Headers show percentage when < 100%:
+  - ProjectionTable column: "Woning Wassenaar (50%)"
+  - AssetMonthlyTable: "Woning Wassenaar (50% meegeteld in netto vermogen)"
+  - NetWorthMonthlyTable column: "Woning Wassenaar (50%)"
+- Verified with Woning Wassenaar set to 50%: €650k × 50% = €325k reduction in net worth
+  - Before: Bezittingen €1,099,703, Netto vermogen €834,703
+  - After: Bezittingen €774,703, Netto vermogen €509,703
+- Zero console errors
+- Restored test data to 100% after verification
+- Commit: c44e79e1
+
+### Files Modified
+- app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx — inclusion_pct weighting in all net worth contexts
+
+### Current Status
+- 1 feature completed this session (#685)
+
 ## Session 2026-04-05 - Features #634, #635
 
 ### Feature #634: Opbouwgrafiek kleuren en legenda - PASSING
