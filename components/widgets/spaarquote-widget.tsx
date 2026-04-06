@@ -73,17 +73,26 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
 
   // ── Full-size: sparkline + averages + FIRE benchmark ──
   if (size === 'full') {
-    // Derive estimated savings rates from net worth deltas
-    const history = data.netWorthHistory ?? []
-    const estimatedRates: number[] = []
-    for (let i = 1; i < history.length; i++) {
-      const monthDelta = history[i].value - history[i - 1].value
-      // Estimate rate as delta / income (use current income as proxy)
-      const estRate = monthlyIncome > 0 ? (monthDelta / monthlyIncome) * 100 : 0
-      estimatedRates.push(Math.max(-100, Math.min(100, estRate)))
+    // Use actual savings rate history from snapshots (preferred),
+    // fall back to estimated rates from net worth deltas if no snapshot data
+    const snapshotHistory = data.savingsHistory ?? []
+    let historicalRates: number[]
+
+    if (snapshotHistory.length > 0) {
+      // Real savings rate data from net_worth_snapshots.savings_rate
+      historicalRates = snapshotHistory.map(s => Math.max(-100, Math.min(100, s.value)))
+    } else {
+      // Fallback: derive estimated savings rates from net worth deltas
+      const history = data.netWorthHistory ?? []
+      historicalRates = []
+      for (let i = 1; i < history.length; i++) {
+        const monthDelta = history[i].value - history[i - 1].value
+        const estRate = monthlyIncome > 0 ? (monthDelta / monthlyIncome) * 100 : 0
+        historicalRates.push(Math.max(-100, Math.min(100, estRate)))
+      }
     }
-    // Append current rate
-    estimatedRates.push(rate)
+    // Append current rate as the most recent data point
+    const estimatedRates = [...historicalRates, rate]
 
     // Take last 12 months for sparkline (showcase full year)
     const sparkData = estimatedRates.slice(-12)

@@ -791,7 +791,7 @@ const tests: TestCase[] = [
         'monte_carlo', 'levensgebeurtenissen', 'spaarquote', 'vrijheidsvoortgang',
         'vaste_lasten', 'jouw_pad', 'gezondheids_score', 'belasting_box3',
         'nibud_benchmark', 'vrijheidsscenarios', 'sim_vermogenspad',
-        'passief_inkomen', 'box3_drag', 'vrijheidsmijlpalen',
+        'box3_drag', 'vrijheidsmijlpalen',
         'backtesting_score', 'inflatie_impact', 'beleggingsrendement',
         'pensioen_aow', 'meldingen', 'ai_inzicht', 'volgende_stap',
         'maandoverzicht', 'weekoverzicht', 'swr_monitor', 'agenda',

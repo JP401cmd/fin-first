@@ -1396,7 +1396,7 @@ const willemData: PersonaData = {
     rebalance_threshold: 10, // agressief — hoge tolerantie, minder herbalanceren
     feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
-      'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
+      'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'monte_carlo',
       'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'gezondheids_score',
       { id: 'beleggingsrendement', size: 'mini' }, { id: 'rebalancing', size: 'mini' },
     ]),
@@ -1941,7 +1941,7 @@ const marijkeData: PersonaData = {
     estimated_monthly_expenses: 2800,
     feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
-      'netto_vermogen', 'passief_inkomen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',
+      'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',
       'holdings', 'vrijheidsmijlpalen', 'acties', 'gezondheids_score',
     ]),
     active_modules: ALL_MODULES,

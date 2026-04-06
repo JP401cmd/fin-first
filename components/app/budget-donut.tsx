@@ -1,9 +1,37 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { type BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, formatCurrency, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { Eye, EyeOff, ChevronDown } from 'lucide-react'
+
+const HIDDEN_BUDGETS_KEY = 'donut-hidden-budgets'
+const COLLAPSED_TYPES_KEY = 'donut-collapsed-types'
+
+function loadHiddenBudgets(): Set<string> {
+  try {
+    const stored = localStorage.getItem(HIDDEN_BUDGETS_KEY)
+    if (stored) return new Set(JSON.parse(stored))
+  } catch { /* */ }
+  return new Set()
+}
+
+function saveHiddenBudgets(set: Set<string>) {
+  try { localStorage.setItem(HIDDEN_BUDGETS_KEY, JSON.stringify(Array.from(set))) } catch { /* */ }
+}
+
+function loadCollapsedTypes(): Set<string> {
+  try {
+    const stored = localStorage.getItem(COLLAPSED_TYPES_KEY)
+    if (stored) return new Set(JSON.parse(stored))
+  } catch { /* */ }
+  return new Set()
+}
+
+function saveCollapsedTypes(set: Set<string>) {
+  try { localStorage.setItem(COLLAPSED_TYPES_KEY, JSON.stringify(Array.from(set))) } catch { /* */ }
+}
 
 interface BudgetDonutProps {
   groups: BudgetWithChildren[]
@@ -173,16 +201,21 @@ interface TypeDonutProps {
   budgetType: BudgetType
   segments: Segment[]
   onNavigate: (budgetId: string) => void
+  hiddenBudgets: Set<string>
+  onToggleHidden: (id: string) => void
+  isCollapsed: boolean
+  onToggleCollapse: () => void
 }
 
-function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
+function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHidden, isCollapsed, onToggleCollapse }: TypeDonutProps) {
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 1200 })
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [hoveredChild, setHoveredChild] = useState<{ parentIdx: number; childIdx: number } | null>(null)
 
-  const totalBudget = segments.reduce((s, seg) => s + seg.limit, 0)
-  const totalSpent = segments.reduce((s, seg) => s + seg.spent, 0)
+  const visibleSegments = useMemo(() => segments.filter(seg => !hiddenBudgets.has(seg.id)), [segments, hiddenBudgets])
+  const totalBudget = visibleSegments.reduce((s, seg) => s + seg.limit, 0)
+  const totalSpent = visibleSegments.reduce((s, seg) => s + seg.spent, 0)
 
   const size = 300
   const cx = size / 2
@@ -195,11 +228,11 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
   const innerGap = 1.5
   const ct = cssType(budgetType)
 
-  // Build outer + inner arcs
+  // Build outer + inner arcs (only for visible segments)
   const arcData = useMemo<OuterArc[]>(() => {
     if (totalBudget <= 0) return []
     let angle = 0
-    return segments.map((seg) => {
+    return visibleSegments.map((seg) => {
       const sweep = (seg.limit / totalBudget) * 360
       const start = angle + gap / 2
       const end = start + Math.max(sweep - gap, 0.5)
@@ -230,12 +263,12 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
       angle += sweep
       return { start, end, spentEnd, isOver, innerArcs }
     })
-  }, [segments, totalBudget, gap, innerGap])
+  }, [visibleSegments, totalBudget, gap, innerGap])
 
-  // Active state
+  // Active state — index refers to visibleSegments for donut, but legend uses all segments
   const active = hoveredIdx ?? selectedIdx
-  const activeSeg = active !== null ? segments[active] : null
-  const activeChild = hoveredChild !== null ? segments[hoveredChild.parentIdx]?.children[hoveredChild.childIdx] : null
+  const activeSeg = active !== null ? visibleSegments[active] : null
+  const activeChild = hoveredChild !== null ? visibleSegments[hoveredChild.parentIdx]?.children[hoveredChild.childIdx] : null
 
   const pctUsed = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 
@@ -303,11 +336,26 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
       {/* 3px accent top */}
       <div className="h-[3px]" style={{ backgroundColor: `var(--color-${ct}-500)` }} />
 
-      <div className="p-4">
-        {/* Type title */}
-        <p className="mb-3 text-center font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-          {TYPE_LABELS[budgetType] ?? budgetType}
+      {/* Clickable type header */}
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
+      >
+        <div className="flex items-center gap-2">
+          <ChevronDown className={`h-3.5 w-3.5 text-[var(--ink-4)] transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`} />
+          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            {TYPE_LABELS[budgetType] ?? budgetType}
+          </p>
+          <span className="font-mono text-[10px] text-[var(--ink-4)]">{segments.length}</span>
+        </div>
+        <p className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">
+          {formatCurrency(segments.reduce((s, seg) => s + seg.spent, 0))}
+          <span className="font-normal text-[var(--ink-4)]"> / {formatCurrency(segments.reduce((s, seg) => s + seg.limit, 0))}</span>
         </p>
+      </button>
+
+      {!isCollapsed && <div className="px-4 pb-4">
 
         {/* SVG donut */}
         <div className="flex justify-center">
@@ -465,45 +513,58 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
           {segments.map((seg, i) => {
             const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
             const isOver = seg.spent > seg.limit && seg.limit > 0
-            const isExpanded = selectedIdx === i
+            const isHidden = hiddenBudgets.has(seg.id)
+            const visibleIdx = visibleSegments.indexOf(seg)
+            const isExpanded = selectedIdx !== null && selectedIdx === visibleIdx && !isHidden
 
             return (
               <div key={seg.id}>
-                <button
-                  className="flex w-full items-center gap-2 rounded-[var(--r)] border px-2.5 py-1.5 text-left transition-all"
-                  style={{
-                    borderColor: isExpanded ? c.border : 'var(--border-ed)',
-                    backgroundColor: isExpanded ? c.bg : 'var(--paper)',
-                    boxShadow: isExpanded ? `0 0 0 2px ${c.border}` : undefined,
-                  }}
-                  onMouseEnter={() => { setHoveredIdx(i); setHoveredChild(null) }}
-                  onMouseLeave={() => setHoveredIdx(null)}
-                  onClick={() => {
-                    setSelectedIdx(selectedIdx === i ? null : i)
-                    setHoveredChild(null)
-                  }}
-                >
-                  <div className="flex items-center gap-0.5">
-                    <span className="block h-4 w-2 rounded-l-sm" style={{ backgroundColor: c.spent }} />
-                    <span className="block h-4 w-2 rounded-r-sm" style={{ backgroundColor: c.budget }} />
-                  </div>
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: c.bg }}>
-                    <BudgetIcon name={seg.icon} className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-[var(--ink)]">{seg.name}</p>
-                    <p className="font-mono text-[10px] text-[var(--ink-3)]">
-                      <span className={isOver ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
-                        {formatCurrency(seg.spent)}
-                      </span>
-                      {' / '}
-                      {formatCurrency(seg.limit)}
-                    </p>
-                  </div>
-                  <span className={`shrink-0 font-mono text-[10px] font-bold ${isOver ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
-                    {pct}%
-                  </span>
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-[var(--r)] border px-2.5 py-1.5 text-left transition-all ${isHidden ? 'opacity-40' : ''}`}
+                    style={{
+                      borderColor: isExpanded ? c.border : 'var(--border-ed)',
+                      backgroundColor: isExpanded ? c.bg : 'var(--paper)',
+                      boxShadow: isExpanded ? `0 0 0 2px ${c.border}` : undefined,
+                    }}
+                    onMouseEnter={() => { if (!isHidden && visibleIdx >= 0) { setHoveredIdx(visibleIdx); setHoveredChild(null) } }}
+                    onMouseLeave={() => setHoveredIdx(null)}
+                    onClick={() => {
+                      if (isHidden) return
+                      setSelectedIdx(selectedIdx === visibleIdx ? null : visibleIdx)
+                      setHoveredChild(null)
+                    }}
+                  >
+                    <div className="flex items-center gap-0.5">
+                      <span className="block h-4 w-2 rounded-l-sm" style={{ backgroundColor: c.spent }} />
+                      <span className="block h-4 w-2 rounded-r-sm" style={{ backgroundColor: c.budget }} />
+                    </div>
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: c.bg }}>
+                      <BudgetIcon name={seg.icon} className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={`truncate text-xs font-medium ${isHidden ? 'text-[var(--ink-4)] line-through' : 'text-[var(--ink)]'}`}>{seg.name}</p>
+                      <p className="font-mono text-[10px] text-[var(--ink-3)]">
+                        <span className={isOver && !isHidden ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
+                          {formatCurrency(seg.spent)}
+                        </span>
+                        {' / '}
+                        {formatCurrency(seg.limit)}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 font-mono text-[10px] font-bold ${isOver && !isHidden ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
+                      {pct}%
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onToggleHidden(seg.id) }}
+                    className="shrink-0 rounded-[var(--r-sm)] p-1.5 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                    title={isHidden ? 'Tonen in donut' : 'Verbergen uit donut'}
+                  >
+                    {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
 
                 {/* Expanded children */}
                 {isExpanded && seg.children.length > 0 && (
@@ -517,7 +578,7 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
                         <button
                           key={child.id}
                           className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left transition-colors hover:bg-[var(--subtle)]"
-                          onMouseEnter={() => setHoveredChild({ parentIdx: i, childIdx: ci })}
+                          onMouseEnter={() => { if (visibleIdx >= 0) setHoveredChild({ parentIdx: visibleIdx, childIdx: ci }) }}
                           onMouseLeave={() => setHoveredChild(null)}
                           onClick={(e) => { e.stopPropagation(); onNavigate(child.id) }}
                         >
@@ -548,7 +609,7 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
             )
           })}
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
@@ -653,6 +714,26 @@ export function MiniDonut({ slices, size = 56, strokeWidth = 7, className }: Min
 
 export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) {
   const segments = useMemo(() => buildSegments(groups, spending), [groups, spending])
+  const [hiddenBudgets, setHiddenBudgets] = useState<Set<string>>(() => loadHiddenBudgets())
+  const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(() => loadCollapsedTypes())
+
+  const toggleHidden = (id: string) => {
+    setHiddenBudgets(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      saveHiddenBudgets(next)
+      return next
+    })
+  }
+
+  const toggleCollapsedType = (type: string) => {
+    setCollapsedTypes(prev => {
+      const next = new Set(prev)
+      if (next.has(type)) next.delete(type); else next.add(type)
+      saveCollapsedTypes(next)
+      return next
+    })
+  }
 
   // Group by budgetType, filter types with budget > 0
   const typeGroups = useMemo(() => {
@@ -681,6 +762,10 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
           budgetType={type}
           segments={typeSegs}
           onNavigate={onNavigate}
+          hiddenBudgets={hiddenBudgets}
+          onToggleHidden={toggleHidden}
+          isCollapsed={collapsedTypes.has(type)}
+          onToggleCollapse={() => toggleCollapsedType(type)}
         />
       ))}
     </div>

@@ -687,18 +687,18 @@ function StackedAreaChart({
           <line x1={px} y1={toY(0)} x2={w - px} y2={toY(0)} stroke="var(--ink-3)" strokeWidth={0.75} strokeDasharray="4 2" />
         )}
         {/* X axis labels */}
-        {xLabels.map(({ x, label }) => (
-          <text key={label} x={x} y={h - 4} textAnchor="middle" fontSize={8} fill="var(--ink-4)" className="font-mono">
+        {xLabels.map(({ x, label }, i) => (
+          <text key={`xlabel-${i}`} x={x} y={h - 4} textAnchor="middle" fontSize={8} fill="var(--ink-4)" className="font-mono">
             {label}
           </text>
         ))}
         {/* Positive stacked areas (assets + savings) */}
-        {posAreaPaths.map(({ path, color, label }) => (
-          <path key={`pos-${label}`} d={path} fill={color} fillOpacity={0.35} stroke={color} strokeWidth={0.5} />
+        {posAreaPaths.map(({ path, color, label }, i) => (
+          <path key={`pos-${i}-${label}`} d={path} fill={color} fillOpacity={0.35} stroke={color} strokeWidth={0.5} />
         ))}
         {/* Negative stacked areas (debts) */}
-        {negAreaPaths.map(({ path, color, label }) => (
-          <path key={`neg-${label}`} d={path} fill={color} fillOpacity={0.3} stroke={color} strokeWidth={0.5} />
+        {negAreaPaths.map(({ path, color, label }, i) => (
+          <path key={`neg-${i}-${label}`} d={path} fill={color} fillOpacity={0.3} stroke={color} strokeWidth={0.5} />
         ))}
         {/* Net worth line */}
         <path d={netLine} fill="none" stroke="#8b5cf6" strokeWidth={2.5} />
@@ -763,8 +763,8 @@ function StackedAreaChart({
                 <div className="text-[9px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Bezittingen</div>
                 {hoverData.items
                   .filter((it) => it.side === 'asset' || it.side === 'savings')
-                  .map((it) => (
-                    <div key={it.label} className="flex items-center justify-between gap-3">
+                  .map((it, idx) => (
+                    <div key={`asset-hover-${idx}-${it.label}`} className="flex items-center justify-between gap-3">
                       <span className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
                         <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: it.color, opacity: 0.8 }} />
                         <span className="truncate max-w-[100px]">{it.label}</span>
@@ -791,8 +791,8 @@ function StackedAreaChart({
                 <div className="text-[9px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Schulden</div>
                 {hoverData.items
                   .filter((it) => it.side === 'debt')
-                  .map((it) => (
-                    <div key={it.label} className="flex items-center justify-between gap-3">
+                  .map((it, idx) => (
+                    <div key={`debt-hover-${idx}-${it.label}`} className="flex items-center justify-between gap-3">
                       <span className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
                         <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: it.color, opacity: 0.8 }} />
                         <span className="truncate max-w-[100px]">{it.label}</span>
@@ -818,8 +818,8 @@ function StackedAreaChart({
 
       {/* Legend */}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-2">
-        {legendItems.map(({ label, color }) => (
-          <div key={label} className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+        {legendItems.map(({ label, color }, i) => (
+          <div key={`legend-${i}-${label}`} className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
             <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color, opacity: label === 'Netto vermogen' ? 1 : 0.6 }} />
             <span className="truncate max-w-[120px]">{label}</span>
           </div>
@@ -1171,8 +1171,8 @@ function ProjectionTable({ title, columns, color, projectionYears, defaultExpand
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
               <th className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">Jaar</th>
-              {columns.map((col) => (
-                <th key={col.label} className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">
+              {columns.map((col, ci) => (
+                <th key={`col-h-${ci}-${col.label}`} className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">
                   {col.label}
                 </th>
               ))}
@@ -1185,8 +1185,8 @@ function ProjectionTable({ title, columns, color, projectionYears, defaultExpand
               return (
                 <tr key={yr} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
                   <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{yr}</td>
-                  {columns.map((col) => (
-                    <td key={col.label} className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                  {columns.map((col, ci) => (
+                    <td key={`col-${yr}-${ci}-${col.label}`} className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                       {formatCurrency(col.rows[yr - 1]?.value ?? 0)}
                     </td>
                   ))}
@@ -1718,7 +1718,7 @@ function NetWorthMonthlyTable({
                 const pct = assets[aIdx]?.net_worth_inclusion_pct ?? 100
                 return (
                 <th
-                  key={`asset-${a.name}`}
+                  key={`asset-${aIdx}-${a.name}`}
                   className="whitespace-nowrap px-3 py-1.5 text-right font-medium text-emerald-600"
                 >
                   {a.name}{pct < 100 && <span className="ml-1 text-[9px] text-[var(--ink-4)]">({pct}%)</span>}
@@ -1730,9 +1730,9 @@ function NetWorthMonthlyTable({
                   ∑ Bezittingen
                 </th>
               )}
-              {debtMonthlyData.map((d) => (
+              {debtMonthlyData.map((d, dIdx) => (
                 <th
-                  key={`debt-${d.name}`}
+                  key={`debt-${dIdx}-${d.name}`}
                   className="whitespace-nowrap px-3 py-1.5 text-right font-medium text-red-500"
                 >
                   {d.name}

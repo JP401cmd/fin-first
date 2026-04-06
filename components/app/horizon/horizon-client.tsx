@@ -155,6 +155,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(initialData.avgExpenses6m)
   const [snapshotResilience, setSnapshotResilience] = useState<number | null>(initialData.snapshotResilience)
   const [resilienceSnapshots, setResilienceSnapshots] = useState<SnapshotForTrend[]>(initialData.resilienceSnapshots)
+  const [healthChartOpen, setHealthChartOpen] = useState(false)
   const [events, setEvents] = useState<LifeEvent[]>(initialData.events)
   const [impacts, setImpacts] = useState<LifeEventImpact[]>(initialData.impacts)
   const [actions, setActions] = useState<Action[]>(initialData.actions)
@@ -2409,10 +2410,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 type="button"
                 onClick={() => triggerDream('/horizon/whatif')}
                 disabled={phase !== 'idle'}
-                className={`mt-4 flex w-full items-center justify-center gap-2 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/30 px-4 py-3 font-serif text-sm italic text-wil-700 transition-all hover:border-wil-400 hover:bg-wil-50/60 hover:shadow-[0_0_20px_rgba(196,160,107,0.15)] ${phase !== 'idle' ? 'dream-cta-active' : ''}`}
+                className={`mt-4 flex w-full items-center gap-3 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/30 px-4 py-3 text-left transition-all hover:border-wil-400 hover:bg-wil-50/60 hover:shadow-[0_0_20px_rgba(196,160,107,0.15)] ${phase !== 'idle' ? 'dream-cta-active' : ''}`}
               >
-                <Sparkles className="h-4 w-4" />
-                Wat als...? Speel met je toekomst &rarr;
+                <Sparkles className="h-5 w-5 shrink-0 text-wil-500" />
+                <div className="min-w-0">
+                  <span className="font-serif text-sm italic text-wil-700">Wat als...? Speel met je toekomst &rarr;</span>
+                  {savedScenarios.length === 0 && (
+                    <p className="mt-1 font-sans text-[11px] leading-relaxed text-wil-600/70">
+                      Stel een alternatief scenario op met andere inkomsten, uitgaven of levensgebeurtenissen.
+                      Sla het op en bekijk het als overlay op deze pagina om te vergelijken met je huidige pad.
+                    </p>
+                  )}
+                </div>
               </button>
             </>
           ) : null}
@@ -2934,28 +2943,101 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       {/* === 5. Household FIRE Projections === */}
       <HouseholdFireSection />
 
-
-
-      {/* === 5. Health Score Trend Chart (Deep Dive) === */}
-      {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
-        <FeatureGate featureId="gezondheids_score" fallback="hidden">
-        <section className="mt-5 sm:mt-8" data-testid="health-trend-section">
-          <div className="mb-3">
-            <h2 className="label-editorial text-[var(--ink-2)]">
-              <Shield className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
-              Gezondheidsverloop
-            </h2>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              Je gezondheidsscore over tijd, gebaseerd op echte snapshot data
-            </p>
-          </div>
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
-            <ResilienceContextMessage snapshots={resilienceSnapshots} />
-            <ResilienceTrendChart snapshots={resilienceSnapshots} />
+      {/* === 5a. Toekomst instellingen === */}
+      <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
+        <section className="mt-4 sm:mt-8">
+          <button
+            type="button"
+            onClick={() => setActiveModal('strategie')}
+            className="block w-full"
+          >
+            <div className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
+                <Landmark className="h-5 w-5 text-horizon-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-[var(--ink-3)]">Toekomst instellingen</p>
+                <p className="text-sm font-semibold text-[var(--ink)]">{fireStrategy ? STRATEGY_LABELS[fireStrategy.strategy].name : 'Niet ingesteld'}</p>
+                <p className="text-sm text-[var(--ink-2)]">{wsConfig ? ({ static: 'Vast (SWR)', guardrails: 'Guardrails', vpw: 'VPW', bucket: 'Bucket' } as Record<WithdrawalStrategyType, string>)[wsConfig.strategy] + (wsConfig.strategy === 'guardrails' ? ` ${Math.round(wsConfig.floor * 100)}–${Math.round(wsConfig.ceiling * 100)}%` : '') : 'Geen opnamestrategie'}</p>
+              </div>
+            </div>
+          </button>
+          <div className="mt-1 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setActiveModal('strategie')}
+              className="text-[11px] text-horizon-600 hover:text-horizon-700 underline underline-offset-2"
+            >
+              Strategieën vergelijken →
+            </button>
           </div>
         </section>
-        </FeatureGate>
-      )}
+      </FeatureGate>
+
+      {/* === 5b. Health Score Trend Chart (Deep Dive) === */}
+      <FeatureGate featureId="gezondheids_score" fallback="hidden">
+        <section className="mt-5 sm:mt-8" data-testid="health-trend-section">
+          <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+            {/* ── Accent bar ── */}
+            <div className="h-[3px] w-full bg-horizon-500" />
+
+            {/* ── Header (clickable toggle) ── */}
+            <button
+              type="button"
+              onClick={() => setHealthChartOpen(v => !v)}
+              aria-expanded={healthChartOpen}
+              className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+            >
+              <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${healthChartOpen ? 'rotate-180' : ''}`} />
+              <div className="flex min-w-0 flex-1 items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Heart className="h-4 w-4 fill-horizon-500 text-horizon-500" />
+                  <h3 className="label-editorial text-[var(--ink-2)]">Gezondheidsverloop</h3>
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); setShowResilienceReceipt(true) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setShowResilienceReceipt(true) } }}
+                  className="flex items-center gap-1.5 rounded-full bg-horizon-50 px-2.5 py-1 transition-colors hover:bg-horizon-100"
+                  data-testid="health-score-card"
+                  title={`Financiële Gezondheid: ${snapshotResilience !== null ? snapshotResilience : healthScore.total} / 100`}
+                >
+                  <Heart className="h-3.5 w-3.5 fill-horizon-500 text-horizon-500" />
+                  <span className="font-mono text-sm font-semibold tabular-nums text-horizon-700">
+                    {snapshotResilience !== null ? snapshotResilience : healthScore.total}/100
+                  </span>
+                </div>
+              </div>
+            </button>
+
+            {/* ── Content ── */}
+            {healthChartOpen && (
+              resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowResilienceReceipt(true)}
+                  className="w-full cursor-pointer p-4 text-left transition-colors hover:bg-[var(--subtle)] sm:p-6"
+                >
+                  <ResilienceContextMessage snapshots={resilienceSnapshots} />
+                  <ResilienceTrendChart snapshots={resilienceSnapshots} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowResilienceReceipt(true)}
+                  className="w-full cursor-pointer p-6 text-center transition-colors hover:bg-[var(--subtle)] sm:p-8"
+                >
+                  <Heart className="mx-auto mb-2 h-8 w-8 text-horizon-300" />
+                  <p className="text-sm text-[var(--ink-3)]">
+                    Gebruik de app langer om het verloop in je financiële gezondheid weer te geven
+                  </p>
+                </button>
+              )
+            )}
+          </div>
+        </section>
+      </FeatureGate>
 
       {/* === 5b. FIRE Age Trend Chart (Deep Dive) === */}
       {(() => {
@@ -3017,74 +3099,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         )
       })()}
 
-      {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
-      <section className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
-        <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
-          <button
-            type="button"
-            onClick={() => setActiveModal('strategie')}
-            className="block w-full"
-          >
-            <div className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
-                <Landmark className="h-5 w-5 text-horizon-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-[var(--ink-3)]">Opnamestrategie</p>
-                <p className="text-lg font-bold text-[var(--ink)]">{wsConfig ? ({ static: 'Vast (SWR)', guardrails: 'Guardrails', vpw: 'VPW', bucket: 'Bucket' } as Record<WithdrawalStrategyType, string>)[wsConfig.strategy] + (wsConfig.strategy === 'guardrails' ? ` ${Math.round(wsConfig.floor * 100)}–${Math.round(wsConfig.ceiling * 100)}%` : '') : '4 strategieën'}</p>
-                <p className="mt-0.5 text-xs text-[var(--ink-3)]">hoe je vermogen opneemt</p>
-              </div>
-            </div>
-          </button>
-          <div className="mt-1 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setActiveModal('strategie')}
-              className="text-[11px] text-horizon-600 hover:text-horizon-700 underline underline-offset-2"
-            >
-              Strategieën vergelijken →
-            </button>
-          </div>
-        </FeatureGate>
-        <FeatureGate featureId="gezondheids_score" fallback="hidden">
-          <button
-            type="button"
-            onClick={() => setShowResilienceReceipt(true)}
-            className="group flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
-            data-testid="health-score-card"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
-              <Shield className="h-5 w-5 text-horizon-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-[var(--ink-3)]">Financiële Gezondheid</p>
-              <p className="text-lg font-bold text-[var(--ink)]">
-                {snapshotResilience !== null ? snapshotResilience : healthScore.total} / 100
-              </p>
-              <p className="text-xs text-[var(--ink-4)]">
-                {snapshotResilience !== null ? getHealthLabel(snapshotResilience) : healthScore.label}
-                {' · '}{healthScore.activePillarCount} pilaren
-              </p>
-            </div>
-          </button>
-        </FeatureGate>
-        <Link
-          href="/horizon/doorrekening-test"
-          className="group flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
-          data-testid="doorrekening-test-card"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
-            <TableProperties className="h-5 w-5 text-horizon-600" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-[var(--ink-3)]">Doorrekening Test</p>
-            <p className="text-lg font-bold text-[var(--ink)]">Opbouw &amp; Projectie</p>
-            <p className="text-xs text-[var(--ink-4)]">
-              Bekijk jaar-op-jaar tabellen van je vermogensopbouw
-            </p>
-          </div>
-        </Link>
-      </section>
 
       {/* === 9. Acties (Primary Content) === */}
       {actions.length > 0 && (
@@ -3106,45 +3120,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       )}
 
 
-      {/* === 11. Samenvatting (Deep Dive) === */}
-      <section className="mt-5 sm:mt-8">
-        <div className="mb-5">
-          <h2 className="label-editorial text-[var(--ink-2)]">
-            Samenvatting
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-6">
-            <p className="label-editorial text-[var(--ink-3)]">Opgebouwde vrijheidstijd</p>
-            <p className="mt-2 text-2xl font-bold text-[var(--ink)]">
-              {fire.freedomYears} jaar en {fire.freedomMonths} maanden
-            </p>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              Je kunt {fire.freedomYears > 0 ? `${fire.freedomYears} jaar en ${fire.freedomMonths} maanden` : `${fire.freedomMonths} maanden`} leven van je vermogen zonder inkomen.
-            </p>
-          </div>
-          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-6">
-            <p className="label-editorial text-[var(--ink-3)]">Passief inkomen vs. uitgaven</p>
-            <p className="mt-2 text-2xl font-bold text-[var(--ink)]">
-              {formatCurrency(fire.monthlyPassiveIncome + monthlyDividendIncome)} / mnd
-            </p>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              passief inkomen dekt {(fire.monthlyPassiveIncome + monthlyDividendIncome) > 0 && effectiveInput?.monthlyExpenses
-                ? `${Math.round(((fire.monthlyPassiveIncome + monthlyDividendIncome) / effectiveInput.monthlyExpenses) * 100)}%`
-                : '0%'
-              } van je maandelijkse uitgaven ({formatCurrency(effectiveInput?.monthlyExpenses ?? 0)})
-            </p>
-            {monthlyDividendIncome > 0 && (
-              <div className="mt-2 flex items-center gap-2 rounded-[var(--r)] bg-emerald-50 border border-emerald-100 px-3 py-1.5" data-testid="dividend-passive-income">
-                <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
-                <p className="text-xs text-emerald-700">
-                  Waarvan {formatCurrency(monthlyDividendIncome)} / mnd uit dividenden
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
 
       {/* === Event Form Modal === */}
       {showForm && (() => {

@@ -124,6 +124,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   // Budget legend state (overview)
   const [overviewBudgetGroups, setOverviewBudgetGroups] = useState<BudgetWithChildren[]>([])
   const [overviewSpending, setOverviewSpending] = useState<Record<string, number>>({})
+  const [prevMonthSpending, setPrevMonthSpending] = useState<Record<string, number>>({})
   const [expandedOverviewGroupId, setExpandedOverviewGroupId] = useState<string | null>(null)
   // Savings rate kassabon data
   const [savingsReceiptData, setSavingsReceiptData] = useState<{extHalfYearIncome: number; extHalfYearExpenses: number; halfYearSavings: number; rawIncome6m: number; rawExpenses6m: number}>({extHalfYearIncome: 0, extHalfYearExpenses: 0, halfYearSavings: 0, rawIncome6m: 0, rawExpenses6m: 0})
@@ -194,6 +195,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     setMustExpenseItems(initialData.mustExpenseItems)
     setOverviewBudgetGroups(initialData.overviewBudgetGroups)
     setOverviewSpending(initialData.overviewSpending)
+    setPrevMonthSpending(initialData.prevMonthSpending)
     setSavingsReceiptData(initialData.savingsReceiptData)
     setSavingsBreakdown(initialData.savingsBreakdown)
     setSavingsBudgetTotal6m(initialData.savingsBudgetTotal6m)
@@ -499,7 +501,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
       // Fetch budget alert data + debt progress + asset valuations + goals + 6m spending for kassabon
       const sixMonthsAgoForBudgets = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1)).toISOString().split('T')[0]
-      const [budgetResult, spendingResult, snapshotResult, debtFullResult, assetValuationResult, goalsResult, spending6mResult] = await Promise.all([
+      const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
+      const [budgetResult, spendingResult, snapshotResult, debtFullResult, assetValuationResult, goalsResult, spending6mResult, prevSpendingResult] = await Promise.all([
         supabase.from('budgets').select('*').limit(500),
         supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true }).limit(24),
@@ -507,6 +510,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
         supabase.from('goals').select('id').limit(1),
         supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd),
+        supabase.from('transactions').select('budget_id, amount').gte('date', prevMonthStart).lt('date', monthStart),
       ])
 
       // Set goals state for smart prioritization (Feature #255)
@@ -558,6 +562,18 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
         // Store data for budget legend overview
         setOverviewSpending(spendMap)
+
+        // Build previous-month spending map
+        if (prevSpendingResult.data) {
+          const prevMap: Record<string, number> = {}
+          for (const t of prevSpendingResult.data) {
+            if (t.budget_id) {
+              prevMap[t.budget_id] = (prevMap[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+            }
+          }
+          setPrevMonthSpending(prevMap)
+        }
+
         const allBudgets = budgetResult.data as Budget[]
         const parents = allBudgets.filter(b => !b.parent_id)
         const allChildren = allBudgets.filter(b => !!b.parent_id)
@@ -1563,6 +1579,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           budgetingActive={budgetingActive}
           overviewBudgetGroups={overviewBudgetGroups}
           overviewSpending={overviewSpending}
+          prevMonthSpending={prevMonthSpending}
           totalBudgetSpent={totalBudgetSpent}
           totalBudgetLimit={totalBudgetLimit}
           overBudgetCount={overBudgetCount}
@@ -1810,7 +1827,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         open={activeModal?.type === 'assets'}
         onClose={() => { setActiveModal(null); loadData() }}
         title={hasVermogen ? "Bezittingen" : "Bankrekeningen"}
-        href={hasVermogen ? "/core/assets" : "/core/cash"}
       >
         {hasVermogen ? (
           <DynAssetsPage initialAssetId={activeModal?.type === 'assets' ? activeModal.itemId : undefined} />
@@ -1822,7 +1838,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         open={activeModal?.type === 'debts'}
         onClose={() => { setActiveModal(null); loadData() }}
         title="Schulden"
-        href="/core/debts"
       >
         <DynDebtsPage initialDebtId={activeModal?.type === 'debts' ? activeModal.itemId : undefined} />
       </FullScreenModal>}

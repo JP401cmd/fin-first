@@ -315,24 +315,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── 4. Dividend impact op passief inkomen widget ──────────────────
-  {
-    id: 'dividend-passief-inkomen-widget',
-    name: 'Passief inkomen widget: bestaat in widget catalog',
-    category: CAT,
-    description: 'passief_inkomen widget is defined in widget catalog and feature registry',
-    priority: 'high',
-    estimatedDurationMs: 300,
-    async fn() {
-      const { WIDGET_CATALOG } = await import('@/lib/widget-catalog')
-      assertDefined(WIDGET_CATALOG, 'WIDGET_CATALOG exported')
-
-      const widget = WIDGET_CATALOG.find((w: { id: string }) => w.id === 'passief_inkomen')
-      assertNotNull(widget, 'passief_inkomen widget exists in catalog')
-      assertDefined(widget!.name, 'Widget has name')
-      assertDefined(widget!.description, 'Widget has description')
-    },
-  },
+  // ── 4. (Removed: passief_inkomen widget was deleted) ──────────────────
   {
     id: 'dividend-freedom-days-calculation',
     name: 'Dividend vrijheidsdagen: berekening',

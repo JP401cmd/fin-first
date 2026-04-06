@@ -5,7 +5,7 @@ import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import Link from 'next/link'
 import {
   ShoppingCart, Wallet, PiggyBank, Building2, TrendingUp,
-  ArrowRight, ChevronDown,
+  ArrowRight,
   CheckCircle2, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Minus,
   BarChart3, PieChart,
@@ -27,6 +27,7 @@ interface KernMissionControlProps {
   // Budget data
   overviewBudgetGroups: BudgetWithChildren[]
   overviewSpending: Record<string, number>
+  prevMonthSpending: Record<string, number>
   totalBudgetSpent: number
   totalBudgetLimit: number
   overBudgetCount: number
@@ -67,6 +68,7 @@ export function KernMissionControl({
   budgetingActive,
   overviewBudgetGroups,
   overviewSpending,
+  prevMonthSpending,
   totalBudgetSpent,
   totalBudgetLimit,
   overBudgetCount,
@@ -84,14 +86,18 @@ export function KernMissionControl({
   hasVermogen = true,
   onCardClick,
 }: KernMissionControlProps) {
-  // Flash animations for live value changes
-  const { flashClass: assetsFlash } = useFlashChange(totalNonCashAssets + totalCash)
-  const { flashClass: debtsFlash } = useFlashChange(rawTotalDebts)
-  const { flashClass: budgetFlash } = useFlashChange(totalBudgetSpent)
+  // Previous month toggle for budget donut
+  const [showPrevMonth, setShowPrevMonth] = useState(false)
+  const activeSpending = showPrevMonth ? prevMonthSpending : overviewSpending
 
-  // Compute derived data
-  const segments = buildSegments(overviewBudgetGroups, overviewSpending)
-  const budgetPct = totalBudgetLimit > 0 ? Math.round((totalBudgetSpent / totalBudgetLimit) * 100) : 0
+  // Month labels for the toggle
+  const now = new Date()
+  const currentMonthLabel = now.toLocaleString('nl-NL', { month: 'short' })
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const prevMonthLabel = prevDate.toLocaleString('nl-NL', { month: 'short' })
+
+  // Compute derived data — all based on activeSpending so they respond to the month toggle
+  const segments = buildSegments(overviewBudgetGroups, activeSpending)
 
   // Group budgets by type for the card summary
   const budgetTypeSummaries = (() => {
@@ -109,6 +115,27 @@ export function KernMissionControl({
       .map(t => ({ type: t as BudgetType, label: labels[t] || t, ...map.get(t)! }))
   })()
 
+  // Derive totals from segments so they update with the month toggle
+  const activeTotalSpent = (() => {
+    const expenseSummary = budgetTypeSummaries.find(ts => ts.type === 'expense')
+    return expenseSummary?.spent ?? 0
+  })()
+  const activeTotalLimit = (() => {
+    const expenseSummary = budgetTypeSummaries.find(ts => ts.type === 'expense')
+    return expenseSummary?.limit ?? 0
+  })()
+  const activeBudgetPct = activeTotalLimit > 0 ? Math.round((activeTotalSpent / activeTotalLimit) * 100) : 0
+  const activeOverBudgetCount = (() => {
+    // Count parent expense budgets where spending exceeds limit
+    const expenseSegs = segments.filter(s => s.budgetType === 'expense')
+    return expenseSegs.filter(s => s.limit > 0 && s.spent > s.limit).length
+  })()
+
+  // Flash animations for live value changes (must be after activeTotalSpent is computed)
+  const { flashClass: assetsFlash } = useFlashChange(totalNonCashAssets + totalCash)
+  const { flashClass: debtsFlash } = useFlashChange(rawTotalDebts)
+  const { flashClass: budgetFlash } = useFlashChange(activeTotalSpent)
+
   // Always merge cash into assets — cash is a subset of assets (shown in bottom row)
   const cashItems = cashAccounts.map(a => ({ id: a.id, name: a.name, value: a.balance, isCash: true, source: a.source }))
   const nonCashItems = nonCashAssets.map(a => ({ id: a.id, name: a.name, value: a.current_value, isCash: false, source: 'asset' as const }))
@@ -122,8 +149,8 @@ export function KernMissionControl({
       {
         key: 'budgets' as const,
         label: 'Budg.',
-        metric: totalBudgetLimit > 0 ? `${budgetPct}%` : '\u2014',
-        subtitle: overBudgetCount > 0 ? `${overBudgetCount} over` : 'op schema',
+        metric: activeTotalLimit > 0 ? `${activeBudgetPct}%` : '\u2014',
+        subtitle: activeOverBudgetCount > 0 ? `${activeOverBudgetCount} over` : 'op schema',
       },
     ] : []),
     ...(hasVermogen ? [{
@@ -157,9 +184,7 @@ export function KernMissionControl({
     localStorage.setItem('kern-budget-view', mode)
   }
 
-  // Desktop-only collapsible state for Vermogen & Schulden cards
-  const [assetsOpen, setAssetsOpen] = useState(!budgetingActive)
-  const [debtsOpen, setDebtsOpen] = useState(!budgetingActive)
+  // Bezittingen & schulden are always expanded
 
   // Vermogen view toggle — persisted in localStorage
   const [vermogenView, setVermogenViewState] = useState<'compact' | 'cards'>(() => {
@@ -179,7 +204,7 @@ export function KernMissionControl({
     let green = 0
     let total = 0
     if (budgetingActive) {
-      green += overBudgetCount === 0 ? 1 : 0
+      green += activeOverBudgetCount === 0 ? 1 : 0
       total++
     }
     if (hasVermogen) {
@@ -384,13 +409,29 @@ export function KernMissionControl({
                   <div>
                     <p className="text-sm font-semibold text-[var(--ink-2)]">Budgetten</p>
                     <p className={`text-xs text-[var(--ink-3)] rounded-sm ${budgetFlash}`}>
-                      <span className="font-mono tabular-nums">{formatCurrency(totalBudgetSpent)}</span>
+                      <span className="font-mono tabular-nums">{formatCurrency(activeTotalSpent)}</span>
                       <span className="text-[var(--ink-4)]"> van </span>
-                      <span className="font-mono tabular-nums">{formatCurrency(totalBudgetLimit)}</span>
+                      <span className="font-mono tabular-nums">{formatCurrency(activeTotalLimit)}</span>
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Month toggle pill */}
+                  <div className="flex items-center gap-0.5 rounded-[var(--r)] bg-[var(--subtle)] p-0.5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowPrevMonth(false) }}
+                      className={`rounded-[var(--r-sm)] px-2 py-1 text-[10px] font-medium capitalize transition-colors ${!showPrevMonth ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'}`}
+                    >
+                      {currentMonthLabel}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowPrevMonth(true) }}
+                      className={`rounded-[var(--r-sm)] px-2 py-1 text-[10px] font-medium capitalize transition-colors ${showPrevMonth ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'}`}
+                    >
+                      {prevMonthLabel}
+                    </button>
+                  </div>
+                  {/* View toggle (list/donut) */}
                   <div className="flex items-center gap-0.5 rounded-[var(--r)] bg-[var(--subtle)] p-0.5">
                     <button
                       onClick={(e) => { e.stopPropagation(); setBudgetView('list') }}
@@ -406,10 +447,10 @@ export function KernMissionControl({
                     </button>
                   </div>
                   <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    overBudgetCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
+                    activeOverBudgetCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
                   }`}>
-                    {overBudgetCount === 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                    {overBudgetCount === 0 ? `${budgetPct}% besteed` : `${overBudgetCount} over budget`}
+                    {activeOverBudgetCount === 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                    {activeOverBudgetCount === 0 ? `${activeBudgetPct}% besteed` : `${activeOverBudgetCount} over budget`}
                   </div>
                 </div>
               </div>
@@ -440,7 +481,7 @@ export function KernMissionControl({
                 <div onClick={(e) => e.stopPropagation()}>
                   <BudgetDonut
                     groups={overviewBudgetGroups}
-                    spending={overviewSpending}
+                    spending={activeSpending}
                     onNavigate={(budgetId) => onCardClick('budgets', budgetId)}
                   />
                 </div>
@@ -490,16 +531,8 @@ export function KernMissionControl({
               onClick={() => onCardClick('assets')}
               className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('assets')} ${activeTab !== 'assets' ? 'hidden lg:block' : ''}`}
             >
-              {/* Header — clickable toggle on desktop (lg+), passthrough on mobile */}
-              <div
-                onClick={(e) => {
-                  if (window.innerWidth >= 1024) {
-                    e.stopPropagation()
-                    setAssetsOpen(prev => !prev)
-                  }
-                }}
-                className="mb-2 sm:mb-3 flex items-center justify-between lg:cursor-pointer lg:select-none"
-              >
+              {/* Header */}
+              <div className="mb-2 sm:mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
                     <PiggyBank className="h-5 w-5 text-kern-600" />
@@ -514,14 +547,11 @@ export function KernMissionControl({
                   {assetGrowthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-positive" />}
                   {assetGrowthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-negative" />}
                   {assetGrowthDirection === 'flat' && <Minus className="h-4 w-4 text-[var(--ink-4)]" />}
-                  {/* Chevron — desktop only */}
-                  <ChevronDown className={`hidden lg:block h-4 w-4 text-[var(--ink-3)] transition-transform duration-200 ${assetsOpen ? 'rotate-180' : ''}`} />
                 </div>
               </div>
 
-              {/* Collapsible detail content */}
-              {/* Mobile: always visible (grid-rows-[1fr]). Desktop: collapsed by default, toggle with assetsOpen */}
-              <div className={`grid transition-[grid-template-rows] duration-200 ease-out grid-rows-[1fr] ${!assetsOpen ? 'lg:grid-rows-[0fr]' : 'lg:grid-rows-[1fr]'}`}>
+              {/* Detail content — always visible */}
+              <div className="grid grid-rows-[1fr]">
                 <div className="overflow-hidden">
                   {/* Big total — mobile only (desktop shows it in header) */}
                   <p className={`font-mono text-2xl font-bold text-[var(--ink)] lg:hidden rounded-sm ${assetsFlash}`}>{formatCurrency(heroTotal)}</p>
@@ -626,16 +656,8 @@ export function KernMissionControl({
               onClick={() => onCardClick('debts')}
               className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('debts')} ${activeTab !== 'debts' ? 'hidden lg:block' : ''}`}
             >
-              {/* Header — clickable toggle on desktop (lg+), passthrough on mobile */}
-              <div
-                onClick={(e) => {
-                  if (window.innerWidth >= 1024) {
-                    e.stopPropagation()
-                    setDebtsOpen(prev => !prev)
-                  }
-                }}
-                className="mb-2 sm:mb-3 flex items-center justify-between lg:cursor-pointer lg:select-none"
-              >
+              {/* Header */}
+              <div className="mb-2 sm:mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
                     <Building2 className="h-5 w-5 text-kern-600" />
@@ -656,14 +678,11 @@ export function KernMissionControl({
                   ) : (
                     <AlertTriangle className="h-4 w-4 text-kern-500" />
                   )}
-                  {/* Chevron — desktop only */}
-                  <ChevronDown className={`hidden lg:block h-4 w-4 text-[var(--ink-3)] transition-transform duration-200 ${debtsOpen ? 'rotate-180' : ''}`} />
                 </div>
               </div>
 
-              {/* Collapsible detail content */}
-              {/* Mobile: always visible (grid-rows-[1fr]). Desktop: collapsed by default, toggle with debtsOpen */}
-              <div className={`grid transition-[grid-template-rows] duration-200 ease-out grid-rows-[1fr] ${!debtsOpen ? 'lg:grid-rows-[0fr]' : 'lg:grid-rows-[1fr]'}`}>
+              {/* Detail content — always visible */}
+              <div className="grid grid-rows-[1fr]">
                 <div className="overflow-hidden">
                   {/* Big total — mobile only (desktop shows it in header) */}
                   <p className={`font-mono text-2xl font-bold lg:hidden rounded-sm ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-positive'} ${debtsFlash}`}>

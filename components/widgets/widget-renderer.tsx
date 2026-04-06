@@ -146,10 +146,6 @@ const SimVermogenspadWidget = dynamic(
   () => import('./sim-vermogenspad-widget').then(m => ({ default: m.SimVermogenspadWidget })),
   { loading: WidgetLoadingFallback }
 )
-const PassiefInkomenWidget = dynamic(
-  () => import('./passief-inkomen-widget').then(m => ({ default: m.PassiefInkomenWidget })),
-  { loading: WidgetLoadingFallback }
-)
 const Box3DragWidget = dynamic(
   () => import('./box3-drag-widget').then(m => ({ default: m.Box3DragWidget })),
   { loading: WidgetLoadingFallback }
@@ -718,8 +714,6 @@ function renderWidgetById(
       return <VrijheidsScenarioWidget size={size} data={data} href={href} />
     case 'sim_vermogenspad':
       return <SimVermogenspadWidget size={size} data={data} href={href} />
-    case 'passief_inkomen':
-      return <PassiefInkomenWidget size={size} data={data} href={href} />
     case 'box3_drag':
       return <Box3DragWidget size={size} data={data} href={href} />
     case 'vrijheidsmijlpalen':

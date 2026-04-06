@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
-  Plus, CheckCircle2, TrendingDown, Wallet, Target, Scale,
+  Plus, CheckCircle2, TrendingDown, Wallet, Target, Scale, ChevronDown, BarChart3, Receipt,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -23,8 +23,6 @@ import { OwnershipBadge, useHouseholdStatus } from '@/components/app/ownership-t
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
-import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { FhinAvatar } from '@/components/app/avatars'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -57,7 +55,6 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
   const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
-  const { ref: debtListRef, hasEntered: debtListEntered } = useInViewAnimation({ duration: 800 })
   const { hasHousehold, householdId } = useHouseholdStatus()
   const [householdSplit, setHouseholdSplit] = useState<{ splitMode: SplitMode; mySharePct: number; myName: string; partnerName: string } | null>(null)
 
@@ -116,6 +113,32 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
     }
     loadFireParams()
   }, [])
+
+  // Collapsible section state (persisted in localStorage)
+  const [strategyOpen, setStrategyOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('collapsible_debts-strategy')
+      if (stored !== null) return stored === 'true'
+    }
+    return false
+  })
+  const toggleStrategy = () => {
+    const next = !strategyOpen
+    setStrategyOpen(next)
+    try { localStorage.setItem('collapsible_debts-strategy', String(next)) } catch { /* */ }
+  }
+  const [belastingOpen, setBelastingOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('collapsible_debts-belasting')
+      if (stored !== null) return stored === 'true'
+    }
+    return false
+  })
+  const toggleBelasting = () => {
+    const next = !belastingOpen
+    setBelastingOpen(next)
+    try { localStorage.setItem('collapsible_debts-belasting', String(next)) } catch { /* */ }
+  }
 
   // Kassabon modal state
   const [showTotalKassabon, setShowTotalKassabon] = useState(false)
@@ -347,241 +370,14 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
 
-      {/* ═══ 1. HERO ═══ */}
-      <section className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)]" data-testid="debts-hero">
-        <div className="h-1.5 bg-kern-500" />
-        <div className="p-4 sm:p-6 md:p-8">
-          <div className="mb-5 flex items-center gap-3">
-            <FhinAvatar size={40} />
-            <p className="label-editorial text-kern-600">
-              Vrijheid die je terugkoopt
+      {/* ═══ 1. HEADER ═══ */}
+      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6" data-testid="debts-hero">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-negative">Schulden</h1>
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
+              {activeDebts.length} schuld{activeDebts.length !== 1 ? 'en' : ''} — vrijheid die je terugkoopt
             </p>
-          </div>
-
-          <span className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)] sm:text-[44px] md:text-[52px]" data-testid="hero-total-debt">
-            {formatCurrency(totalBalance)}
-          </span>
-
-          {payoffDateStr && (
-            <p className="mt-1 font-serif italic text-lg text-[var(--ink-3)]">
-              schuldenvrij in <span className="font-semibold not-italic text-[var(--ink-2)]">{payoffDateStr}</span>
-            </p>
-          )}
-          {!payoffDateStr && activeDebts.length > 0 && (
-            <p className="mt-1 font-serif italic text-lg text-[var(--ink-3)]">
-              {activeDebts.length} actieve schuld{activeDebts.length !== 1 ? 'en' : ''}
-            </p>
-          )}
-
-          {/* Progress bar */}
-          {totalOriginal > 0 && (
-            <div className="mt-5">
-              <div className="mb-1 flex items-center justify-between text-xs text-[var(--ink-3)]">
-                <span>{paidOff.toFixed(1)}% afgelost</span>
-                <span>{formatCurrency(paidOffAmount)} van {formatCurrency(totalOriginal)}</span>
-              </div>
-              <div className="h-[5px] w-full overflow-hidden rounded-full bg-kern-100">
-                <div
-                  className="h-full rounded-full bg-kern-500 transition-all duration-700"
-                  style={{ width: `${Math.min(paidOff, 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ═══ 2. KPI GRID ═══ */}
-      <section className="mt-5 sm:mt-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="debts-kpi-grid">
-        {/* KPI: Totale Schuld */}
-        <button
-          type="button"
-          onClick={() => setShowTotalKassabon(true)}
-          className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-left transition-all hover:border-kern-300 hover:shadow-sm"
-          data-testid="kpi-total-debt"
-        >
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
-            <Wallet className="h-5 w-5 text-kern-600" />
-          </div>
-          <p className="text-sm font-medium text-[var(--ink-3)]">Totale Schuld</p>
-          <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(totalBalance)}</p>
-          <FreedomTimeBadge amount={totalBalance} className="mt-2" />
-        </button>
-
-        {/* KPI: Maandelijkse Aflossing */}
-        <button
-          type="button"
-          onClick={() => setShowMonthlyKassabon(true)}
-          className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-left transition-all hover:border-kern-300 hover:shadow-sm"
-          data-testid="kpi-monthly-payment"
-        >
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
-            <TrendingDown className="h-5 w-5 text-kern-600" />
-          </div>
-          <p className="text-sm font-medium text-[var(--ink-3)]">Maandelijkse Aflossing</p>
-          <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(totalMonthlyPayments)}</p>
-          {monthlyPaymentFreedomDays > 0 && (
-            <p className="mt-2 text-xs text-kern-600/80">
-              {monthlyPaymentFreedomDays} {monthlyPaymentFreedomDays === 1 ? 'dag' : 'dagen'} per maand teruggewonnen
-            </p>
-          )}
-        </button>
-
-        {/* KPI: Al Afgelost */}
-        <button
-          type="button"
-          onClick={() => setShowPaidOffKassabon(true)}
-          className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-left transition-all hover:border-kern-300 hover:shadow-sm"
-          data-testid="kpi-paid-off"
-        >
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
-            <CheckCircle2 className="h-5 w-5 text-kern-600" />
-          </div>
-          <p className="text-sm font-medium text-[var(--ink-3)]">Al Afgelost</p>
-          <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-emerald-600">{formatCurrency(paidOffAmount)}</p>
-          {dailyExpenses > 0 && paidOffAmount >= 100 && (
-            <p className="mt-2 text-xs text-emerald-600/80">
-              {formatFreedomTimeString(calculateFreedomTime(paidOffAmount, dailyExpenses), 'long')} vrijheid herwonnen
-            </p>
-          )}
-        </button>
-
-        {/* KPI: Voortgang */}
-        <button
-          type="button"
-          onClick={() => setShowProgressKassabon(true)}
-          className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-left transition-all hover:border-kern-300 hover:shadow-sm"
-          data-testid="kpi-progress"
-        >
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
-            <Target className="h-5 w-5 text-kern-600" />
-          </div>
-          <p className="text-sm font-medium text-[var(--ink-3)]">Voortgang</p>
-          <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{paidOff.toFixed(1)}%</p>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-              style={{ width: `${Math.min(paidOff, 100)}%` }}
-            />
-          </div>
-        </button>
-      </section>
-
-      {/* ═══ 3. AFLOSSTRATEGIE ═══ */}
-      <FeatureGate featureId="schulden_aflosplan" fallback="hidden">
-      <section className="mt-5 sm:mt-8" data-testid="strategy-section">
-        <div className="mb-4 flex items-center gap-2">
-          <div className="h-5 w-1 rounded-full bg-kern-500" />
-          <h2 className="label-editorial text-[var(--ink-2)]">Aflosstrategie</h2>
-        </div>
-
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-          <div className="flex flex-wrap items-center gap-3">
-            {(['avalanche', 'snowball', 'current'] as PayoffStrategy[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStrategy(s)}
-                className={`rounded-[var(--r)] border px-4 py-2 text-sm font-medium transition-colors ${
-                  strategy === s
-                    ? 'border-kern-300 bg-kern-50 text-kern-700'
-                    : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
-                }`}
-              >
-                {s === 'avalanche' ? 'Avalanche (hoogste rente eerst)' :
-                 s === 'snowball' ? 'Sneeuwbal (kleinste schuld eerst)' :
-                 'Huidig (ongewijzigd)'}
-              </button>
-            ))}
-
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-[var(--ink-3)]">Extra p/m:</label>
-              <input
-                type="number"
-                min={0}
-                step={25}
-                value={extraMonthly}
-                onChange={(e) => setExtraMonthly(Math.max(0, Number(e.target.value)))}
-                className="w-20 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-[var(--ink)]"
-              />
-            </div>
-          </div>
-
-          {/* Strategy results */}
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
-            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="strategy-payoff-date">
-              <p className="text-xs text-[var(--ink-3)]">Schuldenvrij op</p>
-              <p className="mt-1 text-sm font-bold text-[var(--ink)]">
-                {summary.payoffDate
-                  ? new Date(summary.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
-                  : 'Niet mogelijk'}
-              </p>
-              {summary.payoffDate && (
-                <p className="mt-0.5 text-[10px] text-kern-600/80" data-testid="strategy-payoff-freedom">
-                  Schuldenvrij in {new Date(summary.payoffDate).getFullYear()} — dan verdien je 100% voor jezelf
-                </p>
-              )}
-            </div>
-            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
-              <p className="text-xs text-[var(--ink-3)]">Totale rente</p>
-              <p className="mt-1 text-sm font-bold text-red-600">{formatCurrency(summary.totalInterest)}</p>
-              {dailyExpenses > 0 && summary.totalInterest >= 100 && (
-                <p className="mt-0.5 text-[10px] text-red-500/80">
-                  {formatFreedomTimeString(calculateFreedomTime(summary.totalInterest, dailyExpenses), 'long')} aan verloren vrijheid
-                </p>
-              )}
-            </div>
-            {interestSaved > 0 && (
-              <div className="rounded-[var(--r-lg)] border border-emerald-100 bg-emerald-50 p-3">
-                <p className="text-xs text-emerald-600">Rente bespaard</p>
-                <p className="mt-1 text-sm font-bold text-emerald-700">{formatCurrency(interestSaved)}</p>
-                {dailyExpenses > 0 && interestSaved >= 100 && (
-                  <p className="mt-0.5 text-[10px] text-emerald-600/80">
-                    {formatFreedomTimeString(calculateFreedomTime(interestSaved, dailyExpenses), 'long')} vrijheid gered
-                  </p>
-                )}
-              </div>
-            )}
-            {monthsSaved > 0 && (
-              <div className="rounded-[var(--r-lg)] border border-emerald-100 bg-emerald-50 p-3">
-                <p className="text-xs text-emerald-600">Maanden eerder vrij</p>
-                <p className="mt-1 text-sm font-bold text-emerald-700">{monthsSaved} maanden</p>
-              </div>
-            )}
-          </div>
-
-          {/* Payoff chart */}
-          {simulation.length > 0 && (
-            <div className="mt-4">
-              <PayoffChart months={simulation} debts={activeDebts} />
-            </div>
-          )}
-
-          {/* Strategy comparison: Snowball vs Avalanche trajectory overlay */}
-          {activeDebts.length > 0 && snowballSim.length > 0 && avalancheSim.length > 0 && (
-            <div className="mt-3 sm:mt-6" data-testid="strategy-comparison-section">
-              <DebtPayoffTrajectoryChart
-                snowballMonths={snowballSim}
-                avalancheMonths={avalancheSim}
-                snowballSummary={snowballSummary}
-                avalancheSummary={avalancheSummary}
-              />
-              <StrategyComparisonMessage
-                snowballSummary={snowballSummary}
-                avalancheSummary={avalancheSummary}
-                dailyExpenses={dailyExpenses}
-              />
-            </div>
-          )}
-        </div>
-      </section>
-      </FeatureGate>
-
-      {/* ═══ 4. JOUW SCHULDEN ═══ */}
-      <section className="mt-5 sm:mt-8" data-testid="debt-list-section">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-5 w-1 rounded-full bg-kern-500" />
-            <h2 className="label-editorial text-[var(--ink-2)]">Jouw Schulden</h2>
             {perspective === 'household' && hiddenCategories.includes('debts') && (
               <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['debts']} />
             )}
@@ -595,7 +391,181 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
           </button>
         </div>
 
-        <div className="space-y-2" ref={debtListRef}>
+        <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4" data-testid="debts-kpi-grid">
+          <button type="button" onClick={() => setShowTotalKassabon(true)} className="text-left" data-testid="kpi-total-debt">
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale schuld</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalBalance)}</p>
+            {dailyExpenses > 0 && totalBalance >= 100 && (
+              <p className="mt-0.5 text-xs text-kern-600/70">
+                {formatFreedomTimeString(calculateFreedomTime(totalBalance, dailyExpenses), 'long')} terug te winnen
+              </p>
+            )}
+          </button>
+          <button type="button" onClick={() => setShowMonthlyKassabon(true)} className="text-left" data-testid="kpi-monthly-payment">
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Maandelijkse aflossing</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalMonthlyPayments)}</p>
+            {monthlyPaymentFreedomDays > 0 && (
+              <p className="mt-0.5 text-xs text-kern-600/70">
+                {monthlyPaymentFreedomDays} {monthlyPaymentFreedomDays === 1 ? 'dag' : 'dagen'}/mnd teruggewonnen
+              </p>
+            )}
+          </button>
+          <button type="button" onClick={() => setShowPaidOffKassabon(true)} className="text-left" data-testid="kpi-paid-off">
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Al afgelost</p>
+            <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrency(paidOffAmount)}</p>
+            {dailyExpenses > 0 && paidOffAmount >= 100 && (
+              <p className="mt-0.5 text-xs text-emerald-500/70">
+                {formatFreedomTimeString(calculateFreedomTime(paidOffAmount, dailyExpenses), 'long')} herwonnen
+              </p>
+            )}
+          </button>
+          <button type="button" onClick={() => setShowProgressKassabon(true)} className="text-left" data-testid="kpi-progress">
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Voortgang</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{paidOff.toFixed(1)}%</p>
+            {totalOriginal > 0 && (
+              <div className="mt-1 h-[5px] w-full overflow-hidden rounded-full bg-kern-100">
+                <div className="h-full rounded-full bg-kern-500 transition-all duration-700" style={{ width: `${Math.min(paidOff, 100)}%` }} />
+              </div>
+            )}
+          </button>
+        </div>
+      </section>
+
+      {/* ═══ 2. AFLOSSTRATEGIE — collapsible card ═══ */}
+      <FeatureGate featureId="schulden_aflosplan" fallback="hidden">
+      <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden" data-testid="strategy-section">
+        {/* ── Accent bar ── */}
+        <div className="h-[3px] w-full bg-kern-500" />
+
+        {/* ── Header (clickable toggle) ── */}
+        <button
+          type="button"
+          onClick={toggleStrategy}
+          aria-expanded={strategyOpen}
+          className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+        >
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${strategyOpen ? 'rotate-180' : ''}`} />
+          <div className="flex min-w-0 flex-1 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-kern-500" />
+              <h3 className="label-editorial text-[var(--ink-2)]">Aflosstrategie</h3>
+            </div>
+            {payoffDateStr && (
+              <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                vrij in {payoffDateStr}
+              </p>
+            )}
+          </div>
+        </button>
+
+        {/* ── Content ── */}
+        {strategyOpen && (
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-wrap items-center gap-3">
+              {(['avalanche', 'snowball', 'current'] as PayoffStrategy[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStrategy(s)}
+                  className={`rounded-[var(--r)] border px-4 py-2 text-sm font-medium transition-colors ${
+                    strategy === s
+                      ? 'border-kern-300 bg-kern-50 text-kern-700'
+                      : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  {s === 'avalanche' ? 'Avalanche (hoogste rente eerst)' :
+                   s === 'snowball' ? 'Sneeuwbal (kleinste schuld eerst)' :
+                   'Huidig (ongewijzigd)'}
+                </button>
+              ))}
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-[var(--ink-3)]">Extra p/m:</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={25}
+                  value={extraMonthly}
+                  onChange={(e) => setExtraMonthly(Math.max(0, Number(e.target.value)))}
+                  className="w-20 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-[var(--ink)]"
+                />
+              </div>
+            </div>
+
+            {/* Strategy results */}
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
+              <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="strategy-payoff-date">
+                <p className="text-xs text-[var(--ink-3)]">Schuldenvrij op</p>
+                <p className="mt-1 text-sm font-bold text-[var(--ink)]">
+                  {summary.payoffDate
+                    ? new Date(summary.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+                    : 'Niet mogelijk'}
+                </p>
+                {summary.payoffDate && (
+                  <p className="mt-0.5 text-[10px] text-kern-600/80" data-testid="strategy-payoff-freedom">
+                    Schuldenvrij in {new Date(summary.payoffDate).getFullYear()} — dan verdien je 100% voor jezelf
+                  </p>
+                )}
+              </div>
+              <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+                <p className="text-xs text-[var(--ink-3)]">Totale rente</p>
+                <p className="mt-1 text-sm font-bold text-red-600">{formatCurrency(summary.totalInterest)}</p>
+                {dailyExpenses > 0 && summary.totalInterest >= 100 && (
+                  <p className="mt-0.5 text-[10px] text-red-500/80">
+                    {formatFreedomTimeString(calculateFreedomTime(summary.totalInterest, dailyExpenses), 'long')} aan verloren vrijheid
+                  </p>
+                )}
+              </div>
+              {interestSaved > 0 && (
+                <div className="rounded-[var(--r-lg)] border border-emerald-100 bg-emerald-50 p-3">
+                  <p className="text-xs text-emerald-600">Rente bespaard</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-700">{formatCurrency(interestSaved)}</p>
+                  {dailyExpenses > 0 && interestSaved >= 100 && (
+                    <p className="mt-0.5 text-[10px] text-emerald-600/80">
+                      {formatFreedomTimeString(calculateFreedomTime(interestSaved, dailyExpenses), 'long')} vrijheid gered
+                    </p>
+                  )}
+                </div>
+              )}
+              {monthsSaved > 0 && (
+                <div className="rounded-[var(--r-lg)] border border-emerald-100 bg-emerald-50 p-3">
+                  <p className="text-xs text-emerald-600">Maanden eerder vrij</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-700">{monthsSaved} maanden</p>
+                </div>
+              )}
+            </div>
+
+            {/* Payoff chart */}
+            {simulation.length > 0 && (
+              <div className="mt-4">
+                <PayoffChart months={simulation} debts={activeDebts} />
+              </div>
+            )}
+
+            {/* Strategy comparison: Snowball vs Avalanche trajectory overlay */}
+            {activeDebts.length > 0 && snowballSim.length > 0 && avalancheSim.length > 0 && (
+              <div className="mt-3 sm:mt-6" data-testid="strategy-comparison-section">
+                <DebtPayoffTrajectoryChart
+                  snowballMonths={snowballSim}
+                  avalancheMonths={avalancheSim}
+                  snowballSummary={snowballSummary}
+                  avalancheSummary={avalancheSummary}
+                />
+                <StrategyComparisonMessage
+                  snowballSummary={snowballSummary}
+                  avalancheSummary={avalancheSummary}
+                  dailyExpenses={dailyExpenses}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      </FeatureGate>
+
+      {/* ═══ 3. JOUW SCHULDEN ═══ */}
+      <section className="mt-3 sm:mt-6 space-y-1" data-testid="debt-list-section">
+
+        <div className="space-y-2">
         {debts.map((debt, debtIndex) => {
           const balance = Number(debt.current_balance)
           const original = Number(debt.original_amount)
@@ -668,13 +638,8 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
                 </div>
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
                   <div
-                    className="h-full rounded-full bg-kern-500"
-                    style={{
-                      width: debtListEntered ? `${Math.min(pct, 100)}%` : '0%',
-                      transition: debtListEntered
-                        ? `width 500ms cubic-bezier(.22,1,.36,1) ${100 + debtIndex * 80}ms`
-                        : 'none',
-                    }}
+                    className="h-full rounded-full bg-kern-500 transition-all duration-500"
+                    style={{ width: `${Math.min(pct, 100)}%` }}
                   />
                 </div>
                 {/* Per-partner split for shared debts */}
@@ -726,9 +691,35 @@ export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } 
         )}
       </section>
 
-      {/* ═══ 5. BOX 3 BELASTING ═══ */}
+      {/* ═══ 4. BOX 3 BELASTING — collapsible card ═══ */}
       <FeatureGate featureId="box3_belasting" fallback="hidden">
-        <BelastingSection dailyExpenses={dailyExpenses} />
+        <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+          {/* ── Accent bar ── */}
+          <div className="h-[3px] w-full bg-kern-500" />
+
+          {/* ── Header (clickable toggle) ── */}
+          <button
+            type="button"
+            onClick={toggleBelasting}
+            aria-expanded={belastingOpen}
+            className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+          >
+            <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${belastingOpen ? 'rotate-180' : ''}`} />
+            <div className="flex min-w-0 flex-1 items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-kern-500" />
+                <h3 className="label-editorial text-[var(--ink-2)]">Box 3 Belasting</h3>
+              </div>
+            </div>
+          </button>
+
+          {/* ── Content ── */}
+          {belastingOpen && (
+            <div className="[&>section]:mt-0 [&>section>div:first-child]:hidden [&>*>section]:mt-0 [&>*>section>div:first-child]:hidden px-4 pb-4 sm:px-6 sm:pb-6">
+              <BelastingSection dailyExpenses={dailyExpenses} />
+            </div>
+          )}
+        </div>
       </FeatureGate>
 
       {/* ═══ 6. MODALS ═══ */}

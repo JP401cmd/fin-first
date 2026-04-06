@@ -36,8 +36,10 @@ import {
   type LifeEvent,
 } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
-import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
+import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
+import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import { runUnifiedProjection, toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
@@ -513,6 +515,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const fireRange = computeFireRange(horizonInput, fireSwr, undefined, fireParams.grossReturn, strategyOpts)
 
   // Horizon extra: sim rows for vermogenspad chart
+  // Uses runUnifiedProjection() — the same engine as the horizon page — for per-asset-type
+  // rendement, per-schuld aflossing, and proper Box 3 per asset category.
   let simRows: { age: number; endPortfolio: number; phase: string }[] | null = null
   let simRequiredPortfolio: number | null = null
   let simFireAgeFractional: number | null = null
@@ -524,20 +528,31 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const dashboardForcedFireAge = fireStrategy.strategy === 'pensioen'
         ? Math.ceil(NL_AOW_AGE)
         : undefined
-      const simResult = runSimulation(
+      // Derive hasPartner from profile household_type (consistent with horizon-data-loader)
+      const householdType = (profileResult.data as Record<string, unknown> | null)?.household_type as string | null
+      const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
+      const unifiedInput: UnifiedProjectionInput = {
+        assets: (assetsResult.data ?? []) as unknown as Asset[],
+        debts: (debtsResult.data ?? []) as unknown as Debt[],
         currentAge,
-        fireStrategy.endAge,
-        netWorth,
-        yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12,
-        monthlyContributions * 12,
-        fireParams.grossReturn,
-        'nl_box3',
-        fireParams.inflationRate,
-        simCashflows,
-        fireStrategy,
-        undefined,
-        dashboardForcedFireAge,
-      )
+        endAge: fireStrategy.endAge,
+        yearlyExpenses: yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12,
+        annualSavings: monthlyContributions * 12,
+        monthlySurplus: monthlyContributions,
+        monthlyIncome: effectiveMonthlyIncome,
+        incomeGrowthRate: 0,  // conservatief: geen inkomensgroei in FIRE simulatie
+        grossReturn: fireParams.grossReturn,
+        inflationRate: fireParams.inflationRate,
+        box3Method: fireParams.box3Method,
+        cashflows: simCashflows,
+        strategyConfig: fireStrategy,
+        withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+        forcedFireAge: dashboardForcedFireAge,
+        hasPartner,
+        bankAccountCash: unlinkedCash,
+      }
+      const unifiedResult = runUnifiedProjection(unifiedInput)
+      const simResult = toSimResult(unifiedResult)
       simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
       simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
       simFireAgeFractional = simResult.fireAgeFractional

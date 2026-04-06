@@ -22756,3 +22756,20 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#679, #680)
 - Overall progress: 670/683 passing (98.1%)
+
+## Session 2026-04-06 - Feature #691
+
+### Feature #691: What-if pagina geeft 5e parameter mee aan computeRetirementExpenses - PASSING
+- The horizon page passes `profileMonthlyExpenses * 12` as the 5th parameter to `computeRetirementExpenses()` for the fallback chain
+- The what-if page was missing this parameter, which could lead to different yearlyRetirementExpenses values
+- Added `estimated_monthly_expenses` to the profile select query on the what-if page
+- Extracted `profileMonthlyExpenses` from profile data and passed `profileMonthlyExpenses * 12` as 5th arg
+- Verified: what-if page loads correctly with zero console errors
+- Commit: fb9193c2
+
+### Files Modified
+- app/(app)/horizon/whatif/page.tsx — added estimated_monthly_expenses to profile query + 5th param
+
+### Current Status
+- 1 feature completed this session (#691)
+- Overall progress: 684/692 passing (98.8%)

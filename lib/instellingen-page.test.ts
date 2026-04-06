@@ -165,10 +165,9 @@ describe('Sectie B — Widgets', () => {
     const prefs: Record<string, { enabled: boolean; size: string }> = {
       netto_vermogen: { enabled: true, size: 'full' },
       fire_prognose: { enabled: true, size: 'half' },
-      passief_inkomen: { enabled: false, size: 'quarter' },
     }
 
-    expect(Object.keys(prefs).length).toBe(3)
+    expect(Object.keys(prefs).length).toBe(2)
     expect(prefs.netto_vermogen.enabled).toBe(true)
     expect(prefs.fire_prognose.size).toBe('half')
   })

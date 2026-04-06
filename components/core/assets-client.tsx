@@ -67,6 +67,18 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [modalStep, setModalStep] = useState<'detail' | 'edit' | 'revalue'>('detail')
   const [projectionYears, setProjectionYears] = useState(10)
+  const [insightOpen, setInsightOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('collapsible_assets-insight')
+      if (stored !== null) return stored === 'true'
+    }
+    return false
+  })
+  const toggleInsight = () => {
+    const next = !insightOpen
+    setInsightOpen(next)
+    try { localStorage.setItem('collapsible_assets-insight', String(next)) } catch { /* */ }
+  }
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>(initialData ? initialData.valuations as unknown as Record<string, Valuation[]> : {})
   const [dailyExpenses, setDailyExpenses] = useState(initialData?.dailyExpenses ?? 0)
   const [showCashModal, setShowCashModal] = useState(false)
@@ -345,7 +357,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
       <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-[var(--ink)]">Bezittingen</h1>
+            <h1 className="text-xl font-bold text-positive">Bezittingen</h1>
             <p className="mt-1 text-sm text-[var(--ink-3)]">
               {activeAssets.length} bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
             </p>
@@ -418,77 +430,104 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         </div>
       </section>
 
-      {/* Allocation + projection */}
-      <div className="mt-3 sm:mt-6 grid gap-3 sm:gap-6 lg:grid-cols-2">
-        {/* Allocation donut */}
-        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
-          <div className="mt-4 flex items-center gap-6">
-            <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
-            <div className="flex-1 space-y-2">
-              {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
-                const data = byType[type]
-                if (!data || data.total === 0) return null
-                const pct = totalValue > 0 ? (data.total / totalValue) * 100 : 0
-                return (
-                  <div key={type} className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-3 w-3 rounded-sm"
-                      style={{ backgroundColor: ASSET_TYPE_COLORS[type] }}
-                    />
-                    <span className="flex-1 text-xs text-[var(--ink-2)]">{ASSET_TYPE_LABELS[type]}</span>
-                    <span className="text-xs font-medium text-[var(--ink)]">{pct.toFixed(0)}%</span>
-                    <span className="text-xs text-[var(--ink-3)]">{formatCurrency(data.total)}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </section>
+      {/* Allocation + projection — collapsible card */}
+      <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+        {/* ── Accent bar ── */}
+        <div className="h-[3px] w-full bg-kern-500" />
 
-        {/* Projection chart */}
-        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6" data-testid="portfolio-projection-section">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[var(--ink-2)]">Projectie</h2>
-            <div className="flex items-center gap-1" data-testid="projection-year-buttons">
-              {[5, 10, 20, 30].map((y) => (
-                <button
-                  key={y}
-                  onClick={() => setProjectionYears(y)}
-                  data-testid={`projection-year-${y}`}
-                  className={`rounded-md px-2 py-1 text-xs font-medium ${
-                    projectionYears === y
-                      ? 'bg-kern-100 text-kern-700'
-                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                  }`}
-                >
-                  {y}j
-                </button>
-              ))}
+        {/* ── Header (clickable toggle) ── */}
+        <button
+          type="button"
+          onClick={toggleInsight}
+          aria-expanded={insightOpen}
+          className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+        >
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${insightOpen ? 'rotate-180' : ''}`} />
+          <div className="flex min-w-0 flex-1 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-kern-500" />
+              <h3 className="label-editorial text-[var(--ink-2)]">Verdeling &amp; Projectie</h3>
             </div>
-          </div>
-          <ProjectionChart data={projection} currentValue={totalValue} />
-          <div className="mt-3 flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1">
-              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-              <span className="text-[var(--ink-3)]">Verwachte groei:</span>
-              <span className="font-medium text-emerald-600" data-testid="projected-growth">+{formatCurrency(projectedGrowth)}</span>
-            </div>
-          </div>
-          {/* Contextual projection message */}
-          {projection.length > 0 && (
-            <p className="mt-3 text-xs text-[var(--ink-3)] leading-relaxed" data-testid="projection-context-message">
-              {totalMonthlyContrib > 0
-                ? `Met je huidige inleg van ${formatCurrency(totalMonthlyContrib)}/maand groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`
-                : `Zonder extra inleg groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`}
-              {dailyExpenses > 0 && futureValue > 0 && (
-                <span className="text-emerald-600 font-medium">
-                  {' — '}dat is {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
-                </span>
-              )}
+            <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(totalValue)}
             </p>
-          )}
-        </section>
+          </div>
+        </button>
+
+        {/* ── Content ── */}
+        {insightOpen && (
+          <div className="grid gap-3 sm:gap-6 lg:grid-cols-2 p-4 sm:p-6">
+            {/* Allocation donut */}
+            <section>
+              <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
+              <div className="mt-4 flex items-center gap-6">
+                <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
+                <div className="flex-1 space-y-2">
+                  {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
+                    const data = byType[type]
+                    if (!data || data.total === 0) return null
+                    const pct = totalValue > 0 ? (data.total / totalValue) * 100 : 0
+                    return (
+                      <div key={type} className="flex items-center gap-2">
+                        <span
+                          className="inline-block h-3 w-3 rounded-sm"
+                          style={{ backgroundColor: ASSET_TYPE_COLORS[type] }}
+                        />
+                        <span className="flex-1 text-xs text-[var(--ink-2)]">{ASSET_TYPE_LABELS[type]}</span>
+                        <span className="text-xs font-medium text-[var(--ink)]">{pct.toFixed(0)}%</span>
+                        <span className="text-xs text-[var(--ink-3)]">{formatCurrency(data.total)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </section>
+
+            {/* Projection chart */}
+            <section data-testid="portfolio-projection-section">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-[var(--ink-2)]">Projectie</h2>
+                <div className="flex items-center gap-1" data-testid="projection-year-buttons">
+                  {[5, 10, 20, 30].map((y) => (
+                    <button
+                      key={y}
+                      onClick={(e) => { e.stopPropagation(); setProjectionYears(y) }}
+                      data-testid={`projection-year-${y}`}
+                      className={`rounded-md px-2 py-1 text-xs font-medium ${
+                        projectionYears === y
+                          ? 'bg-kern-100 text-kern-700'
+                          : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                      }`}
+                    >
+                      {y}j
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ProjectionChart data={projection} currentValue={totalValue} />
+              <div className="mt-3 flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="text-[var(--ink-3)]">Verwachte groei:</span>
+                  <span className="font-medium text-emerald-600" data-testid="projected-growth">+{formatCurrency(projectedGrowth)}</span>
+                </div>
+              </div>
+              {/* Contextual projection message */}
+              {projection.length > 0 && (
+                <p className="mt-3 text-xs text-[var(--ink-3)] leading-relaxed" data-testid="projection-context-message">
+                  {totalMonthlyContrib > 0
+                    ? `Met je huidige inleg van ${formatCurrency(totalMonthlyContrib)}/maand groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`
+                    : `Zonder extra inleg groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`}
+                  {dailyExpenses > 0 && futureValue > 0 && (
+                    <span className="text-emerald-600 font-medium">
+                      {' — '}dat is {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
+                    </span>
+                  )}
+                </p>
+              )}
+            </section>
+          </div>
+        )}
       </div>
 
       {/* Grouped asset list */}

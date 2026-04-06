@@ -154,7 +154,6 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   vrijheidsmijlpalen: 'toekomstplannen',
   vrijheidsscenarios: 'toekomstplannen',
   sim_vermogenspad: 'toekomstplannen',
-  passief_inkomen: 'toekomstplannen',
   monte_carlo: 'toekomstplannen',
   backtesting_score: 'toekomstplannen',
   levensgebeurtenissen: 'toekomstplannen',

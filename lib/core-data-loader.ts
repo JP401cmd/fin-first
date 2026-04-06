@@ -84,6 +84,7 @@ export interface CorePageData {
   totalBudgetSpent: number
   overviewBudgetGroups: BudgetWithChildren[]
   overviewSpending: Record<string, number>
+  prevMonthSpending: Record<string, number>
 
   // Progress indicators
   debtProgress: { totalOriginal: number; totalCurrent: number; progressPct: number } | null
@@ -368,10 +369,11 @@ export const loadCoreData = cache(async function loadCoreData(
 
   // ── Batch 2: Budget alerts + debt progress + asset valuations + goals + 6m spending ──
   const sixMonthsAgoForBudgets = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1)).toISOString().split('T')[0]
+  const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
   const [
     budgetResult, spendingResult, snapshotResult,
     debtFullResult, assetValuationResult, goalsResult, spending6mResult,
-    holdingsResult,
+    holdingsResult, prevSpendingResult,
   ] = await Promise.all([
     supabase.from('budgets').select('id, name, icon, default_limit, budget_type, parent_id, is_essential, interval, is_favorite, alert_threshold').limit(500),
     supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
@@ -385,6 +387,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .from('holdings')
       .select('id, name, ticker, units, current_price, avg_purchase_price, daily_change_percent, asset_id, asset:assets!asset_id(has_holdings_tracking)')
       .eq('is_active', true),
+    supabase.from('transactions').select('budget_id, amount').gte('date', prevMonthStart).lt('date', monthStart),
   ])
 
   // Goals state
@@ -396,6 +399,7 @@ export const loadCoreData = cache(async function loadCoreData(
   let totalBudgetLimit = 0
   let totalBudgetSpent = 0
   let overviewSpending: Record<string, number> = {}
+  let prevMonthSpending: Record<string, number> = {}
   let overviewBudgetGroups: BudgetWithChildren[] = []
   let savingsBreakdown: { name: string; icon: string; budgetType: string; amount6m: number }[] = []
   let savingsBudgetTotal6m = 0
@@ -451,6 +455,18 @@ export const loadCoreData = cache(async function loadCoreData(
 
     // Store data for budget legend overview
     overviewSpending = spendMap
+
+    // Build previous-month spending map
+    if (prevSpendingResult.data) {
+      const prevMap: Record<string, number> = {}
+      for (const t of prevSpendingResult.data) {
+        if (t.budget_id) {
+          prevMap[t.budget_id] = (prevMap[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+        }
+      }
+      prevMonthSpending = prevMap
+    }
+
     const allBudgets = budgetResult.data as Budget[]
     const parents = allBudgets.filter(b => !b.parent_id)
     const budgetChildren = allBudgets.filter(b => !!b.parent_id)
@@ -750,6 +766,7 @@ export const loadCoreData = cache(async function loadCoreData(
     totalBudgetSpent,
     overviewBudgetGroups,
     overviewSpending,
+    prevMonthSpending,
 
     debtProgress,
     assetGrowthDirection,

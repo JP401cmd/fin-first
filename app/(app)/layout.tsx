@@ -1,6 +1,8 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AppHeader } from '@/components/app/app-header'
+import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanel } from '@/components/app/chat/chat-panel'
 import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
@@ -171,6 +173,9 @@ export default async function AppLayout({
                       <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} activeModules={activeModules}>
                         <ChatLayoutWrapper>
                           <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
+                          <Suspense fallback={null}>
+                            <WelcomeBanner />
+                          </Suspense>
                           <DailyExpenseProvider>
                             <main className="pb-20 md:pb-0">{children}</main>
                           </DailyExpenseProvider>

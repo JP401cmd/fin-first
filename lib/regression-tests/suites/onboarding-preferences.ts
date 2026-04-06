@@ -38,7 +38,7 @@ const ALL_FOCUS_OPTIONS: { id: FocusChoice; label: string; description: string }
 const FOCUS_WIDGET_BOOST: Record<FocusChoice, string[]> = {
   budget_cashflow: ['cash_flow', 'budgetten', 'spaarquote', 'vaste_lasten', 'nibud_benchmark', 'noodfonds', 'trend_inkomen', 'trend_uitgaven', 'trend_sparen', 'trend_schulden'],
   assets_investments: ['netto_vermogen', 'assets', 'holdings', 'belasting_box3', 'box3_drag', 'huishouden_vergelijking'],
-  fire_freedom: ['fire_prognose', 'monte_carlo', 'vrijheidsscenarios', 'sim_vermogenspad', 'passief_inkomen', 'vrijheidsmijlpalen', 'backtesting_score', 'gezondheids_score', 'vrijheidsvoortgang', 'levensgebeurtenissen'],
+  fire_freedom: ['fire_prognose', 'monte_carlo', 'vrijheidsscenarios', 'sim_vermogenspad', 'vrijheidsmijlpalen', 'backtesting_score', 'gezondheids_score', 'vrijheidsvoortgang', 'levensgebeurtenissen'],
   goals_actions: ['voorstellen', 'acties', 'doelen', 'volgende_stap', 'beslissingspatronen', 'vrijheidsdagen_maand', 'wilskracht'],
   overview: ['netto_vermogen', 'cash_flow', 'fire_prognose', 'acties', 'spaarquote', 'vrijheidsvoortgang', 'jouw_pad', 'maandoverzicht'],
 }

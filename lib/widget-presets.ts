@@ -28,10 +28,9 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
       { id: 'fire_prognose',       enabled: true, size: 'full',    order: 1 },
       { id: 'netto_vermogen',      enabled: true, size: 'half',    order: 2 },
       { id: 'sim_vermogenspad',    enabled: true, size: 'half',    order: 3 },
-      { id: 'passief_inkomen',     enabled: true, size: 'quarter', order: 4 },
-      { id: 'vrijheidsmijlpalen', enabled: true, size: 'quarter', order: 5 },
-      { id: 'levensgebeurtenissen',enabled: true, size: 'quarter', order: 6 },
-      { id: 'cash_flow',           enabled: true, size: 'quarter', order: 7 },
+      { id: 'vrijheidsmijlpalen', enabled: true, size: 'quarter', order: 4 },
+      { id: 'levensgebeurtenissen',enabled: true, size: 'quarter', order: 5 },
+      { id: 'cash_flow',           enabled: true, size: 'quarter', order: 6 },
     ],
   },
   {
@@ -79,7 +78,6 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
       { id: 'backtesting_score',    enabled: true, size: 'quarter', order: 4 },
       { id: 'spaarquote',           enabled: true, size: 'quarter', order: 5 },
       { id: 'vrijheidsmijlpalen',   enabled: true, size: 'quarter', order: 6 },
-      { id: 'passief_inkomen',      enabled: true, size: 'quarter', order: 7 },
     ],
   },
 ]

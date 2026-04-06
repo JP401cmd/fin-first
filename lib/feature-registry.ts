@@ -95,11 +95,11 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     module: 'horizon',
     requiredTier: 'gratis',
     defaultPhase: 'recovery',
-    widgets: ['fire_prognose', 'vrijheidsmijlpalen', 'vrijheidsscenarios', 'sim_vermogenspad', 'passief_inkomen'],
+    widgets: ['fire_prognose', 'vrijheidsmijlpalen', 'vrijheidsscenarios', 'sim_vermogenspad'],
     legacyIds: [
       'fire_projecties',
       'widget_vrijheidsmijlpalen', 'widget_vrijheidsscenarios',
-      'widget_sim_vermogenspad', 'widget_passief_inkomen',
+      'widget_sim_vermogenspad',
       'vermogensprojectie_chart',
     ],
   },

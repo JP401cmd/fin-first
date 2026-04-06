@@ -17,11 +17,19 @@ import {
 import { resolveFireParams } from '@/lib/fire-params'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import {
-  runSimulation,
   lifeEventsToCashflows,
   type SimResult,
   type SimCashflow,
 } from '@/lib/fire-simulation'
+import {
+  runUnifiedProjection,
+  toSimResult,
+  type UnifiedProjectionInput,
+} from '@/lib/unified-projection'
+import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
+import type { Box3Method } from '@/lib/bucket-projection'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { SimChart } from '@/components/app/horizon/sim-chart'
@@ -73,6 +81,11 @@ export default function WhatIfPage() {
   const [userAowAge, setUserAowAge] = useState<AowAge>({ years: 67, months: 0, fractional: 67, isDefinitive: false })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [fullAssets, setFullAssets] = useState<Asset[]>([])
+  const [fullDebts, setFullDebts] = useState<Debt[]>([])
+  const [box3Method, setBox3Method] = useState<Box3Method>('forfaitair')
+  const [hasPartner, setHasPartner] = useState(false)
+  const [bankAccountCash, setBankAccountCash] = useState(0)
 
   // ── What-If overrides ────────────────────────────────────
   const [overrides, setOverrides] = useState<WhatIfOverrides | null>(null)
@@ -97,16 +110,19 @@ export default function WhatIfPage() {
       const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, income12Result, earliestIncomeResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, income12Result, earliestIncomeResult, fullAssetsResult, fullDebtsResult, bankAccountsResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
         supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
         supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
+        supabase.from('assets').select('*').eq('is_active', true).limit(500),
+        supabase.from('debts').select('*').eq('is_active', true).limit(200),
+        supabase.from('bank_accounts').select('balance').eq('is_active', true),
       ])
 
       let monthlyIncome = 0
@@ -189,6 +205,15 @@ export default function WhatIfPage() {
       setUserGrossReturn(fireParams.grossReturn)
       setUserInflation(fireParams.inflationRate)
 
+      // Store full assets/debts for unified projection engine
+      setFullAssets((fullAssetsResult.data ?? []) as Asset[])
+      setFullDebts((fullDebtsResult.data ?? []) as Debt[])
+      const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s: number, a: { balance: number | string }) => s + Number(a.balance), 0)
+      setBankAccountCash(unlinkedCash)
+      setBox3Method(fireParams.box3Method)
+      const householdType = profileResult.data?.household_type
+      setHasPartner(householdType === 'samenwonend' || householdType === 'getrouwd')
+
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
         monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses, dateOfBirth: dob,
@@ -262,6 +287,44 @@ export default function WhatIfPage() {
     return applyWhatIfOverrides(input, overrides, baseline)
   }, [input, overrides, baseline])
 
+  // ── Unified projection helper ─────────────────────────────
+  /** Helper: run unified projection and return SimResult */
+  const runUnified = useCallback((
+    currentAge: number,
+    yearlyExpenses: number,
+    annualSavings: number,
+    monthlySurplus: number,
+    monthlyInc: number,
+    grossReturn: number,
+    inflationRate: number,
+    cashflows: SimCashflow[],
+    strategyConfig: FireStrategyConfig,
+    forcedFireAge?: number,
+  ): SimResult => {
+    const unifiedInput: UnifiedProjectionInput = {
+      assets: fullAssets,
+      debts: fullDebts,
+      currentAge,
+      endAge: strategyConfig.endAge,
+      yearlyExpenses,
+      annualSavings,
+      monthlySurplus,
+      monthlyIncome: monthlyInc,
+      incomeGrowthRate: 0,
+      grossReturn,
+      inflationRate,
+      box3Method,
+      cashflows,
+      strategyConfig,
+      withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+      forcedFireAge,
+      hasPartner,
+      bankAccountCash,
+    }
+    const unifiedResult = runUnifiedProjection(unifiedInput)
+    return toSimResult(unifiedResult)
+  }, [fullAssets, fullDebts, box3Method, hasPartner, bankAccountCash])
+
   // ── Run baseline simulation ──────────────────────────────
   const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
     if (!input) return null
@@ -269,7 +332,6 @@ export default function WhatIfPage() {
     const currentAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
     if (currentAge === null) return null
 
-    const currentPortfolio = Math.max(0, input.totalAssets - input.totalDebts)
     const yearlyExpenses = input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses : 0
     if (yearlyExpenses <= 0) return null
 
@@ -277,14 +339,13 @@ export default function WhatIfPage() {
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
     const cashflows = lifeEventsToCashflows(activeEvents)
 
-    let result = runSimulation(
+    let result = runUnified(
       currentAge,
-      strategyForSim.endAge,
-      currentPortfolio,
       yearlyExpenses,
       annualSavings,
+      input.monthlyContributions ?? 0,
+      input.monthlyIncome ?? 0,
       userGrossReturn,
-      'nl_box3',
       userInflation,
       cashflows,
       strategyForSim,
@@ -305,7 +366,7 @@ export default function WhatIfPage() {
     }
 
     return { result, cashflows }
-  }, [input, activeEvents, fireStrategy, userGrossReturn, userInflation, userAowAge])
+  }, [input, activeEvents, fireStrategy, userGrossReturn, userInflation, userAowAge, runUnified])
 
   // ── Run what-if simulation ───────────────────────────────
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
@@ -314,24 +375,21 @@ export default function WhatIfPage() {
     const currentAge = whatIfInput.dateOfBirth ? ageAtDate(whatIfInput.dateOfBirth) : null
     if (currentAge === null) return null
 
-    const currentPortfolio = Math.max(0, whatIfInput.totalAssets - whatIfInput.totalDebts)
     const yearlyExpenses = whatIfInput.yearlyMustExpenses > 0 ? whatIfInput.yearlyMustExpenses : 0
     if (yearlyExpenses <= 0) return null
 
-    // Delta-based savings: identical to horizon at entry, continuous delta on slider change
     const annualSavings = whatIfAnnualSavings_sim
     const grossReturn = whatIfInput.expectedReturn ?? userGrossReturn
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
     const cashflows = lifeEventsToCashflows(activeEvents)
 
-    let result = runSimulation(
+    let result = runUnified(
       currentAge,
-      strategyForSim.endAge,
-      currentPortfolio,
       yearlyExpenses,
       annualSavings,
+      whatIfInput.monthlyContributions ?? 0,
+      whatIfInput.monthlyIncome ?? 0,
       grossReturn,
-      'nl_box3',
       userInflation,
       cashflows,
       strategyForSim,
@@ -352,7 +410,7 @@ export default function WhatIfPage() {
     }
 
     return { result, cashflows }
-  }, [whatIfInput, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation, userAowAge])
+  }, [whatIfInput, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation, userAowAge, runUnified])
 
   // ── Impact computation (per-event FIRE delta) ──────────────
   const computeImpact = useCallback((eventId: string) => {
@@ -364,7 +422,6 @@ export default function WhatIfPage() {
     const currentAge = whatIfInput.dateOfBirth ? ageAtDate(whatIfInput.dateOfBirth) : null
     if (currentAge === null) return null
 
-    const currentPortfolio = Math.max(0, whatIfInput.totalAssets - whatIfInput.totalDebts)
     const yearlyExpenses = whatIfInput.yearlyMustExpenses > 0 ? whatIfInput.yearlyMustExpenses : 0
     if (yearlyExpenses <= 0) return null
 
@@ -377,12 +434,12 @@ export default function WhatIfPage() {
       ? activeEvents
       : [...activeEvents, event]
     const cfWith = lifeEventsToCashflows(eventsWithThis)
-    const simWith = runSimulation(currentAge, strategyForSim.endAge, currentPortfolio, yearlyExpenses, annualSavings, grossReturn, 'nl_box3', userInflation, cfWith, strategyForSim)
+    const simWith = runUnified(currentAge, yearlyExpenses, annualSavings, whatIfInput.monthlyContributions ?? 0, whatIfInput.monthlyIncome ?? 0, grossReturn, userInflation, cfWith, strategyForSim)
 
     // Simulate WITHOUT this event
     const eventsWithout = activeEvents.filter(e => e.id !== eventId)
     const cfWithout = lifeEventsToCashflows(eventsWithout)
-    const simWithout = runSimulation(currentAge, strategyForSim.endAge, currentPortfolio, yearlyExpenses, annualSavings, grossReturn, 'nl_box3', userInflation, cfWithout, strategyForSim)
+    const simWithout = runUnified(currentAge, yearlyExpenses, annualSavings, whatIfInput.monthlyContributions ?? 0, whatIfInput.monthlyIncome ?? 0, grossReturn, userInflation, cfWithout, strategyForSim)
 
     // Calculate total cost of the event
     const oneTimeCost = Number(event.one_time_cost ?? 0)
@@ -400,7 +457,7 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [whatIfInput, events, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation])
+  }, [whatIfInput, events, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation, runUnified])
 
   // ── Derived values for display ───────────────────────────
   const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null

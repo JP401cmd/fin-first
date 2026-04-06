@@ -39,7 +39,6 @@ const MODULE_FEATURES: Record<string, string[]> = {
     'fire_geavanceerde_params',
     'widget_vrijheidsscenarios',
     'widget_sim_vermogenspad',
-    'widget_passief_inkomen',
     'widget_box3_drag',
     'widget_vrijheidsmijlpalen',
     'widget_backtesting_score',
