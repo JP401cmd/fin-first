@@ -24,7 +24,7 @@ export function applyWhatIfOverrides(
   // Savings-rate delta reduces expenses relative to baseline income (lifestyle change)
   const savingsRateExpenseDelta = baselineEffectiveIncome * ((overrides.savingsRate - baseline.savingsRate) / 100)
   const adjustedExpenses = Math.max(0, input.monthlyExpenses - savingsRateExpenseDelta)
-  const adjustedContributions = input.monthlyContributions + overrides.extraContribution
+  const adjustedContributions = input.monthlyContributions + savingsRateExpenseDelta + overrides.extraContribution
 
   const adjustedInput: FinancialInput = {
     ...input,
