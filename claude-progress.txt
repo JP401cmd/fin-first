@@ -23144,3 +23144,33 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#708, #709)
+
+## Session 2026-04-06 - Features #714, #715
+
+### Feature #714: Onttrekking: Monte Carlo analyse review — data, relevantie en weergave - PASSING
+- Added relevance check: shows AlertTriangle warning when no portfolio or withdrawal phase too short
+- Added Info explanation box for non-technical users describing 1,000 simulations with actual data
+- Pattern matches opbouw Monte Carlo component (AlertTriangle + Info + irrelevant state)
+- Verified: real data used (€6,073,108 portfolio, €140,747/yr withdrawal, €18,696 AOW)
+- Verified: longevity sensitivity (+5/+10 years) correctly shown
+- Verified: critical SWR (3.4% at 95%) correctly calculated
+- Zero new console errors
+- Commit: b300174a
+
+### Feature #715: Onttrekking: Huis verkopen analyse review — data, relevantie en weergave - PASSING
+- Changed HuisVerkopen from returning null to showing relevance message when no house
+- Added AlertTriangle "Je hebt geen eigen woning — deze analyse is niet relevant" message
+- Updated parent phase-modal-onttrekking.tsx to always render (removed assets guard)
+- Verified real house data: comparison table, sensitivity (2%/3%/4% growth), opportunity cost
+- Verified: breakeven huur, aannames section, disclaimer all present
+- Verified: recommendation "Huis behouden" with real numbers
+- Zero new console errors
+- Commit: 9397ed32
+
+### Files Modified
+- components/app/horizon/phase-analysis/onttrekken/monte-carlo-onttrekken.tsx — relevance check + info box
+- components/app/horizon/phase-analysis/onttrekken/huis-verkopen.tsx — relevance message + always render
+- components/app/horizon/phase-modal-onttrekking.tsx — removed assets guard for HuisVerkopen
+
+### Current Status
+- 2 features completed this session (#714, #715)
