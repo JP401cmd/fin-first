@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
-import { PieChart, AlertTriangle } from 'lucide-react'
+import { PieChart, AlertTriangle, CheckCircle2, Award } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { compareOvergangStrategieen } from '@/lib/phase-analysis'
@@ -21,6 +21,10 @@ export interface GapAnalyseProps {
   deeltijdInkomen?: number
   /** Current age of the user, used for accurate debt-in-transition detection */
   currentAge?: number
+  /** FIRE age for display in no-gap message */
+  fireAge?: number
+  /** AOW age for display in no-gap message */
+  aowAge?: number
 }
 
 /**
@@ -105,6 +109,8 @@ export const GapAnalyse = memo(function GapAnalyse({
   debts = [],
   deeltijdInkomen,
   currentAge,
+  fireAge,
+  aowAge,
 }: GapAnalyseProps) {
   // Default: 50% of monthly expenses as part-time income
   const effectiveDeeltijdInkomen = deeltijdInkomen ?? Math.round((yearlyExpenses / 12) * 0.5)
@@ -112,9 +118,12 @@ export const GapAnalyse = memo(function GapAnalyse({
 
   const years = Math.max(Math.round(endAge - startAge), 1)
 
+  // ── No gap: FIRE age >= AOW age ──────────────────────────────────────────
+  const noGap = startAge >= endAge || (fireAge != null && aowAge != null && fireAge >= aowAge)
+
   // Lazy compute: defer past first paint
   useEffect(() => {
-    if (years <= 0) return
+    if (noGap || years <= 0) return
 
     const timer = setTimeout(() => {
       const strategies = compareOvergangStrategieen(
@@ -137,10 +146,35 @@ export const GapAnalyse = memo(function GapAnalyse({
 
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startPortfolio, startAge, endAge, yearlyExpenses, expectedReturn, inflationRate, effectiveDeeltijdInkomen])
+  }, [startPortfolio, startAge, endAge, yearlyExpenses, expectedReturn, inflationRate, effectiveDeeltijdInkomen, noGap])
 
   const transitionDebts = debtsInTransition(debts, startAge, endAge, currentAge)
   const loading = state === null
+
+  // ── No-gap message ────────────────────────────────────────────────────────
+  if (noGap) {
+    return (
+      <AnalysisSection
+        title="Gap-analyse"
+        icon={PieChart}
+        willContext="Gap-analyse overgangsfase: geen gap — FIRE-leeftijd ligt op of na AOW-leeftijd."
+      >
+        <div className="flex items-start gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--positive)]/5 p-4">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--positive)]" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">
+              Geen gap om te overbruggen
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              {fireAge != null && aowAge != null
+                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) ligt op of na je AOW-leeftijd (${Math.round(aowAge)}). Er is geen periode zonder AOW-inkomen die overbrugd moet worden.`
+                : 'Je FIRE-leeftijd ligt op of na je AOW-leeftijd. Een gap-analyse is niet nodig.'}
+            </p>
+          </div>
+        </div>
+      </AnalysisSection>
+    )
+  }
 
   return (
     <AnalysisSection
@@ -264,6 +298,48 @@ export const GapAnalyse = memo(function GapAnalyse({
               ))}
             </div>
           </div>
+
+          {/* ── Recommendation ───────────────────────────────────── */}
+          {(() => {
+            const surviving = state.strategies.filter(s => s.overleeft)
+            const best = surviving.length > 0
+              ? surviving.reduce((a, b) =>
+                  a.eindVermogenOvergang >= b.eindVermogenOvergang ? a : b
+                )
+              : null
+
+            if (best) {
+              return (
+                <div className="flex items-start gap-2.5 rounded-[var(--r)] border border-[var(--positive)]/30 bg-[var(--positive)]/5 p-3">
+                  <Award className="mt-0.5 h-4 w-4 shrink-0 text-[var(--positive)]" />
+                  <div>
+                    <p className="text-xs font-medium text-[var(--ink)]">
+                      Aanbeveling: <span className="text-[var(--positive)]">{best.label}</span>
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                      {surviving.length === state.strategies.length
+                        ? `Alle ${surviving.length} strategieën overleven de overgangsperiode. ${best.label} laat het hoogste eindsaldo achter: ${formatCurrency(best.eindVermogenOvergang)}.`
+                        : `${surviving.length} van ${state.strategies.length} strategieën overleven. ${best.label} is het meest robuust met een eindsaldo van ${formatCurrency(best.eindVermogenOvergang)}.`}
+                    </p>
+                  </div>
+                </div>
+              )
+            }
+
+            return (
+              <div className="flex items-start gap-2.5 rounded-[var(--r)] border border-[var(--negative)]/30 bg-[var(--negative)]/5 p-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--negative)]" />
+                <div>
+                  <p className="text-xs font-medium text-[var(--negative)]">
+                    Geen strategie overleeft de overgang
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                    Je portfolio van {formatCurrency(Math.round(startPortfolio))} is onvoldoende voor {years} jaar overbrugging. Overweeg langer werken, uitgaven verlagen, of meer deeltijdwerk.
+                  </p>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* ── Debts in transition warning ─────────────────────── */}
           {transitionDebts.length > 0 && (
