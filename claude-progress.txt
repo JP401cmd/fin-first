@@ -23174,3 +23174,60 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#714, #715)
+
+## Session 2026-04-06 - Features #716, #717
+
+### Feature #716: Onttrekking: SORR analyse review — data, relevantie en weergave - PASSING
+- Verified startPortfolio prop comes from parent (real portfolio at retirement)
+- Three scenarios realistic: favorable (+10/+8/+10%), unfavorable (-10/-8/-10%), crash (-20%)
+- Cash buffer calculation sound: picks smallest buffer improving by ≥3pp, defaults to 2 years
+- Added "Wat is volgorde-risico?" context section explaining SORR concept for users
+- Moved crash callout above scenario table (key risk first, details second)
+- Added "Bescherming: cash buffer" explainer paragraph before buffer table
+- Added "aanbevolen" badge on recommended buffer row in table
+- Renamed title from "Sequence of Returns Risk (SORR)" to "Volgorde-risico (SORR)"
+- Added actionable "Advies" section with green accent border and practical guidance
+- Zero new console errors
+- Commit: 498d1c44
+
+### Feature #717: Onttrekking: End of Life analyse review — data, relevantie en weergave - PASSING
+- Verified inheritance based on real end portfolio from UnifiedProjectionRow netWorth
+- Partner AOW/pensioen continuation calculation correct (from analyzeEndOfLife)
+- Added prominent amber warning when no heirs AND no partner configured
+- Warning includes guidance to fill profile in Identiteit → Profiel
+- Split data availability hints into separate conditional blocks (cleaner rendering)
+- Existing sections verified: sensitivity table, inflation sensitivity, erfenis-indicatie, disclaimer
+- Zero new console errors
+- Commit: 498d1c44
+
+### Files Modified
+- components/app/horizon/phase-analysis/onttrekken/sorr-analyse.tsx — context, layout, cash buffer, advies
+- components/app/horizon/phase-analysis/onttrekken/end-of-life.tsx — no heirs/partner warning
+
+### Current Status
+- 2 features completed this session (#716, #717)
+
+## Session 2026-04-06 - Features #722, #694
+
+### Feature #722: What-if: fix spaarquote slider zodat deze daadwerkelijk de simulatie beïnvloedt - PASSING
+- Bug: In legacy applyWhatIfOverrides(), savingsRateExpenseDelta was applied to expenses but NOT to adjustedContributions
+- Fix: Added savingsRateExpenseDelta to adjustedContributions formula: input.monthlyContributions + savingsRateExpenseDelta + overrides.extraContribution
+- The unified function (applyWhatIfOverridesToUnified) already handled this correctly in annualSavings and monthlySurplus
+- Zero console errors
+- Commit: be4972a1
+
+### Feature #694: FIRE-leeftijd op what-if pagina komt overeen met horizon bij baseline - PASSING
+- Validation test: verified horizon and what-if pages show identical values at baseline
+- FIRE age: 66.5 on both pages ✓
+- Target: €6.05M on both pages ✓
+- Koopkracht: €9.5M on both pages ✓
+- Chart axes identical ✓
+- Cashflow values identical (−€5.5k/mnd, +€1.1k/mnd) ✓
+- Zero console errors on fresh page load
+- No code changes needed (validation only)
+
+### Files Modified
+- lib/whatif-overrides.ts — added savingsRateExpenseDelta to adjustedContributions in legacy function
+
+### Current Status
+- 2 features completed this session (#722, #694)
