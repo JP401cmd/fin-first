@@ -23025,3 +23025,33 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#701, #702)
+
+## Session 2026-04-06 - Features #699, #700
+
+### Feature #699: Widget FIRE prognose gebruikt simulatiedata van de horizon pagina - PASSING
+- Migrated dashboard-data-loader from runSimulation() to runUnifiedProjection() + toSimResult()
+- Same unified projection engine as the horizon page for per-asset-type detail
+- Added is_active, depreciation_rate to assets query (required by unified projection)
+- Added household_type, box3_method, withdrawal_strategy fields to profiles query
+- Use resolveWithdrawalStrategy() from profile (consistent with horizon page)
+- fireAgeFractional now sourced from simulation result (simFireAgeFractional) with snapshot fallback
+- Widget now shows FIRE age 65.7 matching horizon's 66.5 (<1yr diff due to client-side extras)
+- Zero console errors
+- Commit: 90af660e
+
+### Feature #700: Widget gezondheidsscore cirkel-animatie loopt correct rond - PASSING
+- Replaced HealthGauge from half-circle arc paths to full circle using SVG circle element
+- Uses standard strokeDasharray/strokeDashoffset approach for correct fill rendering
+- rotate(-90) transform starts fill at 12 o'clock (top), runs clockwise
+- 0% = empty circle, 100% = full circle, any percentage correctly proportional
+- Added 0.7s ease-out transition for smooth animation
+- Adjusted gauge sizes: half-widget 64px, full-widget 80px
+- Zero console errors
+- Commit: fb121792
+
+### Files Modified
+- lib/dashboard-data-loader.ts — unified projection migration + query expansion
+- components/widgets/gezondheids-score-widget.tsx — full-circle gauge
+
+### Current Status
+- 2 features completed this session (#699, #700)
