@@ -274,13 +274,11 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           fireTarget={fireTarget}
         />
 
-        {/* 6. Schulden — debt summary (only when debts exist with positive balances) */}
-        {debts && debts.length > 0 && (
-          <SchuldenSamenvatting
-            debts={debts}
-            annualSavings={yearlySavings}
-          />
-        )}
+        {/* 6. Schulden — debt summary (shows "no debts" message when empty) */}
+        <SchuldenSamenvatting
+          debts={debts ?? []}
+          annualSavings={yearlySavings}
+        />
 
         {/* 7. Giften — gift tax analysis and opportunity cost */}
         <GiftenCheck
@@ -303,6 +301,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           inflationRate={inflationRate}
           yearlyExpenses={yearlyExpenses}
           cashflows={cashflows}
+          savingsRate={monthlyIncome && monthlyIncome > 0 ? ((monthlyIncome - (monthlyExpenses ?? 0)) / monthlyIncome) * 100 : null}
+          monthlyIncome={monthlyIncome}
         />
 
         {/* 9. Hypotheek vs Beleggen — mortgage vs investing trade-off */}

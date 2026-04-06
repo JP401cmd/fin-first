@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
-import { Gift } from 'lucide-react'
+import { Gift, Info } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import {
@@ -9,6 +9,9 @@ import {
   NL_SCHENKING_VRIJSTELLING,
   type SchenkingAnalysis,
 } from '@/lib/phase-analysis'
+
+/** Minimum portfolio below which gifting analysis is not relevant. */
+const MIN_PORTFOLIO_FOR_GIFTING = 50_000
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -153,6 +156,31 @@ export const GiftenCheck = memo(function GiftenCheck(props: GiftenCheckProps) {
     ],
     [scenario1Kind, scenario2Kinderen, scenarioEenmalig],
   )
+
+  // Show informational message when portfolio is too low for gifting to be relevant
+  if (currentPortfolio < MIN_PORTFOLIO_FOR_GIFTING || annualSavings <= 0) {
+    return (
+      <AnalysisSection
+        title="Schenkingscheck"
+        icon={Gift}
+        willContext=""
+      >
+        <div className="flex items-start gap-3 rounded-md bg-[var(--subtle)]/60 px-3 py-3">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">
+              Schenken is nog niet relevant
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+              {annualSavings <= 0
+                ? 'Je hebt momenteel geen spaarcapaciteit — focus eerst op je financiële basis.'
+                : `Je vermogen (${formatCurrency(currentPortfolio)}) is nog te laag om schenken te overwegen. Bouw eerst je eigen vrijheid op.`}
+            </p>
+          </div>
+        </div>
+      </AnalysisSection>
+    )
+  }
 
   return (
     <AnalysisSection

@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
-import { Landmark } from 'lucide-react'
+import { Landmark, CheckCircle2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import {
@@ -259,8 +259,28 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
     return result.totalInterest === Infinity ? 0 : result.totalInterest
   }, [activeDebts])
 
-  // Bail early if nothing to show
-  if (activeDebts.length === 0) return null
+  // Show informational message when there are no active debts
+  if (activeDebts.length === 0) {
+    return (
+      <AnalysisSection
+        title="Schuldenanalyse"
+        icon={Landmark}
+        willContext=""
+      >
+        <div className="flex items-start gap-3 rounded-md bg-[var(--positive)]/8 px-3 py-3">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--positive)]" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">
+              Je hebt geen schulden
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+              Deze analyse is niet relevant — je volledige inkomen werkt voor je vrijheid.
+            </p>
+          </div>
+        </div>
+      </AnalysisSection>
+    )
+  }
 
   const totalDebt = activeDebts.reduce((s, d) => s + d.current_balance, 0)
   const totalMonthlyPayment = activeDebts.reduce(
