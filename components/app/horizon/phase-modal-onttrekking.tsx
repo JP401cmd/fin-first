@@ -171,11 +171,13 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
     let totalPensioen = 0
     let totalWithdrawal = 0
     let totalBox3 = 0
+    let totalOneTimeCashflows = 0
 
     for (const row of withdrawalRows) {
       totalGrowth += row.totalGrowth
       totalBox3 += row.totalBox3
       totalWithdrawal += row.withdrawal
+      totalOneTimeCashflows += (row.oneTimeNet || 0)
 
       // grossIncome includes AOW + pensioen in withdrawal phase
       // We split: AOW is a known fixed amount; remainder is pensioen
@@ -188,7 +190,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
     // Portfolio withdrawal = total withdrawal minus what AOW/pensioen covered
     const portfolioWithdrawal = totalWithdrawal
 
-    return { totalGrowth, totalAow, totalPensioen, totalWithdrawal, totalBox3, portfolioWithdrawal }
+    return { totalGrowth, totalAow, totalPensioen, totalWithdrawal, totalBox3, portfolioWithdrawal, totalOneTimeCashflows }
   }, [withdrawalRows, yearlyAowIncome])
 
   // Levensonderhoud = withdrawal (what you spend from portfolio) + AOW + pensioen
@@ -263,6 +265,17 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
                 label="Box 3 (cumulatief)"
                 value={`\u2212 ${formatCurrency(Math.round(aggregates.totalBox3))}`}
                 negative
+              />
+            )}
+            {aggregates.totalOneTimeCashflows !== 0 && (
+              <ReceiptRow
+                label="Eenmalige gebeurtenissen"
+                value={aggregates.totalOneTimeCashflows < 0
+                  ? `\u2212 ${formatCurrency(Math.round(Math.abs(aggregates.totalOneTimeCashflows)))}`
+                  : formatCurrency(Math.round(aggregates.totalOneTimeCashflows))
+                }
+                positive={aggregates.totalOneTimeCashflows > 0}
+                negative={aggregates.totalOneTimeCashflows < 0}
               />
             )}
           </div>
