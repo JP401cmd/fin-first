@@ -17,6 +17,10 @@ import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budg
 import { resolveFireParams } from '@/lib/fire-params'
 import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 
+/** Filter out own-account transfers from income/expense calculations */
+const isRealTx = (t: { transaction_type?: string | null }) =>
+  t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+
 // ── Result type ────────────────────────────────────────────────
 
 export interface CorePageData {
@@ -138,7 +142,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .eq('is_active', true),
     supabase
       .from('transactions')
-      .select('amount, date')
+      .select('amount, date, transaction_type')
       .gt('amount', 0)
       .gte('date', twelveMonthsAgo)
       .lt('date', monthEnd),
@@ -152,6 +156,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .from('transactions')
       .select('date')
       .gt('amount', 0)
+      .not('transaction_type', 'in', '("transfer","joint_transfer")')
       .gte('date', twelveMonthsAgo)
       .order('date', { ascending: true })
       .limit(1),
@@ -162,7 +167,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .not('budget_type', 'in', '("archive","income","savings")'),
     supabase
       .from('transactions')
-      .select('amount, date')
+      .select('amount, date, transaction_type')
       .lt('amount', 0)
       .gte('date', twelveMonthsAgo)
       .lt('date', monthEnd),
@@ -212,7 +217,11 @@ export const loadCoreData = cache(async function loadCoreData(
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
   // ── Last 12 months income — extrapolate if less than 12 months of data ──
-  const last12MonthsIncome = income12Result.data.reduce((s, t) => s + Number(t.amount), 0)
+  // Filter out own-account transfers for accurate income/expense totals
+  const realIncome12 = income12Result.data.filter(isRealTx)
+  const realExpense12 = expense12Result.data.filter(isRealTx)
+
+  const last12MonthsIncome = realIncome12.reduce((s, t) => s + Number(t.amount), 0)
   let extrapolatedIncome = last12MonthsIncome
   let actualIncomeMonths = 12
   const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
@@ -230,7 +239,7 @@ export const loadCoreData = cache(async function loadCoreData(
 
   // ── Group income by month for kassabon ──
   const incomeMonthMap: Record<string, number> = {}
-  for (const tx of income12Result.data) {
+  for (const tx of realIncome12) {
     const d = new Date(tx.date)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     incomeMonthMap[key] = (incomeMonthMap[key] ?? 0) + Number(tx.amount)
@@ -242,18 +251,18 @@ export const loadCoreData = cache(async function loadCoreData(
   // ── Last 6 months expenses & savings rate (rolling average) ──
   const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1))
     .toISOString().split('T')[0]
-  const last6MonthsIncome = income12Result.data
+  const last6MonthsIncome = realIncome12
     .filter(t => t.date >= sixMonthsAgo)
     .reduce((s, t) => s + Number(t.amount), 0)
   const last6MonthsExpenses = Math.abs(
-    expense12Result.data
+    realExpense12
       .filter(t => t.date >= sixMonthsAgo)
       .reduce((s, t) => s + Number(t.amount), 0),
   )
-  const earliestTxDate = earliestTxResult.data?.[0]?.date
+  // Use earliest income date (matching dashboard-data-loader) for month extrapolation
   let savingsRateDataMonths = 6
-  if (earliestTxDate && (last6MonthsIncome > 0 || last6MonthsExpenses > 0)) {
-    const earliest = new Date(earliestTxDate)
+  if (earliestIncomeDate && (last6MonthsIncome > 0 || last6MonthsExpenses > 0)) {
+    const earliest = new Date(earliestIncomeDate)
     savingsRateDataMonths = Math.max(1,
       (now.getFullYear() - earliest.getFullYear()) * 12 +
       (now.getMonth() - earliest.getMonth()),
@@ -726,7 +735,7 @@ export const loadCoreData = cache(async function loadCoreData(
     incomeMonths: actualIncomeMonths,
     incomeByMonth: sortedIncomeMonths,
 
-    savingsRate6m: computedSavingsRate6m,
+    savingsRate6m: Math.round(computedSavingsRate6m * 10) / 10,
     savingsRateMonths: savingsRateDataMonths,
     savingsRateMethod,
     savingsReceiptData: {

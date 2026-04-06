@@ -23,7 +23,7 @@ import type {
 import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import {
   computeFireProjection,
   computeFireRange,
@@ -472,8 +472,22 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     : 0
 
   // Fallback savings rate from profile estimates for users without transactions
+  let savingsRateIsEstimate = savingsRate6m === 0
   if (savingsRate6m === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
     savingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
+  }
+
+  // Try net-worth-delta method when still on estimate and snapshots are available
+  // (matches core-data-loader fallback for consistency)
+  const earlySnapshotRows = netWorthSnapshotsResult.data ?? []
+  if (savingsRateIsEstimate && earlySnapshotRows.length >= 2 && effectiveMonthlyIncome > 0) {
+    const deltaResult = computeSavingsRateFromNetWorthDelta(
+      earlySnapshotRows as { snapshot_date: string; net_worth: number }[],
+      effectiveMonthlyIncome,
+    )
+    if (deltaResult) {
+      savingsRate6m = deltaResult.rate
+    }
   }
 
   const fireParams = resolveFireParams(profileResult.data ?? {})
@@ -726,10 +740,25 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, value]) => ({ month, value }))
 
-  // Budget type history: per-type monthly aggregation (income + expense transactions)
-  const typeMonthAgg: Record<string, Map<string, number>> = {
-    income: new Map(), expense: new Map(), savings: new Map(), debt: new Map(),
+  // Budget type history: use ALL transactions (not just budget-linked) for accurate trends
+  // Income history: all positive transactions per month
+  const incomeByMonth = new Map<string, number>()
+  for (const tx of ((income12Result.data ?? []) as { amount: number; date: string; transaction_type?: string | null }[]).filter(isRealTx)) {
+    const month = (tx.date as string).slice(0, 7)
+    incomeByMonth.set(month, (incomeByMonth.get(month) ?? 0) + Number(tx.amount))
   }
+
+  // Savings history: income minus expenses per month (using all transactions)
+  const savingsByMonth = new Map<string, number>()
+  const allMonths = new Set([...incomeByMonth.keys(), ...expenseByMonth.keys()])
+  for (const month of allMonths) {
+    const inc = incomeByMonth.get(month) ?? 0
+    const exp = expenseByMonth.get(month) ?? 0
+    savingsByMonth.set(month, Math.max(0, inc - exp))
+  }
+
+  // Debt history: budget-linked debt transactions (fallback)
+  const debtMonthAgg = new Map<string, number>()
   const allHistTx = [
     ...((income12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
     ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
@@ -737,29 +766,32 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   for (const tx of allHistTx) {
     if (!tx.budget_id) continue
     const bType = budgetTypeMap.get(tx.budget_id)
-    if (!bType || !typeMonthAgg[bType]) continue
-    const month = (tx.date as string).slice(0, 7)
-    const map = typeMonthAgg[bType]
-    map.set(month, (map.get(month) ?? 0) + Math.abs(Number(tx.amount)))
+    if (bType === 'debt') {
+      const month = (tx.date as string).slice(0, 7)
+      debtMonthAgg.set(month, (debtMonthAgg.get(month) ?? 0) + Math.abs(Number(tx.amount)))
+    }
   }
+
   const toSortedHistory = (m: Map<string, number>) =>
     Array.from(m.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, value]) => ({ month, value }))
   const budgetTypeHistory = {
-    income:  toSortedHistory(typeMonthAgg.income),
-    expense: toSortedHistory(typeMonthAgg.expense),
-    savings: toSortedHistory(typeMonthAgg.savings),
-    debt:    toSortedHistory(typeMonthAgg.debt),
+    income:  toSortedHistory(incomeByMonth),
+    expense: toSortedHistory(expenseByMonth),
+    savings: toSortedHistory(savingsByMonth),
+    debt:    toSortedHistory(debtMonthAgg),
   }
 
-  // Meest recente fire_age uit snapshot (gezet door useHorizonFireSim bij bezoek /horizon)
+  // FIRE-leeftijd: prefereer simulatieresultaat (consistent met horizon pagina),
+  // val terug op meest recente snapshot als simulatie niet is uitgevoerd.
   const latestSnapshotFireAge = snapshotRows
     .filter(s => (s as { fire_age?: number | null }).fire_age != null)
     .at(-1)
-  const fireAgeFractional = latestSnapshotFireAge
+  const snapshotFireAge = latestSnapshotFireAge
     ? Number((latestSnapshotFireAge as { fire_age?: number | null }).fire_age)
     : null
+  const fireAgeFractional = simFireAgeFractional ?? snapshotFireAge
 
   // Top recurring transactions (vaste lasten): top 5 by absolute amount
   const allRecurring = (recurringResult.data ?? []) as { id: string; name: string; amount: number; frequency: string; budget_id: string | null }[]
