@@ -1,8 +1,8 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
-import { ArrowDownRight } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { ArrowDownRight, CheckCircle2, Shield, TrendingDown, AlertTriangle } from 'lucide-react'
+import { formatCurrency, formatCurrencyDecimals } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -139,6 +139,26 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
   const loading = state === null
   const durationYears = Math.max(Math.round(endAge - startAge), 1)
 
+  const totalIncome = yearlyWithdrawal + yearlyAowIncome
+
+  // No withdrawal = not relevant
+  if (totalIncome <= 0) {
+    return (
+      <AnalysisSection
+        title="Koopkrachterosie"
+        icon={ArrowDownRight}
+        willContext="Koopkrachterosie: geen onttrekking, niet relevant"
+      >
+        <div className="flex items-start gap-2 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-900/10">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <p className="text-xs leading-relaxed text-emerald-700 dark:text-emerald-400">
+            Geen onttrekking gepland — koopkrachterosie is op dit moment niet relevant voor je situatie.
+          </p>
+        </div>
+      </AnalysisSection>
+    )
+  }
+
   // 0% inflation = no erosion
   if (inflationRate === 0) {
     return (
@@ -147,9 +167,30 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
         icon={ArrowDownRight}
         willContext="Koopkrachterosie: 0% inflatie, geen erosie"
       >
-        <p className="text-xs text-[var(--ink-3)]">
-          Bij 0% inflatie blijft je koopkracht onveranderd gedurende de hele onttrekkingsperiode.
-        </p>
+        <div className="flex items-start gap-2 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-900/10">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <p className="text-xs leading-relaxed text-emerald-700 dark:text-emerald-400">
+            Bij 0% inflatie blijft je koopkracht onveranderd gedurende de hele onttrekkingsperiode.
+          </p>
+        </div>
+      </AnalysisSection>
+    )
+  }
+
+  // Short duration = minimal erosion
+  if (durationYears <= 2) {
+    return (
+      <AnalysisSection
+        title="Koopkrachterosie"
+        icon={ArrowDownRight}
+        willContext={`Koopkrachterosie: slechts ${durationYears} jaar, minimale impact`}
+      >
+        <div className="flex items-start gap-2 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-900/10">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <p className="text-xs leading-relaxed text-emerald-700 dark:text-emerald-400">
+            Je onttrekkingsperiode is slechts {durationYears} jaar — koopkrachterosie is verwaarloosbaar bij deze looptijd.
+          </p>
+        </div>
       </AnalysisSection>
     )
   }
@@ -180,12 +221,32 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
               </span>
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-4)]">
-              {formatCurrency(yearlyWithdrawal + yearlyAowIncome)}/jaar is straks nog maar{' '}
+              {formatCurrency(totalIncome)}/jaar is straks nog maar{' '}
               <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">
                 {formatCurrency(state.reeelLaatsteJaar)}
               </span>{' '}
               waard in huidige euro&apos;s
             </p>
+          </div>
+
+          {/* ── Visual erosion bar ────────────────────────────── */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] text-[var(--ink-4)]">
+              <span>Koopkracht vandaag</span>
+              <span>Na {durationYears} jaar</span>
+            </div>
+            <div className="relative h-5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${Math.max(100 - state.totalErosiePct, 0)}%`,
+                  background: `linear-gradient(90deg, #10b981, ${state.totalErosiePct > 30 ? '#ef4444' : '#f59e0b'})`,
+                }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white mix-blend-difference">
+                {100 - state.totalErosiePct}% behouden
+              </div>
+            </div>
           </div>
 
           {/* ── Erosion table ──────────────────────────────────── */}
@@ -195,7 +256,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
                 <tr className="border-b border-[var(--border-ed)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
                   <th className="px-1 pb-1.5">Leeftijd</th>
                   <th className="px-1 pb-1.5 text-right">Nominaal</th>
-                  <th className="px-1 pb-1.5 text-right">Reeel</th>
+                  <th className="px-1 pb-1.5 text-right">Reëel</th>
                   <th className="px-1 pb-1.5 text-right">Erosie</th>
                 </tr>
               </thead>
@@ -248,13 +309,80 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
 
           {/* ── Future cost of lifestyle ───────────────────────── */}
           <div className="rounded-[var(--r)] border border-dashed border-amber-400/30 bg-amber-50/50 p-3 dark:bg-amber-900/10">
-            <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
-              {state.levensstijlKostTekst}
-            </p>
-            <p className="mt-1 text-[11px] italic leading-relaxed text-[var(--ink-4)]">
-              Overweeg een inflatiecorrectie of stapsgewijze verlaging van je onttrekking om koopkracht te behouden.
-            </p>
+            <div className="flex items-start gap-2">
+              <TrendingDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div>
+                <p className="text-xs font-medium leading-relaxed text-amber-700 dark:text-amber-400">
+                  {state.levensstijlKostTekst}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-4)]">
+                  Ofwel: elke euro die je nu onttrekt, is over {durationYears} jaar slechts{' '}
+                  <span className="font-mono tabular-nums font-medium">
+                    {formatCurrencyDecimals(100 / Math.pow(1 + inflationRate, durationYears))}
+                  </span>{' '}
+                  waard.
+                </p>
+              </div>
+            </div>
           </div>
+
+          {/* ── Protection strategies ──────────────────────────── */}
+          <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
+            <div className="mb-2.5 flex items-center gap-1.5">
+              <Shield className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">
+                Beschermingsstrategieën
+              </span>
+            </div>
+            <ul className="space-y-2 text-xs leading-relaxed text-[var(--ink-2)]">
+              <li className="flex gap-2">
+                <span className="mt-0.5 text-emerald-500">●</span>
+                <span>
+                  <strong className="text-[var(--ink)]">Inflatiecorrectie</strong> — Verhoog je
+                  onttrekking jaarlijks met inflatie ({(inflationRate * 100).toFixed(1)}%). Je koopkracht
+                  blijft gelijk, maar je portefeuille wordt sneller aangesproken.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="mt-0.5 text-blue-500">●</span>
+                <span>
+                  <strong className="text-[var(--ink)]">Guardrails-methode</strong> — Gebruik
+                  dynamische onttrekkingsregels: verhoog bij goed rendement, verlaag bij slecht.
+                  Beschermt tegen zowel inflatie als beursdaling.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="mt-0.5 text-amber-500">●</span>
+                <span>
+                  <strong className="text-[var(--ink)]">Stapsgewijs afbouwen</strong> — Neem hogere
+                  onttrekkingen in de eerste jaren (actieve fase) en bouw geleidelijk af.
+                  Onderzoek toont dat uitgaven na 75 jaar vaak dalen.
+                </span>
+              </li>
+              {state.totalErosiePct >= 30 && (
+                <li className="flex gap-2">
+                  <span className="mt-0.5 text-red-500">●</span>
+                  <span>
+                    <strong className="text-[var(--ink)]">Deeltijdwerk overwegen</strong> — Bij{' '}
+                    {state.totalErosiePct}% erosie kan een klein bijinkomen in de eerste jaren
+                    het verschil maken. Zelfs een paar uur per week vermindert de druk op je portefeuille.
+                  </span>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {/* ── Severity indicator ────────────────────────────── */}
+          {state.totalErosiePct >= 40 && (
+            <div className="flex items-start gap-2 rounded-[var(--r)] border border-red-200 bg-red-50/50 p-3 dark:border-red-800 dark:bg-red-900/10">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+              <p className="text-xs leading-relaxed text-red-700 dark:text-red-400">
+                <strong>Let op:</strong> Bij {state.totalErosiePct}% koopkrachtverlies moet je
+                aan het eind van je onttrekkingsperiode rondkomen van minder dan de helft
+                van je oorspronkelijke budget. Overweeg serieus een beschermingsstrategie.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </AnalysisSection>
