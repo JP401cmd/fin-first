@@ -126,6 +126,12 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
     ? accumulationRows[accumulationRows.length - 1].netWorth
     : expectedPortfolioAtFire
 
+  // Debt repayment: reduction in totalDebts over accumulation phase increases netWorth
+  // The waterfall explicitly tracks: savings, growth, box3, events. Debt repayment is implicit
+  // in the net worth change but not captured as a separate flow. We derive it as the reconciliation:
+  const waterfallSum = startVermogen + totalInleg + totalRendement - totalBox3 + totalEvents
+  const totalAfgelost = Math.max(0, eindVermogen - waterfallSum)  // debt reduction = NW increase not captured elsewhere
+
   // ── Rendement per wealthgroup ──────────────────────────────────────────
   const growthByType: Partial<Record<AssetType, number>> = {}
   const box3ByType: Partial<Record<AssetType, number>> = {}
@@ -239,6 +245,13 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
                   : `\u2212${formatCurrency(Math.round(Math.abs(totalEvents))).replace('\u20AC', '\u20AC ')}`}
                 positive={totalEvents > 0}
                 negative={totalEvents < 0}
+              />
+            )}
+            {totalAfgelost > 0.5 && (
+              <ReceiptRow
+                label="Schuldaflossing"
+                value={formatCurrency(Math.round(totalAfgelost))}
+                positive
               />
             )}
           </div>
