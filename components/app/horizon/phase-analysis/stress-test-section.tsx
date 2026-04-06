@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
-import { Zap } from 'lucide-react'
+import { Zap, AlertCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from './analysis-section'
 import { runPhaseStressTests, type StressTestResult } from '@/lib/phase-stress-test'
@@ -64,7 +64,27 @@ export const StressTestSection = memo(function StressTestSection({
         .join(', ')}`
     : willContextPrefix
 
-  const loading = results === null
+  const loading = results === null && rows.length > 0
+
+  // Insufficient data: no projection rows available
+  if (rows.length === 0) {
+    return (
+      <AnalysisSection
+        title="Stresstest: extreme scenario&rsquo;s"
+        icon={Zap}
+        loading={false}
+        willContext={willContextPrefix}
+      >
+        <div className="flex items-start gap-2 rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          <p className="text-xs leading-relaxed text-[var(--ink-3)]">
+            Onvoldoende projectiedata beschikbaar om stresstests uit te voeren.
+            Controleer of je vermogen, inkomsten en uitgaven hebt ingevuld.
+          </p>
+        </div>
+      </AnalysisSection>
+    )
+  }
 
   return (
     <AnalysisSection

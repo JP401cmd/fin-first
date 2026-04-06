@@ -1,7 +1,7 @@
 'use client'
 
 import { memo } from 'react'
-import { Calendar } from 'lucide-react'
+import { Calendar, Info } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { LifeEvent } from '@/lib/horizon-data'
 
@@ -52,7 +52,22 @@ export const LifeEventsInPhase = memo(function LifeEventsInPhase({
     return e.target_age >= phaseStartAge && e.target_age <= phaseEndAge
   })
 
-  if (phaseEvents.length === 0) return null
+  if (phaseEvents.length === 0) {
+    return (
+      <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-3">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+          Levensgebeurtenissen in deze fase
+        </p>
+        <div className="flex items-start gap-2">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-4)]" />
+          <p className="text-xs leading-relaxed text-[var(--ink-4)]">
+            Er vallen geen levensgebeurtenissen in deze fase.
+            Voeg gebeurtenissen toe via de Horizon-pagina om hun impact op je planning te zien.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-3">
