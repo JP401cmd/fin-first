@@ -1,3 +1,42 @@
+## Session 2026-04-06 - Features #693, #703
+
+### Feature #693: What-if sliders passen overrides toe op unified projection input - PASSING
+- Added applyWhatIfOverridesToUnified() to lib/whatif-overrides.ts
+  - Directly mutates UnifiedProjectionInput fields: monthlyIncome, monthlySurplus, annualSavings, yearlyExpenses, grossReturn
+  - Income/workdays slider → monthlyIncome + monthlySurplus + annualSavings
+  - Savings-rate slider → yearlyExpenses (lifestyle change)
+  - Return slider → grossReturn
+  - Extra contribution → annualSavings + monthlySurplus
+- Built baseUnifiedInput once from loaded data in whatif/page.tsx
+- whatIfUnifiedInput computed via applyWhatIfOverridesToUnified(base, overrides, baseline)
+- Removed intermediate runUnified() helper — calls runUnifiedProjection() directly
+- Extracted applyPensioenOverride() helper to reduce duplication
+- computeImpact() now uses whatIfUnifiedInput directly
+- Kept legacy applyWhatIfOverrides() for horizon-client.tsx backward compat
+- Verified: baseline (no slider changes) = 66 jaar FIRE
+- Verified: return slider 9% → 65 jaar (-0.9), extra €500/m → 64 jaar (-1.8)
+- Zero console errors
+- Commit: 25cb7f0f
+
+### Feature #703: Opbouw: Monte Carlo analyse review — data, relevantie en weergave - PASSING
+- Added relevance check: isRelevant = hasInvestmentHorizon && (hasPortfolio || hasSavings)
+- Irrelevant state shows AlertTriangle icon with specific reason:
+  - No portfolio + no savings → "Voeg bezittingen of maandelijkse inleg toe"
+  - No investment horizon → "Minstens 1 jaar projectietijd nodig"
+- Added Info explanation box for non-technical users:
+  - Shows actual user data: vermogen, jaarlijkse inleg, verwacht rendement
+  - Explains fan chart concept: "hoe breder de waaier, hoe groter de onzekerheid"
+- Added subtitle on per-age success table: "het percentage van de 1.000 simulaties..."
+- Verified with real data: €834.695 portfolio, €15.600/yr savings, 7% return
+- Fan chart, 4 stat cards, and per-age table all render correctly
+- Slagingskans 80%, Mediaan 52 jaar, P10 45 jaar — consistent with input data
+- Zero console errors
+- Commit: 25cb7f0f
+
+### Current Status
+- 2 features completed this session (#693, #703)
+- Overall progress: 693/718 passing (96.5%)
+
 ## Session 2026-04-06 - Features #697, #698
 
 ### Feature #697: Widget spaarquote L-formaat toont correcte historische grafiek - PASSING
@@ -22926,3 +22965,34 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#704, #705)
+
+## Session 2026-04-06 - Features #706, #707
+
+### Feature #706: Opbouw: Spaarquote gevoeligheid review — data, relevantie en weergave - PASSING
+- Added savingsRate and monthlyIncome props to SpaarquoteGevoeligheid component
+- Added "Huidige spaarquote" badge showing actual savings rate percentage (e.g. 37.1%) with monthly amount
+- Savings rate derived from income/expenses (same basis as kern page)
+- Added empty state with informative message when no savings data available
+- Removed unused variables (isPositive, isNegative)
+- 5 scenario rows (-20%, -10%, Huidig, +10%, +20%) with FIRE age impact
+- Updated parent phase-modal-opbouw.tsx to pass savingsRate and monthlyIncome props
+- Zero console errors
+- Commit: 599c5092
+
+### Feature #707: Opbouw: Hypotheek vs beleggen review — data, relevantie en weergave - PASSING
+- Added empty state: "Je hebt geen hypotheek — deze analyse is niet relevant"
+- Added mortgage context strip showing: balance (€248,000), rate (3.80%), term (30 jr), type (annuïteit)
+- Removed parent debts.length gating — component now handles its own empty/no-mortgage state
+- Uses real mortgage data from debts array (balance, interest_rate, repayment_type, end_date)
+- Comparison uses user's expectedReturn from profile parameters (7.0%)
+- Clear conclusion: winner badge + FIRE impact + explanation with specific numbers
+- Zero console errors
+- Commit: e1a931b1
+
+### Files Modified
+- components/app/horizon/phase-analysis/opbouw/spaarquote-gevoeligheid.tsx — savings rate badge + empty state
+- components/app/horizon/phase-analysis/opbouw/hypotheek-vs-beleggen-opbouw.tsx — empty state + mortgage context
+- components/app/horizon/phase-modal-opbouw.tsx — pass savingsRate/monthlyIncome + remove debts gating
+
+### Current Status
+- 2 features completed this session (#706, #707)
