@@ -17,6 +17,10 @@ interface SpaarquoteGevoeligheidProps {
   inflationRate: number   // e.g. 0.02
   yearlyExpenses: number
   cashflows?: SimCashflow[]
+  /** Actual savings rate percentage (0-100), e.g. from kern page. When provided, shown in header. */
+  savingsRate?: number | null
+  /** Monthly net income for savings rate context */
+  monthlyIncome?: number | null
 }
 
 interface ScenarioRow {
@@ -103,8 +107,17 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
   inflationRate,
   yearlyExpenses,
   cashflows,
+  savingsRate,
+  monthlyIncome,
 }: SpaarquoteGevoeligheidProps) {
   const [scenarios, setScenarios] = useState<ScenarioRow[] | null>(null)
+
+  // Derive actual savings rate: prefer explicit prop, fall back to income-based computation
+  const effectiveSavingsRate = savingsRate != null && savingsRate > 0
+    ? savingsRate
+    : monthlyIncome && monthlyIncome > 0
+      ? Math.round(((annualSavings / 12) / monthlyIncome) * 1000) / 10
+      : null
 
   // Build scenarios with lazy compute via setTimeout
   const params = useMemo(() => ({
@@ -182,8 +195,30 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
     return () => clearTimeout(timer)
   }, [params])
 
-  // Don't render when there's no meaningful data to show
+  // Don't render when there's no meaningful expense data
   if (yearlyExpenses <= 0) return null
+
+  // Show empty state when savings rate is not available
+  const hasMeaningSavingsData = annualSavings !== 0 || (effectiveSavingsRate != null && effectiveSavingsRate > 0)
+  if (!hasMeaningSavingsData) {
+    return (
+      <AnalysisSection
+        title="Spaarquote gevoeligheid"
+        icon={TrendingUp}
+        loading={false}
+        willContext="Spaarquote gevoeligheid: geen spaarquote beschikbaar."
+      >
+        <div className="rounded-md border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-4 text-center">
+          <p className="text-xs text-[var(--ink-3)]">
+            Er is geen spaarquote beschikbaar om gevoeligheidsscenario&apos;s te berekenen.
+          </p>
+          <p className="mt-1 text-[11px] text-[var(--ink-4)]">
+            Voeg inkomsten en uitgaven toe zodat je spaarquote berekend kan worden.
+          </p>
+        </div>
+      </AnalysisSection>
+    )
+  }
 
   const willContext = scenarios
     ? `Spaarquote gevoeligheid: ${scenarios.map(s => `${s.label} → FIRE ${s.fireAge ?? '–'}`).join(', ')}.`
@@ -197,6 +232,19 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
       willContext={willContext}
     >
       <div className="space-y-3">
+        {/* ── Current savings rate badge ───────────────────── */}
+        {effectiveSavingsRate != null && (
+          <div className="flex items-center gap-2 rounded-md bg-[var(--color-horizon-100)]/30 px-2.5 py-1.5 text-xs text-[var(--ink-2)]">
+            <span className="font-medium">Huidige spaarquote:</span>
+            <span className="font-mono tabular-nums font-semibold text-[var(--color-horizon-600)]">
+              {effectiveSavingsRate.toFixed(1)}%
+            </span>
+            <span className="text-[var(--ink-4)]">
+              ({formatCurrency(Math.round(annualSavings / 12))}/mnd)
+            </span>
+          </div>
+        )}
+
         <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
           Wat als je meer of minder spaart? Onderstaande tabel toont de impact op je FIRE-leeftijd en eindvermogen.
         </p>
@@ -226,8 +274,6 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
             <tbody>
               {scenarios?.map((s) => {
                 const isCurrent = s.pctDelta === 0
-                const isPositive = s.pctDelta > 0
-                const isNegative = s.pctDelta < 0
 
                 // Color for verschil column
                 let verschilColor = 'text-[var(--ink-2)]'
