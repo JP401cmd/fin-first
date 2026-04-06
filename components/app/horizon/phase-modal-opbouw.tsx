@@ -306,22 +306,20 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
         />
 
         {/* 9. Hypotheek vs Beleggen — mortgage vs investing trade-off */}
-        {debts && debts.length > 0 && (
-          <HypotheekVsBeleggenOpbouw
-            debts={debts}
-            monthlyIncome={monthlyIncome ?? 0}
-            monthlyExpenses={monthlyExpenses ?? 0}
-            expectedReturn={expectedReturn}
-            inflationRate={inflationRate}
-            currentAge={currentAge}
-            currentPortfolio={currentNetWorth}
-            yearlyExpenses={yearlyExpenses}
-            annualSavings={yearlySavings}
-            cashflows={cashflows}
-            hasPartner={hasPartner}
-            marginaalTarief={marginaalTarief}
-          />
-        )}
+        <HypotheekVsBeleggenOpbouw
+          debts={debts ?? []}
+          monthlyIncome={monthlyIncome ?? 0}
+          monthlyExpenses={monthlyExpenses ?? 0}
+          expectedReturn={expectedReturn}
+          inflationRate={inflationRate}
+          currentAge={currentAge}
+          currentPortfolio={currentNetWorth}
+          yearlyExpenses={yearlyExpenses}
+          annualSavings={yearlySavings}
+          cashflows={cashflows}
+          hasPartner={hasPartner}
+          marginaalTarief={marginaalTarief}
+        />
 
         {/* 10. Koopkrachterosie — inflation erosion analysis */}
         <KoopkrachtErosie

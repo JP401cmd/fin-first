@@ -177,11 +177,30 @@ export const HypotheekVsBeleggenOpbouw = memo(
       marginaalTarief,
     ])
 
-    // No mortgage or no result — render nothing
-    if (!mortgage || !result) return null
+    // No mortgage found — show informative empty state
+    if (!mortgage || !result) {
+      return (
+        <AnalysisSection
+          title="Hypotheek vs. beleggen"
+          icon={Scale}
+          willContext="Hypotheek vs. beleggen: geen actieve hypotheek gevonden."
+        >
+          <div className="rounded-md border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-4 text-center">
+            <p className="text-xs text-[var(--ink-3)]">
+              Je hebt geen hypotheek — deze analyse is niet relevant.
+            </p>
+            <p className="mt-1 text-[11px] text-[var(--ink-4)]">
+              Voeg een hypotheek toe bij schulden om de vergelijking tussen extra aflossen en beleggen te zien.
+            </p>
+          </div>
+        </AnalysisSection>
+      )
+    }
 
     const isWinnerBeleggen = result.aanbeveling === 'beleggen'
     const isWinnerAflossen = result.aanbeveling === 'aflossen'
+    const restLooptijdMaanden = estimateRestLooptijd(mortgage)
+    const restLooptijdJaren = Math.round(restLooptijdMaanden / 12)
 
     return (
       <AnalysisSection
@@ -190,6 +209,25 @@ export const HypotheekVsBeleggenOpbouw = memo(
         willContext={`Hypotheek vs. beleggen: ${formatCurrency(DEFAULT_EXTRA_BEDRAG)}/mnd extra. Aanbeveling: ${result.aanbeveling}. Verschil: ${formatCurrency(result.verschil)}. Breakeven: ${(result.breakevenRendement * 100).toFixed(1)}%.${result.fireImpactMaanden != null ? ` FIRE-impact: ${result.fireImpactMaanden > 0 ? '+' : ''}${result.fireImpactMaanden} maanden.` : ''}`}
       >
         <div className="space-y-3">
+          {/* ── Mortgage context strip ────────────────────────── */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-[var(--subtle)]/50 px-2.5 py-1.5 text-xs text-[var(--ink-3)]">
+            <span>
+              <span className="text-[var(--ink-4)]">Hypotheek:</span>{' '}
+              <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{formatCurrency(mortgage.current_balance)}</span>
+            </span>
+            <span>
+              <span className="text-[var(--ink-4)]">Rente:</span>{' '}
+              <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{mortgage.interest_rate.toFixed(2)}%</span>
+            </span>
+            <span>
+              <span className="text-[var(--ink-4)]">Restlooptijd:</span>{' '}
+              <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{restLooptijdJaren} jr</span>
+            </span>
+            <span>
+              <span className="text-[var(--ink-4)]">Type:</span>{' '}
+              <span className="font-medium text-[var(--ink-2)]">{mortgage.repayment_type ?? 'annuïteit'}</span>
+            </span>
+          </div>
           {/* ── Scenario cards ────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {/* Aflossen scenario */}
