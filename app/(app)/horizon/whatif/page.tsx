@@ -309,10 +309,11 @@ export default function WhatIfPage() {
       cashflows: [], // filled per-simulation
       strategyConfig: strategyForSim,
       withdrawalStrategy: withdrawalStrategyConfig,
+      forcedFireAge: strategyForSim.strategy === 'pensioen' ? Math.ceil(userAowAge.fractional) : undefined,
       hasPartner,
       bankAccountCash,
     }
-  }, [input, fullAssets, fullDebts, fireStrategy, userGrossReturn, userInflation, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig])
+  }, [input, fullAssets, fullDebts, fireStrategy, userGrossReturn, userInflation, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig, userAowAge])
 
   // ── What-if UnifiedProjectionInput (overrides applied directly) ──────────
   const whatIfUnifiedInput = useMemo<UnifiedProjectionInput | null>(() => {
@@ -326,38 +327,21 @@ export default function WhatIfPage() {
     return applyWhatIfOverrides(input, overrides, baseline)
   }, [input, overrides, baseline])
 
-  // ── Helper: apply pensioen override to SimResult ─────────────
-  const applyPensioenOverride = useCallback((result: SimResult, strategyConfig: FireStrategyConfig): SimResult => {
-    if (strategyConfig.strategy !== 'pensioen') return result
-    const aowAge = userAowAge.fractional
-    const aowAgeInt = Math.floor(aowAge)
-    const rowAtAow = result.rows.find(r => r.age === aowAgeInt)
-    return {
-      ...result,
-      fireAgeFractional: aowAge,
-      fireAge: aowAgeInt,
-      requiredFirePortfolio: rowAtAow?.endPortfolio ?? result.requiredFirePortfolio,
-      fireReachable: true,
-    }
-  }, [userAowAge])
-
   // ── Run baseline simulation ──────────────────────────────
   const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
     if (!baseUnifiedInput) return null
     const cashflows = lifeEventsToCashflows(activeEvents)
     const unifiedResult = runUnifiedProjection({ ...baseUnifiedInput, cashflows })
-    const result = applyPensioenOverride(toSimResult(unifiedResult), baseUnifiedInput.strategyConfig)
-    return { result, cashflows }
-  }, [baseUnifiedInput, activeEvents, applyPensioenOverride])
+    return { result: toSimResult(unifiedResult), cashflows }
+  }, [baseUnifiedInput, activeEvents])
 
   // ── Run what-if simulation ───────────────────────────────
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
     if (!whatIfUnifiedInput) return null
     const cashflows = lifeEventsToCashflows(activeEvents)
     const unifiedResult = runUnifiedProjection({ ...whatIfUnifiedInput, cashflows })
-    const result = applyPensioenOverride(toSimResult(unifiedResult), whatIfUnifiedInput.strategyConfig)
-    return { result, cashflows }
-  }, [whatIfUnifiedInput, activeEvents, applyPensioenOverride])
+    return { result: toSimResult(unifiedResult), cashflows }
+  }, [whatIfUnifiedInput, activeEvents])
 
   // ── Impact computation (per-event FIRE delta) ──────────────
   const computeImpact = useCallback((eventId: string) => {
@@ -405,8 +389,8 @@ export default function WhatIfPage() {
     : null
 
   // Annual savings for scenario summary
-  const whatIfAnnualSavings = whatIfAnnualSavings_sim
-  const baselineAnnualSavings = (input?.monthlyContributions ?? 0) * 12
+  const whatIfAnnualSavings = whatIfUnifiedInput?.annualSavings ?? whatIfAnnualSavings_sim
+  const baselineAnnualSavings = baseUnifiedInput?.annualSavings ?? (input?.monthlyContributions ?? 0) * 12
 
   // ── Scenario key for SimChart animation replay ─────────
   const scenarioKey = useMemo(() => {
