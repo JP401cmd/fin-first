@@ -1,3 +1,24 @@
+## Session 2026-04-06 - Features #697, #698
+
+### Feature #697: Widget spaarquote L-formaat toont correcte historische grafiek - PASSING
+- Full-size spaarquote widget now uses real `savingsHistory` from `net_worth_snapshots.savings_rate`
+- Falls back to estimated rates from net worth deltas only when no snapshot data exists
+- Current rate always appended as most recent data point
+- Zero console errors
+- Committed as part of 278a87ee (concurrent agent) + 8f7b0292
+
+### Feature #698: Widgets inkomenstrend, uitgavetrend, spaartrend en schuldtrend tonen correcte data - PASSING
+- Trend widgets previously only showed budget-linked transactions (skipped tx without budget_id)
+- Fixed: income trend now uses ALL positive transactions per month
+- Fixed: expense trend now uses ALL negative transactions per month (consistent with expenseHistory)
+- Fixed: savings trend now computed as income - expenses per month (not budget-linked only)
+- Debt trend still uses budget-linked debt transactions (appropriate for this type)
+- Zero console errors on dashboard and core pages
+- Commit: 8f7b0292
+
+### Current Status
+- 2 features completed this session (#697, #698)
+
 ## Session 2026-04-05 - Feature #685
 
 ### Feature #685: Opbouw: net_worth_inclusion_pct per bezitting meenemen in doorrekening - PASSING
