@@ -136,7 +136,7 @@ export const SORRAnalyse = memo(function SORRAnalyse({
 
   return (
     <AnalysisSection
-      title="Sequence of Returns Risk (SORR)"
+      title="Volgorde-risico (SORR)"
       icon={ShieldAlert}
       loading={loading}
       willContext={
@@ -149,22 +149,71 @@ export const SORRAnalyse = memo(function SORRAnalyse({
     >
       {state && (
         <div className="space-y-4">
-          {/* -- 1. Fragile decade explainer -------------------------------- */}
+          {/* -- 1. What is SORR — user context ----------------------------- */}
+          <div className="rounded-[var(--r)] bg-[var(--subtle)]/50 px-3 py-2.5">
+            <p className="text-[11px] font-semibold text-[var(--ink-2)]">
+              Wat is volgorde-risico?
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
+              Als je stopt met werken en geld opneemt uit je portfolio, maakt het
+              verschil <em>wanneer</em> een beurscrash valt. Daalt de beurs vroeg
+              in je onttrekkingsfase, dan verkoop je aandelen op een laag punt en
+              is er minder kapitaal dat later kan herstellen. Dit heet het{' '}
+              <span className="font-semibold text-[var(--ink-2)]">Sequence of Returns Risk</span>.
+            </p>
+          </div>
+
+          {/* -- 2. Fragile decade explainer -------------------------------- */}
           <p className="text-xs leading-relaxed text-[var(--ink-3)]">
-            Jouw fragiele decennium loopt van{' '}
+            Jouw{' '}
+            <span className="font-semibold text-[var(--ink-2)]">fragiele decennium</span>{' '}
+            loopt van leeftijd{' '}
             <span className="font-semibold text-[var(--ink-2)]">
-              leeftijd {Math.round(startAge)} tot {Math.round(startAge) + 10}
+              {Math.round(startAge)} tot {Math.round(startAge) + 10}
             </span>
             . In die periode onttrek je circa{' '}
             <span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">
               {formatCurrency(Math.round(yearlyWithdrawal * Math.min(10, yearsInPhase)))}
             </span>{' '}
-            aan levensonderhoud. Een crash vroeg in deze fase heeft meer
-            impact dan later, omdat je tegelijk onttrekkingen doet uit een
-            kleiner wordend portfolio.
+            aan levensonderhoud terwijl je portfolio nog kwetsbaar is.
           </p>
 
-          {/* -- 2. Scenario comparison table ------------------------------- */}
+          {/* -- 3. Crash year 1 callout (moved up — key risk first) -------- */}
+          {crashScenario && (() => {
+            const crashDelta = crashScenario.successRate - state.baseline.successRate
+            return (
+              <div className="rounded-[var(--r)] border border-[var(--negative)]/30 bg-[var(--negative)]/5 px-3 py-2.5">
+                <p className="text-xs font-semibold text-[var(--negative)]">
+                  Wat als de markt &minus;20% daalt in je eerste jaar?
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-2)]">
+                  Jouw slagingskans daalt van{' '}
+                  <span className={`font-mono tabular-nums font-semibold ${successColor(state.baseline.successRate)}`}>
+                    {Math.round(state.baseline.successRate * 100)}%
+                  </span>
+                  {' '}naar{' '}
+                  <span className={`font-mono tabular-nums font-semibold ${successColor(crashScenario.successRate)}`}>
+                    {Math.round(crashScenario.successRate * 100)}%
+                  </span>
+                  <span className="font-mono tabular-nums text-[var(--negative)]">
+                    {' '}({crashDelta >= 0 ? '+' : ''}{Math.round(crashDelta * 100)}pp)
+                  </span>
+                  {crashScenario.yearsLostVsBaseline > 0 && (
+                    <>
+                      . Je portfolio gaat mediaan{' '}
+                      <span className="font-mono tabular-nums font-semibold">
+                        {crashScenario.yearsLostVsBaseline} jaar
+                      </span>{' '}
+                      korter mee
+                    </>
+                  )}
+                  .
+                </p>
+              </div>
+            )
+          })()}
+
+          {/* -- 4. Other scenarios (compact) ------------------------------- */}
           <div>
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
               Scenario vergelijking
@@ -226,34 +275,15 @@ export const SORRAnalyse = memo(function SORRAnalyse({
             </div>
           </div>
 
-          {/* -- 3. Crash year 1 callout ----------------------------------- */}
-          {crashScenario && (
-            <div className="rounded-[var(--r)] border border-[var(--negative)]/30 bg-[var(--negative)]/5 px-3 py-2.5">
-              <p className="text-xs font-semibold text-[var(--negative)]">
-                Impact crash &minus;20% in jaar 1
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-2)]">
-                Slagingskans daalt naar{' '}
-                <span className={`font-mono tabular-nums ${successColor(crashScenario.successRate)}`}>
-                  {Math.round(crashScenario.successRate * 100)}%
-                </span>
-                {crashScenario.yearsLostVsBaseline > 0 && (
-                  <>
-                    {' '}en het portfolio gaat mediaan{' '}
-                    <span className="font-mono tabular-nums">
-                      {crashScenario.yearsLostVsBaseline}
-                    </span>{' '}
-                    jaar korter mee.
-                  </>
-                )}
-              </p>
-            </div>
-          )}
-
-          {/* -- 4. Cash buffer effect table ------------------------------- */}
+          {/* -- 5. Solution: Cash buffer (focused) ------------------------- */}
           <div>
-            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-              Cash buffer effect
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+              Bescherming: cash buffer
+            </p>
+            <p className="mb-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
+              Een cash buffer van 1-3 jaar uitgaven beschermt je tegen het
+              volgorde-risico. Je onttrekkingen komen uit de buffer, zodat je
+              portfolio de tijd krijgt om te herstellen na een dip.
             </p>
             <div className="-mx-1 overflow-x-auto">
               <table className="w-full text-xs">
@@ -265,40 +295,55 @@ export const SORRAnalyse = memo(function SORRAnalyse({
                   </tr>
                 </thead>
                 <tbody>
-                  {state.cashBuffers.map((b) => (
-                    <tr
-                      key={b.bufferYears}
-                      className="border-b border-dashed border-[var(--border-ed)] last:border-b-0"
-                    >
-                      <td className="px-1 py-1.5 text-[var(--ink-2)]">
-                        {b.bufferYears === 0 ? 'Geen buffer' : `${b.bufferYears} jaar`}
-                      </td>
-                      <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                        {b.bufferYears === 0 ? '\u2013' : formatCurrency(b.bufferAmount)}
-                      </td>
-                      <td className={`px-1 py-1.5 text-right font-mono tabular-nums ${successColor(b.successRate)} ${successBgColor(b.successRate)} rounded-sm`}>
-                        {Math.round(b.successRate * 100)}%
-                      </td>
-                    </tr>
-                  ))}
+                  {state.cashBuffers.map((b) => {
+                    const isRecommended = state.recommendedBuffer.amount > 0 &&
+                      b.bufferYears > 0 &&
+                      b.bufferAmount === state.recommendedBuffer.amount
+                    return (
+                      <tr
+                        key={b.bufferYears}
+                        className={`border-b border-dashed border-[var(--border-ed)] last:border-b-0 ${isRecommended ? 'bg-[var(--positive)]/5' : ''}`}
+                      >
+                        <td className="px-1 py-1.5 text-[var(--ink-2)]">
+                          {b.bufferYears === 0 ? 'Geen buffer' : `${b.bufferYears} jaar`}
+                          {isRecommended && (
+                            <span className="ml-1.5 inline-flex items-center rounded-full bg-[var(--positive)]/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--positive)]">
+                              aanbevolen
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                          {b.bufferYears === 0 ? '\u2013' : formatCurrency(b.bufferAmount)}
+                        </td>
+                        <td className={`px-1 py-1.5 text-right font-mono tabular-nums ${successColor(b.successRate)} ${successBgColor(b.successRate)} rounded-sm`}>
+                          {Math.round(b.successRate * 100)}%
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* -- 5. Recommendation ----------------------------------------- */}
-          <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-2.5">
-            <p className="text-xs leading-relaxed text-[var(--ink-2)]">
-              Op basis van jouw portefeuille adviseren we een buffer van{' '}
+          {/* -- 6. Recommendation (actionable) ----------------------------- */}
+          <div className="rounded-[var(--r)] border border-[var(--positive)]/30 bg-[var(--positive)]/5 px-3 py-2.5">
+            <p className="text-xs font-semibold text-[var(--positive)]">
+              Advies
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-2)]">
+              Zet bij pensionering een cash buffer opzij van{' '}
               <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
                 {formatCurrency(state.recommendedBuffer.amount)}
               </span>
               {state.recommendedBuffer.months > 0 && (
                 <>
-                  {' '}(= {state.recommendedBuffer.months} maanden uitgaven)
+                  {' '}({state.recommendedBuffer.months} maanden uitgaven)
                 </>
               )}
-              .
+              . Dit geld beleg je niet, maar gebruik je als leefgeld in de
+              eerste jaren. Zo voorkom je dat je bij een dip aandelen moet
+              verkopen.
             </p>
           </div>
         </div>

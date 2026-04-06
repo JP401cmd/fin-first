@@ -293,19 +293,37 @@ export const EndOfLife = memo(function EndOfLife({
             </div>
           )}
 
-          {/* -- 5. Data availability hints --------------------------------- */}
-          {(!hasRealErfgenamen || (hasPartner && !hasRealPartnerData)) && (
+          {/* -- 5. No heirs / no partner message ----------------------------- */}
+          {!hasRealErfgenamen && !hasPartner && (
+            <div className="rounded-[var(--r)] border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+              <p className="text-xs font-semibold text-amber-700">
+                Geen erfgenamen of partner opgegeven
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-2)]">
+                De erfenis-indicatie hierboven is gebaseerd op een standaardverdeling.
+                Vul je huishoudprofiel aan in{' '}
+                <span className="font-semibold">Identiteit → Profiel</span>{' '}
+                voor een nauwkeurigere berekening van erfbelasting en nalatenschap.
+              </p>
+            </div>
+          )}
+
+          {/* -- 5b. Partial data hints -------------------------------------- */}
+          {!hasRealErfgenamen && hasPartner && (
             <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-medium text-[var(--ink-3)]">
-                {!hasRealErfgenamen && !hasPartner && (
-                  <>Erfgenamen zijn geschat op basis van standaardverdeling. Vul je huishoudprofiel aan in <span className="font-semibold">Identiteit → Profiel</span> voor een nauwkeurigere berekening.</>
-                )}
-                {!hasRealErfgenamen && hasPartner && (
-                  <>Erfgenamen zijn geschat op basis van standaardverdeling. Vul het aantal kinderen aan in <span className="font-semibold">Identiteit → Profiel</span> voor een nauwkeurigere berekening.</>
-                )}
-                {hasRealErfgenamen && hasPartner && !hasRealPartnerData && (
-                  <>Partner-inkomen na overlijden is geschat. Upload je pensioenoverzicht (UPO) voor nabestaandenpensioen-gegevens.</>
-                )}
+                Erfgenamen zijn geschat op basis van standaardverdeling. Vul het
+                aantal kinderen aan in{' '}
+                <span className="font-semibold">Identiteit → Profiel</span>{' '}
+                voor een nauwkeurigere berekening.
+              </p>
+            </div>
+          )}
+          {hasRealErfgenamen && hasPartner && !hasRealPartnerData && (
+            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-2.5">
+              <p className="text-[10px] font-medium text-[var(--ink-3)]">
+                Partner-inkomen na overlijden is geschat. Upload je
+                pensioenoverzicht (UPO) voor nabestaandenpensioen-gegevens.
               </p>
             </div>
           )}
