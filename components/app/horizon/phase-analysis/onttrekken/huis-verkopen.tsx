@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useMemo, useState } from 'react'
-import { Home, ChevronRight, ChevronDown } from 'lucide-react'
+import { Home, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import {
@@ -156,17 +156,35 @@ export const HuisVerkopen = memo(function HuisVerkopen({
     }
   }, [baseInput, result, expectedReturn])
 
-  // No eigen_huis in portfolio -- render nothing
-  if (!result || !baseInput) return null
+  // No eigen_huis in portfolio -- show relevance message
+  const hasHouse = result != null && baseInput != null
 
-  const winner = aanbevelingLabel(result.aanbeveling)
+  const winner = hasHouse ? aanbevelingLabel(result!.aanbeveling) : null
 
   return (
     <AnalysisSection
       title="Huis verkopen vs. behouden"
       icon={Home}
-      willContext={`Huis verkopen analyse: aanbeveling ${result.aanbeveling}. Verschil: ${formatCurrency(result.verschil)} over 20 jaar. Breakeven huur: ${formatCurrency(result.breakevenHuur)}/mnd.`}
+      willContext={
+        hasHouse
+          ? `Huis verkopen analyse: aanbeveling ${result.aanbeveling}. Verschil: ${formatCurrency(result.verschil)} over 20 jaar. Breakeven huur: ${formatCurrency(result.breakevenHuur)}/mnd.`
+          : 'Huis verkopen analyse: niet beschikbaar — geen eigen woning in portefeuille.'
+      }
     >
+      {!hasHouse && (
+        <div className="flex items-start gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-kern-500" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink-2)]">Je hebt geen eigen woning — deze analyse is niet relevant</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+              De huis verkopen vs. behouden vergelijking is alleen beschikbaar als je een eigen woning
+              (type &ldquo;eigen_huis&rdquo;) in je bezittingen hebt staan.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasHouse && (
       <div className="space-y-3">
         {/* -- Comparison table -------------------------------------------- */}
         <div className="-mx-1 overflow-x-auto">
@@ -248,8 +266,8 @@ export const HuisVerkopen = memo(function HuisVerkopen({
 
         {/* -- Winner badge ------------------------------------------------ */}
         <div className="flex items-center justify-center">
-          <span className={`rounded-full bg-[var(--subtle)] px-3 py-1 text-xs font-semibold ${winner.colorClass}`}>
-            {winner.text}
+          <span className={`rounded-full bg-[var(--subtle)] px-3 py-1 text-xs font-semibold ${winner!.colorClass}`}>
+            {winner!.text}
           </span>
         </div>
 
@@ -447,6 +465,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
           voor persoonlijk advies.
         </p>
       </div>
+      )}
     </AnalysisSection>
   )
 })

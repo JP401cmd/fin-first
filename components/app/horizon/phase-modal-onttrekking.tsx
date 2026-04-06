@@ -322,10 +322,10 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           />
         )}
 
-        {/* 7. Huis Verkopen — conditional on eigen_huis in assets */}
-        {assets && expectedReturn != null && (
+        {/* 7. Huis Verkopen — always rendered, shows relevance message if no house */}
+        {expectedReturn != null && (
           <HuisVerkopen
-            assets={assets}
+            assets={assets ?? []}
             debts={debts ?? []}
             expectedReturn={expectedReturn}
             inflationRate={inflationRate}
