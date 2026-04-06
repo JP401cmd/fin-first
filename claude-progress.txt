@@ -22996,3 +22996,32 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#706, #707)
+
+## Session 2026-04-06 - Features #701, #702
+
+### Feature #701: Verwijder Passief Inkomen widget - PASSING
+- Removed passief_inkomen from widget-catalog.ts (entry + WIDGET_HREFS)
+- Removed from widget-renderer.tsx (dynamic import + render case)
+- Removed from widget-presets.ts (both presets, reordered remaining)
+- Removed from feature-registry.ts (widgets array + legacyIds)
+- Removed from auto-dashboard-builder.ts (theme widgets + priority)
+- Removed from module-registry.ts (widget-to-module map)
+- Removed from locked-features-footer.tsx
+- Removed from test-personas.ts (2 persona widget_prefs)
+- Removed from regression test suites (onboarding-preferences, kern-dividenden, dashboard-empty-loading)
+- Updated instellingen-page.test.ts (removed from test prefs, adjusted count)
+- Deleted components/widgets/passief-inkomen-widget.tsx
+- Commit: 278a87ee
+
+### Feature #702: Widget vrijheidsvoortgang consistent met kern percentage - PASSING
+- Root cause: dashboard-data-loader.ts used simplified inline budget loop instead of shared computeYearlyMustExpenses()
+- This produced different yearlyMustExpenses than core-data-loader, causing different simRequiredPortfolio
+- Fixed: replaced inline loop with computeYearlyMustExpenses() from budget-utils.ts
+- Fixed: filtered child budgets to exclude archive/income/savings (matching kern query)
+- Fixed: added monthlyExpenses*12 fallback in kern sim when yearlyMustExpenses=0
+- Result: widget percentage went from 43.7% to 13.7% (vs kern 14.6%) — 29% gap reduced to <1%
+- Remaining <1% gap is from independent sim computations (server vs client)
+- Zero console errors on both pages
+
+### Current Status
+- 2 features completed this session (#701, #702)
