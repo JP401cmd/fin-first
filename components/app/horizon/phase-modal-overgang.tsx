@@ -62,6 +62,8 @@ interface PhaseModalOvergangProps {
   fireStrategy?: FireStrategyConfig
   /** Current portfolio value (may differ from portfolioAtTransitionStart) */
   currentPortfolio?: number
+  /** Monthly income (full-time equivalent) for part-time work scenarios */
+  monthlyIncome?: number
 }
 
 // ── Modal Component ──────────────────────────────────────────────────────────
@@ -89,6 +91,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   annualSavings,
   fireStrategy,
   currentPortfolio,
+  monthlyIncome,
 }: PhaseModalOvergangProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
@@ -225,6 +228,8 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             inflationRate={inflationRate}
             debts={debts}
             currentAge={currentAge}
+            fireAge={fireAge}
+            aowAge={aowAge}
           />
         )}
 
@@ -238,6 +243,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             expectedReturn={expectedReturn}
             inflationRate={inflationRate}
             transitionScenario={transitionScenario}
+            monthlyIncome={monthlyIncome}
             cashflows={cashflows}
           />
         )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
-import { TrendingDown, Check, AlertTriangle, X } from 'lucide-react'
+import { TrendingDown, Check, AlertTriangle, X, CheckCircle2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { berekenEerderStoppen } from '@/lib/phase-analysis'
@@ -122,23 +122,50 @@ export const EerderStoppen = memo(function EerderStoppen({
     ? 'Nog eerder met pensioen'
     : 'Eerder stoppen met werken'
 
+  // FIRE is already reachable within 2 years — earlier stopping is not relevant
+  const yearsToFire = currentFireAge - currentAge
+  const fireAlreadyClose = yearsToFire <= 2
+
+  // All options require no extra savings — already on track
+  const allAlreadyOnTrack = state !== null && state.opties.every(o => o.extraMaandelijksBesparen <= 0 && o.haalbaar)
+
+  const notRelevant = fireAlreadyClose || allAlreadyOnTrack
+
   return (
     <AnalysisSection
       title={sectionTitle}
       icon={TrendingDown}
       loading={loading}
       willContext={
-        state
-          ? `Eerder stoppen analyse: ${state.opties
-              .map(
-                (o) =>
-                  `${o.jarenEerder}j eerder = ${formatCurrency(o.extraMaandelijksBesparen)}/mnd extra (${o.haalbaar ? 'haalbaar' : 'niet haalbaar'})`,
-              )
-              .join(', ')}`
-          : 'Eerder stoppen analyse (laden...)'
+        notRelevant
+          ? 'Eerder stoppen analyse: niet relevant — FIRE is al op korte termijn bereikbaar'
+          : state
+            ? `Eerder stoppen analyse: ${state.opties
+                .map(
+                  (o) =>
+                    `${o.jarenEerder}j eerder = ${formatCurrency(o.extraMaandelijksBesparen)}/mnd extra (${o.haalbaar ? 'haalbaar' : 'niet haalbaar'})`,
+                )
+                .join(', ')}`
+            : 'Eerder stoppen analyse (laden...)'
       }
     >
-      {state && (
+      {notRelevant && (
+        <div className="flex items-start gap-3 rounded-md bg-[var(--positive)]/8 px-3 py-3">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--positive)]" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">
+              FIRE is al op korte termijn bereikbaar
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+              {fireAlreadyClose
+                ? `Je bereikt financiële vrijheid over ${yearsToFire <= 0 ? 'minder dan een jaar' : `${yearsToFire} jaar`} — eerder stoppen is niet meer relevant.`
+                : 'Je zit al op koers om al deze doelen zonder extra inleg te bereiken.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!notRelevant && state && (
         <div className="space-y-3">
           {/* ── Options table ──────────────────────────────────── */}
           <div className="-mx-1 overflow-x-auto">

@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
-import { Briefcase } from 'lucide-react'
+import { Briefcase, AlertCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import type { SimCashflow } from '@/lib/fire-simulation'
@@ -265,6 +265,7 @@ export const DeeltijdwerkImpact = memo(function DeeltijdwerkImpact(
 
   const loading = state === null
   const isGap = props.transitionScenario === 'gap'
+  const noIncome = !props.monthlyIncome || props.monthlyIncome <= 0
 
   return (
     <AnalysisSection
@@ -272,17 +273,33 @@ export const DeeltijdwerkImpact = memo(function DeeltijdwerkImpact(
       icon={Briefcase}
       loading={loading}
       willContext={
-        state
-          ? `Deeltijdwerk impact: ${state.scenarios
-              .map(
-                (s) =>
-                  `${s.label}: ${formatCurrency(s.maandInkomen)}/mnd → ${isGap ? `eindvermogen ${formatCurrency(s.eindVermogen ?? 0)}` : `eindvermogen ${formatCurrency(s.eindVermogen ?? 0)}`}${s.verschil !== 0 ? ` (${s.verschil > 0 ? '+' : ''}${formatCurrency(s.verschil)})` : ''}`,
-              )
-              .join(', ')}`
-          : 'Deeltijdwerk impact (laden...)'
+        noIncome
+          ? 'Deeltijdwerk impact: geen inkomen opgegeven — analyse niet beschikbaar'
+          : state
+            ? `Deeltijdwerk impact: ${state.scenarios
+                .map(
+                  (s) =>
+                    `${s.label}: ${formatCurrency(s.maandInkomen)}/mnd → ${isGap ? `eindvermogen ${formatCurrency(s.eindVermogen ?? 0)}` : `eindvermogen ${formatCurrency(s.eindVermogen ?? 0)}`}${s.verschil !== 0 ? ` (${s.verschil > 0 ? '+' : ''}${formatCurrency(s.verschil)})` : ''}`,
+                )
+                .join(', ')}`
+            : 'Deeltijdwerk impact (laden...)'
       }
     >
-      {state && (
+      {noIncome && (
+        <div className="flex items-start gap-3 rounded-md bg-amber-50/50 px-3 py-3 dark:bg-amber-900/10">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">
+              Geen inkomen opgegeven
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+              Vul je netto maandinkomen in bij je profiel om te zien wat deeltijdwerk voor je portefeuille betekent.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!noIncome && state && (
         <div className="space-y-4">
           {/* ── Scenario table ──────────────────────────────────── */}
           <div className="-mx-1 overflow-x-auto">

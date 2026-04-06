@@ -5402,6 +5402,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           annualSavings={(fire?.monthlySavings ?? 0) * 12}
           fireStrategy={fireStrategy}
           currentPortfolio={(effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)}
+          monthlyIncome={effectiveInput?.monthlyIncome}
         />
       )}
       {/* Onttrekking phase modal */}
