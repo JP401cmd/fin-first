@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, CheckCircle2, Info } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
@@ -24,6 +24,10 @@ export interface MonteCarloOvergangProps {
   expectedReturn: number
   inflationRate: number
   cashflows?: SimCashflow[]
+  /** FIRE age for display in no-gap message */
+  fireAge?: number
+  /** AOW age for display in no-gap message */
+  aowAge?: number
 }
 
 /**
@@ -67,14 +71,19 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
   expectedReturn,
   inflationRate,
   cashflows,
+  fireAge,
+  aowAge,
 }: MonteCarloOvergangProps) {
   const [state, setState] = useState<MCComputedState | null>(null)
 
   const yearsInPhase = Math.max(Math.round(endAge - startAge), 1)
 
+  // ── No transition gap: FIRE age >= AOW age ──────────────────────────────
+  const noGap = startAge >= endAge || (fireAge != null && aowAge != null && fireAge >= aowAge)
+
   // Lazy compute: defer MC past the first paint so modal opens instantly
   useEffect(() => {
-    if (yearsInPhase <= 0) return
+    if (noGap || yearsInPhase <= 0) return
 
     const timer = setTimeout(() => {
       const baseInput = {
@@ -124,9 +133,35 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
     expectedReturn,
     inflationRate,
     cashflows,
+    noGap,
   ])
 
   const loading = state === null
+
+  // ── No-gap message: FIRE age >= AOW age ─────────────────────────────────
+  if (noGap) {
+    return (
+      <AnalysisSection
+        title="Monte Carlo simulatie"
+        icon={BarChart3}
+        willContext="Monte Carlo overgangsfase: geen overgangsfase — FIRE-leeftijd ligt op of na AOW-leeftijd."
+      >
+        <div className="flex items-start gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--positive)]/5 p-4">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--positive)]" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">
+              Geen overgangsfase nodig
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              {fireAge != null && aowAge != null
+                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) ligt op of na je AOW-leeftijd (${Math.round(aowAge)}). Er is geen periode waarin je volledig van je portfolio leeft zonder AOW-inkomen — de Monte Carlo simulatie voor de overgangsfase is daarom niet relevant.`
+                : 'Je FIRE-leeftijd ligt op of na je AOW-leeftijd. Er is geen overgangsfase om te simuleren.'}
+            </p>
+          </div>
+        </div>
+      </AnalysisSection>
+    )
+  }
 
   return (
     <AnalysisSection
@@ -212,9 +247,15 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
 
           {/* ── Buffer sensitivity table ──────────────────────── */}
           <div>
-            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
               Buffergevoeligheid
             </p>
+            <div className="mb-2 flex items-start gap-1.5">
+              <Info className="mt-0.5 h-3 w-3 shrink-0 text-[var(--ink-4)]" />
+              <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
+                Slagingskans bij een hoger minimumportfolio. Een hogere buffer beschermt tegen onverwachte kosten, maar verlaagt de kans dat je portfolio boven dat minimum blijft.
+              </p>
+            </div>
             <div className="-mx-1 overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>

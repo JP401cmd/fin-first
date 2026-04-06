@@ -209,6 +209,8 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             expectedReturn={expectedReturn}
             inflationRate={inflationRate}
             cashflows={cashflows}
+            fireAge={fireAge}
+            aowAge={aowAge}
           />
         )}
 
