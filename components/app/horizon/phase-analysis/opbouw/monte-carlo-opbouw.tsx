@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, AlertTriangle, Info } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
@@ -95,9 +95,24 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
   const yearsInPhase = (fireAge ?? currentAge + 30) - currentAge
   const checkpointAges = buildCheckpointAges(currentAge, fireAge)
 
+  // ── Relevance check ──────────────────────────────────────────────
+  // Determine if the analysis is meaningful given the user's data.
+  const hasPortfolio = startPortfolio > 0
+  const hasSavings = annualSavings > 0
+  const hasInvestmentHorizon = yearsInPhase > 0
+  const isRelevant = hasInvestmentHorizon && (hasPortfolio || hasSavings)
+
+  // Build a human-readable reason if the analysis cannot run
+  let irrelevantReason: string | null = null
+  if (!hasInvestmentHorizon) {
+    irrelevantReason = 'De analyse heeft minstens 1 jaar projectietijd nodig om zinvol te zijn.'
+  } else if (!hasPortfolio && !hasSavings) {
+    irrelevantReason = 'Er is geen vermogen of spaarinleg om te simuleren. Voeg bezittingen of maandelijkse inleg toe om de analyse te activeren.'
+  }
+
   // Lazy compute: defer MC past the first paint so modal opens instantly
   useEffect(() => {
-    if (yearsInPhase <= 0) return
+    if (!isRelevant) return
 
     const timer = setTimeout(() => {
       const mcInput = {
@@ -121,6 +136,7 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    isRelevant,
     currentAge,
     fireAge,
     startPortfolio,
@@ -140,7 +156,7 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
     ? state.main.fireAges[Math.floor(state.main.fireAges.length * 0.1)]
     : null
 
-  const loading = state === null
+  const loading = isRelevant && state === null
 
   return (
     <AnalysisSection
@@ -148,14 +164,38 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
       icon={BarChart3}
       loading={loading}
       willContext={
-        state
-          ? `Monte Carlo opbouwfase: mediaan eindportfolio ${formatCurrency(state.main.medianEndPortfolio)}, ` +
-            `slagingskans ${Math.round((state.main.fireProb ?? 0) * 100)}%.`
-          : 'Monte Carlo simulatie (laden...)'
+        !isRelevant
+          ? `Monte Carlo simulatie: niet beschikbaar — ${irrelevantReason}`
+          : state
+            ? `Monte Carlo opbouwfase: mediaan eindportfolio ${formatCurrency(state.main.medianEndPortfolio)}, ` +
+              `slagingskans ${Math.round((state.main.fireProb ?? 0) * 100)}%.`
+            : 'Monte Carlo simulatie (laden...)'
       }
     >
+      {/* ── Irrelevant state ─────────────────────────────────── */}
+      {!isRelevant && (
+        <div className="flex items-start gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-kern-500" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink-2)]">Analyse niet beschikbaar</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">{irrelevantReason}</p>
+          </div>
+        </div>
+      )}
+
       {state && (
         <div className="space-y-4">
+          {/* ── Explanation for non-technical users ───────────── */}
+          <div className="flex items-start gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-2">
+            <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-4)]" />
+            <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
+              Deze analyse simuleert 1.000 mogelijke toekomstscenario&apos;s op basis van jouw
+              huidige vermogen ({formatCurrency(startPortfolio)}), jaarlijkse inleg ({formatCurrency(annualSavings)}),
+              en verwacht rendement ({(expectedReturn * 100).toFixed(1)}%).
+              De grafiek toont de bandbreedte: hoe breder de waaier, hoe groter de onzekerheid.
+            </p>
+          </div>
+
           {/* ── Fan chart ─────────────────────────────────────── */}
           <FanChart
             percentiles={state.main.percentiles}
@@ -167,7 +207,7 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
           />
 
           {/* ── Key statistics ────────────────────────────────── */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             {/* 1. Overall success probability */}
             <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
@@ -223,6 +263,9 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
             <div>
               <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
                 Slagingskans per leeftijd
+              </p>
+              <p className="mb-2 text-[11px] text-[var(--ink-3)]">
+                Bij elke leeftijd: het percentage van de 1.000 simulaties waarin je FIRE-doel is bereikt.
               </p>
               <div className="-mx-1 overflow-x-auto">
                 <table className="w-full text-xs">
