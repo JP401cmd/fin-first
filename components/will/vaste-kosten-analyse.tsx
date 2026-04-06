@@ -186,6 +186,18 @@ export function VasteKostenAnalyse({
         isOpen && mounted ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
       }`}>
 
+      {/* ── Empty state: geen transacties ── */}
+      {totalCount === 0 && (
+        <div className="px-5 py-8 text-center">
+          <CreditCard className="mx-auto mb-3 h-8 w-8 text-[var(--ink-4)]" />
+          <p className="text-sm font-medium text-[var(--ink-2)]">Nog geen vaste kosten gevonden</p>
+          <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-[var(--ink-4)]">
+            Upload transacties of koppel een bankrekening zodat we je vaste kosten en abonnementen automatisch kunnen herkennen.
+          </p>
+        </div>
+      )}
+
+      {totalCount > 0 && (<>
       {/* ── Mobile tab bar (< md) ── */}
       <div className="border-b border-[var(--border-ed)] px-5 pb-3 pt-3 md:hidden">
         <div className="flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1" role="tablist">
@@ -372,8 +384,10 @@ export function VasteKostenAnalyse({
           </button>
         </div>
       </div>
+      </>)}
 
-      </div> {/* end collapsible content */}
+      {/* end collapsible content */}
+      </div>
 
       {/* ── Classify sheet ──────────────────────────────── */}
       <RecurringClassifySheet
