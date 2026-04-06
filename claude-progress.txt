@@ -22848,3 +22848,29 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#686, #687)
+
+## Session 2026-04-06 - Features #688, #689
+
+### Feature #688: What-if pagina gebruikt withdrawal strategy config uit gebruikersprofiel - PASSING
+- Imported resolveWithdrawalStrategy and WithdrawalStrategyConfig from withdrawal-strategy module
+- Added withdrawal strategy fields to profile select query (withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step)
+- Added withdrawalStrategyConfig state variable (defaults to WITHDRAWAL_DEFAULTS)
+- Resolve withdrawal strategy from profile data after load using resolveWithdrawalStrategy()
+- Replaced hardcoded WITHDRAWAL_DEFAULTS with withdrawalStrategyConfig in runUnified/baseUnifiedInput
+- Added withdrawalStrategyConfig to useMemo dependency array
+- Zero console errors on what-if page
+- Commit: f7644a15
+
+### Feature #689: What-if pagina gebruikt box3Method en hasPartner uit profiel - PASSING
+- Already correctly implemented by existing code:
+  - box3Method resolved from resolveFireParams(profileResult.data).box3Method (line 214)
+  - hasPartner derived from household_type in profile (lines 215-216)
+  - Both passed to runUnifiedProjection via runUnified/baseUnifiedInput callback
+- Profile query already includes box3_method and household_type fields
+- No code changes needed - feature was already working
+
+### Files Modified
+- app/(app)/horizon/whatif/page.tsx — withdrawal strategy from profile + state + dependency
+
+### Current Status
+- 2 features completed this session (#688, #689)
