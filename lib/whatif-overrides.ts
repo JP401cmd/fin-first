@@ -1,5 +1,6 @@
 import type { FinancialInput } from '@/lib/horizon-data'
 import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { UnifiedProjectionInput } from '@/lib/unified-projection'
 
 /**
  * Apply what-if overrides to a financial input to produce adjusted values.
@@ -8,6 +9,9 @@ import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
  * Income changes flow 1:1 to savings (lifestyle stays fixed).
  * Savings-rate changes adjust expenses on the BASELINE income.
  * Extra contribution is additive on top of base monthly contributions.
+ *
+ * @deprecated Prefer applyWhatIfOverridesToUnified() for new code paths
+ * that use the unified projection engine.
  */
 export function applyWhatIfOverrides(
   input: FinancialInput,
@@ -37,6 +41,60 @@ export function applyWhatIfOverrides(
   const annualSavings = Math.max(0, baseAnnualSavings + (incomeDelta + savingsRateDelta + extraDelta) * 12)
 
   return { adjustedInput, annualSavings }
+}
+
+/**
+ * Apply what-if slider overrides directly to a UnifiedProjectionInput.
+ * Pure function — no side effects, no DB access.
+ *
+ * This is the preferred path after migrating to runUnifiedProjection.
+ * It mutates the projection input fields that each slider controls:
+ *
+ * - **Income slider** → monthlyIncome, monthlySurplus, annualSavings
+ * - **Work-days slider** → scales income (4/5 = 80% income)
+ * - **Savings-rate slider** → adjusts yearlyExpenses (lifestyle change)
+ * - **Return slider** → grossReturn
+ * - **Extra contribution** → annualSavings, monthlySurplus
+ */
+export function applyWhatIfOverridesToUnified(
+  base: UnifiedProjectionInput,
+  overrides: WhatIfOverrides,
+  baseline: WhatIfOverrides,
+): UnifiedProjectionInput {
+  const effectiveIncome = overrides.monthlyIncome * (overrides.workDaysPerWeek / 5)
+  const baselineEffectiveIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
+
+  // Income delta flows 1:1 to savings (lifestyle stays fixed)
+  const incomeDelta = effectiveIncome - baselineEffectiveIncome
+
+  // Savings-rate delta adjusts expenses on baseline income (lifestyle change)
+  const savingsRateExpenseDelta = baselineEffectiveIncome * ((overrides.savingsRate - baseline.savingsRate) / 100)
+
+  // Extra contribution is additive
+  const extraContribution = overrides.extraContribution ?? 0
+
+  // Compute adjusted annualSavings
+  const baseAnnualSavings = base.annualSavings
+  const annualSavings = Math.max(0, baseAnnualSavings + (incomeDelta + savingsRateExpenseDelta + extraContribution) * 12)
+
+  // Compute adjusted monthlySurplus (used for per-asset distribution)
+  const baseMonthlySurplus = base.monthlySurplus
+  const monthlySurplus = Math.max(0, baseMonthlySurplus + incomeDelta + savingsRateExpenseDelta + extraContribution)
+
+  // Compute adjusted yearlyExpenses (lifestyle change from savings-rate slider)
+  const adjustedYearlyExpenses = Math.max(0, base.yearlyExpenses - savingsRateExpenseDelta * 12)
+
+  // Return slider → grossReturn (overrides.expectedReturn is a percentage, e.g. 7 → 0.07)
+  const grossReturn = overrides.expectedReturn / 100
+
+  return {
+    ...base,
+    monthlyIncome: effectiveIncome,
+    monthlySurplus,
+    annualSavings,
+    yearlyExpenses: adjustedYearlyExpenses,
+    grossReturn,
+  }
 }
 
 /**

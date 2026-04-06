@@ -570,7 +570,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
       simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
       simFireAgeFractional = simResult.fireAgeFractional
-    } catch {
+    } catch (err) {
+      console.error('[dashboard-data-loader] runUnifiedProjection failed:', err)
       simRows = null
       simRequiredPortfolio = null
       simFireAgeFractional = null

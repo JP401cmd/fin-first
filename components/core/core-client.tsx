@@ -934,7 +934,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       if (!profileResult.data?.date_of_birth || !data) return
       const currentAge = ageAtDate(profileResult.data.date_of_birth, new Date())
       setCoreCurrentAge(currentAge)
-      const yearlyExp = data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses : 0
+      const yearlyExp = data.yearlyMustExpenses > 0
+        ? data.yearlyMustExpenses
+        : (rawFinancials?.monthlyExpenses ?? 0) * 12
       if (!yearlyExp) return
       const monthlyContributions = (assetsContribResult.data ?? [])
         .reduce((s, a) => s + Number((a as { monthly_contribution?: number | null }).monthly_contribution ?? 0), 0)

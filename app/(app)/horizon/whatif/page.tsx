@@ -285,165 +285,98 @@ export default function WhatIfPage() {
     return buildBaselineOverrides(input, userGrossReturn)
   }, [input, userGrossReturn])
 
-  // ── Compute what-if FinancialInput + annual savings from overrides ──────────
+  // ── Base UnifiedProjectionInput (built once from loaded data) ──────────
+  const baseUnifiedInput = useMemo<UnifiedProjectionInput | null>(() => {
+    if (!input) return null
+    const currentAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
+    if (currentAge === null) return null
+    const yearlyExpenses = input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses : 0
+    if (yearlyExpenses <= 0) return null
+    const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
+    return {
+      assets: fullAssets,
+      debts: fullDebts,
+      currentAge,
+      endAge: strategyForSim.endAge,
+      yearlyExpenses,
+      annualSavings: (input.monthlyContributions ?? 0) * 12,
+      monthlySurplus: input.monthlyContributions ?? 0,
+      monthlyIncome: input.monthlyIncome ?? 0,
+      incomeGrowthRate: 0,
+      grossReturn: userGrossReturn,
+      inflationRate: userInflation,
+      box3Method,
+      cashflows: [], // filled per-simulation
+      strategyConfig: strategyForSim,
+      withdrawalStrategy: withdrawalStrategyConfig,
+      hasPartner,
+      bankAccountCash,
+    }
+  }, [input, fullAssets, fullDebts, fireStrategy, userGrossReturn, userInflation, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig])
+
+  // ── What-if UnifiedProjectionInput (overrides applied directly) ──────────
+  const whatIfUnifiedInput = useMemo<UnifiedProjectionInput | null>(() => {
+    if (!baseUnifiedInput || !overrides || !baseline) return null
+    return applyWhatIfOverridesToUnified(baseUnifiedInput, overrides, baseline)
+  }, [baseUnifiedInput, overrides, baseline])
+
+  // ── Legacy what-if FinancialInput (for dailyExpenses display only) ──────
   const { adjustedInput: whatIfInput, annualSavings: whatIfAnnualSavings_sim } = useMemo(() => {
     if (!input || !overrides || !baseline) return { adjustedInput: null as FinancialInput | null, annualSavings: 0 }
     return applyWhatIfOverrides(input, overrides, baseline)
   }, [input, overrides, baseline])
 
-  // ── Unified projection helper ─────────────────────────────
-  /** Helper: run unified projection and return SimResult */
-  const runUnified = useCallback((
-    currentAge: number,
-    yearlyExpenses: number,
-    annualSavings: number,
-    monthlySurplus: number,
-    monthlyInc: number,
-    grossReturn: number,
-    inflationRate: number,
-    cashflows: SimCashflow[],
-    strategyConfig: FireStrategyConfig,
-    forcedFireAge?: number,
-  ): SimResult => {
-    const unifiedInput: UnifiedProjectionInput = {
-      assets: fullAssets,
-      debts: fullDebts,
-      currentAge,
-      endAge: strategyConfig.endAge,
-      yearlyExpenses,
-      annualSavings,
-      monthlySurplus,
-      monthlyIncome: monthlyInc,
-      incomeGrowthRate: 0,
-      grossReturn,
-      inflationRate,
-      box3Method,
-      cashflows,
-      strategyConfig,
-      withdrawalStrategy: withdrawalStrategyConfig,
-      forcedFireAge,
-      hasPartner,
-      bankAccountCash,
+  // ── Helper: apply pensioen override to SimResult ─────────────
+  const applyPensioenOverride = useCallback((result: SimResult, strategyConfig: FireStrategyConfig): SimResult => {
+    if (strategyConfig.strategy !== 'pensioen') return result
+    const aowAge = userAowAge.fractional
+    const aowAgeInt = Math.floor(aowAge)
+    const rowAtAow = result.rows.find(r => r.age === aowAgeInt)
+    return {
+      ...result,
+      fireAgeFractional: aowAge,
+      fireAge: aowAgeInt,
+      requiredFirePortfolio: rowAtAow?.endPortfolio ?? result.requiredFirePortfolio,
+      fireReachable: true,
     }
-    const unifiedResult = runUnifiedProjection(unifiedInput)
-    return toSimResult(unifiedResult)
-  }, [fullAssets, fullDebts, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig])
+  }, [userAowAge])
 
   // ── Run baseline simulation ──────────────────────────────
   const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
-    if (!input) return null
-
-    const currentAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
-    if (currentAge === null) return null
-
-    const yearlyExpenses = input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses : 0
-    if (yearlyExpenses <= 0) return null
-
-    const annualSavings = (input.monthlyContributions ?? 0) * 12
-    const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
+    if (!baseUnifiedInput) return null
     const cashflows = lifeEventsToCashflows(activeEvents)
-
-    let result = runUnified(
-      currentAge,
-      yearlyExpenses,
-      annualSavings,
-      input.monthlyContributions ?? 0,
-      input.monthlyIncome ?? 0,
-      userGrossReturn,
-      userInflation,
-      cashflows,
-      strategyForSim,
-    )
-
-    // Pensioen-modus override: use AOW age as FIRE age
-    if (strategyForSim.strategy === 'pensioen') {
-      const aowAge = userAowAge.fractional
-      const aowAgeInt = Math.floor(aowAge)
-      const rowAtAow = result.rows.find(r => r.age === aowAgeInt)
-      result = {
-        ...result,
-        fireAgeFractional: aowAge,
-        fireAge: aowAgeInt,
-        requiredFirePortfolio: rowAtAow?.endPortfolio ?? result.requiredFirePortfolio,
-        fireReachable: true,
-      }
-    }
-
+    const unifiedResult = runUnifiedProjection({ ...baseUnifiedInput, cashflows })
+    const result = applyPensioenOverride(toSimResult(unifiedResult), baseUnifiedInput.strategyConfig)
     return { result, cashflows }
-  }, [input, activeEvents, fireStrategy, userGrossReturn, userInflation, userAowAge, runUnified])
+  }, [baseUnifiedInput, activeEvents, applyPensioenOverride])
 
   // ── Run what-if simulation ───────────────────────────────
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
-    if (!whatIfInput) return null
-
-    const currentAge = whatIfInput.dateOfBirth ? ageAtDate(whatIfInput.dateOfBirth) : null
-    if (currentAge === null) return null
-
-    const yearlyExpenses = whatIfInput.yearlyMustExpenses > 0 ? whatIfInput.yearlyMustExpenses : 0
-    if (yearlyExpenses <= 0) return null
-
-    const annualSavings = whatIfAnnualSavings_sim
-    const grossReturn = whatIfInput.expectedReturn ?? userGrossReturn
-    const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
+    if (!whatIfUnifiedInput) return null
     const cashflows = lifeEventsToCashflows(activeEvents)
-
-    let result = runUnified(
-      currentAge,
-      yearlyExpenses,
-      annualSavings,
-      whatIfInput.monthlyContributions ?? 0,
-      whatIfInput.monthlyIncome ?? 0,
-      grossReturn,
-      userInflation,
-      cashflows,
-      strategyForSim,
-    )
-
-    // Pensioen-modus override: use AOW age as FIRE age
-    if (strategyForSim.strategy === 'pensioen') {
-      const aowAge = userAowAge.fractional
-      const aowAgeInt = Math.floor(aowAge)
-      const rowAtAow = result.rows.find(r => r.age === aowAgeInt)
-      result = {
-        ...result,
-        fireAgeFractional: aowAge,
-        fireAge: aowAgeInt,
-        requiredFirePortfolio: rowAtAow?.endPortfolio ?? result.requiredFirePortfolio,
-        fireReachable: true,
-      }
-    }
-
+    const unifiedResult = runUnifiedProjection({ ...whatIfUnifiedInput, cashflows })
+    const result = applyPensioenOverride(toSimResult(unifiedResult), whatIfUnifiedInput.strategyConfig)
     return { result, cashflows }
-  }, [whatIfInput, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation, userAowAge, runUnified])
+  }, [whatIfUnifiedInput, activeEvents, applyPensioenOverride])
 
   // ── Impact computation (per-event FIRE delta) ──────────────
   const computeImpact = useCallback((eventId: string) => {
-    if (!whatIfInput || !fireStrategy) return null
+    if (!whatIfUnifiedInput) return null
 
     const event = events.find(e => e.id === eventId)
     if (!event) return null
-
-    const currentAge = whatIfInput.dateOfBirth ? ageAtDate(whatIfInput.dateOfBirth) : null
-    if (currentAge === null) return null
-
-    const yearlyExpenses = whatIfInput.yearlyMustExpenses > 0 ? whatIfInput.yearlyMustExpenses : 0
-    if (yearlyExpenses <= 0) return null
-
-    const annualSavings = whatIfAnnualSavings_sim
-    const grossReturn = whatIfInput.expectedReturn ?? userGrossReturn
-    const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
 
     // Simulate WITH this event (all active events)
     const eventsWithThis = activeEvents.some(e => e.id === eventId)
       ? activeEvents
       : [...activeEvents, event]
     const cfWith = lifeEventsToCashflows(eventsWithThis)
-    const simWith = runUnified(currentAge, yearlyExpenses, annualSavings, whatIfInput.monthlyContributions ?? 0, whatIfInput.monthlyIncome ?? 0, grossReturn, userInflation, cfWith, strategyForSim)
+    const simWith = toSimResult(runUnifiedProjection({ ...whatIfUnifiedInput, cashflows: cfWith }))
 
     // Simulate WITHOUT this event
     const eventsWithout = activeEvents.filter(e => e.id !== eventId)
     const cfWithout = lifeEventsToCashflows(eventsWithout)
-    const simWithout = runUnified(currentAge, yearlyExpenses, annualSavings, whatIfInput.monthlyContributions ?? 0, whatIfInput.monthlyIncome ?? 0, grossReturn, userInflation, cfWithout, strategyForSim)
+    const simWithout = toSimResult(runUnifiedProjection({ ...whatIfUnifiedInput, cashflows: cfWithout }))
 
     // Calculate total cost of the event
     const oneTimeCost = Number(event.one_time_cost ?? 0)
@@ -461,7 +394,7 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [whatIfInput, events, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation, runUnified])
+  }, [whatIfUnifiedInput, events, activeEvents])
 
   // ── Derived values for display ───────────────────────────
   const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
