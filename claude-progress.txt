@@ -1,3 +1,37 @@
+## Session 2026-04-06 - Features #718, #719
+
+### Feature #718: Onttrekking: Koopkracht erosie review — data, relevantie en weergave - PASSING
+- Added empty state for no withdrawal (totalIncome <= 0)
+- Added empty state for 0% inflation (already existed, upgraded to card style)
+- Added empty state for short duration (<=2 years)
+- Added visual erosion progress bar showing "X% behouden"
+- Added per-euro context message (e.g., €1 becomes €X.XX)
+- Added Beschermingsstrategieën section with 4 strategies:
+  - Inflatiecorrectie (increase withdrawal with inflation)
+  - Guardrails-methode (dynamic withdrawal rules)
+  - Stapsgewijs afbouwen (higher early, lower later)
+  - Deeltijdwerk overwegen (shown when erosion >30%)
+- Added severity warning for >40% erosion (AlertTriangle)
+- All data comes from real simulation: yearlyWithdrawal, inflationRate, startAge, endAge
+- Zero new console errors
+- Commit: 39a079ab
+
+### Feature #719: Onttrekking: Afbouwanalyse kassabon review — data en weergave - PASSING
+- Verified kassabon waterfall uses real unified projection data
+- Start portfolio, cumulative AOW/pensioen, growth, withdrawal, Box 3 all from simulation rows
+- Added totalOneTimeCashflows aggregate for one-time life event cashflows
+- "Eenmalige gebeurtenissen" receipt row appears when one-time events affect withdrawal phase
+- Small rounding gap (~€36k over 23 years) between summed receipt lines and actual endPortfolio is expected (per-row rounding)
+- Zero new console errors
+- Commit: 41198462
+
+### Files Modified
+- components/app/horizon/phase-analysis/onttrekken/koopkracht-erosie-onttrekken.tsx — relevance checks + visual bar + protection strategies
+- components/app/horizon/phase-modal-onttrekking.tsx — one-time events in kassabon
+
+### Current Status
+- 2 features completed this session (#718, #719)
+
 ## Session 2026-04-06 - Features #720, #721
 
 ### Feature #720: Alle fase-analyses: gedeelde componenten review (StressTest, LifeEvents, PhaseDetailTable) - PASSING
