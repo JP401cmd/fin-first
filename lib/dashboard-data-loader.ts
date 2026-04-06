@@ -38,9 +38,9 @@ import {
 import { resolveFireParams } from '@/lib/fire-params'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
-import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy } from '@/lib/withdrawal-strategy'
 import { runUnifiedProjection, toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
-import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
 import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { resolveDepreciation, type Asset } from '@/lib/asset-data'
@@ -130,9 +130,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     allHoldingsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
+    supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit, is_active, depreciation_rate').eq('is_active', true),
     supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id, interest_rate, repayment_type, remaining_term_months, monthly_payment, start_date, end_date, original_amount, include_aflossing_in_savings, custom_aflossing_amount').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules').single(),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -229,16 +229,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const totalPurchaseValue = assetsByType.reduce((s, a) => s + a.purchaseValue, 0)
 
   const allChildren = allChildrenData
-  let yearlyMustExpenses = 0
-  for (const b of essentialBudgetsData) {
-    const children = allChildren.filter(c => c.parent_id === b.id)
-    const limit = children.length > 0
-      ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-      : Number(b.default_limit)
-    if (b.interval === 'monthly') yearlyMustExpenses += limit * 12
-    else if (b.interval === 'quarterly') yearlyMustExpenses += limit * 4
-    else yearlyMustExpenses += limit
-  }
+  // Filter children same as core-data-loader: exclude archive/income/savings
+  const expenseChildren = allChildren.filter(c => !['archive', 'income', 'savings'].includes(c.budget_type))
+  // Use shared computeYearlyMustExpenses for consistency with core-data-loader
+  const { yearlyMustExpenses } = computeYearlyMustExpenses(
+    essentialBudgetsData as BudgetRow[],
+    expenseChildren as ChildBudgetRow[],
+  )
 
   // Budget totals per type — limiet en werkelijke besteding
   const allParentBudgets = allParentBudgetsData as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; is_favorite: boolean; alert_threshold: number }[]
@@ -545,6 +542,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       // Derive hasPartner from profile household_type (consistent with horizon-data-loader)
       const householdType = (profileResult.data as Record<string, unknown> | null)?.household_type as string | null
       const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
+      // Resolve withdrawal strategy from profile (consistent with horizon page)
+      const withdrawalStrategy = resolveWithdrawalStrategy(profileResult.data as Record<string, unknown> ?? {})
       const unifiedInput: UnifiedProjectionInput = {
         assets: (assetsResult.data ?? []) as unknown as Asset[],
         debts: (debtsResult.data ?? []) as unknown as Debt[],
@@ -560,7 +559,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         box3Method: fireParams.box3Method,
         cashflows: simCashflows,
         strategyConfig: fireStrategy,
-        withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+        withdrawalStrategy,
         forcedFireAge: dashboardForcedFireAge,
         hasPartner,
         bankAccountCash: unlinkedCash,
