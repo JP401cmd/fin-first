@@ -26,7 +26,7 @@ import {
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
-import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
@@ -37,7 +37,7 @@ import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
-import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
+import { applyWhatIfOverrides, buildBaselineOverrides, applyWhatIfOverridesToUnified } from '@/lib/whatif-overrides'
 import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { type SuggestedEvent } from '@/components/app/horizon/whatif-suggestion-cards'
 import { useWhatIfSuggestions } from '@/lib/hooks/use-whatif-suggestions'
@@ -86,6 +86,7 @@ export default function WhatIfPage() {
   const [box3Method, setBox3Method] = useState<Box3Method>('forfaitair')
   const [hasPartner, setHasPartner] = useState(false)
   const [bankAccountCash, setBankAccountCash] = useState(0)
+  const [withdrawalStrategyConfig, setWithdrawalStrategyConfig] = useState<WithdrawalStrategyConfig>(WITHDRAWAL_DEFAULTS)
 
   // ── What-If overrides ────────────────────────────────────
   const [overrides, setOverrides] = useState<WhatIfOverrides | null>(null)
@@ -114,7 +115,7 @@ export default function WhatIfPage() {
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
@@ -122,7 +123,7 @@ export default function WhatIfPage() {
         supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
         supabase.from('assets').select('*').eq('is_active', true).limit(500),
         supabase.from('debts').select('*').eq('is_active', true).limit(200),
-        supabase.from('bank_accounts').select('balance').eq('is_active', true),
+        supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
       ])
 
       let monthlyIncome = 0
@@ -213,6 +214,9 @@ export default function WhatIfPage() {
       setBox3Method(fireParams.box3Method)
       const householdType = profileResult.data?.household_type
       setHasPartner(householdType === 'samenwonend' || householdType === 'getrouwd')
+
+      // Resolve withdrawal strategy from user profile
+      setWithdrawalStrategyConfig(resolveWithdrawalStrategy(profileResult.data ?? {}))
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
@@ -316,14 +320,14 @@ export default function WhatIfPage() {
       box3Method,
       cashflows,
       strategyConfig,
-      withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+      withdrawalStrategy: withdrawalStrategyConfig,
       forcedFireAge,
       hasPartner,
       bankAccountCash,
     }
     const unifiedResult = runUnifiedProjection(unifiedInput)
     return toSimResult(unifiedResult)
-  }, [fullAssets, fullDebts, box3Method, hasPartner, bankAccountCash])
+  }, [fullAssets, fullDebts, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig])
 
   // ── Run baseline simulation ──────────────────────────────
   const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
