@@ -7,7 +7,6 @@ import type { SimResult } from '@/lib/fire-simulation'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
-import { WhatIfSuggestionCards, type SuggestedEvent } from './whatif-suggestion-cards'
 import {
   Calendar, Plus, ChevronDown, ChevronUp, Eye, EyeOff, Info, Clock,
   ArrowLeft, Check, Pencil,
@@ -52,10 +51,6 @@ export function WhatIfEventsPanel({
   computeImpact,
   dailyExpenses,
   isHousehold = false,
-  suggestions,
-  suggestionsLoading,
-  onAddSuggestion,
-  onDismissSuggestion,
 }: {
   events: WhatIfEvent[]
   onToggleEvent: (id: string) => void
@@ -68,10 +63,6 @@ export function WhatIfEventsPanel({
   dailyExpenses?: number
   /** Whether user has a household (enables household-only events) */
   isHousehold?: boolean
-  suggestions?: SuggestedEvent[]
-  suggestionsLoading?: boolean
-  onAddSuggestion?: (s: SuggestedEvent) => void
-  onDismissSuggestion?: (index: number) => void
 }) {
   const [expanded, setExpanded] = useState(true)
   const [showCatalog, setShowCatalog] = useState(false)
@@ -231,15 +222,6 @@ export function WhatIfEventsPanel({
 
         {expanded && (
           <div className="px-4 pb-4">
-            {(suggestions?.length || suggestionsLoading) && onAddSuggestion && onDismissSuggestion && (
-              <WhatIfSuggestionCards
-                suggestions={suggestions ?? []}
-                loading={suggestionsLoading ?? false}
-                onAdd={onAddSuggestion}
-                onDismiss={onDismissSuggestion}
-              />
-            )}
-
             {events.length === 0 ? (
               <p className="py-4 text-center font-sans text-[11px] text-[var(--ink-4)]">
                 Geen levensgebeurtenissen ingesteld.
