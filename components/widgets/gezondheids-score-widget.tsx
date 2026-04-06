@@ -39,44 +39,58 @@ function barColorClass(score: number): string {
   return 'bg-red-500'
 }
 
-// ── Half-circle gauge SVG ────────────────────────────────────
+// ── Full-circle gauge SVG ────────────────────────────────────
+// Uses strokeDasharray/strokeDashoffset on a <circle> element.
+// The circle starts at 12 o'clock (top) via transform="rotate(-90)"
+// and fills clockwise proportional to the score percentage.
 
 function HealthGauge({ score, sz }: { score: number; sz: number }) {
   const cx = sz / 2
   const cy = sz / 2
-  const r = (sz - 12) / 2
   const strokeW = 6
-
-  const startAngle = Math.PI
-  const totalArc = Math.PI
+  const r = (sz - strokeW - 6) / 2
+  const circumference = 2 * Math.PI * r
 
   const pct = Math.max(0, Math.min(score, 100)) / 100
-  const sweepAngle = startAngle - totalArc * pct
-
-  const bgX1 = cx + r * Math.cos(startAngle)
-  const bgY1 = cy - r * Math.sin(startAngle)
-  const bgX2 = cx + r * Math.cos(0)
-  const bgY2 = cy - r * Math.sin(0)
-  const bgPath = `M ${bgX1} ${bgY1} A ${r} ${r} 0 0 1 ${bgX2} ${bgY2}`
-
-  const valX2 = cx + r * Math.cos(sweepAngle)
-  const valY2 = cy - r * Math.sin(sweepAngle)
-  const largeArc = pct > 0.5 ? 1 : 0
-  const valPath = `M ${bgX1} ${bgY1} A ${r} ${r} 0 ${largeArc} 1 ${valX2} ${valY2}`
+  // strokeDasharray = circumference: the full circle length
+  // strokeDashoffset = circumference * (1 - pct): hides the unfilled portion
+  const dashOffset = circumference * (1 - pct)
 
   const color = scoreColor(score)
 
   return (
-    <svg width={sz} height={sz / 2 + 4} viewBox={`0 0 ${sz} ${sz / 2 + 4}`} className="mx-auto">
-      <path d={bgPath} fill="none" stroke="var(--border-ed)" strokeWidth={strokeW} strokeLinecap="round" />
+    <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} className="mx-auto">
+      {/* Background track (full circle) */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke="var(--border-ed)"
+        strokeWidth={strokeW}
+      />
+      {/* Filled arc — starts at 12 o'clock, runs clockwise */}
       {pct > 0 && (
-        <path d={valPath} fill="none" stroke={color} strokeWidth={strokeW} strokeLinecap="round" />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeW}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${cx} ${cy})`}
+          style={{ transition: 'stroke-dashoffset 0.7s ease-out' }}
+        />
       )}
+      {/* Center score label */}
       <text
         x={cx}
-        y={cy - 4}
+        y={cy + 1}
         textAnchor="middle"
-        dominantBaseline="auto"
+        dominantBaseline="central"
         className="font-mono text-lg font-bold tabular-nums"
         fill={color}
       >
@@ -353,7 +367,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
     return (
       <WidgetShell module="horizon" size={size} kicker="Gezondheid" onClick={() => setShowKassabon(true)}>
         <div className="flex items-start gap-3">
-          <HealthGauge score={health.total} sz={90} />
+          <HealthGauge score={health.total} sz={64} />
           <div className="flex-1 min-w-0 space-y-1">
             {health.pillars.slice(0, 3).map(p => (
               <PillarRow key={p.id} pillar={p} />
@@ -382,7 +396,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
     <WidgetShell module="horizon" size={size} kicker="Gezondheid" onClick={() => setShowKassabon(true)}>
       {/* Top row: gauge + label + trend */}
       <div className="flex items-start gap-3">
-        <HealthGauge score={health.total} sz={120} />
+        <HealthGauge score={health.total} sz={80} />
         <div className="flex-1 pt-2">
           <p className={`font-mono text-lg font-semibold ${color}`}>{health.label}</p>
           <div className="mt-1 flex items-center gap-2">
