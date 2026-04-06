@@ -22899,3 +22899,30 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#690, #692)
 - Overall progress: 693/718 passing (96.5%)
+
+## Session 2026-04-06 - Features #704, #705
+
+### Feature #704: Opbouw: Schulden samenvatting review — data, relevantie en weergave - PASSING
+- SchuldenSamenvatting already uses real debt data (Debt[] from props): name, balance, rate, monthly payment
+- Early payoff calculations use correct annuity formula with edge case handling
+- Added empty state: when no active debts, shows "Je hebt geen schulden — deze analyse is niet relevant" with CheckCircle2 icon and green success background
+- Updated parent phase-modal-opbouw.tsx to always render SchuldenSamenvatting (removed debts.length > 0 guard)
+- Interface is clean and focused: total debt, per-debt details by type, monthly burden, scenarios table
+- Zero new console errors
+
+### Feature #705: Opbouw: Giften check review — data, relevantie en weergave - PASSING
+- GiftenCheck uses real portfolio data (currentPortfolio, yearlyExpenses, annualSavings, expectedReturn)
+- Schenkbelasting and opportunity cost calculations are correct (analyzeSchenkingPlan in lib/phase-analysis.ts)
+- Added relevance check: shows "Schenken is nog niet relevant" when portfolio < €50,000 or annualSavings <= 0
+- Low-portfolio message explains why (portfolio too low) or (no savings capacity)
+- Interface is well-structured: exemption cards, safe gifting amount, scenario comparison table, disclaimer
+- Zero new console errors
+- Commit: eba46695
+
+### Files Modified
+- components/app/horizon/phase-analysis/opbouw/schulden-samenvatting.tsx — empty state message
+- components/app/horizon/phase-modal-opbouw.tsx — always render SchuldenSamenvatting
+- components/app/horizon/phase-analysis/opbouw/giften-check.tsx — low-portfolio relevance check
+
+### Current Status
+- 2 features completed this session (#704, #705)
