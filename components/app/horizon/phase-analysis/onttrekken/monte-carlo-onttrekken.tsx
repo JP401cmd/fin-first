@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, AlertTriangle, Info } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
@@ -69,9 +69,21 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
   // Net yearly cashflow: portfolio perspective (negative = outflow)
   const yearlyCashflow = -(yearlyWithdrawal - yearlyAowIncome)
 
+  // ── Relevance check ──────────────────────────────────────────────
+  const hasPortfolio = startPortfolio > 0
+  const hasWithdrawalPhase = yearsInPhase > 0
+  const isRelevant = hasWithdrawalPhase && hasPortfolio
+
+  let irrelevantReason: string | null = null
+  if (!hasWithdrawalPhase) {
+    irrelevantReason = 'De onttrekkingsfase is te kort (0 jaar) om een zinvolle simulatie uit te voeren.'
+  } else if (!hasPortfolio) {
+    irrelevantReason = 'Er is geen vermogen bij pensionering om te simuleren. De Monte Carlo analyse heeft een startportfolio nodig om de slagingskans te berekenen.'
+  }
+
   // Lazy compute: defer MC past the first paint so modal opens instantly
   useEffect(() => {
-    if (yearsInPhase <= 0 || startPortfolio <= 0) return
+    if (!isRelevant) return
 
     const timer = setTimeout(() => {
       const mcInput = {
@@ -118,6 +130,7 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    isRelevant,
     startPortfolio,
     startAge,
     endAge,
@@ -128,7 +141,7 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
     cashflows,
   ])
 
-  const loading = state === null
+  const loading = isRelevant && state === null
 
   return (
     <AnalysisSection
@@ -136,15 +149,39 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
       icon={BarChart3}
       loading={loading}
       willContext={
-        state
-          ? `Monte Carlo onttrekkingsfase: slagingskans ${Math.round(state.main.successRate * 100)}%, ` +
-            `mediaan eindvermogen ${formatCurrency(state.main.medianEndPortfolio)}, ` +
-            `kritische SWR ${(state.criticalSwr * 100).toFixed(1)}%.`
-          : 'Monte Carlo simulatie (laden...)'
+        !isRelevant
+          ? `Monte Carlo simulatie: niet beschikbaar — ${irrelevantReason}`
+          : state
+            ? `Monte Carlo onttrekkingsfase: slagingskans ${Math.round(state.main.successRate * 100)}%, ` +
+              `mediaan eindvermogen ${formatCurrency(state.main.medianEndPortfolio)}, ` +
+              `kritische SWR ${(state.criticalSwr * 100).toFixed(1)}%.`
+            : 'Monte Carlo simulatie (laden...)'
       }
     >
+      {/* ── Irrelevant state ─────────────────────────────────── */}
+      {!isRelevant && (
+        <div className="flex items-start gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-kern-500" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink-2)]">Analyse niet beschikbaar</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">{irrelevantReason}</p>
+          </div>
+        </div>
+      )}
+
       {state && (
         <div className="space-y-4">
+          {/* -- Explanation for non-technical users ----------------------- */}
+          <div className="flex items-start gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-2">
+            <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-4)]" />
+            <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
+              Deze analyse simuleert 1.000 mogelijke scenario&apos;s voor je onttrekkingsfase.
+              Startend met {formatCurrency(startPortfolio)} vermogen en een jaarlijkse onttrekking
+              van {formatCurrency(yearlyWithdrawal)}{yearlyAowIncome > 0 ? ` (waarvan ${formatCurrency(yearlyAowIncome)} via AOW)` : ''}.
+              De &ldquo;slagingskans&rdquo; toont hoe vaak je vermogen niet opraakt vóór leeftijd {Math.round(endAge)}.
+            </p>
+          </div>
+
           {/* -- Fan chart --------------------------------------------------- */}
           <FanChart
             percentiles={state.main.percentiles}
