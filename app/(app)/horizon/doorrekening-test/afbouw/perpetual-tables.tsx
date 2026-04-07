@@ -85,6 +85,7 @@ export function PerpetualStrategyTables({
   grossReturn: number;
   inflationRate: number;
   hasPartner: boolean;
+  activeWithdrawalStrategy?: string;
 }) {
   const totalYears = Math.max(0, endAge - retirementAge);
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1;
