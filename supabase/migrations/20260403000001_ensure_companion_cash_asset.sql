@@ -21,6 +21,7 @@ CREATE OR REPLACE FUNCTION ensure_companion_cash_asset(
 ) RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_ba RECORD;
@@ -28,7 +29,7 @@ DECLARE
   v_new_asset_id UUID;
 BEGIN
   -- Fetch the bank account
-  SELECT * INTO v_ba FROM bank_accounts WHERE id = p_bank_account_id;
+  SELECT * INTO v_ba FROM public.bank_accounts WHERE id = p_bank_account_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'bank_account % not found', p_bank_account_id;
   END IF;
@@ -43,29 +44,29 @@ BEGIN
   IF v_ba.linked_asset_id IS NOT NULL THEN
     -- Ensure budget tracking flag is up-to-date
     IF p_has_budget_tracking THEN
-      UPDATE assets SET has_budget_tracking = true WHERE id = v_ba.linked_asset_id;
+      UPDATE public.assets SET has_budget_tracking = true WHERE id = v_ba.linked_asset_id;
     END IF;
     RETURN v_ba.linked_asset_id;
   END IF;
 
   -- Check if an orphan companion asset exists via linked_bank_account_id (stale column from RPC)
   SELECT id INTO v_existing_asset_id
-    FROM assets
+    FROM public.assets
     WHERE linked_bank_account_id = p_bank_account_id
       AND asset_type = 'cash'
     LIMIT 1;
 
   IF v_existing_asset_id IS NOT NULL THEN
     -- Link the existing orphan asset
-    UPDATE bank_accounts SET linked_asset_id = v_existing_asset_id WHERE id = p_bank_account_id;
+    UPDATE public.bank_accounts SET linked_asset_id = v_existing_asset_id WHERE id = p_bank_account_id;
     IF p_has_budget_tracking THEN
-      UPDATE assets SET has_budget_tracking = true WHERE id = v_existing_asset_id;
+      UPDATE public.assets SET has_budget_tracking = true WHERE id = v_existing_asset_id;
     END IF;
     RETURN v_existing_asset_id;
   END IF;
 
   -- Create new companion cash asset
-  INSERT INTO assets (
+  INSERT INTO public.assets (
     user_id, name, asset_type, current_value, purchase_value,
     expected_return, monthly_contribution, institution,
     is_active, sort_order, ownership, household_id,
@@ -81,7 +82,7 @@ BEGIN
   ) RETURNING id INTO v_new_asset_id;
 
   -- Set the canonical backlink
-  UPDATE bank_accounts SET linked_asset_id = v_new_asset_id WHERE id = p_bank_account_id;
+  UPDATE public.bank_accounts SET linked_asset_id = v_new_asset_id WHERE id = p_bank_account_id;
 
   RETURN v_new_asset_id;
 END;

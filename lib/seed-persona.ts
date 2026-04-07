@@ -29,6 +29,24 @@ function monthsAgoDate(months: number): string {
 // ── Helper: delete from table ─────────────────────────────────
 
 async function deleteTable(supabase: SupabaseClient, table: string, userId: string): Promise<number> {
+  // budget_amounts has no user_id column; cascade via budgets
+  if (table === 'budget_amounts') {
+    const { data: budgetIds } = await supabase
+      .from('budgets')
+      .select('id')
+      .eq('user_id', userId)
+    const ids = (budgetIds ?? []).map((b) => b.id)
+    if (ids.length === 0) return 0
+    const { count, error } = await supabase
+      .from('budget_amounts')
+      .delete({ count: 'exact' })
+      .in('budget_id', ids)
+    if (error) {
+      console.warn(`[seed] Delete from budget_amounts failed: ${error.message}`)
+    }
+    return count ?? 0
+  }
+
   const { count, error } = await supabase
     .from(table)
     .delete({ count: 'exact' })
