@@ -981,7 +981,17 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       // Store strategy options so computeCoreData fallback is also strategy-aware
       const realReturn = (1 + simFireParams.grossReturn) / (1 + simFireParams.inflationRate) - 1
       const yearsInRetirement = fireStrategy.strategy === 'deplete' ? Math.max(1, fireStrategy.endAge - Math.round(currentAge)) : undefined
-      setCoreFireStrategyOpts({ strategy: fireStrategy.strategy, yearsInRetirement, realReturn })
+      // Guard against ref churn: if values are unchanged, return prev so React
+      // bails out and effect 989 (which depends on coreFireStrategyOpts) does not rerun,
+      // preventing an infinite loop with effect 925 via setData -> [data] dep.
+      setCoreFireStrategyOpts(prev =>
+        prev
+          && prev.strategy === fireStrategy.strategy
+          && prev.yearsInRetirement === yearsInRetirement
+          && prev.realReturn === realReturn
+          ? prev
+          : { strategy: fireStrategy.strategy, yearsInRetirement, realReturn }
+      )
     }
     runCoreSimulation()
   }, [data])
@@ -1297,16 +1307,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(totalCash)}</p>
                 <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">{cashAccounts.length} rekening{cashAccounts.length !== 1 ? 'en' : ''}</p>
               </button>
-            ) : hasToekomst ? (
-              <button
-                type="button"
-                onClick={() => setShowFreeDaysReceipt(true)}
-                className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-kern-300"
-              >
-                <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vrije dagen</p>
-                <p className="font-mono text-xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}/jaar</p>
-                <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">passief inkomen</p>
-              </button>
             ) : null}
             </>
             )}
@@ -1549,22 +1549,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data`
                     : 'laatste 6 maanden'}
                 </p>
-                {hasToekomst && (
-                  <div className="mt-3">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setShowFreeDaysReceipt(true)}
-                        className="flex items-center gap-1.5 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
-                      >
-                        <p className="font-mono text-2xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}</p>
-                        <span className="text-sm text-[var(--ink-3)]">vrije dagen/jaar</span>
-                      </button>
-                      <HeroTooltip text={`Klik op het getal voor de volledige berekening. Hoeveel dagen per jaar je passief inkomen (${(fireSwr * 100).toFixed(2)}% NL-SWR op must-uitgaven) je dagelijkse kosten dekt.`} />
-                    </div>
-                    <p className="text-[10px] text-[var(--ink-4)]">gedekt door passief inkomen</p>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1820,7 +1804,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           open={activeModal?.type === 'budgets'}
           onClose={() => { setActiveModal(null); loadData() }}
           title="Budgetten"
-          href="/core/budgets"
         >
           <DynBudgetsPage initialBudgetId={activeModal?.type === 'budgets' ? activeModal.itemId : undefined} />
         </FullScreenModal>

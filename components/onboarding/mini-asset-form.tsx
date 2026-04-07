@@ -70,7 +70,7 @@ const EMPTY: AssetEntry = {
   annual_dividend: '',
 }
 
-const ALL_TYPES: AssetType[] = ['savings', 'investment', 'retirement', 'eigen_huis', 'real_estate', 'crypto', 'vehicle', 'physical', 'deelneming', 'levensverzekering', 'vordering', 'other']
+export const ALL_ASSET_TYPES: AssetType[] = ['savings', 'investment', 'retirement', 'eigen_huis', 'real_estate', 'crypto', 'vehicle', 'physical', 'deelneming', 'levensverzekering', 'vordering', 'other']
 
 export function MiniAssetForm({
   items,
@@ -201,7 +201,7 @@ export function MiniAssetForm({
                   onChange={(e) => handleTypeChange(e.target.value as AssetType)}
                   className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
-                  {ALL_TYPES.map((t) => (
+                  {ALL_ASSET_TYPES.map((t) => (
                     <option key={t} value={t}>{ASSET_TYPE_LABELS[t]}</option>
                   ))}
                 </select>

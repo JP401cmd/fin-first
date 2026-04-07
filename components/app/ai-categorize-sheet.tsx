@@ -53,7 +53,19 @@ type Props = {
   budgetGroups: { parent: Budget; children: Budget[] }[]
   onClose: () => void
   onSaved: () => void
+  /**
+   * Optionele props voor de scope-toggle in de choice-fase.
+   * Wanneer accountId is gegeven (of currentUserId voor combined view),
+   * krijgt de gebruiker de keuze tussen "Deze maand" (default, gebruikt
+   * `transactions`) en "Alle tijden" (lazy-fetch van álle ongekoppelde
+   * transacties op deze rekening of gebruiker).
+   */
+  accountId?: string | null
+  monthLabel?: string
+  currentUserId?: string | null
 }
+
+const ALL_TIME_LIMIT = 500
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -78,7 +90,16 @@ const SHOW_MORE_STEP = 20
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose, onSaved }: Props) {
+export function AICategorizeSheet({
+  transactions,
+  budgets,
+  budgetGroups,
+  onClose,
+  onSaved,
+  accountId,
+  monthLabel,
+  currentUserId,
+}: Props) {
   const [phase, setPhase] = useState<'choice' | 'ai' | 'review' | 'saving' | 'success'>('choice')
   const [rows, setRows] = useState<RowState[]>([])
   const [aiError, setAiError] = useState<string | null>(null)
@@ -89,6 +110,71 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
   const [aiBatchProgress, setAiBatchProgress] = useState({ current: 0, total: 0 })
 
+  // ── Scope-toggle state (optional feature; only shown when accountId or
+  //    currentUserId is provided so we know which transactions to fetch). ──
+  const scopeAvailable = accountId !== undefined || !!currentUserId
+  const [scope, setScope] = useState<'month' | 'all'>('month')
+  const [allTransactions, setAllTransactions] = useState<Transaction[] | null>(null)
+  const [loadingAll, setLoadingAll] = useState(false)
+  const [allError, setAllError] = useState<string | null>(null)
+  const [allCapped, setAllCapped] = useState(false)
+
+  /** Resolved working set used by both AI and manual flow. */
+  const activeTransactions = scope === 'all' && allTransactions ? allTransactions : transactions
+
+  // Fetch all uncategorized transactions for the current account/user.
+  // Lazy: only triggered when the user picks the 'all' tab. Capped at 500
+  // to keep AI batch budget and UX manageable; the cap is surfaced via
+  // `allCapped` so the choice-fase can show a footnote.
+  const loadAllUncategorized = useCallback(async () => {
+    if (allTransactions) return // already cached
+    setLoadingAll(true)
+    setAllError(null)
+    try {
+      const supabase = createClient()
+      let query = supabase
+        .from('transactions')
+        .select('*')
+        .is('budget_id', null)
+
+      if (accountId) {
+        query = query.eq('account_id', accountId)
+      } else if (currentUserId) {
+        query = query.eq('user_id', currentUserId)
+      }
+
+      const { data, error } = await query
+        .order('date', { ascending: false })
+        .limit(ALL_TIME_LIMIT)
+
+      if (error) throw new Error(error.message)
+      // Filter transfers in JS rather than SQL: PostgreSQL evaluates
+      // `NULL != 'transfer'` as UNKNOWN which strips manually-unlinked rows
+      // (where `transaction_type` is NULL). JS `!==` returns true for null,
+      // matching the existing behaviour in cash-account-view.tsx (regel 531).
+      const raw = (data ?? []) as Transaction[]
+      const list = raw.filter(
+        (t) => (t as { transaction_type?: string | null }).transaction_type !== 'transfer'
+      )
+      setAllTransactions(list)
+      // Cap detection runs on the *raw* result so the footnote stays accurate
+      // even if some rows are dropped by the JS transfer filter afterwards.
+      setAllCapped(raw.length >= ALL_TIME_LIMIT)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Kon transacties niet laden'
+      setAllError(msg)
+      setScope('month') // fall back so the user is never stuck
+    } finally {
+      setLoadingAll(false)
+    }
+  }, [accountId, currentUserId, allTransactions])
+
+  function handleScopeChange(next: 'month' | 'all') {
+    if (next === scope) return
+    setScope(next)
+    if (next === 'all') void loadAllUncategorized()
+  }
+
   // ── Fetch AI suggestions (parallel batches, max 3 concurrent) ─────────────
 
   const fetchSuggestions = useCallback(async () => {
@@ -96,8 +182,12 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
     setAiError(null)
     setAiBatchProgress({ current: 0, total: 0 })
 
+    // Snapshot the resolved set so async work below can't race with a scope
+    // change. Manual / AI flow always operates on the same list.
+    const sourceTx = activeTransactions
+
     try {
-      const payload = transactions.map((tx) => ({
+      const payload = sourceTx.map((tx) => ({
         import_hash: tx.import_hash ?? `${tx.date}-${tx.amount}-${tx.description}`,
         description: tx.description,
         counterparty_name: tx.counterparty_name,
@@ -150,7 +240,7 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
       }
 
       // Build rows
-      const initialRows: RowState[] = transactions.map((tx) => {
+      const initialRows: RowState[] = sourceTx.map((tx) => {
         const hash = tx.import_hash ?? `${tx.date}-${tx.amount}-${tx.description}`
         const suggestion = suggestionMap.get(hash) ?? null
 
@@ -171,7 +261,7 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
       const msg = err instanceof Error ? err.message : 'AI-analyse niet beschikbaar'
       setAiError(msg)
       // Fall back to review mode without suggestions
-      setRows(transactions.map((tx) => ({
+      setRows(sourceTx.map((tx) => ({
         tx,
         suggestion: null,
         accepted: false,
@@ -181,10 +271,10 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
       })))
       setPhase('review')
     }
-  }, [transactions])
+  }, [activeTransactions])
 
   function startManual() {
-    setRows(transactions.map((tx) => ({
+    setRows(activeTransactions.map((tx) => ({
       tx,
       suggestion: null,
       accepted: false,
@@ -403,15 +493,79 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
       {phase === 'choice' && (
         <div className="flex flex-col gap-4 py-4">
           <p className="text-sm text-[var(--ink-2)]">
-            <strong className="text-[var(--ink)]">{transactions.length}</strong> {transactions.length === 1 ? 'transactie' : 'transacties'} zonder categorie.
-            Hoe wil je verdergaan?
+            <strong className="text-[var(--ink)] font-mono tabular-nums">{activeTransactions.length}</strong>{' '}
+            {activeTransactions.length === 1 ? 'transactie' : 'transacties'} zonder categorie
+            {scope === 'month' && monthLabel ? <> in <span className="text-[var(--ink)]">{monthLabel}</span></> : null}
+            {scope === 'all' ? <> op deze rekening</> : null}
+            . Hoe wil je verdergaan?
           </p>
+
+          {/* Scope-toggle — alleen wanneer caller een scope-bron meegeeft.
+              Compacte segmented control in tab-strip-stijl: het is een
+              filter/setting, niet een primaire actie, dus visueel rustig
+              en zonder module-kleur. */}
+          {scopeAvailable && (
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">
+                Scope <span className="ml-1 normal-case tracking-normal text-[var(--ink-4)]">— welke transacties?</span>
+              </p>
+              <div className="flex gap-1 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleScopeChange('month')}
+                  className={[
+                    'flex-1 min-h-[44px] rounded-[var(--r-sm)] px-3 py-2 text-xs font-medium transition-colors',
+                    scope === 'month'
+                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s1)]'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
+                  ].join(' ')}
+                  aria-pressed={scope === 'month'}
+                >
+                  Deze maand
+                  <span className="ml-1.5 font-mono tabular-nums text-[var(--ink-4)]">({transactions.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleScopeChange('all')}
+                  className={[
+                    'flex-1 min-h-[44px] rounded-[var(--r-sm)] px-3 py-2 text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5',
+                    scope === 'all'
+                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s1)]'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
+                  ].join(' ')}
+                  aria-pressed={scope === 'all'}
+                  disabled={loadingAll}
+                >
+                  Alle tijden
+                  {loadingAll ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-[var(--ink-3)]" aria-label="Laden" />
+                  ) : (
+                    <span className="font-mono tabular-nums text-[var(--ink-4)]">
+                      ({allTransactions ? allTransactions.length : '?'})
+                    </span>
+                  )}
+                </button>
+              </div>
+              {allError && (
+                <p className="mt-1.5 text-[11px] text-orange-700">{allError}</p>
+              )}
+              {scope === 'all' && allCapped && (
+                <p className="mt-1.5 text-[11px] italic text-[var(--ink-4)]">
+                  Maximaal {ALL_TIME_LIMIT} oudste ongekoppelde meegenomen — herhaal voor de rest.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Subtiele scheiding tussen scope-setting en de primaire acties */}
+          {scopeAvailable && <div className="border-t border-[var(--border-ed)]" />}
 
           {/* Vraag Will */}
           <button
             type="button"
             onClick={() => void fetchSuggestions()}
-            className="flex items-start gap-4 rounded-[var(--r-lg)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-4 text-left transition-all hover:border-wil-400 hover:shadow-[var(--s1)]"
+            disabled={loadingAll || activeTransactions.length === 0}
+            className="flex items-start gap-4 rounded-[var(--r-lg)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-4 text-left transition-all hover:border-wil-400 hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-wil-300"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-wil-100">
               <Sparkles className="h-4 w-4 text-wil-600" />
@@ -428,7 +582,8 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
           <button
             type="button"
             onClick={startManual}
-            className="flex items-start gap-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-4 text-left transition-all hover:border-[var(--border-md)] hover:shadow-[var(--s1)]"
+            disabled={loadingAll || activeTransactions.length === 0}
+            className="flex items-start gap-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-4 text-left transition-all hover:border-[var(--border-md)] hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-[var(--border-ed)]"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--subtle)]">
               <HelpCircle className="h-4 w-4 text-[var(--ink-3)]" />

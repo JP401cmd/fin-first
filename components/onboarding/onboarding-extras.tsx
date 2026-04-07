@@ -6,8 +6,10 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import { MiniBankForm, type BankAccountEntry } from './mini-bank-form'
-import { MiniAssetForm, type AssetEntry } from './mini-asset-form'
-import { MiniDebtForm, type DebtEntry } from './mini-debt-form'
+import { MiniAssetForm, ALL_ASSET_TYPES, type AssetEntry } from './mini-asset-form'
+import { MiniDebtForm, ALL_DEBT_TYPES, type DebtEntry } from './mini-debt-form'
+import { ASSET_TYPE_LABELS, ASSET_SUBTYPE_DEFAULTS, type AssetType } from '@/lib/asset-data'
+import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 import { type ModuleId } from '@/lib/module-registry'
 
 type Section = 'assets' | 'debts'
@@ -191,6 +193,152 @@ export function OnboardingExtras({
     onNext()
   }
 
+  /**
+   * DEV-ONLY: seed one entry per asset type and one per debt type so testers
+   * can skip the tedious manual flow when verifying downstream features.
+   *
+   * The seed values are intentionally simple (round numbers, "Test" creditor/
+   * institution) so they are easy to spot in lists and bookkeeping views.
+   * Defaults must satisfy the AssetEntry / DebtEntry shapes exactly — keep them
+   * in sync with mini-asset-form.tsx and mini-debt-form.tsx.
+   */
+  const handleSeedAll = () => {
+    // Build a fresh AssetEntry for each asset type, layering on type-specific
+    // fields that are required for the form's downstream logic (e.g. WOZ for
+    // housing, ticker for crypto, ownership for deelneming).
+    const newAssets: AssetEntry[] = ALL_ASSET_TYPES.map((type) => {
+      // Pick a sensible default subtype when one is defined for the type.
+      // investment + crypto use fixed seeds so tests cover the "liquid ETF"
+      // path; other types pick the first available subtype as a stand-in.
+      const defaultSubtypeByType: Partial<Record<AssetType, string>> = {
+        savings: 'vrij_opneembaar',
+        investment: 'etf',
+        retirement: 'lijfrente',
+        real_estate: 'beleggingspand',
+        crypto: 'bitcoin',
+        vehicle: 'auto_eigendom',
+        physical: 'inboedel',
+        deelneming: 'holding_bv',
+        levensverzekering: 'kapitaalverzekering',
+        vordering: 'lening_derden',
+      }
+      const subtype = defaultSubtypeByType[type] ?? ''
+      const subtypeDefaults = subtype ? ASSET_SUBTYPE_DEFAULTS[subtype] : undefined
+
+      const entry: AssetEntry = {
+        name: ASSET_TYPE_LABELS[type],
+        asset_type: type,
+        current_value: '10000',
+        purchase_value: '10000',
+        expected_return: '0.05',
+        monthly_contribution: '100',
+        institution: 'Test',
+        subtype,
+        risk_profile: subtypeDefaults?.risk_profile ?? '',
+        tax_benefit: subtypeDefaults?.tax_benefit ?? false,
+        is_liquid: subtypeDefaults?.is_liquid ?? true,
+        lock_end_date: '',
+        ticker_symbol: '',
+        rental_income: '',
+        woz_value: '',
+        // retirement_provider_type must be one of the RetirementProviderType
+        // enum values ('bedrijfspensioenfonds' | 'verzekeraar' | 'ppi'); the
+        // 'lijfrente' referenced in the task spec is actually a SUBTYPE and is
+        // set above. Seed the provider itself with 'verzekeraar' only for the
+        // retirement type — leave blank otherwise.
+        retirement_provider_type: type === 'retirement' ? 'verzekeraar' : '',
+        depreciation_rate: type === 'vehicle' ? '15' : '',
+        address_postcode: '',
+        address_house_number: '',
+        expiry_date: '',
+        beneficiary: '',
+        kvk_number: '',
+        ownership_percentage: '',
+        annual_dividend: '',
+      }
+
+      // Investment override: force ETF + middel + liquid regardless of
+      // subtype defaults (matches the auto-seed path above for consistency).
+      if (type === 'investment') {
+        entry.subtype = 'etf'
+        entry.risk_profile = 'middel'
+        entry.is_liquid = true
+      }
+
+      // Housing: add WOZ + address so the form's type-specific fields all
+      // round-trip without missing data warnings.
+      if (type === 'eigen_huis' || type === 'real_estate') {
+        entry.woz_value = '300000'
+        entry.address_postcode = '1000AA'
+        entry.address_house_number = '1'
+      }
+
+      // Crypto: ticker is a required type-specific field per ASSET_TYPE_FIELDS.
+      if (type === 'crypto') {
+        entry.ticker_symbol = 'BTC'
+      }
+
+      // Deelneming: company registration + ownership share + dividend.
+      if (type === 'deelneming') {
+        entry.ownership_percentage = '100'
+        entry.kvk_number = '12345678'
+        entry.annual_dividend = '0'
+      }
+
+      // Levensverzekering: policy end date + beneficiary are type-specific.
+      if (type === 'levensverzekering') {
+        entry.expiry_date = '2040-01-01'
+        entry.beneficiary = 'Test'
+      }
+
+      return entry
+    })
+
+    // Build a fresh DebtEntry for each debt type. Mortgage gets the full
+    // tax-deductible annuity defaults; credit/revolving get a credit limit.
+    const newDebts: DebtEntry[] = ALL_DEBT_TYPES.map((type) => {
+      const entry: DebtEntry = {
+        name: DEBT_TYPE_LABELS[type],
+        debt_type: type,
+        original_amount: '10000',
+        current_balance: '8000',
+        interest_rate: '3.5',
+        minimum_payment: '50',
+        monthly_payment: '100',
+        creditor: 'Test',
+        subtype: '',
+        // repayment_type is stored as plain string on DebtEntry, but the
+        // canonical value in the RepaymentType enum is 'annuiteit' (not
+        // 'annuitair' as the task spec suggests).
+        repayment_type: '',
+        is_tax_deductible: false,
+        fixed_rate_end_date: '',
+        nhg: false,
+        credit_limit: '',
+        draagkrachtmeting_date: '',
+      }
+
+      if (type === 'mortgage') {
+        entry.subtype = 'annuiteit'
+        entry.repayment_type = 'annuiteit'
+        entry.nhg = false
+        entry.is_tax_deductible = true
+        entry.fixed_rate_end_date = '2030-01-01'
+      }
+
+      if (type === 'credit_card' || type === 'revolving_credit') {
+        entry.credit_limit = '5000'
+      }
+
+      return entry
+    })
+
+    onAssetChange([...assets, ...newAssets])
+    onDebtChange([...debts, ...newDebts])
+    // Open both accordions so the tester can immediately verify the seed.
+    setOpenSections({ assets: true, debts: true })
+  }
+
   return (
     <div className="pb-20 sm:pb-0">
       <button
@@ -215,6 +363,26 @@ export function OnboardingExtras({
           Voeg je rekeningen, bezittingen en schulden toe zodat ik je netto vermogen en vrijheidspercentage kan berekenen. Later kun je in de app transacties uploaden of je bankrekening koppelen om je uitgaven automatisch te volgen. Dit is helemaal optioneel &mdash; je kunt het ook later toevoegen.
         </SpeechBubble>
       </div>
+
+      {/*
+        DEV-ONLY seed helper. Gated on NODE_ENV so it is stripped from the
+        production bundle by the Next.js build (dead-code elimination when
+        process.env.NODE_ENV is inlined as 'production').
+      */}
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={handleSeedAll}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-ed)] px-3 py-2 text-xs text-[var(--ink-3)] hover:bg-[var(--subtle)]"
+          >
+            <span className="rounded-full bg-[var(--ink)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--paper)]">
+              Test
+            </span>
+            <span>Test: vul alle bezittingen &amp; schulden in</span>
+          </button>
+        </div>
+      )}
 
       <div className="space-y-4">
         {sections.map(({ key, label, description, count }) => (

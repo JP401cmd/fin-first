@@ -214,6 +214,22 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const [uncategorizedCount, setUncategorizedCount] = useState(initialData?.uncategorizedCount ?? 0)
   const [uncategorizedTotal, setUncategorizedTotal] = useState(initialData?.uncategorizedTotal ?? 0)
 
+  // Module-scheiding: de banner is alleen relevant wanneer budgetteren actief
+  // is. Op deze pagina is dat doorgaans waar (anders zie je geen budgets-pagina),
+  // maar de gate maakt het expliciet en consistent met cash-account-view.
+  const [budgetingActive, setBudgetingActive] = useState(true)
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('profiles')
+      .select('budgeting_active')
+      .single()
+      .then(({ data }) => {
+        const active = (data as { budgeting_active?: boolean | null } | null)?.budgeting_active
+        setBudgetingActive(active !== false)
+      })
+  }, [])
+
   // Compute date range + month count based on period mode
   const { periodStart, periodEnd, periodMonthCount } = useMemo(() => {
     const now = new Date()
@@ -1052,12 +1068,14 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           </div>
         </FeatureGate>}
 
-        <UncategorizedTransactionsBanner
-          count={uncategorizedCount}
-          totalAmount={uncategorizedTotal}
-          onClick={() => router.push('/core/cash?filterBudget=uncategorized')}
-          formatCurrency={formatCurrency}
-        />
+        {budgetingActive && (
+          <UncategorizedTransactionsBanner
+            count={uncategorizedCount}
+            totalAmount={uncategorizedTotal}
+            onClick={() => router.push('/core/cash?filterBudget=uncategorized')}
+            formatCurrency={formatCurrency}
+          />
+        )}
       </section>
 
       {/* G3: Budget Hub — unified alerts + inzichten, gated by budget_optimalisatie */}

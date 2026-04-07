@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { exchangeCode, getAccounts, getBaseUrls } from '@/lib/truelayer/client'
+import { blindIndex, encryptField } from '@/lib/crypto/field-encryption'
 
 export async function GET(req: Request) {
   const supabase = await createClient()
@@ -44,11 +45,16 @@ export async function GET(req: Request) {
     const now = new Date()
     const tokenExpiresAt = new Date(now.getTime() + tokens.expires_in * 1000)
 
+    // Dual-write: keep plaintext in old columns + encrypted in *_encrypted.
+    // PR2 (a week later) drops the plaintext columns; until then we need both
+    // so a rollback is possible without re-running OAuth for every user.
     await supabase
       .from('bank_connections')
       .update({
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token ?? null,
+        access_token_encrypted: encryptField(tokens.access_token),
+        refresh_token_encrypted: encryptField(tokens.refresh_token ?? null),
         token_expires_at: tokenExpiresAt.toISOString(),
         status: 'active',
         authorized_at: now.toISOString(),
@@ -69,11 +75,18 @@ export async function GET(req: Request) {
       let bankAccountId: string | null = null
 
       if (iban) {
+        // Look up existing bank_account by IBAN. We use the blind index so
+        // this keeps working once the plaintext `iban` column is dropped in
+        // PR2. Existing rows that haven't been backfilled yet have a NULL
+        // iban_hash and would silently miss — the backfill script
+        // (scripts/encrypt-existing-bank-credentials.mjs) populates iban_hash
+        // for every existing row before we deploy this code path to prod.
+        const ibanHash = blindIndex(iban)
         const { data: existing } = await supabase
           .from('bank_accounts')
           .select('id, linked_asset_id')
           .eq('user_id', user.id)
-          .eq('iban', iban)
+          .eq('iban_hash', ibanHash)
           .eq('is_active', true)
           .limit(1)
           .single()
@@ -95,7 +108,11 @@ export async function GET(req: Request) {
                 expected_return: 0,
                 monthly_contribution: 0,
                 institution: connection.provider_name,
+                // Dual-write: plaintext for fallback + encrypted/hash for the
+                // post-PR2 world where the plaintext column is gone.
                 account_number: iban,
+                account_number_encrypted: encryptField(iban),
+                account_number_hash: blindIndex(iban),
                 is_liquid: true,
                 subtype: 'checking',
                 has_budget_tracking: true,
@@ -119,6 +136,9 @@ export async function GET(req: Request) {
       if (!bankAccountId) {
         // Create linked asset (cash-as-asset)
         const assetName = iban ? `${connection.provider_name} ${iban.slice(-4)}` : connection.provider_name
+        // Both encrypt + index helpers tolerate null inputs (return null), so
+        // we can pass `iban` directly even when this TrueLayer account has no
+        // IBAN at all.
         const { data: newAsset } = await supabase
           .from('assets')
           .insert({
@@ -131,6 +151,8 @@ export async function GET(req: Request) {
             monthly_contribution: 0,
             institution: connection.provider_name,
             account_number: iban,
+            account_number_encrypted: encryptField(iban),
+            account_number_hash: iban ? blindIndex(iban) : null,
             is_liquid: true,
             subtype: 'checking',
             has_budget_tracking: true,
@@ -148,6 +170,8 @@ export async function GET(req: Request) {
             user_id: user.id,
             name: assetName,
             iban,
+            iban_encrypted: encryptField(iban),
+            iban_hash: iban ? blindIndex(iban) : null,
             bank_name: connection.provider_name,
             account_type: 'checking',
             balance: 0,
@@ -175,6 +199,8 @@ export async function GET(req: Request) {
             connection_id: connection.id,
             bank_account_id: bankAccountId,
             iban,
+            iban_encrypted: encryptField(iban),
+            iban_hash: iban ? blindIndex(iban) : null,
             account_name: accountName,
             is_active: true,
             updated_at: new Date().toISOString(),
@@ -189,6 +215,8 @@ export async function GET(req: Request) {
             bank_account_id: bankAccountId,
             external_account_id: tlAccount.account_id,
             iban,
+            iban_encrypted: encryptField(iban),
+            iban_hash: iban ? blindIndex(iban) : null,
             account_name: accountName,
           })
       }

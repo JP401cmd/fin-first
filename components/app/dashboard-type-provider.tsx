@@ -27,9 +27,15 @@ export function useDashboardType() {
 export function DashboardTypeProvider({ children }: { children: ReactNode }) {
   const [dashboardType, setType] = useState<DashboardType>('widgets')
   const [loading, setLoading] = useState(true)
-  const [isCollapsed, setIsCollapsedState] = useState(() => {
-    try { return localStorage.getItem('dashboard-collapsed') === 'true' } catch { return false }
-  })
+  const [isCollapsed, setIsCollapsedState] = useState(false)
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('dashboard-collapsed') === 'true') {
+        setIsCollapsedState(true)
+      }
+    } catch { /* noop */ }
+  }, [])
 
   useEffect(() => {
     fetch('/api/dashboard-type')

@@ -16,7 +16,7 @@ import { OnboardingIntro } from '@/components/onboarding/onboarding-intro'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingBudgets } from '@/components/onboarding/onboarding-budgets'
 import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
-import { OnboardingPreferences, INITIAL_PREFERENCES, buildWidgetPrefsFromPreferences } from '@/components/onboarding/onboarding-preferences'
+import { INITIAL_PREFERENCES } from '@/components/onboarding/onboarding-preferences'
 import { OnboardingModules } from '@/components/onboarding/onboarding-persona'
 import { OnboardingHorizon, INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
@@ -50,6 +50,99 @@ type Step =
   | 'success'
 
 type Direction = 'forward' | 'back'
+
+/**
+ * Canonical order of every step that has ever existed in the flow, used as a
+ * fallback anchor when a restored `lastStep` is no longer present in the
+ * active step order. Keep this in sync with the `Step` union above.
+ */
+const CANONICAL_STEP_ORDER: readonly Step[] = [
+  'intro',
+  'identity',
+  'modules',
+  'bezittingen',
+  'budgets',
+  'horizon',
+  'preferences',
+  'nieuws_only',
+  'saving',
+  'success',
+] as const
+
+/**
+ * Self-healing restore: given a previously saved `lastStep` and the currently
+ * active step order, return a step the user can actually land on. When the
+ * saved step is no longer present in the active order (e.g. the flow changed
+ * while the user had a draft in localStorage), we anchor on the saved step's
+ * position in the canonical union and walk forward to the first valid step
+ * the user has not yet passed, skipping the terminal `saving` / `success`
+ * placeholders. As a last resort we fall back to `'identity'` — never
+ * `'intro'`, because the presence of saved data means the user is already
+ * past the intro.
+ */
+export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrder: Step[]): {
+  step: Step
+  healed: boolean
+} {
+  const terminalSteps: Step[] = ['saving', 'success']
+  const isSelectable = (s: Step): boolean => !terminalSteps.includes(s)
+
+  // No saved step at all → start at identity (user already past intro if
+  // we're restoring data).
+  if (!lastStep) {
+    return { step: 'identity', healed: false }
+  }
+
+  // Happy path: saved step is still in the active order and not terminal.
+  if (
+    (activeStepOrder as string[]).includes(lastStep) &&
+    isSelectable(lastStep as Step)
+  ) {
+    return { step: lastStep as Step, healed: false }
+  }
+
+  // Anchor on the saved step's position in the canonical union. If the name
+  // is completely unknown (e.g. a removed step that was never part of the
+  // union) the index is -1 and we fall all the way through to 'identity'.
+  const canonicalIdx = (CANONICAL_STEP_ORDER as readonly string[]).indexOf(lastStep)
+
+  if (canonicalIdx >= 0) {
+    // Walk forward through the active order and take the first selectable
+    // step whose canonical position is >= the saved step's canonical
+    // position. This lands us on the first step the user has not yet passed.
+    for (const candidate of activeStepOrder) {
+      if (!isSelectable(candidate)) continue
+      const candidateIdx = CANONICAL_STEP_ORDER.indexOf(candidate)
+      if (candidateIdx >= canonicalIdx) {
+        return { step: candidate, healed: true }
+      }
+    }
+  }
+
+  // Last resort: identity if it's in the active order, otherwise the first
+  // selectable step. We intentionally skip 'intro' because the user already
+  // had persisted data — sending them back to the welcome screen would feel
+  // like a full reset.
+  const identityFallback = activeStepOrder.find((s) => s === 'identity')
+  if (identityFallback) {
+    return { step: 'identity', healed: true }
+  }
+  const firstSelectable = activeStepOrder.find(isSelectable)
+  return { step: firstSelectable ?? 'identity', healed: true }
+}
+
+/**
+ * Pick a safe navigation landing spot when the user's current step is not in
+ * the active step order. Skips `intro` (user already past it) and the
+ * terminal `saving` / `success` placeholders. Used by `goToNext` / `goToBack`
+ * as a self-healing fallback so the navigation buttons never silently no-op.
+ */
+export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
+  const recovery = activeStepOrder.find(
+    (s) => s !== 'intro' && s !== 'saving' && s !== 'success'
+  )
+  return recovery ?? activeStepOrder[0] ?? 'identity'
+}
 
 /**
  * Compute the dynamic step order based on which modules the user selected.
@@ -134,7 +227,7 @@ type Action =
   | { type: 'SET_PREFERENCES'; data: PreferencesData }
   | { type: 'RESTORE_STATE'; data: PersistedData }
 
-const initialState: State = {
+export const _initialState: State = {
   step: 'intro',
   direction: 'forward',
   persona: null,
@@ -157,7 +250,7 @@ const initialState: State = {
   preferences: INITIAL_PREFERENCES,
 }
 
-function reducer(state: State, action: Action): State {
+export function _reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_STEP': {
       const stepOrder = computeStepOrder(state.selectedModules)
@@ -196,16 +289,30 @@ function reducer(state: State, action: Action): State {
     case 'SET_PREFERENCES':
       return { ...state, preferences: action.data }
     case 'RESTORE_STATE': {
-      const restoredStep = action.data.lastStep && !['saving', 'success'].includes(action.data.lastStep)
-        ? action.data.lastStep
-        : 'identity'
+      const restoredModules = action.data.selectedModules ?? []
+      // Recompute the active step order for the restored module selection so
+      // we can validate `lastStep` against the flow the user will actually
+      // see. The user's saved module choice — not the in-memory state —
+      // defines which steps are reachable.
+      const restoredStepOrder = computeStepOrder(restoredModules)
+      const { step: restoredStep, healed } = _resolveRestoredStep(
+        action.data.lastStep,
+        restoredStepOrder
+      )
+      if (healed) {
+        // Surface self-healing restores in logs so we can monitor how often
+        // legacy drafts are encountered after flow changes.
+        console.warn(
+          `[onboarding] lastStep ${action.data.lastStep ?? '(none)'} not in active order, falling back to ${restoredStep}`
+        )
+      }
       return {
         ...state,
-        step: restoredStep as Step,
+        step: restoredStep,
         direction: 'forward',
         identity: action.data.identity,
         persona: action.data.persona ?? null,
-        selectedModules: action.data.selectedModules ?? [],
+        selectedModules: restoredModules,
         horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
         newsDescription: action.data.newsDescription ?? '',
         extraction: action.data.extraction ?? null,
@@ -334,7 +441,7 @@ function clearLocalStorage() {
 export default function OnboardingPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [state, dispatch] = useReducer(reducer, initialState)
+  const [state, dispatch] = useReducer(_reducer, _initialState)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveProgress, setSaveProgress] = useState(0)
@@ -344,15 +451,18 @@ export default function OnboardingPage() {
 
   const activeStepOrder = useMemo(() => computeStepOrder(state.selectedModules), [state.selectedModules])
 
-  const goToNext = useCallback(() => {
-    const idx = activeStepOrder.indexOf(state.step)
-    if (idx < activeStepOrder.length - 1) {
-      dispatch({ type: 'SET_STEP', step: activeStepOrder[idx + 1] })
-    }
-  }, [activeStepOrder, state.step])
-
   const goToBack = useCallback(() => {
     const idx = activeStepOrder.indexOf(state.step)
+    if (idx === -1) {
+      // Same self-heal path as goToNext — keep the user moving instead of
+      // silently dead-ending on an orphaned step.
+      const fallback = _firstNavigationRecoveryStep(activeStepOrder)
+      console.warn(
+        `[onboarding] goToBack: step ${state.step} not in active order, falling back to ${fallback}`
+      )
+      dispatch({ type: 'SET_STEP', step: fallback })
+      return
+    }
     if (idx > 0) {
       dispatch({ type: 'SET_STEP', step: activeStepOrder[idx - 1] })
     }
@@ -440,9 +550,6 @@ export default function OnboardingPage() {
     try {
       const { identity, budgetAmounts, bankAccounts, assets, debts, preferences } = state
 
-      // Start with empty dashboard — user builds it themselves
-      const widgetPrefs: unknown[] = []
-
       // Generate idempotency key to prevent duplicate saves on retry
       const idempotencyKey = crypto.randomUUID()
 
@@ -456,7 +563,7 @@ export default function OnboardingPage() {
           estimated_monthly_expenses: identity.estimated_monthly_expenses ? Number(identity.estimated_monthly_expenses) : undefined,
         },
         budgetAmounts,
-        widgetPrefs,
+        widgetPrefs: { widgets: [] },
         idempotencyKey,
         activeModules: state.selectedModules.length > 0 ? state.selectedModules : undefined,
       }
@@ -559,7 +666,17 @@ export default function OnboardingPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.error || 'Opslaan mislukt')
+        // eslint-disable-next-line no-console
+        console.error(`[onboarding-save] server rejected payload (status ${res.status}): ${JSON.stringify(data)}`)
+        // Build a human-readable summary of Zod field errors when present
+        let detail = ''
+        if (data?.details?.fieldErrors && typeof data.details.fieldErrors === 'object') {
+          const fields = Object.entries(data.details.fieldErrors as Record<string, string[]>)
+            .filter(([, msgs]) => Array.isArray(msgs) && msgs.length > 0)
+            .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
+          if (fields.length > 0) detail = ` — ${fields.join('; ')}`
+        }
+        throw new Error(`${data.error || 'Opslaan mislukt'}${detail}`)
       }
 
       // Complete the progress bar
@@ -587,6 +704,37 @@ export default function OnboardingPage() {
       setSaving(false)
     }
   }, [saving, state, activeStepOrder])
+
+  // Defined after handleSaveOwnData so the safety-net branch below can call it
+  // without tripping the no-use-before-define rule. goToNext is wired into
+  // every step's <OnboardingX onNext={goToNext} /> prop, so the user-click
+  // handlers see the latest closure on every render.
+  const goToNext = useCallback(() => {
+    const idx = activeStepOrder.indexOf(state.step)
+    if (idx === -1) {
+      // Self-heal: current step is no longer in the active order (e.g. the
+      // user had a draft pointing at a step that was removed). Dispatch to
+      // the first valid non-intro step instead of silently no-op'ing.
+      const fallback = _firstNavigationRecoveryStep(activeStepOrder)
+      console.warn(
+        `[onboarding] goToNext: step ${state.step} not in active order, falling back to ${fallback}`
+      )
+      dispatch({ type: 'SET_STEP', step: fallback })
+      return
+    }
+    const next = activeStepOrder[idx + 1]
+    // Safety net: if the next step is 'saving', invoke the actual save handler
+    // instead of just dispatching to the saving screen. Without this, any
+    // module combination that omits 'preferences' would dead-end at 90% on
+    // the progress bar (the saving step never triggers the POST itself).
+    if (next === 'saving') {
+      handleSaveOwnData()
+      return
+    }
+    if (idx < activeStepOrder.length - 1) {
+      dispatch({ type: 'SET_STEP', step: next })
+    }
+  }, [activeStepOrder, state.step, handleSaveOwnData])
 
   const dismissError = useCallback(() => setSaveError(null), [])
 
@@ -741,18 +889,6 @@ export default function OnboardingPage() {
               onChange={(data) => dispatch({ type: 'SET_HORIZON', data })}
               onNext={goToNext}
               onBack={goToBack}
-              activeModules={state.selectedModules}
-              subStep={currentSubStep}
-            />
-          )}
-
-          {state.step === 'preferences' && (
-            <OnboardingPreferences
-              data={state.preferences}
-              onChange={(data) => dispatch({ type: 'SET_PREFERENCES', data })}
-              onNext={handleSaveOwnData}
-              onBack={goToBack}
-              saving={saving}
               activeModules={state.selectedModules}
               subStep={currentSubStep}
             />

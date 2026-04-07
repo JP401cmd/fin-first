@@ -209,6 +209,7 @@ export default function GidsPage() {
                 "Automatische categorisatie: bij import worden transacties gekoppeld aan budgetten via (1) eerdere correcties, (2) keyword-herkenning en (3) AI voor onbekende transacties",
                 "Corrigeer waar nodig — elke correctie wordt automatisch een regel die bij volgende imports direct wordt toegepast",
                 "Eigen overboekingen tussen je rekeningen worden automatisch herkend en gekoppeld, zodat ze niet dubbel tellen in je budget",
+                "Vergeten transacties later koppelen: zie je later een 'X transacties zonder categorie'-banner op een rekening of op De Wil? Tik erop om Will alsnog te laten categoriseren — je kunt kiezen tussen alleen deze maand of alle ongekoppelde transacties op die rekening",
               ],
               tip: "Importeer minimaal 3 maanden aan transacties — dan herkent de AI je vaste patronen en wordt de categorisatie steeds nauwkeuriger.",
             }}

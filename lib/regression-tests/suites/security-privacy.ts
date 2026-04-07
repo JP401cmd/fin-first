@@ -514,6 +514,72 @@ const tests: TestCase[] = [
       }
     },
   },
+
+  // ── Step 7: Field-level encryption — bank credentials ─────────────
+  {
+    id: 'field-encryption-token-roundtrip',
+    name: 'Field encryption: TrueLayer token round-trips through encryptField',
+    category: CAT,
+    description: 'encryptField produces a v1: ciphertext that decryptField recovers, and never leaks the plaintext',
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    async fn() {
+      // Inject test keys for the duration of this assertion. The real keys
+      // live in Vercel env; this regression suite only verifies the wire
+      // contract, not the runtime keys.
+      const prevEnc = process.env.ENCRYPTION_KEY_V1
+      const prevIdx = process.env.IBAN_INDEX_KEY_V1
+      process.env.ENCRYPTION_KEY_V1 = 'aa'.repeat(32)
+      process.env.IBAN_INDEX_KEY_V1 = 'bb'.repeat(32)
+      try {
+        const mod = await import('@/lib/crypto/field-encryption')
+        mod.__resetKeyCacheForTests()
+
+        const plaintext = 'tl_access_token_xxxxxxxxxxxxxx'
+        const ciphertext = mod.encryptField(plaintext)
+        assertNotNull(ciphertext, 'ciphertext should not be null')
+        assert(ciphertext!.startsWith('v1:'), 'ciphertext has v1: prefix')
+        assert(!ciphertext!.includes(plaintext), 'plaintext is not visible in ciphertext')
+        assertEqual(mod.decryptField(ciphertext), plaintext, 'round-trip recovers plaintext')
+      } finally {
+        process.env.ENCRYPTION_KEY_V1 = prevEnc
+        process.env.IBAN_INDEX_KEY_V1 = prevIdx
+        const mod = await import('@/lib/crypto/field-encryption')
+        mod.__resetKeyCacheForTests()
+      }
+    },
+  },
+  {
+    id: 'field-encryption-iban-blind-index-stable',
+    name: 'Field encryption: IBAN blind index normalises whitespace + case',
+    category: CAT,
+    description: 'blindIndex collapses spaced and lowercased IBAN variants to the same hash so callback IBAN lookups still work after encryption',
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    async fn() {
+      const prevEnc = process.env.ENCRYPTION_KEY_V1
+      const prevIdx = process.env.IBAN_INDEX_KEY_V1
+      process.env.ENCRYPTION_KEY_V1 = 'cc'.repeat(32)
+      process.env.IBAN_INDEX_KEY_V1 = 'dd'.repeat(32)
+      try {
+        const mod = await import('@/lib/crypto/field-encryption')
+        mod.__resetKeyCacheForTests()
+
+        const a = mod.blindIndex('NL91 ABNA 0417 1643 00')
+        const b = mod.blindIndex('nl91abna0417164300')
+        const c = mod.blindIndex('NL91ABNA0417164300')
+        assertEqual(a, b, 'spaced + lowercase variant matches')
+        assertEqual(b, c, 'lowercase + canonical variant matches')
+        assert(/^[0-9a-f]{64}$/.test(a), 'blind index is 64-char hex')
+        assert(!a.includes('0417'), 'blind index does not contain plaintext')
+      } finally {
+        process.env.ENCRYPTION_KEY_V1 = prevEnc
+        process.env.IBAN_INDEX_KEY_V1 = prevIdx
+        const mod = await import('@/lib/crypto/field-encryption')
+        mod.__resetKeyCacheForTests()
+      }
+    },
+  },
 ]
 
 export function register() {

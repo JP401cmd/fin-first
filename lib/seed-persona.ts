@@ -8,6 +8,11 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PersonaData } from '@/lib/test-personas'
+import {
+  blindIndex,
+  encryptField,
+  isFieldEncryptionConfigured,
+} from '@/lib/crypto/field-encryption'
 
 type ProgressCallback = (step: string, table: string, action: string, count?: number) => void
 
@@ -249,6 +254,34 @@ export async function seedPersonaData(
 
   // ── Phase 1a: Cash assets first (bank_accounts need their IDs) ──
 
+  // Field-encryption is OPTIONAL during seeding so local dev / CI without
+  // ENCRYPTION_KEY_V1 doesn't crash. Production seeds (and any environment
+  // where the keys are configured) will populate the encrypted columns so
+  // the seeded persona is testable end-to-end through the post-PR2 code
+  // paths that no longer read the plaintext IBAN column.
+  //
+  // We only spread the encrypted/hash fields into the row literal when keys
+  // are present — that way an env without the migration applied yet (e.g. a
+  // dev DB that hasn't run `db push`) doesn't error on "column does not
+  // exist" for unrelated test data.
+  const encryptionEnabled = isFieldEncryptionConfigured()
+
+  function ibanEncryptedFields(iban: string | null | undefined): Record<string, string | null> {
+    if (!encryptionEnabled || !iban) return {}
+    return {
+      iban_encrypted: encryptField(iban),
+      iban_hash: blindIndex(iban),
+    }
+  }
+
+  function accountNumberEncryptedFields(value: string | null | undefined): Record<string, string | null> {
+    if (!encryptionEnabled || !value) return {}
+    return {
+      account_number_encrypted: encryptField(value),
+      account_number_hash: blindIndex(value),
+    }
+  }
+
   const cashAssetRows = persona.bank_accounts.map((ba) => ({
     user_id: userId,
     name: ba.name,
@@ -259,6 +292,7 @@ export async function seedPersonaData(
     monthly_contribution: 0,
     institution: ba.bank_name,
     account_number: ba.iban,
+    ...accountNumberEncryptedFields(ba.iban),
     is_active: ba.is_active,
     sort_order: ba.sort_order,
     ownership: 'personal',
@@ -283,6 +317,7 @@ export async function seedPersonaData(
   const accountRows = persona.bank_accounts.map((a, i) => ({
     user_id: userId,
     ...a,
+    ...ibanEncryptedFields(a.iban),
     linked_asset_id: cashAssetIds[i] ?? null,
   }))
 

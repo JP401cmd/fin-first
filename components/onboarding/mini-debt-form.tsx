@@ -49,7 +49,7 @@ const EMPTY: DebtEntry = {
   draagkrachtmeting_date: '',
 }
 
-const ALL_TYPES: DebtType[] = ['mortgage', 'personal_loan', 'student_loan', 'car_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'other']
+export const ALL_DEBT_TYPES: DebtType[] = ['mortgage', 'personal_loan', 'student_loan', 'car_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'other']
 
 export function MiniDebtForm({
   items,
@@ -166,7 +166,7 @@ export function MiniDebtForm({
                   onChange={(e) => handleTypeChange(e.target.value as DebtType)}
                   className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
-                  {ALL_TYPES.map((t) => (
+                  {ALL_DEBT_TYPES.map((t) => (
                     <option key={t} value={t}>{DEBT_TYPE_LABELS[t]}</option>
                   ))}
                 </select>

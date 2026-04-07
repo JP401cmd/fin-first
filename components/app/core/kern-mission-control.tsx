@@ -502,8 +502,7 @@ export function KernMissionControl({
 
         {/* ── Bezittingen & Schulden view toggle ── */}
         {hasVermogen && (
-          <div className={`lg:col-span-2 flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-1 ${activeTab === 'budgets' ? 'hidden lg:flex' : ''}`}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">Bezittingen & Schulden</p>
+          <div className={`lg:col-span-2 flex items-center justify-end px-3 sm:px-5 pt-3 sm:pt-4 pb-1 ${activeTab === 'budgets' ? 'hidden lg:flex' : ''}`}>
             <div className="flex items-center gap-0.5 rounded-[var(--r)] bg-[var(--subtle)] p-0.5">
               <button
                 onClick={(e) => { e.stopPropagation(); setVermogenView('compact') }}
@@ -778,10 +777,26 @@ export function KernMissionControl({
             <>
             {/* Left column: Bezittingen cards */}
             <div
-              className={`cursor-pointer p-3 sm:p-5 ${getBorderClasses('assets')} ${activeTab !== 'assets' ? 'hidden lg:block' : ''} transition-colors hover:bg-emerald-500/[0.06]`}
+              className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('assets')} ${activeTab !== 'assets' ? 'hidden lg:block' : ''} transition-colors hover:bg-emerald-500/[0.06]`}
               onClick={() => onCardClick('assets')}
             >
-                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-positive">Bezittingen</p>
+                {/* Header — matches compact view */}
+                <div className="mb-2 sm:mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                      <PiggyBank className="h-5 w-5 text-kern-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--ink-2)]">Bezittingen</p>
+                      <p className={`hidden lg:block font-mono text-lg font-bold tabular-nums text-[var(--ink)] rounded-sm ${assetsFlash}`}>{formatCurrency(heroTotal)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {assetGrowthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-positive" />}
+                    {assetGrowthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-negative" />}
+                    {assetGrowthDirection === 'flat' && <Minus className="h-4 w-4 text-[var(--ink-4)]" />}
+                  </div>
+                </div>
                 <div className="space-y-4">
                   {LAYER_ORDER.map((layer, layerIdx) => {
                     const assets = groupedAssets[layer]
@@ -818,10 +833,32 @@ export function KernMissionControl({
 
             {/* Right column: Schulden cards */}
             <div
-              className={`cursor-pointer p-3 sm:p-5 ${getBorderClasses('debts')} ${activeTab !== 'debts' ? 'hidden lg:block' : ''} transition-colors hover:bg-red-500/[0.06]`}
+              className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('debts')} ${activeTab !== 'debts' ? 'hidden lg:block' : ''} transition-colors hover:bg-red-500/[0.06]`}
               onClick={() => onCardClick('debts')}
             >
-                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-negative">Schulden</p>
+                {/* Header — matches compact view */}
+                <div className="mb-2 sm:mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                      <Building2 className="h-5 w-5 text-kern-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--ink-2)]">Schulden</p>
+                      <p className={`hidden lg:block font-mono text-lg font-bold tabular-nums rounded-sm ${rawTotalDebts > 0 ? 'text-[var(--ink)]' : 'text-positive'} ${debtsFlash}`}>
+                        {rawTotalDebts > 0 ? formatCurrency(rawTotalDebts) : 'Schuldvrij'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {rawTotalDebts === 0 ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : debtProgress && debtProgress.progressPct > 50 ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4 text-kern-500" />
+                    )}
+                  </div>
+                </div>
                 {activeDebts.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2">
                     {activeDebts.map((debt, i) => (

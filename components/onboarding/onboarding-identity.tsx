@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { User, Users, Baby } from 'lucide-react'
 import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
@@ -17,14 +16,13 @@ export interface IdentityData {
   estimated_monthly_expenses: string
 }
 
-type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income' | 'number_of_children'
+type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income'
 
 /** Field ID mapping for scroll-to-error */
 const FIELD_IDS: Record<FieldKey, string> = {
   full_name: 'ob-name',
   date_of_birth: 'ob-dob',
   net_monthly_income: 'ob-income',
-  number_of_children: 'ob-children',
 }
 
 function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
@@ -70,15 +68,6 @@ function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
     }
   }
 
-  // Children: required if gezin
-  if (data.household_type === 'gezin') {
-    if (data.number_of_children < 1) {
-      errors.number_of_children = 'Minimaal 1 kind bij huishoudtype gezin'
-    } else if (data.number_of_children > 20) {
-      errors.number_of_children = 'Voer een realistisch aantal in'
-    }
-  }
-
   return errors
 }
 
@@ -111,7 +100,7 @@ export function OnboardingIdentity({
   const disableNext = submitted && !isValid
 
   const scrollToFirstError = useCallback(() => {
-    const fieldOrder: FieldKey[] = ['full_name', 'date_of_birth', 'number_of_children', 'net_monthly_income']
+    const fieldOrder: FieldKey[] = ['full_name', 'date_of_birth', 'net_monthly_income']
     for (const field of fieldOrder) {
       if (errors[field]) {
         const el = document.getElementById(FIELD_IDS[field])
@@ -181,7 +170,7 @@ export function OnboardingIdentity({
             placeholder="Je naam"
             aria-invalid={!!showError('full_name')}
             aria-describedby={showError('full_name') ? 'ob-name-error' : undefined}
-            className={`w-full rounded-xl bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
+            className={`w-full rounded-xl bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
           />
           {showError('full_name') && (
             <p id="ob-name-error" className="mt-1 text-xs text-red-500" role="alert">{showError('full_name')}</p>
@@ -201,72 +190,12 @@ export function OnboardingIdentity({
             onBlur={() => markTouched('date_of_birth')}
             aria-invalid={!!showError('date_of_birth')}
             aria-describedby={showError('date_of_birth') ? 'ob-dob-error' : undefined}
-            className={`w-full rounded-xl bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
+            className={`w-full rounded-xl bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
           />
           {showError('date_of_birth') && (
             <p id="ob-dob-error" className="mt-1 text-xs text-red-500" role="alert">{showError('date_of_birth')}</p>
           )}
         </div>
-
-        {/* Household type — large clickable cards */}
-        <div>
-          <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">
-            Huishouden <span className="text-red-400">*</span>
-          </span>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-            {([
-              { type: 'solo' as const, label: 'Solo', desc: 'Ik woon alleen', Icon: User },
-              { type: 'samen' as const, label: 'Samen', desc: 'Samen / getrouwd', Icon: Users },
-              { type: 'gezin' as const, label: 'Gezin', desc: 'Samen met kinderen', Icon: Baby },
-            ]).map(({ type, label, desc, Icon }) => {
-              const isSelected = data.household_type === type
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onChange({ ...data, household_type: type, number_of_children: type === 'gezin' ? Math.max(1, data.number_of_children) : 0 })}
-                  className={`flex min-h-[56px] items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all active:scale-[0.98] ${
-                    isSelected
-                      ? 'border-wil-500 bg-wil-50 shadow-sm'
-                      : 'border-[var(--border-ed)] bg-[var(--subtle)] hover:border-[var(--border-md)] hover:bg-[var(--paper)]'
-                  }`}
-                >
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                    isSelected ? 'bg-wil-100 text-wil-600' : 'bg-[var(--border-ed)] text-[var(--ink-3)]'
-                  }`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className={`text-sm font-semibold ${isSelected ? 'text-wil-700' : 'text-[var(--ink-2)]'}`}>{label}</p>
-                    <p className={`text-xs ${isSelected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`}>{desc}</p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Number of children (if gezin) */}
-        {data.household_type === 'gezin' && (
-          <div>
-            <label htmlFor="ob-children" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Aantal kinderen</label>
-            <input
-              id="ob-children"
-              type="number"
-              min={1}
-              max={20}
-              value={data.number_of_children}
-              onChange={(e) => onChange({ ...data, number_of_children: Math.max(0, Number(e.target.value)) })}
-              onBlur={() => markTouched('number_of_children')}
-              aria-invalid={!!showError('number_of_children')}
-              aria-describedby={showError('number_of_children') ? 'ob-children-error' : undefined}
-              className={`w-full sm:w-24 min-h-[44px] rounded-xl bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('number_of_children')}`}
-            />
-            {showError('number_of_children') && (
-              <p id="ob-children-error" className="mt-1 text-xs text-red-500" role="alert">{showError('number_of_children')}</p>
-            )}
-          </div>
-        )}
 
         {/* Net monthly income */}
         <div>
@@ -289,7 +218,7 @@ export function OnboardingIdentity({
               autoComplete="off"
               aria-invalid={!!showError('net_monthly_income')}
               aria-describedby={showError('net_monthly_income') ? 'ob-income-error' : 'ob-income-hint'}
-              className={`w-full rounded-xl bg-[var(--subtle)]py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('net_monthly_income')}`}
+              className={`w-full rounded-xl bg-[var(--subtle)] py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('net_monthly_income')}`}
             />
           </div>
           {showError('net_monthly_income') ? (

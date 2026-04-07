@@ -573,6 +573,17 @@ const rooseTransactions: PersonaTransactionTemplate[] = [
     { monthsAgo: 12, day: 15, amount: -55, description: 'Lente-opruiming kleding Primark', counterparty_name: 'Primark', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 13, day: 14, amount: -45, description: 'Valentijnsdag diner', counterparty_name: 'Restaurant De Hoek', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
     { monthsAgo: 14, day: 8, amount: -129, description: 'Nieuwjaarsuitverkoop Mediamarkt', counterparty_name: 'Mediamarkt', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    // Ongekoppelde transacties — bewust een niet-bestaande slug zodat
+    // seedPersonaData ze met budget_id = NULL inserteert. Gebruikt om de
+    // "X transacties zonder categorie"-flow + scope-toggle ("Deze maand" vs
+    // "Alle tijden") te testen op een seeded persona.
+    { monthsAgo: 0, day: 8, amount: -67.50, description: 'PAYP*OBSCURE-MERCHANT', counterparty_name: 'PAYP*OBSCURE', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 1, day: 4, amount: -23.95, description: 'CARDLINK PAYMENT', counterparty_name: '', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 1, day: 19, amount: -41.20, description: 'iDEAL ONBEKEND-WEBSHOP', counterparty_name: 'OnbekendShop BV', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 2, day: 3, amount: -89.99, description: 'SEPA INCASSO ABONNEMENT', counterparty_name: 'SubscribeCo', counterparty_iban: 'NL44INGB0009988776', budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 2, day: 22, amount: -12.40, description: 'BUITENLANDSE BETALING USD', counterparty_name: '', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 3, day: 11, amount: -34.50, description: 'PIN BETALING WINKEL', counterparty_name: 'Lokale Winkel', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 3, day: 27, amount: -156.00, description: 'OVERBOEKING ONBEKEND', counterparty_name: 'J. Pietersen', counterparty_iban: 'NL55RABO0123456789', budgetSlug: '__none__', is_income: false },
   ]),
 ]
 
@@ -803,6 +814,14 @@ const daanTransactions: PersonaTransactionTemplate[] = [
     { monthsAgo: 2, day: 20, amount: -65, description: 'Kerstcadeau ouders', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 3, day: 28, amount: -45, description: 'Sinterklaas cadeautjes', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 13, day: 14, amount: -35, description: 'Valentijnsdag cadeau vriendin', counterparty_name: 'Rituals', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    // Ongekoppelde transacties — bewust een niet-bestaande slug zodat
+    // seedPersonaData ze met budget_id = NULL inserteert. Stelt de combined-view
+    // (`/core/cash`) in staat om de scope-toggle te tonen voor Daan.
+    { monthsAgo: 0, day: 6, amount: -29.99, description: 'STEAM*GAME PURCHASE', counterparty_name: 'Steam', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 1, day: 12, amount: -52.40, description: 'PIN BETALING ONBEKEND', counterparty_name: '', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 2, day: 8, amount: -18.50, description: 'iDEAL ONBEKENDE WINKEL', counterparty_name: 'Niche Webshop', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 3, day: 20, amount: -75.00, description: 'OVERBOEKING NAAR VRIEND', counterparty_name: 'M. de Vries', counterparty_iban: 'NL22RABO0987654321', budgetSlug: '__none__', is_income: false },
+    { monthsAgo: 3, day: 5, amount: -14.99, description: 'SEPA INCASSO ONBEKEND', counterparty_name: 'XYZ Services', counterparty_iban: 'NL66INGB0001122334', budgetSlug: '__none__', is_income: false },
   ]),
 ]
 

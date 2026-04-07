@@ -104,7 +104,13 @@
       "Bash(ls -la /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/rapportages/)",
       "Bash(ls -la /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/core/budgets/[id]/)",
       "Bash(head -5 /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/core/budgets/[id]/page.tsx)",
-      "Bash(jq \".text | fromjson | .tables[] | select\\(.name == \"\"public.recurring_transactions\"\"\\)\")"
+      "Bash(jq \".text | fromjson | .tables[] | select\\(.name == \"\"public.recurring_transactions\"\"\\)\")",
+      "Bash(xxd \"C:/Users/janpa/cd/development/fin/.env.local\")",
+      "Read(//c/Users/janpa/AppData/Local/**)",
+      "Read(//c/Users/janpa/**)",
+      "Bash(mkdir -p \"C:/Users/janpa/cd/development/fin/.tmp-debug\")",
+      "Bash(cp /tmp/debug_user.mjs \"C:/Users/janpa/cd/development/fin/.tmp-debug/debug_user.mjs\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); us=sorted\\(d.get\\('users',[]\\),key=lambda u:u.get\\('created_at',''\\),reverse=True\\)[:5]; [print\\(u['id'],'|',u.get\\('email'\\),'|',u.get\\('created_at'\\),'|',u.get\\('last_sign_in_at'\\)\\) for u in us]\")"
     ]
   },
   "enableAllProjectMcpServers": true,

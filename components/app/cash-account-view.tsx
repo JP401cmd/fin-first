@@ -191,6 +191,11 @@ export function CashAccountView({
     partnerName: string
   } | null>(null)
 
+  // Budgeting module gating — only show the "X transacties zonder categorie"
+  // banner when the user has the budgetteren module active. Defaults to true
+  // until the profile is loaded so we don't flash the banner off and on.
+  const [budgetingActive, setBudgetingActive] = useState(true)
+
   // Settings menu & asset edit state
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [showAssetEdit, setShowAssetEdit] = useState(false)
@@ -409,6 +414,21 @@ export function CashAccountView({
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) setCurrentUserId(user.id)
     })
+  }, [])
+
+  // Load budgeting_active flag once on mount. Treat missing/error as `true`
+  // (matches /api/budgeting-active fallback) so we never silently hide the
+  // banner before we've actually verified the user has budgetting disabled.
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('profiles')
+      .select('budgeting_active')
+      .single()
+      .then(({ data }) => {
+        const active = (data as { budgeting_active?: boolean | null } | null)?.budgeting_active
+        setBudgetingActive(active !== false)
+      })
   }, [])
 
   useEffect(() => {
@@ -1367,8 +1387,9 @@ export function CashAccountView({
         </div>
       )}
 
-      {/* Uncategorized transactions banner */}
-      {uncatTx.length > 0 && (
+      {/* Uncategorized transactions banner — alleen relevant wanneer
+          budgetteren-module actief is (module-scheiding architectuurprincipe). */}
+      {budgetingActive && uncatTx.length > 0 && (
         <div className="mt-5 sm:mt-8">
           <UncategorizedTransactionsBanner
             count={uncatTx.length}
@@ -2063,6 +2084,9 @@ export function CashAccountView({
           budgetGroups={budgetGroups}
           onClose={() => setShowAICategorize(false)}
           onSaved={() => { void loadTransactions(); setShowAICategorize(false) }}
+          accountId={isCombined ? null : accountId}
+          monthLabel={monthLabel}
+          currentUserId={currentUserId}
         />
       )}
 

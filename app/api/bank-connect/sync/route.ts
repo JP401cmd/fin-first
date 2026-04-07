@@ -4,6 +4,7 @@ import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { getBaseUrls, getAccountTransactions, refreshAccessToken } from '@/lib/truelayer/client'
 import { mapTransactions } from '@/lib/truelayer/mapper'
 import { categorizeTransaction, buildFrequencyMap, type CategoryCorrection } from '@/lib/parsers/categorize'
+import { decryptField, encryptField } from '@/lib/crypto/field-encryption'
 import type { Budget } from '@/lib/budget-data'
 
 export async function POST(req: Request) {
@@ -63,24 +64,32 @@ export async function POST(req: Request) {
       }, { status: 429 })
     }
 
-    // Refresh token if needed
-    let accessToken = connection.access_token
+    // Dual-read: prefer the encrypted column, fall back to plaintext for rows
+    // that haven't been backfilled yet. Once PR2 drops the plaintext columns
+    // the `?? connection.access_token` branches become dead code.
+    let accessToken: string = decryptField(connection.access_token_encrypted ?? null) ?? connection.access_token
+    const refreshTokenPlaintext: string | null =
+      decryptField(connection.refresh_token_encrypted ?? null) ?? connection.refresh_token ?? null
     const tokenExpiresAt = connection.token_expires_at ? new Date(connection.token_expires_at) : null
 
     if (tokenExpiresAt && tokenExpiresAt.getTime() < Date.now() + 5 * 60 * 1000) {
-      if (!connection.refresh_token) {
+      if (!refreshTokenPlaintext) {
         return NextResponse.json({ error: 'Token verlopen, verbind opnieuw' }, { status: 401 })
       }
 
       try {
-        const newTokens = await refreshAccessToken(supabase, connection.refresh_token)
+        const newTokens = await refreshAccessToken(supabase, refreshTokenPlaintext)
         accessToken = newTokens.access_token
+        const nextRefreshToken = newTokens.refresh_token ?? refreshTokenPlaintext
 
+        // Dual-write the refreshed tokens so both columns stay in sync.
         await supabase
           .from('bank_connections')
           .update({
             access_token: newTokens.access_token,
-            refresh_token: newTokens.refresh_token ?? connection.refresh_token,
+            refresh_token: nextRefreshToken,
+            access_token_encrypted: encryptField(newTokens.access_token),
+            refresh_token_encrypted: encryptField(nextRefreshToken),
             token_expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
             updated_at: new Date().toISOString(),
           })
