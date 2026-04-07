@@ -195,25 +195,29 @@ function computeLifeEventInflow(
 ): number {
   let totalInflow = 0
   for (const evt of lifeEvents) {
-    const evtAge = Number(evt.age ?? 0)
+    const evtAge = Number(evt.target_age ?? 0)
     const age = currentAge != null ? currentAge + year : year
-    // One-time events
-    if (evt.type === 'eenmalig' || evt.type === 'one_time') {
+    // One-time events (duration_months === 0)
+    if (evt.duration_months === 0) {
       if (Math.floor(evtAge) === Math.floor(age)) {
-        const income = Number(evt.monthly_income ?? evt.income ?? 0)
-        const cost = Number(evt.monthly_cost ?? evt.cost ?? 0)
-        totalInflow += income - cost
+        const income = Number(evt.monthly_income_change ?? 0)
+        const cost = Number(evt.monthly_cost_change ?? 0)
+        totalInflow += income - cost - Number(evt.one_time_cost ?? 0)
       }
     }
-    // Recurring events
-    if (evt.type === 'doorlopend' || evt.type === 'recurring') {
+    // Recurring events (duration_months > 0)
+    if (evt.duration_months > 0) {
       const startAge = evtAge
-      const duration = Number(evt.duration_years ?? evt.duration ?? 0)
-      const endAge = startAge + duration
+      const durationYears = evt.duration_months / 12
+      const endAge = startAge + durationYears
       if (age >= startAge && age < endAge) {
-        const income = Number(evt.monthly_income ?? evt.income ?? 0) * 12
-        const cost = Number(evt.monthly_cost ?? evt.cost ?? 0) * 12
+        const income = Number(evt.monthly_income_change ?? 0) * 12
+        const cost = Number(evt.monthly_cost_change ?? 0) * 12
         totalInflow += income - cost
+      }
+      // One-time cost at start age
+      if (Math.floor(evtAge) === Math.floor(age)) {
+        totalInflow -= Number(evt.one_time_cost ?? 0)
       }
     }
   }
