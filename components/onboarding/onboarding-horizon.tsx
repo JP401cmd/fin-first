@@ -573,39 +573,6 @@ export function OnboardingHorizon({
         </button>
       </section>
 
-      {/* ── Section D: Temporaal Evenwicht ────────────────────── */}
-      <section className="mb-8">
-        <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">
-          Temporaal evenwicht
-        </h2>
-        <p className="mb-4 text-sm text-[var(--ink-3)]">
-          Hoe balanceer je genieten van nu versus sparen voor later?
-        </p>
-
-        <select
-          id="ob-temporal-balance"
-          value={data.temporal_balance}
-          onChange={(e) => onChange({ ...data, temporal_balance: Number(e.target.value) })}
-          className="w-full min-h-[44px] rounded-xl bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border border-[var(--border-ed)] focus:border-horizon-500 focus:ring-1 focus:ring-horizon-500 sm:text-sm"
-        >
-          {temporalLevels.map((level) => (
-            <option key={level.level} value={level.level}>
-              {level.icon} {level.nameNl} — {level.tagline}
-            </option>
-          ))}
-        </select>
-
-        {/* Description card for the active level */}
-        <div className="mt-3 rounded-xl border border-horizon-200 bg-horizon-50/60 px-4 py-3">
-          <p className="text-sm font-semibold text-horizon-900">
-            {activeTemporalLevel.icon} {activeTemporalLevel.nameNl}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
-            {activeTemporalLevel.description}
-          </p>
-        </div>
-      </section>
-
       {/* ── Sticky navigation ────────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-8 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button

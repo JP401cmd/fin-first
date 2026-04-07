@@ -67,7 +67,6 @@ function computeStepOrder(selectedModules: ModuleId[]): Step[] {
     if (has('vermogensregistratie') || has('budgetteren')) steps.push('bezittingen')
     if (has('budgetteren')) steps.push('budgets')
     if (has('toekomstplannen')) steps.push('horizon')
-    if (has('inzicht_acties')) steps.push('preferences')
   }
 
   steps.push('saving', 'success')
@@ -441,8 +440,8 @@ export default function OnboardingPage() {
     try {
       const { identity, budgetAmounts, bankAccounts, assets, debts, preferences } = state
 
-      // Build widget prefs from user preferences
-      const widgetPrefs = buildWidgetPrefsFromPreferences(preferences)
+      // Start with empty dashboard — user builds it themselves
+      const widgetPrefs: unknown[] = []
 
       // Generate idempotency key to prevent duplicate saves on retry
       const idempotencyKey = crypto.randomUUID()

@@ -229,10 +229,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const [showAddPicker, setShowAddPicker] = useState(false)
   const [showAutoWizard, setShowAutoWizard] = useState(false)
   const [selectedPreset, setSelectedPreset] = useState<WidgetPreset | null>(null)
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('dashboard-collapsed') === 'true'
-  })
+  // Dashboard state from shared context (type + collapsed)
+  const { dashboardType, setDashboardType, isCollapsed, setIsCollapsed: setCollapsedCtx } = useDashboardType()
 
   // ── API-loaded presets (fallback to hardcoded) ──────────────
   const [apiPresets, setApiPresets] = useState<WidgetPreset[]>(WIDGET_PRESETS)
@@ -249,8 +247,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     return () => { cancelled = true }
   }, [])
 
-  // Dashboard type toggle (only active when showDashboardTypeToggle is true)
-  const { dashboardType, setDashboardType } = useDashboardType()
+  // Briefing content preferences
   const [briefingPrefs, setBriefingPrefs] = useState<BriefingContentPrefs>({ showNextSteps: true, showDiscover: true })
 
   useEffect(() => {
@@ -487,12 +484,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   }, [])
 
   const toggleCollapsed = useCallback(() => {
-    setIsCollapsed(prev => {
-      const next = !prev
-      localStorage.setItem('dashboard-collapsed', String(next))
-      return next
-    })
-  }, [])
+    setCollapsedCtx(!isCollapsed)
+  }, [isCollapsed, setCollapsedCtx])
 
   const activePref = activeId ? activeWidgets.find(p => p.id === activeId) ?? null : null
   const ids = activeWidgets.map(p => p.id)
@@ -530,6 +523,17 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                 }`}
               >
                 Briefing
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardType('nieuws')}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  dashboardType === 'nieuws'
+                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                Nieuws
               </button>
             </div>
           )}
@@ -599,8 +603,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         </div>
       )}
 
-      {/* Widget content — hidden when briefing mode is active */}
-      {!(showDashboardTypeToggle && dashboardType === 'briefing') && (<>
+      {/* Widget content — hidden when briefing or nieuws mode is active */}
+      {!(showDashboardTypeToggle && (dashboardType === 'briefing' || dashboardType === 'nieuws')) && (<>
 
       {activeWidgets.length === 0 && !isEditMode ? (
         <div className="py-12 flex flex-col items-center text-center">

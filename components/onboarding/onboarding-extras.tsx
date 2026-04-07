@@ -212,7 +212,7 @@ export function OnboardingExtras({
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0"><WillDots size={48} /></div>
         <SpeechBubble>
-          Als je je rekeningen en bezittingen toevoegt, kan ik meteen je netto vermogen en vrijheidspercentage berekenen. Heb je schulden? Dan laat ik zien hoeveel vrijheid je terugkoopt als je die aflost. Dit is helemaal optioneel &mdash; je kunt het ook later toevoegen.
+          Voeg je rekeningen, bezittingen en schulden toe zodat ik je netto vermogen en vrijheidspercentage kan berekenen. Later kun je in de app transacties uploaden of je bankrekening koppelen om je uitgaven automatisch te volgen. Dit is helemaal optioneel &mdash; je kunt het ook later toevoegen.
         </SpeechBubble>
       </div>
 

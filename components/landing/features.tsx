@@ -171,25 +171,25 @@ export function Features() {
             Het probleem
           </p>
           <h2 className="mb-10 text-center font-display text-[2rem] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)] md:text-[2.6rem]">
-            Je financiële leven staat verspreid{' '}
-            <em className="italic text-wil-600">over zeven apps</em>
+            Geld hebben is niet genoeg &mdash;{' '}
+            <em className="italic text-wil-600">grip voelen wel</em>
           </h2>
 
           <div className="mb-10 grid gap-4 sm:grid-cols-3">
             {[
               {
-                title: 'Losse apps',
-                body: 'YNAB voor budgetten. Excel voor vermogen. Broker-apps voor beleggen. Pensioenportalen voor later. Alles staat los.',
+                title: 'Economische onzekerheid raakt iedereen',
+                body: 'Inflatie, rentestijgingen, ontslagrondes, pensioengaten \u2014 het nieuws stapelt zich op. Toch kan vrijwel niemand antwoorden: \u201CHoeveel maanden kan ik door als mijn inkomen morgen stopt?\u201D Onze app vertaalt macro-onzekerheid naar jouw persoonlijke ruimte in tijd.',
                 accentColor: 'var(--color-kern-300)',
               },
               {
-                title: 'Geen tijdperspectief',
-                body: 'Niemand vertelt je hoeveel vrijheid je hebt. Hoeveel maanden kun je leven van je vermogen? Je weet het niet.',
+                title: 'Levenskeuzes komen niet op een handig moment',
+                body: 'Ontslag, scheiding, gezinsuitbreiding, mantelzorg, een kans die je n\u00FA moet grijpen \u2014 ze wachten niet tot je je financi\u00EBn op orde hebt. Wie pas dan gaat rekenen, is te laat. Onze app zorgt dat je ruimte altijd zichtbaar is, v\u00F3\u00F3rdat je het nodig hebt.',
                 accentColor: 'var(--color-wil-300)',
               },
               {
-                title: 'Handmatig bijhouden',
-                body: 'Elke maand spreadsheets bijwerken, transacties categoriseren, zelf berekeningen maken. Financiën als bijbaan.',
+                title: 'De kloof tussen verdienen en begrijpen groeit',
+                body: 'Mensen verdienen meer dan ooit, maar financi\u00EBle producten, regelingen en belastingconstructies worden steeds complexer. Het resultaat: geld hebben maar geen grip voelen. Onze app brengt alles samen in \u00E9\u00E9n helder beeld \u2014 overzicht, inzicht, vooruitzicht \u2014 zodat verdienen ook begrijpen wordt.',
                 accentColor: 'var(--color-horizon-300)',
               },
             ].map((item) => (
@@ -206,8 +206,8 @@ export function Features() {
 
           <div className="mx-auto max-w-2xl rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] px-8 py-6 text-center">
             <p className="font-serif text-lg leading-relaxed text-[var(--ink-2)]">
-              TriFinity geeft je inzicht, grip en vooruitzicht op je financiële
-              leven &mdash; alles op één plek, in één taal:{' '}
+              TriFinity geeft je inzicht, grip en vooruitzicht op je financi&euml;le
+              leven &mdash; alles op &eacute;&eacute;n plek, in &eacute;&eacute;n taal:{' '}
               <strong className="font-semibold text-[var(--ink)]">tijd</strong>.
             </p>
           </div>

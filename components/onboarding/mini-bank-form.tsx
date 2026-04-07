@@ -8,7 +8,7 @@ export interface BankAccountEntry {
   has_budget_tracking: boolean
 }
 
-const EMPTY: BankAccountEntry = { name: '', bank_name: '', account_type: 'checking', balance: '', has_budget_tracking: true }
+const EMPTY: BankAccountEntry = { name: '', bank_name: '', account_type: 'checking', balance: '', has_budget_tracking: false }
 
 export function MiniBankForm({
   items,
@@ -59,7 +59,7 @@ export function MiniBankForm({
               <input
                 type="number"
                 inputMode="decimal"
-                step={0.01}
+                step={100}
                 placeholder="Saldo"
                 value={item.balance}
                 onChange={(e) => update(i, { balance: e.target.value })}
@@ -67,14 +67,19 @@ export function MiniBankForm({
               />
             </div>
           </div>
-          <label className="flex items-center gap-2 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
+          <label className="flex items-start gap-2 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
             <input
               type="checkbox"
               checked={item.has_budget_tracking}
               onChange={(e) => update(i, { has_budget_tracking: e.target.checked })}
-              className="h-4 w-4 rounded border-[var(--border-ed)] text-wil-600 focus:ring-wil-500"
+              className="mt-0.5 h-4 w-4 rounded border-[var(--border-ed)] text-wil-600 focus:ring-wil-500"
             />
-            <span className="text-sm text-[var(--ink-2)]">Gebruik voor budgetteren</span>
+            <div>
+              <span className="text-sm text-[var(--ink-2)]">Gebruik voor budgetteren</span>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-4)]">
+                Activeer dit als je transacties op deze rekening wilt koppelen aan budgetten. Ideaal voor je dagelijkse betaalrekening.
+              </p>
+            </div>
           </label>
         </div>
       ))}

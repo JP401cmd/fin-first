@@ -9,6 +9,7 @@ import type { TemporalContext } from '@/lib/briefing/types'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { SectionDivider } from '@/components/app/section-divider'
 import { DAIshboard } from '@/components/daishboard/daishboard'
+import { NieuwsOnlyClient } from '@/components/berichten/nieuws-only-client'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { ActionCenter } from './action-center'
@@ -38,7 +39,7 @@ export function WillLanding({
 }: WillLandingProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { dashboardType } = useDashboardType()
+  const { dashboardType, isCollapsed } = useDashboardType()
 
   // Recurring costs state (loaded client-side)
   const [subscriptions, setSubscriptions] = useState<RecurringItem[]>([])
@@ -98,9 +99,9 @@ export function WillLanding({
     <FreedomDaysAnimationProvider>
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
 
-        {/* ── Sectie 1: Widget grid of DAIshboard ── */}
+        {/* ── Sectie 1: Widget grid, DAIshboard of Nieuws ── */}
         <section
-          aria-label={dashboardType === 'widgets' ? 'Mijn Widgets' : "Will's Briefing"}
+          aria-label={dashboardType === 'widgets' ? 'Mijn Widgets' : dashboardType === 'briefing' ? "Will's Briefing" : 'TriFinity Post'}
           data-testid="will-widget-grid"
           className="card-editorial overflow-hidden"
         >
@@ -112,7 +113,7 @@ export function WillLanding({
               data={dashboardData}
               showDashboardTypeToggle
             />
-            {dashboardType === 'briefing' && (
+            {dashboardType === 'briefing' && !isCollapsed && (
               <div className="mt-4">
                 <DAIshboard
                   data={dashboardData}
@@ -120,6 +121,11 @@ export function WillLanding({
                   userName={userName}
                   aiEnabled={aiEnabled}
                 />
+              </div>
+            )}
+            {dashboardType === 'nieuws' && !isCollapsed && (
+              <div className="mt-4 -mx-4 sm:-mx-6 md:-mx-8">
+                <NieuwsOnlyClient />
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   DEBT_TYPE_LABELS,
@@ -71,8 +71,13 @@ export function MiniDebtForm({
     setEditingIndex(i)
   }
 
+  const duplicateName = useMemo(() => {
+    if (!draft.name.trim()) return false
+    return items.some((item, idx) => idx !== editingIndex && item.name.trim().toLowerCase() === draft.name.trim().toLowerCase())
+  }, [draft.name, items, editingIndex])
+
   function save() {
-    if (!draft.name || !draft.current_balance) return
+    if (!draft.name || !draft.current_balance || duplicateName) return
     if (editingIndex === -1) {
       onChange([...items, { ...draft }])
     } else if (editingIndex !== null) {
@@ -192,8 +197,11 @@ export function MiniDebtForm({
                   placeholder="Bijv. Hypotheek ABN AMRO"
                   value={draft.name}
                   onChange={(e) => updateDraft({ name: e.target.value })}
-                  className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className={`w-full rounded-xl border bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:ring-1 ${duplicateName ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-[var(--border-ed)] focus:border-wil-500 focus:ring-wil-500'}`}
                 />
+                {duplicateName && (
+                  <p className="mt-1 text-[11px] text-red-500">Er bestaat al een schuld met deze naam</p>
+                )}
               </div>
 
               {/* Original amount */}
@@ -394,7 +402,7 @@ export function MiniDebtForm({
               </button>
               <button
                 onClick={save}
-                disabled={!draft.name || !draft.current_balance}
+                disabled={!draft.name || !draft.current_balance || duplicateName}
                 className="flex-1 min-h-[44px] rounded-xl bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:opacity-40"
               >
                 {editingIndex === -1 ? 'Toevoegen' : 'Opslaan'}

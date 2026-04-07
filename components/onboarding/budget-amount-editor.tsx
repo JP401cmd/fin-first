@@ -101,7 +101,7 @@ export function BudgetAmountEditor({
                           <input
                             type="number"
                             min={0}
-                            step={5}
+                            step={100}
                             value={val}
                             onChange={(e) => setAmount(child.slug, Number(e.target.value))}
                             className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--subtle)] py-2 pr-2 pl-6 text-right text-base text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)] sm:py-1.5 sm:text-xs"

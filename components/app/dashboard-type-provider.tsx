@@ -2,18 +2,22 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 
-type DashboardType = 'widgets' | 'briefing'
+type DashboardType = 'widgets' | 'briefing' | 'nieuws'
 
 interface DashboardTypeContextValue {
   dashboardType: DashboardType
   setDashboardType: (type: DashboardType) => Promise<void>
   loading: boolean
+  isCollapsed: boolean
+  setIsCollapsed: (collapsed: boolean) => void
 }
 
 const DashboardTypeContext = createContext<DashboardTypeContextValue>({
   dashboardType: 'widgets',
   setDashboardType: async () => {},
   loading: true,
+  isCollapsed: false,
+  setIsCollapsed: () => {},
 })
 
 export function useDashboardType() {
@@ -23,12 +27,15 @@ export function useDashboardType() {
 export function DashboardTypeProvider({ children }: { children: ReactNode }) {
   const [dashboardType, setType] = useState<DashboardType>('widgets')
   const [loading, setLoading] = useState(true)
+  const [isCollapsed, setIsCollapsedState] = useState(() => {
+    try { return localStorage.getItem('dashboard-collapsed') === 'true' } catch { return false }
+  })
 
   useEffect(() => {
     fetch('/api/dashboard-type')
       .then(r => r.json())
       .then(d => {
-        if (d.dashboard_type === 'widgets' || d.dashboard_type === 'briefing') {
+        if (d.dashboard_type === 'widgets' || d.dashboard_type === 'briefing' || d.dashboard_type === 'nieuws') {
           setType(d.dashboard_type)
         }
       })
@@ -45,8 +52,13 @@ export function DashboardTypeProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const setIsCollapsed = useCallback((collapsed: boolean) => {
+    setIsCollapsedState(collapsed)
+    try { localStorage.setItem('dashboard-collapsed', String(collapsed)) } catch { /* noop */ }
+  }, [])
+
   return (
-    <DashboardTypeContext.Provider value={{ dashboardType, setDashboardType, loading }}>
+    <DashboardTypeContext.Provider value={{ dashboardType, setDashboardType, loading, isCollapsed, setIsCollapsed }}>
       {children}
     </DashboardTypeContext.Provider>
   )
