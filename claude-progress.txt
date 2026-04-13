@@ -23667,3 +23667,67 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#752, #753)
+
+## Session 2026-04-13 - Features #757, #758
+
+### Feature #757: AI pre-generatie failure blokkeert onboarding niet - PASSING
+- Changed console.warn to console.error for better visibility in error tracking
+- Added HTTP status check: logs res.status + res.statusText for non-ok responses
+- Captured error object in catch block for detailed logging
+- Onboarding flow continues to success step regardless of AI call outcome
+- Zero console errors
+- Commit: 756bbd9e
+
+### Feature #758: Fallback module-guide-stap bij AI pre-generatie failure - PASSING
+- Added fallback step detection in briefing-card-grid.tsx using data.recommendations count
+- When recommendations === 0 and inzicht_acties module is active:
+  - Prepends { key: 'inzicht_genereer', label: 'Genereer je eerste voorstellen', href: '/will' }
+  - Step appears first in the inzicht_acties guide card
+- When recommendations > 0 (AI succeeded): fallback step is not shown
+- isAllComplete checks against DEFAULT_MODULE_GUIDE_STEPS (excludes dynamic step) — correct behavior
+- TypeScript compiles clean, zero console errors
+- Commit: 80d76f12
+
+### Files Modified
+- app/(onboarding)/onboarding/page.tsx — console.error with error details + HTTP status check
+- components/daishboard/briefing-card-grid.tsx — dynamic fallback step for inzicht_acties
+
+### Current Status
+- 2 features completed this session (#757, #758)
+- Overall progress: 746/762 passing (97.9%)
+
+## Session 2026-04-13 - Features #754, #755
+
+### Feature #754: Beheer: enable/disable toggle per module - PASSING
+- Added EnableToggle per module section header (reusing briefing pattern)
+- Disabled modules show dimmed steps (opacity 60%), non-editable content (pointer-events-none)
+- Red "uitgeschakeld" badge shows next to disabled module names
+- Header shows active module count (e.g. "5 actief")
+- Created /api/module-guide/settings endpoint (GET/PUT) for persisting disabled modules in app_settings
+- Toggle state saved under app_settings key 'module_guide_disabled_modules'
+- Updated useModuleGuideState hook: isCardVisible() now checks disabled modules
+- Shared disabled modules cache across hook instances to avoid duplicate fetches
+- Fixed button nesting hydration error by restructuring section header (div wraps separate button + toggle)
+- Zero console errors
+- Commit: 8173dff8
+
+### Feature #755: Beheer: opslaan en reset naar defaults - PASSING
+- Save button already existed and works correctly (writes to PUT /api/module-guide/steps)
+- Inline success feedback ("Instellingen opgeslagen!") already in place
+- Disabled save button when no changes already implemented
+- Added DELETE /api/module-guide/steps endpoint: removes app_settings record, returns DEFAULT_MODULE_GUIDE_STEPS
+- Added "Reset naar defaults" button below Save button with RotateCcw icon
+- Confirmation dialog: red banner with "Weet je het zeker?" + explanation text
+- Two action buttons: "Ja, reset naar defaults" (red) + "Annuleren"
+- After reset: steps revert to DEFAULT_MODULE_GUIDE_STEPS, disabled modules cleared, success message shown
+- Zero console errors
+- Commit: 7c0afdb0
+
+### Files Modified
+- app/(app)/beheer/module-guide/page.tsx — EnableToggle, disabled modules state, reset dialog
+- app/api/module-guide/steps/route.ts — DELETE endpoint for reset
+- app/api/module-guide/settings/route.ts — new GET/PUT endpoint for disabled modules
+- lib/hooks/use-module-guide-state.ts — disabled modules check in isCardVisible
+
+### Current Status
+- 2 features completed this session (#754, #755)
