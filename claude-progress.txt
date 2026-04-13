@@ -1,3 +1,61 @@
+## Session 2026-04-13 - Features #745, #761
+
+### Feature #745: Step-key reconciliatie voor orphaned keys - PASSING
+- Added getReconciledSteps() helper to useModuleGuideState hook
+- Filters completedSteps against DEFAULT_MODULE_GUIDE_STEPS catalog
+- Orphaned keys (from deleted steps) are ignored in counting and display
+- isStepComplete() now validates step key exists in catalog before returning true
+- isAllComplete() uses getReconciledSteps() instead of raw completedSteps
+- New catalog steps naturally appear unchecked (not in completedSteps)
+- Zero new TypeScript errors
+
+### Feature #761: Stap-completie persistent via database - PASSING (verification)
+- Verified step toggle sends PUT to /api/module-guide/progress
+- Verified optimistic update: checkmark appears immediately (green dot, strikethrough)
+- Verified persistence: after page refresh, completed step still shows as checked
+- Verified rollback: API 503 during HMR caused step to revert (optimistic rollback works)
+- Verified independent per-module: toggling in Budgetteren doesn't affect Vermogensregistratie
+- No code changes needed (existing implementation verified)
+
+### Files Modified
+- lib/hooks/use-module-guide-state.ts — getReconciledSteps, isStepComplete catalog check, isAllComplete uses reconciled
+
+### Current Status
+- 2 features completed this session (#745, #761)
+
+## Session 2026-04-13 - Features #746, #760
+
+### Feature #746: Module-guide-kaarten injected in briefing-card-grid - PASSING
+- Modified components/daishboard/briefing-card-grid.tsx to render ModuleGuideCard components
+- Guide cards generated client-side from active_modules + MODULE_GUIDE_DISPLAY_ORDER
+- Filtered: only active modules, not dismissed, not all steps completed, not in-development
+- aandelenregistratie correctly skipped (inDevelopment: true)
+- Cards rendered BEFORE AI cards using [...guideCards, ...cards] merge
+- Modified components/daishboard/daishboard.tsx: error state now renders BriefingCardGrid too
+- validateBriefingLayout not affected (runs server-side on AI cards only)
+- Verified: 4 guide cards (Budgetteren, Vermogensregistratie, Inzicht & Acties, Toekomstplannen)
+- Commit: cc2480df
+
+### Feature #760: Module-guide-kaarten alleen voor nieuwe gebruikers - PASSING
+- Extended GET /api/module-guide/progress to return { state, hasOnboardingIntent } shape
+- Added onboarding_intent to profile select query in progress endpoint
+- useModuleGuideState hook parses new response shape and exposes hasOnboardingIntent
+- Backward compatible: handles both old (bare state) and new ({ state, hasOnboardingIntent }) shapes
+- BriefingCardGrid skips guide cards when hasOnboardingIntent is false
+- Verified: regression test user (no intent) sees no guide cards
+- Verified: TypeScript compiles clean, no new console errors
+- Commit: 0bbf0f60
+
+### Files Modified
+- components/daishboard/briefing-card-grid.tsx — guide card generation + intent gating
+- components/daishboard/daishboard.tsx — error state renders grid for guide cards
+- app/api/module-guide/progress/route.ts — return hasOnboardingIntent + fallback pattern
+- lib/hooks/use-module-guide-state.ts — parse new response, expose hasOnboardingIntent
+
+### Current Status
+- 2 features completed this session (#746, #760)
+- Overall progress: 744/762 passing (97.6%)
+
 ## Session 2026-04-13 - Features #732, #733
 
 ### Feature #732: computeStepOrder werkt correct per intentie - PASSING
