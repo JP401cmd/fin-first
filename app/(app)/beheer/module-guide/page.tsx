@@ -198,12 +198,12 @@ function ModuleSection({
         hasChanges ? 'border-amber-400' : 'border-[var(--border-ed)]'
       } ${!enabled ? 'opacity-60' : ''}`}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex w-full items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--subtle)]">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-3 text-left"
+        >
           {isOpen ? (
             <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
           ) : (
@@ -225,9 +225,9 @@ function ModuleSection({
               gewijzigd
             </span>
           )}
-        </div>
+        </button>
         <EnableToggle enabled={enabled} onToggle={onToggleEnabled} />
-      </button>
+      </div>
 
       {isOpen && (
         <div className={`border-t border-[var(--border-ed)] px-4 py-2 ${!enabled ? 'pointer-events-none opacity-50' : ''}`}>

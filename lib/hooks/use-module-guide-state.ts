@@ -177,16 +177,25 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
       // If dismissed, not visible
       if (progress?.dismissedAt) return false
 
-      // If all steps are completed, not visible
-      const steps = DEFAULT_MODULE_GUIDE_STEPS[moduleId]
-      if (steps && progress?.completedSteps) {
-        const allDone = steps.every((s) => progress.completedSteps.includes(s.key))
-        if (allDone) return false
-      }
+      // Note: we no longer hide cards when all steps are complete here.
+      // The ModuleGuideCard component handles the completion celebration
+      // and calls dismissCard() after the animation, which sets dismissedAt.
 
       return true
     },
     [state, disabledModules],
+  )
+
+  /** Check if all steps for a module are completed (against current catalog) */
+  const isAllComplete = useCallback(
+    (moduleId: ModuleId): boolean => {
+      const steps = DEFAULT_MODULE_GUIDE_STEPS[moduleId]
+      const progress = state[moduleId]
+      if (!steps || steps.length === 0) return false
+      if (!progress?.completedSteps) return false
+      return steps.every((s) => progress.completedSteps.includes(s.key))
+    },
+    [state],
   )
 
   return {
@@ -197,5 +206,6 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
     dismissCard,
     isStepComplete,
     isCardVisible,
+    isAllComplete,
   }
 }
