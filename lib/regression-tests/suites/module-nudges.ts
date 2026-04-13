@@ -8,6 +8,13 @@ import {
   type NudgeDataState,
   type NudgeOverrides,
 } from '@/lib/nudge-definitions'
+import {
+  type IntentId,
+  INTENT_MODULE_PRESETS,
+  getFirstWinPath,
+  PERSONA_MODULE_PRESETS,
+} from '@/lib/module-registry'
+import { _resolveRestoredStep } from '@/app/(onboarding)/onboarding/page'
 
 const CAT = 'module.nudges'
 
@@ -455,14 +462,182 @@ const tests: TestCase[] = [
   },
 ]
 
+// ── Intent-based flow tests ─────────────────────────────────────────────────
+
+const ALL_INTENTS: IntentId[] = ['coaching', 'grip_uitgaven', 'overzicht_geld', 'toekomst', 'alles', 'nieuws']
+
+const EXPECTED_FIRST_WIN_PATHS: Record<IntentId, string> = {
+  coaching: '/will',
+  grip_uitgaven: '/core/budgets',
+  overzicht_geld: '/core',
+  toekomst: '/horizon',
+  alles: '/will',
+  nieuws: '/nieuws',
+}
+
+const intentTests: TestCase[] = [
+  // ── 13. INTENT_MODULE_PRESETS mapping for all 6 intents ────────────────
+  {
+    id: 'intent-presets-all-six',
+    name: 'INTENT_MODULE_PRESETS bevat alle 6 intenties met non-empty arrays',
+    category: CAT,
+    description: 'Elke IntentId heeft een non-empty module preset array',
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      for (const intent of ALL_INTENTS) {
+        const modules = INTENT_MODULE_PRESETS[intent]
+        assert(Array.isArray(modules), `Preset voor ${intent} is een array`)
+        assert(modules.length > 0, `Preset voor ${intent} is niet leeg`)
+      }
+      // Verify total count matches expected
+      assertEqual(Object.keys(INTENT_MODULE_PRESETS).length, 6, 'Precies 6 intenties in INTENT_MODULE_PRESETS')
+    },
+  },
+
+  // ── 14. INTENT_MODULE_PRESETS specific module contents ─────────────────
+  {
+    id: 'intent-presets-specific-modules',
+    name: 'INTENT_MODULE_PRESETS heeft correcte modules per intentie',
+    category: CAT,
+    description: 'Elke intentie bevat de verwachte modules',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      // coaching: budgetteren + inzicht_acties
+      const coaching = INTENT_MODULE_PRESETS.coaching
+      assert(coaching.includes('budgetteren'), 'coaching bevat budgetteren')
+      assert(coaching.includes('inzicht_acties'), 'coaching bevat inzicht_acties')
+      assertEqual(coaching.length, 2, 'coaching heeft exact 2 modules')
+
+      // grip_uitgaven: alleen budgetteren
+      const grip = INTENT_MODULE_PRESETS.grip_uitgaven
+      assert(grip.includes('budgetteren'), 'grip_uitgaven bevat budgetteren')
+      assertEqual(grip.length, 1, 'grip_uitgaven heeft exact 1 module')
+
+      // overzicht_geld: alleen vermogensregistratie
+      const overzicht = INTENT_MODULE_PRESETS.overzicht_geld
+      assert(overzicht.includes('vermogensregistratie'), 'overzicht_geld bevat vermogensregistratie')
+      assertEqual(overzicht.length, 1, 'overzicht_geld heeft exact 1 module')
+
+      // toekomst: vermogensregistratie + toekomstplannen + inzicht_acties
+      const toekomst = INTENT_MODULE_PRESETS.toekomst
+      assert(toekomst.includes('vermogensregistratie'), 'toekomst bevat vermogensregistratie')
+      assert(toekomst.includes('toekomstplannen'), 'toekomst bevat toekomstplannen')
+      assert(toekomst.includes('inzicht_acties'), 'toekomst bevat inzicht_acties')
+      assertEqual(toekomst.length, 3, 'toekomst heeft exact 3 modules')
+
+      // alles: alle modules (minstens 5)
+      const alles = INTENT_MODULE_PRESETS.alles
+      assert(alles.length >= 5, 'alles heeft minstens 5 modules')
+
+      // nieuws: alleen nieuws
+      const nieuws = INTENT_MODULE_PRESETS.nieuws
+      assert(nieuws.includes('nieuws'), 'nieuws bevat nieuws module')
+      assertEqual(nieuws.length, 1, 'nieuws heeft exact 1 module')
+    },
+  },
+
+  // ── 15. getFirstWinPath for each intent ────────────────────────────────
+  {
+    id: 'intent-first-win-path-all',
+    name: 'getFirstWinPath() retourneert correct pad per intentie',
+    category: CAT,
+    description: 'Elke intentie heeft een first-win pad dat begint met /',
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      for (const intent of ALL_INTENTS) {
+        const path = getFirstWinPath(intent)
+        assert(typeof path === 'string' && path.startsWith('/'), `Pad voor ${intent} begint met /: ${path}`)
+        assertEqual(path, EXPECTED_FIRST_WIN_PATHS[intent], `Pad voor ${intent} is ${EXPECTED_FIRST_WIN_PATHS[intent]}`)
+      }
+    },
+  },
+
+  // ── 16. localStorage healing: 'modules' → 'intent' ────────────────────
+  {
+    id: 'intent-localstorage-healing-modules',
+    name: '_resolveRestoredStep healt "modules" naar "intent"',
+    category: CAT,
+    description: 'Oude localStorage drafts met lastStep="modules" worden correct geheald naar "intent"',
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+      const result = _resolveRestoredStep('modules', [...activeOrder])
+      assertEqual(result.step, 'intent', 'modules wordt geheald naar intent')
+      assertEqual(result.healed, false, 'Geen healing nodig na mapping (intent zit in active order)')
+    },
+  },
+
+  // ── 17. localStorage healing: 'persona' → 'intent' ────────────────────
+  {
+    id: 'intent-localstorage-healing-persona',
+    name: '_resolveRestoredStep healt "persona" naar "intent"',
+    category: CAT,
+    description: 'Oude localStorage drafts met lastStep="persona" worden correct geheald naar "intent"',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+      const result = _resolveRestoredStep('persona', [...activeOrder])
+      assertEqual(result.step, 'intent', 'persona wordt geheald naar intent')
+      assertEqual(result.healed, false, 'Geen healing nodig na mapping')
+    },
+  },
+
+  // ── 18. localStorage healing: 'extras' → 'bezittingen' ────────────────
+  {
+    id: 'intent-localstorage-healing-extras',
+    name: '_resolveRestoredStep healt "extras" naar "bezittingen"',
+    category: CAT,
+    description: 'Oude localStorage drafts met lastStep="extras" worden correct geheald naar "bezittingen"',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+      const result = _resolveRestoredStep('extras', [...activeOrder])
+      assertEqual(result.step, 'bezittingen', 'extras wordt geheald naar bezittingen')
+      assertEqual(result.healed, false, 'Geen healing nodig na mapping')
+    },
+  },
+
+  // ── 19. PersonaId/PERSONA_MODULE_PRESETS still exist but deprecated ────
+  {
+    id: 'intent-persona-deprecated-still-exists',
+    name: 'PERSONA_MODULE_PRESETS bestaat nog (backwards compatibility) maar is deprecated',
+    category: CAT,
+    description: 'De oude PersonaId mapping is nog beschikbaar maar mag niet meer in nieuwe code gebruikt worden',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      // The old presets should still exist for backwards compatibility
+      assert(typeof PERSONA_MODULE_PRESETS === 'object', 'PERSONA_MODULE_PRESETS bestaat nog')
+      const oldKeys = Object.keys(PERSONA_MODULE_PRESETS)
+      assert(oldKeys.length > 0, 'PERSONA_MODULE_PRESETS heeft entries')
+
+      // Each old preset should map to a non-empty module array
+      for (const key of oldKeys) {
+        const modules = PERSONA_MODULE_PRESETS[key as keyof typeof PERSONA_MODULE_PRESETS]
+        assert(Array.isArray(modules) && modules.length > 0, `Oude preset ${key} heeft modules`)
+      }
+
+      // Verify the new INTENT_MODULE_PRESETS is the canonical source
+      assertEqual(Object.keys(INTENT_MODULE_PRESETS).length, 6, 'INTENT_MODULE_PRESETS is de nieuwe standaard met 6 entries')
+    },
+  },
+]
+
 // ── Register ────────────────────────────────────────────────────────────────
 
 export function register() {
   registerCategory({
     id: CAT,
     label: 'Module Nudges',
-    description: 'Module-aware invul-suggesties: catalogus, filtering, admin overrides en dismiss',
+    description: 'Module-aware invul-suggesties: catalogus, filtering, admin overrides, dismiss en intentie-gebaseerde flow',
     testCount: 0,
   })
   registerTests(tests)
+  registerTests(intentTests)
 }

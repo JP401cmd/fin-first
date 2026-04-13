@@ -93,6 +93,16 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
     return { step: 'identity', healed: false }
   }
 
+  // Map legacy step names to their current equivalents so old localStorage
+  // drafts resolve correctly even when this function is called directly.
+  const LEGACY_STEP_MAP: Record<string, string> = {
+    modules: 'intent',
+    persona: 'intent',
+    extras: 'bezittingen',
+  }
+  // eslint-disable-next-line no-param-reassign
+  if (LEGACY_STEP_MAP[lastStep]) lastStep = LEGACY_STEP_MAP[lastStep]
+
   // Happy path: saved step is still in the active order and not terminal.
   if (
     (activeStepOrder as string[]).includes(lastStep) &&
@@ -593,6 +603,11 @@ export default function OnboardingPage() {
         }
       }
 
+      // Add chosen intent for analytics / personalization
+      if (state.intent) {
+        body.intent = state.intent
+      }
+
       // Add news description if present
       if (state.newsDescription) {
         body.newsDescription = state.newsDescription
@@ -689,6 +704,17 @@ export default function OnboardingPage() {
           if (fields.length > 0) detail = ` — ${fields.join('; ')}`
         }
         throw new Error(`${data.error || 'Opslaan mislukt'}${detail}`)
+      }
+
+      // Pre-generate AI recommendations for coaching/alles intents so /will isn't empty
+      if (state.intent === 'coaching' || state.intent === 'alles') {
+        try {
+          await fetch('/api/ai/recommendations/initial', { method: 'POST' })
+        } catch {
+          // Non-blocking: log but don't prevent onboarding from completing
+          // eslint-disable-next-line no-console
+          console.warn('[onboarding] AI pre-generation failed — /will may be empty initially')
+        }
       }
 
       // Complete the progress bar

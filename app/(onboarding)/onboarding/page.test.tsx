@@ -88,6 +88,25 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     expect(result).toEqual({ step: 'intent', healed: false })
   })
 
+  it('heals legacy "modules" step name directly to "intent"', () => {
+    const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+    const result = _resolveRestoredStep('modules', [...activeOrder])
+    // 'modules' is mapped to 'intent' inside _resolveRestoredStep
+    expect(result).toEqual({ step: 'intent', healed: false })
+  })
+
+  it('heals legacy "persona" step name directly to "intent"', () => {
+    const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+    const result = _resolveRestoredStep('persona', [...activeOrder])
+    expect(result).toEqual({ step: 'intent', healed: false })
+  })
+
+  it('heals legacy "extras" step name directly to "bezittingen"', () => {
+    const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+    const result = _resolveRestoredStep('extras', [...activeOrder])
+    expect(result).toEqual({ step: 'bezittingen', healed: false })
+  })
+
   it('walks forward past removed steps to find the next valid one', () => {
     // Imagine a user who had `horizon` saved but the flow was reduced to
     // no toekomstplannen. Canonical-wise horizon is between budgets and
