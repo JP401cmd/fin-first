@@ -1,6 +1,7 @@
 'use client'
 
-import type { BriefingCardSpec } from '@/lib/briefing/types'
+import { useMemo } from 'react'
+import type { BriefingCardSpec, ModuleGuideCardSpec, CardModule } from '@/lib/briefing/types'
 import { CARD_SPAN } from '@/lib/briefing/types'
 import { MetricCard } from './cards/metric-card'
 import { ActionCard } from './cards/action-card'
@@ -19,8 +20,13 @@ import { RecurringCard } from './cards/recurring-card'
 import { LifeEventCard } from './cards/life-event-card'
 import { NextStepBriefingCard } from './cards/next-step-card'
 import { DiscoverCard } from './cards/discover-card'
+import { ModuleGuideCard } from './cards/module-guide-card'
 import { CardFeedbackProvider, type CardFeedbackFn } from './card-feedback-context'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
+import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { useModuleGuideState } from '@/lib/hooks/use-module-guide-state'
+import { MODULE_GUIDE_DISPLAY_ORDER, getModuleGuideSteps } from '@/lib/briefing/module-guide-steps'
+import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 
 interface BriefingCardGridProps {
   cards: BriefingCardSpec[]
@@ -54,13 +60,73 @@ function renderCard(card: BriefingCardSpec, data: DashboardData) {
     case 'lifeEvent': return <LifeEventCard spec={card} />
     case 'nextStep': return <NextStepBriefingCard spec={card} />
     case 'discover': return <DiscoverCard spec={card} />
+    case 'moduleGuide': return <ModuleGuideCard spec={card} />
   }
 }
 
+// ── Module → card accent mapping ──────────────────────────────
+
+const MODULE_CARD_MODULE: Record<ModuleId, CardModule> = {
+  budgetteren: 'kern',
+  vermogensregistratie: 'kern',
+  aandelenregistratie: 'kern',
+  inzicht_acties: 'wil',
+  toekomstplannen: 'horizon',
+  nieuws: 'cross',
+}
+
 export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: BriefingCardGridProps) {
+  const { activeModules } = useModuleAccess()
+  const { isCardVisible } = useModuleGuideState()
+  const guideSteps = getModuleGuideSteps()
+
+  // Fallback step for inzicht_acties when AI pre-generation didn't produce recommendations
+  const hasRecommendations = data.recommendations > 0
+
+  // Build module-guide cards: active modules, in display order, not dismissed/completed, not in-development
+  const guideCards = useMemo<ModuleGuideCardSpec[]>(() => {
+    return MODULE_GUIDE_DISPLAY_ORDER
+      .filter((moduleId) => {
+        // Only active modules
+        if (!activeModules.includes(moduleId)) return false
+        // Skip modules still in development
+        const def = MODULE_CATALOG.find((m) => m.id === moduleId)
+        if (def?.inDevelopment) return false
+        // Not dismissed and not all steps completed
+        if (!isCardVisible(moduleId)) return false
+        return true
+      })
+      .map((moduleId): ModuleGuideCardSpec => {
+        const def = MODULE_CATALOG.find((m) => m.id === moduleId)
+        let steps = guideSteps[moduleId] ?? []
+
+        // When AI pre-generation failed (no recommendations), prepend a fallback step
+        // so the user can manually trigger generation from /will
+        if (moduleId === 'inzicht_acties' && !hasRecommendations) {
+          const fallbackStep = {
+            key: 'inzicht_genereer',
+            label: 'Genereer je eerste voorstellen',
+            href: '/will',
+          }
+          steps = [fallbackStep, ...steps]
+        }
+
+        return {
+          type: 'moduleGuide',
+          moduleId,
+          module: MODULE_CARD_MODULE[moduleId],
+          title: def?.label ?? moduleId,
+          steps,
+        }
+      })
+  }, [activeModules, isCardVisible, guideSteps, hasRecommendations])
+
+  // Merge: guide cards first, then AI-generated cards
+  const allCards: BriefingCardSpec[] = [...guideCards, ...cards]
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 grid-flow-dense">
-      {cards.map((card, i) => {
+      {allCards.map((card, i) => {
         const module = 'module' in card ? card.module : undefined
         const rendered = renderCard(card, data)
         const wrapped = onFeedback
@@ -68,7 +134,7 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
           : rendered
         return (
           <div
-            key={`${card.type}-${i}`}
+            key={card.type === 'moduleGuide' ? `guide-${card.moduleId}` : `${card.type}-${i}`}
             className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}
             style={{ '--stagger': `${i * 80}ms` } as React.CSSProperties}
             onClick={onCardEngage ? () => onCardEngage(card.type, module) : undefined}
