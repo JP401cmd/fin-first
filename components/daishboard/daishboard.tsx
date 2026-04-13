@@ -387,16 +387,19 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
           </p>
         </div>
       ) : error && cards.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-sm text-[var(--ink-3)] mb-3">{error}</p>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="text-sm font-medium text-wil-600 hover:text-wil-700 transition-colors"
-          >
-            Opnieuw proberen
-          </button>
-        </div>
+        <>
+          <BriefingCardGrid cards={cards} data={data} onCardEngage={handleCardEngage} onFeedback={handleFeedback} />
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-sm text-[var(--ink-3)] mb-3">{error}</p>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="text-sm font-medium text-wil-600 hover:text-wil-700 transition-colors"
+            >
+              Opnieuw proberen
+            </button>
+          </div>
+        </>
       ) : cards.length === 0 && composing ? (
         <BriefingComposingIndicator />
       ) : (
