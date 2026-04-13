@@ -23296,3 +23296,21 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#722, #694)
+
+## Session 2026-04-13 - Feature #727
+
+### Feature #727: Intro-scherm reframe zonder module-kaarten - PASSING
+- Removed MODULE_CARDS array (Kern/Wil/Horizon cards) from onboarding-intro.tsx
+- Removed ModuleCard component, ModuleCardDef interface, and unused lucide imports
+- Preserved philosophy quote "Geld is opgeslagen tijd"
+- Added second welcome paragraph leading to intention question
+- Updated regression tests (onboarding-intro.ts) to match new structure
+- Verified on /test-onboarding-intro: clean layout, zero console errors
+- Commit: 8d2437df
+
+### Files Modified
+- components/onboarding/onboarding-intro.tsx — removed module cards, added welcome text
+- lib/regression-tests/suites/onboarding-intro.ts — updated tests for new intro structure
+
+### Current Status
+- 1 feature completed this session (#727)
