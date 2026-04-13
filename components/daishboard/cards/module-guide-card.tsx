@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Check, CheckCircle2 } from 'lucide-react'
 import { BriefingCard } from '../briefing-card'
 import { useModuleGuideState } from '@/lib/hooks/use-module-guide-state'
@@ -67,39 +67,50 @@ export function ModuleGuideCard({ spec }: Props) {
   // ── Completion celebration state ──────────────────────────────
   const allComplete = isAllComplete(spec.moduleId)
   const [fadingOut, setFadingOut] = useState(false)
+  const [hidden, setHidden] = useState(false)
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Stable ref for dismissCard to avoid resetting timers when state changes
   const dismissCardRef = useRef(dismissCard)
   dismissCardRef.current = dismissCard
 
+  // Helper: start fade then dismiss permanently
+  const fadeAndDismiss = useCallback((fadeDelay: number) => {
+    fadeTimerRef.current = setTimeout(() => {
+      setFadingOut(true)
+    }, fadeDelay)
+
+    dismissTimerRef.current = setTimeout(() => {
+      dismissCardRef.current(spec.moduleId)
+      setHidden(true) // Remove from DOM immediately (grid re-render may lag)
+    }, fadeDelay + 500)
+  }, [spec.moduleId])
+
   // When all steps are completed, start the auto-dismiss countdown
   useEffect(() => {
     if (!allComplete) return
-
-    // Start fade-out after 4 seconds
-    fadeTimerRef.current = setTimeout(() => {
-      setFadingOut(true)
-    }, 4000)
-
-    // Dismiss permanently after 4s + 0.5s fade animation
-    dismissTimerRef.current = setTimeout(() => {
-      dismissCardRef.current(spec.moduleId)
-    }, 4500)
-
+    fadeAndDismiss(4000) // 4s celebration → 0.5s fade → dismiss
     return () => {
       if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current)
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
     }
-  }, [allComplete, spec.moduleId])
+  }, [allComplete, fadeAndDismiss])
 
   // Early close: user clicks to dismiss during celebration
   const handleEarlyClose = () => {
     if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current)
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
-    setFadingOut(true)
-    setTimeout(() => dismissCardRef.current(spec.moduleId), 500)
+    fadeAndDismiss(0) // Immediate fade + 0.5s dismiss
   }
+
+  // Also handle X button dismiss: hide card locally
+  const handleDismiss = () => {
+    dismissCard(spec.moduleId)
+    setHidden(true)
+  }
+
+  // ── Hidden: card fully dismissed, don't render ──────────────
+  if (hidden) return null
 
   // ── Completion celebration UI ────────────────────────────────
   if (allComplete) {
@@ -139,7 +150,7 @@ export function ModuleGuideCard({ spec }: Props) {
         <p className="text-sm font-semibold text-[var(--ink)]">{spec.title}</p>
         <button
           type="button"
-          onClick={() => dismissCard(spec.moduleId)}
+          onClick={handleDismiss}
           className="shrink-0 p-0.5 rounded text-[var(--ink-4)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
           aria-label="Verberg kaart"
         >

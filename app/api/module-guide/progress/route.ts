@@ -28,14 +28,25 @@ export async function GET() {
   // Try primary column first
   const { data, error } = await supabase
     .from('profiles')
-    .select('module_guide_state, onboarding_intent')
+    .select('module_guide_state')
     .eq('id', user.id)
     .single()
+
+  // Also try onboarding_intent separately (may not exist yet)
+  const { data: intentData, error: intentError } = await supabase
+    .from('profiles')
+    .select('onboarding_intent')
+    .eq('id', user.id)
+    .single()
+  // Default to true when column doesn't exist (pre-migration users still see guide cards)
+  const hasIntent = isColumnMissing(intentError)
+    ? true
+    : !!(intentData as Record<string, unknown> | null)?.onboarding_intent
 
   if (!error) {
     return NextResponse.json({
       state: data?.module_guide_state ?? {},
-      hasOnboardingIntent: !!data?.onboarding_intent,
+      hasOnboardingIntent: hasIntent,
     })
   }
 
@@ -43,18 +54,18 @@ export async function GET() {
   if (isColumnMissing(error)) {
     const { data: fbData, error: fbError } = await supabase
       .from('profiles')
-      .select('feature_preferences, onboarding_intent')
+      .select('feature_preferences')
       .eq('id', user.id)
       .single()
 
     if (fbError) {
-      return NextResponse.json({ state: {}, hasOnboardingIntent: false })
+      return NextResponse.json({ state: {}, hasOnboardingIntent: hasIntent })
     }
 
     const prefs = (fbData?.feature_preferences ?? {}) as Record<string, unknown>
     return NextResponse.json({
       state: (prefs[FALLBACK_KEY] as ModuleGuideState) ?? {},
-      hasOnboardingIntent: !!fbData?.onboarding_intent,
+      hasOnboardingIntent: hasIntent,
     })
   }
 
