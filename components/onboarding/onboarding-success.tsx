@@ -1,13 +1,15 @@
 import { WillDots } from '@/components/app/will-dots'
-import { Shield, Zap, Telescope, Newspaper, type LucideIcon } from 'lucide-react'
-import { type ModuleId, getActiveNavModules } from '@/lib/module-registry'
+import { Shield, Zap, Telescope, Newspaper, ListChecks, type LucideIcon } from 'lucide-react'
+import { type ModuleId, type IntentId, getActiveNavModules, getFirstWinPath } from '@/lib/module-registry'
 
 export function OnboardingSuccess({
   onDashboard,
   activeModules,
+  intent,
 }: {
   onDashboard: () => void
   activeModules?: ModuleId[]
+  intent?: IntentId
 }) {
   const navModules = getActiveNavModules(activeModules ?? [])
   const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
@@ -17,12 +19,19 @@ export function OnboardingSuccess({
     ? []
     : MODULE_CARDS.filter((c) => navModules.includes(c.navModule))
 
-  // Dynamic CTA label based on active modules
+  // Dynamic CTA label based on intent → first-win page
+  const firstWinPath = intent ? getFirstWinPath(intent) : undefined
   const ctaLabel = isNewsOnly
     ? 'Naar de Trifinity Post'
-    : navModules.includes('wil')
-      ? 'Bekijk De Wil'
-      : 'Bekijk De Kern'
+    : firstWinPath === '/horizon'
+      ? 'Bekijk De Horizon'
+      : firstWinPath === '/core/budgets'
+        ? 'Bekijk je budgetten'
+        : firstWinPath === '/core'
+          ? 'Bekijk De Kern'
+          : navModules.includes('wil')
+            ? 'Bekijk De Wil'
+            : 'Bekijk De Kern'
 
   return (
     <div className="flex flex-col items-center py-8 text-center sm:py-12">
@@ -82,8 +91,26 @@ export function OnboardingSuccess({
         </div>
       )}
 
+      {/* Module-guide briefing explanation */}
+      {!isNewsOnly && (
+        <div className="mx-auto mt-10 flex max-w-md items-start gap-3 rounded-xl bg-[var(--subtle)] px-4 py-4 text-left">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wil-100">
+            <ListChecks className="h-4 w-4 text-wil-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[var(--ink)]">
+              Je dashboard staat klaar!
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              Per actieve module vind je een kaart met je eerste stappen. Vink ze af terwijl
+              je de app ontdekt, of sluit een kaart als je er klaar mee bent.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Will's closing — font-serif italic */}
-      <div className="mx-auto mt-10 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
+      <div className="mx-auto mt-8 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
         <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
           Veel ontdekkingen! Elke bewuste keuze brengt je dichter bij vrijheid.
         </p>

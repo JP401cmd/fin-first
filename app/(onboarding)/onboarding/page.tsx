@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useReducer, useCallback, useMemo } from 'react'
+import { useState, useEffect, useReducer, useCallback, useMemo, useRef } from 'react'
 import './onboarding.css'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -21,7 +21,7 @@ import { OnboardingModules } from '@/components/onboarding/onboarding-persona'
 import { OnboardingHorizon, INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
-import { type PersonaId, type ModuleId, PERSONA_MODULE_PRESETS, getHomePath } from '@/lib/module-registry'
+import { type PersonaId, type IntentId, type ModuleId, PERSONA_MODULE_PRESETS, INTENT_MODULE_PRESETS, getHomePath, getFirstWinPath } from '@/lib/module-registry'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -40,7 +40,7 @@ const SAVING_MESSAGES = [
 type Step =
   | 'intro'
   | 'identity'
-  | 'modules'
+  | 'intent'
   | 'bezittingen'
   | 'budgets'
   | 'horizon'
@@ -59,7 +59,7 @@ type Direction = 'forward' | 'back'
 const CANONICAL_STEP_ORDER: readonly Step[] = [
   'intro',
   'identity',
-  'modules',
+  'intent',
   'bezittingen',
   'budgets',
   'horizon',
@@ -150,7 +150,7 @@ export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
  * Special case: if only 'nieuws' is selected, show a single nieuws_only step.
  */
 function computeStepOrder(selectedModules: ModuleId[]): Step[] {
-  const steps: Step[] = ['intro', 'identity', 'modules']
+  const steps: Step[] = ['intro', 'identity', 'intent']
   const has = (m: ModuleId) => selectedModules.includes(m)
   const isNewsOnly = selectedModules.length === 1 && has('nieuws')
 
@@ -172,7 +172,7 @@ function computeStepOrder(selectedModules: ModuleId[]): Step[] {
  */
 function getSubStep(step: Step, stepOrder: Step[]): { current: number; total: number } | undefined {
   const installenSteps = stepOrder.filter(
-    (s) => !['intro', 'identity', 'modules', 'saving', 'success'].includes(s)
+    (s) => !['intro', 'identity', 'intent', 'saving', 'success'].includes(s)
   )
   const idx = installenSteps.indexOf(step)
   if (idx === -1) return undefined
@@ -183,8 +183,8 @@ interface State {
   step: Step
   direction: Direction
   identity: IdentityData
-  persona: PersonaId | null
-  selectedModules: ModuleId[]
+  intent: IntentId | null
+  activeModules: ModuleId[]
   horizon: HorizonData
   newsDescription: string
   extraction: ExtractionResult | null
@@ -198,8 +198,12 @@ interface State {
 /** Data portion of state that gets persisted to localStorage (excludes step/direction) */
 interface PersistedData {
   identity: IdentityData
-  persona: PersonaId | null
-  selectedModules: ModuleId[]
+  intent: IntentId | null
+  /** @deprecated Use intent — kept for migration from old localStorage drafts */
+  persona?: PersonaId | null
+  activeModules: ModuleId[]
+  /** @deprecated Use activeModules — kept for migration from old localStorage drafts */
+  selectedModules?: ModuleId[]
   horizon?: HorizonData
   newsDescription?: string
   extraction?: ExtractionResult | null
@@ -215,7 +219,7 @@ interface PersistedData {
 type Action =
   | { type: 'SET_STEP'; step: Step }
   | { type: 'SET_IDENTITY'; data: IdentityData }
-  | { type: 'SET_PERSONA'; persona: PersonaId }
+  | { type: 'SET_INTENT'; intent: IntentId }
   | { type: 'TOGGLE_MODULE'; moduleId: ModuleId; enabled: boolean }
   | { type: 'SET_HORIZON'; data: HorizonData }
   | { type: 'SET_NEWS_DESCRIPTION'; value: string }
@@ -230,8 +234,8 @@ type Action =
 export const _initialState: State = {
   step: 'intro',
   direction: 'forward',
-  persona: null,
-  selectedModules: [],
+  intent: null,
+  activeModules: [],
   identity: {
     full_name: '',
     date_of_birth: '',
@@ -253,22 +257,22 @@ export const _initialState: State = {
 export function _reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_STEP': {
-      const stepOrder = computeStepOrder(state.selectedModules)
+      const stepOrder = computeStepOrder(state.activeModules)
       const oldIdx = stepOrder.indexOf(state.step)
       const newIdx = stepOrder.indexOf(action.step)
       const direction: Direction = newIdx >= oldIdx ? 'forward' : 'back'
       return { ...state, step: action.step, direction }
     }
-    case 'SET_PERSONA': {
-      const modules = [...PERSONA_MODULE_PRESETS[action.persona]]
-      return { ...state, persona: action.persona, selectedModules: modules }
+    case 'SET_INTENT': {
+      const modules = [...INTENT_MODULE_PRESETS[action.intent]]
+      return { ...state, intent: action.intent, activeModules: modules }
     }
     case 'TOGGLE_MODULE': {
-      // Always allow toggling — clear persona to null since it no longer matches a preset
+      // Always allow toggling — clear intent to null since it no longer matches a preset
       const updated = action.enabled
-        ? [...state.selectedModules, action.moduleId]
-        : state.selectedModules.filter((m) => m !== action.moduleId)
-      return { ...state, persona: null, selectedModules: updated }
+        ? [...state.activeModules, action.moduleId]
+        : state.activeModules.filter((m) => m !== action.moduleId)
+      return { ...state, intent: null, activeModules: updated }
     }
     case 'SET_IDENTITY':
       return { ...state, identity: action.data }
@@ -289,7 +293,7 @@ export function _reducer(state: State, action: Action): State {
     case 'SET_PREFERENCES':
       return { ...state, preferences: action.data }
     case 'RESTORE_STATE': {
-      const restoredModules = action.data.selectedModules ?? []
+      const restoredModules = action.data.activeModules ?? action.data.selectedModules ?? []
       // Recompute the active step order for the restored module selection so
       // we can validate `lastStep` against the flow the user will actually
       // see. The user's saved module choice — not the in-memory state —
@@ -311,8 +315,8 @@ export function _reducer(state: State, action: Action): State {
         step: restoredStep,
         direction: 'forward',
         identity: action.data.identity,
-        persona: action.data.persona ?? null,
-        selectedModules: restoredModules,
+        intent: action.data.intent ?? action.data.persona ?? null,
+        activeModules: restoredModules,
         horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
         newsDescription: action.data.newsDescription ?? '',
         extraction: action.data.extraction ?? null,
@@ -347,8 +351,8 @@ function saveToLocalStorage(state: State) {
   try {
     const data: PersistedData = {
       identity: state.identity,
-      persona: state.persona,
-      selectedModules: state.selectedModules,
+      intent: state.intent,
+      activeModules: state.activeModules,
       horizon: state.horizon,
       newsDescription: state.newsDescription,
       extraction: state.extraction,
@@ -405,7 +409,9 @@ function loadFromLocalStorage(): PersistedData | null {
 
     const data: PersistedData = {
       identity,
+      intent: parsed.intent ?? parsed.persona ?? null,
       persona: parsed.persona ?? null,
+      activeModules: Array.isArray(parsed.activeModules) ? parsed.activeModules : (Array.isArray(parsed.selectedModules) ? parsed.selectedModules : []),
       selectedModules: Array.isArray(parsed.selectedModules) ? parsed.selectedModules : [],
       horizon,
       newsDescription: parsed.newsDescription,
@@ -419,7 +425,8 @@ function loadFromLocalStorage(): PersistedData | null {
     }
 
     // Map old step names to new ones
-    if (data.lastStep === ('persona' as string)) data.lastStep = 'modules'
+    if (data.lastStep === ('persona' as string)) data.lastStep = 'intent'
+    if (data.lastStep === ('modules' as string)) data.lastStep = 'intent'
     if (data.lastStep === ('extras' as string)) data.lastStep = 'bezittingen'
 
     return data
@@ -444,12 +451,13 @@ export default function OnboardingPage() {
   const [state, dispatch] = useReducer(_reducer, _initialState)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const idempotencyKeyRef = useRef<string | null>(null)
   const [saveProgress, setSaveProgress] = useState(0)
   const [saveMessageIdx, setSaveMessageIdx] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [restoredNotice, setRestoredNotice] = useState(false)
 
-  const activeStepOrder = useMemo(() => computeStepOrder(state.selectedModules), [state.selectedModules])
+  const activeStepOrder = useMemo(() => computeStepOrder(state.activeModules), [state.activeModules])
 
   const goToBack = useCallback(() => {
     const idx = activeStepOrder.indexOf(state.step)
@@ -550,8 +558,12 @@ export default function OnboardingPage() {
     try {
       const { identity, budgetAmounts, bankAccounts, assets, debts, preferences } = state
 
-      // Generate idempotency key to prevent duplicate saves on retry
-      const idempotencyKey = crypto.randomUUID()
+      // Stable idempotency key: reuse across retries so the server can
+      // detect duplicate submissions.  Only generate once per session.
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = crypto.randomUUID()
+      }
+      const idempotencyKey = idempotencyKeyRef.current
 
       const body: Record<string, unknown> = {
         identity: {
@@ -565,11 +577,11 @@ export default function OnboardingPage() {
         budgetAmounts,
         widgetPrefs: { widgets: [] },
         idempotencyKey,
-        activeModules: state.selectedModules.length > 0 ? state.selectedModules : undefined,
+        activeModules: state.activeModules.length > 0 ? state.activeModules : undefined,
       }
 
       // Add horizon data if toekomstplannen is active
-      if (state.selectedModules.includes('toekomstplannen')) {
+      if (state.activeModules.includes('toekomstplannen')) {
         body.horizonData = {
           fire_end_strategy: state.horizon.fire_end_strategy,
           fire_end_age: state.horizon.fire_end_age,
@@ -592,7 +604,7 @@ export default function OnboardingPage() {
       }
 
       // Derive budgettering mode from modules
-      const budgetteringMode = state.selectedModules.includes('budgetteren') ? 'manual' : 'none'
+      const budgetteringMode = state.activeModules.includes('budgetteren') ? 'manual' : 'none'
       body.budgetteringMode = budgetteringMode
 
       // Only send non-empty optional arrays
@@ -844,11 +856,11 @@ export default function OnboardingPage() {
             />
           )}
 
-          {state.step === 'modules' && (
+          {state.step === 'intent' && (
             <OnboardingModules
-              selectedPersona={state.persona}
-              selectedModules={state.selectedModules}
-              onSelectPersona={(p) => dispatch({ type: 'SET_PERSONA', persona: p })}
+              selectedPersona={state.intent}
+              selectedModules={state.activeModules}
+              onSelectPersona={(p) => dispatch({ type: 'SET_INTENT', intent: p as IntentId })}
               onToggleModule={(id, enabled) => dispatch({ type: 'TOGGLE_MODULE', moduleId: id, enabled })}
               onNext={goToNext}
               onBack={goToBack}
@@ -865,7 +877,7 @@ export default function OnboardingPage() {
               onDebtChange={(items) => dispatch({ type: 'SET_DEBTS', items })}
               onNext={goToNext}
               onBack={goToBack}
-              activeModules={state.selectedModules}
+              activeModules={state.activeModules}
               subStep={currentSubStep}
             />
           )}
@@ -889,7 +901,7 @@ export default function OnboardingPage() {
               onChange={(data) => dispatch({ type: 'SET_HORIZON', data })}
               onNext={goToNext}
               onBack={goToBack}
-              activeModules={state.selectedModules}
+              activeModules={state.activeModules}
               subStep={currentSubStep}
             />
           )}
@@ -940,9 +952,13 @@ export default function OnboardingPage() {
             <OnboardingSuccess
               onDashboard={() => {
                 clearLocalStorage()
-                router.push(getHomePath(state.selectedModules) + '?welcome=1')
+                const destination = state.intent
+                  ? getFirstWinPath(state.intent)
+                  : getHomePath(state.activeModules)
+                router.push(destination + '?welcome=1')
               }}
-              activeModules={state.selectedModules}
+              activeModules={state.activeModules}
+              intent={state.intent ?? undefined}
             />
           )}
         </StepTransition>
