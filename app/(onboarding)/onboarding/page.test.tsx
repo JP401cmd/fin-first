@@ -19,7 +19,7 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep('budgets', [
       'intro',
       'identity',
-      'modules',
+      'intent',
       'bezittingen',
       'budgets',
       'saving',
@@ -35,7 +35,7 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep('budgets', [
       'intro',
       'identity',
-      'modules',
+      'intent',
       'nieuws_only',
       'saving',
       'success',
@@ -51,7 +51,7 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep('verzonnen_stap', [
       'intro',
       'identity',
-      'modules',
+      'intent',
       'bezittingen',
       'budgets',
       'saving',
@@ -66,26 +66,26 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep(undefined, [
       'intro',
       'identity',
-      'modules',
+      'intent',
       'saving',
       'success',
     ])
     expect(result.step).toBe('identity')
   })
 
-  it('preserves the existing migration path (persona → modules handled upstream)', () => {
-    // The migration map in `loadFromLocalStorage` renames 'persona' to
-    // 'modules' before dispatch, so by the time `_resolveRestoredStep`
-    // sees it, it should be a valid 'modules' step.
-    const result = _resolveRestoredStep('modules', [
+  it('preserves the existing migration path (persona → intent handled upstream)', () => {
+    // The migration map in `loadFromLocalStorage` renames 'persona'/'modules'
+    // to 'intent' before dispatch, so by the time `_resolveRestoredStep`
+    // sees it, it should be a valid 'intent' step.
+    const result = _resolveRestoredStep('intent', [
       'intro',
       'identity',
-      'modules',
+      'intent',
       'bezittingen',
       'saving',
       'success',
     ])
-    expect(result).toEqual({ step: 'modules', healed: false })
+    expect(result).toEqual({ step: 'intent', healed: false })
   })
 
   it('walks forward past removed steps to find the next valid one', () => {
@@ -96,7 +96,7 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep('horizon', [
       'intro',
       'identity',
-      'modules',
+      'intent',
       'bezittingen',
       'saving',
       'success',
@@ -135,8 +135,8 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        persona: null,
-        selectedModules: ['budgetteren'],
+        intent: null,
+        activeModules: ['budgetteren'],
         horizon: baseHorizon,
         newsDescription: '',
         extraction: null,
@@ -149,7 +149,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       },
     })
     expect(result.step).toBe('budgets')
-    expect(result.selectedModules).toEqual(['budgetteren'])
+    expect(result.activeModules).toEqual(['budgetteren'])
     expect(warnSpy).not.toHaveBeenCalled()
   })
 
@@ -160,8 +160,8 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        persona: null,
-        selectedModules: ['nieuws'],
+        intent: null,
+        activeModules: ['nieuws'],
         horizon: baseHorizon,
         newsDescription: '',
         extraction: null,
@@ -186,8 +186,8 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        persona: null,
-        selectedModules: ['budgetteren'],
+        intent: null,
+        activeModules: ['budgetteren'],
         horizon: baseHorizon,
         newsDescription: '',
         extraction: null,
@@ -209,7 +209,7 @@ describe('onboarding _firstNavigationRecoveryStep', () => {
     const result = _firstNavigationRecoveryStep([
       'intro',
       'identity',
-      'modules',
+      'intent',
       'bezittingen',
       'budgets',
       'saving',
@@ -222,12 +222,12 @@ describe('onboarding _firstNavigationRecoveryStep', () => {
   it('returns the first selectable step when identity is absent', () => {
     const result = _firstNavigationRecoveryStep([
       'intro',
-      'modules',
+      'intent',
       'nieuws_only',
       'saving',
       'success',
     ])
-    expect(result).toBe('modules')
+    expect(result).toBe('intent')
   })
 
   it('falls back to identity when the active order is empty', () => {
@@ -242,7 +242,7 @@ describe('onboarding _firstNavigationRecoveryStep', () => {
     const activeStepOrder = [
       'intro',
       'identity',
-      'modules',
+      'intent',
       'bezittingen',
       'saving',
       'success',

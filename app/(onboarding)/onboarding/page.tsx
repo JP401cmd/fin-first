@@ -315,7 +315,7 @@ export function _reducer(state: State, action: Action): State {
         step: restoredStep,
         direction: 'forward',
         identity: action.data.identity,
-        intent: action.data.intent ?? action.data.persona ?? null,
+        intent: action.data.intent ?? (action.data.persona as IntentId | null) ?? null,
         activeModules: restoredModules,
         horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
         newsDescription: action.data.newsDescription ?? '',
@@ -858,7 +858,7 @@ export default function OnboardingPage() {
 
           {state.step === 'intent' && (
             <OnboardingModules
-              selectedPersona={state.intent}
+              selectedPersona={state.intent as unknown as PersonaId | null}
               selectedModules={state.activeModules}
               onSelectPersona={(p) => dispatch({ type: 'SET_INTENT', intent: p as IntentId })}
               onToggleModule={(id, enabled) => dispatch({ type: 'TOGGLE_MODULE', moduleId: id, enabled })}

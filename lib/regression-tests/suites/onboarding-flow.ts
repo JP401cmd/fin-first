@@ -22,7 +22,7 @@ type ModuleId =
 type Step =
   | 'intro'
   | 'identity'
-  | 'modules'
+  | 'intent'
   | 'bezittingen'
   | 'budgets'
   | 'horizon'
@@ -39,7 +39,7 @@ type Direction = 'forward' | 'back'
  * Special case: if only 'nieuws' is selected, show a single nieuws_only step.
  */
 function computeStepOrder(selectedModules: ModuleId[]): Step[] {
-  const steps: Step[] = ['intro', 'identity', 'modules']
+  const steps: Step[] = ['intro', 'identity', 'intent']
   const has = (m: ModuleId) => selectedModules.includes(m)
   const isNewsOnly = selectedModules.length === 1 && has('nieuws')
 
@@ -69,8 +69,8 @@ interface State {
   step: Step
   direction: Direction
   identity: Record<string, unknown>
-  persona: string | null
-  selectedModules: ModuleId[]
+  intent: string | null
+  activeModules: ModuleId[]
   horizon: Record<string, unknown>
   newsDescription: string
   budgetAmounts: Record<string, number>
@@ -115,7 +115,7 @@ const tests: TestCase[] = [
       assertEqual(steps.length, 9, 'FIRE Fighter: 9 stappen totaal')
       assertEqual(steps[0], 'intro', 'Stap 1: intro')
       assertEqual(steps[1], 'identity', 'Stap 2: identity')
-      assertEqual(steps[2], 'modules', 'Stap 3: modules')
+      assertEqual(steps[2], 'intent', 'Stap 3: intent')
       assertEqual(steps[3], 'bezittingen', 'Stap 4: bezittingen')
       assertEqual(steps[4], 'budgets', 'Stap 5: budgets')
       assertEqual(steps[5], 'horizon', 'Stap 6: horizon')
@@ -250,8 +250,8 @@ const tests: TestCase[] = [
         step: 'identity',
         direction: 'forward',
         identity: { full_name: 'Test Gebruiker', date_of_birth: '1990-01-15' },
-        persona: 'pensioenplanner',
-        selectedModules: modules,
+        intent: 'pensioenplanner',
+        activeModules: modules,
         horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
         newsDescription: '',
         budgetAmounts: {},
@@ -272,8 +272,8 @@ const tests: TestCase[] = [
       // State should be preserved (spread operator in reducer)
       assertEqual(state.identity.full_name, 'Test Gebruiker', 'Naam bewaard na navigatie')
       assertEqual(state.identity.date_of_birth, '1990-01-15', 'Geboortedatum bewaard')
-      assertEqual(state.persona, 'pensioenplanner', 'Persona bewaard na navigatie')
-      assertEqual(state.selectedModules.length, 3, 'Modules bewaard na navigatie')
+      assertEqual(state.intent, 'pensioenplanner', 'Intent bewaard na navigatie')
+      assertEqual(state.activeModules.length, 3, 'Modules bewaard na navigatie')
       assertEqual(state.bankAccounts.length, 1, 'Bankrekeningen bewaard')
       assertEqual(state.assets.length, 1, 'Assets bewaard')
       assertEqual((state.horizon as Record<string, unknown>).fire_end_strategy, 'deplete', 'Horizon data bewaard')
@@ -295,8 +295,8 @@ const tests: TestCase[] = [
 
       // Forward navigations
       assertEqual(getDirection(stepOrder, 'intro', 'identity'), 'forward', 'intro → identity = forward')
-      assertEqual(getDirection(stepOrder, 'identity', 'modules'), 'forward', 'identity → modules = forward')
-      assertEqual(getDirection(stepOrder, 'modules', 'bezittingen'), 'forward', 'modules → bezittingen = forward')
+      assertEqual(getDirection(stepOrder, 'identity', 'intent'), 'forward', 'identity → modules = forward')
+      assertEqual(getDirection(stepOrder, 'intent', 'bezittingen'), 'forward', 'modules → bezittingen = forward')
       assertEqual(getDirection(stepOrder, 'bezittingen', 'budgets'), 'forward', 'bezittingen → budgets = forward')
       assertEqual(getDirection(stepOrder, 'budgets', 'horizon'), 'forward', 'budgets → horizon = forward')
       assertEqual(getDirection(stepOrder, 'horizon', 'preferences'), 'forward', 'horizon → preferences = forward')
@@ -305,8 +305,8 @@ const tests: TestCase[] = [
 
       // Back navigations
       assertEqual(getDirection(stepOrder, 'identity', 'intro'), 'back', 'identity → intro = back')
-      assertEqual(getDirection(stepOrder, 'modules', 'identity'), 'back', 'modules → identity = back')
-      assertEqual(getDirection(stepOrder, 'bezittingen', 'modules'), 'back', 'bezittingen → modules = back')
+      assertEqual(getDirection(stepOrder, 'intent', 'identity'), 'back', 'modules → identity = back')
+      assertEqual(getDirection(stepOrder, 'bezittingen', 'intent'), 'back', 'bezittingen → modules = back')
       assertEqual(getDirection(stepOrder, 'budgets', 'bezittingen'), 'back', 'budgets → bezittingen = back')
       assertEqual(getDirection(stepOrder, 'horizon', 'budgets'), 'back', 'horizon → budgets = back')
 
@@ -440,8 +440,8 @@ const tests: TestCase[] = [
         step: 'preferences',
         direction: 'forward',
         identity: { full_name: 'Jan Jansen', net_monthly_income: '4500' },
-        persona: null,
-        selectedModules: modules,
+        intent: null,
+        activeModules: modules,
         horizon: { fire_end_strategy: 'legacy', fire_legacy_amount: '200000' },
         newsDescription: '',
         budgetAmounts: {},
@@ -460,7 +460,7 @@ const tests: TestCase[] = [
       const errorState = { ...savingState, step: lastContentStep, direction: 'back' as Direction }
       assertEqual(errorState.step, 'preferences', 'Stap terug naar preferences na error')
       assertEqual(errorState.identity.full_name, 'Jan Jansen', 'Identity intact na error')
-      assertEqual(errorState.selectedModules.length, 3, 'Modules intact na error')
+      assertEqual(errorState.activeModules.length, 3, 'Modules intact na error')
       assertEqual((errorState.horizon as Record<string, unknown>).fire_end_strategy, 'legacy', 'Horizon intact na error')
       assertEqual(errorState.bankAccounts.length, 1, 'Bankrekeningen intact na error')
       assertEqual(errorState.assets.length, 1, 'Assets intact na error')
@@ -488,7 +488,7 @@ const tests: TestCase[] = [
       // identity, modules, bezittingen, budgets, horizon, preferences = 6 steps with header
       assertEqual(headerVisibleSteps.length, 6, 'Header met logout zichtbaar op 6 stappen')
       assertIncludes([...headerVisibleSteps], 'identity', 'Header zichtbaar op identity')
-      assertIncludes([...headerVisibleSteps], 'modules', 'Header zichtbaar op modules')
+      assertIncludes([...headerVisibleSteps], 'intent', 'Header zichtbaar op intent')
       assertIncludes([...headerVisibleSteps], 'bezittingen', 'Header zichtbaar op bezittingen')
       assertIncludes([...headerVisibleSteps], 'budgets', 'Header zichtbaar op budgets')
       assertIncludes([...headerVisibleSteps], 'horizon', 'Header zichtbaar op horizon')
@@ -613,7 +613,7 @@ const tests: TestCase[] = [
 
       // Draft data structure mirrors the PersistedData interface
       const draftFields = [
-        'identity', 'persona', 'selectedModules', 'horizon', 'newsDescription',
+        'identity', 'intent', 'activeModules', 'horizon', 'newsDescription',
         'budgetAmounts', 'bankAccounts', 'assets', 'debts', 'preferences', 'lastStep',
       ]
       assertEqual(draftFields.length, 11, 'Draft bevat 11 velden (volledige PersistedData)')
@@ -621,8 +621,8 @@ const tests: TestCase[] = [
       // Simulate serialization/deserialization roundtrip
       const mockState = {
         identity: { full_name: 'Draft Test', net_monthly_income: '3000' },
-        persona: 'pensioenplanner',
-        selectedModules: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
+        intent: 'pensioenplanner',
+        activeModules: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
         horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
         newsDescription: '',
         budgetAmounts: { 'huur-hypotheek': 840 },
@@ -635,39 +635,39 @@ const tests: TestCase[] = [
       const serialized = JSON.stringify(mockState)
       const deserialized = JSON.parse(serialized)
       assertEqual(deserialized.identity.full_name, 'Draft Test', 'Draft identity hersteld')
-      assertEqual(deserialized.persona, 'pensioenplanner', 'Draft persona hersteld')
-      assertEqual(deserialized.selectedModules.length, 3, 'Draft modules hersteld')
+      assertEqual(deserialized.intent, 'pensioenplanner', 'Draft intent hersteld')
+      assertEqual(deserialized.activeModules.length, 3, 'Draft modules hersteld')
       assertEqual(deserialized.horizon.fire_end_strategy, 'deplete', 'Draft horizon hersteld')
       assertEqual(deserialized.lastStep, 'bezittingen', 'Draft lastStep hersteld')
       assertEqual(deserialized.bankAccounts.length, 1, 'Draft bankAccounts hersteld')
     },
   },
 
-  // ── Step 19: Persona clears on manual toggle ──────────────────
+  // ── Step 19: Intent clears on manual toggle ──────────────────
   {
-    id: 'ob-flow-persona-clears-on-toggle',
-    name: 'Persona selectie: handmatig togglen wist persona naar null',
+    id: 'ob-flow-intent-clears-on-toggle',
+    name: 'Intent selectie: handmatig togglen wist intent naar null',
     category: CAT,
-    description: 'Wanneer een module handmatig gewijzigd wordt, verdwijnt de persona-highlight',
+    description: 'Wanneer een module handmatig gewijzigd wordt, verdwijnt de intent-highlight',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // Simulate: select persona → sets modules and persona
+      // Simulate: select intent → sets modules and intent
       let state = {
-        persona: 'fire_fighter' as string | null,
-        selectedModules: [...PERSONA_MODULE_PRESETS.fire_fighter],
+        intent: 'fire_fighter' as string | null,
+        activeModules: [...PERSONA_MODULE_PRESETS.fire_fighter],
       }
-      assertEqual(state.persona, 'fire_fighter', 'Persona geselecteerd')
-      assertEqual(state.selectedModules.length, 6, 'Alle 6 modules actief')
+      assertEqual(state.intent, 'fire_fighter', 'Intent geselecteerd')
+      assertEqual(state.activeModules.length, 6, 'Alle 6 modules actief')
 
-      // Simulate: toggle a module off → persona becomes null
+      // Simulate: toggle a module off → intent becomes null
       state = {
-        persona: null,
-        selectedModules: state.selectedModules.filter((m) => m !== 'nieuws'),
+        intent: null,
+        activeModules: state.activeModules.filter((m) => m !== 'nieuws'),
       }
-      assertEqual(state.persona, null, 'Persona wordt null na handmatige toggle')
-      assertEqual(state.selectedModules.length, 5, 'Module verwijderd')
-      assert(!state.selectedModules.includes('nieuws'), 'Nieuws module uitgeschakeld')
+      assertEqual(state.intent, null, 'Intent wordt null na handmatige toggle')
+      assertEqual(state.activeModules.length, 5, 'Module verwijderd')
+      assert(!state.activeModules.includes('nieuws'), 'Nieuws module uitgeschakeld')
     },
   },
 
