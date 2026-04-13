@@ -449,7 +449,6 @@ export async function POST(req: Request) {
       if (activeModules?.some((m) => m === 'budgetteren' || m === 'vermogensregistratie')) completedSteps.push('bezittingen')
       if (activeModules?.includes('budgetteren')) completedSteps.push('budgets')
       if (activeModules?.includes('toekomstplannen')) completedSteps.push('horizon')
-      if (activeModules?.includes('inzicht_acties')) completedSteps.push('preferences')
     }
 
     // ── Strategy: Try atomic RPC first, fall back to multi-step approach ──

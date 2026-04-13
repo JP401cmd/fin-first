@@ -8,7 +8,6 @@ import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets } from '@/lib/budget-data'
 import { BudgetAmountEditor } from '@/components/onboarding/budget-amount-editor'
-import { temporalLevels } from '@/lib/identity-constants'
 import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import {
@@ -30,7 +29,7 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type OnboardingStep = 'bezittingen' | 'budgets' | 'horizon' | 'preferences'
+type OnboardingStep = 'bezittingen' | 'budgets' | 'horizon'
 
 /**
  * Maps each module to the onboarding steps it requires before activation.
@@ -1314,78 +1313,11 @@ function HorizonStep({
         </div>
       </div>
 
-      {/* Section B: Pensioenuitgaven method */}
-      <div className="space-y-3">
-        <p className="text-xs font-medium text-[var(--ink-2)]">B. Pensioenuitgaven</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {([
-            {
-              method: 'essential_budgets' as RetirementExpenseMethod,
-              label: 'Essenti\u00eble budgetten',
-              desc: 'Berekend uit je must-have budgetten',
-              disabled: !hasBudgetModule,
-            },
-            {
-              method: 'custom_amount' as RetirementExpenseMethod,
-              label: 'Eigen bedrag',
-              desc: 'Vul zelf een maandbedrag in',
-              disabled: false,
-            },
-            {
-              method: 'current_income' as RetirementExpenseMethod,
-              label: 'Huidig inkomen',
-              desc: 'Gebruik je huidige netto inkomen',
-              disabled: false,
-            },
-          ] as const).map((opt) => {
-            const isSelected = horizon.retirement_expense_method === opt.method
-            return (
-              <button
-                key={opt.method}
-                type="button"
-                disabled={opt.disabled}
-                onClick={() => updateField('retirement_expense_method', opt.method)}
-                className={`flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all min-h-[44px] ${
-                  opt.disabled
-                    ? 'border-[var(--border-ed)] opacity-40 cursor-not-allowed'
-                    : isSelected
-                      ? 'border-horizon-400 bg-horizon-50 ring-1 ring-horizon-400'
-                      : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]/50'
-                }`}
-              >
-                <span
-                  className={`text-sm font-medium ${
-                    isSelected ? 'text-horizon-700' : 'text-[var(--ink)]'
-                  }`}
-                >
-                  {opt.label}
-                </span>
-                <span className="text-[11px] text-[var(--ink-3)] leading-snug">{opt.desc}</span>
-                {opt.disabled && (
-                  <span className="text-[10px] text-[var(--ink-4)]">
-                    Activeer de Budgetteren-module om dit te gebruiken
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-        {horizon.retirement_expense_method === 'custom_amount' && (
-          <FormField label="Maandelijks bedrag na pensioen">
-            <input
-              type="number"
-              min={0}
-              step={100}
-              placeholder="2000"
-              value={horizon.retirement_custom_amount}
-              onChange={(e) => updateField('retirement_custom_amount', e.target.value)}
-              className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
-            />
-          </FormField>
-        )}
-      </div>
+      {/* Section B: Pensioenuitgaven — verwijderd uit UI.
+          Default: essential_budgets als budgetteren actief, anders current_income.
+          Aanpasbaar via Identiteit → Instellingen. */}
 
-      {/* Section C: Levensgebeurtenissen */}
+      {/* Section B: Levensgebeurtenissen */}
       <div className="space-y-3">
         <p className="text-xs font-medium text-[var(--ink-2)]">C. Levensgebeurtenissen</p>
         <p className="text-[11px] text-[var(--ink-4)]">
@@ -1467,34 +1399,8 @@ function HorizonStep({
         </button>
       </div>
 
-      {/* Section D: Temporaal evenwicht */}
-      <div className="space-y-3">
-        <p className="text-xs font-medium text-[var(--ink-2)]">D. Temporaal evenwicht</p>
-        <p className="text-[11px] text-[var(--ink-4)]">
-          Hoe verdeel je je middelen tussen nu genieten en later vrij zijn?
-        </p>
-        <select
-          value={horizon.temporal_balance}
-          onChange={(e) => updateField('temporal_balance', parseInt(e.target.value))}
-          className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-horizon-400"
-        >
-          {temporalLevels.map((lvl) => (
-            <option key={lvl.level} value={lvl.level}>
-              {lvl.level}. {lvl.nameNl} \u2014 {lvl.tagline}
-            </option>
-          ))}
-        </select>
-        {/* Show description for selected level */}
-        {(() => {
-          const selected = temporalLevels.find((l) => l.level === horizon.temporal_balance)
-          if (!selected) return null
-          return (
-            <p className="text-[11px] text-[var(--ink-4)] leading-relaxed">
-              {selected.description}
-            </p>
-          )
-        })()}
-      </div>
+      {/* Temporaal evenwicht: verwijderd uit UI, standaard niveau 3 (De Architect).
+          Aanpasbaar via Identiteit → Instellingen. */}
     </section>
   )
 }

@@ -73,18 +73,17 @@ const tests: TestCase[] = [
     id: 'ob-pref-conditional-display',
     name: 'Preferences stap: alleen getoond als inzicht_acties actief is',
     category: CAT,
-    description: 'De preferences stap wordt overgeslagen als inzicht_acties niet in de geselecteerde modules zit',
+    description: 'De inzicht_acties module kan in diverse module-combinaties voorkomen',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // computeStepOrder only includes 'preferences' when inzicht_acties is active
-      // We verify the condition conceptually here (computeStepOrder is tested in onboarding-flow)
+      // Verify inzicht_acties module presence in various module combinations
 
-      // Modules with inzicht_acties → preferences step should be present
+      // Modules with inzicht_acties
       const modulesWithActies: ModuleId[] = ['vermogensregistratie', 'inzicht_acties']
       assert(modulesWithActies.includes('inzicht_acties'), 'Modules bevatten inzicht_acties')
 
-      // Modules without inzicht_acties → preferences step absent
+      // Modules without inzicht_acties
       const modulesWithoutActies: ModuleId[] = ['vermogensregistratie', 'budgetteren']
       assert(!modulesWithoutActies.includes('inzicht_acties'), 'Modules bevatten GEEN inzicht_acties')
 

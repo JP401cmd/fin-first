@@ -21,15 +21,14 @@ const PAGE_STEP_TO_PROGRESS: Record<string, StepKey> = {
   identity: 'profiel',
   extras: 'startpunt',
   budgets: 'budgetten',
-  preferences: 'voorkeuren',
   success: 'klaar',
 }
 
 /** Steps where StepProgress is visible (not intro, not saving) */
-const STEPS_WITH_PROGRESS = ['identity', 'extras', 'budgets', 'preferences', 'success']
+const STEPS_WITH_PROGRESS = ['identity', 'extras', 'budgets', 'success']
 
 /** Steps with back buttons (onBack prop) */
-const STEPS_WITH_BACK = ['identity', 'extras', 'budgets', 'preferences']
+const STEPS_WITH_BACK = ['identity', 'extras', 'budgets']
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -165,12 +164,11 @@ const tests: TestCase[] = [
       // - identity: introduces data collection for freedom calculation
       // - extras: explains optional bank accounts, assets, debts
       // - budgets: explains budget setup and template selection
-      // - preferences: explains dashboard configuration and focus selection
       //
       // The SpeechBubble accepts {children} so text is passed per-step
 
-      const stepsWithBubble = ['identity', 'extras', 'budgets', 'preferences']
-      assertEqual(stepsWithBubble.length, 4, '4 stappen gebruiken SpeechBubble')
+      const stepsWithBubble = ['identity', 'extras', 'budgets']
+      assertEqual(stepsWithBubble.length, 3, '3 stappen gebruiken SpeechBubble')
 
       // Each step imports SpeechBubble from the same component
       for (const step of stepsWithBubble) {
@@ -266,13 +264,10 @@ const tests: TestCase[] = [
       // identity → back to intro
       // extras → back to identity
       // budgets → back to extras
-      // preferences → back to budgets
-
-      assertEqual(STEPS_WITH_BACK.length, 4, '4 stappen hebben een Terug-knop')
+      assertEqual(STEPS_WITH_BACK.length, 3, '3 stappen hebben een Terug-knop')
       assertIncludes(STEPS_WITH_BACK, 'identity', 'identity heeft Terug-knop')
       assertIncludes(STEPS_WITH_BACK, 'extras', 'extras heeft Terug-knop')
       assertIncludes(STEPS_WITH_BACK, 'budgets', 'budgets heeft Terug-knop')
-      assertIncludes(STEPS_WITH_BACK, 'preferences', 'preferences heeft Terug-knop')
 
       // Back navigation dispatches SET_STEP with direction 'back'
       // useReducer preserves all state fields (identity, budgets, bankAccounts, etc.)
@@ -283,7 +278,6 @@ const tests: TestCase[] = [
         identity: 'intro',
         extras: 'identity',
         budgets: 'extras',
-        preferences: 'budgets',
       }
 
       for (const [from, to] of Object.entries(backTargets)) {
@@ -352,14 +346,14 @@ const tests: TestCase[] = [
   // ── Extra: StepProgress visibility per page step ──────────────────
   {
     id: 'ob-ui-progress-visibility',
-    name: 'StepProgress: zichtbaar op 5 stappen, verborgen op intro en saving',
+    name: 'StepProgress: zichtbaar op 4 stappen, verborgen op intro en saving',
     category: CAT,
-    description: 'StepProgress wordt alleen getoond op identity, extras, budgets, preferences, success',
+    description: 'StepProgress wordt alleen getoond op identity, extras, budgets, success',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
       // StepProgress is shown when step is in STEPS_WITH_PROGRESS
-      assertEqual(STEPS_WITH_PROGRESS.length, 5, '5 stappen tonen StepProgress')
+      assertEqual(STEPS_WITH_PROGRESS.length, 4, '4 stappen tonen StepProgress')
 
       // Verify mapping from page step to progress step key
       for (const pageStep of STEPS_WITH_PROGRESS) {

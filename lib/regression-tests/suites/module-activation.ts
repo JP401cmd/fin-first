@@ -106,7 +106,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 50,
     fn() {
       const requiredSteps = MODULE_REQUIRED_STEPS['vermogensregistratie'] ?? []
-      const completedSteps = ['bezittingen', 'budgets', 'horizon', 'preferences']
+      const completedSteps = ['bezittingen', 'budgets', 'horizon']
       const missing = requiredSteps.filter((s) => !completedSteps.includes(s))
       assertEqual(missing.length, 0, 'no steps should be missing')
     },

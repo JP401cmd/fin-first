@@ -26,7 +26,6 @@ type Step =
   | 'bezittingen'
   | 'budgets'
   | 'horizon'
-  | 'preferences'
   | 'nieuws_only'
   | 'saving'
   | 'success'
@@ -49,7 +48,6 @@ function computeStepOrder(selectedModules: ModuleId[]): Step[] {
     if (has('vermogensregistratie') || has('inzicht_acties')) steps.push('bezittingen')
     if (has('budgetteren')) steps.push('budgets')
     if (has('toekomstplannen')) steps.push('horizon')
-    if (has('inzicht_acties')) steps.push('preferences')
   }
 
   steps.push('saving', 'success')
@@ -77,7 +75,6 @@ interface State {
   bankAccounts: unknown[]
   assets: unknown[]
   debts: unknown[]
-  preferences: Record<string, unknown>
 }
 
 const SAVING_MESSAGES = [
@@ -102,7 +99,7 @@ const tests: TestCase[] = [
   // ── Step 1: FIRE Fighter — all content steps ─────────────────
   {
     id: 'ob-flow-fire-fighter-steps',
-    name: 'FIRE Fighter: alle 6 content stappen (bezittingen, budgets, horizon, preferences)',
+    name: 'FIRE Fighter: alle content stappen (bezittingen, budgets, horizon)',
     category: CAT,
     description: 'FIRE Fighter selecteert alle modules → alle content stappen worden getoond',
     priority: 'critical',
@@ -111,23 +108,21 @@ const tests: TestCase[] = [
       const modules = PERSONA_MODULE_PRESETS.fire_fighter
       const steps = computeStepOrder(modules)
 
-      // intro + identity + modules + bezittingen + budgets + horizon + preferences + saving + success = 9
-      assertEqual(steps.length, 9, 'FIRE Fighter: 9 stappen totaal')
+      // intro + identity + intent + bezittingen + budgets + horizon + saving + success = 8
+      assertEqual(steps.length, 8, 'FIRE Fighter: 8 stappen totaal')
       assertEqual(steps[0], 'intro', 'Stap 1: intro')
       assertEqual(steps[1], 'identity', 'Stap 2: identity')
       assertEqual(steps[2], 'intent', 'Stap 3: intent')
       assertEqual(steps[3], 'bezittingen', 'Stap 4: bezittingen')
       assertEqual(steps[4], 'budgets', 'Stap 5: budgets')
       assertEqual(steps[5], 'horizon', 'Stap 6: horizon')
-      assertEqual(steps[6], 'preferences', 'Stap 7: preferences')
-      assertEqual(steps[7], 'saving', 'Stap 8: saving')
-      assertEqual(steps[8], 'success', 'Stap 9: success')
+      assertEqual(steps[6], 'saving', 'Stap 7: saving')
+      assertEqual(steps[7], 'success', 'Stap 8: success')
 
       // Verify all content steps are present
       assert(steps.includes('bezittingen'), 'bevat bezittingen')
       assert(steps.includes('budgets'), 'bevat budgets')
       assert(steps.includes('horizon'), 'bevat horizon')
-      assert(steps.includes('preferences'), 'bevat preferences')
       assert(!steps.includes('nieuws_only'), 'geen nieuws_only (niet nieuws-only)')
     },
   },
@@ -151,7 +146,6 @@ const tests: TestCase[] = [
       assert(!steps.includes('bezittingen'), 'geen bezittingen')
       assert(!steps.includes('budgets'), 'geen budgets')
       assert(!steps.includes('horizon'), 'geen horizon')
-      assert(!steps.includes('preferences'), 'geen preferences')
       assert(steps.includes('nieuws_only'), 'bevat nieuws_only')
     },
   },
@@ -176,15 +170,14 @@ const tests: TestCase[] = [
       assert(!steps.includes('bezittingen'), 'geen bezittingen (alleen budgetteren, geen vermogensregistratie/inzicht_acties)')
       assert(steps.includes('budgets'), 'bevat budgets')
       assert(!steps.includes('horizon'), 'geen horizon')
-      assert(!steps.includes('preferences'), 'geen preferences')
       assert(!steps.includes('nieuws_only'), 'geen nieuws_only')
     },
   },
 
-  // ── Step 4: Pensioenplanner — bezittingen + horizon + preferences ─
+  // ── Step 4: Pensioenplanner — bezittingen + horizon ─
   {
     id: 'ob-flow-pensioenplanner-steps',
-    name: 'Pensioenplanner: bezittingen + horizon + preferences',
+    name: 'Pensioenplanner: bezittingen + horizon',
     category: CAT,
     description: 'Pensioenplanner selecteert vermogensregistratie + toekomstplannen + inzicht_acties',
     priority: 'critical',
@@ -198,19 +191,18 @@ const tests: TestCase[] = [
 
       const steps = computeStepOrder(modules)
 
-      // intro + identity + modules + bezittingen + horizon + preferences + saving + success = 8
-      assertEqual(steps.length, 8, 'Pensioenplanner: 8 stappen totaal')
+      // intro + identity + intent + bezittingen + horizon + saving + success = 7
+      assertEqual(steps.length, 7, 'Pensioenplanner: 7 stappen totaal')
       assert(steps.includes('bezittingen'), 'bevat bezittingen')
       assert(!steps.includes('budgets'), 'geen budgets (budgetteren niet actief)')
       assert(steps.includes('horizon'), 'bevat horizon')
-      assert(steps.includes('preferences'), 'bevat preferences (inzicht_acties actief)')
     },
   },
 
-  // ── Step 5: Vermogensverdeler — bezittingen + preferences ─────
+  // ── Step 5: Vermogensverdeler — bezittingen ─────
   {
     id: 'ob-flow-vermogensverdeler-steps',
-    name: 'Vermogensverdeler: bezittingen + preferences',
+    name: 'Vermogensverdeler: bezittingen',
     category: CAT,
     description: 'Vermogensverdeler selecteert vermogensregistratie + inzicht_acties',
     priority: 'critical',
@@ -223,12 +215,11 @@ const tests: TestCase[] = [
 
       const steps = computeStepOrder(modules)
 
-      // intro + identity + modules + bezittingen + preferences + saving + success = 7
-      assertEqual(steps.length, 7, 'Vermogensverdeler: 7 stappen totaal')
+      // intro + identity + intent + bezittingen + saving + success = 6
+      assertEqual(steps.length, 6, 'Vermogensverdeler: 6 stappen totaal')
       assert(steps.includes('bezittingen'), 'bevat bezittingen')
       assert(!steps.includes('budgets'), 'geen budgets')
       assert(!steps.includes('horizon'), 'geen horizon')
-      assert(steps.includes('preferences'), 'bevat preferences (inzicht_acties actief)')
       assert(!steps.includes('nieuws_only'), 'geen nieuws_only')
     },
   },
@@ -258,7 +249,6 @@ const tests: TestCase[] = [
         bankAccounts: [{ name: 'ING Betaal', balance: 5000 }],
         assets: [{ name: 'ETF Portfolio', current_value: 50000 }],
         debts: [],
-        preferences: { focuses: [] },
       }
 
       // Navigate forward to bezittingen
@@ -299,8 +289,7 @@ const tests: TestCase[] = [
       assertEqual(getDirection(stepOrder, 'intent', 'bezittingen'), 'forward', 'modules → bezittingen = forward')
       assertEqual(getDirection(stepOrder, 'bezittingen', 'budgets'), 'forward', 'bezittingen → budgets = forward')
       assertEqual(getDirection(stepOrder, 'budgets', 'horizon'), 'forward', 'budgets → horizon = forward')
-      assertEqual(getDirection(stepOrder, 'horizon', 'preferences'), 'forward', 'horizon → preferences = forward')
-      assertEqual(getDirection(stepOrder, 'preferences', 'saving'), 'forward', 'preferences → saving = forward')
+      assertEqual(getDirection(stepOrder, 'horizon', 'saving'), 'forward', 'horizon → saving = forward')
       assertEqual(getDirection(stepOrder, 'saving', 'success'), 'forward', 'saving → success = forward')
 
       // Back navigations
@@ -406,13 +395,13 @@ const tests: TestCase[] = [
       assert(errorTypes.fetchFail.includes('Geen internetverbinding'), 'Fetch fail message correct')
       assert(errorTypes.generic.includes('Onbekende fout'), 'Generic error message correct')
 
-      // After error, step goes back to last content step (dynamic, not fixed 'preferences')
+      // After error, step goes back to last content step (dynamic)
       // The page.tsx uses: contentSteps[contentSteps.length - 1]
-      // For FIRE Fighter that would be 'preferences', for budgetteerder that would be 'budgets'
+      // For FIRE Fighter that would be 'horizon', for budgetteerder that would be 'budgets'
       const ffModules = PERSONA_MODULE_PRESETS.fire_fighter
       const ffSteps = computeStepOrder(ffModules)
       const ffContentSteps = ffSteps.filter((s) => !['saving', 'success'].includes(s))
-      assertEqual(ffContentSteps[ffContentSteps.length - 1], 'preferences', 'FIRE Fighter: error recovery naar preferences')
+      assertEqual(ffContentSteps[ffContentSteps.length - 1], 'horizon', 'FIRE Fighter: error recovery naar horizon')
 
       const budgetModules = PERSONA_MODULE_PRESETS.budgetteerder
       const budgetSteps = computeStepOrder(budgetModules)
@@ -434,10 +423,10 @@ const tests: TestCase[] = [
       const stepOrder = computeStepOrder(modules)
       const contentSteps = stepOrder.filter((s) => !['saving', 'success'].includes(s))
       const lastContentStep = contentSteps[contentSteps.length - 1]
-      assertEqual(lastContentStep, 'preferences', 'Laatste content stap is preferences')
+      assertEqual(lastContentStep, 'horizon', 'Laatste content stap is horizon')
 
       const stateBeforeSave: State = {
-        step: 'preferences',
+        step: 'horizon',
         direction: 'forward',
         identity: { full_name: 'Jan Jansen', net_monthly_income: '4500' },
         intent: null,
@@ -448,7 +437,6 @@ const tests: TestCase[] = [
         bankAccounts: [{ name: 'ING Betaal', balance: '3000' }],
         assets: [{ name: 'Vanguard ETF', current_value: '80000' }],
         debts: [{ name: 'Studieschuld', current_balance: '12000' }],
-        preferences: { focuses: ['fire_freedom'] },
       }
 
       // Save initiated → step goes to 'saving'
@@ -458,7 +446,7 @@ const tests: TestCase[] = [
 
       // Save fails → step goes back to last content step
       const errorState = { ...savingState, step: lastContentStep, direction: 'back' as Direction }
-      assertEqual(errorState.step, 'preferences', 'Stap terug naar preferences na error')
+      assertEqual(errorState.step, 'horizon', 'Stap terug naar horizon na error')
       assertEqual(errorState.identity.full_name, 'Jan Jansen', 'Identity intact na error')
       assertEqual(errorState.activeModules.length, 3, 'Modules intact na error')
       assertEqual((errorState.horizon as Record<string, unknown>).fire_end_strategy, 'legacy', 'Horizon intact na error')
@@ -485,14 +473,13 @@ const tests: TestCase[] = [
         (s) => !['intro', 'success', 'saving'].includes(s),
       )
 
-      // identity, modules, bezittingen, budgets, horizon, preferences = 6 steps with header
-      assertEqual(headerVisibleSteps.length, 6, 'Header met logout zichtbaar op 6 stappen')
+      // identity, intent, bezittingen, budgets, horizon = 5 steps with header
+      assertEqual(headerVisibleSteps.length, 5, 'Header met logout zichtbaar op 5 stappen')
       assertIncludes([...headerVisibleSteps], 'identity', 'Header zichtbaar op identity')
       assertIncludes([...headerVisibleSteps], 'intent', 'Header zichtbaar op intent')
       assertIncludes([...headerVisibleSteps], 'bezittingen', 'Header zichtbaar op bezittingen')
       assertIncludes([...headerVisibleSteps], 'budgets', 'Header zichtbaar op budgets')
       assertIncludes([...headerVisibleSteps], 'horizon', 'Header zichtbaar op horizon')
-      assertIncludes([...headerVisibleSteps], 'preferences', 'Header zichtbaar op preferences')
     },
   },
 
@@ -572,14 +559,11 @@ const tests: TestCase[] = [
       assert(!emptySteps.includes('bezittingen'), 'Geen modules: geen bezittingen')
       assert(!emptySteps.includes('budgets'), 'Geen modules: geen budgets')
       assert(!emptySteps.includes('horizon'), 'Geen modules: geen horizon')
-      assert(!emptySteps.includes('preferences'), 'Geen modules: geen preferences')
-
       // Only vermogensregistratie: bezittingen only
       const vermogenSteps = computeStepOrder(['vermogensregistratie'])
       assert(vermogenSteps.includes('bezittingen'), 'vermogensregistratie → bezittingen')
       assert(!vermogenSteps.includes('budgets'), 'geen budgetteren → geen budgets')
       assert(!vermogenSteps.includes('horizon'), 'geen toekomstplannen → geen horizon')
-      assert(!vermogenSteps.includes('preferences'), 'geen inzicht_acties → geen preferences')
 
       // Only toekomstplannen: horizon only
       const toekomstSteps = computeStepOrder(['toekomstplannen'])
@@ -601,7 +585,7 @@ const tests: TestCase[] = [
       const fullSteps = computeStepOrder(allModules)
       assert(fullSteps.indexOf('bezittingen') < fullSteps.indexOf('budgets'), 'bezittingen vóór budgets')
       assert(fullSteps.indexOf('budgets') < fullSteps.indexOf('horizon'), 'budgets vóór horizon')
-      assert(fullSteps.indexOf('horizon') < fullSteps.indexOf('preferences'), 'horizon vóór preferences')
+      assert(fullSteps.indexOf('horizon') < fullSteps.indexOf('saving'), 'horizon vóór saving')
     },
   },
 

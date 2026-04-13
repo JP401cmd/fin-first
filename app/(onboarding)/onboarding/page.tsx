@@ -17,11 +17,11 @@ import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingBudgets } from '@/components/onboarding/onboarding-budgets'
 import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
 import { INITIAL_PREFERENCES } from '@/components/onboarding/onboarding-preferences'
-import { OnboardingModules } from '@/components/onboarding/onboarding-persona'
+import { OnboardingIntent } from '@/components/onboarding/onboarding-intent'
 import { OnboardingHorizon, INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
-import { type PersonaId, type IntentId, type ModuleId, PERSONA_MODULE_PRESETS, INTENT_MODULE_PRESETS, getHomePath, getFirstWinPath } from '@/lib/module-registry'
+import { type PersonaId, type IntentId, type ModuleId, INTENT_MODULE_PRESETS, getHomePath, getFirstWinPath } from '@/lib/module-registry'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -44,7 +44,6 @@ type Step =
   | 'bezittingen'
   | 'budgets'
   | 'horizon'
-  | 'preferences'
   | 'nieuws_only'
   | 'saving'
   | 'success'
@@ -63,7 +62,6 @@ const CANONICAL_STEP_ORDER: readonly Step[] = [
   'bezittingen',
   'budgets',
   'horizon',
-  'preferences',
   'nieuws_only',
   'saving',
   'success',
@@ -99,6 +97,7 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
     modules: 'intent',
     persona: 'intent',
     extras: 'bezittingen',
+    preferences: 'horizon',
   }
   // eslint-disable-next-line no-param-reassign
   if (LEGACY_STEP_MAP[lastStep]) lastStep = LEGACY_STEP_MAP[lastStep]
@@ -566,7 +565,7 @@ export default function OnboardingPage() {
     dispatch({ type: 'SET_STEP', step: 'saving' })
 
     try {
-      const { identity, budgetAmounts, bankAccounts, assets, debts, preferences } = state
+      const { identity, budgetAmounts, bankAccounts, assets, debts } = state
 
       // Stable idempotency key: reuse across retries so the server can
       // detect duplicate submissions.  Only generate once per session.
@@ -767,7 +766,7 @@ export default function OnboardingPage() {
     const next = activeStepOrder[idx + 1]
     // Safety net: if the next step is 'saving', invoke the actual save handler
     // instead of just dispatching to the saving screen. Without this, any
-    // module combination that omits 'preferences' would dead-end at 90% on
+    // module combination would dead-end at 90% on
     // the progress bar (the saving step never triggers the POST itself).
     if (next === 'saving') {
       handleSaveOwnData()
@@ -887,11 +886,9 @@ export default function OnboardingPage() {
           )}
 
           {state.step === 'intent' && (
-            <OnboardingModules
-              selectedPersona={state.intent as unknown as PersonaId | null}
-              selectedModules={state.activeModules}
-              onSelectPersona={(p) => dispatch({ type: 'SET_INTENT', intent: p as IntentId })}
-              onToggleModule={(id, enabled) => dispatch({ type: 'TOGGLE_MODULE', moduleId: id, enabled })}
+            <OnboardingIntent
+              selectedIntent={state.intent}
+              onSelect={(intent) => dispatch({ type: 'SET_INTENT', intent })}
               onNext={goToNext}
               onBack={goToBack}
             />

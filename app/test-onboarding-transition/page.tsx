@@ -5,7 +5,7 @@ import '../(onboarding)/onboarding/onboarding.css'
 
 type Direction = 'forward' | 'back'
 
-const STEPS = ['intro', 'identity', 'extras', 'budgets', 'preferences'] as const
+const STEPS = ['intro', 'identity', 'extras', 'budgets'] as const
 type Step = typeof STEPS[number]
 
 const STEP_LABELS: Record<Step, string> = {
@@ -13,7 +13,6 @@ const STEP_LABELS: Record<Step, string> = {
   identity: 'Profiel',
   extras: 'Startpunt',
   budgets: 'Budgetten',
-  preferences: 'Voorkeuren',
 }
 
 function StepTransition({ direction, children }: {
@@ -76,7 +75,6 @@ export default function TestOnboardingTransition() {
               {step === 'identity' && '👤'}
               {step === 'extras' && '🏦'}
               {step === 'budgets' && '📊'}
-              {step === 'preferences' && '⚙️'}
             </div>
             <h2 className="mb-2 text-xl font-bold text-zinc-900">
               Stap {stepIdx + 1}: {STEP_LABELS[step]}
@@ -86,7 +84,6 @@ export default function TestOnboardingTransition() {
               {step === 'identity' && 'Vul je persoonlijke gegevens in.'}
               {step === 'extras' && 'Voeg je bankrekeningen, bezittingen en schulden toe.'}
               {step === 'budgets' && 'Stel je maandelijkse budgetten in.'}
-              {step === 'preferences' && 'Kies je dashboard voorkeuren.'}
             </p>
             <p className="mt-3 text-xs text-zinc-400">
               Richting: <span className="font-mono font-medium">{direction}</span>

@@ -3,11 +3,11 @@
 import { useRouter } from 'next/navigation'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import type { ModuleId } from '@/lib/module-registry'
-import { Wallet, PiggyBank, Telescope, Lightbulb, ArrowRight } from 'lucide-react'
+import { Wallet, PiggyBank, Telescope, ArrowRight } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type OnboardingStep = 'bezittingen' | 'budgets' | 'horizon' | 'preferences'
+type OnboardingStep = 'bezittingen' | 'budgets' | 'horizon'
 
 /**
  * Maps each module to the onboarding steps it requires before activation.
@@ -61,15 +61,6 @@ const STEP_META: Record<OnboardingStep, StepMeta> = {
     icon: Telescope,
     setupRoute: '/horizon',
     setupLabel: 'Naar De Horizon',
-  },
-  preferences: {
-    title: 'Voorkeuren instellen',
-    description: 'Personaliseer je inzichten en acties.',
-    detail:
-      'Stel je doelen en prioriteiten in voor gepersonaliseerde aanbevelingen. Dit is optioneel — de module werkt ook zonder.',
-    icon: Lightbulb,
-    setupRoute: '/will',
-    setupLabel: 'Naar De Wil',
   },
 }
 
