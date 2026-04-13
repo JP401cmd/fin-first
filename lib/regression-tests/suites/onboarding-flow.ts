@@ -46,7 +46,7 @@ function computeStepOrder(selectedModules: ModuleId[]): Step[] {
   if (isNewsOnly) {
     steps.push('nieuws_only')
   } else {
-    if (has('vermogensregistratie') || has('budgetteren')) steps.push('bezittingen')
+    if (has('vermogensregistratie') || has('inzicht_acties')) steps.push('bezittingen')
     if (has('budgetteren')) steps.push('budgets')
     if (has('toekomstplannen')) steps.push('horizon')
     if (has('inzicht_acties')) steps.push('preferences')
@@ -161,7 +161,7 @@ const tests: TestCase[] = [
     id: 'ob-flow-budgetteerder-steps',
     name: 'Budgetteerder: bezittingen + budgets alleen',
     category: CAT,
-    description: 'Budgetteerder selecteert alleen budgetteren → bezittingen + budgets stappen',
+    description: 'Budgetteerder selecteert alleen budgetteren → alleen budgets stap (geen bezittingen)',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
@@ -171,9 +171,9 @@ const tests: TestCase[] = [
 
       const steps = computeStepOrder(modules)
 
-      // intro + identity + modules + bezittingen + budgets + saving + success = 7
-      assertEqual(steps.length, 7, 'Budgetteerder: 7 stappen totaal')
-      assert(steps.includes('bezittingen'), 'bevat bezittingen (budgetteren triggert ook bezittingen)')
+      // intro + identity + intent + budgets + saving + success = 6
+      assertEqual(steps.length, 6, 'Budgetteerder: 6 stappen totaal')
+      assert(!steps.includes('bezittingen'), 'geen bezittingen (alleen budgetteren, geen vermogensregistratie/inzicht_acties)')
       assert(steps.includes('budgets'), 'bevat budgets')
       assert(!steps.includes('horizon'), 'geen horizon')
       assert(!steps.includes('preferences'), 'geen preferences')
@@ -586,10 +586,15 @@ const tests: TestCase[] = [
       assert(!toekomstSteps.includes('bezittingen'), 'alleen toekomstplannen → geen bezittingen')
       assert(toekomstSteps.includes('horizon'), 'toekomstplannen → horizon')
 
-      // budgetteren implies bezittingen
+      // budgetteren alone does NOT imply bezittingen (needs vermogensregistratie or inzicht_acties)
       const budgetSteps = computeStepOrder(['budgetteren'])
-      assert(budgetSteps.includes('bezittingen'), 'budgetteren triggert ook bezittingen')
+      assert(!budgetSteps.includes('bezittingen'), 'alleen budgetteren → geen bezittingen')
       assert(budgetSteps.includes('budgets'), 'budgetteren → budgets')
+
+      // budgetteren + inzicht_acties implies bezittingen (via inzicht_acties)
+      const coachingSteps = computeStepOrder(['budgetteren', 'inzicht_acties'])
+      assert(coachingSteps.includes('bezittingen'), 'inzicht_acties triggert bezittingen')
+      assert(coachingSteps.includes('budgets'), 'budgetteren → budgets')
 
       // Step order is preserved: bezittingen always before budgets, budgets before horizon, etc.
       const allModules: ModuleId[] = ['budgetteren', 'vermogensregistratie', 'toekomstplannen', 'inzicht_acties']
@@ -688,7 +693,7 @@ const tests: TestCase[] = [
       // Nieuws + another module → NOT nieuws_only
       const nieuwsPlus = computeStepOrder(['nieuws', 'budgetteren'])
       assert(!nieuwsPlus.includes('nieuws_only'), 'Nieuws + budgetteren → geen nieuws_only')
-      assert(nieuwsPlus.includes('bezittingen'), 'Nieuws + budgetteren → bezittingen')
+      assert(!nieuwsPlus.includes('bezittingen'), 'Nieuws + budgetteren → geen bezittingen (geen vermogensregistratie/inzicht_acties)')
       assert(nieuwsPlus.includes('budgets'), 'Nieuws + budgetteren → budgets')
     },
   },
