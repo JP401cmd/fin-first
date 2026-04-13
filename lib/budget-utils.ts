@@ -55,13 +55,12 @@ export function computeYearlyMustExpenses(
     const essentialChildren = children.filter(c => c.is_essential)
     const relevantChildren = essentialChildren.length > 0 ? essentialChildren : children
 
-    const limit = relevantChildren.length > 0
-      ? relevantChildren.reduce((sum, c) => sum + Number(c.default_limit), 0)
-      : Number(b.default_limit)
+    const annual = relevantChildren.length > 0
+      ? relevantChildren.reduce((sum, c) => sum + annualAmount(Number(c.default_limit), c.interval ?? b.interval), 0)
+      : annualAmount(Number(b.default_limit), b.interval)
 
-    // Gebruik child interval wanneer er exact 1 relevant child is; anders parent interval
-    const interval = (relevantChildren.length === 1 ? relevantChildren[0].interval : null) ?? b.interval
-    const annual = annualAmount(limit, interval)
+    // Display interval: bij exact 1 child gebruik child interval; anders parent interval
+    const interval = relevantChildren.length === 1 ? (relevantChildren[0].interval ?? b.interval) : (b.interval ?? 'monthly')
 
     total += annual
     expenseItems.push({

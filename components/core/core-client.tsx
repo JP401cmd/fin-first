@@ -1704,7 +1704,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           <button onClick={() => setShowExpenseReceipt(true)}
             className="flex-1 card-editorial p-3 text-left">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Must uitgaven</p>
-            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
+            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(rawFinancials?.yearlyMustExpenses ?? 0)}</p>
             <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per jaar</p>
           </button>
           {!hasVermogen && (
@@ -1744,8 +1744,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <KpiTooltip text="Jaarlijkse som van je essentiële budgetten: vaste lasten, dagelijkse uitgaven en vervoer. Dit zijn de kosten die je sowieso maakt." />
             </div>
             <p className="text-sm font-medium text-[var(--ink-3)]">Jaarlijkse Must Uitgaven</p>
-            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
-            {hasToekomst && <FreedomTimeBadge amount={data.yearlyMustExpenses} className="mt-1" />}
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(rawFinancials?.yearlyMustExpenses ?? 0)}</p>
+            {hasToekomst && <FreedomTimeBadge amount={rawFinancials?.yearlyMustExpenses ?? 0} className="mt-1" />}
             <p className="mt-1 text-xs text-[var(--ink-3)]">essentiële kosten per jaar</p>
             <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
               Stel je eigen jaarlijkse uitgave na retirement in via{' '}
@@ -2388,17 +2388,15 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           </div>
           <div className="mt-1 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
             <span className="font-bold text-[var(--ink)]">Totaal per jaar</span>
-            <span className="tabular-nums font-bold text-[var(--ink)]">{data ? formatCurrency(data.yearlyMustExpenses) : '—'}</span>
+            <span className="tabular-nums font-bold text-[var(--ink)]">{formatCurrency(mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0))}</span>
           </div>
           <div className="mt-1 flex justify-between text-[var(--ink-3)]">
             <span>Gemiddeld per maand</span>
-            <span className="tabular-nums">{data ? formatCurrency(data.yearlyMustExpenses / 12) : '—'}</span>
+            <span className="tabular-nums">{formatCurrency(mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0) / 12)}</span>
           </div>
-          {data && (
-            <div className="mt-2 flex justify-center">
-              <FreedomTimeBadge amount={data.yearlyMustExpenses} />
-            </div>
-          )}
+          <div className="mt-2 flex justify-center">
+            <FreedomTimeBadge amount={mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0)} />
+          </div>
 
           <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             <p><strong className="text-[var(--ink-3)]">Formule:</strong> per budget het limietbedrag omgerekend naar jaarbasis (maandelijks × 12, per kwartaal × 4, of jaarlijks × 1), alles opgeteld</p>
