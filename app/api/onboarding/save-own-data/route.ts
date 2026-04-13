@@ -38,6 +38,7 @@ function buildRpcPayload(
   idempotencyKey: string | undefined,
   horizonData: z.infer<typeof bodySchema>['horizonData'],
   newsDescription: z.infer<typeof bodySchema>['newsDescription'],
+  intent: z.infer<typeof bodySchema>['intent'],
 ) {
   const defaults = getDefaultBudgets()
 
@@ -111,6 +112,7 @@ function buildRpcPayload(
       fire_end_age: horizonData?.fire_end_age ?? identity.fire_end_age ?? 90,
       temporal_balance: horizonData?.temporal_balance ?? identity.temporal_balance ?? 3,
       news_description: newsDescription ?? null,
+      onboarding_intent: intent ?? null,
     },
     budget_amounts: budgetAmounts,
     budgettering_mode: budgetteringMode ?? 'manual',
@@ -240,6 +242,8 @@ const bodySchema = z.object({
     })).optional(),
   }).optional(),
   newsDescription: z.string().max(500).optional(),
+  /** User-selected intent from the onboarding intent step */
+  intent: z.enum(['coaching', 'grip_uitgaven', 'overzicht_geld', 'toekomst', 'alles', 'nieuws']).optional(),
   /** Pre-extracted data from client-side review (avoids re-running AI extraction) */
   extractionData: z.object({
     assets: z.array(z.object({
@@ -283,7 +287,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Ongeldige invoer', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { identity, horizonData, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey, activeModules, newsDescription, extractionData } = parsed.data
+  const { identity, horizonData, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey, activeModules, newsDescription, extractionData, intent } = parsed.data
 
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
@@ -317,6 +321,7 @@ export async function POST(req: Request) {
           .update({
             active_modules: activeModules,
             budgeting_active: (activeModules as ModuleId[]).includes('budgetteren'),
+            onboarding_intent: intent ?? null,
           })
           .eq('id', user.id)
       }
@@ -454,7 +459,7 @@ export async function POST(req: Request) {
       identity, budgetAmounts, budgetteringMode,
       bankAccounts, assets, debts, widgetPrefs,
       aowTargetAge, idempotencyKey,
-      horizonData, newsDescription,
+      horizonData, newsDescription, intent,
     )
 
     const { data: rpcResult, error: rpcError } = await supabase
@@ -471,6 +476,7 @@ export async function POST(req: Request) {
         const profileUpdates: Record<string, unknown> = {
           last_known_phase: 'recovery',
           completed_onboarding_steps: completedSteps,
+          onboarding_intent: intent ?? null,
         }
         // Persist selected modules when provided by the persona step
         if (activeModules && activeModules.length > 0) {
@@ -603,6 +609,7 @@ export async function POST(req: Request) {
     profileData.fire_end_age = horizonData?.fire_end_age ?? identity.fire_end_age ?? 90
     profileData.temporal_balance = horizonData?.temporal_balance ?? identity.temporal_balance ?? 3
     profileData.news_description = newsDescription ?? null
+    profileData.onboarding_intent = intent ?? null
     profileData.completed_onboarding_steps = completedSteps
     if (widgetPrefs) profileData.widget_prefs = widgetPrefs
     // News-only: store financial context and AI-estimated income/expenses
