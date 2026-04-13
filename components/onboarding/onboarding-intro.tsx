@@ -1,5 +1,4 @@
 import { WillDots } from '@/components/app/will-dots'
-import { Shield, Zap, Telescope, type LucideIcon } from 'lucide-react'
 
 export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLogout?: () => void }) {
   return (
@@ -22,19 +21,16 @@ export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLo
       {/* Editorial divider */}
       <div className="mx-auto mt-8 mb-8 h-px w-16 bg-[var(--border-md)]" />
 
-      {/* Introduction text */}
-      <div className="mx-auto max-w-md text-center font-serif text-sm leading-relaxed text-[var(--ink-3)]">
+      {/* Introduction text — leads to the intention question */}
+      <div className="mx-auto max-w-md text-center font-serif text-sm leading-relaxed text-[var(--ink-3)] space-y-3">
         <p>
           Hier kijken we anders naar geld. Samen brengen we in kaart hoeveel vrijheid
           je al hebt opgebouwd &mdash; en hoe je die kunt laten groeien.
         </p>
-      </div>
-
-      {/* Three-module preview cards — card-editorial with module-colored left border */}
-      <div className="mt-10 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
-        {MODULE_CARDS.map((mod) => (
-          <ModuleCard key={mod.name} {...mod} />
-        ))}
+        <p>
+          We beginnen met een paar vragen om te begrijpen waar jij staat
+          en wat voor jou belangrijk is.
+        </p>
       </div>
 
       {/* CTA button — full-width mobile, centered max-w-xs desktop */}
@@ -62,61 +58,3 @@ export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLo
     </div>
   )
 }
-
-/* ── Module card component ───────────────────────────────── */
-
-function ModuleCard({ name, description, icon: Icon, borderClass, iconBgClass, iconTextClass, nameTextClass }: ModuleCardDef) {
-  return (
-    <div className={`card-editorial flex items-center gap-3 border-l-3 p-4 ${borderClass}`}>
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconBgClass}`}>
-        <Icon className={`h-5 w-5 ${iconTextClass}`} />
-      </div>
-      <div className="text-left">
-        <p className={`font-display text-sm font-semibold ${nameTextClass}`}>{name}</p>
-        <p className="text-xs text-[var(--ink-3)]">{description}</p>
-      </div>
-    </div>
-  )
-}
-
-/* ── Module card data ────────────────────────────────────── */
-
-interface ModuleCardDef {
-  name: string
-  description: string
-  icon: LucideIcon
-  borderClass: string
-  iconBgClass: string
-  iconTextClass: string
-  nameTextClass: string
-}
-
-const MODULE_CARDS: ModuleCardDef[] = [
-  {
-    name: 'De Kern',
-    description: 'Ken je werkelijkheid',
-    icon: Shield,
-    borderClass: 'border-kern-400',
-    iconBgClass: 'bg-kern-100',
-    iconTextClass: 'text-kern-700',
-    nameTextClass: 'text-kern-700',
-  },
-  {
-    name: 'De Wil',
-    description: 'Neem de regie',
-    icon: Zap,
-    borderClass: 'border-wil-400',
-    iconBgClass: 'bg-wil-100',
-    iconTextClass: 'text-wil-700',
-    nameTextClass: 'text-wil-700',
-  },
-  {
-    name: 'De Horizon',
-    description: 'Zie je vrijheid groeien',
-    icon: Telescope,
-    borderClass: 'border-horizon-400',
-    iconBgClass: 'bg-horizon-100',
-    iconTextClass: 'text-horizon-700',
-    nameTextClass: 'text-horizon-700',
-  },
-]

@@ -5,14 +5,6 @@ import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'onboarding.intro'
 
-// ── Module card data (mirrors onboarding-intro.tsx MODULE_CARDS) ────────────
-
-const EXPECTED_MODULES = [
-  { name: 'De Kern', description: 'Ken je werkelijkheid', borderClass: 'border-kern-400' },
-  { name: 'De Wil', description: 'Neem de regie', borderClass: 'border-wil-400' },
-  { name: 'De Horizon', description: 'Zie je vrijheid groeien', borderClass: 'border-horizon-400' },
-]
-
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 const tests: TestCase[] = [
@@ -60,34 +52,27 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 3: Module preview cards ──────────────────────────────────
+  // ── Step 3: Welcome text leading to intention question ─────────────
   {
-    id: 'ob-intro-module-cards',
-    name: '3 module preview kaarten: Kern, Wil, Horizon',
+    id: 'ob-intro-welcome-text',
+    name: 'Welkomsttekst leidt naar de intentie-vraag',
     category: CAT,
-    description: 'Intro toont 3 module kaarten met correcte namen, beschrijvingen en kleuren',
+    description: 'Intro toont korte welkomsttekst zonder module-systeemtaal, leidt gebruiker naar volgende stap',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      assertEqual(EXPECTED_MODULES.length, 3, 'Exact 3 module kaarten')
+      // The intro now has two paragraphs instead of module cards:
+      // 1. The original freedom text
+      const freedomText = 'Hier kijken we anders naar geld'
+      assert(freedomText.includes('anders naar geld'), 'Welkomsttekst present')
 
-      // De Kern
-      assertEqual(EXPECTED_MODULES[0].name, 'De Kern', 'Eerste kaart: De Kern')
-      assertEqual(EXPECTED_MODULES[0].description, 'Ken je werkelijkheid', 'Kern beschrijving')
-      assert(EXPECTED_MODULES[0].borderClass.includes('kern'), 'Kern heeft kern-kleur border')
+      // 2. A new transition text leading to the intention question
+      const transitionText = 'We beginnen met een paar vragen om te begrijpen waar jij staat en wat voor jou belangrijk is.'
+      assert(transitionText.includes('paar vragen'), 'Transitietekst leidt naar intentie-vraag')
+      assert(transitionText.includes('belangrijk'), 'Tekst benadrukt persoonlijke relevantie')
 
-      // De Wil
-      assertEqual(EXPECTED_MODULES[1].name, 'De Wil', 'Tweede kaart: De Wil')
-      assertEqual(EXPECTED_MODULES[1].description, 'Neem de regie', 'Wil beschrijving')
-      assert(EXPECTED_MODULES[1].borderClass.includes('wil'), 'Wil heeft wil-kleur border')
-
-      // De Horizon
-      assertEqual(EXPECTED_MODULES[2].name, 'De Horizon', 'Derde kaart: De Horizon')
-      assertEqual(EXPECTED_MODULES[2].description, 'Zie je vrijheid groeien', 'Horizon beschrijving')
-      assert(EXPECTED_MODULES[2].borderClass.includes('horizon'), 'Horizon heeft horizon-kleur border')
-
-      // Cards use card-editorial class with colored left border (border-l-3)
-      // Each card has icon, name (font-display), and description
+      // No module system language (Kern, Wil, Horizon) in the intro screen
+      // Module concepts are internal architecture, not user-facing in onboarding
     },
   },
 
@@ -158,16 +143,15 @@ const tests: TestCase[] = [
         'Welkom heading (font-display)',
         'Filosofie tagline (font-serif italic)',
         'Editorial divider (h-px w-16)',
-        'Introduction text (font-serif)',
-        'Module cards (3x grid)',
+        'Welcome text (two paragraphs)',
         'CTA button (Aan de slag)',
         'Duration label',
         'Logout link',
       ]
-      assertEqual(elements.length, 9, 'Intro heeft 9 visuele elementen')
+      assertEqual(elements.length, 8, 'Intro heeft 8 visuele elementen')
 
-      // Grid layout: 1 column on mobile, 3 columns on desktop (sm:grid-cols-3)
-      // This ensures module cards are visible and responsive
+      // Clean layout without module system cards
+      // Two paragraphs of welcoming text lead directly to CTA
     },
   },
 
