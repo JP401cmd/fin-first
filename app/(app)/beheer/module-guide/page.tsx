@@ -1,15 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   Loader2,
   AlertCircle,
   Save,
   ArrowUp,
   ArrowDown,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 import { MODULE_CATALOG } from '@/lib/module-registry'
 import { MODULE_GUIDE_DISPLAY_ORDER, type ModuleGuideStep } from '@/lib/briefing/module-guide-steps'
@@ -23,6 +24,139 @@ const MODULE_LABELS: Record<ModuleId, string> = Object.fromEntries(
 // ── Types ───────────────────────────────────────────────────
 type StepsData = Record<ModuleId, ModuleGuideStep[]>
 
+// ── Inline Editable Cell ────────────────────────────────────
+function InlineEdit({
+  value,
+  onChange,
+  placeholder,
+  mono,
+  validate,
+  autoEdit,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  mono?: boolean
+  validate?: (v: string) => string | null
+  autoEdit?: boolean
+}) {
+  const [editing, setEditing] = useState(autoEdit ?? false)
+  const [draft, setDraft] = useState(value)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Sync draft when value changes externally (e.g. after save)
+  useEffect(() => {
+    if (!editing) setDraft(value)
+  }, [value, editing])
+
+  const startEdit = useCallback(() => {
+    setDraft(value)
+    setError(null)
+    setEditing(true)
+  }, [value])
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [editing])
+
+  const confirmEdit = useCallback(() => {
+    if (validate) {
+      const err = validate(draft)
+      if (err) {
+        setError(err)
+        return
+      }
+    }
+    onChange(draft)
+    setEditing(false)
+    setError(null)
+  }, [draft, onChange, validate])
+
+  const cancelEdit = useCallback(() => {
+    setDraft(value)
+    setEditing(false)
+    setError(null)
+  }, [value])
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        confirmEdit()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        cancelEdit()
+      }
+    },
+    [confirmEdit, cancelEdit],
+  )
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={startEdit}
+        className={`w-full cursor-text rounded px-1.5 py-0.5 text-left transition-colors hover:bg-[var(--subtle)] ${
+          mono ? 'font-mono text-xs text-[var(--ink-2)]' : 'text-sm text-[var(--ink)]'
+        } ${!value ? 'italic text-[var(--ink-4)]' : ''}`}
+        title="Klik om te bewerken"
+      >
+        {value || placeholder || '\u2014'}
+      </button>
+    )
+  }
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          if (error) setError(null)
+        }}
+        onKeyDown={handleKeyDown}
+        onBlur={confirmEdit}
+        placeholder={placeholder}
+        className={`w-full rounded border px-1.5 py-0.5 outline-none ${
+          mono ? 'font-mono text-xs' : 'text-sm'
+        } ${
+          error
+            ? 'border-red-400 bg-red-50 text-red-800'
+            : 'border-[var(--border-md)] bg-white text-[var(--ink)]'
+        } focus:ring-1 focus:ring-[var(--ink-3)]`}
+      />
+      {error && (
+        <p className="absolute -bottom-4 left-0 text-[10px] text-red-500">{error}</p>
+      )}
+    </div>
+  )
+}
+
+// ── EnableToggle (reused pattern from /beheer/briefing) ─────
+function EnableToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onToggle() }}
+      className={`relative h-5 w-9 rounded-full transition-colors ${
+        enabled ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--paper)] transition-transform ${
+          enabled ? 'translate-x-4' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  )
+}
+
 // ── Collapsible Module Section ──────────────────────────────
 function ModuleSection({
   moduleId,
@@ -30,22 +164,39 @@ function ModuleSection({
   isOpen,
   onToggle,
   onMoveStep,
+  onUpdateStep,
+  onAddStep,
+  onDeleteStep,
   hasChanges,
+  enabled,
+  onToggleEnabled,
 }: {
   moduleId: ModuleId
   steps: ModuleGuideStep[]
   isOpen: boolean
   onToggle: () => void
   onMoveStep: (moduleId: ModuleId, fromIndex: number, direction: 'up' | 'down') => void
+  onUpdateStep: (moduleId: ModuleId, stepIdx: number, field: 'label' | 'href', value: string) => void
+  onAddStep: (moduleId: ModuleId) => void
+  onDeleteStep: (moduleId: ModuleId, stepIdx: number) => void
   hasChanges: boolean
+  enabled: boolean
+  onToggleEnabled: () => void
 }) {
   const label = MODULE_LABELS[moduleId] ?? moduleId
+
+  const validateLabel = useCallback((v: string) => {
+    if (!v.trim()) return 'Label mag niet leeg zijn'
+    return null
+  }, [])
+
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
 
   return (
     <div
       className={`rounded-[var(--r)] border bg-[var(--paper)] transition-colors ${
         hasChanges ? 'border-amber-400' : 'border-[var(--border-ed)]'
-      }`}
+      } ${!enabled ? 'opacity-60' : ''}`}
     >
       <button
         type="button"
@@ -58,20 +209,28 @@ function ModuleSection({
           ) : (
             <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />
           )}
-          <span className="text-sm font-semibold text-[var(--ink)]">{label}</span>
+          <span className={`text-sm font-semibold ${enabled ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'}`}>
+            {label}
+          </span>
           <span className="rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium text-[var(--ink-3)]">
             {steps.length} stappen
           </span>
+          {!enabled && (
+            <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
+              uitgeschakeld
+            </span>
+          )}
           {hasChanges && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
               gewijzigd
             </span>
           )}
         </div>
+        <EnableToggle enabled={enabled} onToggle={onToggleEnabled} />
       </button>
 
       {isOpen && (
-        <div className="border-t border-[var(--border-ed)] px-4 py-2">
+        <div className={`border-t border-[var(--border-ed)] px-4 py-2 ${!enabled ? 'pointer-events-none opacity-50' : ''}`}>
           {steps.length === 0 ? (
             <p className="py-3 text-center text-sm text-[var(--ink-3)]">
               Geen stappen geconfigureerd voor deze module.
@@ -83,7 +242,8 @@ function ModuleSection({
                   <th className="w-16 py-2 pr-2">Volgorde</th>
                   <th className="py-2 pr-4">Key</th>
                   <th className="py-2 pr-4">Label</th>
-                  <th className="py-2">Href</th>
+                  <th className="py-2 pr-2">Href</th>
+                  <th className="w-10 py-2" />
                 </tr>
               </thead>
               <tbody>
@@ -117,17 +277,54 @@ function ModuleSection({
                     <td className="py-2.5 pr-4 font-mono text-xs text-[var(--ink-3)]">
                       {step.key}
                     </td>
-                    <td className="py-2.5 pr-4 text-sm text-[var(--ink)]">
-                      {step.label}
+                    <td className="py-1.5 pr-4">
+                      <InlineEdit
+                        value={step.label}
+                        onChange={(v) => onUpdateStep(moduleId, idx, 'label', v)}
+                        validate={validateLabel}
+                        autoEdit={!step.label}
+                      />
                     </td>
-                    <td className="py-2.5 text-sm">
-                      {step.href ? (
-                        <span className="inline-flex items-center gap-1 text-[var(--ink-2)]">
-                          <ExternalLink className="h-3 w-3" />
-                          <code className="text-xs">{step.href}</code>
-                        </span>
+                    <td className="py-1.5 pr-2">
+                      <InlineEdit
+                        value={step.href ?? ''}
+                        onChange={(v) => onUpdateStep(moduleId, idx, 'href', v)}
+                        placeholder="geen link"
+                        mono
+                      />
+                    </td>
+                    <td className="py-1.5 text-center">
+                      {confirmDelete === idx ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDeleteStep(moduleId, idx)
+                              setConfirmDelete(null)
+                            }}
+                            className="rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-red-600"
+                            title="Bevestig verwijderen"
+                          >
+                            Ja
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(null)}
+                            className="rounded bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ink-3)] hover:bg-[var(--border-ed)]"
+                            title="Annuleer"
+                          >
+                            Nee
+                          </button>
+                        </div>
                       ) : (
-                        <span className="text-xs text-[var(--ink-4)]">—</span>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(idx)}
+                          className="rounded p-1 text-[var(--ink-4)] transition-colors hover:bg-red-50 hover:text-red-500"
+                          title="Verwijder stap"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -135,6 +332,16 @@ function ModuleSection({
               </tbody>
             </table>
           )}
+
+          {/* Add step button */}
+          <button
+            type="button"
+            onClick={() => onAddStep(moduleId)}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink-2)]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Stap toevoegen
+          </button>
         </div>
       )}
     </div>
@@ -151,16 +358,33 @@ export default function BeheerModuleGuidePage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [openModules, setOpenModules] = useState<Set<ModuleId>>(new Set())
 
+  // ── Disabled modules state ────────────────────────────────
+  const [disabledModules, setDisabledModules] = useState<Set<ModuleId>>(new Set())
+  const [originalDisabledModules, setOriginalDisabledModules] = useState<Set<ModuleId>>(new Set())
+
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/module-guide/steps')
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+        const [stepsRes, settingsRes] = await Promise.all([
+          fetch('/api/module-guide/steps'),
+          fetch('/api/module-guide/settings'),
+        ])
+
+        if (!stepsRes.ok) {
+          throw new Error(`HTTP ${stepsRes.status}: ${stepsRes.statusText}`)
         }
-        const data = await res.json()
+        const data = await stepsRes.json()
         setSteps(data)
         setOriginalSteps(JSON.parse(JSON.stringify(data)))
+
+        // Load disabled modules
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json()
+          const disabled = new Set<ModuleId>(settingsData.disabledModules ?? [])
+          setDisabledModules(disabled)
+          setOriginalDisabledModules(new Set(disabled))
+        }
+
         // Open all modules by default
         setOpenModules(new Set(MODULE_GUIDE_DISPLAY_ORDER))
       } catch (err) {
@@ -183,7 +407,30 @@ export default function BeheerModuleGuidePage() {
       }
     }
   }
-  const hasAnyChanges = changedModules.size > 0
+  // Check if disabled modules changed
+  const disabledModulesChanged = (() => {
+    if (disabledModules.size !== originalDisabledModules.size) return true
+    for (const id of disabledModules) {
+      if (!originalDisabledModules.has(id)) return true
+    }
+    return false
+  })()
+
+  const hasAnyChanges = changedModules.size > 0 || disabledModulesChanged
+
+  // ── Toggle module enabled/disabled ────────────────────────
+  const handleToggleEnabled = useCallback((moduleId: ModuleId) => {
+    setDisabledModules((prev) => {
+      const next = new Set(prev)
+      if (next.has(moduleId)) {
+        next.delete(moduleId)
+      } else {
+        next.add(moduleId)
+      }
+      return next
+    })
+    setSaveMessage(null)
+  }, [])
 
   // ── Move step up or down ──────────────────────────────────
   const handleMoveStep = useCallback(
@@ -206,29 +453,107 @@ export default function BeheerModuleGuidePage() {
     [],
   )
 
+  // ── Inline edit handler ───────────────────────────────────
+  const handleUpdateStep = useCallback(
+    (moduleId: ModuleId, stepIdx: number, field: 'label' | 'href', value: string) => {
+      setSteps((prev) => {
+        if (!prev) return prev
+        const moduleSteps = [...(prev[moduleId] ?? [])]
+        const step = { ...moduleSteps[stepIdx] }
+        if (!step) return prev
+        if (field === 'label') {
+          step.label = value
+        } else {
+          step.href = value || undefined
+        }
+        moduleSteps[stepIdx] = step
+        return { ...prev, [moduleId]: moduleSteps }
+      })
+      setSaveMessage(null)
+    },
+    [],
+  )
+
+  // ── Add step handler ──────────────────────────────────────
+  const handleAddStep = useCallback(
+    (moduleId: ModuleId) => {
+      setSteps((prev) => {
+        if (!prev) return prev
+        const moduleSteps = [...(prev[moduleId] ?? [])]
+        const timestamp = Date.now().toString(36)
+        const newStep: ModuleGuideStep = {
+          key: `${moduleId}_new_${timestamp}`,
+          label: '',
+        }
+        moduleSteps.push(newStep)
+        return { ...prev, [moduleId]: moduleSteps }
+      })
+      setSaveMessage(null)
+    },
+    [],
+  )
+
+  // ── Delete step handler ──────────────────────────────────
+  const handleDeleteStep = useCallback(
+    (moduleId: ModuleId, stepIdx: number) => {
+      setSteps((prev) => {
+        if (!prev) return prev
+        const moduleSteps = [...(prev[moduleId] ?? [])]
+        moduleSteps.splice(stepIdx, 1)
+        return { ...prev, [moduleId]: moduleSteps }
+      })
+      setSaveMessage(null)
+    },
+    [],
+  )
+
   // ── Save changes ──────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!steps) return
     setSaving(true)
     setSaveMessage(null)
     try {
-      const res = await fetch('/api/module-guide/steps', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(steps),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? `HTTP ${res.status}`)
+      // Save steps and disabled modules in parallel
+      const promises: Promise<Response>[] = []
+
+      if (changedModules.size > 0) {
+        promises.push(
+          fetch('/api/module-guide/steps', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(steps),
+          }),
+        )
       }
+
+      if (disabledModulesChanged) {
+        promises.push(
+          fetch('/api/module-guide/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ disabledModules: Array.from(disabledModules) }),
+          }),
+        )
+      }
+
+      const results = await Promise.all(promises)
+
+      for (const res of results) {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error ?? `HTTP ${res.status}`)
+        }
+      }
+
       setOriginalSteps(JSON.parse(JSON.stringify(steps)))
-      setSaveMessage('Volgorde opgeslagen!')
+      setOriginalDisabledModules(new Set(disabledModules))
+      setSaveMessage('Instellingen opgeslagen!')
     } catch (err) {
       setSaveMessage(`Fout: ${err instanceof Error ? err.message : 'Opslaan mislukt'}`)
     } finally {
       setSaving(false)
     }
-  }, [steps])
+  }, [steps, disabledModules, changedModules.size, disabledModulesChanged])
 
   const toggleModule = (id: ModuleId) => {
     setOpenModules((prev) => {
@@ -270,6 +595,7 @@ export default function BeheerModuleGuidePage() {
     (sum, id) => sum + (steps[id]?.length ?? 0),
     0,
   )
+  const enabledCount = MODULE_GUIDE_DISPLAY_ORDER.filter((id) => !disabledModules.has(id)).length
 
   return (
     <div className="space-y-6">
@@ -278,8 +604,8 @@ export default function BeheerModuleGuidePage() {
         <div>
           <h2 className="text-lg font-bold text-[var(--ink)]">Module Guide Stappen</h2>
           <p className="mt-1 text-sm text-[var(--ink-3)]">
-            Overzicht van alle onboarding-stappen per module ({totalSteps} stappen over {MODULE_GUIDE_DISPLAY_ORDER.length} modules).
-            Gebruik de pijlen om stappen te herordenen.
+            Overzicht van alle onboarding-stappen per module ({totalSteps} stappen over {MODULE_GUIDE_DISPLAY_ORDER.length} modules, {enabledCount} actief).
+            Klik op een label of href om te bewerken. Gebruik de toggles om modules in/uit te schakelen.
           </p>
         </div>
 
@@ -323,7 +649,12 @@ export default function BeheerModuleGuidePage() {
             isOpen={openModules.has(moduleId)}
             onToggle={() => toggleModule(moduleId)}
             onMoveStep={handleMoveStep}
+            onUpdateStep={handleUpdateStep}
+            onAddStep={handleAddStep}
+            onDeleteStep={handleDeleteStep}
             hasChanges={changedModules.has(moduleId)}
+            enabled={!disabledModules.has(moduleId)}
+            onToggleEnabled={() => handleToggleEnabled(moduleId)}
           />
         ))}
       </div>
