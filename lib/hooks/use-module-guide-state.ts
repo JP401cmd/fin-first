@@ -4,6 +4,32 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { ModuleId } from '@/lib/module-registry'
 import { DEFAULT_MODULE_GUIDE_STEPS } from '@/lib/briefing/module-guide-steps'
 
+// ── Disabled modules cache (shared across hook instances) ────
+let _disabledModulesCache: Set<ModuleId> | null = null
+let _disabledModulesFetchPromise: Promise<Set<ModuleId>> | null = null
+
+async function fetchDisabledModules(): Promise<Set<ModuleId>> {
+  if (_disabledModulesCache) return _disabledModulesCache
+  if (_disabledModulesFetchPromise) return _disabledModulesFetchPromise
+
+  _disabledModulesFetchPromise = (async () => {
+    try {
+      const res = await fetch('/api/module-guide/settings')
+      if (!res.ok) return new Set<ModuleId>()
+      const data = await res.json()
+      const set = new Set<ModuleId>(data.disabledModules ?? [])
+      _disabledModulesCache = set
+      return set
+    } catch {
+      return new Set<ModuleId>()
+    } finally {
+      _disabledModulesFetchPromise = null
+    }
+  })()
+
+  return _disabledModulesFetchPromise
+}
+
 // ── Types ──────────────────────────────────────────────────────
 
 export interface ModuleGuideProgress {
@@ -24,6 +50,7 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
   const [state, setState] = useState<ModuleGuideState>(initialState ?? {})
   const [loading, setLoading] = useState(!initialState)
   const [error, setError] = useState<string | null>(null)
+  const [disabledModules, setDisabledModules] = useState<Set<ModuleId>>(new Set())
   const fetchedRef = useRef(false)
 
   // ── Fetch state from API on mount (if no initial state provided) ──
@@ -34,10 +61,14 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
 
     async function fetchState() {
       try {
-        const res = await fetch('/api/module-guide/progress')
-        if (!res.ok) throw new Error('Failed to fetch')
-        const data = await res.json()
+        const [progressRes, disabled] = await Promise.all([
+          fetch('/api/module-guide/progress'),
+          fetchDisabledModules(),
+        ])
+        if (!progressRes.ok) throw new Error('Failed to fetch')
+        const data = await progressRes.json()
         setState(data ?? {})
+        setDisabledModules(disabled)
       } catch {
         setError('Kon voortgang niet laden')
       } finally {
@@ -135,9 +166,12 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
     [state],
   )
 
-  /** Check if a module guide card should be visible (not dismissed and not all steps done) */
+  /** Check if a module guide card should be visible (not dismissed, not all steps done, and module not disabled) */
   const isCardVisible = useCallback(
     (moduleId: ModuleId): boolean => {
+      // If module is disabled by admin, never show card
+      if (disabledModules.has(moduleId)) return false
+
       const progress = state[moduleId]
 
       // If dismissed, not visible
@@ -152,7 +186,7 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
 
       return true
     },
-    [state],
+    [state, disabledModules],
   )
 
   return {

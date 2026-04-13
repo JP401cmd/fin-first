@@ -1,3 +1,36 @@
+## Session 2026-04-13 - Features #740, #742
+
+### Feature #740: useModuleGuideState() hook met optimistic updates - PASSING
+- Created lib/hooks/use-module-guide-state.ts
+- Hook reads module_guide_state via GET /api/module-guide/progress (fetches on mount or accepts initialState)
+- toggleStep(moduleId, stepKey): adds/removes stepKey from completedSteps with optimistic update
+- dismissCard(moduleId): sets dismissedAt timestamp with optimistic update
+- Rollback on API error for both operations
+- isCardVisible(moduleId): returns false if dismissed or all steps completed
+- isStepComplete(moduleId, stepKey): checks if stepKey in completedSteps
+- Sends action-based PUT requests matching the server-side API pattern
+- TypeScript compiles cleanly, API endpoint returns {} gracefully when column migration pending
+
+### Feature #742: Module-guide-card component met vinkbare stappen - PASSING
+- Created components/daishboard/cards/module-guide-card.tsx
+- Uses BriefingCard as shell with module accent colors (kern/wil/horizon/cross)
+- Module-to-accent mapping: budgetteren/vermogensregistratie/aandelenregistratie→kern, inzicht_acties→wil, toekomstplannen→horizon, nieuws→cross
+- Header: title + X dismiss button calling dismissCard()
+- Steps: clickable check circles (empty Circle → green Check) with toggleStep()
+- Completed steps: strikethrough text + green check, no longer wrapped in link
+- Uncompleted steps with href: wrapped in Next.js Link component
+- Uses useModuleGuideState() hook for state management
+- Verified visually with browser automation: 3 test cards rendered correctly
+- Only console error: expected 503 from PUT when DB column migration not yet applied
+
+### Files Modified
+- lib/hooks/use-module-guide-state.ts — new hook
+- components/daishboard/cards/module-guide-card.tsx — new component
+- app/api/module-guide/progress/route.ts — already committed by #741 agent
+
+### Current Status
+- 2 features completed this session (#740, #742)
+
 ## Session 2026-04-13 - Features #737, #741
 
 ### Feature #737: DB-migratie: profiles.module_guide_state JSONB kolom - PASSING
