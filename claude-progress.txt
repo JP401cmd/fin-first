@@ -1,3 +1,25 @@
+## Session 2026-04-13 - Features #747, #759
+
+### Feature #747: Module-guide-kaarten met module-accentkleuren - PASSING
+- MODULE_ACCENT mapping already correct: budgetteren/vermogensregistratie/aandelenregistratie→kern, inzicht_acties→wil, toekomstplannen→horizon, nieuws→cross
+- Changed ACCENT_CLASSES dotDone from module colors to emerald-500 (green) for all modules
+- Consistent with ChecklistCard pattern: green checkmark for done, neutral circle for open
+- Timeline lines retain module accent colors (kern-400, wil-400, horizon-400) for visual hierarchy
+- BriefingCard module prop provides correct accent bar per module
+- Verified visually: green checkmark on completed step, module-colored empty circles on open steps
+- Commit: 9650f966
+
+### Feature #759: Module-guide-card consistent met BriefingCard en ChecklistCard - PASSING
+- Verification-only: all patterns already match after #747 changes
+- BriefingCard as outer shell: same border-radius, padding (p-4 pb-6), shadow ✓
+- Checkmarks: emerald-500 green for done, line-through text ✓ (matches ChecklistCard lines 19-29)
+- Typography: text-sm font-semibold for title, text-xs for steps ✓
+- X button: text-[var(--ink-4)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] ✓
+- Visually coherent alongside other briefing cards ✓
+
+### Current Status
+- 2 features completed this session (#747, #759)
+
 ## Session 2026-04-13 - Features #745, #761
 
 ### Feature #745: Step-key reconciliatie voor orphaned keys - PASSING
@@ -23789,3 +23811,23 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#754, #755)
+
+## Session 2026-04-13 - Feature #762
+
+### Feature #762: Module-guide stap-links navigeren naar juiste pagina - PASSING
+- Verified existing implementation in components/daishboard/cards/module-guide-card.tsx
+- ModuleGuideCard already correctly implements all navigation behavior:
+  - Unchecked steps with href wrapped in Next.js <Link> component
+  - Checked steps rendered as plain text (no link, no navigation)
+  - Steps without href: only checkable via timeline dot button
+  - All links use same-tab navigation (no target="_blank")
+- All hrefs verified in lib/briefing/module-guide-steps.ts:
+  /core/budgets, /core, /core/assets, /core/belasting, /will, /horizon, /identity/instellingen, /nieuws
+- Browser tested: clicked links to /core/budgets, /core/assets, /identity/instellingen, /horizon — all correct
+- Checked step toggle verified: checked step loses link, unchecked step gains link
+- No code changes needed (verification only)
+- Console errors unrelated to feature (briefing 403, net_worth 400 — pre-existing)
+
+### Current Status
+- 1 feature completed this session (#762)
+- Overall progress: 755/762 passing (99.1%)
