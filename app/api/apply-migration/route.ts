@@ -548,6 +548,12 @@ $$ LANGUAGE plpgsql`,
   `ALTER TABLE public.profiles ADD CONSTRAINT profiles_fire_end_strategy_check
     CHECK (fire_end_strategy IS NULL OR fire_end_strategy IN ('perpetual', 'legacy', 'deplete', 'pensioen'))`,
 
+  // ── 20260413000001: Onboarding intent column ────────────────────────
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS onboarding_intent text`,
+
+  // ── 20260413000002: Module guide state JSONB column ────────────────
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS module_guide_state JSONB NOT NULL DEFAULT '{}'`,
+
   // ── PostgREST schema cache reload ───────────────────────────────────
   `NOTIFY pgrst, 'reload schema'`,
 ]
@@ -712,7 +718,7 @@ export async function GET() {
   }
 
   // Check profiles columns
-  const profileColumns = ['onboarding_idempotency_key', 'invulfase_active', 'withdrawal_strategy', 'guardrail_floor', 'guardrail_ceiling', 'guardrail_cut_step', 'guardrail_raise_step', 'marginaal_tarief']
+  const profileColumns = ['onboarding_idempotency_key', 'invulfase_active', 'withdrawal_strategy', 'guardrail_floor', 'guardrail_ceiling', 'guardrail_cut_step', 'guardrail_raise_step', 'marginaal_tarief', 'onboarding_intent', 'module_guide_state']
   const profileColumnStatus: Record<string, boolean> = {}
   for (const col of profileColumns) {
     const { error } = await supabase.from('profiles').select(col).limit(0)
