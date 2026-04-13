@@ -1,3 +1,36 @@
+## Session 2026-04-13 - Features #743, #744
+
+### Feature #743: Module-guide-card dismiss via kruisje is permanent - PASSING
+- Verified existing implementation: X button calls dismissCard(moduleId) via useModuleGuideState
+- Optimistic update removes card immediately, API persists dismissedAt to DB
+- isCardVisible checks dismissedAt BEFORE steps-check (line 178 vs 181)
+- Admin adding new steps doesn't resurface dismissed cards (dismissedAt takes priority)
+- Added handleDismiss() with setHidden(true) for immediate local DOM removal
+- No code changes needed for core dismiss logic (validation only)
+
+### Feature #744: Alle stappen afgevinkt: kaart toont voltooiing en verdwijnt - PASSING
+- Added isAllComplete() helper to useModuleGuideState hook (reconciles against catalog)
+- ModuleGuideCard detects all-complete state via isAllComplete(moduleId)
+- Shows "Alles afgerond!" celebration UI: green CheckCircle2 icon + module title + "Sluiten" button
+- Auto fade-out after 4 seconds (CSS opacity-0 scale-95 transition)
+- Calls dismissCard() after 4.5s (4s + 0.5s fade) for permanent DB persistence
+- Early close: "Sluiten" button triggers immediate fade + dismiss
+- Used dismissCardRef pattern to avoid effect dependency on changing dismissCard function
+- Added hidden state for immediate DOM removal (grid uses separate hook instance)
+- API fallback: stores module_guide_state in feature_preferences when column doesn't exist
+- API handles missing onboarding_intent column gracefully (defaults to true)
+- Verified: celebration shows, card auto-dismisses, persists across page refresh
+- Commit: 9f7d580d
+
+### Files Modified
+- components/daishboard/cards/module-guide-card.tsx — celebration state, fade-out, early close, handleDismiss
+- app/api/module-guide/progress/route.ts — feature_preferences fallback, onboarding_intent graceful handling
+- lib/hooks/use-module-guide-state.ts — isAllComplete(), getReconciledSteps(), removed all-done from isCardVisible
+
+### Current Status
+- 2 features completed this session (#743, #744)
+- Overall progress: 747/762 passing (98.0%)
+
 ## Session 2026-04-13 - Features #747, #759
 
 ### Feature #747: Module-guide-kaarten met module-accentkleuren - PASSING
