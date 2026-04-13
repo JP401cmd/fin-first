@@ -2,6 +2,7 @@
 // Types for Will's AI-driven dashboard briefing system.
 
 import type { WidgetModule } from '@/lib/widget-catalog'
+import type { ModuleId } from '@/lib/module-registry'
 
 // ── Temporal Context ────────────────────────────────────────
 
@@ -210,6 +211,14 @@ export interface FreedomDaysTrendCardSpec {
   href?: string
 }
 
+export interface ModuleGuideCardSpec {
+  type: 'moduleGuide'
+  moduleId: ModuleId
+  module: CardModule
+  title: string
+  steps: { key: string; label: string; href?: string }[]
+}
+
 // ── Union Type ──────────────────────────────────────────────
 
 export type BriefingCardSpec =
@@ -232,6 +241,7 @@ export type BriefingCardSpec =
   | DiscoverCardSpec
   | DecisionPatternsCardSpec
   | FreedomDaysTrendCardSpec
+  | ModuleGuideCardSpec
 
 // ── SSE Event Types ─────────────────────────────────────────
 
@@ -318,4 +328,5 @@ export const CARD_SPAN: Record<BriefingCardSpec['type'], number> = {
   discover: 2,
   decisionPatterns: 2,
   freedomDaysTrend: 2,
+  moduleGuide: 2,
 }
