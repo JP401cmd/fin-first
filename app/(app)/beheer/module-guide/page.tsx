@@ -11,7 +11,9 @@ import {
   ArrowDown,
   Plus,
   Trash2,
+  RotateCcw,
 } from 'lucide-react'
+import { DEFAULT_MODULE_GUIDE_STEPS } from '@/lib/briefing/module-guide-steps'
 import { MODULE_CATALOG } from '@/lib/module-registry'
 import { MODULE_GUIDE_DISPLAY_ORDER, type ModuleGuideStep } from '@/lib/briefing/module-guide-steps'
 import type { ModuleId } from '@/lib/module-registry'
@@ -357,6 +359,8 @@ export default function BeheerModuleGuidePage() {
   const [error, setError] = useState<string | null>(null)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [openModules, setOpenModules] = useState<Set<ModuleId>>(new Set())
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   // ── Disabled modules state ────────────────────────────────
   const [disabledModules, setDisabledModules] = useState<Set<ModuleId>>(new Set())
@@ -555,6 +559,42 @@ export default function BeheerModuleGuidePage() {
     }
   }, [steps, disabledModules, changedModules.size, disabledModulesChanged])
 
+  // ── Reset to defaults ──────────────────────────────────────
+  const handleReset = useCallback(async () => {
+    setResetting(true)
+    setSaveMessage(null)
+    try {
+      const res = await fetch('/api/module-guide/steps', { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? `HTTP ${res.status}`)
+      }
+
+      // Reset steps to hardcoded defaults
+      const defaults = JSON.parse(JSON.stringify(DEFAULT_MODULE_GUIDE_STEPS))
+      setSteps(defaults)
+      setOriginalSteps(JSON.parse(JSON.stringify(defaults)))
+
+      // Also reset disabled modules
+      setDisabledModules(new Set())
+      setOriginalDisabledModules(new Set())
+
+      // Reset disabled modules in DB too
+      await fetch('/api/module-guide/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disabledModules: [] }),
+      })
+
+      setSaveMessage('Alle stappen teruggezet naar standaardwaarden.')
+      setShowResetConfirm(false)
+    } catch (err) {
+      setSaveMessage(`Fout: ${err instanceof Error ? err.message : 'Reset mislukt'}`)
+    } finally {
+      setResetting(false)
+    }
+  }, [])
+
   const toggleModule = (id: ModuleId) => {
     setOpenModules((prev) => {
       const next = new Set(prev)
@@ -636,8 +676,51 @@ export default function BeheerModuleGuidePage() {
               {saveMessage}
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            disabled={resetting}
+            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:border-red-300 hover:text-red-600 hover:bg-red-50"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset naar defaults
+          </button>
         </div>
       </div>
+
+      {/* Reset Confirmation Dialog */}
+      {showResetConfirm && (
+        <div className="rounded-[var(--r)] border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-800">
+            Weet je het zeker?
+          </p>
+          <p className="mt-1 text-xs text-red-600">
+            Alle aangepaste stappen, volgorde en module-instellingen worden teruggezet naar de standaardwaarden. Dit kan niet ongedaan worden gemaakt.
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={resetting}
+              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-red-600 bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700"
+            >
+              {resetting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RotateCcw className="h-3.5 w-3.5" />
+              )}
+              Ja, reset naar defaults
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowResetConfirm(false)}
+              className="rounded-[var(--r)] border border-[var(--border-md)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+            >
+              Annuleren
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Module Sections */}
       <div className="space-y-3">

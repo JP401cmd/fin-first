@@ -107,3 +107,27 @@ export async function PUT(request: NextRequest) {
 
   return NextResponse.json(body)
 }
+
+// ── DELETE — Reset to defaults (remove app_settings override) ─────
+
+export async function DELETE() {
+  const supabase = await createClient()
+
+  if (!(await isSuperAdmin(supabase))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { error } = await supabase
+    .from('app_settings')
+    .delete()
+    .eq('key', 'module_guide_steps')
+
+  if (error) {
+    return NextResponse.json(
+      { error: 'Failed to delete configuration' },
+      { status: 500 },
+    )
+  }
+
+  return NextResponse.json(DEFAULT_MODULE_GUIDE_STEPS)
+}
