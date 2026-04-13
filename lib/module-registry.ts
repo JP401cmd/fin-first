@@ -14,7 +14,16 @@ export type ModuleId =
   | 'toekomstplannen'
   | 'nieuws'
 
-/** Onboarding persona presets — each maps to a default set of modules */
+/** Onboarding intent presets — each maps to a default set of modules */
+export type IntentId =
+  | 'coaching'
+  | 'grip_uitgaven'
+  | 'overzicht_geld'
+  | 'toekomst'
+  | 'alles'
+  | 'nieuws'
+
+/** @deprecated Use IntentId instead */
 export type PersonaId =
   | 'budgetteerder'
   | 'vermogensverdeler'
@@ -102,9 +111,22 @@ export const MODULE_CATALOG: ModuleDef[] = [
 
 export const ALL_MODULES: ModuleId[] = MODULE_CATALOG.map((m) => m.id)
 
-// ── Persona Presets ──────────────────────────────────────────────────────────
-// Default module sets per onboarding persona.
+// ── Intent Presets ───────────────────────────────────────────────────────────
+// Default module sets per onboarding intent.
 
+export const INTENT_MODULE_PRESETS: Record<IntentId, ModuleId[]> = {
+  coaching: ['budgetteren', 'inzicht_acties'],
+  grip_uitgaven: ['budgetteren'],
+  overzicht_geld: ['vermogensregistratie'],
+  toekomst: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
+  alles: [...ALL_MODULES],
+  nieuws: ['nieuws'],
+}
+
+// ── Persona Presets (deprecated) ────────────────────────────────────────────
+// @deprecated Use INTENT_MODULE_PRESETS instead.
+
+/** @deprecated Use INTENT_MODULE_PRESETS instead */
 export const PERSONA_MODULE_PRESETS: Record<PersonaId, ModuleId[]> = {
   budgetteerder: ['budgetteren'],
   vermogensverdeler: ['vermogensregistratie', 'inzicht_acties'],
