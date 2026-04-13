@@ -62,18 +62,18 @@ const INTENTS: IntentDef[] = [
     emoji: '\uD83D\uDD2D',
   },
   {
-    id: 'alles',
-    name: 'Alles',
-    tagline: 'Maximale inzichten',
-    description: 'Ik wil alles \u2014 budgetteren, vermogen, toekomst en meer',
-    emoji: '\uD83D\uDD25',
-  },
-  {
     id: 'nieuws',
     name: 'Nieuws',
     tagline: 'Financieel nieuws',
     description: 'Ik wil op de hoogte blijven van financieel nieuws en marktinzichten',
     emoji: '\uD83D\uDCF0',
+  },
+  {
+    id: 'alles',
+    name: 'Alles',
+    tagline: 'Maximale inzichten',
+    description: 'Ik wil alles \u2014 budgetteren, vermogen, toekomst en meer',
+    emoji: '\uD83D\uDD25',
   },
 ]
 
@@ -174,8 +174,8 @@ export function OnboardingIntent({
         Wat wil je bereiken?
       </h2>
 
-      {/* Intent cards grid */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* Intent cards grid — coaching spans full width, others in 2-col grid */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {INTENTS.map((intent) => {
           const isSelected = selectedIntent === intent.id
           const isPrimary = intent.primary
@@ -185,7 +185,11 @@ export function OnboardingIntent({
               key={intent.id}
               type="button"
               onClick={() => onSelect(intent.id)}
-              className={`group w-full min-h-[48px] cursor-pointer rounded-xl border-2 p-4 text-left transition-all active:scale-[0.99] ${
+              className={`group w-full cursor-pointer rounded-xl border-2 text-left transition-all duration-150 active:scale-[0.99] outline-none focus-visible:ring-2 focus-visible:ring-wil-400 focus-visible:ring-offset-2 ${
+                isPrimary
+                  ? 'sm:col-span-2 lg:col-span-3 p-5'
+                  : 'p-4'
+              } ${
                 isPrimary && !isSelected
                   ? 'border-wil-200 bg-wil-50/30 hover:border-wil-300 hover:shadow-md'
                   : ''
@@ -193,15 +197,15 @@ export function OnboardingIntent({
                 isSelected
                   ? 'border-wil-500 bg-wil-50/60 shadow-sm'
                   : !isPrimary
-                    ? 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-md'
+                    ? 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-sm'
                     : ''
               }`}
             >
               <div className="flex items-start gap-3">
                 {/* Emoji icon */}
                 <div
-                  className={`flex shrink-0 items-center justify-center rounded-lg text-xl transition-colors ${
-                    isPrimary ? 'h-12 w-12 text-2xl' : 'h-10 w-10'
+                  className={`flex shrink-0 items-center justify-center rounded-lg transition-colors ${
+                    isPrimary ? 'h-14 w-14 text-2xl' : 'h-10 w-10 text-xl'
                   } ${
                     isSelected
                       ? 'bg-wil-100'
@@ -216,21 +220,30 @@ export function OnboardingIntent({
 
                 {/* Text content */}
                 <div className="min-w-0 flex-1">
-                  <h3
-                    className={`font-semibold leading-tight ${
-                      isPrimary ? 'text-base' : 'text-sm'
-                    } ${isSelected ? 'text-wil-900' : 'text-[var(--ink)]'}`}
-                  >
-                    {intent.name}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3
+                      className={`font-semibold leading-tight ${
+                        isPrimary ? 'text-base' : 'text-sm'
+                      } ${isSelected ? 'text-wil-900' : 'text-[var(--ink)]'}`}
+                    >
+                      {intent.name}
+                    </h3>
+                    {isPrimary && (
+                      <span className="inline-flex items-center rounded-full bg-wil-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-wil-700">
+                        Aanbevolen
+                      </span>
+                    )}
+                  </div>
                   <p
-                    className={`mt-0.5 text-xs font-medium ${
-                      isSelected ? 'text-wil-600' : 'text-[var(--ink-3)]'
-                    }`}
+                    className={`mt-0.5 font-medium ${
+                      isPrimary ? 'text-sm' : 'text-xs'
+                    } ${isSelected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`}
                   >
                     {intent.tagline}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--ink-4)] leading-snug">
+                  <p className={`mt-1 text-[var(--ink-4)] leading-snug ${
+                    isPrimary ? 'text-sm' : 'text-xs'
+                  }`}>
                     {intent.description}
                   </p>
                 </div>
