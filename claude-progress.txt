@@ -1,3 +1,25 @@
+## Session 2026-04-13 - Features #732, #733
+
+### Feature #732: computeStepOrder werkt correct per intentie - PASSING
+- Fixed bezittingen condition in computeStepOrder: changed `has('budgetteren')` to `has('inzicht_acties')`
+- grip_uitgaven (budgetteren only) now correctly skips bezittingen step
+- coaching (budgetteren + inzicht_acties) still gets bezittingen via inzicht_acties
+- Updated regression tests in onboarding-flow.ts (Budgetteerder test, dynamic-step-order, nieuws+budgetteren)
+- All 6 intents verified: coaching, grip_uitgaven, overzicht_geld, toekomst, alles, nieuws
+- All 16 unit tests passing
+- Commit: 1bd276a5
+
+### Feature #733: Onboarding completion routeert naar first-win pagina - PASSING
+- Already implemented in previous session (#724/#734)
+- Verified: getFirstWinPath(state.intent) used after success step
+- Verified: getHomePath(state.activeModules) as fallback when intent is null
+- Verified: getHomePath() still used in app-header.tsx for returning sessions
+- No code changes needed (verification only)
+
+### Current Status
+- 2 features completed this session (#732, #733)
+- Overall progress: 746/762 passing (97.9%)
+
 ## Session 2026-04-13 - Features #740, #742
 
 ### Feature #740: useModuleGuideState() hook met optimistic updates - PASSING
@@ -23567,3 +23589,81 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#728, #730)
+
+## Session 2026-04-13 - Features #729, #764
+
+### Feature #729: localStorage healing migratie voor oude onboarding drafts - PASSING
+- Added LEGACY_STEP_MAP inside _resolveRestoredStep() for direct mapping: modules→intent, persona→intent, extras→bezittingen
+- This makes the function self-contained — old step names resolve correctly even when called directly (not just via loadFromLocalStorage)
+- loadFromLocalStorage already had these mappings (lines 428-430), this adds defense-in-depth
+- Added 3 unit tests verifying direct legacy step healing in page.test.tsx
+- All 16 tests passing
+- Commit: ec198029
+
+### Feature #764: Regression tests bijwerken voor module-nudges suite - PASSING
+- Added 7 new intent-based regression tests to module-nudges.ts:
+  - intent-presets-all-six: verifies all 6 IntentId entries exist with non-empty arrays
+  - intent-presets-specific-modules: verifies exact module contents per intent
+  - intent-first-win-path-all: verifies getFirstWinPath() returns correct path per intent
+  - intent-localstorage-healing-modules: verifies 'modules' → 'intent' healing
+  - intent-localstorage-healing-persona: verifies 'persona' → 'intent' healing
+  - intent-localstorage-healing-extras: verifies 'extras' → 'bezittingen' healing
+  - intent-persona-deprecated-still-exists: verifies PERSONA_MODULE_PRESETS backwards compat
+- Added imports for IntentId, INTENT_MODULE_PRESETS, getFirstWinPath, PERSONA_MODULE_PRESETS, _resolveRestoredStep
+- Updated category description to include intent-based flow
+- TypeScript compiles clean
+- Commit: ec198029
+
+### Current Status
+- 2 features completed this session (#729, #764)
+- Overall progress: 740/762 passing (97.1%)
+
+## Session 2026-04-13 - Features #736, #756
+
+### Feature #736: Intentie opslaan in profiles tijdens saving-stap - PASSING
+- Added state.intent to onboarding save body payload (page.tsx)
+- Added intent field to bodySchema in save-own-data API (zod enum validation)
+- Added onboarding_intent to all profile write paths:
+  - RPC payload profile object
+  - Post-RPC profileUpdates
+  - Fallback profileData
+  - Already-completed update path
+- Column already exists: profiles.onboarding_intent (text, nullable)
+
+### Feature #756: AI pre-generatie voorstellen bij coaching/alles intentie - PASSING
+- After successful onboarding save, checks if intent is 'coaching' or 'alles'
+- Calls POST /api/ai/recommendations/initial synchronously
+- On failure: logs warning but doesn't block onboarding completion
+- Endpoint already existed and generates 3 AI recommendations stored in DB
+
+### Files Modified
+- app/(onboarding)/onboarding/page.tsx — intent body field + AI pre-generation call
+- app/api/onboarding/save-own-data/route.ts — intent schema + all profile write paths
+
+### Current Status
+- 2 features completed this session (#736, #756)
+
+## Session 2026-04-13 - Features #752, #753
+
+### Feature #752: Beheer: stappen inline bewerken - PASSING
+- Added InlineEdit component to beheer/module-guide/page.tsx
+- Click on label or href makes it editable (inline input)
+- Tab/Enter confirms edit, Escape cancels
+- Empty label validation ("Label mag niet leeg zijn")
+- Changes are local until Opslaan button clicked
+- autoEdit prop for auto-focusing newly added steps
+
+### Feature #753: Beheer: stappen toevoegen en verwijderen - PASSING
+- Added "Stap toevoegen" button at bottom of each module section
+- New steps get auto-generated key (moduleId_new_timestamp), empty label, no href
+- Auto-focus on new step label via autoEdit prop
+- Delete button (Trash2 icon) per step with inline Ja/Nee confirmation
+- Minimum 0 steps per module (all can be deleted)
+- All changes local until save
+- Commit: c55bd71c
+
+### Files Modified
+- app/(app)/beheer/module-guide/page.tsx — InlineEdit component, add/delete step handlers, delete confirmation UI
+
+### Current Status
+- 2 features completed this session (#752, #753)
