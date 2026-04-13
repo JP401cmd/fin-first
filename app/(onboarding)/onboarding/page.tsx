@@ -167,7 +167,7 @@ function computeStepOrder(selectedModules: ModuleId[]): Step[] {
   if (isNewsOnly) {
     steps.push('nieuws_only')
   } else {
-    if (has('vermogensregistratie') || has('budgetteren')) steps.push('bezittingen')
+    if (has('vermogensregistratie') || has('inzicht_acties')) steps.push('bezittingen')
     if (has('budgetteren')) steps.push('budgets')
     if (has('toekomstplannen')) steps.push('horizon')
   }
@@ -709,11 +709,15 @@ export default function OnboardingPage() {
       // Pre-generate AI recommendations for coaching/alles intents so /will isn't empty
       if (state.intent === 'coaching' || state.intent === 'alles') {
         try {
-          await fetch('/api/ai/recommendations/initial', { method: 'POST' })
-        } catch {
+          const res = await fetch('/api/ai/recommendations/initial', { method: 'POST' })
+          if (!res.ok) {
+            // eslint-disable-next-line no-console
+            console.error('[onboarding] AI pre-generation returned', res.status, res.statusText)
+          }
+        } catch (err) {
           // Non-blocking: log but don't prevent onboarding from completing
           // eslint-disable-next-line no-console
-          console.warn('[onboarding] AI pre-generation failed — /will may be empty initially')
+          console.error('[onboarding] AI pre-generation failed:', err)
         }
       }
 
