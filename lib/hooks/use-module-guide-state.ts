@@ -51,6 +51,7 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
   const [loading, setLoading] = useState(!initialState)
   const [error, setError] = useState<string | null>(null)
   const [disabledModules, setDisabledModules] = useState<Set<ModuleId>>(new Set())
+  const [hasOnboardingIntent, setHasOnboardingIntent] = useState(false)
   const fetchedRef = useRef(false)
 
   // ── Fetch state from API on mount (if no initial state provided) ──
@@ -67,7 +68,14 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
         ])
         if (!progressRes.ok) throw new Error('Failed to fetch')
         const data = await progressRes.json()
-        setState(data ?? {})
+        // Support both old shape (bare state object) and new shape ({ state, hasOnboardingIntent })
+        if (data && typeof data === 'object' && 'state' in data) {
+          setState(data.state ?? {})
+          setHasOnboardingIntent(!!data.hasOnboardingIntent)
+        } else {
+          setState(data ?? {})
+          setHasOnboardingIntent(false)
+        }
         setDisabledModules(disabled)
       } catch {
         setError('Kon voortgang niet laden')
@@ -158,9 +166,28 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
 
   // ── Helpers ──────────────────────────────────────────────────
 
-  /** Check if a specific step is completed */
+  /**
+   * Reconcile completedSteps against the current step catalog.
+   * Filters out orphaned keys (from deleted steps) so they are never
+   * counted or displayed. New catalog steps not in completedSteps
+   * naturally appear as unchecked.
+   */
+  const getReconciledSteps = useCallback(
+    (moduleId: ModuleId): string[] => {
+      const catalogSteps = DEFAULT_MODULE_GUIDE_STEPS[moduleId]
+      const progress = state[moduleId]
+      if (!catalogSteps || !progress?.completedSteps) return []
+      const catalogKeys = new Set(catalogSteps.map((s) => s.key))
+      return progress.completedSteps.filter((key) => catalogKeys.has(key))
+    },
+    [state],
+  )
+
+  /** Check if a specific step is completed (only if step exists in current catalog) */
   const isStepComplete = useCallback(
     (moduleId: ModuleId, stepKey: string): boolean => {
+      const catalogSteps = DEFAULT_MODULE_GUIDE_STEPS[moduleId]
+      if (!catalogSteps?.some((s) => s.key === stepKey)) return false
       return state[moduleId]?.completedSteps?.includes(stepKey) ?? false
     },
     [state],
@@ -186,26 +213,27 @@ export function useModuleGuideState(initialState?: ModuleGuideState) {
     [state, disabledModules],
   )
 
-  /** Check if all steps for a module are completed (against current catalog) */
+  /** Check if all steps for a module are completed (against current catalog, ignoring orphaned keys) */
   const isAllComplete = useCallback(
     (moduleId: ModuleId): boolean => {
       const steps = DEFAULT_MODULE_GUIDE_STEPS[moduleId]
-      const progress = state[moduleId]
       if (!steps || steps.length === 0) return false
-      if (!progress?.completedSteps) return false
-      return steps.every((s) => progress.completedSteps.includes(s.key))
+      const reconciled = getReconciledSteps(moduleId)
+      return steps.every((s) => reconciled.includes(s.key))
     },
-    [state],
+    [getReconciledSteps],
   )
 
   return {
     state,
     loading,
     error,
+    hasOnboardingIntent,
     toggleStep,
     dismissCard,
     isStepComplete,
     isCardVisible,
     isAllComplete,
+    getReconciledSteps,
   }
 }

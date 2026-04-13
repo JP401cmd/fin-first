@@ -77,14 +77,17 @@ const MODULE_CARD_MODULE: Record<ModuleId, CardModule> = {
 
 export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: BriefingCardGridProps) {
   const { activeModules } = useModuleAccess()
-  const { isCardVisible } = useModuleGuideState()
+  const { isCardVisible, hasOnboardingIntent } = useModuleGuideState()
   const guideSteps = getModuleGuideSteps()
 
   // Fallback step for inzicht_acties when AI pre-generation didn't produce recommendations
   const hasRecommendations = data.recommendations > 0
 
-  // Build module-guide cards: active modules, in display order, not dismissed/completed, not in-development
+  // Build module-guide cards: only for users who went through intent-based onboarding
   const guideCards = useMemo<ModuleGuideCardSpec[]>(() => {
+    // Users without onboarding_intent (existing users) don't see guide cards
+    if (!hasOnboardingIntent) return []
+
     return MODULE_GUIDE_DISPLAY_ORDER
       .filter((moduleId) => {
         // Only active modules
@@ -119,7 +122,7 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
           steps,
         }
       })
-  }, [activeModules, isCardVisible, guideSteps, hasRecommendations])
+  }, [activeModules, isCardVisible, guideSteps, hasRecommendations, hasOnboardingIntent])
 
   // Merge: guide cards first, then AI-generated cards
   const allCards: BriefingCardSpec[] = [...guideCards, ...cards]
