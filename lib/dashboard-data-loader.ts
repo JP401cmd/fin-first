@@ -217,7 +217,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
   // Asset breakdown per type
-  const assetsByType = Object.values(
+  type AssetGroup = { type: string; value: number; purchaseValue: number; weightedReturn: number }
+  const assetsByType = (Object.values(
     (assetsResult.data ?? []).reduce((acc, a) => {
       const type = (a as { asset_type?: string | null }).asset_type ?? 'other'
       if (!acc[type]) acc[type] = { type, value: 0, purchaseValue: 0, weightedReturn: 0 }
@@ -226,8 +227,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const assetReturn = resolveDepreciation(a as Asset) ? 0 : Number((a as { expected_return?: number | null }).expected_return ?? 0)
       acc[type].weightedReturn += Number(a.current_value) * assetReturn
       return acc
-    }, {} as Record<string, { type: string; value: number; purchaseValue: number; weightedReturn: number }>)
-  ).map(g => ({ ...g, expectedReturn: g.value > 0 ? g.weightedReturn / g.value : 0 }))
+    }, {} as Record<string, AssetGroup>)
+  ) as AssetGroup[]).map(g => ({ ...g, expectedReturn: g.value > 0 ? g.weightedReturn / g.value : 0 }))
    .sort((a, b) => b.value - a.value)
 
   const totalPurchaseValue = assetsByType.reduce((s, a) => s + a.purchaseValue, 0)
