@@ -77,6 +77,10 @@ De app is opgesplitst in schakelbare modules (zie `docs/superpowers/specs/2026-0
 
 2. **Fallback bij afgesloten modules.** Berekeningen die hun primaire databron uit een andere module halen, moeten altijd een fallback hebben voor als die module niet actief is. Voorbeeld: de spaarquote wordt automatisch berekend uit budgetdata, maar als Budgetteren uit staat moet er een alternatief pad zijn (bijv. handmatige invoer via check-in, of schatting op basis van netto-inkomsten en vermogensgroei). Bouw nooit een feature die stilzwijgend breekt of lege data toont omdat een andere module uit staat.
 
+## UI/UX Skill (verplicht)
+
+Gebruik **altijd** de `ui-ux` skill voor aanpassingen aan de UI/UX. De skilldefinitie staat in `.claude/commands/ui-ux.md` en moet leidend zijn bij elk visueel of interactie-ontwerp. Roep de skill aan vóór je UI-wijzigingen voorstelt of uitvoert.
+
 ## Guidelines
 
 1. Be concise and helpful
