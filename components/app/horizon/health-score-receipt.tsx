@@ -65,8 +65,12 @@ export function HealthScoreReceipt({
   overrideLabel,
   footer,
 }: HealthScoreReceiptProps) {
-  const displayTotal = overrideTotal ?? health.total
-  const displayLabel = overrideLabel ?? health.label
+  // Always use the live computed total from the weighted average of pillars.
+  // The overrideTotal (from snapshot) is stale and decoupled from the
+  // per-pillar scores displayed below — using it causes the total to not
+  // match the visible weighted average.
+  const displayTotal = health.total
+  const displayLabel = health.label
 
   // Sort pillars: weakest first for improvement focus
   const sorted = [...health.pillars].sort((a, b) => a.score - b.score)

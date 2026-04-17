@@ -16,6 +16,7 @@ import { type SavingsRateMethod, computeSavingsRateFromNetWorthDelta } from '@/l
 import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
 import { resolveFireParams } from '@/lib/fire-params'
 import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
+import { ALL_MODULES } from '@/lib/module-registry'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -213,7 +214,7 @@ export const loadCoreData = cache(async function loadCoreData(
   const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
   const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
   const budgetingActive = profileResult.data?.budgeting_active !== false
-  const activeModules: string[] = (profileResult.data?.active_modules as string[] | null) ?? []
+  const activeModules: string[] = (profileResult.data?.active_modules as string[] | null) ?? [...ALL_MODULES]
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
   // ── Last 12 months income — extrapolate if less than 12 months of data ──
@@ -285,9 +286,12 @@ export const loadCoreData = cache(async function loadCoreData(
   )
 
   const activeRetirementMethod = (profileResult.data?.retirement_expense_method as RetirementExpenseMethod) ?? 'essential_budgets'
+  // When budgeting is off, don't use (potentially stale) essential budget data
+  // for retirement expenses — pass 0 so the fallback to estimatedYearlyExpenses kicks in
+  const effectiveMustExpenses = budgetingActive ? yearlyMustExpenses : 0
   const yearlyRetirementExpenses = computeRetirementExpenses(
-    activeRetirementMethod,
-    yearlyMustExpenses,
+    budgetingActive ? activeRetirementMethod : activeRetirementMethod,
+    effectiveMustExpenses,
     extrapolatedIncome,
     profileResult.data?.retirement_expense_custom_amount,
     profileMonthlyExpenses * 12,
@@ -343,7 +347,7 @@ export const loadCoreData = cache(async function loadCoreData(
     totalAssets: effectiveTotalAssets,
     totalDebts: effectiveTotalDebts,
     extrapolatedIncome,
-    yearlyMustExpenses,
+    yearlyMustExpenses: effectiveMustExpenses,
     yearlyRetirementExpenses,
   }
 

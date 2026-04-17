@@ -1355,52 +1355,68 @@ function SectionHeader({ icon, title, subtitle, color, count, expanded, onToggle
 
 // ── Savings rate section ───────────────────────────────────────
 
-function SavingsRateTable({ assets, debts, profileMonthlyIncome, profileSavingsRate }: {
+function SavingsRateTable({ assets, debts, profileMonthlyIncome, profileSavingsRate, estimatedYearlyIncome, savingsRate6m }: {
   assets: Asset[]
   debts: Debt[]
   profileMonthlyIncome: number
   profileSavingsRate: number
+  estimatedYearlyIncome: number
+  savingsRate6m: number
 }) {
   const totalContributions = assets.reduce((sum, a) => sum + Number(a.monthly_contribution), 0)
   const totalDebtPayments = debts.reduce((sum, d) => sum + Number(d.monthly_payment), 0)
   const monthlySavings = totalContributions + totalDebtPayments
   const computedRate = profileMonthlyIncome > 0 ? (monthlySavings / profileMonthlyIncome) * 100 : 0
+  const monthlyFromYearly = estimatedYearlyIncome / 12
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
       <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
         <h3 className="text-sm font-semibold text-[var(--ink)]">Spaarquote</h3>
+        <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">Gegevens uit de kern pagina — geschat jaarinkomen en 6-maands spaarquote</p>
       </div>
-      <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 lg:grid-cols-6">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Netto inkomen</p>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Geschat jaarinkomen</p>
           <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-            {formatCurrency(profileMonthlyIncome)}
+            {formatCurrency(estimatedYearlyIncome)}
           </p>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">{formatCurrency(monthlyFromYearly)}/mnd</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Spaarquote (6m)</p>
+          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-horizon-600">
+            {savingsRate6m.toFixed(1)}%
+          </p>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">{formatCurrency(monthlyFromYearly * savingsRate6m / 100)}/mnd</p>
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Inleg bezittingen</p>
           <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-emerald-600">
             {formatCurrency(totalContributions)}
           </p>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per maand</p>
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Aflossing schulden</p>
           <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-red-500">
             {formatCurrency(totalDebtPayments)}
           </p>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per maand</p>
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Berekende spaarquote</p>
-          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-horizon-600">
+          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
             {computedRate.toFixed(1)}%
           </p>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">inleg + aflossing / inkomen</p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Profiel spaarquote</p>
-          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
-            {profileSavingsRate.toFixed(1)}%
+          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Verschil</p>
+          <p className={`mt-1 font-mono tabular-nums text-sm font-semibold ${Math.abs(savingsRate6m - computedRate) < 1 ? 'text-emerald-600' : 'text-amber-600'}`}>
+            {(savingsRate6m - computedRate) >= 0 ? '+' : ''}{(savingsRate6m - computedRate).toFixed(1)}%
           </p>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">6m vs berekend</p>
         </div>
       </div>
     </div>
@@ -1979,17 +1995,26 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
 
 // ── Main component ───────────────────────────────────────────
 
-export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, lifeEvents }: {
+export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, lifeEvents, savingsRate6m, estimatedYearlyIncome }: {
   assets: Asset[]
   debts: Debt[]
   profile: Record<string, unknown> | null
   fireParams: FireParams
   cashflows: SimCashflow[]
   lifeEvents: LifeEvent[]
+  /** 6-month rolling savings rate from core page (same as kern header) */
+  savingsRate6m: number
+  /** Extrapolated 12-month income from core page (same as kern "Geschat Jaarinkomen") */
+  estimatedYearlyIncome: number
 }) {
   // ── Profile-derived values with safe defaults (feature #628) ──
-  const profileMonthlyIncome = Number(profile?.net_monthly_income ?? 0)
-  const profileSavingsRate = Number(profile?.savings_rate ?? 0)
+  // Use core page values (transaction-based) with profile fallback
+  const profileMonthlyIncome = estimatedYearlyIncome > 0
+    ? estimatedYearlyIncome / 12
+    : Number(profile?.net_monthly_income ?? 0)
+  const profileSavingsRate = savingsRate6m !== 0
+    ? savingsRate6m
+    : Number(profile?.savings_rate ?? 0)
   const householdType = String(profile?.household_type ?? 'solo')
   const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
 
@@ -2493,6 +2518,8 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
             debts={debts}
             profileMonthlyIncome={profileMonthlyIncome}
             profileSavingsRate={profileSavingsRate}
+            estimatedYearlyIncome={estimatedYearlyIncome}
+            savingsRate6m={savingsRate6m}
           />
           <SavingsProjectionTable
             profileMonthlyIncome={profileMonthlyIncome}

@@ -5,7 +5,6 @@ import { Trash2, Plus } from 'lucide-react'
 import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
-import { temporalLevels } from '@/lib/identity-constants'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { ModuleId } from '@/lib/module-registry'
@@ -56,62 +55,32 @@ const STRATEGIES: StrategyDef[] = [
   {
     id: 'deplete',
     name: 'Vermogen opeten',
-    description: 'Je vermogen raakt op bij een gekozen leeftijd. Geschikt als je je geld wilt gebruiken.',
+    description: 'Je vermogen raakt op bij een gekozen leeftijd. Alle berekeningen houden rekening met inflatie — je koopkracht blijft gelijk.',
     emoji: '\u23F3', // hourglass
   },
   {
     id: 'legacy',
     name: 'Nalatenschap',
-    description: 'Je houdt een doelbedrag over om na te laten. Geschikt als je vermogen wilt doorgeven.',
+    description: 'Je houdt een doelbedrag over om na te laten. Onttrekkingen zijn inflatiegecorrigeerd zodat je levensstijl op peil blijft.',
     emoji: '\uD83C\uDFDB\uFE0F', // classical building
   },
   {
     id: 'perpetual',
     name: 'Eeuwigdurend',
-    description: 'Je vermogen blijft behouden en groeit mee met inflatie. Maximale zekerheid.',
+    description: 'Je vermogen blijft behouden en groeit mee met inflatie — je onttrekt alleen het reële rendement. Maximale zekerheid, maar vereist het meeste startkapitaal.',
     emoji: '\u267E\uFE0F', // infinity
   },
   {
     id: 'pensioen',
     name: 'Pensioenleeftijd',
-    description: 'Opbouw tot AOW-leeftijd, daarna vaste onttrekking. Restant als nalatenschap.',
+    description: 'Opbouw tot AOW-leeftijd, daarna een inflatiebestendige onttrekking. Wat overblijft is je nalatenschap.',
     emoji: '\uD83C\uDF3F', // seedling
   },
 ]
 
-// ── Expense method definitions ──────────────────────────────
-
-interface ExpenseMethodDef {
-  id: RetirementExpenseMethod
-  name: string
-  description: string
-  emoji: string
-  requiresModule?: ModuleId
-  disabledNote?: string
-}
-
-const EXPENSE_METHODS: ExpenseMethodDef[] = [
-  {
-    id: 'essential_budgets',
-    name: 'Essenti\u00eble budgetten',
-    description: 'Uitgaven na pensioen zijn gebaseerd op je budgettemplates.',
-    emoji: '\uD83D\uDCCB', // clipboard
-    requiresModule: 'budgetteren',
-    disabledNote: 'Activeer de budgetteren-module om deze optie te gebruiken.',
-  },
-  {
-    id: 'custom_amount',
-    name: 'Eigen bedrag',
-    description: 'Je kiest zelf een maandbedrag dat je na pensioen wilt besteden.',
-    emoji: '\u270F\uFE0F', // pencil
-  },
-  {
-    id: 'current_income',
-    name: 'Huidig inkomen',
-    description: 'Je huidige netto inkomen wordt als maatstaf gebruikt.',
-    emoji: '\uD83D\uDCB6', // banknote
-  },
-]
+// Expense method definitions removed from onboarding UI.
+// Default is set programmatically based on active modules.
+// User can change via Instellingen after onboarding.
 
 // ── Default life events ─────────────────────────────────────
 
@@ -138,10 +107,10 @@ function createDefaultLifeEvents(aowAge: number): LifeEventEntry[] {
 
 function getSpeechText(strategy: FireEndStrategy): string {
   const map: Record<string, string> = {
-    deplete: 'Met deze strategie gebruik je je vermogen volledig. Ik bereken wanneer je genoeg hebt om comfortabel te leven tot de gekozen leeftijd.',
-    legacy: 'Je wilt iets nalaten \u2014 mooi. Ik reken uit hoeveel extra vermogen je nodig hebt bovenop je eigen uitgaven.',
-    perpetual: 'De meest conservatieve strategie. Je vermogen blijft intact en groeit mee met inflatie. Dit vereist het meeste startkapitaal.',
-    pensioen: 'Je bouwt vermogen op tot je AOW-leeftijd en onttrekt daarna een vast bedrag. Wat overblijft is je nalatenschap.',
+    deplete: 'Met deze strategie gebruik je je vermogen volledig tot de gekozen leeftijd. Alle bedragen worden gecorrigeerd voor inflatie — je koopkracht blijft op peil.',
+    legacy: 'Je wilt iets nalaten \u2014 mooi. Ik reken uit hoeveel extra je nodig hebt, rekening houdend met inflatie zodat je levensstijl intact blijft.',
+    perpetual: 'De meest conservatieve strategie. Je vermogen blijft intact en groeit mee met inflatie \u2014 je onttrekt alleen het reële rendement. Dit vereist het meeste startkapitaal.',
+    pensioen: 'Je bouwt vermogen op tot je AOW-leeftijd en onttrekt daarna een inflatiebestendig bedrag. Wat overblijft gaat naar je nabestaanden.',
   }
   return map[strategy] ?? 'Kies een eindstrategie om te beginnen. Dit bepaalt hoe ik je vrijheidsdoel bereken.'
 }
@@ -167,13 +136,35 @@ export function OnboardingHorizon({
 }) {
   const hasInitialized = useRef(false)
 
-  // Pre-fill AOW and pensioen life events on first render when empty
-  if (!hasInitialized.current && data.life_events.length === 0) {
+  // Pre-fill life events + smart defaults on first render
+  if (!hasInitialized.current) {
     hasInitialized.current = true
-    // Schedule update for next tick to avoid setState-during-render
-    queueMicrotask(() => {
-      onChange({ ...data, life_events: createDefaultLifeEvents(aowAge) })
-    })
+
+    const patches: Partial<HorizonData> = {}
+
+    // Pre-fill AOW and pensioen life events when empty
+    if (data.life_events.length === 0) {
+      patches.life_events = createDefaultLifeEvents(aowAge)
+    }
+
+    // Default retirement expense method based on active modules:
+    // - If budgetteren is active → essentiële budgetten
+    // - Otherwise → huidig inkomen (the existing default)
+    if (activeModules.includes('budgetteren')) {
+      patches.retirement_expense_method = 'essential_budgets'
+    } else {
+      patches.retirement_expense_method = 'current_income'
+    }
+
+    // Default temporal balance to level 3 (De Architect)
+    patches.temporal_balance = 3
+
+    if (Object.keys(patches).length > 0) {
+      // Schedule update for next tick to avoid setState-during-render
+      queueMicrotask(() => {
+        onChange({ ...data, ...patches })
+      })
+    }
   }
 
   // ── Helpers ──────────────────────────────────────────────
@@ -203,10 +194,7 @@ export function OnboardingHorizon({
   // Strategy requires end age for deplete and legacy
   const showEndAge = data.fire_end_strategy === 'deplete' || data.fire_end_strategy === 'legacy'
   const showLegacyAmount = data.fire_end_strategy === 'legacy'
-  const showCustomAmount = data.retirement_expense_method === 'custom_amount'
-
-  // Find the active temporal level definition for the description card
-  const activeTemporalLevel = temporalLevels.find((l) => l.level === data.temporal_balance) ?? temporalLevels[2]
+  // Temporal balance and retirement expense method are auto-set (not shown in onboarding UI)
 
   return (
     <div className="pb-20 sm:pb-0">
@@ -358,112 +346,27 @@ export function OnboardingHorizon({
         )}
       </section>
 
-      {/* ── Section B: Pensioenuitgaven-methode ──────────────── */}
-      <section className="mb-8">
-        <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">
-          Pensioenuitgaven
-        </h2>
+      {/* Pensioenuitgaven: verwijderd uit onboarding UI.
+          Default wordt automatisch gezet:
+          - budgetteren actief → essential_budgets
+          - anders → current_income
+          Gebruiker kan dit later aanpassen via Instellingen. */}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {EXPENSE_METHODS.map((method) => {
-            const isSelected = data.retirement_expense_method === method.id
-            const isDisabled = method.requiresModule != null && !activeModules.includes(method.requiresModule)
-
-            return (
-              <button
-                key={method.id}
-                type="button"
-                onClick={() => {
-                  if (!isDisabled) {
-                    onChange({ ...data, retirement_expense_method: method.id })
-                  }
-                }}
-                disabled={isDisabled}
-                className={`group w-full min-h-[48px] rounded-xl border-2 p-4 text-left transition-all ${
-                  isDisabled
-                    ? 'cursor-not-allowed opacity-50 border-[var(--border-ed)] bg-[var(--paper)]'
-                    : isSelected
-                      ? 'cursor-pointer border-horizon-500 bg-horizon-50/60 shadow-sm active:scale-[0.99]'
-                      : 'cursor-pointer border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-md active:scale-[0.99]'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xl transition-colors ${
-                      isSelected && !isDisabled
-                        ? 'bg-horizon-100'
-                        : 'bg-[var(--subtle)]'
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {method.emoji}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <h3 className={`text-sm font-semibold leading-tight ${
-                      isSelected && !isDisabled ? 'text-horizon-900' : 'text-[var(--ink)]'
-                    }`}>
-                      {method.name}
-                    </h3>
-                    <p className="mt-1 text-xs text-[var(--ink-4)] leading-snug">
-                      {method.description}
-                    </p>
-                    {isDisabled && method.disabledNote && (
-                      <p className="mt-1.5 text-xs font-medium text-amber-600 leading-snug">
-                        {method.disabledNote}
-                      </p>
-                    )}
-                  </div>
-
-                  <div
-                    className={`flex h-5 w-5 shrink-0 mt-0.5 items-center justify-center rounded-full border-2 transition-colors ${
-                      isSelected && !isDisabled
-                        ? 'border-horizon-500 bg-horizon-500'
-                        : 'border-[var(--border-ed)]'
-                    }`}
-                  >
-                    {isSelected && !isDisabled && (
-                      <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
+      {/* Inflatie toelichting */}
+      <div className="mb-8 flex items-start gap-3 rounded-xl border border-horizon-200 bg-horizon-50/40 p-4">
+        <span className="mt-0.5 text-lg" aria-hidden="true">📊</span>
+        <div className="text-xs text-[var(--ink-2)] leading-relaxed">
+          <p className="font-medium text-[var(--ink)]">Inflatie zit in alle berekeningen</p>
+          <p className="mt-1">
+            Alle bedragen en prognoses worden automatisch gecorrigeerd voor inflatie.
+            Dat betekent dat de bedragen die je ziet altijd in <strong>koopkracht van vandaag</strong> zijn
+            — zo kun je appels met appels vergelijken. Je kunt het inflatiepercentage
+            later aanpassen via Instellingen.
+          </p>
         </div>
+      </div>
 
-        {/* Conditional: custom amount input */}
-        {showCustomAmount && (
-          <div className="mt-4 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-            <label htmlFor="ob-custom-expense" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
-              Maandbedrag na pensioen
-            </label>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
-              <input
-                id="ob-custom-expense"
-                type="text"
-                inputMode="decimal"
-                value={data.retirement_custom_amount}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9.,]/g, '')
-                  onChange({ ...data, retirement_custom_amount: val })
-                }}
-                placeholder="0"
-                autoComplete="off"
-                className="w-full rounded-xl bg-[var(--subtle)] py-2.5 pr-3 pl-7 text-base font-mono tabular-nums text-[var(--ink)] outline-none border border-[var(--border-ed)] focus:border-horizon-500 focus:ring-1 focus:ring-horizon-500 sm:text-sm"
-              />
-            </div>
-            <p className="mt-1 text-xs text-[var(--ink-4)]">
-              Het maandbedrag dat je na pensioen wilt besteden (in huidige euro&apos;s).
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* ── Section C: Levensgebeurtenissen ───────────────────── */}
+      {/* ── Section B: Levensgebeurtenissen ───────────────────── */}
       <section className="mb-8">
         <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">
           Levensgebeurtenissen

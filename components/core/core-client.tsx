@@ -307,7 +307,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
       const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
       const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
-      setBudgetingActive(profileResult.data?.budgeting_active !== false)
+      const clientBudgetingActive = profileResult.data?.budgeting_active !== false
+      setBudgetingActive(clientBudgetingActive)
       setProfileIncome(profileMonthlyIncome)
       setProfileExpenses(profileMonthlyExpenses)
 
@@ -383,9 +384,11 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setMustExpenseItems(expenseItems)
 
       const activeRetirementMethod = (profileResult.data?.retirement_expense_method as RetirementExpenseMethod) ?? 'essential_budgets'
+      // When budgeting is off, don't use (potentially stale) essential budget data
+      const effectiveMustExpenses = clientBudgetingActive ? yearlyMustExpenses : 0
       const yearlyRetirementExpenses = computeRetirementExpenses(
         activeRetirementMethod,
-        yearlyMustExpenses,
+        effectiveMustExpenses,
         extrapolatedIncome,
         profileResult.data?.retirement_expense_custom_amount,
         profileMonthlyExpenses * 12,
@@ -427,7 +430,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       // Module-aware: use cash-only when vermogensregistratie is off
       const effectiveTotalAssets = hasVermogen ? totalAssets : totalCashValue
       const effectiveTotalDebts = hasVermogen ? totalDebts : 0
-      setRawFinancials({ monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses, totalAssets: effectiveTotalAssets, totalDebts: effectiveTotalDebts, extrapolatedIncome, yearlyMustExpenses, yearlyRetirementExpenses })
+      setRawFinancials({ monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses, totalAssets: effectiveTotalAssets, totalDebts: effectiveTotalDebts, extrapolatedIncome, yearlyMustExpenses: effectiveMustExpenses, yearlyRetirementExpenses })
       setFullAssets(assetsResult.data as unknown as Asset[])
       setFullDebts(debtsResult.data as unknown as Debt[])
       setCoreUnlinkedCash(unlinkedCash)
@@ -1099,6 +1102,13 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     return Math.floor(Math.max(0, totalMonths) % 12)
   })()
 
+  // When budgeting is off, show retirement expenses (user-chosen method) instead of must expenses from budgets
+  const displayYearlyExpenses = budgetingActive
+    ? (rawFinancials?.yearlyMustExpenses ?? 0)
+    : (rawFinancials?.yearlyRetirementExpenses ?? rawFinancials?.yearlyMustExpenses ?? 0)
+  const displayExpenseLabel = budgetingActive ? 'Must uitgaven' : 'Jaarlijkse uitgaven'
+  const displayExpenseLabelDesktop = budgetingActive ? 'Jaarlijkse Must Uitgaven' : 'Jaarlijkse Uitgaven'
+
   if (loading || !data) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
@@ -1703,8 +1713,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           </button>
           <button onClick={() => setShowExpenseReceipt(true)}
             className="flex-1 card-editorial p-3 text-left">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Must uitgaven</p>
-            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(rawFinancials?.yearlyMustExpenses ?? 0)}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{displayExpenseLabel}</p>
+            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(displayYearlyExpenses)}</p>
             <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per jaar</p>
           </button>
           {!hasVermogen && (
@@ -1741,17 +1751,31 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-[var(--subtle)]">
                 <ShoppingCart className="h-6 w-6 text-[var(--ink-3)]" />
               </div>
-              <KpiTooltip text="Jaarlijkse som van je essentiële budgetten: vaste lasten, dagelijkse uitgaven en vervoer. Dit zijn de kosten die je sowieso maakt." />
+              <KpiTooltip text={budgetingActive
+                ? "Jaarlijkse som van je essentiële budgetten: vaste lasten, dagelijkse uitgaven en vervoer. Dit zijn de kosten die je sowieso maakt."
+                : "Jaarlijkse uitgaven na pensioen, gebaseerd op je instellingen. Pas het bedrag aan via Instellingen → FIRE Instellingen."
+              } />
             </div>
-            <p className="text-sm font-medium text-[var(--ink-3)]">Jaarlijkse Must Uitgaven</p>
-            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(rawFinancials?.yearlyMustExpenses ?? 0)}</p>
-            {hasToekomst && <FreedomTimeBadge amount={rawFinancials?.yearlyMustExpenses ?? 0} className="mt-1" />}
-            <p className="mt-1 text-xs text-[var(--ink-3)]">essentiële kosten per jaar</p>
+            <p className="text-sm font-medium text-[var(--ink-3)]">{displayExpenseLabelDesktop}</p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(displayYearlyExpenses)}</p>
+            {hasToekomst && <FreedomTimeBadge amount={displayYearlyExpenses} className="mt-1" />}
+            <p className="mt-1 text-xs text-[var(--ink-3)]">{budgetingActive ? 'essentiële kosten per jaar' : 'uitgaven na pensioen per jaar'}</p>
             <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
-              Stel je eigen jaarlijkse uitgave na retirement in via{' '}
-              <a href="/identity/profiel" className="text-[var(--kern-t)] underline-offset-2 hover:underline" onClick={(e) => e.stopPropagation()}>
-                Identiteit → Profiel
-              </a>.
+              {budgetingActive ? (
+                <>
+                  Stel je eigen jaarlijkse uitgave na retirement in via{' '}
+                  <a href="/identity/instellingen" className="text-[var(--kern-t)] underline-offset-2 hover:underline" onClick={(e) => e.stopPropagation()}>
+                    Instellingen
+                  </a>.
+                </>
+              ) : (
+                <>
+                  Pas dit bedrag aan via{' '}
+                  <a href="/identity/instellingen" className="text-[var(--kern-t)] underline-offset-2 hover:underline" onClick={(e) => e.stopPropagation()}>
+                    Instellingen → FIRE Instellingen
+                  </a>.
+                </>
+              )}
             </p>
           </button>
 
@@ -2361,48 +2385,100 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         </div>
       </BottomSheet>
 
-      {/* === Kassabon Modal: Must Uitgaven === */}
-      <BottomSheet open={showExpenseReceipt} onClose={() => setShowExpenseReceipt(false)} title="Kassabon: Essentiële Uitgaven">
+      {/* === Kassabon Modal: Must Uitgaven / Jaarlijkse Uitgaven === */}
+      <BottomSheet open={showExpenseReceipt} onClose={() => setShowExpenseReceipt(false)} title={budgetingActive ? "Kassabon: Essentiële Uitgaven" : "Kassabon: Jaarlijkse Uitgaven"}>
         <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
-          <div className="mb-3 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Essentiële uitgaven</p>
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">Vaste lasten op jaarbasis</p>
-          </div>
+          {budgetingActive ? (
+            <>
+              <div className="mb-3 text-center">
+                <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Essentiële uitgaven</p>
+                <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">Vaste lasten op jaarbasis</p>
+              </div>
 
-          <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
-            Dit zijn de kosten die je sowieso maakt — vaste lasten, dagelijkse boodschappen en vervoer. Dit bedrag bepaalt hoeveel vermogen je nodig hebt voor volledige vrijheid.
-          </div>
+              <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+                Dit zijn de kosten die je sowieso maakt — vaste lasten, dagelijkse boodschappen en vervoer. Dit bedrag bepaalt hoeveel vermogen je nodig hebt voor volledige vrijheid.
+              </div>
 
-          <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
-            {mustExpenseItems.map((item) => {
-              const intervalLabel = item.interval === 'monthly' ? '/mnd' : item.interval === 'quarterly' ? '/kwt' : '/jr'
-              return (
-                <div key={item.name} className="flex justify-between py-0.5">
+              <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
+                {mustExpenseItems.map((item) => {
+                  const intervalLabel = item.interval === 'monthly' ? '/mnd' : item.interval === 'quarterly' ? '/kwt' : '/jr'
+                  return (
+                    <div key={item.name} className="flex justify-between py-0.5">
+                      <span className="text-[var(--ink-2)]">
+                        {item.name} <span className="text-[10px] text-[var(--ink-3)]">{intervalLabel}</span>
+                      </span>
+                      <span className="tabular-nums text-[var(--ink)]">{formatCurrency(item.annualAmount)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="mt-1 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
+                <span className="font-bold text-[var(--ink)]">Totaal per jaar</span>
+                <span className="tabular-nums font-bold text-[var(--ink)]">{formatCurrency(mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0))}</span>
+              </div>
+              <div className="mt-1 flex justify-between text-[var(--ink-3)]">
+                <span>Gemiddeld per maand</span>
+                <span className="tabular-nums">{formatCurrency(mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0) / 12)}</span>
+              </div>
+              <div className="mt-2 flex justify-center">
+                <FreedomTimeBadge amount={mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0)} />
+              </div>
+
+              <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+                <p><strong className="text-[var(--ink-3)]">Formule:</strong> per budget het limietbedrag omgerekend naar jaarbasis (maandelijks × 12, per kwartaal × 4, of jaarlijks × 1), alles opgeteld</p>
+              </div>
+
+              <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van essentiële budgetinstellingen</p>
+            </>
+          ) : (
+            <>
+              <div className="mb-3 text-center">
+                <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Jaarlijkse uitgaven</p>
+                <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">Geschatte kosten na pensioen</p>
+              </div>
+
+              <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+                Dit bedrag wordt gebruikt voor je vrijheidsberekening en FIRE-doel. Je kunt het aanpassen in je instellingen.
+              </div>
+
+              <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
+                <div className="flex justify-between py-0.5">
                   <span className="text-[var(--ink-2)]">
-                    {item.name} <span className="text-[10px] text-[var(--ink-3)]">{intervalLabel}</span>
+                    {retirementMethodUsed === 'custom_amount' ? 'Eigen bedrag'
+                      : retirementMethodUsed === 'current_income' ? 'Huidig jaarinkomen'
+                      : 'Geschatte jaarlijkse uitgaven'}
                   </span>
-                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(item.annualAmount)}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(displayYearlyExpenses)}</span>
                 </div>
-              )
-            })}
-          </div>
-          <div className="mt-1 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
-            <span className="font-bold text-[var(--ink)]">Totaal per jaar</span>
-            <span className="tabular-nums font-bold text-[var(--ink)]">{formatCurrency(mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0))}</span>
-          </div>
-          <div className="mt-1 flex justify-between text-[var(--ink-3)]">
-            <span>Gemiddeld per maand</span>
-            <span className="tabular-nums">{formatCurrency(mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0) / 12)}</span>
-          </div>
-          <div className="mt-2 flex justify-center">
-            <FreedomTimeBadge amount={mustExpenseItems.reduce((s, i) => s + i.annualAmount, 0)} />
-          </div>
+              </div>
+              <div className="mt-1 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
+                <span className="font-bold text-[var(--ink)]">Totaal per jaar</span>
+                <span className="tabular-nums font-bold text-[var(--ink)]">{formatCurrency(displayYearlyExpenses)}</span>
+              </div>
+              <div className="mt-1 flex justify-between text-[var(--ink-3)]">
+                <span>Gemiddeld per maand</span>
+                <span className="tabular-nums">{formatCurrency(displayYearlyExpenses / 12)}</span>
+              </div>
+              <div className="mt-2 flex justify-center">
+                <FreedomTimeBadge amount={displayYearlyExpenses} />
+              </div>
 
-          <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
-            <p><strong className="text-[var(--ink-3)]">Formule:</strong> per budget het limietbedrag omgerekend naar jaarbasis (maandelijks × 12, per kwartaal × 4, of jaarlijks × 1), alles opgeteld</p>
-          </div>
+              <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] text-[var(--ink-3)] leading-relaxed">
+                <p>
+                  Pas je jaarlijkse uitgaven aan via{' '}
+                  <a href="/identity/instellingen" className="text-[var(--kern-t)] underline underline-offset-2">
+                    Instellingen → FIRE Instellingen
+                  </a>.
+                </p>
+              </div>
 
-          <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van essentiële budgetinstellingen</p>
+              <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
+                {retirementMethodUsed === 'custom_amount' ? 'Eigen bedrag uit instellingen'
+                  : retirementMethodUsed === 'current_income' ? 'Gebaseerd op huidig jaarinkomen'
+                  : 'Gebaseerd op geschatte maandelijkse uitgaven'}
+              </p>
+            </>
+          )}
         </div>
       </BottomSheet>
 

@@ -26,20 +26,20 @@ export const DEFAULT_FIRE_STRATEGY: FireStrategyConfig = {
 
 export const STRATEGY_LABELS: Record<FireEndStrategy, { name: string; subtitle: string }> = {
   deplete: {
-    name: 'Portfolio opteren',
-    subtitle: 'Vermogen wordt volledig opgemaakt',
+    name: 'Vermogen opeten',
+    subtitle: 'Vermogen volledig opgemaakt — inflatiegecorrigeerd',
   },
   legacy: {
-    name: 'Erfenis',
-    subtitle: 'Eindig met een gewenst bedrag',
+    name: 'Nalatenschap',
+    subtitle: 'Eindig met een doelbedrag — onttrekkingen inflatiebestendig',
   },
   perpetual: {
-    name: 'Behouden van vermogen',
-    subtitle: 'Koopkracht blijft intact, eeuwigdurend',
+    name: 'Eeuwigdurend',
+    subtitle: 'Koopkracht blijft intact — alleen reëel rendement onttrekken',
   },
   pensioen: {
     name: 'Pensioenleeftijd',
-    subtitle: 'Opbouw tot AOW, vaste onttrekking, restant als nalatenschap',
+    subtitle: 'Opbouw tot AOW, inflatiebestendige onttrekking, restant als nalatenschap',
   },
 }
 

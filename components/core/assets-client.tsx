@@ -2551,12 +2551,42 @@ function AssetForm({
             </div>
           </div>
 
-          {/* Ownership toggle */}
+          {/* Huishouden */}
           <OwnershipToggle
             value={ownership}
             onChange={setOwnership}
             hasHousehold={hasHousehold}
           />
+
+          {/* Netto vermogen inclusie — logisch onder huishouden */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+              Neem dit % mee in netto vermogen en berekeningen naar de horizon
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range" min={0} max={100} step={5}
+                value={netWorthInclusionPct}
+                onChange={(e) => setNetWorthInclusionPct(Number(e.target.value))}
+                className="flex-1 accent-kern-600"
+              />
+              <input
+                type="number" min={0} max={100}
+                value={netWorthInclusionPct}
+                onChange={(e) => setNetWorthInclusionPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
+              />
+              <span className="text-sm text-[var(--ink-3)]">%</span>
+            </div>
+            <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+              Stel in welk percentage van deze asset wordt meegeteld in je netto vermogen en vrijheidsberekeningen.
+            </p>
+            {netWorthInclusionPct < 100 && Number(currentValue) > 0 && (
+              <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
+                Effectieve waarde: {formatCurrency(Number(currentValue) * netWorthInclusionPct / 100)}
+              </p>
+            )}
+          </div>
 
           {/* Subtype dropdown (conditional) */}
           {subtypeOptions && (
@@ -3046,35 +3076,6 @@ function AssetForm({
               </div>
             </div>
           )}
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-              Opnemen in netto vermogen
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range" min={0} max={100} step={5}
-                value={netWorthInclusionPct}
-                onChange={(e) => setNetWorthInclusionPct(Number(e.target.value))}
-                className="flex-1 accent-kern-600"
-              />
-              <input
-                type="number" min={0} max={100}
-                value={netWorthInclusionPct}
-                onChange={(e) => setNetWorthInclusionPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
-              />
-              <span className="text-sm text-[var(--ink-3)]">%</span>
-            </div>
-            <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-              Stel in welk percentage van deze asset in het netto vermogen wordt meegeteld.
-            </p>
-            {netWorthInclusionPct < 100 && Number(currentValue) > 0 && (
-              <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
-                Effectieve waarde: {formatCurrency(Number(currentValue) * netWorthInclusionPct / 100)}
-              </p>
-            )}
-          </div>
 
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>

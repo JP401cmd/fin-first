@@ -21,6 +21,7 @@ import { LifeEventCard } from './cards/life-event-card'
 import { NextStepBriefingCard } from './cards/next-step-card'
 import { DiscoverCard } from './cards/discover-card'
 import { ModuleGuideCard } from './cards/module-guide-card'
+import { Sparkles, RefreshCw } from 'lucide-react'
 import { CardFeedbackProvider, type CardFeedbackFn } from './card-feedback-context'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
@@ -124,28 +125,69 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
       })
   }, [activeModules, isCardVisible, guideSteps, hasRecommendations, hasOnboardingIntent])
 
-  // Merge: guide cards first, then AI-generated cards
-  const allCards: BriefingCardSpec[] = [...guideCards, ...cards]
+  // Split into guide cards (client) and AI cards (server-composed)
+  const hasGuides = guideCards.length > 0
+  const hasAiCards = cards.length > 0
+
+  // Render a single card item with optional feedback wrapper
+  const renderCardItem = (card: BriefingCardSpec, index: number) => {
+    const module = 'module' in card ? card.module : undefined
+    const rendered = renderCard(card, data)
+    const wrapped = onFeedback
+      ? <CardFeedbackProvider index={index} cardType={card.type} handler={onFeedback}>{rendered}</CardFeedbackProvider>
+      : rendered
+    return (
+      <div
+        key={card.type === 'moduleGuide' ? `guide-${card.moduleId}` : `${card.type}-${index}`}
+        className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}
+        style={{ '--stagger': `${index * 80}ms` } as React.CSSProperties}
+        onClick={onCardEngage ? () => onCardEngage(card.type, module) : undefined}
+      >
+        {wrapped}
+      </div>
+    )
+  }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 grid-flow-dense">
-      {allCards.map((card, i) => {
-        const module = 'module' in card ? card.module : undefined
-        const rendered = renderCard(card, data)
-        const wrapped = onFeedback
-          ? <CardFeedbackProvider index={i} cardType={card.type} handler={onFeedback}>{rendered}</CardFeedbackProvider>
-          : rendered
-        return (
-          <div
-            key={card.type === 'moduleGuide' ? `guide-${card.moduleId}` : `${card.type}-${i}`}
-            className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}
-            style={{ '--stagger': `${i * 80}ms` } as React.CSSProperties}
-            onClick={onCardEngage ? () => onCardEngage(card.type, module) : undefined}
-          >
-            {wrapped}
+    <div className="flex flex-col gap-5">
+      {/* Module-guide cards (client-generated, onboarding users only) */}
+      {hasGuides && (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 grid-flow-dense">
+          {guideCards.map((card, i) => renderCardItem(card, i))}
+        </div>
+      )}
+
+      {/* Briefing explainer — only shown when guides exist but AI cards haven't loaded yet */}
+      {hasGuides && !hasAiCards && (
+        <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-4 py-3.5 sm:px-5">
+          <div className="flex gap-3 items-start">
+            <div className="mt-0.5 shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-wil-100 text-wil-600">
+              <Sparkles className="h-3.5 w-3.5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-[var(--ink-2)] mb-1">Over je briefing</p>
+              <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
+                Hieronder zie je je persoonlijke financiële briefing — samengesteld door <span className="font-medium text-wil-600">Will</span>, je AI-assistent.
+                De briefing werkt met een AI-abonnement en analyseert dagelijks je financiële situatie om je inzichten, tips en actiepunten te geven.
+              </p>
+              <div className="flex items-center gap-1.5 mt-2 text-[10px] text-[var(--ink-4)]">
+                <RefreshCw className="h-2.5 w-2.5" />
+                <span>Eenmaal per dag te vernieuwen — gebruik de knop onderaan de briefing</span>
+              </div>
+            </div>
           </div>
-        )
-      })}
+        </div>
+      )}
+
+      {/* AI-generated briefing cards */}
+      {(hasAiCards || !hasGuides) && (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 grid-flow-dense">
+          {hasGuides
+            ? cards.map((card, i) => renderCardItem(card, i + guideCards.length))
+            : [...guideCards, ...cards].map((card, i) => renderCardItem(card, i))
+          }
+        </div>
+      )}
     </div>
   )
 }

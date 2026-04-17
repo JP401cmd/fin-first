@@ -43,6 +43,7 @@ import { runUnifiedProjection, toSimResult, type UnifiedProjectionInput } from '
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
 import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
+import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { resolveDepreciation, type Asset } from '@/lib/asset-data'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -56,6 +57,7 @@ import {
 } from '@/lib/rebalancing'
 import type { HoldingForAllocation, TargetAllocation } from '@/lib/portfolio-allocation'
 import { compareMortgageVsInvest, type RepaymentType } from '@/lib/hypotheek-vs-beleggen'
+import { ALL_MODULES } from '@/lib/module-registry'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -128,10 +130,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     expenseTx12Result,
     favHoldingsResult,
     allHoldingsResult,
+    aowResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('assets').select('id, name, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit, is_active, depreciation_rate').eq('is_active', true),
-    supabase.from('debts').select('id, name, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id, interest_rate, repayment_type, remaining_term_months, monthly_payment, start_date, end_date, original_amount, include_aflossing_in_savings, custom_aflossing_amount').eq('is_active', true),
+    supabase.from('assets').select('*').eq('is_active', true),
+    supabase.from('debts').select('*').eq('is_active', true),
     supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
@@ -152,6 +155,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
     supabase.from('holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
     supabase.from('holdings').select('name, ticker, units, avg_purchase_price, current_price, ter'),
+    supabase.from('aow_leeftijden').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
   ])
 
   // ── Derive budget subsets from single query (was 4 queries) ──
@@ -167,7 +171,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ai_enabled column may not exist yet (migration pending) — default to true
   const profileAiEnabled = (profileResult.data as Record<string, unknown> | null)?.ai_enabled !== false
 
-  const activeModules: string[] = ((profileResult.data as Record<string, unknown> | null)?.active_modules as string[] | null) ?? []
+  const activeModules: string[] = ((profileResult.data as Record<string, unknown> | null)?.active_modules as string[] | null) ?? [...ALL_MODULES]
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
   // Core calculations
@@ -535,10 +539,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     try {
       const currentAge = ageAtDate(dob)
       const simCashflows = lifeEventsToCashflows((eventsResult.data ?? []) as LifeEvent[])
+      // Look up actual AOW age from aow_leeftijden table (consistent with horizon page)
+      const userAowAge = lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob)
+      const isPensioen = fireStrategy.strategy === 'pensioen'
+      const aowAgeInt = Math.ceil(userAowAge.fractional)
       // For pensioen strategy: force FIRE transition at AOW age (skip binary search)
-      const dashboardForcedFireAge = fireStrategy.strategy === 'pensioen'
-        ? Math.ceil(NL_AOW_AGE)
-        : undefined
+      const dashboardForcedFireAge = isPensioen ? aowAgeInt : undefined
+      // For pensioen: ensure endAge is at least AOW+1 (consistent with useHorizonFireSim)
+      const effectiveStrategy = isPensioen
+        ? { ...fireStrategy, endAge: Math.max(fireStrategy.endAge, aowAgeInt + 1) }
+        : fireStrategy
       // Derive hasPartner from profile household_type (consistent with horizon-data-loader)
       const householdType = (profileResult.data as Record<string, unknown> | null)?.household_type as string | null
       const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
@@ -548,7 +558,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         assets: (assetsResult.data ?? []) as unknown as Asset[],
         debts: (debtsResult.data ?? []) as unknown as Debt[],
         currentAge,
-        endAge: fireStrategy.endAge,
+        endAge: effectiveStrategy.endAge,
         yearlyExpenses: yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12,
         annualSavings: monthlyContributions * 12,
         monthlySurplus: monthlyContributions,
@@ -558,7 +568,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         inflationRate: fireParams.inflationRate,
         box3Method: fireParams.box3Method,
         cashflows: simCashflows,
-        strategyConfig: fireStrategy,
+        strategyConfig: effectiveStrategy,
         withdrawalStrategy,
         forcedFireAge: dashboardForcedFireAge,
         hasPartner,
@@ -567,8 +577,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const unifiedResult = runUnifiedProjection(unifiedInput)
       const simResult = toSimResult(unifiedResult)
       simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
-      simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
-      simFireAgeFractional = simResult.fireAgeFractional
+      // Pensioen post-processing: use actual projected portfolio at AOW age
+      // instead of binary-search minimum (consistent with useHorizonFireSim #473)
+      if (isPensioen) {
+        simRequiredPortfolio = simResult.firePortfolioAtFire > 0 ? simResult.firePortfolioAtFire : null
+        simFireAgeFractional = userAowAge.fractional
+      } else {
+        simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
+        simFireAgeFractional = simResult.fireAgeFractional
+      }
     } catch (err) {
       console.error('[dashboard-data-loader] runUnifiedProjection failed:', err)
       simRows = null

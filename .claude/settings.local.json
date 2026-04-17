@@ -110,7 +110,11 @@
       "Read(//c/Users/janpa/**)",
       "Bash(mkdir -p \"C:/Users/janpa/cd/development/fin/.tmp-debug\")",
       "Bash(cp /tmp/debug_user.mjs \"C:/Users/janpa/cd/development/fin/.tmp-debug/debug_user.mjs\")",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); us=sorted\\(d.get\\('users',[]\\),key=lambda u:u.get\\('created_at',''\\),reverse=True\\)[:5]; [print\\(u['id'],'|',u.get\\('email'\\),'|',u.get\\('created_at'\\),'|',u.get\\('last_sign_in_at'\\)\\) for u in us]\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); us=sorted\\(d.get\\('users',[]\\),key=lambda u:u.get\\('created_at',''\\),reverse=True\\)[:5]; [print\\(u['id'],'|',u.get\\('email'\\),'|',u.get\\('created_at'\\),'|',u.get\\('last_sign_in_at'\\)\\) for u in us]\")",
+      "Bash(python -c \"import sys,json; users=json.load\\(sys.stdin\\).get\\('users',[]\\); matches=[u for u in users if u.get\\('email',''\\).lower\\(\\)=='liesbuddingh@gmail.com']; print\\(json.dumps\\(matches[0] if matches else {'error':'not found'}, indent=2\\)\\)\")",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(json.dumps\\(data, indent=2\\)\\)\")",
+      "Bash(python -c \"import sys,json; print\\(json.dumps\\(json.load\\(sys.stdin\\), indent=2\\)\\)\")",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(json.dumps\\([{'id':r['id'],'full_name':r['full_name'],'active_subscriptions':r['active_subscriptions'],'commercial_tier':r['commercial_tier']} for r in data], indent=2\\)\\)\")"
     ]
   },
   "enableAllProjectMcpServers": true,

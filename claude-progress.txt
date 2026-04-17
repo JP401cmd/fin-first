@@ -23864,3 +23864,41 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 1 feature completed this session (#762)
 - Overall progress: 755/762 passing (99.1%)
+
+## Session 2026-04-13 - Features #763, #731
+
+### Feature #763: Onboarding-persona.tsx verwijderen na migratie - PASSING
+- Deleted components/onboarding/onboarding-persona.tsx (353 lines removed)
+- Updated import in page.tsx: OnboardingModules → OnboardingIntent from onboarding-intent
+- Updated JSX: replaced cast-heavy props with clean OnboardingIntent props (selectedIntent, onSelect)
+- Removed unused PERSONA_MODULE_PRESETS import
+- Verified no remaining references to onboarding-persona in source files
+- TypeScript compiles clean, dev server loads pages correctly
+
+### Feature #731: Preferences-stap opruimen als dode code - PASSING
+- Removed 'preferences' from Step union type in page.tsx
+- Removed 'preferences' from CANONICAL_STEP_ORDER
+- Added 'preferences' → 'horizon' mapping in _resolveRestoredStep() LEGACY_STEP_MAP
+- Removed unused preferences destructuring from save handler
+- Removed 'preferences' from OnboardingStep type in module-onboarding-modal.tsx and module-activation-modal.tsx
+- Removed preferences StepMeta entry and unused Lightbulb icon import
+- Removed completedSteps.push('preferences') from save-own-data API route
+- Updated regression tests: onboarding-flow.ts (step counts, assertions), onboarding-ui.ts (progress/back steps), onboarding-preferences.ts (updated descriptions), module-activation.ts (completedSteps)
+- Updated test-onboarding-transition/page.tsx (removed preferences step)
+- TypeScript compiles clean, zero new errors
+
+### Files Modified
+- app/(onboarding)/onboarding/page.tsx — intent import, preferences step removal, legacy healing
+- app/api/onboarding/save-own-data/route.ts — removed preferences completedStep
+- app/test-onboarding-transition/page.tsx — removed preferences step
+- components/app/module-activation-modal.tsx — removed preferences from OnboardingStep
+- components/app/module-onboarding-modal.tsx — removed preferences step meta + icon
+- components/onboarding/onboarding-persona.tsx — DELETED
+- lib/regression-tests/suites/onboarding-flow.ts — updated all step counts and assertions
+- lib/regression-tests/suites/onboarding-ui.ts — updated progress/back step lists
+- lib/regression-tests/suites/onboarding-preferences.ts — updated descriptions
+- lib/regression-tests/suites/module-activation.ts — updated completedSteps
+
+### Current Status
+- 2 features completed this session (#763, #731)
+- Overall progress: 756/762 passing (99.2%)

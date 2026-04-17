@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
+  ageAtDate,
   computeFireProjection,
   computeLifeEventImpact,
   type FinancialInput,
@@ -20,11 +21,12 @@ import type { Action } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
-import type { Debt } from '@/lib/debt-data'
+import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { resolveFireStrategyWithOverride, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -131,10 +133,9 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     assetsResult,
     debtsResult,
     profileResult,
-    essentialBudgetsResult,
+    allBudgetsResult,
     eventsResult,
     actionsResult,
-    childBudgetsResult,
     fullDebtsResult,
     snapshotsResult,
     income12Result,
@@ -143,11 +144,12 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     bankAccountsResult,
     fullAssetsResult,
   ] = await Promise.all([
-    supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct, asset_type').eq('is_active', true),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
     supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children').single(),
-    supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
+    // Single budget query (all budgets) — replaces separate essential + child queries
+    supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
       .from('actions')
@@ -157,7 +159,6 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
       .gte('scheduled_week', today)
       .lte('scheduled_week', oneYearFromNow)
       .order('scheduled_week', { ascending: true }),
-    supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
     supabase.from('debts').select('*').eq('is_active', true).limit(200),
     supabase
       .from('net_worth_snapshots')
@@ -166,8 +167,8 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
       .limit(60),
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
-    // 6-month transactions for stable resilience calculation
-    supabase.from('transactions').select('amount').gte('date', sixMonthsAgo).lt('date', monthEnd),
+    // 6-month transactions for stable health score calculation (budget_id for savings-budget correction)
+    supabase.from('transactions').select('amount, budget_id, date').gte('date', sixMonthsAgo).lt('date', monthEnd),
     supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
   ])
@@ -263,11 +264,24 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     }
   }
 
+  // ── Budget subsets from single query ──────────────────────────
+  const allBudgetsRaw = (allBudgetsResult.data ?? []) as { id: string; name: string; default_limit: number; interval: string; budget_type: string; is_essential: boolean; parent_id: string | null }[]
+  const essentialBudgets = allBudgetsRaw.filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
+  const allParentBudgets = allBudgetsRaw.filter(b => b.parent_id === null)
+  const allChildren = allBudgetsRaw.filter(b => b.parent_id !== null)
+
+  // Budget type map: budget_id → budget_type (parent + child)
+  const budgetTypeMap = new Map<string, string>()
+  for (const b of allParentBudgets) budgetTypeMap.set(b.id, b.budget_type)
+  for (const c of allChildren) {
+    const parentType = budgetTypeMap.get(c.parent_id ?? '')
+    if (parentType) budgetTypeMap.set(c.id, parentType)
+  }
+
   // Yearly must expenses + retirement expenses
-  const allChildren = childBudgetsResult.data ?? []
   const { yearlyMustExpenses } = computeYearlyMustExpenses(
-    essentialBudgetsResult.data ?? [],
-    allChildren,
+    essentialBudgets,
+    allChildren.filter(c => !['archive', 'income', 'savings'].includes(c.budget_type)),
   )
 
   const yearlyRetirementExpenses = computeRetirementExpenses(
@@ -311,26 +325,124 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   // Detect budgetingActive from profile (defaults to true if column doesn't exist)
   const budgetingActive = (profile as Record<string, unknown>).budgeting_active !== false
 
-  // savingsRate6m
-  const savingsRate6m = avgIncome6m > 0
-    ? ((avgIncome6m - avgExpenses6m) / avgIncome6m) * 100
+  // ── savingsRate6m (same formula as dashboard-data-loader) ────
+  // Savings-budget IDs: transactions mapped to savings budgets are saving, not spending
+  const savingsBudgetIds = new Set<string>()
+  for (const [id, type] of budgetTypeMap) {
+    if (type === 'savings') savingsBudgetIds.add(id)
+  }
+
+  // 6-month savings-budget spend (add-back for spaarquote correction)
+  let savingsBudgetSpent6m = 0
+  // 6-month income/expenses split from tx6mResult (now has budget_id + date)
+  let income6m = 0
+  let expenses6m = 0
+  for (const tx of tx6mResult.data ?? []) {
+    const amt = Number(tx.amount)
+    if (amt > 0) { income6m += amt; continue }
+    expenses6m += Math.abs(amt)
+    const bid = (tx as { budget_id?: string | null }).budget_id
+    if (bid && savingsBudgetIds.has(bid)) {
+      savingsBudgetSpent6m += Math.abs(amt)
+    }
+  }
+
+  // Debt aflossing add-back (principal repayments count as saving)
+  let debtAflossingMonthly = 0
+  for (const d of fullDebtsResult.data ?? []) {
+    if (!(d as any).include_aflossing_in_savings) continue
+    const customAfl = (d as any).custom_aflossing_amount
+    const aflossing = customAfl != null
+      ? Number(customAfl)
+      : (computeRenteAflossingsSplit(d as unknown as Debt)?.currentAflossing ?? 0)
+    debtAflossingMonthly += aflossing * ((d as any).net_worth_inclusion_pct ?? 100) / 100
+  }
+  const debtAflossing6m = debtAflossingMonthly * 6
+
+  // Extrapolate when < 6 months of data
+  let dataMonths6 = 6
+  const earliestIncomeDateH = earliestIncomeResult.data?.[0]?.date
+  if (earliestIncomeDateH) {
+    const earliest = new Date(earliestIncomeDateH)
+    dataMonths6 = Math.max(1, Math.min(6,
+      (now.getFullYear() - earliest.getFullYear()) * 12 +
+      (now.getMonth() - earliest.getMonth())
+    ))
+  }
+  const extIncome6 = dataMonths6 < 6 ? (income6m / dataMonths6) * 6 : income6m
+  const extExpenses6 = dataMonths6 < 6 ? (expenses6m / dataMonths6) * 6 : expenses6m
+  const extSavingsBudget6 = dataMonths6 < 6 ? (savingsBudgetSpent6m / dataMonths6) * 6 : savingsBudgetSpent6m
+
+  let savingsRate6m = extIncome6 > 0
+    ? ((extIncome6 - extExpenses6 + extSavingsBudget6 + debtAflossing6m) / extIncome6) * 100
     : 0
 
-  // emergencyFundMonths: liquid assets / monthly expenses
-  const emergencyFundMonths = avgExpenses6m > 0 ? totalAssets * 0.3 / avgExpenses6m : 0
+  // Fallback savings rate from profile estimates for users without transactions
+  if (savingsRate6m === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
+    savingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
+  }
 
-  // freedomPct: net worth / FIRE target
+  // ── emergencyFundMonths: actual liquid assets (same as dashboard) ──
+  const liquidAssets = (fullAssetsResult.data ?? [])
+    .filter(a => {
+      const type = (a as { asset_type?: string }).asset_type
+      return type === 'savings' || type === 'checking' || type === 'cash'
+    })
+    .reduce((s, a) => s + Number(a.current_value), 0) + unlinkedCash
+  const emergencyFundMonths = avgExpenses6m > 0 ? liquidAssets / avgExpenses6m : 0
+
+  // ── freedomPct: strategy-adjusted FIRE target (same as dashboard) ──
   const netWorth = totalAssets - totalDebts
   const fireSwr = fireParams.effectiveSwr
-  const fireTarget = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses / fireSwr : 0
-  const freedomPct = fireTarget > 0 ? Math.max(0, Math.min((netWorth / fireTarget) * 100, 100)) : 0
+  const currentAge = dob ? ageAtDate(dob) : null
+  const yearsInRetirement = (fireStrategy.strategy === 'deplete' && currentAge != null)
+    ? Math.max(1, fireStrategy.endAge - Math.round(currentAge))
+    : undefined
+  const realReturn = (1 + fireParams.grossReturn) / (1 + fireParams.inflationRate) - 1
+  const fireTarget = computeFireTarget(
+    computeEffectiveExpenses(yearlyRetirementExpenses, effectiveMonthlyExpenses * 12),
+    fireSwr,
+    { strategy: fireStrategy.strategy, yearsInRetirement, realReturn },
+  )
+  const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
 
-  // assetTypeCount: distinct asset_type values
+  // ── assetTypeCount: distinct asset_type values ──
   const assetTypes = new Set((assetsResult.data ?? []).map(a => a.asset_type).filter(Boolean))
   if (unlinkedCash > 0) assetTypes.add('cash')
   const assetTypeCount = assetTypes.size
 
-  // Budget discipline: no budget spending data on server → use neutral default via empty array
+  // ── Budget discipline: actual budget limits vs spent (same as dashboard) ──
+  const BUDGET_TYPES = ['income', 'expense', 'savings', 'debt'] as const
+  const budgetLimits: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
+  for (const b of allParentBudgets) {
+    const type = b.budget_type as string
+    if (!BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
+    const children = allChildren.filter(c => c.parent_id === b.id)
+    const limit = children.length > 0
+      ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+      : Number(b.default_limit)
+    const monthlyLimit = b.interval === 'monthly' ? limit
+      : b.interval === 'quarterly' ? limit / 3
+      : limit / 12
+    budgetLimits[type] = (budgetLimits[type] ?? 0) + monthlyLimit
+  }
+
+  const budgetSpent: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
+  for (const tx of txResult.data ?? []) {
+    const amt = Number(tx.amount)
+    const budgetId = (tx as { budget_id?: string | null }).budget_id
+    if (!budgetId) continue
+    const type = budgetTypeMap.get(budgetId)
+    if (!type || !BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
+    budgetSpent[type] = (budgetSpent[type] ?? 0) + Math.abs(amt)
+  }
+
+  const budgetCategories = [
+    { limit: budgetLimits.expense, spent: budgetSpent.expense },
+    { limit: budgetLimits.savings, spent: budgetSpent.savings },
+    { limit: budgetLimits.debt, spent: budgetSpent.debt },
+  ]
+
   const healthScoreInput: HealthScoreInput = {
     savingsRate6m,
     totalAssets,
@@ -338,7 +450,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     emergencyFundMonths,
     freedomPct,
     assetTypeCount,
-    budgetCategories: [], // budget spending not available server-side
+    budgetCategories,
   }
   const healthScore = computeHealthScoreFromInputs(healthScoreInput, budgetingActive)
 

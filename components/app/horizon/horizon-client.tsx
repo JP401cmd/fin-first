@@ -24,6 +24,7 @@ import {
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs, getHealthLabel, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
@@ -621,17 +622,32 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     const stratOpts = fireStrategy ? { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge } : undefined
     setFire(computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr, undefined, stratOpts))
     setRange(computeFireRange(effectiveInput, fireSwr, undefined, fireParams.grossReturn, stratOpts))
-    // Health score: recompute with updated inputs
-    const incomeForHealth = avgIncome6m ?? effectiveInput.monthlyIncome
+    // Health score: recompute with updated inputs (same formulas as dashboard)
+    // savingsRate6m + budgetCategories: keep server-computed values (transaction data doesn't change client-side)
+    // Emergency fund: actual liquid assets (same as dashboard-data-loader)
     const expensesForHealth = avgExpenses6m ?? effectiveInput.monthlyExpenses
-    const savingsRate = incomeForHealth > 0 ? ((incomeForHealth - expensesForHealth) / incomeForHealth) * 100 : 0
-    const emergencyMonths = expensesForHealth > 0 ? effectiveInput.totalAssets * 0.3 / expensesForHealth : 0
+    const liquidAssets = (initialData.assets ?? [])
+      .filter(a => {
+        const t = a.asset_type as string
+        return t === 'savings' || t === 'checking' || t === 'cash'
+      })
+      .reduce((s, a) => s + Number(a.current_value), 0) + (initialData.unlinkedCash ?? 0)
+    const emergencyMonths = expensesForHealth > 0 ? liquidAssets / expensesForHealth : 0
+    // Freedom pct: strategy-adjusted FIRE target (same as dashboard-data-loader)
     const nw = effectiveInput.totalAssets - effectiveInput.totalDebts
-    const target = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses / fireSwr : 0
-    const fPct = target > 0 ? Math.max(0, Math.min((nw / target) * 100, 100)) : 0
+    const hsCurrentAge = effectiveInput.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
+    const hsYearsInRetirement = (fireStrategy?.strategy === 'deplete' && hsCurrentAge != null)
+      ? Math.max(1, (fireStrategy.endAge ?? 90) - Math.round(hsCurrentAge))
+      : undefined
+    const hsRealReturn = (1 + fireParams.grossReturn) / (1 + fireParams.inflationRate) - 1
+    const hsFireTarget = computeFireTarget(
+      computeEffectiveExpenses(effectiveInput.yearlyMustExpenses, expensesForHealth * 12),
+      fireSwr,
+      { strategy: fireStrategy?.strategy ?? 'deplete', yearsInRetirement: hsYearsInRetirement, realReturn: hsRealReturn },
+    )
+    const fPct = computeFreedomPercentage(nw, hsFireTarget)
     const newInput: HealthScoreInput = {
       ...healthScoreInput,
-      savingsRate6m: savingsRate,
       totalAssets: effectiveInput.totalAssets,
       totalDebts: effectiveInput.totalDebts,
       emergencyFundMonths: emergencyMonths,
