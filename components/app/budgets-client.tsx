@@ -5,10 +5,10 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Pencil, Save, Trash2,
   GitFork, CircleDot, AlertTriangle, CheckCircle2, Heart, LayoutGrid,
-  TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText,
+  TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText, MoveRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
+import { getDefaultBudgets, BUDGET_SLUGS, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import type { BudgetsPageData, BudgetGoal } from '@/lib/budgets-data-loader'
 import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSegments, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -26,8 +26,8 @@ import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy
 import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { GoalForm } from '@/components/app/goal-form'
-import { EnvelopeTransferSheet } from '@/components/app/envelope-transfer-sheet'
-import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
+import { BudgetPlanEditorSheet } from '@/components/app/budget-plan-editor-sheet'
+import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -44,26 +44,46 @@ function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-type HubAlert = { name: string; spent: number; limit: number; pct: number; severity: 'over' | 'bijna' }
+type HubAlert = { id: string; name: string; spent: number; limit: number; pct: number; severity: 'over' | 'bijna' }
 
 function BudgetHub({
   hubAlertsVisible,
   hubAlertsExtra,
   dekkingsgraad,
   opSchemaCount,
-  expenseParentCount,
+  parentBudgetsCount,
   formatCurrency: fmt,
   openWithMessage,
   totalIncome,
+  teVerdelen,
+  periodMode,
+  onOpenPlanEditor,
+  onOpenBudget,
+  uncategorizedCount,
+  uncategorizedTotal,
+  onUncategorizedClick,
+  coverageRatio,
+  totalIncomeActual,
+  budgetingActive,
 }: {
   hubAlertsVisible: HubAlert[]
   hubAlertsExtra: number
   dekkingsgraad: number
   opSchemaCount: number
-  expenseParentCount: number
+  parentBudgetsCount: number
   formatCurrency: (n: number) => string
   openWithMessage: (message: string) => void
   totalIncome: number
+  teVerdelen: number
+  periodMode: 'maand' | 'ytd' | '12m'
+  onOpenPlanEditor: () => void
+  onOpenBudget: (id: string) => void
+  uncategorizedCount: number
+  uncategorizedTotal: number
+  onUncategorizedClick: () => void
+  coverageRatio: number
+  totalIncomeActual: number
+  budgetingActive: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const { dailyExpenseRate, loading: rateLoading, source } = useDailyExpenseRate()
@@ -71,6 +91,70 @@ function BudgetHub({
 
   const overCount = hubAlertsVisible.filter(a => a.severity === 'over').length
   const bijnaCount = hubAlertsVisible.filter(a => a.severity === 'bijna').length + hubAlertsExtra
+
+  // KPI visibility — KPI-grid bevat Te Verdelen, Dekking, Schema
+  const showTeVerdelen = periodMode === 'maand' && totalIncome > 0
+  const showDekking = totalIncome > 0
+  const showSchema = parentBudgetsCount > 0
+  const kpiCount = (showTeVerdelen ? 1 : 0) + (showDekking ? 1 : 0) + (showSchema ? 1 : 0)
+  const hasKPI = kpiCount > 0
+
+  // Attention-list: items in prioriteits-volgorde
+  const showOverAllocated = dekkingsgraad > 100 && periodMode === 'maand'
+  // "Nog te verdelen" — triggeren we alleen bij > 1 euro om rondingsruis te negeren
+  const showTeVerdelenAttention = periodMode === 'maand' && teVerdelen > 1
+  const showCoverage = coverageRatio < 0.99 && totalIncome > 0
+  const showUncategorized = budgetingActive && uncategorizedCount > 0
+  const hasAnyAttention =
+    showOverAllocated ||
+    showTeVerdelenAttention ||
+    showCoverage ||
+    hubAlertsVisible.length > 0 ||
+    showUncategorized
+  // "Alles op schema" alleen als niks anders aandacht vraagt
+  const showAllOnSchedule =
+    !hasAnyAttention && parentBudgetsCount > 0 && opSchemaCount === parentBudgetsCount
+  const hasAttention = hasAnyAttention || showAllOnSchedule
+
+  const hasAnyContent = hasKPI || hasAttention
+
+  if (!hasAnyContent) return null
+
+  // Collapsed-header preview snippets — max 3 to keep the one-liner scannable
+  const previewSnippets: React.ReactNode[] = []
+  if (overCount > 0) {
+    previewSnippets.push(<span key="over" className="text-red-600">{overCount} overschreden</span>)
+  }
+  if (bijnaCount > 0) {
+    previewSnippets.push(<span key="bijna" className="text-amber-600">{bijnaCount} bijna vol</span>)
+  }
+  if (dekkingsgraad > 100 || teVerdelen < 0) {
+    previewSnippets.push(
+      <span key="over-alloc" className="text-negative">{fmt(Math.abs(teVerdelen))} over-toegewezen</span>
+    )
+  }
+  if (periodMode === 'maand' && teVerdelen > 1) {
+    previewSnippets.push(
+      <span key="te-verdelen" className="text-amber-600">{fmt(teVerdelen)} te verdelen</span>
+    )
+  }
+  if (uncategorizedCount > 0) {
+    previewSnippets.push(
+      <span key="uncat" className="text-kern-600">{uncategorizedCount} ongecategoriseerd</span>
+    )
+  }
+  const visibleSnippets = previewSnippets.slice(0, 3)
+
+  // Grid-cols klasse afgeleid uit kpiCount (Tailwind heeft deze klassen statisch nodig)
+  const gridColsClass =
+    kpiCount === 3 ? 'grid-cols-3' : kpiCount === 2 ? 'grid-cols-2' : 'grid-cols-1'
+
+  // Dekking-kleur: default inkt, negatief bij over-toegewezen of lage coverage
+  const dekkingColorClass =
+    dekkingsgraad > 100 || coverageRatio < 0.8 ? 'text-negative' : 'text-[var(--ink)]'
+  // Schema-kleur: groen als alles op schema, anders default
+  const schemaColorClass =
+    opSchemaCount === parentBudgetsCount ? 'text-positive' : 'text-[var(--ink)]'
 
   return (
     <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
@@ -85,11 +169,15 @@ function BudgetHub({
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-wil-50 px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-wil-700">Will</span>
           <span className="font-sans text-xs font-semibold text-[var(--ink-2)]">Budgetanalyse</span>
-          {!expanded && (overCount > 0 || bijnaCount > 0) && (
+          {!expanded && visibleSnippets.length > 0 && (
             <span className="font-sans text-[11px] text-[var(--ink-3)]">
-              — {overCount > 0 && <span className="text-red-600">{overCount} overschreden</span>}
-              {overCount > 0 && bijnaCount > 0 && ', '}
-              {bijnaCount > 0 && <span className="text-amber-600">{bijnaCount} bijna vol</span>}
+              {'— '}
+              {visibleSnippets.map((snippet, i) => (
+                <span key={i}>
+                  {snippet}
+                  {i < visibleSnippets.length - 1 && ', '}
+                </span>
+              ))}
             </span>
           )}
         </div>
@@ -97,69 +185,191 @@ function BudgetHub({
       </button>
 
       {expanded && (
-      <>
       <div className="border-t border-[var(--border-ed)] px-4 py-3">
-        {/* Alerts sectie */}
-        {hubAlertsVisible.length > 0 && (
-          <div className="space-y-2">
-            {hubAlertsVisible.map(alert => {
-              const overAmount = alert.severity === 'over' ? alert.spent - alert.limit : 0
-              const freedomTime = hasFreedomData && overAmount >= 100
-                ? eurToFreedomTime(overAmount, dailyExpenseRate)
-                : null
-
-              return (
-                <div key={alert.name} className="flex items-start gap-2">
-                  <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                    alert.severity === 'over' ? 'bg-red-500' : 'bg-amber-400'
-                  }`} />
-                  <div>
-                    <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
-                      <strong className="not-italic font-semibold">{alert.name}</strong>
-                      {alert.severity === 'over'
-                        ? <> — {alert.pct}% vol <span className="text-[var(--ink-3)]">({fmt(alert.spent)} van {fmt(alert.limit)})</span></>
-                        : <> is bijna vol — {alert.pct}% <span className="text-[var(--ink-3)]">({fmt(alert.spent)} van {fmt(alert.limit)})</span></>
-                      }
-                    </p>
-                    {freedomTime && (
-                      <p className="text-[12px] italic text-[var(--ink-3)]">
-                        {fmt(overAmount)} over — {freedomTime.formattedDagen} ingeleverd
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-            {hubAlertsExtra > 0 && (
-              <p className="text-[11px] italic text-[var(--ink-3)] pl-3.5">
-                en {hubAlertsExtra} meer…
-              </p>
+        {/* Blok 1: KPI-grid — scanbare top-rij met kritieke metrics */}
+        {hasKPI && (
+          <div className={`grid gap-3 ${gridColsClass}`}>
+            {showTeVerdelen && (
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Te verdelen</p>
+                <p className={`mt-1 font-mono tabular-nums text-lg font-semibold ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {teVerdelen >= 0 ? '' : '–'}{fmt(Math.abs(teVerdelen))}
+                </p>
+                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+                  van {fmt(totalIncome)} inkomen
+                </p>
+              </div>
             )}
-          </div>
-        )}
-
-        {/* Inzichten sectie */}
-        {totalIncome > 0 && (
-          <div className={`space-y-1 ${hubAlertsVisible.length > 0 ? 'mt-3 border-t border-[var(--border-ed)] pt-3' : ''}`}>
-            <div className="flex items-start gap-2">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ink-4)]" />
-              <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
-                Dekkingsgraad: <strong className="not-italic font-semibold">{dekkingsgraad.toFixed(0)}%</strong> van inkomen toegewezen
-              </p>
-            </div>
-            {expenseParentCount > 0 && (
-              <div className="flex items-start gap-2">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ink-4)]" />
-                <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
-                  <strong className="not-italic font-semibold">{opSchemaCount}</strong> van {expenseParentCount} budgetten op schema
+            {showDekking && (
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Dekking</p>
+                <p className={`mt-1 font-mono tabular-nums text-lg font-semibold ${dekkingColorClass}`}>
+                  {dekkingsgraad.toFixed(0)}%
+                </p>
+                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+                  van inkomen toegewezen
+                </p>
+              </div>
+            )}
+            {showSchema && (
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Schema</p>
+                <p className={`mt-1 font-mono tabular-nums text-lg font-semibold ${schemaColorClass}`}>
+                  {opSchemaCount} / {parentBudgetsCount}
+                </p>
+                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+                  van alle hoofdbudgetten op schema
                 </p>
               </div>
             )}
           </div>
         )}
 
-        {/* Vraag Will knop */}
-        <div className={`${hubAlertsVisible.length > 0 || totalIncome > 0 ? 'mt-3 border-t border-[var(--border-ed)] pt-2' : ''}`}>
+        {/* Blok 2: Aandachtslijst — unified, prioriteit-gesorteerd */}
+        {hasAttention && (() => {
+          // Gemeenschappelijke container-classes voor alle aandacht-items.
+          // Elk item krijgt dezelfde verticale ruimte (py-2) en indent (px-2
+          // -mx-2), waardoor bolletjes, tekst en rechter-pijl overal op dezelfde
+          // positie staan — of het item nu klikbaar is of niet. Klikbare items
+          // voegen hover + min-h-[44px] touch-target toe.
+          const rowBase = 'flex items-start gap-2 py-2 px-2 -mx-2'
+          const rowInteractive = `group w-full text-left min-h-[44px] hover:bg-[var(--subtle)] ${rowBase}`
+          const dotBase = 'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full'
+          const textBase = 'font-serif text-[13px] italic leading-snug text-[var(--ink-2)]'
+          const arrowClasses = 'mt-1 h-3.5 w-3.5 shrink-0 text-[var(--ink-4)] transition-transform group-hover:translate-x-0.5'
+
+          return (
+            <div className={hasKPI ? 'mt-3 border-t border-[var(--border-ed)] pt-3' : ''}>
+              <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Aandacht</p>
+              <div className="mt-1">
+                {/* 1. Over-toegewezen — klikbaar, opent budget plan editor */}
+                {showOverAllocated && (
+                  <button
+                    type="button"
+                    onClick={onOpenPlanEditor}
+                    className={rowInteractive}
+                    aria-label={`Over-toegewezen met ${fmt(Math.abs(teVerdelen))} — open budget bewerken`}
+                  >
+                    <span className={`${dotBase} bg-negative`} />
+                    <div className="min-w-0 flex-1">
+                      <p className={textBase}>
+                        <strong className="not-italic font-semibold">Over-toegewezen</strong> — je hebt {fmt(Math.abs(teVerdelen))} meer toegewezen dan verwacht inkomen
+                      </p>
+                    </div>
+                    <MoveRight className={arrowClasses} />
+                  </button>
+                )}
+
+                {/* 2. Nog te verdelen — klikbaar, opent budget plan editor */}
+                {showTeVerdelenAttention && (
+                  <button
+                    type="button"
+                    onClick={onOpenPlanEditor}
+                    className={rowInteractive}
+                    aria-label={`${fmt(teVerdelen)} nog te verdelen — open budget bewerken`}
+                  >
+                    <span className={`${dotBase} bg-amber-400`} />
+                    <div className="min-w-0 flex-1">
+                      <p className={textBase}>
+                        <strong className="not-italic font-semibold">Nog te verdelen</strong> — {fmt(teVerdelen)} van je inkomen is niet toegewezen
+                      </p>
+                    </div>
+                    <MoveRight className={arrowClasses} />
+                  </button>
+                )}
+
+                {/* 3. Coverage-issue — informatief, niet klikbaar */}
+                {showCoverage && (
+                  <div className={rowBase}>
+                    <span className={`${dotBase} ${coverageRatio >= 0.8 ? 'bg-amber-400' : 'bg-red-500'}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className={textBase}>
+                        <strong className="not-italic font-semibold">{Math.round(coverageRatio * 100)}% gedekt</strong> — {fmt(totalIncomeActual)} van {fmt(totalIncome)} ontvangen
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Overschreden budgetten + 5. bijna-vol — klikbaar, opent detail-modal */}
+                {hubAlertsVisible.map(alert => {
+                  const overAmount = alert.severity === 'over' ? alert.spent - alert.limit : 0
+                  const freedomTime = hasFreedomData && overAmount >= 100
+                    ? eurToFreedomTime(overAmount, dailyExpenseRate)
+                    : null
+                  const dotColor = alert.severity === 'over' ? 'bg-red-500' : 'bg-amber-400'
+                  const severityLabel = alert.severity === 'over' ? 'overschreden' : 'bijna vol'
+
+                  return (
+                    <button
+                      key={alert.id}
+                      type="button"
+                      onClick={() => onOpenBudget(alert.id)}
+                      className={rowInteractive}
+                      aria-label={`Open ${alert.name} — ${alert.pct}% ${severityLabel}`}
+                    >
+                      <span className={`${dotBase} ${dotColor}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className={textBase}>
+                          <strong className="not-italic font-semibold">{alert.name}</strong>
+                          {alert.severity === 'over'
+                            ? <> — {alert.pct}% vol <span className="text-[var(--ink-3)]">({fmt(alert.spent)} van {fmt(alert.limit)})</span></>
+                            : <> is bijna vol — {alert.pct}% <span className="text-[var(--ink-3)]">({fmt(alert.spent)} van {fmt(alert.limit)})</span></>
+                          }
+                        </p>
+                        {freedomTime && (
+                          <p className="text-[12px] italic text-[var(--ink-3)]">
+                            {fmt(overAmount)} over — {freedomTime.formattedDagen} ingeleverd
+                          </p>
+                        )}
+                      </div>
+                      <MoveRight className={arrowClasses} />
+                    </button>
+                  )
+                })}
+
+                {/* 6. Ongecategoriseerd — klikbaar, opent categoriseer-modal */}
+                {showUncategorized && (
+                  <button
+                    type="button"
+                    onClick={onUncategorizedClick}
+                    className={rowInteractive}
+                    aria-label={`${uncategorizedCount} ${uncategorizedCount === 1 ? 'transactie' : 'transacties'} zonder categorie — bekijken`}
+                  >
+                    <span className={`${dotBase} bg-[var(--kern)]`} />
+                    <div className="min-w-0 flex-1">
+                      <p className={textBase}>
+                        <strong className="not-italic font-semibold">{uncategorizedCount} {uncategorizedCount === 1 ? 'transactie' : 'transacties'} zonder categorie</strong> — {fmt(uncategorizedTotal)}
+                      </p>
+                    </div>
+                    <MoveRight className={arrowClasses} />
+                  </button>
+                )}
+
+                {/* 7. Alles op schema — positieve feedback, alleen als lijst anders leeg is */}
+                {showAllOnSchedule && (
+                  <div className={rowBase}>
+                    <span className={`${dotBase} bg-positive`} />
+                    <div className="min-w-0 flex-1">
+                      <p className={textBase}>
+                        Alle budgetten op schema
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* "…en N meer" — als hubAlertsVisible is ingekort */}
+                {hubAlertsExtra > 0 && (
+                  <p className="text-[11px] italic text-[var(--ink-3)] pl-3.5 py-2">
+                    en {hubAlertsExtra} meer…
+                  </p>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Blok 3: Footer — Vraag Will (right-aligned, consistent ritme met collapsed header) */}
+        <div className="mt-3 border-t border-[var(--border-ed)] pt-2 flex items-center justify-end">
           <button
             type="button"
             onClick={() => openWithMessage('Analyseer mijn budgetten en geef me de belangrijkste inzichten over overschreden en bijna-volle categorieën')}
@@ -169,7 +379,6 @@ function BudgetHub({
           </button>
         </div>
       </div>
-      </>
       )}
     </div>
   )
@@ -203,16 +412,21 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const [transactions, setTransactions] = useState<{ id?: string; account_id?: string; budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]>(initialData?.transactions ?? [])
   const [rollovers, setRollovers] = useState<BudgetRollover[]>(initialData?.rollovers ?? [])
   const [budgetAmounts, setBudgetAmounts] = useState<{ id: string; budget_id: string; effective_from: string; amount: number }[]>(initialData?.budgetAmounts ?? [])
-  const [showAllocationModal, setShowAllocationModal] = useState(false)
+  const [showPlanEditor, setShowPlanEditor] = useState(false)
   const [goals, setGoals] = useState<Goal[]>(initialData?.goals ?? [])
   const [budgetRolloverHistory, setBudgetRolloverHistory] = useState<BudgetRollover[]>([])
   const [loadingRolloverHistory, setLoadingRolloverHistory] = useState(false)
   const [showArchive, setShowArchive] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showEnvelopeTransfer, setShowEnvelopeTransfer] = useState(false)
   const [copyingMonth, setCopyingMonth] = useState(false)
   const [uncategorizedCount, setUncategorizedCount] = useState(initialData?.uncategorizedCount ?? 0)
   const [uncategorizedTotal, setUncategorizedTotal] = useState(initialData?.uncategorizedTotal ?? 0)
+  // Volledige uncategorized-transactierijen voor de AICategorizeSheet. We
+  // houden ze los van `transactions` (die alleen categorized rijen bevat voor
+  // spending-berekening) omdat de sheet álle velden nodig heeft, inclusief
+  // counterparty_iban, import_hash en reference.
+  type UncatTx = React.ComponentProps<typeof AICategorizeSheet>['transactions'][number]
+  const [uncatTx, setUncatTx] = useState<UncatTx[]>([])
+  const [showAICategorize, setShowAICategorize] = useState(false)
 
   // Module-scheiding: de banner is alleen relevant wanneer budgetteren actief
   // is. Op deze pagina is dat doorgaans waar (anders zie je geen budgets-pagina),
@@ -228,6 +442,16 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         const active = (data as { budgeting_active?: boolean | null } | null)?.budgeting_active
         setBudgetingActive(active !== false)
       })
+  }, [])
+
+  // Huidige gebruiker — nodig voor AICategorizeSheet's "alle tijden" scope in
+  // het combined-view scenario (geen specifieke accountId op deze pagina).
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id ?? null)
+    })
   }, [])
 
   // Compute date range + month count based on period mode
@@ -265,9 +489,13 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
 
   const loadSpending = useCallback(async (signal?: AbortSignal) => {
     const supabase = createClient()
+    // Extra velden (counterparty_iban, import_hash, reference) zijn nodig voor
+    // de AICategorizeSheet die op deze pagina via de "ongecategoriseerd"-
+    // aandacht-item geopend kan worden. Ze zijn goedkoop en voorkomen een
+    // tweede roundtrip puur om dezelfde rijen met meer kolommen op te halen.
     let spendQuery = supabase
       .from('transactions')
-      .select('id, account_id, is_split, budget_id, amount, date, description, counterparty_name, transaction_type')
+      .select('id, account_id, is_split, budget_id, amount, date, description, counterparty_name, transaction_type, counterparty_iban, import_hash, reference')
       .gte('date', monthStart)
       .lt('date', monthEnd)
       .order('date', { ascending: false })
@@ -342,12 +570,28 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       setUncategorizedTotal(
         uncategorized.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0),
       )
+      // Volledige rijen voor de AICategorizeSheet — dezelfde shape als in
+      // cash-account-view.tsx wordt doorgegeven aan de sheet.
+      setUncatTx(
+        uncategorized.map((t) => ({
+          id: t.id as string,
+          date: t.date as string,
+          description: (t.description ?? '') as string,
+          counterparty_name: (t.counterparty_name ?? null) as string | null,
+          counterparty_iban: ((t as { counterparty_iban?: string | null }).counterparty_iban ?? null) as string | null,
+          amount: Number(t.amount),
+          import_hash: ((t as { import_hash?: string | null }).import_hash ?? null) as string | null,
+          budget_id: null,
+          reference: ((t as { reference?: string | null }).reference ?? null) as string | null,
+        }))
+      )
     } else {
       if (signal?.aborted) return
       setSpending({})
       setTransactions([])
       setUncategorizedCount(0)
       setUncategorizedTotal(0)
+      setUncatTx([])
     }
 
     // Fetch rollovers for the current month period
@@ -799,7 +1043,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     .map(b => {
       const lim = getEffectiveLimit(b)
       const spent = spending[b.id] ?? 0
-      return { name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
+      return { id: b.id, name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
     })
   const bijnaVolInzichten = childBudgetsFlat
     .filter(b => {
@@ -810,16 +1054,29 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     .map(b => {
       const lim = getEffectiveLimit(b)
       const spent = spending[b.id] ?? 0
-      return { name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
+      return { id: b.id, name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
     })
   const hasAIInsights = overschredenInzichten.length > 0 || bijnaVolInzichten.length > 0
 
-  // G3-hub: compute op-schema count for expense parent budgets
-  const expenseParentCount = expenseBudgets.length
-  const opSchemaCount = expenseBudgets.filter(b => {
+  // G3-hub: schema-teller over álle hoofdbudgetten (expense, income, savings,
+  // debt), minus archive en de "Eigen rekening"-bucket. Per type verschilt de
+  // definitie van "op schema":
+  //   - expense / debt  → op schema als uitgegeven ≤ limiet (binnen budget blijven)
+  //   - income / savings → op schema als werkelijk ≥ limiet (doel behaald)
+  const schemaParents = budgets.filter(b =>
+    b.budget_type !== 'archive' &&
+    b.slug !== BUDGET_SLUGS.EIGEN_REKENING
+  )
+  const parentBudgetsCount = schemaParents.length
+  const opSchemaCount = schemaParents.filter(b => {
     const lim = getParentEffectiveLimit(b)
-    const spent = getParentSpent(b)
-    return lim > 0 && spent <= lim
+    if (lim <= 0) return false
+    const actual = getParentSpent(b)
+    if (b.budget_type === 'expense' || b.budget_type === 'debt') {
+      return actual <= lim
+    }
+    // income, savings: doel behalen
+    return actual >= lim
   }).length
 
   // G3-hub: combined alert list (overschreden first, then bijna vol), max 5
@@ -1031,68 +1288,31 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           </div>
         </div>
 
-        {/* Te Verdelen + Dekkingsgraad — only shown in single-month mode (allocation is per-month) */}
-        {/* FeatureGate: budget_optimalisatie — Te Verdelen allocatie bar + tools */}
-        {periodMode === 'maand' && <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
-          <div className={`mt-3 sm:mt-4 flex items-center justify-between gap-2 sm:gap-3 rounded-lg border px-3 sm:px-4 py-2 sm:py-3 ${teVerdelen >= 0 ? 'border-positive/20 bg-positive/10' : 'border-negative/20 bg-negative/10'}`}>
-            <div>
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>Te Verdelen</p>
-              <p className={`mt-0.5 font-mono text-base sm:text-lg font-bold ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {teVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(teVerdelen))}
-              </p>
-              <p className={`text-[11px] ${teVerdelen >= 0 ? 'text-positive/70' : 'text-negative/70'}`}>
-                {dekkingsgraad.toFixed(0)}% van inkomen toegewezen
-              </p>
-              {dekkingsgraad > 100 && (
-                <p className="mt-1 text-[11px] font-medium text-red-600">
-                  Je hebt {formatCurrency(Math.abs(teVerdelen))} meer toegewezen dan je verwacht te verdienen.
-                </p>
-              )}
-            </div>
-            <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => setShowEnvelopeTransfer(true)}
-                className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-              >
-                Verplaats →
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAllocationModal(true)}
-                className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-              >
-                Budgetplan instellen
-              </button>
-            </div>
-          </div>
-        </FeatureGate>}
-
-        {budgetingActive && (
-          <UncategorizedTransactionsBanner
-            count={uncategorizedCount}
-            totalAmount={uncategorizedTotal}
-            onClick={() => router.push('/core/cash?filterBudget=uncategorized')}
-            formatCurrency={formatCurrency}
-          />
-        )}
       </section>
 
-      {/* G3: Budget Hub — unified alerts + inzichten, gated by budget_optimalisatie */}
-      <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
-      {(hasAIInsights || expenseParentCount > 0) && (
+      {/* G3: Budget Hub — geconsolideerde dropdown (Allocatie + Aandacht + Alerts + Inzichten) */}
+      {budgetingActive && (
         <BudgetHub
           hubAlertsVisible={hubAlertsVisible}
           hubAlertsExtra={hubAlertsExtra}
           dekkingsgraad={dekkingsgraad}
           opSchemaCount={opSchemaCount}
-          expenseParentCount={expenseParentCount}
+          parentBudgetsCount={parentBudgetsCount}
           formatCurrency={formatCurrency}
           openWithMessage={openWithMessage}
           totalIncome={totalIncome}
+          teVerdelen={teVerdelen}
+          periodMode={periodMode}
+          onOpenPlanEditor={() => setShowPlanEditor(true)}
+          onOpenBudget={(id) => openBudgetModal(id)}
+          uncategorizedCount={uncategorizedCount}
+          uncategorizedTotal={uncategorizedTotal}
+          onUncategorizedClick={() => setShowAICategorize(true)}
+          coverageRatio={coverageRatio}
+          totalIncomeActual={totalIncomeActual}
+          budgetingActive={budgetingActive}
         />
       )}
-      </FeatureGate>
 
       {/* View toggle + New budget button */}
       <div className="mt-2 sm:mt-6 flex items-center justify-between">
@@ -1134,31 +1354,17 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
 
         <button
           type="button"
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+          onClick={() => setShowPlanEditor(true)}
+          className="inline-flex items-center gap-2 rounded-lg border border-kern-600 bg-[var(--paper)] px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
         >
-          <Plus className="h-4 w-4" />
-          Nieuw budget
+          <Pencil className="h-4 w-4" />
+          Budgetten aanpassen
         </button>
       </div>
 
       {/* Budget groups */}
       {viewMode === 'tree' ? (
         <>
-          {/* F2-10: Inkomensdekking — één keer boven de secties */}
-          {coverageRatio < 0.99 && totalIncome > 0 && (
-            <div className={`mt-4 flex items-center gap-2 rounded-[var(--r)] border px-3 py-2 ${
-              coverageRatio >= 0.8
-                ? 'border-kern-200 bg-kern-50 text-kern-700'
-                : 'border-red-200 bg-red-50 text-red-700'
-            }`}>
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              <span className="font-sans text-[11px]">
-                <strong>{Math.round(coverageRatio * 100)}% gedekt</strong> — {formatCurrency(totalIncomeActual)} van {formatCurrency(totalIncome)} verwacht inkomen ontvangen
-              </span>
-            </div>
-          )}
-
           {incomeBudgets.length > 0 && (
             <div className="mt-4 sm:mt-8">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
@@ -1255,20 +1461,43 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       )}
 
       {/* Budget allocation modal */}
-      {showAllocationModal && (
-        <BudgetAllocationModal
+      <BudgetPlanEditorSheet
+        open={showPlanEditor}
+        onClose={() => setShowPlanEditor(false)}
+        onSaved={() => {
+          setShowPlanEditor(false)
+          loadBudgets()
+          loadSpending()
+        }}
+        budgets={budgets}
+        budgetAmounts={budgetAmounts}
+        rollovers={rollovers}
+        totalIncome={totalIncome}
+        monthDate={monthDate}
+        monthlyAverages={initialData?.monthlyAverages ?? {}}
+      />
+
+      {/* AI categorize sheet — geopend vanuit de "ongecategoriseerd"-aandacht
+          in de Budget Hub. We hergebruiken dezelfde flow als in
+          cash-account-view.tsx zodat de gebruiker direct vanaf de budgets-
+          pagina transacties kan koppelen zonder naar /core/cash te navigeren. */}
+      {showAICategorize && (
+        <AICategorizeSheet
+          transactions={uncatTx}
           budgets={budgets}
-          budgetAmounts={budgetAmounts}
-          monthDate={monthDate}
-          totalIncome={totalIncome}
-          rollovers={rollovers}
-          onClose={() => setShowAllocationModal(false)}
+          budgetGroups={budgets.map((b) => ({ parent: b, children: b.children }))}
+          onClose={() => setShowAICategorize(false)}
           onSaved={() => {
-            setShowAllocationModal(false)
+            setShowAICategorize(false)
+            loadBudgets()
             loadSpending()
           }}
+          accountId={null}
+          monthLabel={monthLabel}
+          currentUserId={currentUserId}
         />
       )}
+
 
       {/* Budget detail modal */}
       {selectedBudget && modalStep === 'detail' && (
@@ -1325,283 +1554,11 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         />
       )}
 
-      {/* Budget create modal */}
-      {showCreateModal && (
-        <BudgetCreateModal
-          parentBudgets={budgets}
-          onClose={() => setShowCreateModal(false)}
-          onSaved={() => {
-            setShowCreateModal(false)
-            loadBudgets()
-            loadSpending()
-          }}
-        />
-      )}
-
-      {/* Envelope transfer sheet */}
-      {showEnvelopeTransfer && (
-        <EnvelopeTransferSheet
-          budgets={budgets}
-          budgetAmounts={budgetAmounts}
-          monthDate={monthDate}
-          onClose={() => setShowEnvelopeTransfer(false)}
-          onSaved={() => {
-            setShowEnvelopeTransfer(false)
-            loadSpending()
-          }}
-        />
-      )}
-
       {/* NIBUD Benchmark */}
       <CollapsibleSection storageKey="nibud-benchmark" title="NIBUD Benchmark" defaultOpen={false}>
         <NibudBenchmarkSection />
       </CollapsibleSection>
     </div>
-  )
-}
-
-// ── Budget allocation modal ──────────────────────────────────
-
-function BudgetAllocationModal({
-  budgets,
-  budgetAmounts,
-  monthDate,
-  totalIncome,
-  rollovers,
-  onClose,
-  onSaved,
-}: {
-  budgets: BudgetWithChildren[]
-  budgetAmounts: { id: string; budget_id: string; effective_from: string; amount: number }[]
-  monthDate: Date
-  totalIncome: number
-  rollovers: BudgetRollover[]
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const displayDate = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-01`
-
-  const [localLimits, setLocalLimits] = useState<Record<string, string>>(() => {
-    const result: Record<string, string> = {}
-    const nonIncomeBudgets = budgets.filter(b => b.budget_type !== 'income' && b.budget_type !== 'archive')
-    for (const parent of nonIncomeBudgets) {
-      const items = parent.children.length > 0 ? parent.children : [parent]
-      for (const b of items) {
-        const applicable = budgetAmounts
-          .filter(a => a.budget_id === b.id && a.effective_from <= displayDate)
-          .sort((a, z) => z.effective_from.localeCompare(a.effective_from))
-        result[b.id] = String(applicable.length > 0 ? applicable[0].amount : b.default_limit)
-      }
-    }
-    return result
-  })
-
-  const [saving, setSaving] = useState(false)
-  const [averages, setAverages] = useState<Record<string, number>>({})
-  const [averagesLoading, setAveragesLoading] = useState(true)
-
-  // Fetch 12-month average spending per budget on mount
-  useEffect(() => {
-    async function loadAverages() {
-      setAveragesLoading(true)
-      try {
-        const supabase = createClient()
-        const now = new Date()
-        const startDate = localDateStr(new Date(now.getFullYear(), now.getMonth() - 11, 1))
-        const endDate = localDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 1))
-        const budgetIds = Object.keys(localLimits)
-        if (budgetIds.length === 0) { setAveragesLoading(false); return }
-
-        const [{ data: txData }, { data: splitTxInRange }] = await Promise.all([
-          supabase.from('transactions')
-            .select('budget_id, amount, date')
-            .in('budget_id', budgetIds)
-            .gte('date', startDate)
-            .lt('date', endDate),
-          supabase.from('transactions')
-            .select('id, date')
-            .gte('date', startDate)
-            .lt('date', endDate)
-            .eq('is_split', true),
-        ])
-
-        // Fetch split rows for these budgets
-        const splitTxIds = (splitTxInRange ?? []).map(t => t.id)
-        const splitDateMap: Record<string, string> = {}
-        for (const t of (splitTxInRange ?? [])) splitDateMap[t.id] = t.date
-        let splitRows: { budget_id: string; amount: number }[] = []
-        if (splitTxIds.length > 0) {
-          const { data: splitData } = await supabase
-            .from('transaction_splits')
-            .select('budget_id, amount, transaction_id')
-            .in('budget_id', budgetIds)
-            .in('transaction_id', splitTxIds)
-          if (splitData) {
-            splitRows = splitData
-              .filter(s => s.budget_id)
-              .map(s => ({ budget_id: s.budget_id!, amount: Number(s.amount) }))
-          }
-        }
-
-        // Compute totals per budget
-        const totals: Record<string, number> = {}
-        for (const t of (txData ?? [])) {
-          if (t.budget_id) {
-            totals[t.budget_id] = (totals[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
-          }
-        }
-        for (const s of splitRows) {
-          totals[s.budget_id] = (totals[s.budget_id] ?? 0) + Math.abs(s.amount)
-        }
-
-        // Divide by 12 for monthly average
-        const result: Record<string, number> = {}
-        for (const [id, total] of Object.entries(totals)) {
-          result[id] = Math.round(total / 12)
-        }
-        setAverages(result)
-      } catch {
-        // Silently fail — averages are a non-critical enhancement
-      } finally {
-        setAveragesLoading(false)
-      }
-    }
-    loadAverages()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Rollovers are automatic carry-overs that already count as allocated on the main page.
-  // Include them here so that "te verdelen" matches the main page calculation.
-  const currentPeriod = formatPeriod(monthDate)
-  const totalCarry = Object.keys(localLimits).reduce((sum, budgetId) => {
-    const budgetRollovers = rollovers.filter(r => r.budget_id === budgetId)
-    return sum + getCarriedAmount(budgetRollovers, currentPeriod)
-  }, 0)
-
-  const localTotal = Object.values(localLimits).reduce((sum, v) => sum + (Number(v) || 0), 0)
-  const localTeVerdelen = totalIncome - localTotal - totalCarry
-
-  async function handleSave() {
-    if (saving) return
-    setSaving(true)
-    const effectiveDate = displayDate
-    const supabase = createClient()
-
-    for (const [budgetId, amount] of Object.entries(localLimits)) {
-      await supabase.from('budget_amounts').delete()
-        .eq('budget_id', budgetId).eq('effective_from', effectiveDate)
-      await supabase.from('budget_amounts').insert({
-        budget_id: budgetId,
-        effective_from: effectiveDate,
-        amount: Number(amount),
-      })
-    }
-
-    setSaving(false)
-    onSaved()
-  }
-
-  return (
-    <BottomSheet open={true} onClose={onClose} title="Budgetplan instellen" size="md">
-        <div className="space-y-5 px-6 py-4">
-          {/* Inkomen referentie (readonly) */}
-          <div className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Verwacht inkomen</p>
-            <p className="font-mono text-base font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
-          </div>
-
-          {/* Column headers */}
-          <div className="flex items-center gap-3">
-            <span className="min-w-0 flex-1" />
-            <span className="w-20 text-right text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Gem. 12m</span>
-            <span className="w-28 text-right text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Budget</span>
-          </div>
-
-          {/* Per budget-groep */}
-          {(['expense', 'savings', 'debt'] as const).map(type => {
-            const groups = budgets.filter(b => b.budget_type === type)
-            if (groups.length === 0) return null
-            const typeLabel = type === 'expense' ? 'Uitgaven' : type === 'savings' ? 'Sparen' : 'Schulden'
-            return (
-              <div key={type} className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">{typeLabel}</p>
-                {groups.map(parent => {
-                  const items = parent.children.length > 0 ? parent.children : [parent]
-                  return items.map(b => (
-                    <div key={b.id} className="flex items-center gap-3">
-                      <span className="min-w-0 flex-1 truncate text-sm text-[var(--ink-2)]">{b.name}</span>
-                      <span className="w-20 text-right font-mono text-xs tabular-nums text-[var(--ink-3)]">
-                        {averagesLoading
-                          ? <span className="inline-block animate-pulse">···</span>
-                          : averages[b.id]
-                            ? `€\u00A0${averages[b.id].toLocaleString('nl-NL')}`
-                            : '—'}
-                      </span>
-                      <div className="relative w-28">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={localLimits[b.id] ?? ''}
-                          onChange={e => setLocalLimits(prev => ({ ...prev, [b.id]: e.target.value }))}
-                          className="w-full rounded-[var(--r)] border border-[var(--border-md)] py-1.5 pl-6 pr-2 text-right font-mono text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
-                        />
-                      </div>
-                    </div>
-                  ))
-                })}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Footer: live te verdelen + opslaan */}
-        <div className="space-y-3 border-t border-[var(--border-ed)] px-6 py-4">
-          <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${localTeVerdelen >= 0 ? 'border-positive/20 bg-positive/10' : 'border-negative/20 bg-negative/10'}`}>
-            <span className="text-xs font-medium text-[var(--ink-2)]">Te Verdelen</span>
-            <span className={`font-mono text-sm font-bold ${localTeVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {localTeVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(localTeVerdelen))}
-            </span>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setLocalLimits(prev => {
-                  const next = { ...prev }
-                  for (const [id, avg] of Object.entries(averages)) {
-                    if (avg > 0 && next[id] !== undefined) {
-                      next[id] = String(avg)
-                    }
-                  }
-                  return next
-                })
-              }}
-              disabled={Object.keys(averages).length === 0}
-              className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50"
-            >
-              Gem. overnemen
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-            >
-              Annuleren
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? 'Opslaan...' : 'Opslaan'}
-            </button>
-          </div>
-        </div>
-    </BottomSheet>
   )
 }
 
@@ -3373,12 +3330,15 @@ function BudgetEditModal({
               <span className="text-[11px] font-medium text-kern-700">Onopgeslagen wijzigingen</span>
             </div>
           )}
-          {/* Name + Icon */}
+          {/* ── BASIS ─────────────────────────────────────────── */}
+
+          {/* Icoon + Naam */}
           <div className="flex gap-3">
             <button
               type="button"
               onClick={() => setShowIcons(!showIcons)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-ed)] text-[var(--ink-3)] hover:border-kern-300 hover:bg-kern-50"
+              aria-label="Icoon kiezen"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] text-[var(--ink-3)] hover:border-kern-300 hover:bg-kern-50"
             >
               <SelectedIcon className="h-5 w-5" />
             </button>
@@ -3387,6 +3347,7 @@ function BudgetEditModal({
               onChange={(e) => setName(e.target.value)}
               className={`flex-1 ${inputCls}`}
               placeholder="Naam"
+              aria-label="Naam"
             />
           </div>
 
@@ -3399,7 +3360,7 @@ function BudgetEditModal({
                     key={iconName}
                     type="button"
                     onClick={() => { setIcon(iconName); setShowIcons(false) }}
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition-colors ${
+                    className={`flex h-8 w-8 items-center justify-center rounded-[var(--r)] border text-xs transition-colors ${
                       icon === iconName
                         ? 'border-kern-500 bg-kern-50 text-kern-600'
                         : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
@@ -3412,812 +3373,472 @@ function BudgetEditModal({
             </div>
           )}
 
-          {/* Ownership toggle */}
-          <OwnershipToggle
-            value={ownership}
-            onChange={setOwnership}
-            hasHousehold={hasHousehold}
-            compact
-          />
-
-          {/* Parent selector for sub-budgets */}
-          {isChild && parentOptions.length > 0 && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Hoofdbudget</label>
-              <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={inputCls}>
-                {parentOptions.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Financial row: Type + Limit + Interval */}
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
-              <select value={budgetType} onChange={(e) => setBudgetType(e.target.value as 'income' | 'savings' | 'expense' | 'debt' | 'archive')} className={inputCls}>
-                <option value="expense">Uitgave</option>
-                <option value="income">Inkomen</option>
-                <option value="savings">Sparen</option>
-                <option value="debt">Schuld</option>
-                <option value="archive">Verborgen</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Limiet</label>
-              {isParent ? (
-                <div className={`${inputCls} cursor-not-allowed bg-[var(--subtle)] text-[var(--ink-3)]`}>
-                  {formatCurrency(childrenLimitSum ?? 0)}
-                  <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">Som van sub-budgetten</p>
-                </div>
-              ) : (
-                <input type="number" min="0" step="0.01" value={defaultLimit} onChange={(e) => setDefaultLimit(e.target.value)} className={inputCls} />
-              )}
-              {nibudAmount !== null && nibudAmount > 0 && (
-                <p className="mt-1 flex items-center gap-1 text-[10px] text-[var(--ink-3)]">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--ink-4)]" />
-                  NIBUD-richtlijn: <span className="font-mono font-medium text-[var(--ink-2)]">{formatCurrency(nibudAmount)}/mnd</span>
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Interval</label>
-              <select value={interval} onChange={(e) => setInterval(e.target.value as 'monthly' | 'quarterly' | 'yearly')} className={inputCls}>
-                <option value="monthly">Maandelijks</option>
-                <option value="quarterly">Per kwartaal</option>
-                <option value="yearly">Jaarlijks</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Effective month — only shown when limit is changed */}
-          {limitChanged && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ingangsmaand</label>
-              <select value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className={`${inputCls} capitalize`}>
-                {monthOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value} className="capitalize">{opt.label}</option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-[var(--ink-3)]">
-                Eerdere maanden behouden de oude limiet van {formatCurrency(Number(budget.default_limit))}
-              </p>
-            </div>
-          )}
-
-          {/* Doeltype — alleen voor subbudgetten */}
-          {!isParent && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                Doeltype <span className="font-normal text-[var(--ink-3)]">(optioneel)</span>
-              </label>
-              <p className="mb-2 text-[11px] text-[var(--ink-3)]">
-                Kies hoe dit budget werkt. Het doeltype bepaalt hoe overschotten en voortgang worden berekend.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {([
-                  { value: '', label: 'Geen' },
-                  { value: 'vaste_maandlast', label: 'Vaste maandlast' },
-                  { value: 'bestedingslimiet', label: 'Bestedingslimiet' },
-                  { value: 'spaardoel', label: 'Spaardoel' },
-                  { value: 'maandelijkse_reservering', label: 'Reservering' },
-                  { value: 'periodieke_last', label: 'Periodieke last' },
-                ] as const).map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => {
-                      setGoalType(value)
-                      if (value !== 'spaardoel') { setGoalDate(''); if (value !== 'periodieke_last') setGoalAmount('') }
-                      if (value !== 'periodieke_last') setGoalFrequency('')
-                      if (value === 'maandelijkse_reservering') setRolloverType('carry-over')
-                    }}
-                    className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      goalType === value
-                        ? 'bg-kern-50 border-kern-200 text-kern-700'
-                        : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {goalType !== '' && (
-                <div className="mt-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2.5">
-                  <p className="text-[11px] leading-relaxed text-kern-700">
-                    {goalType === 'vaste_maandlast' && 'Een vaste terugkerende uitgave. Je ziet direct of je inkomsten dit dekken of tekortschiet.'}
-                    {goalType === 'bestedingslimiet' && 'Maximaal te besteden bedrag. Je ontvangt een melding zodra je de ingestelde drempel nadert.'}
-                    {goalType === 'spaardoel' && 'Spaart toe naar een doel. Vul een doelbedrag en einddatum in om de voortgang te volgen.'}
-                    {goalType === 'maandelijkse_reservering' && 'Bouwt maandelijks saldo op voor een toekomstige uitgave. Overschot wordt automatisch doorgeschoven naar de volgende maand.'}
-                    {goalType === 'periodieke_last' && 'Voor grote uitgaven die je periodiek verwacht, zoals een verzekering of vakantie. Je reserveert maandelijks een deel van het totaalbedrag.'}
-                  </p>
-                </div>
-              )}
-
-              {goalType === 'spaardoel' && (
-                <div className="mt-2">
-                  {availableSavingsGoals.length > 0 && (
-                    <select
-                      value={linkedGoalId}
-                      onChange={(e) => {
-                        const gid = e.target.value
-                        setLinkedGoalId(gid)
-                        if (gid) {
-                          const g = availableSavingsGoals.find(x => x.id === gid)
-                          if (g) { setGoalAmount(String(g.target_value)); setGoalDate(g.target_date ?? '') }
-                        } else {
-                          setGoalAmount(''); setGoalDate('')
-                        }
-                      }}
-                      className={inputCls}
-                    >
-                      <option value="">— Geen koppeling —</option>
-                      {availableSavingsGoals.map(g => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
-                      ))}
-                    </select>
-                  )}
-                  {linkedGoalId && (
-                    <p className="mt-1 text-[11px] text-wil-600">Doelbedrag en einddatum worden overgenomen uit het gekoppelde doel.</p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateGoal(true)}
-                    className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-wil-600 hover:text-wil-700"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Maak nieuw doel aan in De Wil
-                  </button>
-                </div>
-              )}
-
-              {goalType === 'periodieke_last' && (
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaalbedrag (€)</label>
-                    <input type="number" min="0" step="0.01" value={goalAmount} onChange={(e) => setGoalAmount(e.target.value)} className={inputCls} placeholder="bijv. 600" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Frequentie</label>
-                    <select value={goalFrequency} onChange={(e) => setGoalFrequency(e.target.value)} className={inputCls}>
-                      <option value="">Kies frequentie</option>
-                      <option value="jaarlijks">Jaarlijks</option>
-                      <option value="halfjaarlijks">Halfjaarlijks</option>
-                      <option value="kwartaal">Kwartaal</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {goalType === 'maandelijkse_reservering' && (
-                <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">Rollover wordt automatisch ingesteld op &apos;Doorschuiven&apos;.</p>
-              )}
-            </div>
-          )}
-
-          {/* Control row: Rollover + Limit type */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Overschot-beheer</label>
-              <select value={rolloverType} onChange={(e) => setRolloverType(e.target.value as 'reset' | 'carry-over' | 'invest-sweep')} className={inputCls}>
-                <option value="reset">Reset</option>
-                <option value="carry-over">Doorschuiven</option>
-                <option value="invest-sweep">Beleggen-sweep</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Limiet-type</label>
-              <select value={limitType} onChange={(e) => setLimitType(e.target.value as 'soft' | 'hard')} className={inputCls}>
-                <option value="soft">Zacht (waarschuwing)</option>
-                <option value="hard">Hard (blokkering)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Alert threshold + Max single */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notificatie: {alertThreshold}%</label>
-              <input
-                type="range" min="0" max="100"
-                value={alertThreshold}
-                onChange={(e) => setAlertThreshold(parseInt(e.target.value))}
-                className="w-full accent-kern-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Max transactie</label>
-              <input type="number" min="0" step="0.01" value={maxSingleAmount} onChange={(e) => setMaxSingleAmount(e.target.value)} className={inputCls} placeholder="0 = geen limiet" />
-            </div>
-          </div>
-
-          {/* Priority */}
+          {/* Type (pill-row) */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Prioriteit</label>
-            <div className="flex gap-1.5">
-              {[1, 2, 3, 4, 5].map((score) => (
+            <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Type</label>
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                { value: 'income', label: 'Inkomen' },
+                { value: 'expense', label: 'Uitgave' },
+                { value: 'savings', label: 'Sparen' },
+                { value: 'debt', label: 'Schuld' },
+                { value: 'archive', label: 'Archief' },
+              ] as const).map(({ value, label }) => (
                 <button
-                  key={score}
+                  key={value}
                   type="button"
-                  onClick={() => setPriorityScore(score)}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
-                    priorityScore === score
-                      ? 'border-kern-500 bg-kern-50 text-kern-700'
-                      : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
+                  onClick={() => setBudgetType(value)}
+                  className={`min-h-[36px] rounded-[var(--r)] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    budgetType === value
+                      ? 'bg-kern-50 border-kern-300 text-kern-700'
+                      : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
                   }`}
                 >
-                  {score}
+                  {label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Toggles */}
-          <div className="flex gap-4">
+          {/* Bedrag */}
+          <div>
+            <label htmlFor="budget-limit" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Bedrag</label>
+            {isParent ? (
+              <div className={`${inputCls} cursor-not-allowed bg-[var(--subtle)] text-[var(--ink-3)] font-mono tabular-nums`}>
+                {formatCurrency(childrenLimitSum ?? 0)}
+                <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">Som van sub-budgetten — pas de kinderen aan</p>
+              </div>
+            ) : (
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-3)]">€</span>
+                <input
+                  id="budget-limit"
+                  type="number" min="0" step="0.01"
+                  inputMode="decimal"
+                  value={defaultLimit}
+                  onChange={(e) => setDefaultLimit(e.target.value)}
+                  className={`${inputCls} pl-7 font-mono tabular-nums`}
+                />
+              </div>
+            )}
+            {nibudAmount !== null && nibudAmount > 0 && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-[var(--ink-3)]">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--ink-4)]" />
+                NIBUD-richtlijn: <span className="font-mono font-medium text-[var(--ink-2)]">{formatCurrency(nibudAmount)}/mnd</span>
+              </p>
+            )}
+          </div>
+
+          {/* Ingangsmaand — verschijnt alleen als bedrag gewijzigd is */}
+          {limitChanged && (
+            <div>
+              <label htmlFor="effective-from" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Ingangsmaand</label>
+              <select
+                id="effective-from"
+                value={effectiveFrom}
+                onChange={(e) => setEffectiveFrom(e.target.value)}
+                className={`${inputCls} capitalize`}
+              >
+                {monthOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value} className="capitalize">{opt.label}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                Eerdere maanden behouden de oude limiet van <span className="font-mono tabular-nums">{formatCurrency(Number(budget.default_limit))}</span>.
+              </p>
+            </div>
+          )}
+
+          {/* Essentieel */}
+          <div>
             <label className="flex cursor-pointer items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsEssential(!isEssential)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isEssential ? 'bg-kern-500' : 'bg-zinc-300'}`}
+                aria-pressed={isEssential}
+                aria-describedby="essential-help"
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isEssential ? 'bg-kern-500' : 'bg-zinc-300'}`}
               >
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${isEssential ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                <span className={`inline-block h-4 w-4 rounded-full bg-[var(--paper)] transition-transform ${isEssential ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
-              <span className="text-xs text-[var(--ink-2)]">Essentieel</span>
+              <span className="text-sm font-medium text-[var(--ink-2)]">Essentieel</span>
             </label>
-            <label className="flex cursor-pointer items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsInflationIndexed(!isInflationIndexed)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isInflationIndexed ? 'bg-kern-500' : 'bg-zinc-300'}`}
-              >
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${isInflationIndexed ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </button>
-              <span className="text-xs text-[var(--ink-2)]">Inflatie-indexatie</span>
-            </label>
+            <p id="essential-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+              Essentiële budgetten tellen mee voor je FIRE-berekening als vaste last na pensioen.
+            </p>
           </div>
 
-          {/* Description */}
+          {/* Beschrijving */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Beschrijving (optioneel)</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
+            <label htmlFor="budget-description" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+              Beschrijving <span className="font-normal text-[var(--ink-3)]">(optioneel)</span>
+            </label>
+            <textarea
+              id="budget-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              className={inputCls}
+            />
           </div>
-        </div>
 
-        <div className="flex justify-end gap-2 border-t border-[var(--border-ed)] px-6 py-4">
-          <button onClick={handleClose} className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]">
-            Annuleren
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !name.trim()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+          {/* ── GEAVANCEERD (ingeklapt) ──────────────────────── */}
+          <CollapsibleSection
+            storageKey="budget-edit-advanced"
+            title="Geavanceerde instellingen"
+            summary="interval · overschot · drempels · prioriteit · context"
+            defaultOpen={false}
           >
-            <Save className="h-4 w-4" />
-            {saving ? 'Opslaan...' : 'Opslaan'}
-          </button>
-        </div>
-    </BottomSheet>
+            <div className="space-y-6">
 
-    {showCreateGoal && (
-      <GoalForm
-        assets={[]}
-        debts={[]}
-        lockedToSavings
-        onClose={() => setShowCreateGoal(false)}
-        onSaved={async (newGoalId) => {
-          setShowCreateGoal(false)
-          if (newGoalId) {
-            const supabase = createClient()
-            const { data } = await supabase
-              .from('goals')
-              .select('id, name, target_value, target_date')
-              .eq('goal_type', 'savings')
-              .eq('is_completed', false)
-              .order('sort_order', { ascending: true })
-            setAvailableSavingsGoals(data ?? [])
-            setLinkedGoalId(newGoalId)
-            const newGoal = data?.find(g => g.id === newGoalId)
-            if (newGoal) { setGoalAmount(String(newGoal.target_value)); setGoalDate(newGoal.target_date ?? '') }
-          }
-        }}
-        initialValues={{ target_value: goalAmount || undefined, target_date: goalDate || undefined }}
-      />
-    )}
-    </>
-  )
-}
-
-// ── Budget create modal ──────────────────────────────────────
-
-function BudgetCreateModal({
-  parentBudgets,
-  onClose,
-  onSaved,
-}: {
-  parentBudgets: BudgetWithChildren[]
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const [parentId, setParentId] = useState('new')
-  const [categoryName, setCategoryName] = useState('')
-  const [name, setName] = useState('')
-  const [icon, setIcon] = useState('Circle')
-  const [budgetType, setBudgetType] = useState<'expense' | 'income' | 'savings' | 'debt'>('expense')
-  const [defaultLimit, setDefaultLimit] = useState('')
-  const [interval, setInterval] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly')
-  const [ownership, setOwnership] = useState<OwnershipType>('personal')
-  const [goalType, setGoalType] = useState('')
-  const [goalAmount, setGoalAmount] = useState('')
-  const [goalDate, setGoalDate] = useState('')
-  const [goalFrequency, setGoalFrequency] = useState('')
-  const [rolloverType, setRolloverType] = useState<'reset' | 'carry-over' | 'invest-sweep'>('reset')
-  const [priorityScore, setPriorityScore] = useState(3)
-  const [isEssential, setIsEssential] = useState(false)
-  const [isInflationIndexed, setIsInflationIndexed] = useState(false)
-  const [description, setDescription] = useState('')
-  const [showIcons, setShowIcons] = useState(false)
-  const [showAdvanced, setShowAdvanced] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
-  const { hasHousehold, householdId } = useHouseholdStatus()
-  // De Wil goal linking
-  const [linkedGoalId, setLinkedGoalId] = useState<string>('')
-  const [availableSavingsGoals, setAvailableSavingsGoals] = useState<
-    { id: string; name: string; target_value: number; target_date: string | null }[]
-  >([])
-  const [showCreateGoal, setShowCreateGoal] = useState(false)
-
-  const isDirty = name.trim() !== '' || categoryName.trim() !== '' || defaultLimit !== ''
-
-  // Load De Wil savings goals on mount
-  useEffect(() => {
-    const supabase = createClient()
-    supabase
-      .from('goals')
-      .select('id, name, target_value, target_date')
-      .eq('goal_type', 'savings')
-      .eq('is_completed', false)
-      .order('sort_order', { ascending: true })
-      .then(({ data }) => { if (data) setAvailableSavingsGoals(data) })
-  }, [])
-
-  function handleClose() {
-    if (isDirty) {
-      setShowCloseConfirm(true)
-    } else {
-      onClose()
-    }
-  }
-
-  async function handleSave() {
-    if (!name.trim()) { setError('Naam is verplicht'); return }
-    if (parentId === 'new' && !categoryName.trim()) { setError('Categorienaam is verplicht'); return }
-    setSaving(true)
-    setError('')
-
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Niet ingelogd'); setSaving(false); return }
-
-    const ownershipFields = {
-      ownership,
-      household_id: ownership === 'shared' ? householdId : null,
-    }
-
-    let resolvedParentId: string | null = parentId === 'new' ? null : parentId
-
-    if (parentId === 'new') {
-      const { data: parentData, error: parentError } = await supabase
-        .from('budgets')
-        .insert({
-          user_id: user.id,
-          name: categoryName.trim(),
-          icon,
-          default_limit: 0,
-          budget_type: budgetType,
-          interval,
-          rollover_type: rolloverType,
-          is_essential: isEssential,
-          priority_score: priorityScore,
-          is_inflation_indexed: isInflationIndexed,
-          parent_id: null,
-          ...ownershipFields,
-        })
-        .select('id')
-        .single()
-
-      if (parentError || !parentData) {
-        setError(parentError?.message ?? 'Fout bij aanmaken categorie')
-        setSaving(false)
-        return
-      }
-      resolvedParentId = parentData.id
-    }
-
-    const { data: insertedBudget, error: insertError } = await supabase
-      .from('budgets')
-      .insert({
-        user_id: user.id,
-        name: name.trim(),
-        icon,
-        description: description.trim() || null,
-        default_limit: parseFloat(defaultLimit) || 0,
-        budget_type: budgetType,
-        interval,
-        rollover_type: goalType === 'maandelijkse_reservering' ? 'carry-over' : rolloverType,
-        limit_type: 'soft',
-        alert_threshold: 80,
-        max_single_transaction_amount: 0,
-        is_essential: isEssential,
-        priority_score: priorityScore,
-        is_inflation_indexed: isInflationIndexed,
-        parent_id: resolvedParentId,
-        goal_type: goalType || null,
-        goal_amount: parseFloat(goalAmount) || null,
-        goal_date: goalDate || null,
-        goal_frequency: goalFrequency || null,
-        sort_order: 0,
-        ...ownershipFields,
-      })
-      .select('id')
-      .single()
-
-    if (insertError) {
-      setSaving(false)
-      setError(insertError.message)
-      return
-    }
-
-    // Goal linking for spaardoel
-    if (goalType === 'spaardoel' && linkedGoalId && insertedBudget?.id) {
-      await supabase.from('goals').update({ budget_id: insertedBudget.id }).eq('id', linkedGoalId)
-    }
-
-    setSaving(false)
-    onSaved()
-  }
-
-  const SelectedIcon = iconMap[icon] ?? iconMap['Circle']
-  const inputCls = 'w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500'
-
-  return (
-    <>
-    <BottomSheet open={true} onClose={handleClose} title="Nieuw budget" size="lg">
-        <div className="space-y-4 px-6 py-4">
-          {/* Unsaved changes close confirmation */}
-          {showCloseConfirm && (
-            <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-orange-800">Onopgeslagen wijzigingen</p>
-                  <p className="mt-1 text-xs text-orange-700">
-                    Je hebt wijzigingen die nog niet zijn opgeslagen. Wil je deze verwijderen?
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
-                    >
-                      Wijzigingen verwijderen
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowCloseConfirm(false)}
-                      className="rounded-md border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
-                    >
-                      Verder bewerken
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
-              <p className="text-xs text-red-700">{error}</p>
-            </div>
-          )}
-
-          {/* STRUCTUUR */}
-          <div className="space-y-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Structuur</p>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Hoofdcategorie</label>
-              <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={inputCls}>
-                <option value="new">+ Nieuwe categorie</option>
-                {parentBudgets.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {parentId === 'new' && (
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Categorienaam</label>
-                <input
-                  value={categoryName}
-                  onChange={(e) => setCategoryName(e.target.value)}
-                  className={inputCls}
-                  placeholder="bijv. Wonen"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
-              <div className="flex gap-1.5">
-                {(['expense', 'income', 'savings', 'debt'] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setBudgetType(t)}
-                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
-                      budgetType === t
-                        ? 'border-kern-500 bg-kern-50 text-kern-700'
-                        : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
-                    }`}
-                  >
-                    {t === 'expense' ? 'Uitgave' : t === 'income' ? 'Inkomen' : t === 'savings' ? 'Sparen' : 'Schuld'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* IDENTITEIT */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Identiteit</p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowIcons(!showIcons)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-ed)] text-[var(--ink-3)] hover:border-kern-300 hover:bg-kern-50"
-              >
-                <SelectedIcon className="h-5 w-5" />
-              </button>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={`flex-1 ${inputCls}`}
-                placeholder="Naam van het budget"
-              />
-            </div>
-            {showIcons && (
-              <div className="flex flex-wrap gap-1">
-                {iconOptions.map((iconName) => {
-                  const Icon = iconMap[iconName]
-                  return (
-                    <button
-                      key={iconName}
-                      type="button"
-                      onClick={() => { setIcon(iconName); setShowIcons(false) }}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition-colors ${
-                        icon === iconName
-                          ? 'border-kern-500 bg-kern-50 text-kern-600'
-                          : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
-                      }`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* FINANCIEEL */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Financieel</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Limiet (€)</label>
-                <input type="number" min="0" step="0.01" value={defaultLimit} onChange={(e) => setDefaultLimit(e.target.value)} className={inputCls} placeholder="0" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Interval</label>
-                <select value={interval} onChange={(e) => setInterval(e.target.value as 'monthly' | 'quarterly' | 'yearly')} className={inputCls}>
-                  <option value="monthly">Maandelijks</option>
-                  <option value="quarterly">Per kwartaal</option>
-                  <option value="yearly">Jaarlijks</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* EIGENDOM */}
-          <OwnershipToggle
-            value={ownership}
-            onChange={setOwnership}
-            hasHousehold={hasHousehold}
-            compact
-          />
-
-          {/* DOELTYPE — alleen voor subbudgetten (bestaande parent geselecteerd) */}
-          {parentId !== 'new' && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                Doeltype <span className="font-normal text-[var(--ink-3)]">(optioneel)</span>
-              </label>
-              <p className="mb-2 text-[11px] text-[var(--ink-3)]">
-                Kies hoe dit budget werkt. Het doeltype bepaalt hoe overschotten en voortgang worden berekend.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {([
-                  { value: '', label: 'Geen' },
-                  { value: 'vaste_maandlast', label: 'Vaste maandlast' },
-                  { value: 'bestedingslimiet', label: 'Bestedingslimiet' },
-                  { value: 'spaardoel', label: 'Spaardoel' },
-                  { value: 'maandelijkse_reservering', label: 'Reservering' },
-                  { value: 'periodieke_last', label: 'Periodieke last' },
-                ] as const).map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => {
-                      setGoalType(value)
-                      if (value !== 'spaardoel') { setGoalDate(''); if (value !== 'periodieke_last') setGoalAmount('') }
-                      if (value !== 'periodieke_last') setGoalFrequency('')
-                      if (value === 'maandelijkse_reservering') setRolloverType('carry-over')
-                    }}
-                    className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      goalType === value
-                        ? 'bg-kern-50 border-kern-200 text-kern-700'
-                        : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {goalType !== '' && (
-                <div className="mt-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2.5">
-                  <p className="text-[11px] leading-relaxed text-kern-700">
-                    {goalType === 'vaste_maandlast' && 'Een vaste terugkerende uitgave. Je ziet direct of je inkomsten dit dekken of tekortschiet.'}
-                    {goalType === 'bestedingslimiet' && 'Maximaal te besteden bedrag. Je ontvangt een melding zodra je de ingestelde drempel nadert.'}
-                    {goalType === 'spaardoel' && 'Spaart toe naar een doel. Vul een doelbedrag en einddatum in om de voortgang te volgen.'}
-                    {goalType === 'maandelijkse_reservering' && 'Bouwt maandelijks saldo op voor een toekomstige uitgave. Overschot wordt automatisch doorgeschoven naar de volgende maand.'}
-                    {goalType === 'periodieke_last' && 'Voor grote uitgaven die je periodiek verwacht, zoals een verzekering of vakantie. Je reserveert maandelijks een deel van het totaalbedrag.'}
-                  </p>
-                </div>
-              )}
-
-              {goalType === 'spaardoel' && (
-                <div className="mt-2">
-                  {availableSavingsGoals.length > 0 && (
+              {/* Sub-groep A — Gedrag over tijd */}
+              <section>
+                <h4 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">
+                  Gedrag over tijd
+                </h4>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="budget-interval" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Interval</label>
                     <select
-                      value={linkedGoalId}
-                      onChange={(e) => {
-                        const gid = e.target.value
-                        setLinkedGoalId(gid)
-                        if (gid) {
-                          const g = availableSavingsGoals.find(x => x.id === gid)
-                          if (g) { setGoalAmount(String(g.target_value)); setGoalDate(g.target_date ?? '') }
-                        } else {
-                          setGoalAmount(''); setGoalDate('')
-                        }
-                      }}
+                      id="budget-interval"
+                      aria-describedby="budget-interval-help"
+                      value={interval}
+                      onChange={(e) => setInterval(e.target.value as 'monthly' | 'quarterly' | 'yearly')}
                       className={inputCls}
                     >
-                      <option value="">— Geen koppeling —</option>
-                      {availableSavingsGoals.map(g => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
+                      <option value="monthly">Maandelijks</option>
+                      <option value="quarterly">Per kwartaal</option>
+                      <option value="yearly">Jaarlijks</option>
+                    </select>
+                    <p id="budget-interval-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Maandelijks voor vaste lasten; Per kwartaal voor gas/water-afrekening; Jaarlijks voor verzekeringspremies of vakantie.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Overschot-beheer</label>
+                    <div
+                      className="flex flex-wrap gap-1.5"
+                      role="radiogroup"
+                      aria-describedby="rollover-help"
+                      aria-label="Overschot-beheer"
+                    >
+                      {([
+                        { value: 'reset', label: 'Reset' },
+                        { value: 'carry-over', label: 'Doorschuiven' },
+                        { value: 'invest-sweep', label: 'Beleggen-sweep' },
+                      ] as const).map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          role="radio"
+                          aria-checked={rolloverType === value}
+                          onClick={() => setRolloverType(value)}
+                          className={`min-h-[36px] rounded-[var(--r)] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            rolloverType === value
+                              ? 'bg-kern-50 border-kern-300 text-kern-700'
+                              : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                          }`}
+                        >
+                          {label}
+                        </button>
                       ))}
-                    </select>
-                  )}
-                  {linkedGoalId && (
-                    <p className="mt-1 text-[11px] text-wil-600">Doelbedrag en einddatum worden overgenomen uit het gekoppelde doel.</p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateGoal(true)}
-                    className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-wil-600 hover:text-wil-700"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Maak nieuw doel aan in De Wil
-                  </button>
-                </div>
-              )}
-
-              {goalType === 'periodieke_last' && (
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaalbedrag (€)</label>
-                    <input type="number" min="0" step="0.01" value={goalAmount} onChange={(e) => setGoalAmount(e.target.value)} className={inputCls} placeholder="bijv. 600" />
+                    </div>
+                    <p id="rollover-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Reset start elke maand opnieuw. Doorschuiven rolt het niet-bestede deel naar volgende maand — handig voor een vakantiepot. Beleggen-sweep boekt het overschot als spaar/invest-bedrag.
+                    </p>
                   </div>
+
                   <div>
-                    <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Frequentie</label>
-                    <select value={goalFrequency} onChange={(e) => setGoalFrequency(e.target.value)} className={inputCls}>
-                      <option value="">Kies frequentie</option>
-                      <option value="jaarlijks">Jaarlijks</option>
-                      <option value="halfjaarlijks">Halfjaarlijks</option>
-                      <option value="kwartaal">Kwartaal</option>
-                    </select>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsInflationIndexed(!isInflationIndexed)}
+                        aria-pressed={isInflationIndexed}
+                        aria-describedby="inflation-help"
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isInflationIndexed ? 'bg-kern-500' : 'bg-zinc-300'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 rounded-full bg-[var(--paper)] transition-transform ${isInflationIndexed ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                      <span className="text-sm font-medium text-[var(--ink-2)]">Inflatie-indexering</span>
+                    </label>
+                    <p id="inflation-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Het budget groeit jaarlijks automatisch mee met de inflatie. Ideaal voor boodschappen, energie en huur.
+                    </p>
                   </div>
                 </div>
-              )}
+              </section>
 
-              {goalType === 'maandelijkse_reservering' && (
-                <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">Rollover wordt automatisch ingesteld op &apos;Doorschuiven&apos;.</p>
+              {/* Sub-groep B — Limieten & signalen */}
+              <section>
+                <h4 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">
+                  Limieten &amp; signalen
+                </h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Limiet-type</label>
+                    <div
+                      className="flex flex-wrap gap-1.5"
+                      role="radiogroup"
+                      aria-describedby="limit-type-help"
+                      aria-label="Limiet-type"
+                    >
+                      {([
+                        { value: 'soft', label: 'Zacht' },
+                        { value: 'hard', label: 'Hard' },
+                      ] as const).map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          role="radio"
+                          aria-checked={limitType === value}
+                          onClick={() => setLimitType(value)}
+                          className={`min-h-[36px] rounded-[var(--r)] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            limitType === value
+                              ? 'bg-kern-50 border-kern-300 text-kern-700'
+                              : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p id="limit-type-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Zacht geeft een waarschuwing bij overschrijding maar laat transacties toe. Hard probeert transacties boven de limiet te blokkeren (waar technisch mogelijk).
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="alert-threshold" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+                      Notificatiedrempel: <span className="font-mono tabular-nums text-kern-700">{alertThreshold}%</span>
+                    </label>
+                    <input
+                      id="alert-threshold"
+                      type="range" min="0" max="100" step="5"
+                      value={alertThreshold}
+                      onChange={(e) => setAlertThreshold(parseInt(e.target.value))}
+                      aria-describedby="alert-threshold-help"
+                      className="w-full accent-kern-500"
+                    />
+                    <p id="alert-threshold-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Krijg een melding wanneer je dit percentage van je budget bereikt. Standaard 80%.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="max-single" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Max transactiebedrag</label>
+                    <div className="relative w-40">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-3)]">€</span>
+                      <input
+                        id="max-single"
+                        type="number" min="0" step="0.01"
+                        inputMode="decimal"
+                        value={maxSingleAmount}
+                        onChange={(e) => setMaxSingleAmount(e.target.value)}
+                        aria-describedby="max-single-help"
+                        className={`${inputCls} pl-7 font-mono tabular-nums`}
+                        placeholder="0"
+                      />
+                    </div>
+                    <p id="max-single-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Waarschuwing als één transactie groter is dan dit bedrag. Voorkomt dat één uitschieter je budget uitput. 0 = geen limiet.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Prioriteit</label>
+                    <div
+                      className="flex gap-1.5"
+                      role="radiogroup"
+                      aria-describedby="priority-help"
+                      aria-label="Prioriteit"
+                    >
+                      {[1, 2, 3, 4, 5].map((score) => (
+                        <button
+                          key={score}
+                          type="button"
+                          role="radio"
+                          aria-checked={priorityScore === score}
+                          onClick={() => setPriorityScore(score)}
+                          className={`flex h-11 w-11 items-center justify-center rounded-[var(--r)] border text-sm font-medium font-mono tabular-nums transition-colors ${
+                            priorityScore === score
+                              ? 'border-kern-500 bg-kern-50 text-kern-700'
+                              : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
+                          }`}
+                        >
+                          {score}
+                        </button>
+                      ))}
+                    </div>
+                    <p id="priority-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Bepaalt volgorde in aanbevelingen en het Te Verdelen-advies. 1 = laagste, 5 = hoogste. Standaard 3.
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Sub-groep C — Context */}
+              {(isChild || !isParent || hasHousehold) && (
+                <section>
+                  <h4 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">
+                    Context
+                  </h4>
+                  <div className="space-y-4">
+
+                    {isChild && parentOptions.length > 0 && (
+                      <div>
+                        <label htmlFor="budget-parent" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Hoofdbudget</label>
+                        <select
+                          id="budget-parent"
+                          aria-describedby="parent-help"
+                          value={parentId}
+                          onChange={(e) => setParentId(e.target.value)}
+                          className={inputCls}
+                        >
+                          {parentOptions.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                        <p id="parent-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                          Verplaats dit deelbudget naar een andere hoofdcategorie. Transacties blijven gekoppeld.
+                        </p>
+                      </div>
+                    )}
+
+                    {!isParent && (
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+                          Doeltype <span className="font-normal text-[var(--ink-3)]">(optioneel)</span>
+                        </label>
+                        <div
+                          className="flex flex-wrap gap-1.5"
+                          role="radiogroup"
+                          aria-describedby="goal-type-help"
+                          aria-label="Doeltype"
+                        >
+                          {([
+                            { value: '', label: 'Geen' },
+                            { value: 'vaste_maandlast', label: 'Vaste maandlast' },
+                            { value: 'bestedingslimiet', label: 'Bestedingslimiet' },
+                            { value: 'spaardoel', label: 'Spaardoel' },
+                            { value: 'maandelijkse_reservering', label: 'Reservering' },
+                            { value: 'periodieke_last', label: 'Periodieke last' },
+                          ] as const).map(({ value, label }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              role="radio"
+                              aria-checked={goalType === value}
+                              onClick={() => {
+                                setGoalType(value)
+                                if (value !== 'spaardoel') { setGoalDate(''); if (value !== 'periodieke_last') setGoalAmount('') }
+                                if (value !== 'periodieke_last') setGoalFrequency('')
+                                if (value === 'maandelijkse_reservering') setRolloverType('carry-over')
+                              }}
+                              className={`min-h-[36px] rounded-[var(--r)] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                goalType === value
+                                  ? 'bg-kern-50 border-kern-300 text-kern-700'
+                                  : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                        <p id="goal-type-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                          Geen = gewoon budget. Vaste maandlast = terugkerende vaste post (hypotheek). Bestedingslimiet = plafond op variabele uitgaven. Spaardoel = koppelen aan een doel in De Wil. Reservering = maandelijks saldo opbouwen. Periodieke last = kost die elk kwartaal/jaar terugkomt, verspreid over maanden.
+                        </p>
+
+                        {goalType === 'spaardoel' && (
+                          <div className="mt-2">
+                            {availableSavingsGoals.length > 0 && (
+                              <select
+                                value={linkedGoalId}
+                                onChange={(e) => {
+                                  const gid = e.target.value
+                                  setLinkedGoalId(gid)
+                                  if (gid) {
+                                    const g = availableSavingsGoals.find(x => x.id === gid)
+                                    if (g) { setGoalAmount(String(g.target_value)); setGoalDate(g.target_date ?? '') }
+                                  } else {
+                                    setGoalAmount(''); setGoalDate('')
+                                  }
+                                }}
+                                className={inputCls}
+                              >
+                                <option value="">— Geen koppeling —</option>
+                                {availableSavingsGoals.map(g => (
+                                  <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                              </select>
+                            )}
+                            {linkedGoalId && (
+                              <p className="mt-1 text-xs text-wil-600 leading-relaxed">Doelbedrag en einddatum worden overgenomen uit het gekoppelde doel.</p>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setShowCreateGoal(true)}
+                              className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-wil-600 hover:text-wil-700"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Maak nieuw doel aan in De Wil
+                            </button>
+                          </div>
+                        )}
+
+                        {goalType === 'periodieke_last' && (
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaalbedrag (€)</label>
+                              <input
+                                type="number" min="0" step="0.01"
+                                inputMode="decimal"
+                                value={goalAmount}
+                                onChange={(e) => setGoalAmount(e.target.value)}
+                                className={`${inputCls} font-mono tabular-nums`}
+                                placeholder="bijv. 600"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Frequentie</label>
+                              <select value={goalFrequency} onChange={(e) => setGoalFrequency(e.target.value)} className={inputCls}>
+                                <option value="">Kies frequentie</option>
+                                <option value="jaarlijks">Jaarlijks</option>
+                                <option value="halfjaarlijks">Halfjaarlijks</option>
+                                <option value="kwartaal">Kwartaal</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+
+                        {goalType === 'maandelijkse_reservering' && (
+                          <p className="mt-1.5 text-xs text-[var(--ink-3)] leading-relaxed">
+                            Rollover wordt automatisch ingesteld op &apos;Doorschuiven&apos;.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {hasHousehold && (
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Eigendom</label>
+                        <OwnershipToggle
+                          value={ownership}
+                          onChange={setOwnership}
+                          hasHousehold={hasHousehold}
+                          compact
+                        />
+                        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+                          Persoonlijk of gedeeld met je huishouden. Gedeelde budgetten verdelen kosten automatisch volgens je huishoud-verhouding.
+                        </p>
+                      </div>
+                    )}
+
+                  </div>
+                </section>
               )}
             </div>
-          )}
-
-          {/* GEAVANCEERD */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-1.5 text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]"
-            >
-              <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
-              Geavanceerd
-            </button>
-            {showAdvanced && (
-              <div className="mt-3 space-y-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Overschot-beheer</label>
-                  <select value={rolloverType} onChange={(e) => setRolloverType(e.target.value as 'reset' | 'carry-over' | 'invest-sweep')} className={inputCls}>
-                    <option value="reset">Reset</option>
-                    <option value="carry-over">Doorschuiven</option>
-                    <option value="invest-sweep">Beleggen-sweep</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Prioriteit</label>
-                  <div className="flex gap-1.5">
-                    {[1, 2, 3, 4, 5].map((score) => (
-                      <button
-                        key={score}
-                        type="button"
-                        onClick={() => setPriorityScore(score)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
-                          priorityScore === score
-                            ? 'border-kern-500 bg-kern-50 text-kern-700'
-                            : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
-                        }`}
-                      >
-                        {score}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsEssential(!isEssential)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isEssential ? 'bg-kern-500' : 'bg-zinc-300'}`}
-                    >
-                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${isEssential ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                    </button>
-                    <span className="text-xs text-[var(--ink-2)]">Essentieel</span>
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsInflationIndexed(!isInflationIndexed)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isInflationIndexed ? 'bg-kern-500' : 'bg-zinc-300'}`}
-                    >
-                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${isInflationIndexed ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                    </button>
-                    <span className="text-xs text-[var(--ink-2)]">Inflatie-indexatie</span>
-                  </label>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Beschrijving (optioneel)</label>
-                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
-                </div>
-              </div>
-            )}
-          </div>
+          </CollapsibleSection>
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[var(--border-ed)] px-6 py-4">
@@ -4263,3 +3884,4 @@ function BudgetCreateModal({
     </>
   )
 }
+

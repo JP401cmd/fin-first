@@ -10,7 +10,13 @@ import type { FireParams } from '@/lib/fire-params'
 import type { Asset } from '@/lib/asset-data'
 import { ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
-import { ArrowRight } from 'lucide-react'
+import { SettingsBanner } from '../settings-banner'
+import { useDoorrekeningSim } from '../use-doorrekening-sim'
+import { useDoorrekeningSettings } from '../settings-context'
+import { CrossCheckPanel } from '@/components/app/doorrekening/cross-check-panel'
+import type { HybridProjectionInputs } from '../calc/hybrid-projection'
+import type { AfbouwDistributionStrategy, WithdrawalStrategy as AfbouwWithdrawalStrategy } from '../calc/afbouw-projection'
+import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -668,6 +674,12 @@ export function GebeurtenissenClient({
   netWorth,
   annualSavings,
   monthlyExpenses,
+  cashflows: cashflowsProp,
+  userAowAge,
+  weightedGrossReturn,
+  savingsRate6m,
+  estimatedYearlyIncome,
+  yearlyMustExpenses,
 }: {
   lifeEvents: LifeEvent[]
   assets: Asset[]
@@ -676,23 +688,124 @@ export function GebeurtenissenClient({
   netWorth: number
   annualSavings: number
   monthlyExpenses: number
+  cashflows: SimCashflow[]
+  userAowAge: number
+  weightedGrossReturn: number
+  savingsRate6m: number
+  estimatedYearlyIncome: number
+  yearlyMustExpenses: number
 }) {
   const [eventsExpanded, setEventsExpanded] = useState(true)
   const [cashflowsExpanded, setCashflowsExpanded] = useState(true)
   const [distributionExpanded, setDistributionExpanded] = useState(true)
   const [incomeDistributionExpanded, setIncomeDistributionExpanded] = useState(true)
-  const [selectedStrategy, setSelectedStrategy] = useState<DistributionStrategy>('spreiden')
-  const [selectedIncomeStrategy, setSelectedIncomeStrategy] = useState<IncomeDistributionStrategy>('spreiden')
+  // Strategy keys are now fixed defaults; user-facing picker lives on overzicht.
+  const selectedStrategy: DistributionStrategy = 'spreiden'
+  const selectedIncomeStrategy: IncomeDistributionStrategy = 'spreiden'
 
   const dateOfBirth = typeof profile?.date_of_birth === 'string' ? profile.date_of_birth : null
   const currentAge = dateOfBirth
     ? Math.floor((Date.now() - new Date(dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     : null
 
-  // Convert life events to cashflows
+  // Prefer server-provided cashflows for consistency; fallback op lokale derivatie.
   const cashflows: SimCashflow[] = useMemo(() => {
-    return lifeEventsToCashflows(lifeEvents)
-  }, [lifeEvents])
+    return cashflowsProp && cashflowsProp.length > 0 ? cashflowsProp : lifeEventsToCashflows(lifeEvents)
+  }, [cashflowsProp, lifeEvents])
+
+  // Gedeelde sim — geeft context aan timeline-samenvatting + cashflow-markers.
+  const profileMonthlyIncome = estimatedYearlyIncome > 0
+    ? estimatedYearlyIncome / 12
+    : Number(profile?.net_monthly_income ?? 0)
+  const profileSavingsRate = savingsRate6m !== 0
+    ? savingsRate6m
+    : Number(profile?.savings_rate ?? 0)
+  const sim = useDoorrekeningSim({
+    currentAge: currentAge ?? 30,
+    netWorth,
+    monthlyIncome: profileMonthlyIncome,
+    savingsRate: profileSavingsRate,
+    yearlyMustExpenses,
+    estimatedYearlyIncome,
+    weightedGrossReturn,
+    fireParams,
+    lifeEvents,
+    cashflows,
+    userAowAge,
+    profile: profile ?? {},
+  })
+
+  // Cross-check (H4) — vergelijkt lokale sim met hybride projectie. Verborgen
+  // in productie; activeer met ?check=1. Pagina krijgt geen `debts`-prop; we
+  // gebruiken `[]` — consistent met hoe de sim zelf ook geen debts opneemt.
+  const hchSettings = useDoorrekeningSettings()
+  const householdType = String(profile?.household_type ?? 'solo')
+  const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
+  const hybridInputs = useMemo<HybridProjectionInputs>(() => {
+    const retirementMethod = (profile?.retirement_expense_method as RetirementExpenseMethod | undefined) ?? 'essential_budgets'
+    const retirementCustomAmount = Number(profile?.retirement_expense_custom_amount ?? 0)
+    const estimatedMonthlyExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
+    const yearlyRetirementExpenses = computeRetirementExpenses(
+      retirementMethod,
+      yearlyMustExpenses,
+      profileMonthlyIncome * 12,
+      retirementCustomAmount,
+      estimatedMonthlyExpenses * 12,
+    )
+    const displayEndAgeHybrid = hchSettings.endStrategy === 'pensioen' ? 100 : hchSettings.endAge
+    const withdrawalStrategy: AfbouwWithdrawalStrategy =
+      hchSettings.withdrawalStrategy === 'swr' ? 'swr' : hchSettings.withdrawalStrategy
+    const distributionStrategy: AfbouwDistributionStrategy =
+      hchSettings.distributionStrategy === 'cash_first'
+        ? 'cash_first'
+        : hchSettings.distributionStrategy === 'lowest_return'
+          ? 'lowest_return_first'
+          : hchSettings.distributionStrategy === 'highest_return'
+            ? 'highest_return_first'
+            : 'proportional'
+    const outflowDistribution: AfbouwDistributionStrategy =
+      hchSettings.outflowDistribution === 'cash_first'
+        ? 'cash_first'
+        : hchSettings.outflowDistribution === 'lowest_return_first'
+          ? 'lowest_return_first'
+          : 'proportional'
+    const withdrawalOrder: AfbouwDistributionStrategy =
+      hchSettings.withdrawalOrder === 'cash_first'
+        ? 'cash_first'
+        : hchSettings.withdrawalOrder === 'low_return_first'
+          ? 'lowest_return_first'
+          : hchSettings.withdrawalOrder === 'own_home_last'
+            ? 'own_home_last'
+            : hchSettings.withdrawalOrder === 'highest_value_first'
+              ? 'highest_value_first'
+              : 'proportional'
+    return {
+      assets,
+      debts: [],
+      lifeEvents,
+      cashflows,
+      currentAge: currentAge ?? 30,
+      endAge: displayEndAgeHybrid,
+      fireParams,
+      endStrategy: hchSettings.endStrategy,
+      endAgeConfig: hchSettings.endAge,
+      legacyAmount: hchSettings.legacyAmount,
+      withdrawalStrategy,
+      distributionStrategy,
+      outflowDistribution,
+      withdrawalOrder,
+      hasPartner,
+      yearlyRetirementExpenses,
+      aowAge: userAowAge,
+      savingsInflow: { monthlyAmount: (profileMonthlyIncome * profileSavingsRate) / 100 },
+    }
+  }, [
+    assets, lifeEvents, cashflows, currentAge, fireParams,
+    hchSettings.endStrategy, hchSettings.endAge, hchSettings.legacyAmount,
+    hchSettings.withdrawalStrategy, hchSettings.distributionStrategy, hchSettings.outflowDistribution, hchSettings.withdrawalOrder,
+    hasPartner, yearlyMustExpenses, userAowAge,
+    profileMonthlyIncome, profileSavingsRate, profile,
+  ])
 
   // Net impact per event
   const eventsWithImpact = useMemo(() => {
@@ -744,6 +857,15 @@ export function GebeurtenissenClient({
 
   return (
     <div className="space-y-6">
+      <SettingsBanner />
+
+      <CrossCheckPanel
+        pageName="gebeurtenissen"
+        hybridInputs={hybridInputs}
+        localFireAge={sim.fireAge ?? null}
+        localEndPortfolio={sim.rows.at(-1)?.endPortfolio ?? null}
+      />
+
       {/* ── Summary header ── */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
@@ -1028,49 +1150,6 @@ export function GebeurtenissenClient({
 
         {distributionExpanded && (
           <div className="mt-4 space-y-4">
-            {/* Strategy picker — card-style with radio indicators */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              {(Object.keys(STRATEGY_INFO) as DistributionStrategy[]).map((key) => {
-                const info = STRATEGY_INFO[key]
-                const Icon = info.icon
-                const active = selectedStrategy === key
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedStrategy(key)}
-                    className={`relative flex flex-col rounded-xl border-2 p-4 text-left transition-all ${
-                      active
-                        ? 'border-horizon-400 bg-horizon-50/50 shadow-sm'
-                        : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-horizon-200 hover:bg-[var(--subtle)]/30'
-                    }`}
-                  >
-                    {/* Radio indicator */}
-                    <div className="absolute right-3 top-3">
-                      <div className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                        active ? 'border-horizon-500' : 'border-[var(--border-md)]'
-                      }`}>
-                        {active && <div className="h-2 w-2 rounded-full bg-horizon-500" />}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${
-                        active ? 'bg-horizon-100 text-horizon-600' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
-                      }`}>
-                        <Icon className="h-3.5 w-3.5" />
-                      </span>
-                      <span className={`text-xs font-semibold ${active ? 'text-horizon-700' : 'text-[var(--ink)]'}`}>
-                        {info.label}
-                      </span>
-                      <StrategyTooltip strategy={key} />
-                    </div>
-                    <p className="mt-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
-                      {info.description}
-                    </p>
-                  </button>
-                )
-              })}
-            </div>
-
             {/* Distribution results per expense event */}
             {distributionResults.length > 0 ? (
               distributionResults.map(({ event, distribution }) => (
@@ -1167,50 +1246,6 @@ export function GebeurtenissenClient({
 
         {incomeDistributionExpanded && (
           <div className="mt-4 space-y-4">
-            {/* Strategy picker — card-style with radio indicators */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              {(Object.keys(INCOME_STRATEGY_INFO) as IncomeDistributionStrategy[]).map((key) => {
-                const info = INCOME_STRATEGY_INFO[key]
-                const Icon = info.icon
-                const active = selectedIncomeStrategy === key
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedIncomeStrategy(key)}
-                    className={`relative flex flex-col rounded-xl border-2 p-4 text-left transition-all ${
-                      active
-                        ? 'border-emerald-400 bg-emerald-50/50 shadow-sm'
-                        : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-emerald-200 hover:bg-[var(--subtle)]/30'
-                    }`}
-                    data-testid={`income-strategy-${key}`}
-                  >
-                    {/* Radio indicator */}
-                    <div className="absolute right-3 top-3">
-                      <div className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                        active ? 'border-emerald-500' : 'border-[var(--border-md)]'
-                      }`}>
-                        {active && <div className="h-2 w-2 rounded-full bg-emerald-500" />}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${
-                        active ? 'bg-emerald-100 text-emerald-600' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
-                      }`}>
-                        <Icon className="h-3.5 w-3.5" />
-                      </span>
-                      <span className={`text-xs font-semibold ${active ? 'text-emerald-700' : 'text-[var(--ink)]'}`}>
-                        {info.label}
-                      </span>
-                      <IncomeStrategyTooltip strategy={key} />
-                    </div>
-                    <p className="mt-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
-                      {info.description}
-                    </p>
-                  </button>
-                )
-              })}
-            </div>
-
             {/* Income distribution results per income event */}
             {incomeDistributionResults.length > 0 ? (
               incomeDistributionResults.map(({ event, amount, distribution }) => (

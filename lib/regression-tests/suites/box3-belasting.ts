@@ -59,6 +59,11 @@ function makeAsset(overrides: Partial<Asset> & { asset_type: Asset['asset_type']
     household_id: null,
     net_worth_inclusion_pct: 100,
     has_budget_tracking: false,
+    has_woonbalans_tracking: false,
+    has_rental_tracking: false,
+    monthly_maintenance_cost: 0,
+    vva_fee: 0,
+    vacancy_log: [],
     ...rest,
   }
 }
@@ -100,6 +105,7 @@ function makeDebt(overrides: Partial<Debt> & { current_balance: number }): Debt 
     household_id: null,
     partner_split_pct: null,
     net_worth_inclusion_pct: 100,
+    has_strategy_tracking: false,
     ...rest,
   }
 }

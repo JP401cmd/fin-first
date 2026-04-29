@@ -68,6 +68,11 @@ function toAssets(personaAssets: typeof PERSONAS['roos']['assets']): Asset[] {
     household_id: null,
     net_worth_inclusion_pct: 100,
     has_budget_tracking: false,
+    has_woonbalans_tracking: false,
+    has_rental_tracking: false,
+    monthly_maintenance_cost: 0,
+    vva_fee: 0,
+    vacancy_log: [],
   }))
 }
 
@@ -108,6 +113,7 @@ function toDebts(personaDebts: typeof PERSONAS['roos']['debts']): Debt[] {
     household_id: null,
     partner_split_pct: null,
     net_worth_inclusion_pct: 100,
+    has_strategy_tracking: false,
   }))
 }
 
@@ -171,6 +177,11 @@ function buildUnifiedInputFromPersona(key: PersonaKey): UnifiedProjectionInput {
       household_id: null,
       net_worth_inclusion_pct: 100,
       has_budget_tracking: false,
+      has_woonbalans_tracking: false,
+      has_rental_tracking: false,
+      monthly_maintenance_cost: 0,
+      vva_fee: 0,
+      vacancy_log: [],
     })
   }
 
@@ -646,6 +657,11 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
             household_id: null,
             net_worth_inclusion_pct: 100,
             has_budget_tracking: false,
+            has_woonbalans_tracking: false,
+            has_rental_tracking: false,
+            monthly_maintenance_cost: 0,
+            vva_fee: 0,
+            vacancy_log: [],
           })),
         ]
 

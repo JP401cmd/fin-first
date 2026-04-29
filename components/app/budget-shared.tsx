@@ -13,6 +13,8 @@ import {
   Gem, Bitcoin, LineChart, Building, Briefcase,
   SlidersHorizontal, ArrowRightLeft, ArrowLeftRight,
   Heart,
+  // Toegevoegd voor de nieuwe asset/debt icon-set
+  Hourglass, Warehouse, Coins, Clock, MoreHorizontal, FileText, Users,
 } from 'lucide-react'
 
 export const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -28,6 +30,7 @@ export const iconMap: Record<string, React.ComponentType<{ className?: string }>
   Gem, Bitcoin, LineChart, Building, Briefcase,
   Sliders: SlidersHorizontal, SlidersHorizontal, ArrowRightLeft, ArrowLeftRight,
   Heart,
+  Hourglass, Warehouse, Coins, Clock, MoreHorizontal, FileText, Users,
 }
 
 export const iconOptions = Object.keys(iconMap)

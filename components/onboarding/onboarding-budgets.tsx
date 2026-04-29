@@ -12,14 +12,14 @@ import { getDefaultBudgets, BUDGET_SLUGS } from '@/lib/budget-data'
 // ── New category-based template definitions ──────────────────
 export type BudgetTemplateId = 'minimalistisch' | 'nibud' | 'uitgebreid'
 
-interface TemplateCategory {
+export interface TemplateCategory {
   label: string
   icon: string
   /** Budget slugs included in this category */
   slugs: string[]
 }
 
-interface BudgetTemplate {
+export interface BudgetTemplate {
   id: BudgetTemplateId
   name: string
   subtitle: string
@@ -196,7 +196,7 @@ function buildUitgebreidAmounts(netIncome: number): Record<string, number> {
 
 // ── Template definitions ─────────────────────────────────────
 
-const BUDGET_TEMPLATES: BudgetTemplate[] = [
+export const BUDGET_TEMPLATES: BudgetTemplate[] = [
   {
     id: 'minimalistisch',
     name: 'Minimalistisch',
@@ -226,7 +226,7 @@ const BUDGET_TEMPLATES: BudgetTemplate[] = [
   },
 ]
 
-function buildTemplateAmounts(netIncome: number, templateId: BudgetTemplateId): Record<string, number> {
+export function buildTemplateAmounts(netIncome: number, templateId: BudgetTemplateId): Record<string, number> {
   switch (templateId) {
     case 'minimalistisch': return buildMinimalistAmounts(netIncome)
     case 'nibud': return buildNibudAmounts(netIncome)

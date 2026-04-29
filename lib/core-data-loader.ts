@@ -12,11 +12,17 @@ import type { Asset } from '@/lib/asset-data'
 import { type Debt, computeRenteAflossingsSplit, DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireParams } from '@/lib/fire-params'
-import { type SavingsRateMethod, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
+import {
+  type SavingsRateMethod,
+  computeSavingsRateFromNetWorthDelta,
+} from '@/lib/core-metrics'
+import { computeHorizonFireTarget } from '@/lib/fire-target-shared'
 import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
 import { resolveFireParams } from '@/lib/fire-params'
 import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { ALL_MODULES } from '@/lib/module-registry'
+import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { ageAtDate } from '@/lib/horizon-data'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -55,6 +61,20 @@ export interface CorePageData {
   mustExpenseItems: { name: string; monthlyAmount: number; annualAmount: number; interval: string }[]
   retirementMethodUsed: RetirementExpenseMethod
   fireParams: FireParams
+  /**
+   * FIRE eindstrategie afgeleid uit profile-kolommen
+   * (`fire_end_strategy`, `fire_end_age`, `fire_legacy_amount`).
+   * Identiek aan wat Horizon gebruikt — zorgt dat de Kern-FIRE-strip
+   * exact hetzelfde doelbedrag toont als de Horizon-pagina.
+   */
+  fireStrategy: FireStrategyConfig
+  /**
+   * Huidige leeftijd in hele jaren of `null` als geboortedatum onbekend is.
+   * Nodig om `yearsInRetirement` voor de deplete-strategie af te leiden;
+   * de loader doet dit nu zelf zodat client-componenten geen extra
+   * `dateOfBirth`-gegevens hoeven te kennen.
+   */
+  currentAge: number | null
 
   // Assets / debts / cash
   assetsList: { id: string; name: string; current_value: number; net_worth_inclusion_pct: number }[]
@@ -95,6 +115,13 @@ export interface CorePageData {
   debtProgress: { totalOriginal: number; totalCurrent: number; progressPct: number } | null
   assetGrowthDirection: 'up' | 'down' | 'flat'
   snapshots: NetWorthSnapshot[]
+  /**
+   * FIRE-doelbedrag berekend door `computeHorizonFireTarget` — zelfde
+   * `runUnifiedProjection`-aanroep als Horizon's `useHorizonFireSim`-hook,
+   * dus identieke output. `null` wanneer essentiële inputs ontbreken
+   * (geen geboortedatum, geen yearly expenses).
+   */
+  fireTargetFromHorizon: number | null
 
   // Sparklines
   budgetSparklines: { id: string; name: string; icon: string; budgetType: string; data: SparklineDataPoint[] }[]
@@ -121,6 +148,11 @@ export const loadCoreData = cache(async function loadCoreData(
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
   const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
   const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
+
+  // ── FIRE-target promise: vroeg gestart zodat hij parallel met de
+  //    Kern-batches draait. We awaiten 'em pas vlak voor de return.
+  //    Cache via React `cache()` zorgt voor dedup binnen één request.
+  const fireTargetPromise = computeHorizonFireTarget(supabase).catch(() => null)
 
   // ── Batch 1: Primary data fetches ──
   const [
@@ -180,7 +212,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .limit(1),
     supabase
       .from('profiles')
-      .select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules')
+      .select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth')
       .single(),
     supabase
       .from('bank_accounts')
@@ -298,6 +330,11 @@ export const loadCoreData = cache(async function loadCoreData(
   )
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr
+  // Strategie + leeftijd: identiek aan Horizon's loaders zodat de FIRE-strip
+  // op /core exact hetzelfde doelbedrag berekent als de Horizon-pagina.
+  const fireStrategy = parseFireStrategy(profileResult.data ?? {})
+  const dobIso = profileResult.data?.date_of_birth ?? null
+  const currentAge = dobIso ? ageAtDate(dobIso) : null
 
   // ── Total assets (weighted by net_worth_inclusion_pct) ──
   const totalAssetsOnly = assetsResult.data.reduce((s, a) =>
@@ -390,7 +427,7 @@ export const loadCoreData = cache(async function loadCoreData(
   ] = await Promise.all([
     supabase.from('budgets').select('id, name, icon, default_limit, budget_type, parent_id, is_essential, interval, is_favorite, alert_threshold').limit(500),
     supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('net_worth_snapshots').select('snapshot_date, total_assets, total_debts, net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score').order('snapshot_date', { ascending: true }).limit(24),
+    supabase.from('net_worth_snapshots').select('snapshot_date, total_assets, total_debts, net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score, fire_portfolio_required').order('snapshot_date', { ascending: true }).limit(24),
     supabase.from('debts').select('current_balance, original_amount').eq('is_active', true),
     supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
     supabase.from('goals').select('id').limit(1),
@@ -600,6 +637,11 @@ export const loadCoreData = cache(async function loadCoreData(
 
   const snapshots = (snapshotResult.data ?? []) as NetWorthSnapshot[]
 
+  // ── FIRE target via shared helper (single source of truth) ──
+  // Promise is vroeg gestart (zie boven), nu pas resolven zodat hij parallel
+  // met de Kern-batches heeft kunnen draaien. Identieke output als Horizon.
+  const fireTargetFromHorizon = await fireTargetPromise
+
   // ── Load 12-month budget spending sparklines per parent category ──
   let budgetSparklines: CorePageData['budgetSparklines'] = []
   let budgetSpendingHistory: CorePageData['budgetSpendingHistory'] = []
@@ -757,6 +799,8 @@ export const loadCoreData = cache(async function loadCoreData(
     mustExpenseItems: expenseItems,
     retirementMethodUsed: activeRetirementMethod,
     fireParams,
+    fireStrategy,
+    currentAge,
 
     assetsList,
     debtsList,
@@ -784,6 +828,7 @@ export const loadCoreData = cache(async function loadCoreData(
     debtProgress,
     assetGrowthDirection,
     snapshots,
+    fireTargetFromHorizon,
 
     budgetSparklines,
     budgetSpendingHistory,

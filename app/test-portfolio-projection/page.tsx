@@ -30,6 +30,8 @@ const demoAssets: Asset[] = [
     expiry_date: null, beneficiary: null, kvk_number: null, ownership_percentage: null, annual_dividend: null, linked_asset_id: null,
     ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
     has_budget_tracking: false,
+    has_woonbalans_tracking: false, has_rental_tracking: false,
+    monthly_maintenance_cost: 0, vva_fee: 0, vacancy_log: [],
     created_at: '2023-01-01', updated_at: '2023-01-01',
   },
   {
@@ -44,6 +46,8 @@ const demoAssets: Asset[] = [
     expiry_date: null, beneficiary: null, kvk_number: null, ownership_percentage: null, annual_dividend: null, linked_asset_id: null,
     ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
     has_budget_tracking: false,
+    has_woonbalans_tracking: false, has_rental_tracking: false,
+    monthly_maintenance_cost: 0, vva_fee: 0, vacancy_log: [],
     created_at: '2021-06-01', updated_at: '2023-01-01',
   },
   {
@@ -58,6 +62,8 @@ const demoAssets: Asset[] = [
     expiry_date: null, beneficiary: null, kvk_number: null, ownership_percentage: null, annual_dividend: null, linked_asset_id: null,
     ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
     has_budget_tracking: false,
+    has_woonbalans_tracking: false, has_rental_tracking: false,
+    monthly_maintenance_cost: 0, vva_fee: 0, vacancy_log: [],
     created_at: '2019-01-01', updated_at: '2023-01-01',
   },
 ]

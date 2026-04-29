@@ -6,13 +6,31 @@ import { formatCurrency } from '@/lib/format'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { FireParams } from '@/lib/fire-params'
-import { parseFireStrategy, STRATEGY_LABELS, type FireEndStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { STRATEGY_LABELS, type FireEndStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '@/lib/constants'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import type { LifeEvent } from '@/lib/horizon-data'
+import type { SimCashflow } from '@/lib/fire-simulation'
 import { PerpetualStrategyTables } from './perpetual-tables'
 import { LegacyStrategyTables } from './legacy-tables'
 import { PensionStrategyTables } from './pension-tables'
 import { DepleteStrategyTables } from './deplete-tables'
+import { SettingsBanner } from '../settings-banner'
+import { useDoorrekeningSim } from '../use-doorrekening-sim'
+import { useDoorrekeningSettings } from '../settings-context'
+import { CrossCheckPanel } from '@/components/app/doorrekening/cross-check-panel'
+import type { HybridProjectionInputs } from '../calc/hybrid-projection'
+import type { AfbouwDistributionStrategy, WithdrawalStrategy as AfbouwWithdrawalStrategy } from '../calc/afbouw-projection'
+import {
+  computeRequiredPortfolio,
+  computeMonthlyCrossover,
+  computeWithdrawalSchedule,
+  computeInflationExpenseSchedule,
+  type WithdrawalStrategy,
+  type MonthlyCrossover,
+  type WithdrawalRow,
+  type InflationExpenseRow,
+} from '../calc/afbouw-projection'
 
 // ── Withdrawal strategy types ─────────────────────────────────
 
@@ -66,285 +84,13 @@ function computeCrossoverAge(
   return null
 }
 
-// ── Withdrawal strategy types for crossover ──
-
-type WithdrawalStrategy = 'swr' | 'guardrails' | 'vpw' | 'bucket'
+// ── Withdrawal strategy labels (locale labels voor UI) ──
 
 const WITHDRAWAL_LABELS: Record<WithdrawalStrategy, { name: string; desc: string }> = {
   swr: { name: 'SWR', desc: 'Safe Withdrawal Rate' },
   guardrails: { name: 'Guardrails', desc: 'Variabele met bandbreedte' },
   vpw: { name: 'VPW', desc: 'Variable Percentage Withdrawal' },
   bucket: { name: 'Bucket', desc: 'Emmer-strategie' },
-}
-
-/**
- * Compute the minimum portfolio needed to sustain a given withdrawal strategy
- * from startAge to endAge, covering yearlyExpenses (with inflation), minus AOW from 67.
- */
-function computeRequiredPortfolio(
-  yearlyExpenses: number,
-  startAge: number,
-  endAge: number,
-  grossReturn: number,
-  inflationRate: number,
-  strategy: FireEndStrategy,
-  withdrawalStrategy: WithdrawalStrategy,
-  hasPartner: boolean,
-  legacyAmount: number,
-): number {
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-  const totalYears = Math.max(1, endAge - startAge)
-
-  // For each strategy, compute what initial portfolio is required
-  if (strategy === 'perpetual') {
-    // SWR: portfolio × SWR ≥ expenses − AOW => portfolio ≥ (expenses − AOW) / SWR
-    // For perpetual, required portfolio is expenses / SWR (pre-AOW), reduced after AOW kicks in
-    // Simplified: max withdrawal needed / SWR
-    const maxNeeded = startAge >= NL_AOW_AGE
-      ? Math.max(0, yearlyExpenses - aowYearly)
-      : yearlyExpenses
-    return maxNeeded / NL_SWR
-  }
-
-  if (strategy === 'deplete') {
-    // Annuity formula: PV of expenses stream from startAge to endAge
-    // accounting for AOW offset from age 67
-    if (realReturn === 0) {
-      let total = 0
-      for (let y = 0; y < totalYears; y++) {
-        const age = startAge + y
-        const aow = age >= NL_AOW_AGE ? aowYearly : 0
-        total += Math.max(0, yearlyExpenses - aow)
-      }
-      return total
-    }
-    let pv = 0
-    for (let y = 0; y < totalYears; y++) {
-      const age = startAge + y
-      const aow = age >= NL_AOW_AGE ? aowYearly : 0
-      const needed = Math.max(0, yearlyExpenses - aow)
-      pv += needed / Math.pow(1 + realReturn, y)
-    }
-    return pv
-  }
-
-  if (strategy === 'legacy') {
-    // Like deplete but preserve legacyAmount at endAge
-    const pvLegacy = legacyAmount / Math.pow(1 + realReturn, totalYears)
-    let pv = pvLegacy
-    for (let y = 0; y < totalYears; y++) {
-      const age = startAge + y
-      const aow = age >= NL_AOW_AGE ? aowYearly : 0
-      const needed = Math.max(0, yearlyExpenses - aow)
-      pv += needed / Math.pow(1 + realReturn, y === 0 ? 1 : y)
-    }
-    return pv
-  }
-
-  // pensioen: same as perpetual from AOW age
-  const maxNeeded = Math.max(0, yearlyExpenses - aowYearly)
-  return maxNeeded / NL_SWR
-}
-
-/** Monthly crossover result */
-interface MonthlyCrossover {
-  ageYears: number
-  ageMonths: number
-  portfolioAtCrossover: number
-  requiredPortfolio: number
-}
-
-/**
- * Compute crossover on a monthly basis.
- * For each month, compare accumulation portfolio vs required portfolio for chosen strategy.
- */
-function computeMonthlyCrossover(
-  currentAge: number,
-  currentNetWorth: number,
-  annualSavings: number,
-  grossReturn: number,
-  inflationRate: number,
-  yearlyExpenses: number,
-  endAge: number,
-  strategy: FireEndStrategy,
-  withdrawalStrategy: WithdrawalStrategy,
-  hasPartner: boolean,
-  legacyAmount: number,
-  maxAge: number = 100,
-): MonthlyCrossover | null {
-  const monthlyReturn = Math.pow(1 + grossReturn, 1 / 12) - 1
-  const monthlyInflation = Math.pow(1 + inflationRate, 1 / 12) - 1
-  const monthlyRealReturn = (1 + monthlyReturn) / (1 + monthlyInflation) - 1
-  const monthlySavings = annualSavings / 12
-  const totalMonths = (maxAge - currentAge) * 12
-
-  let portfolio = currentNetWorth
-
-  for (let m = 0; m <= totalMonths; m++) {
-    const ageYears = currentAge + Math.floor(m / 12)
-    const ageMonths = m % 12
-
-    // Compute required portfolio at this age for the chosen end strategy
-    const displayEnd = strategy === 'perpetual' || strategy === 'pensioen' ? 100 : endAge
-    const requiredPortfolio = computeRequiredPortfolio(
-      yearlyExpenses,
-      ageYears,
-      displayEnd,
-      grossReturn,
-      inflationRate,
-      strategy,
-      withdrawalStrategy,
-      hasPartner,
-      legacyAmount,
-    )
-
-    if (portfolio >= requiredPortfolio) {
-      return {
-        ageYears,
-        ageMonths,
-        portfolioAtCrossover: Math.round(portfolio),
-        requiredPortfolio: Math.round(requiredPortfolio),
-      }
-    }
-
-    portfolio = portfolio * (1 + monthlyRealReturn) + monthlySavings
-  }
-  return null
-}
-
-/** Generate withdrawal schedule (decumulation table). */
-interface WithdrawalRow {
-  age: number
-  year: number
-  startBalance: number
-  withdrawal: number
-  aowIncome: number
-  growth: number
-  endBalance: number
-}
-
-function computeWithdrawalSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  yearlyExpenses: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-  strategy: FireEndStrategy,
-  legacyAmount: number,
-): WithdrawalRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-
-  // Determine annual withdrawal amount based on strategy
-  let baseWithdrawal: number
-  if (strategy === 'perpetual') {
-    // SWR-based: withdraw NL_SWR (2.883%) × portfolio (recalculated yearly with inflation correction)
-    baseWithdrawal = startPortfolio * NL_SWR
-  } else if (strategy === 'deplete') {
-    // Annuity formula: withdraw evenly so portfolio hits 0 at endAge
-    if (realReturn === 0) {
-      baseWithdrawal = startPortfolio / totalYears
-    } else {
-      baseWithdrawal = startPortfolio * realReturn / (1 - Math.pow(1 + realReturn, -totalYears))
-    }
-  } else if (strategy === 'legacy') {
-    // Annuity that preserves legacyAmount at endAge
-    const netPortfolio = startPortfolio - legacyAmount * Math.pow(1 + realReturn, -totalYears)
-    if (realReturn === 0) {
-      baseWithdrawal = Math.max(0, netPortfolio / totalYears)
-    } else {
-      baseWithdrawal = Math.max(0, netPortfolio * realReturn / (1 - Math.pow(1 + realReturn, -totalYears)))
-    }
-  } else {
-    // pensioen / default: SWR-based
-    baseWithdrawal = startPortfolio * NL_SWR
-  }
-
-  const schedule: WithdrawalRow[] = []
-  let balance = startPortfolio
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const startBalance = balance
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-
-    // Inflate yearly expenses for this year
-    const inflatedExpenses = yearlyExpenses * Math.pow(1 + inflationRate, y)
-
-    // How much do we need from portfolio?
-    let neededFromPortfolio: number
-    if (strategy === 'perpetual') {
-      // Variable: NL_SWR (2.883%) of current balance, capped at inflation-adjusted expenses minus AOW
-      neededFromPortfolio = Math.max(0, Math.min(balance * NL_SWR, inflatedExpenses - aow))
-    } else {
-      neededFromPortfolio = Math.max(0, baseWithdrawal - aow)
-    }
-
-    const withdrawal = Math.min(neededFromPortfolio, balance)
-    const remaining = balance - withdrawal
-    const growth = remaining * realReturn
-    const endBalance = remaining + growth
-
-    schedule.push({
-      age,
-      year: y + 1,
-      startBalance: Math.round(startBalance),
-      withdrawal: Math.round(withdrawal),
-      aowIncome: Math.round(aow),
-      growth: Math.round(growth),
-      endBalance: Math.max(0, Math.round(endBalance)),
-    })
-
-    balance = Math.max(0, endBalance)
-    if (balance <= 0) break
-  }
-
-  return schedule
-}
-
-/** Generate month-by-month expense schedule with inflation correction. */
-interface InflationExpenseRow {
-  month: number
-  age: number
-  ageMonth: number // month within the year (0-11)
-  baseExpense: number
-  inflationCorrection: number
-  adjustedExpense: number
-}
-
-function computeInflationExpenseSchedule(
-  monthlyExpense: number,
-  startAge: number,
-  endAge: number,
-  yearlyInflation: number,
-): InflationExpenseRow[] {
-  if (monthlyExpense <= 0 || endAge <= startAge) return []
-  const totalMonths = (endAge - startAge) * 12
-  const monthlyInflation = Math.pow(1 + yearlyInflation, 1 / 12) - 1
-  const rows: InflationExpenseRow[] = []
-  let adjusted = monthlyExpense
-
-  for (let m = 0; m < totalMonths; m++) {
-    const yearOffset = Math.floor(m / 12)
-    const monthInYear = m % 12
-    const correction = adjusted - monthlyExpense
-    rows.push({
-      month: m + 1,
-      age: startAge + yearOffset,
-      ageMonth: monthInYear,
-      baseExpense: Math.round(monthlyExpense * 100) / 100,
-      inflationCorrection: Math.round(correction * 100) / 100,
-      adjustedExpense: Math.round(adjusted * 100) / 100,
-    })
-    adjusted = adjusted * (1 + monthlyInflation)
-  }
-  return rows
 }
 
 function getDisplayExpenseRows(rows: InflationExpenseRow[]): InflationExpenseRow[] {
@@ -379,19 +125,38 @@ export function AfbouwClient({
   profile,
   fireParams,
   yearlyMustExpenses,
+  lifeEvents,
+  cashflows,
+  netWorth,
+  weightedGrossReturn,
+  userAowAge,
+  savingsRate6m,
+  estimatedYearlyIncome,
 }: {
   assets: Asset[]
   debts: Debt[]
   profile: Record<string, unknown> | null
   fireParams: FireParams
   yearlyMustExpenses: number
+  lifeEvents: LifeEvent[]
+  cashflows: SimCashflow[]
+  netWorth: number
+  weightedGrossReturn: number
+  userAowAge: number
+  savingsRate6m: number
+  estimatedYearlyIncome: number
 }) {
   // ── Profile-derived values ──
   const dateOfBirth = typeof profile?.date_of_birth === 'string' ? profile.date_of_birth : null
   const currentAge = dateOfBirth ? ageFromDob(dateOfBirth) : null
-  const profileMonthlyIncome = Number(profile?.net_monthly_income ?? 0)
+  // Prefer core-data extrapolated values (same source as kern header), fall back to profile.
+  const profileMonthlyIncome = estimatedYearlyIncome > 0
+    ? estimatedYearlyIncome / 12
+    : Number(profile?.net_monthly_income ?? 0)
   const profileMonthlyExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
-  const profileSavingsRate = Number(profile?.savings_rate ?? 0)
+  const profileSavingsRate = savingsRate6m !== 0
+    ? savingsRate6m
+    : Number(profile?.savings_rate ?? 0)
   const householdType = String(profile?.household_type ?? 'solo')
   const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
 
@@ -399,26 +164,37 @@ export function AfbouwClient({
   const retirementMethod = (profile?.retirement_expense_method as RetirementExpenseMethod) ?? 'essential_budgets'
   const retirementCustomAmount = Number(profile?.retirement_expense_custom_amount ?? 0)
 
-  // FIRE strategy (from profile as initial default)
-  const profileStrategyConfig: FireStrategyConfig = parseFireStrategy(profile ?? {})
+  // ── Instellingen uit layout-Context (gedeeld met /overzicht) ──
+  const settings = useDoorrekeningSettings()
+  const selectedEndStrategy: FireEndStrategy = settings.endStrategy
+  const selectedWithdrawalStrategy: WithdrawalStrategyType = settings.withdrawalStrategy
 
-  // ── User-selectable strategy overrides ──
-  const [selectedEndStrategy, setSelectedEndStrategy] = useState<FireEndStrategy>(profileStrategyConfig.strategy)
-  const [selectedWithdrawalStrategy, setSelectedWithdrawalStrategy] = useState<WithdrawalStrategyType>('swr')
-
-  // Build effective strategyConfig from user selection
+  // Effective strategyConfig from Context
   const strategyConfig: FireStrategyConfig = useMemo(() => ({
-    ...profileStrategyConfig,
-    strategy: selectedEndStrategy,
-  }), [profileStrategyConfig, selectedEndStrategy])
+    strategy: settings.endStrategy,
+    endAge: settings.endAge,
+    legacyAmount: settings.legacyAmount,
+  }), [settings.endStrategy, settings.endAge, settings.legacyAmount])
 
-  // ── Computed values ──
-  const totalAssets = assets.reduce((s, a) => s + Number(a.current_value ?? 0), 0)
-  const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance ?? 0), 0)
-  const netWorth = totalAssets - totalDebts
+  // ── Gedeelde simulatie — zelfde engine als /overzicht ──
+  const sim = useDoorrekeningSim({
+    currentAge: currentAge ?? 30,
+    netWorth,
+    monthlyIncome: profileMonthlyIncome,
+    savingsRate: profileSavingsRate,
+    yearlyMustExpenses,
+    estimatedYearlyIncome,
+    weightedGrossReturn,
+    fireParams,
+    lifeEvents,
+    cashflows,
+    userAowAge,
+    profile: profile ?? {},
+  })
+
   const annualSavings = profileMonthlyIncome * (profileSavingsRate / 100) * 12
 
-  // Yearly expenses for retirement
+  // Yearly expenses for retirement (zelfde resolver als hook, gedupliceerd voor UI-weergave).
   const yearlyRetirementExpenses = useMemo(() => {
     return computeRetirementExpenses(
       retirementMethod,
@@ -431,40 +207,86 @@ export function AfbouwClient({
 
   const monthlyRetirementExpenses = yearlyRetirementExpenses / 12
 
-  // FIRE target
-  const fireTarget = useMemo(() => {
-    if (yearlyRetirementExpenses <= 0) return 0
-    if (strategyConfig.strategy === 'deplete' && currentAge != null) {
-      const yearsInRetirement = Math.max(1, strategyConfig.endAge - (currentAge ?? 67))
-      const realReturn = (1 + fireParams.grossReturn) / (1 + fireParams.inflationRate) - 1
-      if (realReturn === 0) return yearlyRetirementExpenses * yearsInRetirement
-      return yearlyRetirementExpenses * (1 - Math.pow(1 + realReturn, -yearsInRetirement)) / realReturn
+  // Cross-check (H4) — vergelijkt lokale sim met hybride projectie. Verborgen
+  // in productie; activeer met ?check=1 in URL.
+  const hybridInputs = useMemo<HybridProjectionInputs>(() => {
+    const displayEndAgeHybrid = settings.endStrategy === 'pensioen' ? 100 : settings.endAge
+    const withdrawalStrategy: AfbouwWithdrawalStrategy =
+      settings.withdrawalStrategy === 'swr' ? 'swr' : settings.withdrawalStrategy
+    const distributionStrategy: AfbouwDistributionStrategy =
+      settings.distributionStrategy === 'cash_first'
+        ? 'cash_first'
+        : settings.distributionStrategy === 'lowest_return'
+          ? 'lowest_return_first'
+          : settings.distributionStrategy === 'highest_return'
+            ? 'highest_return_first'
+            : 'proportional'
+    const outflowDistribution: AfbouwDistributionStrategy =
+      settings.outflowDistribution === 'cash_first'
+        ? 'cash_first'
+        : settings.outflowDistribution === 'lowest_return_first'
+          ? 'lowest_return_first'
+          : 'proportional'
+    const withdrawalOrder: AfbouwDistributionStrategy =
+      settings.withdrawalOrder === 'cash_first'
+        ? 'cash_first'
+        : settings.withdrawalOrder === 'low_return_first'
+          ? 'lowest_return_first'
+          : settings.withdrawalOrder === 'own_home_last'
+            ? 'own_home_last'
+            : settings.withdrawalOrder === 'highest_value_first'
+              ? 'highest_value_first'
+              : 'proportional'
+    return {
+      assets,
+      debts,
+      lifeEvents,
+      cashflows,
+      currentAge: currentAge ?? 30,
+      endAge: displayEndAgeHybrid,
+      fireParams,
+      endStrategy: settings.endStrategy,
+      endAgeConfig: settings.endAge,
+      legacyAmount: settings.legacyAmount,
+      withdrawalStrategy,
+      distributionStrategy,
+      outflowDistribution,
+      withdrawalOrder,
+      hasPartner,
+      yearlyRetirementExpenses,
+      aowAge: userAowAge,
+      savingsInflow: { monthlyAmount: (profileMonthlyIncome * profileSavingsRate) / 100 },
     }
-    return yearlyRetirementExpenses / NL_SWR
-  }, [yearlyRetirementExpenses, strategyConfig, currentAge, fireParams])
+  }, [
+    assets, debts, lifeEvents, cashflows, currentAge, fireParams,
+    settings.endStrategy, settings.endAge, settings.legacyAmount,
+    settings.withdrawalStrategy, settings.distributionStrategy, settings.outflowDistribution, settings.withdrawalOrder,
+    hasPartner, yearlyRetirementExpenses, userAowAge,
+    profileMonthlyIncome, profileSavingsRate,
+  ])
 
-  // Cap end age at 100 (consistent with opbouw tables)
-  const displayEndAge = Math.max(strategyConfig.endAge, 100)
+  // FIRE-doelbedrag uit gedeelde sim (consistent met overzicht).
+  const fireTarget = sim.requiredFirePortfolio
 
-  // Crossover age
-  const crossoverAge = useMemo(() => {
-    if (currentAge == null || fireTarget <= 0) return null
-    return computeCrossoverAge(
-      currentAge, netWorth, annualSavings,
-      fireParams.grossReturn, fireParams.inflationRate,
-      fireTarget, displayEndAge,
-    )
-  }, [currentAge, netWorth, annualSavings, fireParams, fireTarget, displayEndAge])
+  // Display-horizon uit gedeelde sim — pensioen = 100j, anders endAge uit Context.
+  const displayEndAge = sim.displayEndAge
 
-  // Retirement age (crossover or AOW, whichever is later for display)
+  // Kruispunt uit gedeelde simulatie: sim.fireAge is de overgang opbouw→afbouw.
+  const crossoverAge = sim.fireAge
+
+  // Retirement age (crossover of AOW, wat later is voor display).
   const retirementAge = crossoverAge ?? (currentAge != null ? Math.max(currentAge + 5, NL_AOW_AGE) : NL_AOW_AGE)
 
-  // Projected portfolio at retirement
+  // Projected portfolio at retirement — uit gedeelde sim als fireAge bekend is,
+  // anders fallback op lokale projectie naar AOW-leeftijd.
   const portfolioAtRetirement = useMemo(() => {
+    if (sim.fireAge != null && sim.firePortfolioAtFire > 0) {
+      return sim.firePortfolioAtFire
+    }
     if (currentAge == null) return netWorth
     const years = Math.max(0, retirementAge - currentAge)
     return projectPortfolio(netWorth, annualSavings, fireParams.grossReturn, fireParams.inflationRate, years)
-  }, [currentAge, netWorth, annualSavings, fireParams, retirementAge])
+  }, [sim.fireAge, sim.firePortfolioAtFire, currentAge, netWorth, annualSavings, fireParams, retirementAge])
 
   // Withdrawal schedule
   const withdrawalSchedule = useMemo(() => {
@@ -479,7 +301,7 @@ export function AfbouwClient({
       strategyConfig.strategy,
       strategyConfig.legacyAmount,
     )
-  }, [portfolioAtRetirement, retirementAge, strategyConfig, yearlyRetirementExpenses, fireParams, hasPartner])
+  }, [portfolioAtRetirement, retirementAge, displayEndAge, strategyConfig, yearlyRetirementExpenses, fireParams, hasPartner])
 
   const displayRows = useMemo(() => getDisplayRows(withdrawalSchedule), [withdrawalSchedule])
   const depleted = withdrawalSchedule.length > 0 && withdrawalSchedule[withdrawalSchedule.length - 1].endBalance <= 0
@@ -539,52 +361,21 @@ export function AfbouwClient({
 
   return (
     <div className="space-y-6">
+      <SettingsBanner />
+
+      <CrossCheckPanel
+        pageName="afbouw"
+        hybridInputs={hybridInputs}
+        localFireAge={sim.fireAge ?? null}
+        localEndPortfolio={sim.rows.at(-1)?.endPortfolio ?? null}
+      />
+
       {/* ── Summary header ── */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
         <h2 className="text-lg font-bold text-[var(--ink)]">Afbouw — Decumulatiefase</h2>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
           Hoe je vermogen wordt opgebruikt na financiele onafhankelijkheid
         </p>
-
-        {/* Strategy selectors */}
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="end-strategy-select" className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">
-              Eindstrategie
-            </label>
-            <select
-              id="end-strategy-select"
-              value={selectedEndStrategy}
-              onChange={(e) => setSelectedEndStrategy(e.target.value as FireEndStrategy)}
-              className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-semibold text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-horizon-400"
-            >
-              {(Object.keys(STRATEGY_LABELS) as FireEndStrategy[]).map((key) => (
-                <option key={key} value={key}>{STRATEGY_LABELS[key].name}</option>
-              ))}
-            </select>
-            <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">
-              {STRATEGY_LABELS[selectedEndStrategy]?.subtitle}
-            </p>
-          </div>
-          <div>
-            <label htmlFor="withdrawal-strategy-select" className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">
-              Onttrekkingsstrategie
-            </label>
-            <select
-              id="withdrawal-strategy-select"
-              value={selectedWithdrawalStrategy}
-              onChange={(e) => setSelectedWithdrawalStrategy(e.target.value as WithdrawalStrategyType)}
-              className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-semibold text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-horizon-400"
-            >
-              {(Object.keys(WITHDRAWAL_STRATEGY_LABELS) as WithdrawalStrategyType[]).map((key) => (
-                <option key={key} value={key}>{WITHDRAWAL_STRATEGY_LABELS[key].name}</option>
-              ))}
-            </select>
-            <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">
-              {WITHDRAWAL_STRATEGY_LABELS[selectedWithdrawalStrategy]?.subtitle}
-            </p>
-          </div>
-        </div>
 
         {/* Key metrics */}
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -1287,55 +1078,6 @@ export function AfbouwClient({
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Strategy selectors */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* End strategy selector */}
-                    <div>
-                      <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)] mb-1.5">
-                        Eindstrategie
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(['perpetual', 'legacy', 'deplete', 'pensioen'] as FireEndStrategy[]).map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => setSelectedEndStrategy(s)}
-                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                              selectedEndStrategy === s
-                                ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
-                                : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-300 hover:text-[var(--ink-2)]'
-                            }`}
-                          >
-                            {STRATEGY_LABELS[s].name}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="mt-1 text-[11px] text-[var(--ink-4)]">{STRATEGY_LABELS[selectedEndStrategy].subtitle}</p>
-                    </div>
-
-                    {/* Withdrawal strategy selector */}
-                    <div>
-                      <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)] mb-1.5">
-                        Onttrekkingsstrategie
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(['swr', 'guardrails', 'vpw', 'bucket'] as WithdrawalStrategy[]).map((ws) => (
-                          <button
-                            key={ws}
-                            onClick={() => setSelectedWithdrawalStrategy(ws)}
-                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                              selectedWithdrawalStrategy === ws
-                                ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
-                                : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-300 hover:text-[var(--ink-2)]'
-                            }`}
-                          >
-                            {WITHDRAWAL_LABELS[ws].name}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="mt-1 text-[11px] text-[var(--ink-4)]">{WITHDRAWAL_LABELS[selectedWithdrawalStrategy].desc}</p>
-                    </div>
-                  </div>
-
                   {/* Monthly crossover result */}
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>

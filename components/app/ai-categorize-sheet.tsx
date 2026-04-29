@@ -491,7 +491,7 @@ export function AICategorizeSheet({
 
       {/* ── Choice ── */}
       {phase === 'choice' && (
-        <div className="flex flex-col gap-4 py-4">
+        <div className="flex flex-col gap-5 py-5">
           <p className="text-sm text-[var(--ink-2)]">
             <strong className="text-[var(--ink)] font-mono tabular-nums">{activeTransactions.length}</strong>{' '}
             {activeTransactions.length === 1 ? 'transactie' : 'transacties'} zonder categorie
@@ -506,7 +506,7 @@ export function AICategorizeSheet({
               en zonder module-kleur. */}
           {scopeAvailable && (
             <div>
-              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">
                 Scope <span className="ml-1 normal-case tracking-normal text-[var(--ink-4)]">— welke transacties?</span>
               </p>
               <div className="flex gap-1 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-0.5">
@@ -547,10 +547,10 @@ export function AICategorizeSheet({
                 </button>
               </div>
               {allError && (
-                <p className="mt-1.5 text-[11px] text-orange-700">{allError}</p>
+                <p className="mt-2 text-[11px] text-orange-700">{allError}</p>
               )}
               {scope === 'all' && allCapped && (
-                <p className="mt-1.5 text-[11px] italic text-[var(--ink-4)]">
+                <p className="mt-2 text-[11px] italic text-[var(--ink-4)]">
                   Maximaal {ALL_TIME_LIMIT} oudste ongekoppelde meegenomen — herhaal voor de rest.
                 </p>
               )}
@@ -565,14 +565,14 @@ export function AICategorizeSheet({
             type="button"
             onClick={() => void fetchSuggestions()}
             disabled={loadingAll || activeTransactions.length === 0}
-            className="flex items-start gap-4 rounded-[var(--r-lg)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-4 text-left transition-all hover:border-wil-400 hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-wil-300"
+            className="flex items-start gap-3 rounded-[var(--r-lg)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-4 text-left transition-all hover:border-wil-400 hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-wil-300"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-wil-100">
               <Sparkles className="h-4 w-4 text-wil-600" />
             </div>
             <div>
               <p className="text-sm font-semibold text-[var(--ink)]">Vraag Will</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Will analyseert de transacties en stelt categorieën voor op basis van beschrijving en tegenpartij.
               </p>
             </div>
@@ -583,14 +583,14 @@ export function AICategorizeSheet({
             type="button"
             onClick={startManual}
             disabled={loadingAll || activeTransactions.length === 0}
-            className="flex items-start gap-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-4 text-left transition-all hover:border-[var(--border-md)] hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-[var(--border-ed)]"
+            className="flex items-start gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-4 text-left transition-all hover:border-[var(--border-md)] hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-[var(--border-ed)]"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--subtle)]">
               <HelpCircle className="h-4 w-4 text-[var(--ink-3)]" />
             </div>
             <div>
               <p className="text-sm font-semibold text-[var(--ink)]">Handmatig categoriseren</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Wijs zelf per transactie een categorie toe vanuit een keuzelijst.
               </p>
             </div>
@@ -600,8 +600,8 @@ export function AICategorizeSheet({
 
       {/* ── AI processing ── */}
       {phase === 'ai' && (
-        <div className="space-y-4 py-6">
-          <div className="flex flex-col items-center gap-3 pb-2">
+        <div className="space-y-5 py-6">
+          <div className="flex flex-col items-center gap-3 pb-3">
             <Loader2 className="h-7 w-7 animate-spin text-wil-500" />
             <p className="text-sm font-medium text-[var(--ink-2)]">
               {aiBatchProgress.total > 0
@@ -625,15 +625,15 @@ export function AICategorizeSheet({
           )}
 
           {/* Fhin editorial quote card */}
-          <div className="rounded-[var(--r-lg)] border border-dashed border-wil-200 bg-wil-50/50 px-4 py-3">
+          <div className="rounded-[var(--r-lg)] border border-dashed border-wil-200 bg-wil-50/50 px-4 py-4">
             <p className="font-[var(--font-source-serif)] text-[13px] italic leading-relaxed text-[var(--ink-2)] border-l-[3px] border-wil-500 pl-3">
               &ldquo;{transactions.length} transacties worden vergeleken met jouw eerdere gewoonten…&rdquo;
             </p>
-            <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-wil-600">— Will</p>
+            <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-wil-600">— Will</p>
           </div>
 
           {/* Skeleton rows */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {[0, 1, 2].map((i) => (
               <div key={i} className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 animate-pulse">
                 <div className="flex justify-between">
@@ -653,13 +653,13 @@ export function AICategorizeSheet({
         <div className="flex flex-col gap-0">
           {/* AI error fallback */}
           {aiError && (
-            <div className="mb-3 rounded-[var(--r)] border border-orange-200 bg-orange-50 px-3 py-2 text-[11px] text-orange-700">
+            <div className="mb-4 rounded-[var(--r)] border border-orange-200 bg-orange-50 px-3 py-3 text-[11px] text-orange-700">
               {aiError}
             </div>
           )}
 
           {/* Sticky header */}
-          <div className="sticky top-0 z-10 bg-[var(--paper)] border-b border-[var(--border-ed)] px-0 py-3 flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="sticky top-0 z-10 bg-[var(--paper)] border-b border-[var(--border-ed)] px-0 py-4 flex flex-wrap items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-3 text-sm text-[var(--ink-2)]">
               <span>
                 <strong className="text-[var(--ink)]">{pendingCount}</strong> van {rows.length} nog te beoordelen
@@ -676,7 +676,7 @@ export function AICategorizeSheet({
                 <button
                   type="button"
                   onClick={acceptAll}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-300 px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-300 px-3 py-2 min-h-[44px] text-xs font-medium text-kern-700 hover:bg-kern-50"
                 >
                   <Check className="h-3.5 w-3.5" />
                   Alles goedkeuren
@@ -686,7 +686,7 @@ export function AICategorizeSheet({
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={acceptedCount === 0}
-                className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 min-h-[44px] text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-40"
               >
                 <Check className="h-3.5 w-3.5" />
                 Opslaan
@@ -696,7 +696,7 @@ export function AICategorizeSheet({
 
           {/* Bulk-apply prompt */}
           {bulkApplyPrompt && (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-3 text-sm">
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-4 text-sm">
               <p className="text-[var(--ink-2)]">
                 <span className="font-medium text-[var(--ink)]">{bulkApplyPrompt.siblingCount}</span> andere{' '}
                 <span className="font-medium text-[var(--ink)]">'{bulkApplyPrompt.matchValue}'</span>-transacties.{' '}
@@ -706,14 +706,14 @@ export function AICategorizeSheet({
                 <button
                   type="button"
                   onClick={applyToSiblings}
-                  className="rounded-[var(--r-sm)] bg-wil-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-wil-700"
+                  className="rounded-[var(--r-sm)] bg-wil-600 px-3 py-2 min-h-[44px] text-xs font-medium text-white hover:bg-wil-700"
                 >
                   Ja, allemaal
                 </button>
                 <button
                   type="button"
                   onClick={() => setBulkApplyPrompt(null)}
-                  className="rounded-[var(--r-sm)] border border-[var(--border-md)] px-3 py-1.5 text-xs text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                  className="rounded-[var(--r-sm)] border border-[var(--border-md)] px-3 py-2 min-h-[44px] text-xs text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                 >
                   Overslaan
                 </button>
@@ -722,7 +722,7 @@ export function AICategorizeSheet({
           )}
 
           {/* Transaction rows */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {rows.slice(0, showCount).map((row, idx) => (
               <TransactionRow
                 key={row.tx.id}
@@ -740,7 +740,7 @@ export function AICategorizeSheet({
             <button
               type="button"
               onClick={() => setShowCount((n) => n + SHOW_MORE_STEP)}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] py-2.5 text-xs text-[var(--ink-3)] hover:bg-[var(--subtle)]"
+              className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] py-3 text-xs text-[var(--ink-3)] hover:bg-[var(--subtle)]"
             >
               <ChevronDown className="h-3.5 w-3.5" />
               {rows.length - showCount} meer transacties tonen
@@ -751,7 +751,7 @@ export function AICategorizeSheet({
 
       {/* ── Saving ── */}
       {phase === 'saving' && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
           <Loader2 className="h-7 w-7 animate-spin text-kern-500" />
           <p className="text-sm text-[var(--ink-3)]">Opslaan…</p>
         </div>
@@ -765,11 +765,11 @@ export function AICategorizeSheet({
           </div>
           <div>
             <p className="text-lg font-bold font-[var(--font-playfair)] text-[var(--ink)]">Klaar</p>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">
+            <p className="mt-2 text-sm text-[var(--ink-2)]">
               {savedCount} {savedCount === 1 ? 'transactie' : 'transacties'} gecategoriseerd
             </p>
             {ruleCount > 0 && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 {ruleCount} {ruleCount === 1 ? 'regel' : 'regels'} aangemaakt
                 {bulkUpdated > 0 && (
                   <> — {bulkUpdated} eerder{bulkUpdated === 1 ? 'e transactie' : 'e transacties'} automatisch gecategoriseerd</>
@@ -806,7 +806,7 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
   const hasSuggestion = !!suggestion?.budget_id
 
   return (
-    <div className={`rounded-[var(--r-lg)] border p-3 transition-colors ${
+    <div className={`rounded-[var(--r-lg)] border p-4 transition-colors ${
       accepted
         ? 'border-emerald-200 bg-emerald-50/30'
         : 'border-[var(--border-ed)] bg-[var(--paper)]'
@@ -815,9 +815,9 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] text-[var(--ink-3)]">{formatDate(tx.date)}</p>
-          <p className="mt-0.5 truncate text-sm font-medium text-[var(--ink)] line-clamp-2">{tx.description}</p>
+          <p className="mt-1 truncate text-sm font-medium text-[var(--ink)] line-clamp-2">{tx.description}</p>
           {tx.counterparty_name && (
-            <p className="mt-0.5 truncate text-[11px] text-[var(--ink-3)]">{tx.counterparty_name}</p>
+            <p className="mt-1 truncate text-[11px] text-[var(--ink-3)]">{tx.counterparty_name}</p>
           )}
         </div>
         <div className="shrink-0 text-right">
@@ -827,7 +827,7 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
             {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount)}
           </p>
           {accepted && (
-            <span className="mt-0.5 flex items-center justify-end gap-0.5 text-[10px] text-emerald-600">
+            <span className="mt-1 flex items-center justify-end gap-0.5 text-[10px] text-emerald-600">
               <Check className="h-3 w-3" />
               Gekeurd
             </span>
@@ -837,10 +837,10 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
 
       {/* AI suggestion block */}
       {hasSuggestion && !accepted && (
-        <div className="mt-2 rounded-r-[var(--r-sm)] border border-dashed border-kern-200 bg-kern-50/50 px-3 py-2">
+        <div className="mt-3 rounded-r-[var(--r-sm)] border border-dashed border-kern-200 bg-kern-50/50 px-3 py-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1 mb-1">
+              <div className="flex items-center gap-1 mb-2">
                 <Sparkles className="h-3 w-3 text-kern-500 shrink-0" />
                 <p className="font-[var(--font-source-serif)] text-[11px] italic text-[var(--ink-2)] line-clamp-2">
                   {suggestion.reasoning}
@@ -853,7 +853,7 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
             <button
               type="button"
               onClick={onAcceptSuggestion}
-              className="shrink-0 inline-flex items-center gap-1 rounded-[var(--r-sm)] bg-[var(--kern)] px-2.5 py-1.5 text-xs font-medium text-white min-h-[32px] hover:opacity-90"
+              className="shrink-0 inline-flex items-center gap-1 rounded-[var(--r-sm)] bg-[var(--kern)] px-3 py-2 text-xs font-medium text-white min-h-[44px] hover:opacity-90"
             >
               <Check className="h-3 w-3" />
               OK
@@ -864,7 +864,7 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
 
       {/* Accepted AI suggestion — show rule toggle */}
       {accepted && hasSuggestion && (
-        <div className="mt-2 flex items-center gap-2 rounded-[var(--r-sm)] border border-dashed border-[var(--border-ed)] px-3 py-1.5">
+        <div className="mt-3 flex items-center gap-2 rounded-[var(--r-sm)] border border-dashed border-[var(--border-ed)] px-3 py-2.5">
           <GitFork className="h-3.5 w-3.5 text-[var(--ink-3)] shrink-0" />
           <span className="text-[11px] text-[var(--ink-3)] flex-1">
             Maak ook een regel
@@ -890,12 +890,12 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
 
       {/* Manual selection — no AI suggestion or manual override */}
       {!hasSuggestion && (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <HelpCircle className="h-3.5 w-3.5 text-[var(--ink-4)] shrink-0" />
           <select
             value={row.acceptedBudgetId ?? ''}
             onChange={(e) => onManualBudget(e.target.value)}
-            className="flex-1 rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
+            className="flex-1 rounded border border-[var(--border-ed)] px-2 py-2 min-h-[44px] text-xs outline-none focus:border-kern-500"
           >
             <option value="">Kies handmatig</option>
             {budgetGroups
@@ -913,7 +913,7 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
 
       {/* Manual selection for rows with AI suggestion (override) */}
       {hasSuggestion && !accepted && (
-        <div className="mt-1.5 flex justify-end">
+        <div className="mt-2 flex justify-end">
           <button
             type="button"
             onClick={() => {
@@ -928,13 +928,13 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
 
       {/* Manual override dropdown for rows that had AI suggestions */}
       {hasSuggestion && (
-        <div className={`mt-1 ${accepted ? 'hidden' : ''}`} id={`manual-${row.tx.id}`}>
+        <div className={`mt-2 ${accepted ? 'hidden' : ''}`} id={`manual-${row.tx.id}`}>
           <select
             value=""
             onChange={(e) => {
               if (e.target.value) onManualBudget(e.target.value)
             }}
-            className="w-full rounded border border-dashed border-[var(--border-ed)] px-2 py-1 text-xs text-[var(--ink-3)] outline-none focus:border-kern-500 focus:text-[var(--ink)]"
+            className="w-full rounded border border-dashed border-[var(--border-ed)] px-2 py-2 min-h-[44px] text-xs text-[var(--ink-3)] outline-none focus:border-kern-500 focus:text-[var(--ink)]"
             aria-label="Andere categorie kiezen"
           >
             <option value="">— Andere categorie kiezen —</option>

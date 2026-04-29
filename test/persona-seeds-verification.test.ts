@@ -29,6 +29,8 @@ const ASSET_DEFAULTS: Omit<Asset, 'id' | 'name' | 'asset_type' | 'current_value'
   beneficiary: null, kvk_number: null, ownership_percentage: null, annual_dividend: null,
   linked_asset_id: null, ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
   has_budget_tracking: false, has_holdings_tracking: false,
+  has_woonbalans_tracking: false, has_rental_tracking: false,
+  monthly_maintenance_cost: 0, vva_fee: 0, vacancy_log: [],
 }
 
 const DEBT_DEFAULTS: Omit<Debt, 'id' | 'name' | 'debt_type' | 'original_amount' | 'current_balance' | 'interest_rate' | 'minimum_payment' | 'monthly_payment' | 'start_date' | 'sort_order'> = {
@@ -38,6 +40,7 @@ const DEBT_DEFAULTS: Omit<Debt, 'id' | 'name' | 'debt_type' | 'original_amount' 
   repayment_type: null, draagkrachtmeting_date: null, tax_year: null,
   has_payment_plan: false, has_written_agreement: false, include_aflossing_in_savings: false, custom_aflossing_amount: null, ownership: 'personal',
   household_id: null, partner_split_pct: null, net_worth_inclusion_pct: 100,
+  has_strategy_tracking: false,
 }
 
 function personaAssetsToAssets(pa: PersonaData['assets'], ba: PersonaData['bank_accounts']): Asset[] {

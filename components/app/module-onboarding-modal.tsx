@@ -48,7 +48,7 @@ const STEP_META: Record<OnboardingStep, StepMeta> = {
     title: 'Budgetten instellen',
     description: 'Voor budgetteren heb je categoriebudgetten nodig.',
     detail:
-      'In De Kern kun je je maandelijkse budgetten instellen per categorie. Je kunt dit nu doen of later vanuit het dashboard.',
+      'Op De Kern → Budgetten opent één knop ("Budgetten aanpassen") de hele editor: structuur, maandbedragen en templates (Minimalistisch, Nibud, Uitgebreid) op één plek.',
     icon: PiggyBank,
     setupRoute: '/core',
     setupLabel: 'Naar De Kern',

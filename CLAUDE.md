@@ -77,6 +77,33 @@ De app is opgesplitst in schakelbare modules (zie `docs/superpowers/specs/2026-0
 
 2. **Fallback bij afgesloten modules.** Berekeningen die hun primaire databron uit een andere module halen, moeten altijd een fallback hebben voor als die module niet actief is. Voorbeeld: de spaarquote wordt automatisch berekend uit budgetdata, maar als Budgetteren uit staat moet er een alternatief pad zijn (bijv. handmatige invoer via check-in, of schatting op basis van netto-inkomsten en vermogensgroei). Bouw nooit een feature die stilzwijgend breekt of lege data toont omdat een andere module uit staat.
 
+## Kern-architectuur: Kern → Categorie → App
+
+De Kern (`/core`) is het fundament: een pure registratie van bezittingen en schulden, zonder module-eis. Daarbinnen geldt een vaste hiërarchie van drie niveaus:
+
+1. **Kern** — `/core` — landing met alle categorieën in twee secties (Bezittingen + Schulden) plus een hero met netto vermogen, FIRE-voortgang en samenvatting.
+
+2. **Categorie** — `/core/assets/[type]` of `/core/debts/[type]` — één pagina per asset- of debt-type (cash, investment, eigen_huis, mortgage, …). Toont alle items binnen die categorie, plus een mini-hero (totaal + aantal). Gegroepeerd via `ASSET_TYPE_LABELS` resp. `DEBT_TYPE_LABELS` in `lib/asset-data.ts` / `lib/debt-data.ts`.
+
+3. **App** — een verdiepende functionaliteit binnen één categorie, getoond als tweede tab op de categorie-pagina. Voorbeelden:
+   - Cash → app **Budgetteren** (vereist module `budgetteren`)
+   - Investment → app **Holdings** (vereist module `aandelenregistratie`)
+   - Mortgage → app **Aflossingsstrategie** (toekomstig — vereist module `toekomstplannen`)
+
+### Regels voor Apps
+
+- **Eén registry-entry per app.** Apps worden geregistreerd in `components/core/category-deepening-registry.ts` met velden `{ type, kind, label, moduleId, tipStripCopy }` plus een component-mapping. Een nieuwe app toevoegen kost één entry + één tab-component.
+- **Één-op-één-koppeling.** Een app hoort bij precies één categorie. Functionaliteit die voor meerdere categorieën nuttig is, wordt een gedeeld component dat door meerdere apps wordt gebruikt — niet één app voor meerdere categorieën.
+- **Module-gating via fallback.** Als een app een module vereist die uit staat, toont de tab een **teaser** (uitleg + CTA naar Instellingen) en verschijnt op de items-tab een subtiele **tip-strip** met deeplink. Conform CLAUDE.md fallback-regel: nooit stilzwijgend verbergen.
+- **Embed full features, dupliceer geen logica.** Als er al een volwaardige pagina bestaat (bv. `BudgetsClient` op `/core/budgets`, `HoldingsPage` op `/core/assets/holdings`), wordt die als-is geëmbed in de app-tab — geen lichte teaser-implementatie die uit de pas loopt.
+- **App-data komt uit de server-loader.** De server-component van de categorie-pagina laadt zelf de benodigde data (bv. `loadBudgetsData(supabase)` voor cash) en geeft die via `initialData` door aan de app — geen waterfall van client-side fetches.
+- **URL-state voor app-keuze.** De actieve tab leeft als `?tab=<appKey>` query-param zodat deeplinks deelbaar zijn en de browser-back-knop terugkeert naar de items-tab.
+
+### Wanneer is iets een App, wanneer een aparte route?
+
+- **App** als de functionaliteit context-gebonden is aan één categorie en winst oplevert om naast de items zichtbaar te zijn (Budgetteren bij cash, Holdings bij investment).
+- **Aparte route** binnen de categorie als de feature een eigen levenscyclus heeft (eigen list/detail/edit-flow) en ook standalone bezocht moet kunnen worden — bv. `/core/assets/holdings/[id]` voor een individuele holding-detail. De app-tab linkt dan dóór naar die route.
+
 ## UI/UX Skill (verplicht)
 
 Gebruik **altijd** de `ui-ux` skill voor aanpassingen aan de UI/UX. De skilldefinitie staat in `.claude/commands/ui-ux.md` en moet leidend zijn bij elk visueel of interactie-ontwerp. Roep de skill aan vóór je UI-wijzigingen voorstelt of uitvoert.

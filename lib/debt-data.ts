@@ -79,6 +79,11 @@ export interface Debt {
   // Aflossing in spaarquote
   include_aflossing_in_savings: boolean
   custom_aflossing_amount: number | null // null = berekend, getal = eigen bedrag p/m
+  // ── App-koppeling (zie components/core/category-deepening-registry.ts) ──
+  // Aflosstrategie-app (en Hypotheekplanner voor mortgages) tracken een
+  // schuld op basis van deze boolean. Default false zodat bestaande
+  // gebruikers geen app-tracking krijgen zonder dat ze die hebben geactiveerd.
+  has_strategy_tracking: boolean
 }
 
 export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
@@ -96,17 +101,49 @@ export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
 }
 
 export const DEBT_TYPE_ICONS: Record<DebtType, string> = {
-  mortgage: 'Home',
+  mortgage: 'Building',
   personal_loan: 'Banknote',
   student_loan: 'GraduationCap',
   car_loan: 'Car',
   credit_card: 'CreditCard',
-  revolving_credit: 'RefreshCw',
-  payment_plan: 'CalendarCheck',
+  revolving_credit: 'Repeat',
+  payment_plan: 'Clock',
   belastingschuld: 'Receipt',
-  familielening: 'Heart',
-  dga_schuld: 'Building2',
-  other: 'CircleDot',
+  familielening: 'Users',
+  dga_schuld: 'Briefcase',
+  other: 'MoreHorizontal',
+}
+
+/**
+ * Kleur-palet voor schuld-typen — monochroom semantisch rood (`--negative`)
+ * met intensiteit-laddertje. Differentiatie loopt langs de **looptijd /
+ * formaliteit-as**: lange-termijn formele schulden (hypotheek, fiscaal,
+ * DGA) staan in de diepste tint, korte-termijn persoonlijk krediet
+ * (lening, creditcard) in de medium-tint, en onderhands/overig in de
+ * zachtste tint.
+ *
+ * Eén tegenpool-tint t.o.v. de Kern-bruin asset-laddertje houdt de Kern-
+ * pagina visueel rustig en consistent. De kleur volgt het bestaande
+ * `--negative` token (oklch 0.50 0.09 25); we variëren alleen de lightness.
+ *
+ * Wordt hergebruikt in `opbouw-composition-chart.tsx` voor de negatieve
+ * gestapelde bars onder de nullijn.
+ */
+export const DEBT_TYPE_COLORS: Record<DebtType, string> = {
+  // Klasse I — lange termijn / formeel
+  mortgage: 'oklch(0.50 0.09 25)',
+  dga_schuld: 'oklch(0.50 0.09 25)',
+  belastingschuld: 'oklch(0.50 0.09 25)',
+  // Klasse II — korte termijn / consumptief krediet
+  personal_loan: 'oklch(0.58 0.09 25)',
+  student_loan: 'oklch(0.58 0.09 25)',
+  car_loan: 'oklch(0.58 0.09 25)',
+  credit_card: 'oklch(0.58 0.09 25)',
+  revolving_credit: 'oklch(0.58 0.09 25)',
+  // Klasse III — onderhands / overig
+  payment_plan: 'oklch(0.66 0.07 25)',
+  familielening: 'oklch(0.66 0.07 25)',
+  other: 'oklch(0.71 0.05 25)',
 }
 
 // ── Subtypes ─────────────────────────────────────────────────
@@ -824,4 +861,137 @@ export function getDefaultDebts(): DefaultDebt[] {
       subtype: 'oud_stelsel',
     },
   ]
+}
+
+// ── Quick-add wizard extensions ──────────────────────────────
+//
+// Alles onder deze scheidingslijn wordt uitsluitend gebruikt door de
+// `QuickAddWizard`. Bestaande DEBT_* constanten hierboven blijven
+// ongewijzigd.
+
+/** Kortere NL-labels voor de quick-add wizard. */
+export const DEBT_QUICK_ADD_LABELS: Record<DebtType, string> = {
+  mortgage: 'Hypotheek',
+  personal_loan: 'Persoonlijke lening',
+  student_loan: 'Studielening (DUO)',
+  car_loan: 'Autolening',
+  credit_card: 'Creditcard',
+  revolving_credit: 'Doorlopend krediet',
+  payment_plan: 'Afbetalingsregeling',
+  belastingschuld: 'Belastingschuld',
+  familielening: 'Familielening',
+  dga_schuld: 'Lening bij eigen BV',
+  other: 'Overig',
+}
+
+/** Default naam per type — prefill in stap 3. */
+export const DEBT_DEFAULT_NAMES: Partial<Record<DebtType, string>> = {
+  mortgage: 'Hypotheek',
+  student_loan: 'Studielening DUO',
+  credit_card: 'Creditcard',
+  belastingschuld: 'Aanslag IB',
+}
+
+/**
+ * Default looptijd (jaren) per debt-type — gebruikt in `buildDebtDraft`
+ * voor `end_date` berekening en `monthly_payment` via
+ * `computeDefaultMonthlyPayment`. `null` = doorlopend (geen einddatum).
+ */
+export const DEFAULT_TERM_YEARS_PER_TYPE: Record<DebtType, number | null> = {
+  mortgage: 30,
+  personal_loan: 5,
+  car_loan: 5,
+  student_loan: 15,
+  familielening: 10,
+  dga_schuld: 10,
+  belastingschuld: 1,
+  payment_plan: 2,
+  credit_card: null,
+  revolving_credit: null,
+  other: null,
+}
+
+/** Default repayment-type per debt-type (laat user later aanpassen in full form). */
+export const DEBT_DEFAULT_REPAYMENT_TYPE: Record<DebtType, RepaymentType | null> = {
+  mortgage: 'annuiteit',
+  personal_loan: 'annuiteit',
+  car_loan: 'annuiteit',
+  credit_card: 'aflossingsvrij',
+  revolving_credit: 'aflossingsvrij',
+  student_loan: 'lineair',
+  familielening: 'lineair',
+  dga_schuld: 'lineair',
+  belastingschuld: 'lineair',
+  payment_plan: 'lineair',
+  other: null,
+}
+
+/** Volgorde in de quick-add type-grid — meest voorkomende schulden eerst. */
+export const QUICK_ADD_DEBT_ORDER: readonly DebtType[] = [
+  'mortgage',
+  'personal_loan',
+  'student_loan',
+  'car_loan',
+  'credit_card',
+  'revolving_credit',
+  'belastingschuld',
+  'payment_plan',
+  'familielening',
+  'dga_schuld',
+  'other',
+] as const
+
+/** Configuratie voor het (optionele) derde veld in stap 3. */
+export type DebtField3Kind =
+  | null
+  | { kind: 'percentage'; label: string; defaultValue?: number }
+  | { kind: 'currency'; label: string }
+  | { kind: 'year'; label: string; defaultValue?: number }
+
+export const DEBT_QUICK_ADD_FIELD3: Record<DebtType, DebtField3Kind> = {
+  mortgage: { kind: 'percentage', label: 'Rente (%)' },
+  personal_loan: { kind: 'percentage', label: 'Rente (%)' },
+  student_loan: null, // DUO-rente via defaults
+  car_loan: { kind: 'percentage', label: 'Rente (%)' },
+  credit_card: { kind: 'percentage', label: 'Rente (%)', defaultValue: 14 },
+  revolving_credit: { kind: 'percentage', label: 'Rente (%)' },
+  payment_plan: { kind: 'currency', label: 'Maandbedrag' },
+  belastingschuld: { kind: 'year', label: 'Jaar' },
+  familielening: { kind: 'percentage', label: 'Rente (%)', defaultValue: 0 },
+  dga_schuld: { kind: 'percentage', label: 'Rente (%)', defaultValue: 2.5 },
+  other: { kind: 'percentage', label: 'Rente (%)' },
+}
+
+/**
+ * Bereken de default maandbedrag voor een schuld op basis van saldo,
+ * rente, looptijd en aflossingstype. Gebruikt door `buildDebtDraft`,
+ * maar kan later ook door `debt-form.tsx` worden hergebruikt als
+ * refactor van de inline-versie (regels 99-132 aldaar).
+ *
+ * - `aflossingsvrij`: alleen rente per maand.
+ * - `annuiteit`: klassieke PMT-formule.
+ * - `lineair`: vaste aflossing + rente over huidige saldo.
+ * - `null` repayment of ontbrekende looptijd bij niet-aflossingsvrij → 0.
+ */
+export function computeDefaultMonthlyPayment(
+  balance: number,
+  ratePct: number,
+  years: number | null,
+  repayment: RepaymentType | null,
+): number {
+  if (repayment === 'aflossingsvrij') {
+    return Math.round((balance * (ratePct / 100) / 12) * 100) / 100
+  }
+  if (years == null || years <= 0) return 0
+
+  const months = years * 12
+  if (ratePct === 0) return Math.round((balance / months) * 100) / 100
+
+  const monthlyRate = ratePct / 100 / 12
+  if (repayment === 'lineair') {
+    return Math.round((balance / months + balance * monthlyRate) * 100) / 100
+  }
+  // annuiteit (default als repayment null of 'annuiteit')
+  const factor = Math.pow(1 + monthlyRate, months)
+  return Math.round(((balance * (monthlyRate * factor)) / (factor - 1)) * 100) / 100
 }

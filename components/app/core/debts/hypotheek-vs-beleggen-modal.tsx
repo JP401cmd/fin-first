@@ -9,9 +9,13 @@ import { formatCurrency } from '@/lib/format'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface HypotheekVsBeleggenModalProps {
-  open: boolean
-  onClose: () => void
+/**
+ * Pure berekenings-input voor de sectie. Het modal-component voegt hier
+ * `open` + `onClose` aan toe via `HypotheekVsBeleggenModalProps` — zo
+ * blijft de sectie zelf modal-vrij en kan hij ook inline (binnen een
+ * tab/pagina) worden gerenderd zonder portal of focus-trap overhead.
+ */
+export interface HypotheekVsBeleggenInputs {
   /** Hypotheek gegevens (vanuit debt detail) */
   hypotheekBalance: number
   rente: number
@@ -27,6 +31,11 @@ interface HypotheekVsBeleggenModalProps {
   yearlyExpenses?: number
   annualSavings?: number
   cashflows?: HvBParams['cashflows']
+}
+
+interface HypotheekVsBeleggenModalProps extends HypotheekVsBeleggenInputs {
+  open: boolean
+  onClose: () => void
 }
 
 // ── Slider Row ───────────────────────────────────────────────────────────────
@@ -191,11 +200,24 @@ function JaarVergelijkingTabel({ result }: { result: HvBResult }) {
   )
 }
 
-// ── Main Component ───────────────────────────────────────────────────────────
+// ── Sectie (inline, modal-vrij) ──────────────────────────────────────────────
+//
+// `HypotheekVsBeleggenSectie` is de pure inhoud — sliders, scenario-cards,
+// summary-metrics, vergelijkingstabel — zonder modal/sheet wrapper. Wordt
+// hergebruikt in:
+//   - de Hypotheekplanner-app (als inline sectie binnen de tab)
+//   - de bestaande modal (`HypotheekVsBeleggenModal` hieronder, dunne
+//     wrapper rond een BottomSheet)
+//
+// Wat hier inzit (en niet in de modal-wrapper): alle slider-state,
+// disclaimer-state, useMemo-berekening, en alle JSX van de body. Wat in
+// de wrapper zit: alleen de BottomSheet-portal en title-prop.
+//
+// Backwards-compat: `HypotheekVsBeleggenModal` blijft de default export
+// zodat alle huidige call-sites (debt-detail-modal, /core/debts page)
+// ongewijzigd blijven werken.
 
-export default function HypotheekVsBeleggenModal({
-  open,
-  onClose,
+export function HypotheekVsBeleggenSectie({
   hypotheekBalance,
   rente,
   repaymentType,
@@ -209,7 +231,7 @@ export default function HypotheekVsBeleggenModal({
   yearlyExpenses,
   annualSavings,
   cashflows,
-}: HypotheekVsBeleggenModalProps) {
+}: HypotheekVsBeleggenInputs) {
   // ── Slider state ───────────────────────────────────────────────────────────
   const [extraBedrag, setExtraBedrag] = useState(300)
   const [verwachtRendement, setVerwachtRendement] = useState(7) // in %
@@ -252,8 +274,7 @@ export default function HypotheekVsBeleggenModal({
   const isGelijk = result.aanbeveling === 'gelijk'
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Hypotheek vs. Beleggen" size="xl">
-      <div className="space-y-5 px-6 pb-6 pt-2">
+    <div className="space-y-5">
         {/* ── Disclaimer ──────────────────────────────────────────────────── */}
         <div className="rounded-[var(--r)] border border-amber-200 bg-amber-50/60">
           <button
@@ -428,6 +449,32 @@ export default function HypotheekVsBeleggenModal({
 
         {/* ── Yearly comparison table ─────────────────────────────────────── */}
         <JaarVergelijkingTabel result={result} />
+    </div>
+  )
+}
+
+// ── Modal wrapper (backwards-compat) ─────────────────────────────────────────
+
+/**
+ * Dunne wrapper: rendert `<HypotheekVsBeleggenSectie>` binnen een
+ * `<BottomSheet>`. Behouden zodat alle bestaande call-sites
+ * (debt-detail-modal, /core/debts page) zonder wijziging blijven werken.
+ *
+ * Voor nieuwe call-sites die de inhoud inline willen embedden (bv. de
+ * Hypotheekplanner-app), gebruik direct `<HypotheekVsBeleggenSectie>`.
+ */
+export default function HypotheekVsBeleggenModal({
+  open,
+  onClose,
+  ...inputs
+}: HypotheekVsBeleggenModalProps) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Hypotheek vs. Beleggen" size="xl">
+      {/* Behoud bestaande inner-padding van de modal — die zit niet meer in
+          de sectie zelf zodat inline-gebruik (Hypotheekplanner) niet dubbel
+          gepad wordt. */}
+      <div className="px-6 pb-6 pt-2">
+        <HypotheekVsBeleggenSectie {...inputs} />
       </div>
     </BottomSheet>
   )

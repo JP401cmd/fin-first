@@ -11,6 +11,7 @@ import { BottomNav } from '@/components/app/bottom-nav'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { ToastProvider } from '@/components/app/toast-provider'
+import { PrivacyProvider } from '@/lib/hooks/use-privacy'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
@@ -161,6 +162,7 @@ export default async function AppLayout({
   return (
     <MobilePreviewProvider>
       <MobilePreviewFrame>
+        <PrivacyProvider>
         <ToastProvider>
           <SessionMonitor />
           <AutoSnapshotTrigger />
@@ -191,6 +193,7 @@ export default async function AppLayout({
             </ChatProvider>
           </PerspectiveProvider>
         </ToastProvider>
+        </PrivacyProvider>
       </MobilePreviewFrame>
     </MobilePreviewProvider>
   )

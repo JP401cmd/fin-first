@@ -29,15 +29,20 @@ export const HuishoudenActiviteitWidget = memo(function HuishoudenActiviteitWidg
   // Solo users: hide widget completely (no empty state)
   if (!isHousehold) return null
 
-  // Household user but not in household perspective or no data
+  // Household user but not in household perspective or no data.
+  // Two sub-states, both mapping to `variant="no-results"` per the design
+  // bible — the active perspective acts as an effective filter, so the
+  // absence of data is a filter-driven empty, not a first-use moment.
   if (perspective !== 'household' || items.length === 0) {
+    const isPerspectiveMismatch = perspective !== 'household'
     return (
       <WidgetShell module="kern" size={size} kicker="Huishouden Activiteit" href={href}>
         <WidgetEmpty
+          variant="no-results"
           icon={Users}
-          message={perspective !== 'household'
+          description={isPerspectiveMismatch
             ? 'Schakel naar het huishouden-perspectief om activiteit te zien.'
-            : 'Nog geen gedeelde transacties.'}
+            : 'Nog geen gedeelde transacties in dit perspectief.'}
         />
       </WidgetShell>
     )

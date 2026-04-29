@@ -94,6 +94,23 @@ export interface Asset {
   has_budget_tracking: boolean
   // Holdings tracking (investment assets managed by portfolio tracker)
   has_holdings_tracking?: boolean
+  // ── App-koppelingen (zie components/core/category-deepening-registry.ts) ──
+  // Hypotheekplanner + Woonbalans op `eigen_huis`-asset; default false zodat
+  // bestaande gebruikers geen app-tracking krijgen zonder dat ze die hebben
+  // geactiveerd.
+  has_woonbalans_tracking: boolean
+  // Verhuurrendement-app op `real_estate`-asset; default false.
+  has_rental_tracking: boolean
+  // ── Verhuur-overrides (alleen relevant bij has_rental_tracking) ──
+  // Override op de 1%-schatting voor onderhoudskosten per maand. 0 (default)
+  // betekent: gebruik de schatting (1% × marktwaarde / 12).
+  monthly_maintenance_cost: number
+  // VVE-bijdrage / verzekering per maand voor verhuur-vastgoed.
+  vva_fee: number
+  // Bezet/leegstand-log per maand. Max 24 entries (rolling window). Lege
+  // array betekent dat de gebruiker nog niets heeft gelogd — Verhuurrendement
+  // toont dan een aanmoediging om te beginnen met loggen.
+  vacancy_log: Array<{ month: string; occupied: boolean }>
 }
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -114,34 +131,51 @@ export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
 
 export const ASSET_TYPE_ICONS: Record<AssetType, string> = {
   cash: 'Wallet',
-  savings: 'PiggyBank',
-  investment: 'TrendingUp',
-  retirement: 'Vault',
+  savings: 'Landmark',
+  investment: 'LineChart',
+  retirement: 'Hourglass',
   eigen_huis: 'Home',
-  real_estate: 'Building',
-  crypto: 'Bitcoin',
+  real_estate: 'Warehouse',
+  crypto: 'Coins',
   vehicle: 'Car',
   physical: 'Gem',
-  deelneming: 'Building2',
+  deelneming: 'Briefcase',
   levensverzekering: 'Shield',
-  vordering: 'HandCoins',
-  other: 'Briefcase',
+  vordering: 'FileText',
+  other: 'CircleDot',
 }
 
+/**
+ * Kleur-palet voor asset-typen — monochroom kern-bruin met intensiteit-laddertje.
+ *
+ * Differentiatie loopt langs de **liquiditeits-as**: hoe donkerder, hoe meer
+ * direct beschikbaar het vermogen is. Cash en savings staan op kern-700,
+ * beleggingen en pensioen op kern-500, vastgoed/levensverzekering op kern-400,
+ * en kortdurende of overige bezittingen lopen af naar kern-200/300.
+ *
+ * Eén module-tint familie houdt de Kern-pagina visueel rustig en in lijn met
+ * de krant-esthetiek (zie `CLAUDE.md` Design Language). Differentiatie tussen
+ * categorieën gebeurt verder via icon, label en bedrag — niet via een
+ * regenboog van willekeurige Tailwind hex-waardes.
+ */
 export const ASSET_TYPE_COLORS: Record<AssetType, string> = {
-  cash: '#22c55e',
-  savings: '#3b82f6',
-  investment: '#10b981',
-  retirement: '#8b5cf6',
-  eigen_huis: '#d97706',
-  real_estate: '#f59e0b',
-  crypto: '#f97316',
-  vehicle: '#6366f1',
-  physical: '#ec4899',
-  deelneming: '#0d9488',
-  levensverzekering: '#7c3aed',
-  vordering: '#0ea5e9',
-  other: '#71717a',
+  // Klasse I — direct liquide
+  cash: 'oklch(0.345 0.0571 34.7)', // kern-700
+  savings: 'oklch(0.345 0.0571 34.7)', // kern-700
+  // Klasse II — belegd / groei
+  investment: 'oklch(0.427 0.0584 34.7)', // kern-500
+  crypto: 'oklch(0.427 0.0584 34.7)', // kern-500
+  retirement: 'oklch(0.427 0.0584 34.7)', // kern-500
+  // Klasse III — vast / illiquide
+  eigen_huis: 'oklch(0.538 0.0467 34.7)', // kern-400
+  real_estate: 'oklch(0.538 0.0467 34.7)', // kern-400
+  levensverzekering: 'oklch(0.538 0.0467 34.7)', // kern-400
+  deelneming: 'oklch(0.538 0.0467 34.7)', // kern-400
+  // Klasse IV — kortdurend / persoonlijk
+  vehicle: 'oklch(0.666 0.0311 34.7)', // kern-300
+  physical: 'oklch(0.666 0.0311 34.7)', // kern-300
+  vordering: 'oklch(0.666 0.0311 34.7)', // kern-300
+  other: 'oklch(0.771 0.0175 34.7)', // kern-200
 }
 
 /** Typical annual return expectations per asset type (for default suggestions) */
@@ -443,5 +477,98 @@ export function projectPortfolio(
   }
 
   return result
+}
+
+// ── Quick-add wizard extensions ──────────────────────────────
+//
+// Alles onder deze scheidingslijn wordt uitsluitend gebruikt door de
+// `QuickAddWizard` (`components/app/quick-add-wizard/*`). Bestaande
+// ASSET_* constanten hierboven blijven ongewijzigd.
+
+import type { DebtType } from './debt-data'
+
+/** Kortere NL-labels voor de quick-add wizard (minder formeel dan ASSET_TYPE_LABELS). */
+export const ASSET_QUICK_ADD_LABELS: Record<AssetType, string> = {
+  savings: 'Spaargeld',
+  cash: 'Bankrekening',
+  eigen_huis: 'Eigen woning',
+  investment: 'Beleggingen',
+  retirement: 'Pensioen',
+  vehicle: 'Auto of motor',
+  real_estate: 'Vastgoed',
+  crypto: 'Crypto',
+  deelneming: 'Eigen BV',
+  physical: 'Kunst of sieraden',
+  levensverzekering: 'Levensverzekering',
+  vordering: 'Lening aan iemand',
+  other: 'Overig',
+}
+
+/**
+ * Default naam per type — prefill in stap 3. Types zonder default
+ * beginnen met een leeg naamveld (gebruiker krijgt placeholder + suggesties).
+ */
+export const ASSET_DEFAULT_NAMES: Partial<Record<AssetType, string>> = {
+  savings: 'Spaarrekening',
+  cash: 'Betaalrekening',
+  eigen_huis: 'Mijn woning',
+  investment: 'Beleggingsrekening',
+  retirement: 'Pensioen',
+  crypto: 'Crypto-portfolio',
+}
+
+/**
+ * Welk debt-type wordt in stap 4 voorgesteld bij welk asset-type?
+ * Types die hier niet in staan skippen stap 4 en gaan direct naar success.
+ */
+export const LINKED_DEBT_SUGGESTIONS: Partial<Record<AssetType, DebtType>> = {
+  eigen_huis: 'mortgage',
+  real_estate: 'mortgage',
+  vehicle: 'car_loan',
+  deelneming: 'dga_schuld',
+}
+
+/**
+ * Volgorde waarin asset-types in de quick-add type-grid worden getoond.
+ * Meest voorkomende eerst zodat gebruikers in <30 sec kunnen kiezen.
+ */
+export const QUICK_ADD_ASSET_ORDER: readonly AssetType[] = [
+  'savings',
+  'cash',
+  'eigen_huis',
+  'investment',
+  'retirement',
+  'vehicle',
+  'real_estate',
+  'crypto',
+  'deelneming',
+  'physical',
+  'levensverzekering',
+  'vordering',
+  'other',
+] as const
+
+/** Configuratie voor het (optionele) derde veld in stap 3. `null` = geen derde veld tonen. */
+export type AssetField3Kind =
+  | null
+  | { kind: 'text'; label: string; placeholder?: string; required?: boolean }
+  | { kind: 'currency'; label: string; placeholder?: string; required?: boolean }
+  | { kind: 'percentage'; label: string; defaultValue?: number; required?: boolean }
+  | { kind: 'date'; label: string }
+
+export const ASSET_QUICK_ADD_FIELD3: Record<AssetType, AssetField3Kind> = {
+  savings: { kind: 'text', label: 'Bank / instelling' },
+  cash: { kind: 'text', label: 'Bank' },
+  eigen_huis: { kind: 'currency', label: 'WOZ-waarde' },
+  investment: { kind: 'currency', label: 'Maandelijkse inleg' },
+  retirement: { kind: 'text', label: 'Uitvoerder' },
+  vehicle: { kind: 'currency', label: 'Aankoopprijs' },
+  real_estate: { kind: 'currency', label: 'Huurinkomsten per maand' },
+  crypto: null,
+  deelneming: { kind: 'percentage', label: 'Belang (%)', defaultValue: 100 },
+  physical: null,
+  levensverzekering: { kind: 'date', label: 'Einddatum' },
+  vordering: { kind: 'percentage', label: 'Rente (%)' },
+  other: null,
 }
 

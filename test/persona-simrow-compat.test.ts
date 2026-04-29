@@ -468,6 +468,11 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
         net_worth_inclusion_pct: 100,
         has_budget_tracking: false,
         has_holdings_tracking: pa.has_holdings_tracking ?? false,
+        has_woonbalans_tracking: false,
+        has_rental_tracking: false,
+        monthly_maintenance_cost: 0,
+        vva_fee: 0,
+        vacancy_log: [],
       }))
 
       // Add bank accounts as savings-type assets
@@ -512,6 +517,11 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
           net_worth_inclusion_pct: 100,
           has_budget_tracking: false,
           has_holdings_tracking: false,
+          has_woonbalans_tracking: false,
+          has_rental_tracking: false,
+          monthly_maintenance_cost: 0,
+          vva_fee: 0,
+          vacancy_log: [],
         })
       }
 
@@ -554,6 +564,7 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
         household_id: null,
         partner_split_pct: null,
         net_worth_inclusion_pct: 100,
+        has_strategy_tracking: false,
       }))
     }
 

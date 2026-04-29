@@ -817,12 +817,13 @@ const tests: TestCase[] = [
         { method: 'DELETE', path: '/api/budgets/[id]', errorMsg: 'Niet ingelogd' },
         { method: 'GET', path: '/api/budgets/[id]', errorMsg: 'Niet ingelogd' },
         { method: 'PUT', path: '/api/budgets/favorites', errorMsg: 'Niet ingelogd' },
+        { method: 'POST', path: '/api/budgets/plan', errorMsg: 'Niet ingelogd' },
         { method: 'GET', path: '/api/budget-trends', errorMsg: 'Unauthorized' },
         { method: 'GET', path: '/api/budget-variance', errorMsg: 'Niet ingelogd' },
         { method: 'GET', path: '/api/cashflow-forecast', errorMsg: 'Niet ingelogd' },
       ]
 
-      assertEqual(endpoints.length, 6, 'All 6 endpoints have auth guards')
+      assertEqual(endpoints.length, 7, 'All 7 endpoints have auth guards')
 
       for (const endpoint of endpoints) {
         assertType(endpoint.method, 'string', `${endpoint.path} has method`)

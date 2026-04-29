@@ -147,6 +147,11 @@ function personaAssetToAsset(pa: PersonaData['assets'][0]): Asset {
     net_worth_inclusion_pct: 100,
     has_budget_tracking: false,
     has_holdings_tracking: pa.has_holdings_tracking ?? false,
+    has_woonbalans_tracking: false,
+    has_rental_tracking: false,
+    monthly_maintenance_cost: 0,
+    vva_fee: 0,
+    vacancy_log: [],
   }
 }
 
@@ -187,6 +192,7 @@ function personaDebtToDebt(pd: PersonaData['debts'][0]): Debt {
     household_id: null,
     partner_split_pct: null,
     net_worth_inclusion_pct: 100,
+    has_strategy_tracking: false,
   }
 }
 
@@ -241,6 +247,11 @@ function buildUnifiedInput(key: PersonaKey): UnifiedProjectionInput {
       net_worth_inclusion_pct: 100,
       has_budget_tracking: false,
       has_holdings_tracking: false,
+      has_woonbalans_tracking: false,
+      has_rental_tracking: false,
+      monthly_maintenance_cost: 0,
+      vva_fee: 0,
+      vacancy_log: [],
     })
   }
 

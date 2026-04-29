@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useId, type ReactNode } from 
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
+import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 
 type BottomSheetProps = {
   open: boolean
@@ -34,7 +35,6 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<Element | null>(null)
   const titleId = useId()
 
   // Touch / drag state
@@ -228,48 +228,16 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
 
   useScrollLock(visible)
 
-  // ── Focus management ───────────────────────────────────────
+  // ── Focus management + trap ────────────────────────────────
 
-  useEffect(() => {
-    if (visible) {
-      triggerRef.current = document.activeElement
-      const timer = requestAnimationFrame(() => {
-        if (!sheetRef.current) return
-        const focusable = sheetRef.current.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
-        focusable?.focus()
-      })
-      return () => cancelAnimationFrame(timer)
-    } else {
-      if (triggerRef.current && triggerRef.current instanceof HTMLElement) {
-        triggerRef.current.focus()
-      }
-      triggerRef.current = null
-    }
-  }, [visible])
+  useFocusTrap({ active: visible, containerRef: sheetRef })
 
-  // ── Focus trap + Escape ────────────────────────────────────
+  // ── Escape key ─────────────────────────────────────────────
 
   useEffect(() => {
     if (!visible) return
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { handleProgrammaticClose(); return }
-      if (e.key !== 'Tab' || !sheetRef.current) return
-
-      const focusableEls = sheetRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      )
-      if (focusableEls.length === 0) return
-
-      const first = focusableEls[0]
-      const last = focusableEls[focusableEls.length - 1]
-
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus() }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus() }
-      }
+      if (e.key === 'Escape') handleProgrammaticClose()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)

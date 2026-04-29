@@ -1,0 +1,530 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowLeft, Plus } from 'lucide-react'
+import {
+  type Asset,
+  type AssetType,
+  ASSET_TYPE_COLORS,
+  ASSET_TYPE_LABELS,
+} from '@/lib/asset-data'
+import type { BudgetsPageData } from '@/lib/budgets-data-loader'
+import type { HoldingsPageData } from '@/lib/holdings-data-loader'
+import type { CorePageData } from '@/lib/core-data-loader'
+import { formatCurrency } from '@/lib/format'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
+import { BottomSheet } from '@/components/app/bottom-sheet'
+import { CashOverview } from '@/components/app/cash-overview'
+import { VermogenAssetCard } from './vermogen-asset-card'
+import { CategoryTabs, type CategoryTab } from './category-tabs'
+import { ModuleTipStrip } from './module-tip-strip'
+import { CoreKengetallen } from './core-kengetallen'
+import { AssetDetailFlow } from './asset-detail-flow'
+import {
+  findDeepenings,
+  getDeepeningComponent,
+  getDeepeningSlug,
+  type DeepeningEntry,
+} from './category-deepening-registry'
+
+// ── Constants ────────────────────────────────────────────────
+
+/**
+ * Items-tab is de eerste tab op elke categorie-pagina. Een tweede tab wordt
+ * dynamisch toegevoegd wanneer er een verdieping in het registry staat voor
+ * dit type — onafhankelijk van of de bijbehorende module actief is. Wanneer
+ * de module uit staat blijft de tab zichtbaar en toont de inhoud een
+ * tip-strip met deeplink naar Instellingen.
+ */
+const ITEMS_TAB_KEY = 'items'
+
+// ── Helpers ──────────────────────────────────────────────────
+
+/**
+ * Item-label per type — vermijdt awkward formules zoals "Cash & Spaargeld
+ * geregistreerd". We gebruiken een korter, instinctief begrip ("rekening",
+ * "belegging", "huis") in counts en CTA's.
+ */
+function itemNoun(type: AssetType, count: number): string {
+  const map: Record<AssetType, [string, string]> = {
+    cash: ['rekening', 'rekeningen'],
+    savings: ['rekening', 'rekeningen'],
+    investment: ['positie', 'posities'],
+    retirement: ['regeling', 'regelingen'],
+    eigen_huis: ['woning', 'woningen'],
+    real_estate: ['object', 'objecten'],
+    crypto: ['positie', 'posities'],
+    vehicle: ['voertuig', 'voertuigen'],
+    physical: ['item', 'items'],
+    deelneming: ['deelneming', 'deelnemingen'],
+    levensverzekering: ['polis', 'polissen'],
+    vordering: ['vordering', 'vorderingen'],
+    other: ['item', 'items'],
+  }
+  const [singular, plural] = map[type]
+  return count === 1 ? singular : plural
+}
+
+/** Korter actie-label voor het toevoeg-CTA (bv. "Voeg rekening toe"). */
+function addItemCta(type: AssetType): string {
+  return `Voeg ${itemNoun(type, 1)} toe`
+}
+
+// ── Props ────────────────────────────────────────────────────
+
+interface AssetCategoryPageProps {
+  /** Validated AssetType — server-component heeft `notFound()` gedraaid bij invalid type. */
+  type: AssetType
+  /** Initiële assets, server-side geladen. Client kan deze later updaten. */
+  initialAssets: Asset[]
+  /**
+   * Server-geladen budget-data, alleen relevant voor `type === 'cash'`. Wordt
+   * doorgegeven aan de Budgetteren-verdieping zodat `<BudgetsClient />` direct
+   * met server-data kan renderen (geen client-fetch waterfall). `undefined`
+   * wanneer de module uit staat of de fetch faalde — de tab vangt dat zelf op.
+   */
+  initialBudgetsData?: BudgetsPageData
+  /**
+   * Server-geladen holdings-data, alleen relevant voor `type === 'investment'`.
+   * Doorgegeven aan de Holdings-verdieping zodat `<HoldingsPage />` direct
+   * kan renderen. `undefined` valt netjes terug op een eigen client-fetch
+   * binnen `HoldingsPage` of een empty-state.
+   */
+  initialHoldingsData?: HoldingsPageData
+  /**
+   * Server-geladen Kern-data, alleen relevant voor `type === 'cash'`. Wordt
+   * gebruikt om de financiële kencijfers (geschat jaarinkomen, jaarlijkse
+   * must-uitgaven) en de volledige cash-overview te tonen bovenaan de pagina.
+   */
+  initialCoreData?: CorePageData
+}
+
+// ── Component ────────────────────────────────────────────────
+
+/**
+ * Categorie-pagina voor één asset-type. Hergebruikt `VermogenAssetCard` voor
+ * de items-tab en raadpleegt de deepening-registry voor een optionele
+ * tweede tab (Budgetteren bij `cash`, Holdings bij `investment`).
+ *
+ * Routing:
+ * - URL-state: `?tab=items` (default) of `?tab=<deepeningKey>`. Elke wissel
+ *   gebruikt `router.replace` zodat de browser-back-knop correct terugkeert
+ *   naar `/core` in plaats van te bouncen door tab-history.
+ * - Onbekende `?tab=…` waarde valt terug op de items-tab.
+ *
+ * Module-fallback:
+ * - Verdieping zonder actieve module → `<ModuleTipStrip />` op de items-tab
+ *   onderaan (subtiel, geen pop-up). De verdiepings-tab zelf rendert dan een
+ *   teaser i.p.v. data.
+ *
+ * Design (UX-skill):
+ * - Mini-hero in krant-stijl: kicker (UPPERCASE 11px) + groot bedrag (DM Mono
+ *   tabular-nums) + meta-regel (count + items). Geen kaart-rand — alleen
+ *   onder-border om de hero te scheiden van de tab-content.
+ * - Items-grid: 1-koloms op mobiel, 2-koloms op tablet, 3-koloms op desktop.
+ * - Empty state: krant-kicker "GEEN [type] GEREGISTREERD" + Source Serif
+ *   italic uitleg-zin + primaire CTA "+ Voeg [type] toe".
+ */
+export function AssetCategoryPage({
+  type,
+  initialAssets,
+  initialBudgetsData,
+  initialHoldingsData,
+  initialCoreData,
+}: AssetCategoryPageProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { activeModules } = useFeatureAccess()
+
+  // Assets zijn server-geladen; client houdt geen Supabase-poll. Mutaties
+  // vinden plaats via de QuickAddWizard en sturen `router.refresh()` zodat
+  // de server-component opnieuw laadt — daarna update React de prop.
+  const assets = initialAssets
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
+  const selectedAsset = useMemo(
+    () => assets.find((a) => a.id === selectedAssetId) ?? null,
+    [assets, selectedAssetId],
+  )
+
+  // ── Deepening-resolutie ───────────────────────────────────
+  // Een categorie kan meerdere apps hebben (bv. mortgage → Aflosstrategie +
+  // Hypotheekplanner). We loopen één keer per render door de registry-
+  // entries en cachen het resultaat (`deepenings`) achter useMemo zodat
+  // identiteit stabiel blijft zolang `type` niet verandert — anders zou
+  // `findDeepenings` elke render een nieuwe array opleveren en alle
+  // afhankelijke `useMemo` / effects nodeloos triggeren.
+  const deepenings = useMemo(() => findDeepenings(type, 'asset'), [type])
+  // Eerste deepening blijft beschikbaar voor module-uit fallback (tip-strip
+  // en module-active flag onder de items-tab — ongewijzigd gedrag voor de
+  // single-app categorieën die er waren).
+  const primaryDeepening = deepenings[0]
+  const moduleActive = primaryDeepening
+    ? activeModules.includes(primaryDeepening.moduleId)
+    : false
+
+  // Tabs: items + één tab per registry-entry. Slug uit `getDeepeningSlug()`
+  // dient als URL-state én als component-lookup-key bij multi-app
+  // categorieën.
+  const tabs = useMemo<CategoryTab[]>(() => {
+    const base: CategoryTab[] = [
+      { key: ITEMS_TAB_KEY, label: itemsTabLabel(type) },
+    ]
+    for (const entry of deepenings) {
+      // Component-lookup vindt plaats in render-laag; tab wordt alleen
+      // toegevoegd als er ook werkelijk een component voor de slug bestaat.
+      const slug = getDeepeningSlug(entry)
+      if (getDeepeningComponent(type, 'asset', slug) !== undefined) {
+        base.push({ key: slug, label: entry.label })
+      }
+    }
+    return base
+  }, [type, deepenings])
+
+  // ── URL-state synchronisatie ──────────────────────────────
+  const requestedTab = searchParams.get('tab')
+  const activeTabKey = useMemo(() => {
+    // Onbekende ?tab=… waardes negeren we — items is altijd een veilige
+    // fallback en voorkomt 404-achtig gedrag bij verkeerde deeplinks.
+    if (requestedTab && tabs.some((t) => t.key === requestedTab)) {
+      return requestedTab
+    }
+    return ITEMS_TAB_KEY
+  }, [requestedTab, tabs])
+
+  const handleTabChange = useCallback(
+    (key: string) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (key === ITEMS_TAB_KEY) {
+        params.delete('tab')
+      } else {
+        params.set('tab', key)
+      }
+      const queryString = params.toString()
+      router.replace(
+        `/core/assets/${type}${queryString ? `?${queryString}` : ''}`,
+        { scroll: false },
+      )
+    },
+    [router, searchParams, type],
+  )
+
+  // Wanneer de deepening verdwijnt (module wordt extern uitgezet en het
+  // registry-component bestaat niet meer) corrigeren we de URL — zo land
+  // je niet op een tab die niet meer in de tablist staat.
+  useEffect(() => {
+    if (
+      requestedTab &&
+      !tabs.some((tab) => tab.key === requestedTab)
+    ) {
+      handleTabChange(ITEMS_TAB_KEY)
+    }
+  }, [handleTabChange, requestedTab, tabs])
+
+  // ── Afgeleide waarden ─────────────────────────────────────
+  const total = useMemo(
+    () => assets.reduce((sum, asset) => sum + Number(asset.current_value), 0),
+    [assets],
+  )
+  const count = assets.length
+  const isItemsTab = activeTabKey === ITEMS_TAB_KEY
+  // Tip-strip onderaan de items-tab: tonen wanneer de eerste app van de
+  // categorie nog niet geactiveerd is. Bij multi-app wordt alleen de eerste
+  // app benoemd in de strip — meer dan dat zou de copy onleesbaar maken.
+  const showTipStrip =
+    isItemsTab && primaryDeepening !== undefined && !moduleActive
+
+  // ── Actieve deepening ─────────────────────────────────────
+  // Wanneer een verdiepings-tab actief is, zoeken we de bijbehorende entry
+  // en component op basis van de slug in de URL. moduleActive wordt per
+  // entry herberekend zodat elke app zijn eigen module-flag respecteert.
+  //
+  // De lookup teruggegeven referentie is stabiel per (type, kind, slug):
+  // `getDeepeningComponent` leest uit een module-level `DEEPENING_COMPONENTS`
+  // record dat éénmaal wordt geconstrueerd, dus dezelfde slug levert altijd
+  // dezelfde React component-referentie. De `react-hooks/static-components`
+  // waarschuwing slaat hier niet op werkelijke runtime-stabiliteit —
+  // hetzelfde patroon zit elders in deze codebase (`category-card.tsx`
+  // resolveert ook icons dynamisch op render).
+  const activeDeepening: DeepeningEntry | undefined = deepenings.find(
+    (entry) => !isItemsTab && getDeepeningSlug(entry) === activeTabKey,
+  )
+  const ActiveDeepeningComponent = getDeepeningComponent(
+    type,
+    'asset',
+    activeTabKey,
+  )
+  const activeDeepeningModuleActive = activeDeepening
+    ? activeModules.includes(activeDeepening.moduleId)
+    : false
+
+  // Klik op een asset opent een lokale BottomSheet met de details. Bewerken
+  // gaat via de volledige flow op `/core/assets`; we navigeren daarheen
+  // alleen wanneer de gebruiker dat expliciet kiest in de sheet.
+  const openAssetDetail = useCallback((assetId: string) => {
+    setSelectedAssetId(assetId)
+  }, [])
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      <CategoryHero type={type} total={total} count={count} />
+
+      <div className="px-4 sm:px-6">
+        <CategoryTabs
+          tabs={tabs}
+          activeKey={activeTabKey}
+          onChange={handleTabChange}
+          className="mt-4"
+        />
+
+        <div
+          role="tabpanel"
+          id={`category-tabpanel-${activeTabKey}`}
+          aria-labelledby={`category-tab-${activeTabKey}`}
+          className="py-6"
+        >
+          {isItemsTab ? (
+            <>
+              {/* Voor cash: volledige overview + kencijfers boven de
+                  rekeningen-grid. Andere types tonen alleen de items. */}
+              {type === 'cash' && (
+                <div className="mb-8 -mx-4 sm:-mx-6">
+                  <CashOverview embedded />
+                </div>
+              )}
+
+              <ItemsTab
+                type={type}
+                assets={assets}
+                onItemClick={openAssetDetail}
+                onAddClick={() => setQuickAddOpen(true)}
+              />
+
+              {type === 'cash' && initialCoreData && (
+                <div className="mt-10 -mx-4 sm:-mx-6">
+                  <CoreKengetallen
+                    yearlyIncome={initialCoreData.rawFinancials.extrapolatedIncome}
+                    incomeMonths={initialCoreData.incomeMonths}
+                    incomeByMonth={initialCoreData.incomeByMonth}
+                    yearlyMustExpenses={initialCoreData.rawFinancials.yearlyMustExpenses}
+                    mustExpenseItems={initialCoreData.mustExpenseItems}
+                    retirementMethod={initialCoreData.retirementMethodUsed}
+                    budgetingActive={initialCoreData.budgetingActive}
+                  />
+                </div>
+              )}
+            </>
+          ) : ActiveDeepeningComponent ? (
+            <ActiveDeepeningComponent
+              type={type}
+              moduleActive={activeDeepeningModuleActive}
+              initialData={
+                type === 'cash'
+                  ? initialBudgetsData
+                  : type === 'investment'
+                    ? initialHoldingsData
+                    : undefined
+              }
+            />
+          ) : null}
+        </div>
+
+        {showTipStrip && primaryDeepening && (
+          <ModuleTipStrip copy={primaryDeepening.tipStripCopy} className="mb-6" />
+        )}
+      </div>
+
+      <QuickAddWizard
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        initialIntent="asset"
+        onSaved={() => {
+          setQuickAddOpen(false)
+          router.refresh()
+        }}
+      />
+
+      <AssetDetailFlow
+        asset={selectedAsset}
+        onClose={() => setSelectedAssetId(null)}
+        onAfterSave={() => router.refresh()}
+      />
+    </div>
+  )
+}
+
+// ── Items-tab label ──────────────────────────────────────────
+
+/**
+ * Sentence-case label voor de items-tab. Cash en savings krijgen
+ * "Rekeningen", investment "Posities", etc. — alle types zonder duidelijke
+ * Nederlandse term vallen terug op "Items".
+ */
+function itemsTabLabel(type: AssetType): string {
+  const labels: Partial<Record<AssetType, string>> = {
+    cash: 'Rekeningen',
+    savings: 'Rekeningen',
+    investment: 'Posities',
+    retirement: 'Regelingen',
+    eigen_huis: 'Woning',
+    real_estate: 'Objecten',
+    crypto: 'Posities',
+    vehicle: 'Voertuigen',
+    physical: 'Items',
+    deelneming: 'Deelnemingen',
+    levensverzekering: 'Polissen',
+    vordering: 'Vorderingen',
+    other: 'Items',
+  }
+  return labels[type] ?? 'Items'
+}
+
+// ── Mini-hero ────────────────────────────────────────────────
+
+interface CategoryHeroProps {
+  type: AssetType
+  total: number
+  count: number
+}
+
+/**
+ * Krant-stijl mini-hero bovenaan de categorie-pagina. Toont een terug-link,
+ * de kicker, het totaalbedrag groot, en een meta-regel met item-aantal +
+ * een dunne bar in de type-kleur (visuele aankondiging zonder de tekst te
+ * kleuren — krant-discipline).
+ */
+function CategoryHero({ type, total, count }: CategoryHeroProps) {
+  const accentColor = ASSET_TYPE_COLORS[type]
+  const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
+
+  return (
+    <section className="border-b border-[var(--border-ed)] bg-[var(--paper)]">
+      <div className="h-1 bg-kern-500" />
+
+      <div className="px-4 py-5 sm:px-6 sm:py-7">
+        <Link
+          href="/core"
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          <ArrowLeft className="h-3 w-3" aria-hidden="true" />
+          <span>Kern</span>
+        </Link>
+
+        <p className="mt-3 text-[11px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+          {ASSET_TYPE_LABELS[type]}
+        </p>
+
+        <p
+          className="mt-1 font-mono text-[28px] font-bold tabular-nums leading-none tracking-tight text-[var(--ink)] sm:text-[36px]"
+          style={{
+            fontFamily: 'var(--font-playfair, var(--font-mono, monospace))',
+          }}
+        >
+          {formatCurrency(total)}
+        </p>
+
+        <div ref={ref as unknown as React.RefObject<HTMLDivElement>} className="mt-3 flex items-center gap-3">
+          <div
+            className="h-1 w-16 overflow-hidden bg-[var(--subtle)]"
+            aria-hidden="true"
+          >
+            <span
+              className="block h-full"
+              style={{
+                width: hasEntered ? '100%' : '0%',
+                backgroundColor: accentColor,
+                transition: 'width 600ms cubic-bezier(.22,1,.36,1)',
+              }}
+            />
+          </div>
+          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            {count} {itemNoun(type, count)}
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Items-tab ────────────────────────────────────────────────
+
+interface ItemsTabProps {
+  type: AssetType
+  assets: Asset[]
+  onItemClick: (assetId: string) => void
+  onAddClick: () => void
+}
+
+/**
+ * Lijst van assets in deze categorie + toevoeg-CTA. Empty state behoudt
+ * krant-toon: kicker + serif-italic uitleg + duidelijke primaire actie.
+ */
+function ItemsTab({ type, assets, onItemClick, onAddClick }: ItemsTabProps) {
+  if (assets.length === 0) {
+    return <EmptyItemsState type={type} onAddClick={onAddClick} />
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {assets.map((asset, idx) => (
+          <VermogenAssetCard
+            key={asset.id}
+            asset={asset}
+            onClick={onItemClick}
+            staggerIndex={idx}
+          />
+        ))}
+      </div>
+
+      <div className="pt-2">
+        <button
+          type="button"
+          onClick={onAddClick}
+          className="inline-flex h-11 items-center gap-2 border border-kern-200 bg-kern-50 px-4 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100 hover:text-kern-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {addItemCta(type)}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Empty state ──────────────────────────────────────────────
+
+interface EmptyItemsStateProps {
+  type: AssetType
+  onAddClick: () => void
+}
+
+/**
+ * Empty state met krant-stijl kicker + serif-italic uitleg-zin. Voldoet aan
+ * de UX-skill regel "geen doodlopende lege lijst" — er is altijd een
+ * primaire CTA met een outcome-georiënteerd label.
+ */
+function EmptyItemsState({ type, onAddClick }: EmptyItemsStateProps) {
+  const noun = itemNoun(type, 1)
+  return (
+    <div className="border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-6 py-10 text-center">
+      <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+        Geen {itemNoun(type, 2)} geregistreerd
+      </p>
+      <p className="mt-2 font-serif italic text-base leading-relaxed text-[var(--ink-2)]">
+        Voeg je eerste {noun} toe om hier te beginnen — vrijheid begint bij overzicht.
+      </p>
+      <button
+        type="button"
+        onClick={onAddClick}
+        className="mt-4 inline-flex h-11 items-center gap-2 border border-kern-300 bg-kern-50 px-4 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+      >
+        <Plus className="h-4 w-4" aria-hidden="true" />
+        {addItemCta(type)}
+      </button>
+    </div>
+  )
+}

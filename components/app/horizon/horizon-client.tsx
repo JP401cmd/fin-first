@@ -517,6 +517,26 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
   }, [])
 
+  // Lightweight refetch used after life-event CRUD, so a single failing parallel
+  // query in `loadData` cannot silently block the events update.
+  const refreshEvents = useCallback(async () => {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('life_events')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+    if (error) {
+      console.error('Failed to refresh life events:', error)
+      return
+    }
+    const loaded = (data ?? []) as LifeEvent[]
+    setEvents(loaded)
+    if (input) {
+      setImpacts(computeCumulativeImpacts(input, loaded))
+    }
+  }, [input])
+
   // Fetch household/partner FIRE data when perspective changes
   useEffect(() => {
     if (!isHouseholdView && !isPartnerView) {
@@ -1482,7 +1502,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       const huwelijksreis = Number(formMetadata.huwelijksreis) || 0
       const huwelijksvoorwaarden = Boolean(formMetadata.huwelijksvoorwaarden)
       const notariskosten = huwelijksvoorwaarden ? 1200 : 0
-      oneTimeCost = bruiloftBudget + huwelijksreis + notariskosten
+      const totaal = bruiloftBudget + huwelijksreis + notariskosten
+      // Sign convention (zie inheritance): expense = positief one_time_cost, income = negatief
+      oneTimeCost = formDirection === 'income' ? -totaal : totaal
       monthlyCostChange = 0
       monthlyIncomeChange = 0
       durMonths = 0
@@ -1763,7 +1785,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       setSelectedEventId(null)
       setViewModalMode('view')
     }
-    loadData()
+    await refreshEvents()
   }
 
   async function deleteEvent(id: string) {
@@ -1775,7 +1797,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
     const { error } = await supabase.from('life_events').delete().eq('id', id)
     if (error) console.error('Failed to delete life event:', error)
-    loadData()
+    await refreshEvents()
   }
 
   if (!fire || !range || !healthScore) {

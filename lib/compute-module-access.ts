@@ -80,22 +80,34 @@ export function isWidgetVisible(
  * Routes are checked from most specific to least specific so that sub-paths
  * like /core/assets/holdings are evaluated before their parent /core/assets.
  * Routes not matched by any rule are always accessible (fail-open).
+ *
+ * **Kern fundament-regel** (zie CLAUDE.md):
+ * Registratie van bezittingen en schulden is fundament — geen module-eis op
+ * `/core`, `/core/assets`, `/core/assets/[type]` (behalve holdings),
+ * `/core/debts` en `/core/debts/[type]`. Verdiepingen (Budgetteren,
+ * Holdings) hebben hun eigen specifieke module-eis op specialistische
+ * sub-routes.
  */
 export function isRouteAccessible(pathname: string, activeModules: ModuleId[]): boolean {
   // Most-specific routes first to prevent early exit on a parent pattern
 
-  // Holdings is a sub-section of assets, requires dedicated module
+  // Holdings is a sub-section of assets and requires the dedicated
+  // aandelenregistratie module — it is the verdieping op investment-assets.
   if (pathname.startsWith('/core/assets/holdings')) {
     return isModuleActive(activeModules, 'aandelenregistratie')
   }
 
-  // General asset/debt/tax routes all require vermogensregistratie
-  if (
-    pathname.startsWith('/core/assets') ||
-    pathname.startsWith('/core/debts') ||
-    pathname.startsWith('/core/belasting')
-  ) {
+  // Box 3 belasting is een berekenings-tool die rust op vermogensregistratie.
+  if (pathname.startsWith('/core/belasting')) {
     return isModuleActive(activeModules, 'vermogensregistratie')
+  }
+
+  // /core/assets, /core/assets/[type] (cash/savings/etc.), /core/debts en
+  // /core/debts/[type] zijn pure registratie — altijd toegankelijk.
+  // Verdiepings-tabs binnen deze pagina's vallen zelf terug op een
+  // tip-strip wanneer de bijbehorende module uit staat.
+  if (pathname.startsWith('/core/assets') || pathname.startsWith('/core/debts')) {
+    return true
   }
 
   if (pathname.startsWith('/core/budgets')) {

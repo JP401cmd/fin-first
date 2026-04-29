@@ -61,6 +61,7 @@ export interface BudgetsPageData {
   currentPeriod: string  // e.g. '2026-03'
   monthStart: string     // e.g. '2026-03-01'
   monthEnd: string       // e.g. '2026-04-01'
+  monthlyAverages: Record<string, { avg: number; months: number }>
 }
 
 // ── Loader ────────────────────────────────────────────────────
@@ -78,8 +79,11 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
   const monthEnd = localDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 1))
   const currentPeriod = formatPeriod(monthDate)
 
-  // Parallel batch: budgets, transactions, rollovers, budget amounts, goals
-  const [budgetsRes, txRes, rolloversRes, amountsRes, goalsRes] = await Promise.all([
+  // 12-month historical window (exclusive of current month) for averages.
+  const twelveMonthsAgoStart = localDateStr(new Date(now.getFullYear(), now.getMonth() - 12, 1))
+
+  // Parallel batch: budgets, transactions, rollovers, budget amounts, goals, 12mo history
+  const [budgetsRes, txRes, rolloversRes, amountsRes, goalsRes, historyTxRes] = await Promise.all([
     supabase
       .from('budgets')
       .select('*')
@@ -102,6 +106,11 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
       .from('goals')
       .select('id, name, goal_type, target_value, current_value, target_date, icon, color, is_completed, budget_id')
       .order('sort_order', { ascending: true }),
+    supabase
+      .from('transactions')
+      .select('id, budget_id, amount, date, transaction_type, is_split')
+      .gte('date', twelveMonthsAgoStart)
+      .lt('date', monthStart),
   ])
 
   // ── Build budget tree ───────────────────────────────────────
@@ -186,6 +195,75 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
     0,
   )
 
+  // ── 12-month averages per budget ────────────────────────────
+  // Excludes transfers (they are not real spending/income). Averages are
+  // computed over the number of distinct months in which the budget had
+  // any activity, not over a fixed 12-month denominator — this avoids
+  // pulling seasonal budgets (e.g. vakantie) down to near-zero.
+  const historyTx = (historyTxRes.data ?? []) as Array<{
+    id: string
+    budget_id: string | null
+    amount: number
+    date: string
+    transaction_type: string | null
+    is_split: boolean | null
+  }>
+
+  const historySplitTxIds = historyTx.filter(t => t.is_split).map(t => t.id)
+  let historySplits: Array<{ transaction_id: string; budget_id: string | null; amount: number; transaction_type: string | null; date: string }> = []
+  if (historySplitTxIds.length > 0) {
+    const { data: splits } = await supabase
+      .from('transaction_splits')
+      .select('transaction_id, budget_id, amount, transactions!inner(transaction_type, date)')
+      .in('transaction_id', historySplitTxIds)
+    if (splits) {
+      historySplits = (splits as unknown as Array<{
+        transaction_id: string
+        budget_id: string | null
+        amount: number
+        transactions: { transaction_type: string | null; date: string } | null
+      }>).map((s) => ({
+        transaction_id: s.transaction_id,
+        budget_id: s.budget_id,
+        amount: s.amount,
+        transaction_type: s.transactions?.transaction_type ?? null,
+        date: s.transactions?.date ?? '',
+      }))
+    }
+  }
+
+  const aggregates = new Map<string, { total: number; months: Set<string> }>()
+  const addToAggregate = (budgetId: string, amount: number, date: string, transactionType: string | null) => {
+    if (transactionType === 'transfer' || transactionType === 'joint_transfer') return
+    if (!date) return
+    const monthKey = date.slice(0, 7)
+    let entry = aggregates.get(budgetId)
+    if (!entry) {
+      entry = { total: 0, months: new Set() }
+      aggregates.set(budgetId, entry)
+    }
+    entry.total += Math.abs(Number(amount) || 0)
+    entry.months.add(monthKey)
+  }
+
+  for (const t of historyTx) {
+    // Parent row of a split: skip — amounts live on the splits.
+    if (t.is_split) continue
+    if (!t.budget_id) continue
+    addToAggregate(t.budget_id, t.amount, t.date, t.transaction_type)
+  }
+  for (const s of historySplits) {
+    if (!s.budget_id) continue
+    addToAggregate(s.budget_id, s.amount, s.date, s.transaction_type)
+  }
+
+  const monthlyAverages: Record<string, { avg: number; months: number }> = {}
+  for (const [budgetId, { total, months }] of aggregates) {
+    const count = months.size
+    if (count === 0) continue
+    monthlyAverages[budgetId] = { avg: total / count, months: count }
+  }
+
   return {
     budgets,
     spending,
@@ -198,5 +276,6 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
     currentPeriod,
     monthStart,
     monthEnd,
+    monthlyAverages,
   }
 })

@@ -394,16 +394,17 @@ export default function GidsPage() {
             howTo={{
               steps: [
                 "Keuze maken: tijdens de onboarding kies je of je wilt budgetteren. Je kunt dit later altijd aanpassen via De Kern → Budgetten",
-                "Template kiezen: selecteer Minimalistisch (5 categorieën, snel overzicht), Nibud (9 categorieën, beproefde indeling) of Uitgebreid (16 categorieën, maximaal detail)",
-                "Bedragen aanpassen: pas de voorgestelde bedragen per categorie aan op basis van je inkomen. TriFinity berekent automatisch suggesties",
-                "Doeltypes kiezen: vast bedrag per maand (bijv. €400), percentage van inkomen (bijv. 30%) of flexibel zonder limiet — zo past je plan bij jouw situatie",
-                "Markeer elke categorie als essentieel of niet-essentieel — dit beïnvloedt je FIRE-berekening direct",
+                "Openen: ga naar De Kern → Budgetten en klik rechtsboven op 'Budgetten aanpassen'. Eén modal bevat je hele plan: structuur, maandbedragen en templates",
+                "Template toepassen (optioneel): kies Minimalistisch, Nibud of Uitgebreid. Bedragen worden vooringevuld op basis van je nettoinkomen, je past ze aan vóór je bevestigt, en pas als je 'VERVANG' typt wordt je huidige plan vervangen vanaf deze maand",
+                "Handmatig opbouwen: per type (Inkomsten, Uitgaven, Sparen, Schulden, Archief) staat een knop + Hoofdbudget. Per hoofdbudget voeg je deelbudgets toe met de + naast de rij",
+                "Bedragen invullen: tik op het bedrag achter een deelbudget en typ je gewenste limiet voor deze maand. De 'Te verdelen'-balk onderaan toont live of alles gedekt is",
+                "Markeer essentieel: deelbudgets kun je later via de detailpagina markeren als essentieel — dit beïnvloedt je FIRE-berekening direct",
                 "Na transactie-import worden uitgaven automatisch gekoppeld via AI-categorisatie en frequentie-matching",
                 "Analyse: tik op een bedrag om de kassabon te openen — een gedetailleerde breakdown van alle transacties binnen dat budget. Vergelijk maand-op-maand met trendgrafieken",
                 "Bekijk je voortgang in boom-, donut- of sparkline-weergave en vergelijk maanden onderling om patronen te ontdekken",
                 "Favorieten: markeer een budget als favoriet (♥) en het verschijnt automatisch als widget op De Wil-pagina in 4 formaten (mini, quarter, half, full)",
               ],
-              tip: "Begin met het Minimalistisch-template als je nieuw bent. De Nibud-indeling is ideaal als je een beproefde structuur wilt. Verfijn later naar Uitgebreid als je meer detail wilt.",
+              tip: "Begin met Minimalistisch als je nieuw bent. Nibud is ideaal als je een beproefde structuur wilt. Verfijn later naar Uitgebreid als je meer detail wilt. Alle aanpassingen gaan via één knop: 'Budgetten aanpassen'.",
             }}
           />
 

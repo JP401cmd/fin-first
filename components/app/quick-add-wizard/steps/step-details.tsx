@@ -1,0 +1,548 @@
+'use client'
+
+import { useEffect, useId, useState } from 'react'
+import {
+  ASSET_DEFAULT_NAMES,
+  ASSET_QUICK_ADD_FIELD3,
+  ASSET_QUICK_ADD_LABELS,
+  type AssetField3Kind,
+  type AssetType,
+} from '@/lib/asset-data'
+import {
+  DEBT_DEFAULT_NAMES,
+  DEBT_QUICK_ADD_FIELD3,
+  DEBT_QUICK_ADD_LABELS,
+  type DebtField3Kind,
+  type DebtType,
+} from '@/lib/debt-data'
+import {
+  ASSET_NAME_SUGGESTIONS,
+  DEBT_NAME_SUGGESTIONS,
+} from '@/lib/quick-add/name-suggestions'
+import {
+  AssetQuickInputSchema,
+  DebtQuickInputSchema,
+} from '@/lib/quick-add/validation'
+import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
+import type { AssetDraftState, DebtDraftState } from '../wizard-reducer'
+
+/**
+ * Stap 3 — mini-form met maximaal 3 velden (naam, bedrag, type-specifiek
+ * veld). Defaults uit `ASSET_DEFAULT_NAMES` / `DEBT_DEFAULT_NAMES` worden
+ * automatisch ingevuld zodat de gebruiker in veel gevallen alleen het
+ * bedrag hoeft te typen. Suggesties komen via een native `<datalist>` —
+ * het simpelste patroon dat zowel keyboard als touch goed ondersteunt.
+ *
+ * De "Meer details"-link onder de save-knop is de ontsnappingsroute voor
+ * de ~10% power-users die direct het volledige formulier willen zien.
+ * De callback blijft optioneel zodat de initiële rollout dit kan
+ * uitstellen zonder de component-API te wijzigen.
+ */
+
+type AssetProps = {
+  intent: 'asset'
+  draft: AssetDraftState
+  onChange: (patch: Partial<AssetQuickInput>) => void
+  onSubmit: () => void
+  onOpenFullForm?: () => void
+  isSaving?: boolean
+  submitLabel?: string
+}
+
+type DebtProps = {
+  intent: 'debt'
+  draft: DebtDraftState
+  onChange: (patch: Partial<DebtQuickInput>) => void
+  onSubmit: () => void
+  onOpenFullForm?: () => void
+  isSaving?: boolean
+  submitLabel?: string
+}
+
+export type StepDetailsProps = AssetProps | DebtProps
+
+const PALETTE = {
+  asset: {
+    focusBorder: 'focus:border-[var(--color-kern-500)] focus:ring-[var(--color-kern-500)]',
+    saveBg: 'bg-[var(--color-kern-600)] hover:bg-[var(--color-kern-700)] active:bg-[var(--color-kern-800)]',
+  },
+  debt: {
+    focusBorder: 'focus:border-[var(--color-debt-500)] focus:ring-[var(--color-debt-500)]',
+    saveBg: 'bg-[var(--color-debt-600)] hover:bg-[var(--color-debt-700)] active:bg-[var(--color-debt-800)]',
+  },
+} as const
+
+type FieldErrors = {
+  name?: string
+  amount?: string
+  field3?: string
+}
+
+function getCurrentYear(): number {
+  return new Date().getFullYear()
+}
+
+/**
+ * Helper om string-invoer veilig naar number te parsen voor currency-
+ * en percentage-inputs. Lege string → `undefined` (geen waarde), zodat
+ * de reducer het veld "niet gezet" laat.
+ */
+function parseNumberInput(raw: string): number | undefined {
+  if (raw.trim().length === 0) return undefined
+  const normalised = raw.replace(',', '.')
+  const parsed = Number(normalised)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+export function StepDetails(props: StepDetailsProps) {
+  const isAsset = props.intent === 'asset'
+  const palette = PALETTE[props.intent]
+  const nameListId = useId()
+
+  // ── Meta per intent ─────────────────────────────────────────────
+  const typeKey = isAsset
+    ? (props.draft as AssetDraftState).asset_type
+    : (props.draft as DebtDraftState).debt_type
+
+  const defaultName = isAsset
+    ? ASSET_DEFAULT_NAMES[typeKey as AssetType]
+    : DEBT_DEFAULT_NAMES[typeKey as DebtType]
+
+  const typeLabel = isAsset
+    ? ASSET_QUICK_ADD_LABELS[typeKey as AssetType]
+    : DEBT_QUICK_ADD_LABELS[typeKey as DebtType]
+
+  const field3Config: AssetField3Kind | DebtField3Kind = isAsset
+    ? ASSET_QUICK_ADD_FIELD3[typeKey as AssetType]
+    : DEBT_QUICK_ADD_FIELD3[typeKey as DebtType]
+
+  const suggestions = isAsset
+    ? ASSET_NAME_SUGGESTIONS[typeKey as AssetType]
+    : DEBT_NAME_SUGGESTIONS[typeKey as DebtType]
+
+  const amountLabel = isAsset ? 'Huidige waarde' : 'Huidig saldo'
+
+  // ── Lokale state voor currency/number string-inputs ─────────────
+  //
+  // We houden de rauwe invoer als string bij zodat gebruikers "1200.5"
+  // kunnen typen zonder dat de cursor wegspringt. De genormaliseerde
+  // `number` propageert via `onChange(patch)` naar de reducer.
+  const draftName =
+    typeof props.draft.name === 'string' ? props.draft.name : defaultName ?? ''
+
+  const draftAmount =
+    isAsset
+      ? (props.draft as AssetDraftState).current_value
+      : (props.draft as DebtDraftState).current_balance
+
+  const [amountRaw, setAmountRaw] = useState<string>(
+    typeof draftAmount === 'number' ? String(draftAmount) : '',
+  )
+
+  // Field3 init — sommige types hebben een defaultValue (bv. credit_card
+  // → 14% rente), die prefillen we op de eerste render via een lazy init.
+  const [field3Raw, setField3Raw] = useState<string>(() => {
+    if (!field3Config) return ''
+    if (typeof props.draft.field3 === 'string') return props.draft.field3
+    if (typeof props.draft.field3 === 'number') return String(props.draft.field3)
+    if (field3Config.kind === 'year') {
+      return String(
+        (field3Config as Extract<DebtField3Kind, { kind: 'year' }>).defaultValue ??
+          getCurrentYear(),
+      )
+    }
+    if ('defaultValue' in field3Config && typeof field3Config.defaultValue === 'number') {
+      return String(field3Config.defaultValue)
+    }
+    return ''
+  })
+
+  // First-render: als er nog geen naam is, prefill met de default.
+  // `useEffect` i.p.v. `useMemo` omdat we hier een side effect triggeren
+  // (reducer-update via props). De lege dep-array is bedoeld: we willen
+  // alleen éénmalig prefillen bij de eerste mount per type-keuze.
+  useEffect(() => {
+    if (
+      !props.draft.name &&
+      typeof defaultName === 'string' &&
+      defaultName.length > 0
+    ) {
+      if (isAsset) {
+        ;(props as AssetProps).onChange({ name: defaultName })
+      } else {
+        ;(props as DebtProps).onChange({ name: defaultName })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Error state ─────────────────────────────────────────────────
+  //
+  // We bewaren geen volledige error-map in state — errors worden altijd
+  // per render opnieuw afgeleid uit de actuele draft via `validateAll()`.
+  // `touched` bepaalt alleen of we de error onder het veld mogen tónen
+  // (zodat de user niet meteen rood ziet bij de eerste keystroke).
+  const [touched, setTouched] = useState<{ [K in keyof FieldErrors]?: boolean }>({})
+
+  function validateAll(): FieldErrors {
+    const next: FieldErrors = {}
+    const nameValue = (draftName ?? '').trim()
+    const amountValue = typeof draftAmount === 'number' ? draftAmount : NaN
+
+    const schema = isAsset ? AssetQuickInputSchema : DebtQuickInputSchema
+
+    // Zod valideren met de lookup zoals die in de reducer zit — maar we
+    // willen per-veld errors en geen top-level. Daarom valideren we ook
+    // handmatig en gebruiken Zod alleen voor het amount-veld.
+    if (nameValue.length === 0) next.name = 'Naam is verplicht'
+
+    if (!Number.isFinite(amountValue)) {
+      next.amount = 'Voer een geldig bedrag in'
+    } else {
+      const probe = isAsset
+        ? { asset_type: typeKey, name: 'x', current_value: amountValue }
+        : { debt_type: typeKey, name: 'x', current_balance: amountValue }
+      const result = schema.safeParse(probe)
+      if (!result.success) {
+        const amountIssue = result.error.issues.find((i) =>
+          i.path.includes(isAsset ? 'current_value' : 'current_balance'),
+        )
+        if (amountIssue) next.amount = amountIssue.message
+      }
+    }
+
+    if (field3Config?.kind === 'year') {
+      const year = parseNumberInput(field3Raw)
+      if (year != null && (year < 1900 || year > 2100)) {
+        next.field3 = 'Vul een geldig jaartal in'
+      }
+    }
+    if (field3Config?.kind === 'percentage') {
+      const pct = parseNumberInput(field3Raw)
+      if (pct != null && pct < 0) next.field3 = 'Percentage mag niet negatief zijn'
+    }
+    if (field3Config?.kind === 'currency') {
+      const value = parseNumberInput(field3Raw)
+      if (value != null && value < 0) next.field3 = 'Bedrag mag niet negatief zijn'
+    }
+
+    return next
+  }
+
+  const currentErrors = validateAll()
+  const canSubmit = Object.keys(currentErrors).length === 0 && !props.isSaving
+
+  // ── Handlers ────────────────────────────────────────────────────
+
+  function handleNameChange(raw: string) {
+    if (isAsset) {
+      ;(props as AssetProps).onChange({ name: raw })
+    } else {
+      ;(props as DebtProps).onChange({ name: raw })
+    }
+    // `currentErrors` wordt per render opnieuw berekend — de error verdwijnt
+    // vanzelf zodra de input valid wordt. Geen expliciete setter nodig.
+  }
+
+  function handleAmountChange(raw: string) {
+    setAmountRaw(raw)
+    const parsed = parseNumberInput(raw)
+    if (isAsset) {
+      ;(props as AssetProps).onChange({ current_value: parsed as number })
+    } else {
+      ;(props as DebtProps).onChange({ current_balance: parsed as number })
+    }
+  }
+
+  function handleField3Change(raw: string) {
+    setField3Raw(raw)
+    if (!field3Config) return
+    if (field3Config.kind === 'text' || field3Config.kind === 'date') {
+      if (isAsset) {
+        ;(props as AssetProps).onChange({ field3: raw })
+      } else {
+        ;(props as DebtProps).onChange({ field3: raw })
+      }
+      return
+    }
+    const parsed = parseNumberInput(raw)
+    if (isAsset) {
+      ;(props as AssetProps).onChange({ field3: parsed ?? null })
+    } else {
+      ;(props as DebtProps).onChange({ field3: parsed ?? null })
+    }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setTouched({ name: true, amount: true, field3: true })
+    const nextErrors = validateAll()
+    if (Object.keys(nextErrors).length === 0) {
+      props.onSubmit()
+    }
+  }
+
+  const showNameError = touched.name && currentErrors.name
+  const showAmountError = touched.amount && currentErrors.amount
+  const showField3Error = touched.field3 && currentErrors.field3
+
+  const submitLabel = props.submitLabel ?? 'Toevoegen'
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      {/* Naam-veld met native datalist voor suggesties. */}
+      <div>
+        <label
+          htmlFor={`${nameListId}-name`}
+          className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
+        >
+          Naam
+        </label>
+        <input
+          id={`${nameListId}-name`}
+          type="text"
+          autoComplete="off"
+          list={suggestions && suggestions.length > 0 ? `${nameListId}-suggestions` : undefined}
+          value={draftName}
+          placeholder={defaultName ?? `Bijv. ${typeLabel.toLowerCase()}`}
+          onChange={(e) => handleNameChange(e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+          aria-invalid={Boolean(showNameError)}
+          aria-describedby={showNameError ? `${nameListId}-name-error` : undefined}
+          className={`w-full border bg-[var(--paper)] px-3 py-2.5 text-base text-[var(--ink)] outline-none transition-colors ${
+            showNameError
+              ? 'border-[var(--negative)] focus:border-[var(--negative)] focus:ring-1 focus:ring-[var(--negative)]'
+              : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
+          }`}
+        />
+        {suggestions && suggestions.length > 0 && (
+          <datalist id={`${nameListId}-suggestions`}>
+            {suggestions.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        )}
+        {showNameError && (
+          <p
+            id={`${nameListId}-name-error`}
+            role="alert"
+            className="mt-1 text-[11px] text-[var(--negative)]"
+          >
+            {currentErrors.name}
+          </p>
+        )}
+      </div>
+
+      {/* Bedrag — altijd currency met EUR prefix. */}
+      <div>
+        <label
+          htmlFor={`${nameListId}-amount`}
+          className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
+        >
+          {amountLabel}
+        </label>
+        <div className="relative">
+          <span
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm tabular-nums text-[var(--ink-4)]"
+            aria-hidden="true"
+          >
+            &euro;
+          </span>
+          <input
+            id={`${nameListId}-amount`}
+            type="number"
+            inputMode="decimal"
+            step={100}
+            min={0}
+            value={amountRaw}
+            onChange={(e) => handleAmountChange(e.target.value)}
+            onBlur={() => setTouched((t) => ({ ...t, amount: true }))}
+            aria-invalid={Boolean(showAmountError)}
+            aria-describedby={showAmountError ? `${nameListId}-amount-error` : undefined}
+            className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${
+              showAmountError
+                ? 'border-[var(--negative)] focus:border-[var(--negative)] focus:ring-1 focus:ring-[var(--negative)]'
+                : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
+            }`}
+          />
+        </div>
+        {showAmountError && (
+          <p
+            id={`${nameListId}-amount-error`}
+            role="alert"
+            className="mt-1 text-[11px] text-[var(--negative)]"
+          >
+            {currentErrors.amount}
+          </p>
+        )}
+      </div>
+
+      {/* Optioneel veld 3 — type-afhankelijk. */}
+      {field3Config && (
+        <Field3Input
+          id={`${nameListId}-field3`}
+          config={field3Config}
+          value={field3Raw}
+          onChange={handleField3Change}
+          onBlur={() => setTouched((t) => ({ ...t, field3: true }))}
+          error={showField3Error ? currentErrors.field3 : undefined}
+          palette={palette}
+        />
+      )}
+
+      {/* Hint */}
+      <p className="text-center text-[11px] text-[var(--ink-4)] leading-relaxed">
+        Alleen het minimum — je kunt de rest later aanvullen.
+      </p>
+
+      {/* Save-knop + escape-hatch naar full form. */}
+      <div className="space-y-2 pt-1">
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className={`inline-flex min-h-[44px] w-full items-center justify-center px-4 py-2.5 text-sm font-medium text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${palette.saveBg} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]`}
+        >
+          {props.isSaving ? 'Opslaan…' : submitLabel}
+        </button>
+
+        {props.onOpenFullForm && (
+          <button
+            type="button"
+            onClick={props.onOpenFullForm}
+            className="block w-full text-center text-xs text-[var(--ink-3)] underline-offset-4 hover:text-[var(--ink)] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+          >
+            Meer velden invullen? Open het volledige formulier →
+          </button>
+        )}
+      </div>
+    </form>
+  )
+}
+
+// ── Veld-3 rendering ──────────────────────────────────────────────
+
+interface Field3InputProps {
+  id: string
+  config: AssetField3Kind | DebtField3Kind
+  value: string
+  onChange: (raw: string) => void
+  onBlur: () => void
+  error: string | undefined
+  palette: (typeof PALETTE)['asset'] | (typeof PALETTE)['debt']
+}
+
+function Field3Input({
+  id,
+  config,
+  value,
+  onChange,
+  onBlur,
+  error,
+  palette,
+}: Field3InputProps) {
+  if (!config) return null
+
+  const borderClass = error
+    ? 'border-[var(--negative)] focus:border-[var(--negative)] focus:ring-1 focus:ring-[var(--negative)]'
+    : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
+
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
+      >
+        {config.label}
+      </label>
+
+      {config.kind === 'text' && (
+        <input
+          id={id}
+          type="text"
+          value={value}
+          placeholder={
+            'placeholder' in config && config.placeholder ? config.placeholder : ''
+          }
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          className={`w-full border bg-[var(--paper)] px-3 py-2.5 text-base text-[var(--ink)] outline-none transition-colors ${borderClass}`}
+        />
+      )}
+
+      {config.kind === 'currency' && (
+        <div className="relative">
+          <span
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm tabular-nums text-[var(--ink-4)]"
+            aria-hidden="true"
+          >
+            &euro;
+          </span>
+          <input
+            id={id}
+            type="number"
+            inputMode="decimal"
+            step={100}
+            min={0}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={onBlur}
+            className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${borderClass}`}
+          />
+        </div>
+      )}
+
+      {config.kind === 'percentage' && (
+        <div className="relative">
+          <input
+            id={id}
+            type="number"
+            inputMode="decimal"
+            step={0.1}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={onBlur}
+            className={`w-full border bg-[var(--paper)] py-2.5 pl-3 pr-8 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${borderClass}`}
+          />
+          <span
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]"
+            aria-hidden="true"
+          >
+            %
+          </span>
+        </div>
+      )}
+
+      {config.kind === 'date' && (
+        <input
+          id={id}
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          className={`w-full border bg-[var(--paper)] px-3 py-2.5 text-base text-[var(--ink)] outline-none transition-colors ${borderClass}`}
+        />
+      )}
+
+      {config.kind === 'year' && (
+        <input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          step={1}
+          min={1900}
+          max={2100}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          className={`w-full border bg-[var(--paper)] px-3 py-2.5 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${borderClass}`}
+        />
+      )}
+
+      {error && (
+        <p role="alert" className="mt-1 text-[11px] text-[var(--negative)]">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}

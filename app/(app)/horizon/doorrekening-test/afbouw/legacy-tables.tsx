@@ -2,19 +2,15 @@
 
 import { useMemo, useState } from 'react'
 import { formatCurrency } from '@/lib/format'
-import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '@/lib/constants'
+import { NL_AOW_AGE, NL_SWR } from '@/lib/constants'
+import {
+  computeTableSchedule,
+  type TableScheduleRow,
+} from '../calc/afbouw-table-schedules'
 
-// ── Types ────────────────────────────────────────────────────
+// ── Types & Constants ──────────────────────────────────────────
 
-interface WithdrawalRow {
-  year: number
-  age: number
-  startBalance: number
-  withdrawal: number
-  aowIncome: number
-  growth: number
-  endBalance: number
-}
+type WithdrawalRow = TableScheduleRow
 
 interface BucketRow {
   year: number
@@ -26,12 +22,8 @@ interface BucketRow {
   withdrawal: number
 }
 
-// ── Constants ────────────────────────────────────────────────
-
 const BOND_RETURN = 0.02
 const GUARDRAIL_BAND = 0.20
-
-// ── Sampling helper ─────────────────────────────────────────
 
 function sampleRows<T extends { year: number }>(rows: T[]): T[] {
   if (rows.length <= 20) return rows
@@ -43,235 +35,16 @@ function sampleRows<T extends { year: number }>(rows: T[]): T[] {
   return result
 }
 
-// ── Schedule computation helpers ────────────────────────────
-
-/** SWR-based withdrawal: fixed annual amount = (portfolio - PV(legacy)) x SWR. */
-function computeLegacySwrSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-  legacyAmount: number,
-): WithdrawalRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-  const pvLegacy = legacyAmount / Math.pow(1 + realReturn, totalYears)
-  const baseWithdrawal = Math.max(0, (startPortfolio - pvLegacy) * NL_SWR)
-
-  const schedule: WithdrawalRow[] = []
-  let balance = startPortfolio
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const startBalance = balance
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-    const neededFromPortfolio = Math.max(0, baseWithdrawal - aow)
-    const withdrawal = Math.min(neededFromPortfolio, balance)
-    const remaining = balance - withdrawal
-    const growth = remaining * realReturn
-    const endBalance = remaining + growth
-
-    schedule.push({
-      year: y + 1, age,
-      startBalance: Math.round(startBalance),
-      withdrawal: Math.round(withdrawal),
-      aowIncome: Math.round(aow),
-      growth: Math.round(growth),
-      endBalance: Math.max(0, Math.round(endBalance)),
-    })
-    balance = Math.max(0, endBalance)
-    if (balance <= 0) break
+function toBucketRow(r: TableScheduleRow): BucketRow {
+  return {
+    year: r.year,
+    age: r.age,
+    cash: r.bucketCash ?? 0,
+    bonds: r.bucketBonds ?? 0,
+    equity: r.bucketEquity ?? 0,
+    total: r.startBalance,
+    withdrawal: r.withdrawal,
   }
-  return schedule
-}
-
-/** Guardrails: variable withdrawal with +/- 20% bands around base SWR, preserving legacy PV. */
-function computeLegacyGuardrailsSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-  legacyAmount: number,
-): WithdrawalRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-  const pvLegacy = legacyAmount / Math.pow(1 + realReturn, totalYears)
-  const initialWithdrawal = Math.max(0, (startPortfolio - pvLegacy) * NL_SWR)
-  const ceiling = NL_SWR * (1 + GUARDRAIL_BAND)
-  const floor = NL_SWR * (1 - GUARDRAIL_BAND)
-
-  const schedule: WithdrawalRow[] = []
-  let balance = startPortfolio
-  let currentWithdrawal = initialWithdrawal
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const startBalance = balance
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-
-    // Apply guardrail check: ratio of withdrawal to current balance
-    if (balance > 0) {
-      const ratio = currentWithdrawal / balance
-      if (ratio > ceiling) {
-        currentWithdrawal = ceiling * balance
-      } else if (ratio < floor) {
-        currentWithdrawal = floor * balance
-      }
-    }
-
-    const neededFromPortfolio = Math.max(0, currentWithdrawal - aow)
-    const withdrawal = Math.min(neededFromPortfolio, balance)
-    const remaining = balance - withdrawal
-    const growth = remaining * realReturn
-    const endBalance = remaining + growth
-
-    schedule.push({
-      year: y + 1, age,
-      startBalance: Math.round(startBalance),
-      withdrawal: Math.round(withdrawal),
-      aowIncome: Math.round(aow),
-      growth: Math.round(growth),
-      endBalance: Math.max(0, Math.round(endBalance)),
-    })
-    balance = Math.max(0, endBalance)
-    if (balance <= 0) break
-  }
-  return schedule
-}
-
-/** VPW: each year withdraw (portfolio - PV_remaining_legacy) / remaining_years. */
-function computeLegacyVpwSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-  legacyAmount: number,
-): WithdrawalRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-
-  const schedule: WithdrawalRow[] = []
-  let balance = startPortfolio
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const startBalance = balance
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-    const remainingYears = Math.max(1, totalYears - y)
-
-    // PV of legacy decreases as we get closer to end age
-    const pvLegacyNow = legacyAmount / Math.pow(1 + realReturn, remainingYears)
-    const vpwWithdrawal = Math.max(0, (balance - pvLegacyNow) / remainingYears)
-    const neededFromPortfolio = Math.max(0, vpwWithdrawal - aow)
-    const withdrawal = Math.min(neededFromPortfolio, balance)
-    const remaining = balance - withdrawal
-    const growth = remaining * realReturn
-    const endBalance = remaining + growth
-
-    schedule.push({
-      year: y + 1, age,
-      startBalance: Math.round(startBalance),
-      withdrawal: Math.round(withdrawal),
-      aowIncome: Math.round(aow),
-      growth: Math.round(growth),
-      endBalance: Math.max(0, Math.round(endBalance)),
-    })
-    balance = Math.max(0, endBalance)
-    if (balance <= 0) break
-  }
-  return schedule
-}
-
-/** Bucket strategy: 3 buckets with legacy buffer in equity that is never touched. */
-function computeLegacyBucketSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  yearlyExpenses: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-  legacyBuffer: number,
-): BucketRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-
-  const cashTarget = yearlyExpenses * 2
-  const bondTarget = yearlyExpenses * 5
-
-  let cash = Math.min(cashTarget, startPortfolio)
-  let bonds = Math.min(bondTarget, Math.max(0, startPortfolio - cash))
-  let equity = Math.max(0, startPortfolio - cash - bonds)
-
-  const schedule: BucketRow[] = []
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-    const neededFromPortfolio = Math.max(0, yearlyExpenses - aow)
-    const total = cash + bonds + equity
-    const withdrawal = Math.min(neededFromPortfolio, total)
-
-    schedule.push({
-      year: y + 1, age,
-      cash: Math.round(cash),
-      bonds: Math.round(bonds),
-      equity: Math.round(equity),
-      total: Math.round(total),
-      withdrawal: Math.round(withdrawal),
-    })
-
-    // Withdraw from cash first, then bonds, then available equity (above buffer)
-    let toWithdraw = withdrawal
-    const fromCash = Math.min(toWithdraw, cash)
-    cash -= fromCash
-    toWithdraw -= fromCash
-
-    const fromBonds = Math.min(toWithdraw, bonds)
-    bonds -= fromBonds
-    toWithdraw -= fromBonds
-
-    const availableEquity = Math.max(0, equity - legacyBuffer)
-    const fromEquity = Math.min(toWithdraw, availableEquity)
-    equity -= fromEquity
-
-    // Apply returns per bucket
-    bonds = bonds * (1 + BOND_RETURN)
-    equity = equity * (1 + realReturn)
-
-    // Refill cascade: equity -> bonds -> cash
-    const bondShortfall = Math.max(0, bondTarget - bonds)
-    const equityForRefill = Math.max(0, equity - legacyBuffer)
-    const bondRefill = Math.min(bondShortfall, equityForRefill)
-    bonds += bondRefill
-    equity -= bondRefill
-
-    const cashShortfall = Math.max(0, cashTarget - cash)
-    const cashRefill = Math.min(cashShortfall, bonds)
-    cash += cashRefill
-    bonds -= cashRefill
-
-    if (cash + bonds + equity <= 0) break
-  }
-  return schedule
 }
 
 // ── Sub-table: standard withdrawal columns ──────────────────
@@ -524,25 +297,36 @@ export function LegacyStrategyTables({
   const availableForWithdrawal = Math.max(0, startPortfolio - pvLegacy)
   const swrAnnual = availableForWithdrawal * NL_SWR
 
-  // ── Compute all four schedules ──
-  const swrRows = useMemo(() =>
-    computeLegacySwrSchedule(startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner, legacyAmount),
-    [startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner, legacyAmount],
+  const tableInputs = useMemo(() => ({
+    startPortfolio,
+    retirementAge,
+    endAge,
+    yearlyExpenses,
+    grossReturn,
+    inflationRate,
+    hasPartner,
+    aowAge: NL_AOW_AGE,
+    legacyAmount,
+  }), [startPortfolio, retirementAge, endAge, yearlyExpenses, grossReturn, inflationRate, hasPartner, legacyAmount])
+
+  const swrRows = useMemo<WithdrawalRow[]>(
+    () => computeTableSchedule('legacy', 'swr', tableInputs),
+    [tableInputs],
   )
 
-  const guardrailsRows = useMemo(() =>
-    computeLegacyGuardrailsSchedule(startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner, legacyAmount),
-    [startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner, legacyAmount],
+  const guardrailsRows = useMemo<WithdrawalRow[]>(
+    () => computeTableSchedule('legacy', 'guardrails', tableInputs),
+    [tableInputs],
   )
 
-  const vpwRows = useMemo(() =>
-    computeLegacyVpwSchedule(startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner, legacyAmount),
-    [startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner, legacyAmount],
+  const vpwRows = useMemo<WithdrawalRow[]>(
+    () => computeTableSchedule('legacy', 'vpw', tableInputs),
+    [tableInputs],
   )
 
-  const bucketRows = useMemo(() =>
-    computeLegacyBucketSchedule(startPortfolio, retirementAge, endAge, yearlyExpenses, grossReturn, inflationRate, hasPartner, legacyAmount),
-    [startPortfolio, retirementAge, endAge, yearlyExpenses, grossReturn, inflationRate, hasPartner, legacyAmount],
+  const bucketRows = useMemo<BucketRow[]>(
+    () => computeTableSchedule('legacy', 'bucket', tableInputs).map(toBucketRow),
+    [tableInputs],
   )
 
   return (

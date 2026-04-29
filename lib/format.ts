@@ -33,6 +33,41 @@ export function formatCurrencyDecimals(value: number): string {
 }
 
 /**
+ * Fixed placeholder for masked monetary amounts.
+ *
+ * Six U+2022 BULLET characters — render with `font-mono tabular-nums` so the
+ * width matches an unmasked currency string and there is no layout shift when
+ * the user flips the privacy toggle. The glyph count is deliberate: enough to
+ * obscure any realistic balance, short enough to fit in compact widget cells.
+ */
+export const MASKED_AMOUNT_PLACEHOLDER = '\u2022\u2022\u2022\u2022\u2022\u2022'
+
+/**
+ * Privacy-aware currency formatter.
+ *
+ * Returns the masked bullet-placeholder when `masked === true`, otherwise
+ * delegates to the standard `formatCurrency` so all call sites share a single
+ * nl-NL formatting path. Callers are expected to render the result inside an
+ * element with `font-mono tabular-nums` to preserve column alignment across
+ * masked/unmasked states.
+ *
+ * Design-bible rule ("Trust & veiligheid"):
+ *   Bedragen worden `••••••` in DM Mono — status per device.
+ *
+ * @param value - EUR amount to format (null/undefined/NaN safe via formatCurrency)
+ * @param masked - When true, return the placeholder string
+ * @returns Either the masked placeholder or a fully formatted EUR string
+ */
+export function formatMaskedCurrency(
+  value: number | null | undefined,
+  masked: boolean,
+): string {
+  if (masked) return MASKED_AMOUNT_PLACEHOLDER
+  // formatCurrency's safeNumber guard handles null/undefined/NaN internally.
+  return formatCurrency((value ?? 0) as number)
+}
+
+/**
  * Freedom time breakdown from a EUR amount and daily expenses.
  */
 export interface FreedomTimeBreakdown {

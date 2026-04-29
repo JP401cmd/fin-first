@@ -2,7 +2,8 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { formatCurrency, formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { DashboardData } from './widget-renderer'
 import { Landmark } from 'lucide-react'
 
@@ -38,6 +39,8 @@ interface Props {
 
 export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Props) {
   const { totalAssets, monthlyContributions, monthlyExpenses, assetsByType, totalPurchaseValue } = data
+  // Privacy-toggle proof-of-concept — mini hero amount respects the masking flag.
+  const { masked } = useMaskedAmounts()
 
   if (totalAssets === 0 && assetsByType.length === 0) {
     return (
@@ -51,7 +54,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
     return (
       <WidgetShell module="kern" size="mini" kicker="Vermogen" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {formatCurrency(totalAssets)}
+          {formatMaskedCurrency(totalAssets, masked)}
         </p>
       </WidgetShell>
     )

@@ -16,6 +16,8 @@ export type NetWorthSnapshot = {
   sovereignty_level?: number | null
   savings_rate?: number | null
   resilience_score?: number | null
+  /** FIRE-doelbedrag zoals door Horizon's unified projection berekend en weggeschreven. */
+  fire_portfolio_required?: number | null
 }
 
 /**

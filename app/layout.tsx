@@ -63,6 +63,7 @@ export default function RootLayout({
     <html lang="nl">
       <body
         className={`${playfair.variable} ${sourceSerif.variable} ${dmMono.variable} ${inter.variable} ${andadaPro.variable} antialiased`}
+        suppressHydrationWarning
       >
         {children}
         <SpeedInsights />

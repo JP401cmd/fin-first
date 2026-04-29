@@ -30,14 +30,15 @@ import {
   RETIREMENT_PROVIDER_LABELS,
   projectPortfolio,
 } from '@/lib/asset-data'
-import { FullScreenModal } from '@/components/app/full-screen-modal'
-import { CashAccountView } from '@/components/app/cash-account-view'
+import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
+import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
 import type { AssetsPageData } from '@/lib/assets-data-loader'
 
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
 
 export default function AssetsPage({ initialAssetId, initialData }: { initialAssetId?: string; initialData?: AssetsPageData } = {}) {
   const router = useRouter()
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [assets, setAssets] = useState<Asset[]>(() => {
     if (!initialData) return []
     const rawAssets = initialData.assets as unknown as Asset[]
@@ -81,8 +82,6 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   }
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>(initialData ? initialData.valuations as unknown as Record<string, Valuation[]> : {})
   const [dailyExpenses, setDailyExpenses] = useState(initialData?.dailyExpenses ?? 0)
-  const [showCashModal, setShowCashModal] = useState(false)
-  const [cashAccountId, setCashAccountId] = useState<string | undefined>(undefined)
   const [budgetingActive, setBudgetingActive] = useState(initialData?.budgetingActive ?? true)
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
@@ -315,15 +314,12 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   }
 
   function handleAssetClick(asset: Asset) {
-    // Cash with active budget tracking → open transaction view
-    // Cash without tracking (or budgetteren off) → open as regular asset
+    // Cash assets with active budget tracking deep-link to the cash-categorie
+    // pagina (which exposes the Budgetteren tab). Other assets keep the
+    // existing detail-modal — registratie zonder verdieping is fundament.
     if (asset.asset_type === 'cash' && budgetingActive && asset.has_budget_tracking) {
-      const linkedBA = linkedBankAccounts.get(asset.id)
-      if (linkedBA) {
-        setCashAccountId(linkedBA.id)
-        setShowCashModal(true)
-        return
-      }
+      router.push(`/core/assets/cash?asset=${asset.id}`)
+      return
     }
     openAssetModal(asset)
   }
@@ -357,7 +353,19 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
       <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-positive">Bezittingen</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-positive">Bezittingen</h1>
+              <button
+                type="button"
+                onClick={() => setQuickAddOpen(true)}
+                aria-label="Bezitting toevoegen"
+                title="Bezitting toevoegen"
+                className="inline-flex min-h-[32px] items-center gap-1.5 border border-kern-200 bg-[var(--color-kern-50)] px-2.5 py-1 text-xs font-medium text-kern-700 transition-colors hover:bg-kern-100 hover:text-kern-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
+                Bezitting
+              </button>
+            </div>
             <p className="mt-1 text-sm text-[var(--ink-3)]">
               {activeAssets.length} bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
             </p>
@@ -373,13 +381,6 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
               <RefreshCw className="h-4 w-4" />
               Herwaarderen
             </Link>
-            <button
-              onClick={() => { setEditAsset(null); setShowForm(true) }}
-              className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
-            >
-              <Plus className="h-4 w-4" />
-              Asset toevoegen
-            </button>
           </div>
         </div>
 
@@ -533,18 +534,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
       {/* Grouped asset list */}
       <section className="mt-3 sm:mt-6 space-y-1">
         {activeAssets.length === 0 && (
-          <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
-            <TrendingUp className="mx-auto h-8 w-8 text-kern-400" />
-            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Nog geen bezittingen toegevoegd</p>
-            <p className="mt-1 text-xs text-[var(--ink-3)]">Voeg je eerste bezitting toe om je vermogen te volgen.</p>
-            <button
-              onClick={() => { setEditAsset(null); setShowForm(true) }}
-              className="mt-4 inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
-            >
-              <Plus className="h-4 w-4" />
-              Bezitting toevoegen
-            </button>
-          </div>
+          <QuickAddEmptyState intent="asset" onAdd={() => setQuickAddOpen(true)} />
         )}
         {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
           const group = byType[type]
@@ -555,16 +545,18 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
 
           return (
             <div key={type}>
-              {/* Group header */}
+              {/* Group header — klikbaar bij cash zodat gebruikers naar de
+                  categorie-pagina (incl. Budgetteren tab) navigeren. Voor
+                  andere types blijft het een statische kicker. */}
               <div className="flex items-center gap-2 pt-4 pb-1.5">
                 <span style={{ color: groupColor }}><BudgetIcon name={groupIcon} className="h-4 w-4" /></span>
-                {isCash && budgetingActive && group.assets.some(a => linkedBankAccounts.has(a.id)) ? (
-                  <button
-                    onClick={() => setShowCashModal(true)}
-                    className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] hover:text-kern-600 transition-colors cursor-pointer"
+                {isCash ? (
+                  <Link
+                    href="/core/assets/cash"
+                    className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] hover:text-kern-600 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
                   >
                     {ASSET_TYPE_LABELS[type]}
-                  </button>
+                  </Link>
                 ) : (
                   <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
                     {ASSET_TYPE_LABELS[type]}
@@ -801,27 +793,19 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         />
       )}
 
-      {/* Combined cash view modal */}
-      <FullScreenModal
-        open={showCashModal}
-        onClose={() => { setShowCashModal(false); setCashAccountId(undefined) }}
-        title="Cash"
-        href="/core/cash"
-      >
-        <CashAccountView
-          key={cashAccountId ?? 'combined'}
-          embedded
-          accountId={cashAccountId}
-          onNavigateToAccount={(id) => setCashAccountId(id)}
-        />
-      </FullScreenModal>
+      <QuickAddWizard
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        initialIntent="asset"
+        onSaved={() => router.refresh()}
+      />
     </div>
   )
 }
 
 // ── Asset detail modal ───────────────────────────────────────
 
-function AssetDetailModal({
+export function AssetDetailModal({
   asset,
   valuations,
   mortgage,
@@ -2174,7 +2158,7 @@ function ProjectionChart({
 
 // ── Asset form modal ─────────────────────────────────────────
 
-function AssetForm({
+export function AssetForm({
   asset,
   defaultType,
   linkedBankAccounts,
@@ -3115,7 +3099,7 @@ function AssetForm({
 
 // ── Shared types & components for valuations ─────────────────
 
-type Valuation = {
+export type Valuation = {
   id: string
   user_id: string
   entity_type: string
@@ -3126,7 +3110,7 @@ type Valuation = {
   created_at: string
 }
 
-function ValuationModal({
+export function ValuationModal({
   entityId,
   entityType,
   entityName,

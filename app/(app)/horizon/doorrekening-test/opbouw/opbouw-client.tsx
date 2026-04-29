@@ -9,90 +9,36 @@ import type { FireParams } from '@/lib/fire-params'
 import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import { computeLifeEventNetImpact, type LifeEvent } from '@/lib/horizon-data'
-
-// Heffingsvrij vermogen 2026 (single / partner)
-const HEFFINGSVRIJ_SINGLE = 59_357
-const HEFFINGSVRIJ_PARTNER = 118_714
+import { SettingsBanner } from '../settings-banner'
+import { useDoorrekeningSettings } from '../settings-context'
+import { useDoorrekeningSim } from '../use-doorrekening-sim'
+import { CrossCheckPanel } from '@/components/app/doorrekening/cross-check-panel'
+import type { HybridProjectionInputs } from '../calc/hybrid-projection'
+import type { AfbouwDistributionStrategy, WithdrawalStrategy as AfbouwWithdrawalStrategy } from '../calc/afbouw-projection'
+import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import {
+  projectAssetYearly,
+  projectDebtYearly,
+  simulateAssetsWithEvents,
+  computeBox3Tax,
+  computeAssetMonthly,
+  computeAmortization,
+  type YearRow,
+  type AmortizationRow,
+  type AllocationStrategy,
+  type EventAssetAllocation,
+} from '../calc/opbouw-projection'
+// SavingsRateTable + SavingsProjectionTable verhuisd naar gedeelde file
+// in Fase G4 zodat overzicht + year-details-sheet ze kunnen hergebruiken
+// zonder dit bestand te importeren.
+import {
+  SavingsRateTable,
+  SavingsProjectionTable,
+} from '@/components/app/doorrekening/savings-tables'
 
 // ── Projection helpers ────────────────────────────────────────
 
 const DEFAULT_PROJECTION_YEARS = 30
-
-interface YearRow {
-  year: number
-  value: number
-  growth: number
-  contribution: number
-}
-
-/**
- * Project an asset yearly, optionally stopping monthly contributions after
- * the crossover month (kruispunt). Returns continue after crossover.
- */
-function projectAssetYearly(asset: Asset, years: number, crossoverMonth?: number | null): YearRow[] {
-  const monthlyRate = Number(asset.expected_return) / 100 / 12
-  const monthlyContrib = Number(asset.monthly_contribution)
-  const totalMonths = years * 12
-  let value = Number(asset.current_value)
-
-  // Month-by-month simulation with crossover-aware contributions
-  const monthlyValues: number[] = []
-  for (let m = 1; m <= totalMonths; m++) {
-    const growth = value * monthlyRate
-    // Stop contributions after crossover month (if set), but keep returns
-    const contrib = (crossoverMonth != null && m > crossoverMonth) ? 0 : monthlyContrib
-    value = Math.max(0, value + growth + contrib)
-    monthlyValues.push(value)
-  }
-
-  const rows: YearRow[] = []
-  for (let y = 1; y <= years; y++) {
-    const idx = y * 12 - 1
-    const prevIdx = (y - 1) * 12 - 1
-    const prev = prevIdx >= 0 ? monthlyValues[prevIdx] : Number(asset.current_value)
-    const curr = monthlyValues[idx] ?? prev
-    // Sum actual contributions for this year
-    let yearContrib = 0
-    for (let m = (y - 1) * 12 + 1; m <= y * 12; m++) {
-      if (crossoverMonth != null && m > crossoverMonth) continue
-      yearContrib += monthlyContrib
-    }
-    rows.push({
-      year: y,
-      value: Math.round(curr),
-      growth: Math.round(curr - prev - yearContrib),
-      contribution: Math.round(yearContrib),
-    })
-  }
-  return rows
-}
-
-function projectDebtYearly(debt: Debt, years: number): YearRow[] {
-  const monthlyRate = Number(debt.interest_rate) / 100 / 12
-  const monthly = Number(debt.monthly_payment)
-  let balance = Number(debt.current_balance)
-  const rows: YearRow[] = []
-
-  for (let y = 1; y <= years; y++) {
-    let yearInterest = 0
-    let yearPayment = 0
-    for (let m = 0; m < 12; m++) {
-      if (balance <= 0) break
-      const interest = balance * monthlyRate
-      yearInterest += interest
-      const payment = Math.min(monthly, balance + interest)
-      yearPayment += payment
-      balance = Math.max(0, balance + interest - payment)
-    }
-    rows.push({
-      year: y,
-      value: Math.round(balance),
-      growth: Math.round(yearInterest),
-      contribution: Math.round(-yearPayment),
-    })
-  }
-  return rows
-}
 
 // ── Grouped types ────────────────────────────────────────────
 
@@ -114,242 +60,6 @@ function groupDebtsByType(debts: Debt[]) {
     groups.set(d.debt_type, list)
   }
   return groups
-}
-
-// ── Box 3 belasting berekening ───────────────────────────────
-
-/**
- * Bereken Box 3 belasting op basis van netto vermogen (peildatum 1 januari).
- * Fictief rendement × tarief, na aftrek heffingsvrij vermogen.
- */
-function computeBox3Tax(netWorth: number, hasPartner: boolean): number {
-  const heffingsvrij = hasPartner ? HEFFINGSVRIJ_PARTNER : HEFFINGSVRIJ_SINGLE
-  // Grondslag = netto vermogen minus heffingsvrij, minimaal 0
-  const grondslag = Math.max(0, netWorth - heffingsvrij)
-  // Fictief rendement over de grondslag
-  const fictief = grondslag * NL_FICTIEF_BELEGGINGEN
-  // Belasting = fictief rendement × tarief
-  return Math.round(fictief * BOX3_TARIEF)
-}
-
-
-// ── Withdrawal strategy for life event impacts (features #665, #666) ────
-
-type AllocationStrategy = 'spreiden' | 'cash_first' | 'hoogste_rendement'
-
-/**
- * Apply a withdrawal from assets using the chosen strategy.
- * Mutates the `values` array in-place. Assets can never go below 0 —
- * any remainder cascades to the next asset.
- */
-function applyWithdrawal(
-  values: number[],
-  assets: Asset[],
-  amount: number,
-  strategy: AllocationStrategy,
-) {
-  let remaining = amount
-
-  if (strategy === 'spreiden') {
-    // Proportional: withdraw from each asset by its value share
-    const total = values.reduce((s, v) => s + v, 0)
-    if (total <= 0) return
-    for (let i = 0; i < values.length; i++) {
-      const share = values[i] / total
-      const withdraw = Math.min(values[i], remaining * share)
-      values[i] -= withdraw
-      remaining -= withdraw
-    }
-    // Handle rounding remainder — cascade through assets
-    if (remaining > 0.01) {
-      for (let i = 0; i < values.length; i++) {
-        const withdraw = Math.min(values[i], remaining)
-        values[i] -= withdraw
-        remaining -= withdraw
-        if (remaining <= 0.01) break
-      }
-    }
-  } else if (strategy === 'cash_first') {
-    // Cash first: withdraw from lowest-returning asset first
-    const indices = assets.map((_, i) => i)
-    indices.sort(
-      (a, b) => Number(assets[a].expected_return) - Number(assets[b].expected_return),
-    )
-    for (const idx of indices) {
-      if (remaining <= 0.01) break
-      const withdraw = Math.min(values[idx], remaining)
-      values[idx] -= withdraw
-      remaining -= withdraw
-    }
-  } else {
-    // hoogste_rendement: withdraw from highest-returning asset first
-    const indices = assets.map((_, i) => i)
-    indices.sort(
-      (a, b) => Number(assets[b].expected_return) - Number(assets[a].expected_return),
-    )
-    for (const idx of indices) {
-      if (remaining <= 0.01) break
-      const withdraw = Math.min(values[idx], remaining)
-      values[idx] -= withdraw
-      remaining -= withdraw
-    }
-  }
-}
-
-/**
- * Apply a deposit (positive cashflow) to assets using the chosen strategy.
- * Mutates the `values` array in-place.
- */
-function applyDeposit(
-  values: number[],
-  assets: Asset[],
-  amount: number,
-  strategy: AllocationStrategy,
-) {
-  if (values.length === 0) return
-
-  if (strategy === 'spreiden') {
-    // Proportional: distribute across assets by current value share
-    const total = values.reduce((s, v) => s + v, 0)
-    if (total > 0) {
-      for (let i = 0; i < values.length; i++) {
-        values[i] += amount * (values[i] / total)
-      }
-    } else {
-      // All zero: distribute equally
-      const share = amount / values.length
-      for (let i = 0; i < values.length; i++) {
-        values[i] += share
-      }
-    }
-  } else if (strategy === 'cash_first') {
-    // Cash first: add to lowest-returning asset first
-    const indices = assets.map((_, i) => i)
-    indices.sort(
-      (a, b) => Number(assets[a].expected_return) - Number(assets[b].expected_return),
-    )
-    values[indices[0]] += amount
-  } else {
-    // hoogste_rendement: add to highest-returning asset first
-    const indices = assets.map((_, i) => i)
-    indices.sort(
-      (a, b) => Number(assets[b].expected_return) - Number(assets[a].expected_return),
-    )
-    values[indices[0]] += amount
-  }
-}
-
-/** Per-event allocation record: how an event's cashflow was distributed across assets in a given year */
-interface EventAssetAllocation {
-  /** Amount allocated to each asset (positive = deposit, negative = withdrawal) */
-  perAsset: number[]
-}
-
-/** Result from simulateAssetsWithEvents including per-event allocation tracking */
-interface EventSimulationResult {
-  yearlyAssetValues: number[][] /* [assetIdx][year] */
-  /** Per-event per-year allocation details: [eventIdx][year] */
-  yearlyEventAllocations: EventAssetAllocation[][]
-}
-
-/**
- * Run a joint month-by-month asset simulation that applies life event
- * cashflows each month via the chosen allocation strategy.
- *
- * Positive cashflows (income events) are deposited using `applyDeposit`.
- * Negative cashflows (expense events) are withdrawn using `applyWithdrawal`.
- *
- * Returns yearly snapshots (end of each 12-month period) per asset,
- * plus per-event allocation tracking for the TotalTable.
- */
-function simulateAssetsWithEvents(
-  assets: Asset[],
-  totalMonths: number,
-  perEventYearlyCashflows: number[][],
-  strategy: AllocationStrategy,
-  crossoverMonth: number | null,
-): EventSimulationResult {
-  const numEvents = perEventYearlyCashflows.length
-  // Initialize per-asset values
-  const values = assets.map((a) => Number(a.current_value))
-  const rates = assets.map((a) => Number(a.expected_return) / 100 / 12)
-  const contribs = assets.map((a) => Number(a.monthly_contribution))
-
-  // Convert per-event yearly cashflows to monthly by dividing evenly across 12 months.
-  // monthlyPerEvent: Map<month, number[]> where number[] is per-event monthly cashflow
-  const monthlyPerEvent = new Map<number, number[]>()
-  for (let ei = 0; ei < numEvents; ei++) {
-    const yearlyCf = perEventYearlyCashflows[ei]
-    for (let yr = 0; yr < yearlyCf.length; yr++) {
-      const annual = yearlyCf[yr]
-      if (annual === 0) continue
-      const monthly = annual / 12
-      for (let m = yr * 12 + 1; m <= (yr + 1) * 12 && m <= totalMonths; m++) {
-        let arr = monthlyPerEvent.get(m)
-        if (!arr) { arr = new Array(numEvents).fill(0); monthlyPerEvent.set(m, arr) }
-        arr[ei] += monthly
-      }
-    }
-  }
-
-  // Track yearly snapshots (end of each 12-month period)
-  const yearlyValues: number[][] = assets.map(() => [])
-  // Track per-event per-year cumulative allocations per asset
-  // yearlyAllocAccum[eventIdx][assetIdx] accumulates within the current year
-  const yearlyAllocAccum: number[][] = Array.from({ length: numEvents }, () => new Array(assets.length).fill(0))
-  const yearlyEventAllocations: EventAssetAllocation[][] = Array.from({ length: numEvents }, () => [])
-
-  for (let m = 1; m <= totalMonths; m++) {
-    // 1. Apply returns
-    for (let i = 0; i < values.length; i++) {
-      values[i] += values[i] * rates[i]
-    }
-
-    // 2. Apply contributions (stop after crossover)
-    for (let i = 0; i < values.length; i++) {
-      if (crossoverMonth != null && m > crossoverMonth) continue
-      values[i] += contribs[i]
-    }
-
-    // 3. Apply per-event cashflows using the chosen allocation strategy
-    const evCfs = monthlyPerEvent.get(m)
-    if (evCfs) {
-      for (let ei = 0; ei < numEvents; ei++) {
-        const cf = evCfs[ei]
-        if (cf === 0) continue
-        // Snapshot before applying this event to track per-asset delta
-        const before = values.slice()
-        if (cf < 0) {
-          applyWithdrawal(values, assets, -cf, strategy)
-        } else {
-          applyDeposit(values, assets, cf, strategy)
-        }
-        // Record per-asset delta for this event
-        for (let ai = 0; ai < assets.length; ai++) {
-          yearlyAllocAccum[ei][ai] += values[ai] - before[ai]
-        }
-      }
-    }
-
-    // Ensure no negative values
-    for (let i = 0; i < values.length; i++) {
-      values[i] = Math.max(0, values[i])
-    }
-
-    // Record yearly snapshot at end of each 12-month period
-    if (m % 12 === 0) {
-      for (let i = 0; i < values.length; i++) {
-        yearlyValues[i].push(Math.round(values[i]))
-      }
-      // Record and reset per-event allocation accumulators
-      for (let ei = 0; ei < numEvents; ei++) {
-        yearlyEventAllocations[ei].push({ perAsset: yearlyAllocAccum[ei].map(v => Math.round(v)) })
-        yearlyAllocAccum[ei].fill(0)
-      }
-    }
-  }
-
-  return { yearlyAssetValues: yearlyValues, yearlyEventAllocations }
 }
 
 // ── Stacked area chart (feature #633) ───────────────────────
@@ -1205,38 +915,6 @@ function ProjectionTable({ title, columns, color, projectionYears, defaultExpand
 
 // ── Per-asset monthly detail table ───────────────────────────
 
-interface MonthRow {
-  month: number
-  startValue: number
-  rendement: number
-  inleg: number
-  endValue: number
-}
-
-function computeAssetMonthly(asset: Asset, totalMonths: number, crossoverMonth?: number | null): MonthRow[] {
-  const monthlyRate = Number(asset.expected_return) / 100 / 12
-  const monthlyContrib = Number(asset.monthly_contribution)
-  let value = Number(asset.current_value)
-  const rows: MonthRow[] = []
-
-  for (let m = 1; m <= totalMonths; m++) {
-    const startValue = value
-    const rendement = startValue * monthlyRate
-    // Stop contributions after crossover month, returns continue
-    const inleg = (crossoverMonth != null && m > crossoverMonth) ? 0 : monthlyContrib
-    const endValue = startValue + rendement + inleg
-    rows.push({
-      month: m,
-      startValue: Math.round(startValue * 100) / 100,
-      rendement: Math.round(rendement * 100) / 100,
-      inleg: Math.round(inleg * 100) / 100,
-      endValue: Math.round(endValue * 100) / 100,
-    })
-    value = endValue
-  }
-  return rows
-}
-
 function getDisplayMonths(totalMonths: number): number[] {
   if (totalMonths <= 24) {
     return Array.from({ length: totalMonths }, (_, i) => i + 1)
@@ -1353,214 +1031,15 @@ function SectionHeader({ icon, title, subtitle, color, count, expanded, onToggle
   )
 }
 
-// ── Savings rate section ───────────────────────────────────────
-
-function SavingsRateTable({ assets, debts, profileMonthlyIncome, profileSavingsRate, estimatedYearlyIncome, savingsRate6m }: {
-  assets: Asset[]
-  debts: Debt[]
-  profileMonthlyIncome: number
-  profileSavingsRate: number
-  estimatedYearlyIncome: number
-  savingsRate6m: number
-}) {
-  const totalContributions = assets.reduce((sum, a) => sum + Number(a.monthly_contribution), 0)
-  const totalDebtPayments = debts.reduce((sum, d) => sum + Number(d.monthly_payment), 0)
-  const monthlySavings = totalContributions + totalDebtPayments
-  const computedRate = profileMonthlyIncome > 0 ? (monthlySavings / profileMonthlyIncome) * 100 : 0
-  const monthlyFromYearly = estimatedYearlyIncome / 12
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
-      <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
-        <h3 className="text-sm font-semibold text-[var(--ink)]">Spaarquote</h3>
-        <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">Gegevens uit de kern pagina — geschat jaarinkomen en 6-maands spaarquote</p>
-      </div>
-      <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 lg:grid-cols-6">
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Geschat jaarinkomen</p>
-          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-            {formatCurrency(estimatedYearlyIncome)}
-          </p>
-          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">{formatCurrency(monthlyFromYearly)}/mnd</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Spaarquote (6m)</p>
-          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-horizon-600">
-            {savingsRate6m.toFixed(1)}%
-          </p>
-          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">{formatCurrency(monthlyFromYearly * savingsRate6m / 100)}/mnd</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Inleg bezittingen</p>
-          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-emerald-600">
-            {formatCurrency(totalContributions)}
-          </p>
-          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per maand</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Aflossing schulden</p>
-          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-red-500">
-            {formatCurrency(totalDebtPayments)}
-          </p>
-          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per maand</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Berekende spaarquote</p>
-          <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
-            {computedRate.toFixed(1)}%
-          </p>
-          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">inleg + aflossing / inkomen</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Verschil</p>
-          <p className={`mt-1 font-mono tabular-nums text-sm font-semibold ${Math.abs(savingsRate6m - computedRate) < 1 ? 'text-emerald-600' : 'text-amber-600'}`}>
-            {(savingsRate6m - computedRate) >= 0 ? '+' : ''}{(savingsRate6m - computedRate).toFixed(1)}%
-          </p>
-          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">6m vs berekend</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Savings projection table (month-by-month) ───────────────
-
-function SavingsProjectionTable({ profileMonthlyIncome, profileSavingsRate, projectionYears, crossoverMonth }: {
-  profileMonthlyIncome: number
-  profileSavingsRate: number
-  projectionYears: number
-  crossoverMonth: number | null
-}) {
-  const totalMonths = projectionYears * 12
-  const savingsRateFrac = profileSavingsRate / 100
-  const monthlySavings = profileMonthlyIncome * savingsRateFrac
-
-  // For large horizons, show sampled rows instead of every month
-  const displayMonths: number[] = useMemo(() => {
-    if (totalMonths <= 24) {
-      // Show every month for ≤2 years
-      return Array.from({ length: totalMonths }, (_, i) => i + 1)
-    }
-    // Show first 3 months, then every 6 months, plus last month
-    const months: number[] = [1, 2, 3]
-    for (let m = 6; m <= totalMonths; m += 6) {
-      if (!months.includes(m)) months.push(m)
-    }
-    // Always include crossover month so the kruispunt row is visible
-    if (crossoverMonth != null && crossoverMonth >= 1 && crossoverMonth <= totalMonths && !months.includes(crossoverMonth)) {
-      months.push(crossoverMonth)
-    }
-    if (!months.includes(totalMonths)) months.push(totalMonths)
-    return months.sort((a, b) => a - b)
-  }, [totalMonths, crossoverMonth])
-
-  if (profileMonthlyIncome <= 0 || profileSavingsRate <= 0) {
-    return (
-      <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
-        <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
-          <h3 className="text-sm font-semibold text-[var(--ink)]">Spaarquote doorrekening — maand-op-maand</h3>
-        </div>
-        <div className="p-4 text-center text-sm text-[var(--ink-3)]">
-          Vul je netto inkomen en spaarquote in bij je profiel om de doorrekening te zien.
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
-      <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
-        <h3 className="text-sm font-semibold text-[var(--ink)]">
-          Spaarquote doorrekening — maand-op-maand
-        </h3>
-        <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-          {formatCurrency(monthlySavings)}/mnd bij {profileSavingsRate.toFixed(1)}% spaarquote
-        </p>
-      </div>
-      <div className="overflow-auto max-h-[70vh]">
-        <table className="w-full text-[11px]">
-          <thead className="sticky top-0 z-10">
-            <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
-              <th className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">Maand</th>
-              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Inkomen (mnd)</th>
-              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Spaarquote %</th>
-              <th className="px-3 py-1.5 text-right font-medium text-[var(--ink-3)]">Spaarbedrag</th>
-              <th className="px-3 py-1.5 text-right font-medium text-horizon-600">Cumulatief</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayMonths.map((month, idx) => {
-              const isAfterCrossover = crossoverMonth != null && month > crossoverMonth
-              const isCrossoverMonth = crossoverMonth != null && month === crossoverMonth
-              // Cumulative: grows until crossover, then stays flat
-              const effectiveMonths = crossoverMonth != null ? Math.min(month, crossoverMonth) : month
-              const cumulative = monthlySavings * effectiveMonths
-              const effectiveSavings = isAfterCrossover ? 0 : monthlySavings
-              const effectiveRate = isAfterCrossover ? 0 : profileSavingsRate
-              const effectiveIncome = isAfterCrossover ? 0 : profileMonthlyIncome
-              return (
-                <tr key={month} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${isCrossoverMonth ? 'bg-horizon-50/60' : isAfterCrossover ? 'bg-[var(--subtle)]/15' : idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
-                  <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">
-                    {month}
-                    {isCrossoverMonth && <span className="ml-1 text-[9px] font-semibold text-horizon-600">⚡ kruispunt</span>}
-                  </td>
-                  <td className={`px-3 py-1 text-right font-mono tabular-nums ${isAfterCrossover ? 'text-[var(--ink-4)]' : 'text-[var(--ink-2)]'}`}>
-                    {formatCurrency(effectiveIncome)}
-                  </td>
-                  <td className={`px-3 py-1 text-right font-mono tabular-nums ${isAfterCrossover ? 'text-[var(--ink-4)]' : 'text-[var(--ink-2)]'}`}>
-                    {effectiveRate.toFixed(1)}%
-                  </td>
-                  <td className={`px-3 py-1 text-right font-mono tabular-nums ${isAfterCrossover ? 'text-[var(--ink-4)]' : 'text-emerald-600'}`}>
-                    {formatCurrency(effectiveSavings)}
-                  </td>
-                  <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-horizon-600">
-                    {formatCurrency(cumulative)}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
+// ── Savings rate + projection tables ────────────────────────────
+//
+// Deze componenten (`SavingsRateTable`, `SavingsProjectionTable`) zijn
+// in Fase G4 verhuisd naar `@/components/app/doorrekening/savings-tables`
+// zodat ze ook vanuit de overzicht-pagina en de year-details-sheet
+// hergebruikt kunnen worden zonder deze grote client-file te importeren.
+// Bij oorzaak-twijfel: zie `kun-je-een-mogelijkheid-glittery-waterfall.md`.
 
 // ── Per-debt amortization table (month-by-month) ────────────
-
-interface AmortizationRow {
-  month: number
-  startBalance: number
-  interest: number
-  repayment: number
-  endBalance: number
-}
-
-function computeAmortization(debt: Debt, maxMonths: number): AmortizationRow[] {
-  const monthlyRate = Number(debt.interest_rate) / 100 / 12
-  const monthly = Number(debt.monthly_payment)
-  let balance = Number(debt.current_balance)
-  const rows: AmortizationRow[] = []
-
-  for (let m = 1; m <= maxMonths; m++) {
-    if (balance <= 0.005) break
-    const interest = balance * monthlyRate
-    const payment = Math.min(monthly, balance + interest)
-    const repayment = payment - interest
-    const endBalance = Math.max(0, balance - repayment)
-
-    rows.push({
-      month: m,
-      startBalance: Math.round(balance * 100) / 100,
-      interest: Math.round(interest * 100) / 100,
-      repayment: Math.round(repayment * 100) / 100,
-      endBalance: Math.round(endBalance * 100) / 100,
-    })
-
-    balance = endBalance
-  }
-  return rows
-}
 
 function getAmortizationDisplayMonths(rows: AmortizationRow[]): number[] {
   const total = rows.length
@@ -1845,6 +1324,110 @@ function NetWorthMonthlyTable({
 // ── Total overview table ─────────────────────────────────────
 
 /** Tooltip that shows per-asset allocation for an event cell */
+// ── Event-toewijzingen summary (Stap 3) ─────────────────────────
+
+/**
+ * Toont per life-event de totale verdeling over de bezittingen. Aggregeert
+ * `eventAllocations` over alle jaren en rendert per event een strook met
+ * bedrag + percentage per asset + mini horizontale bar.
+ *
+ * Verandert live mee met de `Verdeling Toename`-instelling uit de settings-
+ * context — dezelfde bron als de TotalTable. Geen eigen rekenlogica, alleen
+ * aggregatie van bestaande per-jaar data.
+ */
+function EventAllocationsSummary({
+  eventGroups,
+  eventAllocations,
+  assetNames,
+  strategyLabel,
+}: {
+  eventGroups: { event: LifeEvent; cashflows: SimCashflow[] }[]
+  eventAllocations: EventAssetAllocation[][] | null
+  assetNames: string[]
+  strategyLabel: string
+}) {
+  if (!eventAllocations || eventGroups.length === 0) return null
+
+  // Som per event-idx → per asset-idx over alle jaren.
+  const perEventTotals: { eventName: string; firstYear: number | null; totalsByAsset: number[]; total: number }[] = eventGroups.map((g, ei) => {
+    const yearRows = eventAllocations[ei] ?? []
+    const totals = new Array<number>(assetNames.length).fill(0)
+    let firstYear: number | null = null
+    for (let yr = 0; yr < yearRows.length; yr++) {
+      const row = yearRows[yr]
+      if (!row) continue
+      for (let ai = 0; ai < assetNames.length; ai++) {
+        totals[ai] += row.perAsset[ai] ?? 0
+      }
+      if (firstYear == null && row.perAsset.some(v => v !== 0)) {
+        firstYear = yr + 1
+      }
+    }
+    const total = totals.reduce((s, v) => s + v, 0)
+    return { eventName: g.event.name, firstYear, totalsByAsset: totals, total }
+  }).filter(e => Math.abs(e.total) > 0.5)
+
+  if (perEventTotals.length === 0) return null
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
+      <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--ink)]">Event-toewijzingen</h3>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+            Hoe ieder life event over je bezittingen wordt verdeeld volgens de gekozen strategie.
+          </p>
+        </div>
+        <span className="rounded bg-horizon-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-horizon-700">
+          {strategyLabel}
+        </span>
+      </div>
+      <div className="divide-y divide-[var(--border-ed)]">
+        {perEventTotals.map((ev) => {
+          const isInflow = ev.total > 0
+          return (
+            <div key={ev.eventName} className="px-4 py-3">
+              <div className="flex items-baseline justify-between gap-3 mb-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[12px] font-semibold text-[var(--ink)]">{ev.eventName}</span>
+                  {ev.firstYear != null && (
+                    <span className="text-[10px] text-[var(--ink-4)]">vanaf jaar {ev.firstYear}</span>
+                  )}
+                </div>
+                <span className={`font-mono tabular-nums text-[12px] font-semibold ${isInflow ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {isInflow ? '+' : ''}{formatCurrency(Math.round(ev.total))}
+                </span>
+              </div>
+              <div className="space-y-1">
+                {ev.totalsByAsset.map((amount, ai) => {
+                  if (Math.abs(amount) < 0.5) return null
+                  const pct = ev.total !== 0 ? (amount / ev.total) * 100 : 0
+                  const barWidthPct = Math.min(100, Math.abs(pct))
+                  return (
+                    <div key={ai} className="flex items-center gap-2 text-[11px]">
+                      <span className="min-w-0 flex-1 truncate text-[var(--ink-3)]">{assetNames[ai]}</span>
+                      <div className="h-1.5 w-24 overflow-hidden rounded bg-[var(--subtle)]">
+                        <div
+                          className={`h-full ${isInflow ? 'bg-emerald-400' : 'bg-red-400'}`}
+                          style={{ width: `${barWidthPct}%` }}
+                        />
+                      </div>
+                      <span className="w-10 text-right font-mono tabular-nums text-[10px] text-[var(--ink-4)]">{pct.toFixed(0)}%</span>
+                      <span className={`w-24 text-right font-mono tabular-nums ${amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {amount > 0 ? '+' : ''}{formatCurrency(Math.round(amount))}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function EventAllocationTooltip({ allocation, assetNames }: {
   allocation: EventAssetAllocation
   assetNames: string[]
@@ -1870,7 +1453,7 @@ function EventAllocationTooltip({ allocation, assetNames }: {
   )
 }
 
-function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionYears, crossoverYear, yearlyEventCashflows, perEventYearlyCashflows, eventGroups, eventAllocations, assetNames }: {
+function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionYears, crossoverYear, yearlyEventCashflows, perEventYearlyCashflows, eventGroups, eventAllocations, assetNames, allocationStrategyLabel }: {
   assetTotals: number[]
   debtTotals: number[]
   netTotals: number[]
@@ -1882,6 +1465,7 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
   eventGroups: { event: LifeEvent; cashflows: SimCashflow[] }[]
   eventAllocations: EventAssetAllocation[][] | null // [eventIdx][year]
   assetNames: string[]
+  allocationStrategyLabel?: string
 }) {
   const hasEvents = yearlyEventCashflows.some((v) => v !== 0)
   const [hoveredCell, setHoveredCell] = useState<string | null>(null)
@@ -1905,12 +1489,19 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
-      <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3">
-        <h3 className="text-sm font-semibold text-[var(--ink)]">Totaaloverzicht</h3>
-        <p className="text-[10px] text-[var(--ink-4)] mt-0.5">
-          Box 3: fictief rendement {(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}% × tarief {(BOX3_TARIEF * 100).toFixed(0)}%, heffingsvrij vermogen afgetrokken
-          {hasEvents && ' · hover op event-kolom toont verdeling over bezittingen'}
-        </p>
+      <div className="border-b border-[var(--border-ed)] bg-horizon-50/30 px-4 py-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--ink)]">Totaaloverzicht</h3>
+          <p className="text-[10px] text-[var(--ink-4)] mt-0.5">
+            Box 3: fictief rendement {(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}% × tarief {(BOX3_TARIEF * 100).toFixed(0)}%, heffingsvrij vermogen afgetrokken
+            {hasEvents && ' · hover op event-kolom toont verdeling over bezittingen'}
+          </p>
+        </div>
+        {hasEvents && allocationStrategyLabel && (
+          <span className="rounded bg-horizon-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-horizon-700 whitespace-nowrap">
+            Verdeling: {allocationStrategyLabel}
+          </span>
+        )}
       </div>
       <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-[11px]">
@@ -1995,7 +1586,20 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
 
 // ── Main component ───────────────────────────────────────────
 
-export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, lifeEvents, savingsRate6m, estimatedYearlyIncome }: {
+export function OpbouwClient({
+  assets,
+  debts,
+  profile,
+  fireParams,
+  cashflows,
+  lifeEvents,
+  savingsRate6m,
+  estimatedYearlyIncome,
+  netWorth,
+  yearlyMustExpenses,
+  userAowAge,
+  weightedGrossReturn,
+}: {
   assets: Asset[]
   debts: Debt[]
   profile: Record<string, unknown> | null
@@ -2006,6 +1610,14 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
   savingsRate6m: number
   /** Extrapolated 12-month income from core page (same as kern "Geschat Jaarinkomen") */
   estimatedYearlyIncome: number
+  /** Huidig netto vermogen (totalAssets - totalDebts). */
+  netWorth: number
+  /** Jaarlijkse essentiële uitgaven — input voor computeRetirementExpenses. */
+  yearlyMustExpenses: number
+  /** Fractionele AOW-leeftijd. */
+  userAowAge: number
+  /** Gewogen asset-return (zelfde bron als overzicht). */
+  weightedGrossReturn: number
 }) {
   // ── Profile-derived values with safe defaults (feature #628) ──
   // Use core page values (transaction-based) with profile fallback
@@ -2026,55 +1638,130 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
   const maxProjectionYears = currentAge != null ? Math.max(1, 100 - currentAge) : 60
   const defaultYears = currentAge != null ? maxProjectionYears : DEFAULT_PROJECTION_YEARS
 
-  const [projectionYears, setProjectionYears] = useState(defaultYears)
+  // Tijdshorizon and allocation-strategie zijn nu gecentraliseerd op /overzicht
+  // en worden uit de gedeelde settings-context gelezen.
+  const projectionYears = defaultYears
+  const settings = useDoorrekeningSettings()
+  // Settings `distributionStrategy` ('proportional' | 'cash_first' | 'lowest_return')
+  // → mappen naar de opbouw-lokale `AllocationStrategy` union. cash_first en
+  // lowest_return zijn functioneel equivalent (beide sorteren assets op
+  // expected_return oplopend). Deze mapping moet in sync blijven met de
+  // mapping in `hybrid-projection.ts` en de cross-check panel-inputs
+  // hieronder — één bron van waarheid voor beide tabbladen.
+  const allocationStrategy: AllocationStrategy =
+    settings.distributionStrategy === 'cash_first' ? 'cash_first'
+    : settings.distributionStrategy === 'lowest_return' ? 'cash_first'
+    : settings.distributionStrategy === 'highest_return' ? 'hoogste_rendement'
+    : 'spreiden'
   const [assetsExpanded, setAssetsExpanded] = useState(true)
   const [debtsExpanded, setDebtsExpanded] = useState(true)
-  const [allocationStrategy, setAllocationStrategy] = useState<AllocationStrategy>('spreiden')
-
-  const handleYearsChange = useCallback((value: number) => {
-    setProjectionYears(Math.max(1, Math.min(maxProjectionYears, value)))
-  }, [maxProjectionYears])
 
   // Group and project
   const assetGroups = useMemo(() => groupAssetsByType(assets), [assets])
   const debtGroups = useMemo(() => groupDebtsByType(debts), [debts])
 
-  // ── Kruispunt (crossover month) berekening ──
-  // The month at which passive income >= expenses — contributions stop after this point.
-  // Annual expenses = income - savings. Passive income = netWorth × effectiveSwr.
-  const crossoverMonth = useMemo(() => {
-    const monthlyExpenses = profileMonthlyIncome * (1 - profileSavingsRate / 100)
-    const annualExpenses = monthlyExpenses * 12
-    if (annualExpenses <= 0 || profileMonthlyIncome <= 0) return null // No meaningful crossover
+  // ── Kruispunt-bron (overgangsfase) ─────────────────────────────────
+  // TODO(fase-later): vervang deze gedeelde runSimulation-aanroep door een
+  // eigen `findIntersection(computeOpbouwProjection(...).yearlyRows,
+  // computeAfbouwRequiredSchedule(...))` zodat opbouw-client volledig los
+  // staat van lib/fire-simulation. Overzicht heeft die migratie in Fase 2c
+  // al afgerond; hier moet nog een analoge wiring komen incl. retirement-
+  // expense + AOW-household resolution vanuit profile/settings-context.
+  // Voor nu blijft `sim.fireAge` de bron — met dat voorbehoud is de
+  // kruispunt-leeftijd identiek aan wat /overzicht tekent tijdens Fase 3.
+  const sim = useDoorrekeningSim({
+    currentAge: currentAge ?? 30,
+    netWorth,
+    monthlyIncome: profileMonthlyIncome,
+    savingsRate: profileSavingsRate,
+    yearlyMustExpenses,
+    estimatedYearlyIncome,
+    weightedGrossReturn,
+    fireParams,
+    lifeEvents,
+    cashflows,
+    userAowAge,
+    profile: profile ?? {},
+  })
 
-    // Simulate each asset individually with its own return rate
-    const totalMonths = projectionYears * 12
-    const aVals = assets.map((a) => Number(a.current_value))
-    const aRates = assets.map((a) => Number(a.expected_return) / 100 / 12)
-    const aContribs = assets.map((a) => Number(a.monthly_contribution))
-    const dBals = debts.map((d) => Number(d.current_balance))
-    const dRates = debts.map((d) => Number(d.interest_rate) / 100 / 12)
-    const dPays = debts.map((d) => Number(d.monthly_payment))
+  // Kruispunt uit gedeelde simulatie: jaar = sim.fireAge - currentAge; maand = jaar × 12.
+  const crossoverYear = useMemo(() => {
+    if (sim.fireAge == null || currentAge == null) return null
+    return sim.fireAge - currentAge
+  }, [sim.fireAge, currentAge])
+  const crossoverMonth = crossoverYear != null ? crossoverYear * 12 : null
 
-    for (let m = 1; m <= totalMonths; m++) {
-      for (let i = 0; i < aVals.length; i++) {
-        aVals[i] = Math.max(0, aVals[i] + aVals[i] * aRates[i] + aContribs[i])
-      }
-      for (let i = 0; i < dBals.length; i++) {
-        if (dBals[i] <= 0) continue
-        const interest = dBals[i] * dRates[i]
-        dBals[i] = Math.max(0, dBals[i] + interest - Math.min(dPays[i], dBals[i] + interest))
-      }
-      const nw = aVals.reduce((s, v) => s + v, 0) - dBals.reduce((s, v) => s + v, 0)
-      if (nw * fireParams.effectiveSwr >= annualExpenses) {
-        return m
-      }
+  // ── Cross-check (H4) ─────────────────────────────────────────────
+  // Bouwt `HybridProjectionInputs` met dezelfde bronnen die `sim` ook krijgt,
+  // plus settings-context voor strategie. Het panel vergelijkt sim.fireAge +
+  // sim.rows[last].endPortfolio met de hybride uitkomst en waarschuwt bij
+  // divergentie. Verborgen in productie (activeer via ?check=1). Settings-
+  // context wordt hierboven al ingelezen — hergebruik die instance.
+  const hybridInputs = useMemo<HybridProjectionInputs>(() => {
+    const retirementMethod = (profile?.retirement_expense_method as RetirementExpenseMethod | undefined) ?? 'essential_budgets'
+    const retirementCustomAmount = Number(profile?.retirement_expense_custom_amount ?? 0)
+    const estimatedMonthlyExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
+    const yearlyRetirementExpenses = computeRetirementExpenses(
+      retirementMethod,
+      yearlyMustExpenses,
+      profileMonthlyIncome * 12,
+      retirementCustomAmount,
+      estimatedMonthlyExpenses * 12,
+    )
+    const displayEndAge = settings.endStrategy === 'pensioen' ? 100 : settings.endAge
+    const withdrawalStrategy: AfbouwWithdrawalStrategy =
+      settings.withdrawalStrategy === 'swr' ? 'swr' : settings.withdrawalStrategy
+    const distributionStrategy: AfbouwDistributionStrategy =
+      settings.distributionStrategy === 'cash_first'
+        ? 'cash_first'
+        : settings.distributionStrategy === 'lowest_return'
+          ? 'lowest_return_first'
+          : settings.distributionStrategy === 'highest_return'
+            ? 'highest_return_first'
+            : 'proportional'
+    const outflowDistribution: AfbouwDistributionStrategy =
+      settings.outflowDistribution === 'cash_first'
+        ? 'cash_first'
+        : settings.outflowDistribution === 'lowest_return_first'
+          ? 'lowest_return_first'
+          : 'proportional'
+    const withdrawalOrder: AfbouwDistributionStrategy =
+      settings.withdrawalOrder === 'cash_first'
+        ? 'cash_first'
+        : settings.withdrawalOrder === 'low_return_first'
+          ? 'lowest_return_first'
+          : settings.withdrawalOrder === 'own_home_last'
+            ? 'own_home_last'
+            : settings.withdrawalOrder === 'highest_value_first'
+              ? 'highest_value_first'
+              : 'proportional'
+    return {
+      assets,
+      debts,
+      lifeEvents,
+      cashflows,
+      currentAge: currentAge ?? 30,
+      endAge: displayEndAge,
+      fireParams,
+      endStrategy: settings.endStrategy,
+      endAgeConfig: settings.endAge,
+      legacyAmount: settings.legacyAmount,
+      withdrawalStrategy,
+      distributionStrategy,
+      outflowDistribution,
+      withdrawalOrder,
+      hasPartner,
+      yearlyRetirementExpenses,
+      aowAge: userAowAge,
+      savingsInflow: { monthlyAmount: (profileMonthlyIncome * profileSavingsRate) / 100 },
     }
-    return null // Not reached within projection horizon
-  }, [assets, debts, profileMonthlyIncome, profileSavingsRate, fireParams, projectionYears])
-
-  // Crossover year for display purposes
-  const crossoverYear = crossoverMonth != null ? Math.ceil(crossoverMonth / 12) : null
+  }, [
+    assets, debts, lifeEvents, cashflows, currentAge, fireParams,
+    settings.endStrategy, settings.endAge, settings.legacyAmount,
+    settings.withdrawalStrategy, settings.distributionStrategy, settings.outflowDistribution, settings.withdrawalOrder,
+    hasPartner, yearlyMustExpenses, userAowAge,
+    profileMonthlyIncome, profileSavingsRate, profile,
+  ])
 
   // ── Per-event yearly cashflow impacts (features #663, #670) ──
   // Group cashflows by source life event, then compute per-event yearly cashflows.
@@ -2193,9 +1880,11 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
     )
   }, [assets, projectionYears, perEventYearlyCashflows, allocationStrategy, crossoverMonth, hasEvents])
 
-  // Compute yearly totals with Box 3 tax impact on net worth.
-  // When events exist, asset totals come from the event-adjusted simulation
-  // so that Box 3 tax automatically reflects reduced/increased asset values (#666).
+  // Compute yearly totals met Box 3 belasting op netto vermogen.
+  // Asset/debt totals komen uit per-asset projections (drill-down-tabellen delen
+  // dezelfde bron). Netto-vermogen = assets − debts − cumulatieve Box 3 —
+  // volledig opbouw-eigen formules (geen runSimulation-override meer; zie
+  // Fase 4 van `doorrekening-overzicht-aggregatie.md`).
   const { assetTotals, debtTotals, netTotals, box3Taxes } = useMemo(() => {
     const aTotals: number[] = []
     const dTotals: number[] = []
@@ -2203,18 +1892,15 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
     const taxes: number[] = []
     let cumulativeTax = 0
 
-    // Build a flat list of inclusion weights matching the asset order
     const inclusionWeights = assets.map(a => (a.net_worth_inclusion_pct ?? 100) / 100)
 
     for (let yr = 0; yr < projectionYears; yr++) {
       let assetSum = 0
       if (eventAdjustedAssets) {
-        // Use event-adjusted per-asset values, weighted by inclusion pct
         for (let i = 0; i < assets.length; i++) {
           assetSum += (eventAdjustedAssets.yearlyAssetValues[i]?.[yr] ?? 0) * inclusionWeights[i]
         }
       } else {
-        // Original: sum from independent projections, weighted by inclusion pct
         let flatIdx = 0
         for (const group of assetProjections) {
           for (const col of group.columns) {
@@ -2250,10 +1936,13 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
   const totalAssetValueRaw = assets.reduce((s, a) => s + Number(a.current_value), 0)
   const totalAssetValue = assets.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
   const totalDebtValue = debts.reduce((s, d) => s + Number(d.current_balance), 0)
-  const netWorth = totalAssetValue - totalDebtValue
+  // Display-only net worth met inclusion-pct weging (header-weergave).
+  const displayNetWorth = totalAssetValue - totalDebtValue
 
   return (
     <div className="space-y-6">
+      <SettingsBanner />
+
       {/* Section 1: Summary header card with time horizon */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
@@ -2278,7 +1967,7 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
               Netto vermogen
             </p>
             <p className="font-mono tabular-nums text-xl font-bold text-horizon-600">
-              {formatCurrency(netWorth)}
+              {formatCurrency(displayNetWorth)}
             </p>
           </div>
           <div>
@@ -2311,79 +2000,10 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
           </div>
         </div>
 
-        {/* Time horizon selector inside the summary card */}
-        <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-              Tijdshorizon
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={1}
-                max={60}
-                step={1}
-                value={projectionYears}
-                onChange={(e) => handleYearsChange(Number(e.target.value))}
-                className="h-2 w-40 cursor-pointer appearance-none rounded-full bg-[var(--subtle)] accent-horizon-500 sm:w-56"
-              />
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={projectionYears}
-                  onChange={(e) => handleYearsChange(Number(e.target.value))}
-                  className="w-16 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1.5 text-center font-mono tabular-nums text-sm text-[var(--ink)] focus:border-horizon-500 focus:outline-none focus:ring-1 focus:ring-horizon-500"
-                />
-                <span className="text-sm text-[var(--ink-3)]">jaar</span>
-              </div>
-            </div>
-            {projectionYears !== DEFAULT_PROJECTION_YEARS && (
-              <button
-                onClick={() => setProjectionYears(DEFAULT_PROJECTION_YEARS)}
-                className="text-[11px] text-horizon-600 underline underline-offset-2 hover:text-horizon-700"
-              >
-                Reset naar {DEFAULT_PROJECTION_YEARS} jaar
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Withdrawal strategy selector — only shown when life events produce cashflows */}
         {hasEvents && (
-          <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <label className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Toename-strategie
-              </label>
-              <div className="flex gap-2">
-                {([
-                  { key: 'spreiden' as const, label: 'Spreiden' },
-                  { key: 'cash_first' as const, label: 'Cash first' },
-                  { key: 'hoogste_rendement' as const, label: 'Hoogste rendement' },
-                ] as const).map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setAllocationStrategy(key)}
-                    className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors ${
-                      allocationStrategy === key
-                        ? 'bg-horizon-600 text-white'
-                        : 'bg-[var(--subtle)] text-[var(--ink-3)] hover:bg-[var(--subtle)]/80'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="mt-2 text-[10px] text-[var(--ink-4)]">
-              {lifeEvents.length} levensgebeurtenis{lifeEvents.length !== 1 ? 'sen' : ''} be{'\u00EF'}nvloeden de projectie
-              {allocationStrategy === 'spreiden' && ' \u2014 bedragen worden proportioneel verdeeld over bezittingen'}
-              {allocationStrategy === 'cash_first' && ' \u2014 bedragen gaan eerst naar bezitting met laagste rendement'}
-              {allocationStrategy === 'hoogste_rendement' && ' \u2014 bedragen gaan eerst naar bezitting met hoogste rendement'}
-            </p>
-          </div>
+          <p className="mt-4 border-t border-[var(--border-ed)] pt-3 text-[11px] text-[var(--ink-4)]">
+            {lifeEvents.length} levensgebeurtenis{lifeEvents.length !== 1 ? 'sen' : ''} be{'\u00EF'}nvloeden de projectie.
+          </p>
         )}
       </div>
 
@@ -2562,10 +2182,32 @@ export function OpbouwClient({ assets, debts, profile, fireParams, cashflows, li
               eventGroups={eventCashflowGroups}
               eventAllocations={eventAdjustedAssets?.yearlyEventAllocations ?? null}
               assetNames={assets.map(a => a.name)}
+              allocationStrategyLabel={
+                allocationStrategy === 'cash_first' ? 'Cash first'
+                : allocationStrategy === 'hoogste_rendement' ? 'Hoogste rendement'
+                : 'Spreiden'
+              }
+            />
+            <EventAllocationsSummary
+              eventGroups={eventCashflowGroups}
+              eventAllocations={eventAdjustedAssets?.yearlyEventAllocations ?? null}
+              assetNames={assets.map(a => a.name)}
+              strategyLabel={
+                allocationStrategy === 'cash_first' ? 'Cash first / laagste rendement'
+                : allocationStrategy === 'hoogste_rendement' ? 'Hoogste rendement first'
+                : 'Spreiden (proportioneel)'
+              }
             />
           </div>
         </div>
       )}
+
+      <CrossCheckPanel
+        pageName="opbouw"
+        hybridInputs={hybridInputs}
+        localFireAge={sim.fireAge ?? null}
+        localEndPortfolio={sim.rows.at(-1)?.endPortfolio ?? null}
+      />
 
       {/* Empty state */}
       {!hasAssets && !hasDebts && (

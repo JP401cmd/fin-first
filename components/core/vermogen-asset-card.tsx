@@ -25,6 +25,9 @@ import {
   Briefcase,
   type LucideIcon,
 } from 'lucide-react'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { findDeepenings } from './category-deepening-registry'
+import { AssetAppChip } from './asset-app-chip'
 
 // ── Icon mapping ────────────────────────────────────────────
 
@@ -62,12 +65,29 @@ export function VermogenAssetCard({
   staggerIndex = 0,
 }: VermogenAssetCardProps) {
   const { flashClass } = useFlashChange(asset.current_value)
+  const { activeModules } = useFeatureAccess()
   const Icon = ASSET_ICONS[asset.asset_type]
   const accentColor = ASSET_TYPE_COLORS[asset.asset_type]
 
   // Determine delta direction for styling
   const hasDelta = monthlyChange != null && monthlyChange !== 0
   const isPositiveDelta = hasDelta && monthlyChange! > 0
+
+  // App-koppeling — leest direct uit de asset zelf via de registry-helper.
+  // Geen separate state, geen junction-tabel: het bezit bepaalt de app-status.
+  //
+  // Multi-app: bij een categorie met meerdere apps (mortgage, real_estate)
+  // tonen we voor MVP slechts één chip. Voorkeur: de eerste app waarvoor
+  // het item al getracked is (concrete, leesbare status). Vinden we geen
+  // tracked-app, dan vallen we terug op de eerste registry-entry — zo blijft
+  // de chip-area stabiel en kan de gebruiker tenminste één app-label zien.
+  const deepenings = findDeepenings(asset.asset_type, 'asset')
+  const trackedDeepening = deepenings.find((d) => d.isItemTracked?.(asset))
+  const displayDeepening = trackedDeepening ?? deepenings[0]
+  const moduleActive = displayDeepening
+    ? activeModules.includes(displayDeepening.moduleId)
+    : false
+  const tracked = displayDeepening?.isItemTracked?.(asset) ?? false
 
   return (
     <button
@@ -84,8 +104,7 @@ export function VermogenAssetCard({
       <div className="flex items-center gap-3 p-3 sm:p-4">
         {/* Left: icon + name + institution */}
         <div
-          className="flex h-7 w-7 shrink-0 items-center justify-center"
-          style={{ backgroundColor: `${accentColor}26` }}
+          className="flex h-7 w-7 shrink-0 items-center justify-center bg-[var(--subtle)]"
         >
           <Icon className="h-4 w-4" style={{ color: accentColor }} />
         </div>
@@ -98,6 +117,13 @@ export function VermogenAssetCard({
             {ASSET_TYPE_LABELS[asset.asset_type]}
             {asset.institution ? ` · ${asset.institution}` : ''}
           </p>
+          {displayDeepening && (
+            <AssetAppChip
+              tracked={tracked}
+              appLabel={displayDeepening.label}
+              moduleActive={moduleActive}
+            />
+          )}
         </div>
 
         {/* Right: value + delta */}

@@ -40,46 +40,50 @@ function findTsxFiles(dir: string, results: string[] = []): string[] {
 
 const tests: TestCase[] = [
   // ── 1. Financial amounts use font-mono tabular-nums ──────────────────
+  // The Kern hero (formerly kern-mission-control) is now <CoreHero /> +
+  // <FireProgressStrip />; both use font-mono tabular-nums via shared
+  // design tokens. Coverage moved to component-level checks elsewhere —
+  // these monolith string-grep tests were removed during the Kern
+  // refactor (cleanup task #10).
   {
-    id: 'typo-kern-mc-font-mono',
-    name: 'kern-mission-control: bedragen gebruiken font-mono',
+    id: 'typo-core-hero-font-mono',
+    name: 'core-hero: bedragen gebruiken font-mono',
     category: CAT,
-    description: 'Financiële bedragen in KernMissionControl moeten font-mono class gebruiken',
+    description: 'Financiële bedragen in CoreHero moeten font-mono class gebruiken',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      const src = readSourceFile('components/app/core/kern-mission-control.tsx')
-      assert(src.length > 0, 'kern-mission-control.tsx kon niet gelezen worden')
+      const src = readSourceFile('components/core/core-hero.tsx')
+      assert(src.length > 0, 'core-hero.tsx kon niet gelezen worden')
 
-      // Count formatCurrency usages vs font-mono usages
       const formatCurrencyMatches = src.match(/formatCurrency/g) || []
       const fontMonoMatches = src.match(/font-mono/g) || []
 
       assertGreaterThan(
         formatCurrencyMatches.length, 0,
-        'kern-mission-control moet formatCurrency aanroepen',
+        'core-hero moet formatCurrency aanroepen',
       )
       assertGreaterThan(
         fontMonoMatches.length, 0,
-        'kern-mission-control moet font-mono class bevatten voor bedragen',
+        'core-hero moet font-mono class bevatten voor bedragen',
       )
     },
   },
   {
-    id: 'typo-kern-mc-tabular-nums',
-    name: 'kern-mission-control: bedragen gebruiken tabular-nums',
+    id: 'typo-core-hero-tabular-nums',
+    name: 'core-hero: bedragen gebruiken tabular-nums',
     category: CAT,
-    description: 'Financiële bedragen in KernMissionControl moeten tabular-nums gebruiken voor uitgelijnde cijfers',
+    description: 'Financiële bedragen in CoreHero moeten tabular-nums gebruiken voor uitgelijnde cijfers',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      const src = readSourceFile('components/app/core/kern-mission-control.tsx')
-      assert(src.length > 0, 'kern-mission-control.tsx kon niet gelezen worden')
+      const src = readSourceFile('components/core/core-hero.tsx')
+      assert(src.length > 0, 'core-hero.tsx kon niet gelezen worden')
 
       const tabularMatches = src.match(/tabular-nums/g) || []
       assertGreaterThan(
         tabularMatches.length, 0,
-        'kern-mission-control moet tabular-nums class bevatten',
+        'core-hero moet tabular-nums class bevatten',
       )
     },
   },

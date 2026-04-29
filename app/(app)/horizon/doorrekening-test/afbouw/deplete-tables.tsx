@@ -2,32 +2,20 @@
 
 import { useMemo, useState } from 'react'
 import { formatCurrency } from '@/lib/format'
-import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
+import { NL_AOW_AGE } from '@/lib/constants'
+import {
+  computeTableSchedule,
+  type TableScheduleRow,
+} from '../calc/afbouw-table-schedules'
 
-// ── Types ────────────────────────────────────────────────────
+// ── Types & Constants ──────────────────────────────────────────
 
-interface WithdrawalRow {
-  year: number
-  age: number
-  startBalance: number
-  withdrawal: number
-  aowIncome: number
-  growth: number
-  endBalance: number
-}
+/** Row-alias voor de twee sub-tables met standaard/VPW-kolommen. */
+type WithdrawalRow = TableScheduleRow
+type VpwRow = TableScheduleRow
 
-interface VpwRow {
-  year: number
-  age: number
-  startBalance: number
-  remainingYears: number
-  vpwPct: number
-  withdrawal: number
-  aowIncome: number
-  growth: number
-  endBalance: number
-}
-
+/** Bucket-row shape matching sub-table render contract. Gemapped uit
+ * `TableScheduleRow` met `bucketCash/Bonds/Equity` velden. */
 interface BucketRow {
   year: number
   age: number
@@ -37,8 +25,6 @@ interface BucketRow {
   total: number
   withdrawal: number
 }
-
-// ── Constants ────────────────────────────────────────────────
 
 const BOND_RETURN = 0.02
 const GUARDRAIL_BAND = 0.20
@@ -55,240 +41,17 @@ function sampleRows<T extends { year: number }>(rows: T[]): T[] {
   return result
 }
 
-// ── Annuity helper ──────────────────────────────────────────
-
-/** Compute level annuity payment that fully depletes portfolio over n years at rate r. */
-function annuityPayment(portfolio: number, realReturn: number, years: number): number {
-  if (years <= 0 || portfolio <= 0) return 0
-  if (realReturn === 0) return portfolio / years
-  return portfolio * realReturn / (1 - Math.pow(1 + realReturn, -years))
-}
-
-// ── Schedule computation helpers ────────────────────────────
-
-/** SWR-based depletion: annuity formula gives a fixed annual withdrawal that reaches €0 at endAge. */
-function computeDepleteSwrSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-): WithdrawalRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-  const baseWithdrawal = annuityPayment(startPortfolio, realReturn, totalYears)
-
-  const schedule: WithdrawalRow[] = []
-  let balance = startPortfolio
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const startBalance = balance
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-    const neededFromPortfolio = Math.max(0, baseWithdrawal - aow)
-    const withdrawal = Math.min(neededFromPortfolio, balance)
-    const remaining = balance - withdrawal
-    const growth = remaining * realReturn
-    const endBalance = remaining + growth
-
-    schedule.push({
-      year: y + 1, age,
-      startBalance: Math.round(startBalance),
-      withdrawal: Math.round(withdrawal),
-      aowIncome: Math.round(aow),
-      growth: Math.round(growth),
-      endBalance: Math.max(0, Math.round(endBalance)),
-    })
-    balance = Math.max(0, endBalance)
-    if (balance <= 0) break
+/** Map een TableScheduleRow met bucket-velden naar de BucketRow-shape. */
+function toBucketRow(r: TableScheduleRow): BucketRow {
+  return {
+    year: r.year,
+    age: r.age,
+    cash: r.bucketCash ?? 0,
+    bonds: r.bucketBonds ?? 0,
+    equity: r.bucketEquity ?? 0,
+    total: r.startBalance,
+    withdrawal: r.withdrawal,
   }
-  return schedule
-}
-
-/** Guardrails: variable withdrawal with +/- 20% bands around annuity rate, depleting to €0. */
-function computeDepleteGuardrailsSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-): WithdrawalRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-  const annuityRate = realReturn === 0
-    ? 1 / totalYears
-    : realReturn / (1 - Math.pow(1 + realReturn, -totalYears))
-  const initialWithdrawal = annuityPayment(startPortfolio, realReturn, totalYears)
-  const ceiling = annuityRate * (1 + GUARDRAIL_BAND)
-  const floor = annuityRate * (1 - GUARDRAIL_BAND)
-
-  const schedule: WithdrawalRow[] = []
-  let balance = startPortfolio
-  let currentWithdrawal = initialWithdrawal
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const startBalance = balance
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-
-    // Apply guardrail check: ratio of withdrawal to current balance
-    if (balance > 0) {
-      const ratio = currentWithdrawal / balance
-      if (ratio > ceiling) {
-        currentWithdrawal = ceiling * balance
-      } else if (ratio < floor) {
-        currentWithdrawal = floor * balance
-      }
-    }
-
-    const neededFromPortfolio = Math.max(0, currentWithdrawal - aow)
-    const withdrawal = Math.min(neededFromPortfolio, balance)
-    const remaining = balance - withdrawal
-    const growth = remaining * realReturn
-    const endBalance = remaining + growth
-
-    schedule.push({
-      year: y + 1, age,
-      startBalance: Math.round(startBalance),
-      withdrawal: Math.round(withdrawal),
-      aowIncome: Math.round(aow),
-      growth: Math.round(growth),
-      endBalance: Math.max(0, Math.round(endBalance)),
-    })
-    balance = Math.max(0, endBalance)
-    if (balance <= 0) break
-  }
-  return schedule
-}
-
-/** VPW: each year withdraw balance / remaining years. Naturally depletes to €0. */
-function computeDepleteVpwSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-): VpwRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-
-  const schedule: VpwRow[] = []
-  let balance = startPortfolio
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const startBalance = balance
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-    const remainingYears = Math.max(1, totalYears - y)
-
-    const vpwWithdrawal = balance / remainingYears
-    const vpwPct = balance > 0 ? (vpwWithdrawal / balance) * 100 : 0
-    const neededFromPortfolio = Math.max(0, vpwWithdrawal - aow)
-    const withdrawal = Math.min(neededFromPortfolio, balance)
-    const remaining = balance - withdrawal
-    const growth = remaining * realReturn
-    const endBalance = remaining + growth
-
-    schedule.push({
-      year: y + 1, age,
-      startBalance: Math.round(startBalance),
-      remainingYears,
-      vpwPct: Math.round(vpwPct * 100) / 100,
-      withdrawal: Math.round(withdrawal),
-      aowIncome: Math.round(aow),
-      growth: Math.round(growth),
-      endBalance: Math.max(0, Math.round(endBalance)),
-    })
-    balance = Math.max(0, endBalance)
-    if (balance <= 0) break
-  }
-  return schedule
-}
-
-/** Bucket strategy: 3 buckets, no legacy buffer — portfolio is fully consumed. */
-function computeDepleteBucketSchedule(
-  startPortfolio: number,
-  retirementAge: number,
-  endAge: number,
-  yearlyExpenses: number,
-  grossReturn: number,
-  inflationRate: number,
-  hasPartner: boolean,
-): BucketRow[] {
-  const totalYears = endAge - retirementAge
-  if (totalYears <= 0 || startPortfolio <= 0) return []
-
-  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
-  const aowYearly = (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12
-
-  const cashTarget = yearlyExpenses * 2
-  const bondTarget = yearlyExpenses * 5
-
-  let cash = Math.min(cashTarget, startPortfolio)
-  let bonds = Math.min(bondTarget, Math.max(0, startPortfolio - cash))
-  let equity = Math.max(0, startPortfolio - cash - bonds)
-
-  const schedule: BucketRow[] = []
-
-  for (let y = 0; y < totalYears; y++) {
-    const age = retirementAge + y
-    const aow = age >= NL_AOW_AGE ? aowYearly : 0
-    const neededFromPortfolio = Math.max(0, yearlyExpenses - aow)
-    const total = cash + bonds + equity
-    const withdrawal = Math.min(neededFromPortfolio, total)
-
-    schedule.push({
-      year: y + 1, age,
-      cash: Math.round(cash),
-      bonds: Math.round(bonds),
-      equity: Math.round(equity),
-      total: Math.round(total),
-      withdrawal: Math.round(withdrawal),
-    })
-
-    // Withdraw from cash first, then bonds, then all equity (no legacy buffer)
-    let toWithdraw = withdrawal
-    const fromCash = Math.min(toWithdraw, cash)
-    cash -= fromCash
-    toWithdraw -= fromCash
-
-    const fromBonds = Math.min(toWithdraw, bonds)
-    bonds -= fromBonds
-    toWithdraw -= fromBonds
-
-    const fromEquity = Math.min(toWithdraw, equity)
-    equity -= fromEquity
-
-    // Apply returns per bucket
-    bonds = bonds * (1 + BOND_RETURN)
-    equity = equity * (1 + realReturn)
-
-    // Refill cascade: equity -> bonds -> cash
-    const bondShortfall = Math.max(0, bondTarget - bonds)
-    const bondRefill = Math.min(bondShortfall, equity)
-    bonds += bondRefill
-    equity -= bondRefill
-
-    const cashShortfall = Math.max(0, cashTarget - cash)
-    const cashRefill = Math.min(cashShortfall, bonds)
-    cash += cashRefill
-    bonds -= cashRefill
-
-    if (cash + bonds + equity <= 0) break
-  }
-  return schedule
 }
 
 // ── Sub-table: standard withdrawal columns ──────────────────
@@ -449,10 +212,10 @@ function VpwSubTable({
                     {formatCurrency(row.startBalance)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
-                    {row.remainingYears}
+                    {row.remainingYears ?? '\u2014'}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {row.vpwPct.toFixed(1)}%
+                    {(row.vpwRate ?? 0).toFixed(1)}%
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
                     -{formatCurrency(row.withdrawal)}
@@ -626,28 +389,45 @@ export function DepleteStrategyTables({
   const totalYears = Math.max(0, endAge - retirementAge)
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
 
-  // Annuity withdrawal that fully depletes portfolio at endAge
-  const annuityAnnual = annuityPayment(startPortfolio, realReturn, totalYears)
+  // Annuity withdrawal that fully depletes portfolio at endAge (display only).
+  const annuityAnnual = totalYears > 0 && startPortfolio > 0
+    ? (realReturn === 0
+      ? startPortfolio / totalYears
+      : (startPortfolio * realReturn) / (1 - Math.pow(1 + realReturn, -totalYears)))
+    : 0
 
-  // ── Compute all four schedules ──
-  const swrRows = useMemo(() =>
-    computeDepleteSwrSchedule(startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner),
-    [startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner],
+  // Gedeelde input-shape voor `computeTableSchedule`. Alle 4 schedules delen
+  // dezelfde parameters — de engine kiest het juiste formule-pad.
+  const tableInputs = useMemo(() => ({
+    startPortfolio,
+    retirementAge,
+    endAge,
+    yearlyExpenses,
+    grossReturn,
+    inflationRate,
+    hasPartner,
+    aowAge: NL_AOW_AGE,
+    legacyAmount: 0,
+  }), [startPortfolio, retirementAge, endAge, yearlyExpenses, grossReturn, inflationRate, hasPartner])
+
+  const swrRows = useMemo<WithdrawalRow[]>(() =>
+    computeTableSchedule('deplete', 'swr', tableInputs),
+    [tableInputs],
   )
 
-  const guardrailsRows = useMemo(() =>
-    computeDepleteGuardrailsSchedule(startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner),
-    [startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner],
+  const guardrailsRows = useMemo<WithdrawalRow[]>(() =>
+    computeTableSchedule('deplete', 'guardrails', tableInputs),
+    [tableInputs],
   )
 
-  const vpwRows = useMemo(() =>
-    computeDepleteVpwSchedule(startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner),
-    [startPortfolio, retirementAge, endAge, grossReturn, inflationRate, hasPartner],
+  const vpwRows = useMemo<VpwRow[]>(() =>
+    computeTableSchedule('deplete', 'vpw', tableInputs),
+    [tableInputs],
   )
 
-  const bucketRows = useMemo(() =>
-    computeDepleteBucketSchedule(startPortfolio, retirementAge, endAge, yearlyExpenses, grossReturn, inflationRate, hasPartner),
-    [startPortfolio, retirementAge, endAge, yearlyExpenses, grossReturn, inflationRate, hasPartner],
+  const bucketRows = useMemo<BucketRow[]>(
+    () => computeTableSchedule('deplete', 'bucket', tableInputs).map(toBucketRow),
+    [tableInputs],
   )
 
   return (

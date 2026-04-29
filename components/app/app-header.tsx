@@ -9,6 +9,7 @@ import { getActiveNavModules, getHomePath } from '@/lib/module-registry'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
+import { PrivacyToggle } from '@/components/app/privacy-toggle'
 
 // Static config for each nav module — label, path, and color token
 const navConfig: Record<string, { label: string; href: string; color: string }> = {
@@ -101,6 +102,9 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
 
         <div className="flex items-center gap-3">
           <PerspectiveSwitcher />
+
+          {/* Privacy toggle — mask/unmask monetary amounts across the app */}
+          <PrivacyToggle />
 
           {/* Notification bell — opens modal */}
           <button

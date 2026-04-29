@@ -195,7 +195,16 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
   if (!hasAnyBudget) {
     return (
       <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
-        <WidgetEmpty icon={LayoutGrid} message="Maak je eerste budget aan om je bestedingen te volgen." />
+        {/* First-use empty state — onboarding moment per design bible.
+            CTA mirrors the UPPERCASE kicker copy with werkwoord-eerst
+            phrasing and points straight to the /new flow. */}
+        <WidgetEmpty
+          variant="first-use"
+          icon={LayoutGrid}
+          title="Nog geen budgetten"
+          description="Maak je eerste budget aan om je bestedingen te volgen."
+          action={{ label: 'Maak je eerste budget aan', href: '/core/budgets/new' }}
+        />
       </WidgetShell>
     )
   }

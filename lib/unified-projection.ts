@@ -2236,6 +2236,13 @@ export function runSimulationUnified(
     net_worth_inclusion_pct: 100,
     has_budget_tracking: false,
     has_holdings_tracking: false,
+    // App-koppelingen — synthetische bucket gebruikt geen apps; defaults
+    // matchen het databaseschema zodat de stub typecheckbaar blijft.
+    has_woonbalans_tracking: false,
+    has_rental_tracking: false,
+    monthly_maintenance_cost: 0,
+    vva_fee: 0,
+    vacancy_log: [],
   }
 
   const input: UnifiedProjectionInput = {
