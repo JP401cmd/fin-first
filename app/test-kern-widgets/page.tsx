@@ -2,6 +2,7 @@
 
 import { WidgetRenderer, type DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetSize } from '@/lib/widget-catalog'
+import { PrivacyProvider } from '@/lib/hooks/use-privacy'
 
 // Minimal mock data for testing widget rendering
 const MOCK_DATA: DashboardData = {
@@ -259,6 +260,7 @@ const SIZES: WidgetSize[] = ['quarter', 'half', 'full']
 
 export default function TestKernWidgetsPage() {
   return (
+    <PrivacyProvider>
     <div className="p-4 space-y-8">
       <h1 className="text-2xl font-bold">Kern Widget Format Test</h1>
       <p className="text-sm text-zinc-500">
@@ -375,5 +377,6 @@ export default function TestKernWidgetsPage() {
         </div>
       </div>
     </div>
+    </PrivacyProvider>
   )
 }
