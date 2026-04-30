@@ -2184,6 +2184,10 @@ export function AssetForm({
   const [assetType, setAssetType] = useState<AssetType>(asset?.asset_type ?? defaultType ?? 'savings')
   const [hasBudgetTracking, setHasBudgetTracking] = useState(asset?.has_budget_tracking ?? false)
   const [hasHoldingsTracking, setHasHoldingsTracking] = useState(asset?.has_holdings_tracking ?? false)
+  // App-koppeling per asset-type — Hypotheekplanner (eigen_huis) en Verhuurrendement (real_estate).
+  // De boolean leeft op de asset zelf; geen aparte API-call nodig — de save-payload schrijft mee.
+  const [hasWoonbalansTracking, setHasWoonbalansTracking] = useState(asset?.has_woonbalans_tracking ?? false)
+  const [hasRentalTracking, setHasRentalTracking] = useState(asset?.has_rental_tracking ?? false)
   const [iban, setIban] = useState(asset?.account_number ?? '')
   const [currentValue, setCurrentValue] = useState(String(asset?.current_value ?? ''))
   const [purchaseValue, setPurchaseValue] = useState(String(asset?.purchase_value ?? ''))
@@ -2405,6 +2409,11 @@ export function AssetForm({
       has_budget_tracking: isCashType ? hasBudgetTracking : false,
       // Holdings tracking
       has_holdings_tracking: ['investment', 'crypto', 'savings', 'retirement'].includes(assetType) ? hasHoldingsTracking : false,
+      // App-koppeling: Hypotheekplanner (eigen_huis) + Verhuurrendement (real_estate).
+      // Voor andere asset-types gedwongen `false` zodat een type-wissel niet stilzwijgend
+      // een verkeerde app-vlag laat staan.
+      has_woonbalans_tracking: assetType === 'eigen_huis' ? hasWoonbalansTracking : false,
+      has_rental_tracking: assetType === 'real_estate' ? hasRentalTracking : false,
       // Ensure new assets are visible
       is_active: true,
     }
@@ -2833,6 +2842,42 @@ export function AssetForm({
                 </div>
               )}
             </>
+          )}
+
+          {/* Hypotheekplanner-app toggle (eigen_huis only) — patroon analoog aan budget/holdings hierboven. */}
+          {assetType === 'eigen_huis' && (
+            <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasWoonbalansTracking}
+                onChange={(e) => setHasWoonbalansTracking(e.target.checked)}
+                className="mt-0.5 rounded border-[var(--border-md)]"
+              />
+              <div>
+                <span className="text-sm font-medium text-[var(--ink)]">Hypotheekplanner</span>
+                <p className="text-xs text-[var(--ink-3)]">
+                  Schakel in om je equity-opbouw, oversluit-scenario&apos;s en hypotheek-vs-beleggen te zien.
+                </p>
+              </div>
+            </label>
+          )}
+
+          {/* Verhuurrendement-app toggle (real_estate only) — patroon analoog aan budget/holdings hierboven. */}
+          {assetType === 'real_estate' && (
+            <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasRentalTracking}
+                onChange={(e) => setHasRentalTracking(e.target.checked)}
+                className="mt-0.5 rounded border-[var(--border-md)]"
+              />
+              <div>
+                <span className="text-sm font-medium text-[var(--ink)]">Verhuurrendement</span>
+                <p className="text-xs text-[var(--ink-3)]">
+                  Schakel in om netto rendement, cashflow en bezetting per object te zien.
+                </p>
+              </div>
+            </label>
           )}
 
           {/* Type-specific fields */}

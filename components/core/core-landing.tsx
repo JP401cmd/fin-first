@@ -377,12 +377,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
               })}
             </div>
           ) : (
-            <EmptyCategoryState
-              kicker="Geen bezittingen geregistreerd"
-              message="Voeg je eerste bezitting toe om hier te beginnen."
-              ctaLabel="Voeg bezitting toe"
-              onClick={() => setQuickAddIntent('asset')}
-            />
+            <EmptyAssetsState onClick={() => setQuickAddIntent('asset')} />
           )}
         </div>
       </section>
@@ -416,12 +411,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
               ))}
             </div>
           ) : (
-            <EmptyCategoryState
-              kicker="Geen schulden geregistreerd"
-              message="Voeg een schuld toe als je bv. een hypotheek of lening hebt."
-              ctaLabel="Voeg schuld toe"
-              onClick={() => setQuickAddIntent('debt')}
-            />
+            <EmptyDebtsState onClick={() => setQuickAddIntent('debt')} />
           )}
         </div>
       </section>
@@ -452,33 +442,84 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
   )
 }
 
-// ── Empty state ──────────────────────────────────────────────
+// ── Empty states ─────────────────────────────────────────────
 
-function EmptyCategoryState({
-  kicker,
-  message,
-  ctaLabel,
-  onClick,
-}: {
-  kicker: string
-  message: string
-  ctaLabel: string
-  onClick: () => void
-}) {
+/**
+ * First-use empty state voor bezittingen. Naast de standaard kicker en CTA
+ * geven we een korte how-to: wat tel je mee, en hoe je het toevoegt. Dit
+ * is bewust een uitgebreidere body dan een gewone empty state — het
+ * eerste-gebruik-moment is meteen de onboarding.
+ */
+function EmptyAssetsState({ onClick }: { onClick: () => void }) {
   return (
-    <div className="mt-6 border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-6 py-10 text-center">
-      <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
-        {kicker}
+    <div className="mx-auto mt-6 max-w-2xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-6 py-10 text-center sm:px-10">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+        Begin bij wat je bezit
       </p>
-      <p className="mt-2 font-serif italic text-sm text-[var(--ink-2)]">
-        {message}
+      <p className="mt-3 font-serif text-xl italic text-[var(--ink)] sm:text-2xl">
+        Voeg je eerste bezitting toe.
+      </p>
+      <p className="mx-auto mt-4 max-w-lg font-serif text-base leading-relaxed text-[var(--ink-2)]">
+        Een bankrekening, je woning, beleggingen, een voertuig of een
+        levensverzekering — alles wat waarde voor je heeft. Klik op{' '}
+        <span className="font-semibold text-[var(--ink)]">Voeg bezitting toe</span>{' '}
+        en de wizard helpt je stap voor stap. Je kunt het altijd later bewerken
+        of meer toevoegen.
       </p>
       <button
         type="button"
         onClick={onClick}
-        className="mt-4 inline-flex h-11 items-center gap-2 border border-kern-300 bg-kern-50 px-4 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        className="mt-6 inline-flex h-11 items-center gap-2 border border-kern-300 bg-kern-50 px-5 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
       >
-        {ctaLabel}
+        Voeg bezitting toe
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Empty state voor schulden — dubbele framing.
+ *
+ * Schuldenvrij is een sterke financiële positie en mag gevierd worden, maar
+ * de afwezigheid van schulden kan ook gewoon "nog niet geregistreerd"
+ * betekenen. We geven beide lezingen ruimte: eerst de bevestiging dat
+ * schuldenvrij waardevol is, dan een asterisk-divider in krant-stijl, dan
+ * de uitnodiging om alsnog een schuld toe te voegen als die er is. Zo
+ * voelt geen van beide gebruikersgroepen genegeerd.
+ */
+function EmptyDebtsState({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="mx-auto mt-6 max-w-2xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-6 py-10 text-center sm:px-10">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+        Schuldenvrij
+      </p>
+      <p className="mt-3 font-serif text-xl italic text-[var(--ink)] sm:text-2xl">
+        Geen schulden geregistreerd — een ijzersterke positie.
+      </p>
+      <p className="mx-auto mt-4 max-w-lg font-serif text-base leading-relaxed text-[var(--ink-2)]">
+        Schuldenvrij zijn betekent dat al je vermogen voor jou werkt, niet
+        voor de bank. Houd dat zo: het is één van de belangrijkste fundamenten
+        onder je financiële vrijheid.
+      </p>
+
+      <p
+        aria-hidden="true"
+        className="mx-auto mt-6 text-[var(--ink-4)] tracking-[0.4em]"
+      >
+        * * *
+      </p>
+
+      <p className="mx-auto mt-6 max-w-lg font-serif text-base leading-relaxed text-[var(--ink-2)]">
+        Heb je toch een hypotheek, studielening of andere schuld? Registreer
+        hem dan hier zodat je netto vermogen, schuldgraad en FIRE-projectie
+        volledig kloppen.
+      </p>
+      <button
+        type="button"
+        onClick={onClick}
+        className="mt-6 inline-flex h-11 items-center gap-2 border border-kern-300 bg-kern-50 px-5 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+      >
+        Voeg schuld toe
       </button>
     </div>
   )

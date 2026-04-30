@@ -63,6 +63,10 @@ export function DebtForm({
   const [hasPaymentPlan, setHasPaymentPlan] = useState(debt?.has_payment_plan ?? false)
   // Familielening fields
   const [hasWrittenAgreement, setHasWrittenAgreement] = useState(debt?.has_written_agreement ?? false)
+  // App-koppeling: Aflosstrategie (en voor mortgage óók Hypotheekplanner) — één boolean
+  // drijft beide apps aan, kopie wisselt op debtType. Geen aparte API-call: de save-payload
+  // schrijft `has_strategy_tracking` direct mee.
+  const [hasStrategyTracking, setHasStrategyTracking] = useState(debt?.has_strategy_tracking ?? false)
   const [validationError, setValidationError] = useState<string | null>(null)
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(debt?.ownership ?? 'personal')
@@ -241,6 +245,12 @@ export function DebtForm({
       tax_year: taxYear ? Number(taxYear) : null,
       has_payment_plan: debtType === 'belastingschuld' ? hasPaymentPlan : false,
       has_written_agreement: debtType === 'familielening' ? hasWrittenAgreement : false,
+      // App-koppeling: alleen voor de zes Aflosstrategie-types (zie AFLOSSTRATEGIE_DEBT_TYPES
+      // in components/core/category-deepening-registry.ts). Voor andere types `false` zodat
+      // een type-wissel de vlag schoonveegt.
+      has_strategy_tracking: ['personal_loan', 'student_loan', 'car_loan', 'credit_card', 'revolving_credit', 'mortgage'].includes(debtType)
+        ? hasStrategyTracking
+        : false,
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
@@ -720,6 +730,30 @@ export function DebtForm({
                 </div>
               )}
             </div>
+          )}
+
+          {/* Aflosstrategie / Hypotheekplanner-app toggle — alleen voor de zes types in
+              AFLOSSTRATEGIE_DEBT_TYPES (registry). Eén toggle dekt zowel Aflosstrategie als
+              (voor mortgage) Hypotheekplanner — kopie wisselt op debtType. */}
+          {(['personal_loan', 'student_loan', 'car_loan', 'credit_card', 'revolving_credit', 'mortgage'] as const).includes(debtType as 'personal_loan' | 'student_loan' | 'car_loan' | 'credit_card' | 'revolving_credit' | 'mortgage') && (
+            <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasStrategyTracking}
+                onChange={(e) => setHasStrategyTracking(e.target.checked)}
+                className="mt-0.5 rounded border-[var(--border-md)]"
+              />
+              <div>
+                <span className="text-sm font-medium text-[var(--ink)]">
+                  {debtType === 'mortgage' ? 'Aflosstrategie & Hypotheekplanner' : 'Aflosstrategie'}
+                </span>
+                <p className="text-xs text-[var(--ink-3)]">
+                  {debtType === 'mortgage'
+                    ? 'Schakel in om je optimale aflossingsroute én equity, oversluit-scenario’s en hypotheek-vs-beleggen mee te nemen.'
+                    : 'Schakel in om deze schuld mee te nemen in je optimale aflossingsroute.'}
+                </p>
+              </div>
+            </label>
           )}
 
           {/* Wet excessief lenen warning for DGA-schuld */}

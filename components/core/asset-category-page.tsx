@@ -101,6 +101,15 @@ interface AssetCategoryPageProps {
    * must-uitgaven) en de volledige cash-overview te tonen bovenaan de pagina.
    */
   initialCoreData?: CorePageData
+  /**
+   * Mapping van cash-asset-ID → bank-account-ID, alleen relevant voor
+   * `type === 'cash'`. Wanneer een cash-asset `has_budget_tracking=true`
+   * heeft én een bijbehorende rij in `bank_accounts` (1:1 koppeling), dan
+   * navigeren we bij een klik op de asset-card naar de cash-detail-pagina
+   * (`/core/assets/cash/[bankAccountId]`). Zonder koppeling valt de klik
+   * terug op de bestaande `<AssetDetailFlow />` bottom-sheet.
+   */
+  bankAccountByAssetId?: Record<string, string>
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -135,6 +144,7 @@ export function AssetCategoryPage({
   initialBudgetsData,
   initialHoldingsData,
   initialCoreData,
+  bankAccountByAssetId,
 }: AssetCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -262,15 +272,29 @@ export function AssetCategoryPage({
     ? activeModules.includes(activeDeepening.moduleId)
     : false
 
-  // Klik op een asset opent een lokale BottomSheet met de details. Bewerken
-  // gaat via de volledige flow op `/core/assets`; we navigeren daarheen
-  // alleen wanneer de gebruiker dat expliciet kiest in de sheet.
-  const openAssetDetail = useCallback((assetId: string) => {
-    setSelectedAssetId(assetId)
-  }, [])
+  // Klik op een asset: voor cash met `has_budget_tracking=true` én een
+  // gekoppelde bank-account-rij navigeren we naar de volledige
+  // cash-detail-pagina — daar zit de transactie-historie, herhalingen,
+  // import en bewerken bij elkaar. In alle andere gevallen openen we de
+  // lokale BottomSheet (lichte preview met optionele deep-link naar de
+  // bewerk-flow). Zo blijven niet-getrackte cash-assets en alle andere
+  // asset-types netjes binnen het bestaande BottomSheet-patroon.
+  const openAssetDetail = useCallback(
+    (asset: Asset) => {
+      if (asset.has_budget_tracking) {
+        const accId = bankAccountByAssetId?.[asset.id]
+        if (accId) {
+          router.push(`/core/assets/cash/${accId}`)
+          return
+        }
+      }
+      setSelectedAssetId(asset.id)
+    },
+    [bankAccountByAssetId, router],
+  )
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-6xl">
       <CategoryHero type={type} total={total} count={count} />
 
       <div className="px-4 sm:px-6">
@@ -289,20 +313,27 @@ export function AssetCategoryPage({
         >
           {isItemsTab ? (
             <>
-              {/* Voor cash: volledige overview + kencijfers boven de
-                  rekeningen-grid. Andere types tonen alleen de items. */}
-              {type === 'cash' && (
-                <div className="mb-8 -mx-4 sm:-mx-6">
-                  <CashOverview embedded />
-                </div>
-              )}
-
+              {/* Volgorde voor cash:
+                  1. ItemsTab — de standaard asset-cards (alle cash-assets,
+                     ook handmatig ingevoerde zonder bank-account-rij).
+                  2. CashOverview embedded — toont alleen hero (totaal
+                     liquiditeit) + geldstroom; rekeningen-sectie en snelle
+                     acties zijn verborgen omdat die overlappen met de
+                     items-grid en de detail-pagina's.
+                  3. CoreKengetallen — financiële kencijfers onderaan.
+                  Andere types tonen alleen de items-tab. */}
               <ItemsTab
                 type={type}
                 assets={assets}
                 onItemClick={openAssetDetail}
                 onAddClick={() => setQuickAddOpen(true)}
               />
+
+              {type === 'cash' && (
+                <div className="mt-8 -mx-4 sm:-mx-6">
+                  <CashOverview embedded hideAccountsSection hideQuickActions />
+                </div>
+              )}
 
               {type === 'cash' && initialCoreData && (
                 <div className="mt-10 -mx-4 sm:-mx-6">
@@ -455,7 +486,7 @@ function CategoryHero({ type, total, count }: CategoryHeroProps) {
 interface ItemsTabProps {
   type: AssetType
   assets: Asset[]
-  onItemClick: (assetId: string) => void
+  onItemClick: (asset: Asset) => void
   onAddClick: () => void
 }
 

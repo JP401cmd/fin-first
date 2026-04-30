@@ -18,10 +18,13 @@ interface CategoryCardAppStripProps {
 /**
  * Compacte app-status-strip onderaan een `<CategoryCard>` op de Kern-landing.
  *
- * Drie statussen:
- * - **Aan, gekoppeld**: gevulde stip kern-700 + `{App} · {n}/{m}`.
- * - **Aan, leeg**: open stip ink-3 + `{App} · niet gekoppeld`.
- * - **Uit**: streep ink-4 + `{App} uit`.
+ * Drie statussen — uniforme tekst, onderscheid via `<StatusDot>` + tekstkleur:
+ * - **Aan, gekoppeld**: gevulde stip kern-700 + `{App} · {n}/{m}` (kern-700).
+ * - **Aan, leeg**: open stip ink-3 + `{App} · 0/{m}` (ink-3).
+ * - **Uit**: streep ink-4 + `{App} uit` (ink-4).
+ *
+ * Door ook bij 0 het breukje te tonen blijft de tekst op één regel en
+ * voorspelbaar; de stip-variant communiceert de "leeg"-staat visueel.
  *
  * Klik op de strip stopt propagation (zodat de outer card-link niet ook
  * fired) en navigeert direct naar `tabHref`. Dat geeft de gebruiker een
@@ -66,21 +69,13 @@ export function CategoryCardAppStrip({
         }
       >
         {moduleActive ? (
-          trackedCount > 0 ? (
-            <>
-              {appLabel}
-              <span className="mx-1 text-[var(--ink-4)]">·</span>
-              <span className="font-mono tabular-nums">
-                {trackedCount}/{totalCount}
-              </span>
-            </>
-          ) : (
-            <>
-              {appLabel}
-              <span className="mx-1 text-[var(--ink-4)]">·</span>
-              niet gekoppeld
-            </>
-          )
+          <>
+            {appLabel}
+            <span className="mx-1 text-[var(--ink-4)]">·</span>
+            <span className="font-mono tabular-nums">
+              {trackedCount}/{totalCount}
+            </span>
+          </>
         ) : (
           <>{appLabel} uit</>
         )}

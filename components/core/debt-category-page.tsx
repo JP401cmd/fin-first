@@ -191,7 +191,7 @@ export function DebtCategoryPage({
   }, [])
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-6xl">
       <DebtCategoryHero type={type} total={total} count={count} />
 
       <div className="px-4 sm:px-6">

@@ -94,17 +94,37 @@ export default async function AssetCategoryServerPage({
   let budgetsData: BudgetsPageData | null = null
   let holdingsData: HoldingsPageData | null = null
   let coreData: CorePageData | null = null
+  // Lookup voor cash-assets die gekoppeld zijn aan een actieve bank-account-rij.
+  // Een cash-asset met `has_budget_tracking=true` opent de detail-pagina van
+  // de gekoppelde rekening (`/core/assets/cash/[bankAccountId]`); zonder
+  // koppeling valt de klik terug op de algemene asset-detail-sheet.
+  // Niet-cash categorieën hebben deze prop niet nodig — `undefined` is veilig.
+  let bankAccountByAssetId: Record<string, string> | undefined
 
   if (type === 'cash') {
     // Voor de cash-categorie laden we ook de Kern-data zodat we de
     // kencijfers (geschat jaarinkomen, must-uitgaven) kunnen tonen
     // bovenaan de pagina.
-    const [budgetsResult, coreResult] = await Promise.allSettled([
+    const [budgetsResult, coreResult, bankAccountsResult] = await Promise.allSettled([
       loadBudgetsData(supabase),
       loadCoreData(supabase),
+      supabase
+        .from('bank_accounts')
+        .select('id, linked_asset_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .not('linked_asset_id', 'is', null),
     ])
     if (budgetsResult.status === 'fulfilled') budgetsData = budgetsResult.value
     if (coreResult.status === 'fulfilled') coreData = coreResult.value
+    if (bankAccountsResult.status === 'fulfilled' && bankAccountsResult.value.data) {
+      const rows = bankAccountsResult.value.data as Array<{ id: string; linked_asset_id: string | null }>
+      bankAccountByAssetId = Object.fromEntries(
+        rows
+          .filter((r): r is { id: string; linked_asset_id: string } => r.linked_asset_id !== null)
+          .map((r) => [r.linked_asset_id, r.id]),
+      )
+    }
   } else if (type === 'investment') {
     try {
       holdingsData = await loadHoldingsData(supabase)
@@ -120,6 +140,7 @@ export default async function AssetCategoryServerPage({
       initialBudgetsData={budgetsData ?? undefined}
       initialHoldingsData={holdingsData ?? undefined}
       initialCoreData={coreData ?? undefined}
+      bankAccountByAssetId={bankAccountByAssetId}
     />
   )
 }

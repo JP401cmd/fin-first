@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, Wallet, ArrowUpRight, ArrowDownLeft,
-  Upload, ArrowLeftRight, Link2, ArrowRight, X, ExternalLink,
+  Upload, Link2, ArrowRight, X, ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { type Account } from '@/components/app/account-form-modal'
@@ -46,7 +46,17 @@ type BudgetExpense = {
   limit: number
 }
 
-export function CashOverview({ embedded = false, onNavigateToAccount }: { embedded?: boolean; onNavigateToAccount?: (accountId: string) => void }) {
+export function CashOverview({
+  embedded = false,
+  onNavigateToAccount,
+  hideAccountsSection = false,
+  hideQuickActions = false,
+}: {
+  embedded?: boolean
+  onNavigateToAccount?: (accountId: string) => void
+  hideAccountsSection?: boolean
+  hideQuickActions?: boolean
+}) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [budgets, setBudgets] = useState<BudgetRow[]>([])
   const [transactions, setTransactions] = useState<TxAgg[]>([])
@@ -101,23 +111,47 @@ export function CashOverview({ embedded = false, onNavigateToAccount }: { embedd
 
   const loadAccounts = useCallback(async () => {
     const supabase = createClient()
-    let q = supabase.from('bank_accounts').select('*').eq('is_active', true).order('sort_order', { ascending: true })
+    // We laden alleen rekeningen waarvan het gekoppelde cash-asset
+    // `has_budget_tracking=true` heeft. Dit zijn de rekeningen die in de
+    // geldstroom-secties (inkomsten/uitgaven, totaal liquiditeit) horen
+    // mee te tellen — handmatig ingevoerde cash-assets zonder
+    // bank_accounts-rij vallen automatisch buiten de query.
+    let q = supabase
+      .from('bank_accounts')
+      .select('*, linked_asset:assets!bank_accounts_linked_asset_id_fkey(has_budget_tracking)')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
     if (perspective === 'personal') q = q.eq('ownership', 'personal')
     const { data } = await q
-    if (data) setAccounts(data as Account[])
+    if (data) {
+      const filtered = (data as Array<Account & { linked_asset?: { has_budget_tracking: boolean | null } | null }>)
+        .filter((a) => a.linked_asset?.has_budget_tracking === true)
+      setAccounts(filtered as Account[])
+    }
   }, [perspective])
 
+  // Account-IDs die de geldstroom-aggregaties mogen voeden. Wanneer er geen
+  // budget-tracked rekeningen zijn, slaan we de transactions-query over —
+  // anders levert `.in('account_id', [])` een 400 op en ruisen we de
+  // server onnodig met een lege query.
+  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts])
+
   const loadTransactions = useCallback(async () => {
+    if (accountIds.length === 0) {
+      setTransactions([])
+      return
+    }
     const supabase = createClient()
     let q = supabase
       .from('transactions')
       .select('amount, account_id, budget_id, is_income, transaction_type')
       .gte('date', monthStart)
       .lt('date', monthEnd)
+      .in('account_id', accountIds)
     if (perspective === 'personal') q = q.eq('ownership', 'personal')
     const { data } = await q
     if (data) setTransactions(data as TxAgg[])
-  }, [monthStart, monthEnd, perspective])
+  }, [monthStart, monthEnd, perspective, accountIds])
 
   const loadBudgets = useCallback(async () => {
     const supabase = createClient()
@@ -304,6 +338,7 @@ export function CashOverview({ embedded = false, onNavigateToAccount }: { embedd
       </section>
 
       {/* === 2. Rekeningen === */}
+      {!hideAccountsSection && (
       <section className="mt-5 sm:mt-8">
         <div className="mb-4 flex items-center gap-2">
           <div className="h-5 w-1 rounded-full bg-kern-500" />
@@ -372,6 +407,7 @@ export function CashOverview({ embedded = false, onNavigateToAccount }: { embedd
           })}
         </div>
       </section>
+      )}
 
       {/* === 3. Geldstroom === */}
       <section className="mt-5 sm:mt-8">
@@ -558,33 +594,26 @@ export function CashOverview({ embedded = false, onNavigateToAccount }: { embedd
       </section>
 
       {/* === 4. Snelle acties === */}
-      <section className="mt-5 sm:mt-8">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/core/cash/import"
-            className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-          >
-            <Upload className="h-4 w-4" />
-            Importeer transacties
-          </Link>
-          <Link
-            href="/core/cash/connect"
-            className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-          >
-            <Link2 className="h-4 w-4" />
-            Bank koppelen
-          </Link>
-          {accounts.length >= 2 && (
+      {!hideQuickActions && (
+        <section className="mt-5 sm:mt-8">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/core/cash"
+              href="/core/cash/import"
               className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
             >
-              <ArrowLeftRight className="h-4 w-4" />
-              Overboeking
+              <Upload className="h-4 w-4" />
+              Importeer transacties
             </Link>
-          )}
-        </div>
-      </section>
+            <Link
+              href="/core/cash/connect"
+              className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              <Link2 className="h-4 w-4" />
+              Bank koppelen
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* === Kassabon: Inkomsten === */}
       <BottomSheet

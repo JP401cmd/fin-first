@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import Link from 'next/link'
 import {
   formatCurrency,
   calculateFreedomTime,
@@ -140,7 +141,8 @@ export function CoreHero({
         {/* Bezittingen/schulden-bar */}
         <AssetsDebtsBar totalAssets={totalAssets} totalDebts={totalDebts} />
 
-        {/* Drie kolommen onderaan */}
+        {/* Drie kolommen onderaan — bezittingen + schulden zijn klikbaar
+            en navigeren naar de respectievelijke overzichtspagina's. */}
         <dl className="mt-6 grid grid-cols-1 gap-y-5 sm:mt-8 sm:grid-cols-3 sm:gap-x-6">
           <SummaryColumn
             kicker="Totale bezittingen"
@@ -148,6 +150,7 @@ export function CoreHero({
             value={totalAssets}
             valueClass="text-[var(--ink)]"
             meta={`${assetCount} ${assetCount === 1 ? 'bezitting' : 'bezittingen'}`}
+            href="/core/assets"
           />
           <SummaryColumn
             kicker="Totale schulden"
@@ -155,6 +158,7 @@ export function CoreHero({
             value={totalDebts}
             valueClass="text-negative"
             meta={`${debtCount} ${debtCount === 1 ? 'schuld' : 'schulden'}`}
+            href="/core/debts"
           />
           <SummaryColumn
             kicker="Schuldgraad"
@@ -327,6 +331,7 @@ function SummaryColumn({
   valueClass,
   meta,
   asPercentage = false,
+  href,
 }: {
   kicker: string
   kickerClass: string
@@ -334,13 +339,15 @@ function SummaryColumn({
   valueClass: string
   meta: string
   asPercentage?: boolean
+  /** Optioneel: maakt de hele kolom klikbaar als deeplink. */
+  href?: string
 }) {
   const formatted = asPercentage
     ? `${(Math.round(value * 10) / 10).toString().replace('.', ',')}%`
     : formatCurrency(value)
 
-  return (
-    <div>
+  const content = (
+    <>
       <dt
         className={[
           'text-[10px] font-semibold uppercase tracking-[0.1em]',
@@ -360,6 +367,20 @@ function SummaryColumn({
         {formatted}
       </dd>
       <p className="mt-1 text-[11px] text-[var(--ink-4)]">{meta}</p>
-    </div>
+    </>
   )
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="group -mx-2 -my-1 block px-2 py-1 transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        aria-label={`${kicker} — bekijk overzicht`}
+      >
+        {content}
+      </Link>
+    )
+  }
+
+  return <div>{content}</div>
 }

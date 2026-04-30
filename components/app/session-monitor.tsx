@@ -109,18 +109,34 @@ export function SessionMonitor() {
 
   // ── 3. Intercept 401 responses from API calls ────────────────────
   useEffect(() => {
-    const originalFetch = window.fetch
-    window.fetch = async (...args) => {
-      let response: Response
-      try {
-        response = await originalFetch(...args)
-      } catch (err) {
-        // Network errors (Failed to fetch) — pass through, not a session issue
-        throw err
-      }
+    // Bewaar het originele fetch met expliciete `this`-binding op `window`.
+    // Zonder bind faalt `originalFetch(...args)` in Chromium met
+    // `TypeError: Failed to fetch` (de native fetch eist een Window-receiver).
+    // Dat liet ALLE network-errors uit de app op session-monitor:116 landen,
+    // ook als de echte fout elders ontstond.
+    const originalFetch = window.fetch.bind(window)
 
-      // Only intercept our own API calls, not Supabase auth calls
-      const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url ?? ''
+    // Voorkom dubbele wrapping (Strict Mode of HMR) — als `window.fetch` al
+    // een ander wrapper-merk draagt, plakken we daar niet nog eens overheen.
+    const FETCH_WRAPPED = Symbol.for('trifinity.fetchWrapped')
+    if ((window.fetch as unknown as { [k: symbol]: unknown })[FETCH_WRAPPED]) {
+      return
+    }
+
+    const wrapped: typeof window.fetch = async (...args) => {
+      // Geen try/catch hier: network-errors moeten transparant doorlopen
+      // zodat ze in de stacktrace bij hun eigen call-site landen, niet bij
+      // de session-monitor. We onderscheppen alleen het 401-pad.
+      const response = await originalFetch(...args)
+
+      const url =
+        typeof args[0] === 'string'
+          ? args[0]
+          : args[0] instanceof Request
+            ? args[0].url
+            : args[0] instanceof URL
+              ? args[0].toString()
+              : ''
       const isOurApi = url.startsWith('/api/') || url.includes('/api/')
       const isAuthApi = url.includes('/auth/') || url.includes('supabase.co/auth')
 
@@ -130,9 +146,16 @@ export function SessionMonitor() {
 
       return response
     }
+    ;(wrapped as unknown as { [k: symbol]: unknown })[FETCH_WRAPPED] = true
+
+    window.fetch = wrapped
 
     return () => {
-      window.fetch = originalFetch
+      // Alleen onze eigen wrapper terugdraaien — als iets anders al weer
+      // overschreven heeft, laten we dat staan.
+      if (window.fetch === wrapped) {
+        window.fetch = originalFetch
+      }
     }
   }, [handleSessionExpired])
 

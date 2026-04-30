@@ -52,7 +52,13 @@ const ASSET_ICONS: Record<AssetType, LucideIcon> = {
 interface VermogenAssetCardProps {
   asset: Asset
   monthlyChange?: number | null
-  onClick: (assetId: string) => void
+  /**
+   * Click-handler ontvangt het volledige asset-object — niet alleen het ID.
+   * Reden: de caller (bv. `<AssetCategoryPage>` voor cash) moet kunnen
+   * beslissen op basis van velden als `has_budget_tracking` welke flow er
+   * geopend wordt (cash-detail-pagina vs. asset-detail-sheet).
+   */
+  onClick: (asset: Asset) => void
   staggerIndex?: number
 }
 
@@ -92,7 +98,7 @@ export function VermogenAssetCard({
   return (
     <button
       type="button"
-      onClick={(e) => { e.stopPropagation(); onClick(asset.id) }}
+      onClick={(e) => { e.stopPropagation(); onClick(asset) }}
       className="card-editorial animate-fade-up w-full text-left"
       style={
         { '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties
