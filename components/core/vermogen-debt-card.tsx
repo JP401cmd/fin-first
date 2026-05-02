@@ -21,6 +21,10 @@ import {
   Building2,
   CircleDot,
 } from 'lucide-react'
+import { CardKpiStrip } from './card-kpi-strip'
+import { ConnectionIndicator } from './connection-indicator'
+import type { KpiPair } from '@/lib/asset-kpi'
+import type { AssetConnectionSummary } from '@/lib/connections-data'
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -47,6 +51,18 @@ const DEBT_ICONS: Record<DebtType, React.ComponentType<{ className?: string }>> 
 
 interface VermogenDebtCardProps {
   debt: Debt
+  /**
+   * KPI-paar voor de strip onder de hoofdregel. Caller berekent dit via
+   * `computeDebtKpi(debt, ctx)` uit `lib/debt-kpi.ts`.
+   */
+  kpiPair?: KpiPair
+  /**
+   * Optionele actieve externe koppeling — rendert hetzelfde `Plug`-symbool
+   * als op asset-kaarten zodra een hypotheek-API of bank-connector aan een
+   * schuld gekoppeld kan worden. Voorlopig altijd `undefined` in productie
+   * (geen actieve debt-koppelingen), maar het display-pad is in stelling.
+   */
+  connection?: AssetConnectionSummary
   onClick: (debtId: string) => void
   staggerIndex?: number
 }
@@ -65,6 +81,8 @@ function formatRate(rate: number): string {
 
 export function VermogenDebtCard({
   debt,
+  kpiPair,
+  connection,
   onClick,
   staggerIndex = 0,
 }: VermogenDebtCardProps) {
@@ -79,7 +97,7 @@ export function VermogenDebtCard({
   if (debt.interest_rate > 0) {
     subtitleParts.push(formatRate(debt.interest_rate))
   }
-  const subtitle = subtitleParts.join(' \u00B7 ') // joined with middle dot
+  const subtitle = subtitleParts.join(' · ') // joined with middle dot
 
   return (
     <button
@@ -103,9 +121,12 @@ export function VermogenDebtCard({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-[var(--ink)]">
-            {debt.name}
-          </p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="truncate text-sm font-semibold text-[var(--ink)]">
+              {debt.name}
+            </p>
+            {connection && <ConnectionIndicator connection={connection} />}
+          </div>
           <p className="truncate text-[10px] text-[var(--ink-4)]">
             {DEBT_TYPE_LABELS[debt.debt_type]}
             {subtitle ? ` · ${subtitle}` : ''}
@@ -127,6 +148,8 @@ export function VermogenDebtCard({
           )}
         </div>
       </div>
+
+      {kpiPair && <CardKpiStrip pair={kpiPair} variant="item" />}
     </button>
   )
 }

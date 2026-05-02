@@ -2,11 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 import { getEURRateSync } from '@/lib/forex'
+import { resolveHolding } from '@/lib/holdings-table-resolver'
 
 /**
  * GET /api/holdings — List user's investment holdings.
  *
- * Reads from the dedicated `holdings` table.
+ * Na de tabel-split (migratie 20260502000003): leest uit `investment_holdings`.
+ * De Holdings-pagina is bedoeld voor effectenposities; crypto-posities lopen
+ * via de exchange-sync en de crypto-detail-routes — niet door deze
+ * overzichts-endpoint.
  *
  * Query params:
  *   ?asset_id=<uuid> — filter holdings for a specific asset
@@ -23,9 +27,8 @@ export async function GET(request: NextRequest) {
   const assetIdFilter = searchParams.get('asset_id')
 
   try {
-    // Join with assets to include parent asset name and filter by has_holdings_tracking
     let query = supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('*, asset:assets!asset_id(id, name, has_holdings_tracking)')
       .eq('user_id', user.id)
       .eq('is_active', true)
@@ -48,8 +51,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Exclude rows where the asset filter didn't match (nested object is null)
-    // and flatten asset_name onto each holding for client-side grouping.
     const holdings = (rawHoldings ?? [])
       .filter((h: Record<string, unknown>) => h.asset != null)
       .map((h: Record<string, unknown>) => {
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
       holdings,
       total_value: totalValue,
       total_cost: totalCost,
-      source: 'holdings_table',
+      source: 'investment_holdings_table',
     })
   } catch {
     return NextResponse.json({
@@ -213,13 +214,14 @@ export async function POST(request: NextRequest) {
       assetId = investmentAsset?.id || null
     }
 
-    // Check for duplicate ticker within the same asset (if ticker is provided)
+    // Check for duplicate ticker within the same asset (if ticker is provided).
+    // Investment-only — crypto duplicates worden via de exchange-sync afgehandeld
+    // (unique index op external_source + external_trade_id).
     if (ticker && typeof ticker === 'string' && ticker.trim().length > 0 && !forceDuplicate) {
       const tickerNorm = ticker.trim().toUpperCase()
 
-      // Build query: same user, same ticker, active holdings
       let dupeQuery = supabase
-        .from('holdings')
+        .from('investment_holdings')
         .select('id, name, ticker, asset_id')
         .eq('user_id', user.id)
         .eq('is_active', true)
@@ -265,17 +267,19 @@ export async function POST(request: NextRequest) {
       ...(ter_source != null && ter == null ? { ter_source: ter_source as string } : {}),
     }
 
-    // Try insert with TER fields first; retry without if column doesn't exist yet
+    // Insert in investment_holdings. Crypto-rijen verwachten we via de
+    // exchange-sync; handmatige POST naar deze endpoint is bedoeld voor
+    // effectenposities (CSV-import / manual entry op de Holdings-pagina).
     let { data: holding, error } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .insert({ ...baseRow, ...terFields })
       .select()
       .single()
 
     if (error && error.message?.includes("'ter'")) {
-      // TER column not yet in schema — retry without TER fields
+      // TER column missing in schema — retry without TER fields
       ;({ data: holding, error } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .insert(baseRow)
         .select()
         .single())
@@ -290,7 +294,7 @@ export async function POST(request: NextRequest) {
       await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
     }
 
-    const responseBody = { holding, source: 'holdings_table' }
+    const responseBody = { holding, source: 'investment_holdings_table' }
     // Cache the successful response for idempotency
     if (idempotencyKey) {
       const cacheKey = `${user.id}:${idempotencyKey}`
@@ -360,24 +364,23 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Resolve welke typed-tabel deze id huisvest. Vóór de tabel-split
+    // was dit een directe lookup; nu doen we eerst een resolver-roundtrip.
+    const resolved = await resolveHolding(supabase, id, user.id, 'id, asset_id, updated_at, name, units, avg_purchase_price, current_price, ticker, notes')
+    if (!resolved) {
+      return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
+    }
+    const tableName = resolved.tables.holdings
+
     // --- Optimistic concurrency check ---
-    // If the client sent expected_updated_at, verify the row hasn't changed since
     const expectedUpdatedAt = body.expected_updated_at as string | undefined
     if (expectedUpdatedAt) {
-      const { data: currentRow, error: fetchError } = await supabase
-        .from('holdings')
-        .select('updated_at, name, units, avg_purchase_price, current_price, ticker, notes')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .single()
+      const currentRow = resolved.holding as Record<string, unknown>
 
-      if (fetchError) {
-        return NextResponse.json({ error: fetchError.message }, { status: 500 })
-      }
-
-      if (currentRow) {
+      const updatedAtRaw = currentRow.updated_at as string | number | undefined
+      if (updatedAtRaw != null) {
         // Compare timestamps — normalize both to millisecond precision
-        const serverTime = new Date(currentRow.updated_at).getTime()
+        const serverTime = new Date(updatedAtRaw).getTime()
         const clientTime = new Date(expectedUpdatedAt).getTime()
 
         if (serverTime !== clientTime) {
@@ -386,7 +389,7 @@ export async function PATCH(request: NextRequest) {
             message: 'Deze holding is ondertussen door een andere sessie gewijzigd. Herlaad de gegevens en probeer opnieuw.',
             conflict: true,
             server_state: currentRow,
-            server_updated_at: currentRow.updated_at,
+            server_updated_at: updatedAtRaw,
             client_updated_at: expectedUpdatedAt,
           }, { status: 409 })
         }
@@ -400,6 +403,7 @@ export async function PATCH(request: NextRequest) {
     if (body.avg_purchase_price !== undefined) updates.avg_purchase_price = Number(body.avg_purchase_price)
     if (body.name !== undefined) updates.name = body.name
     if (body.ticker !== undefined) updates.ticker = body.ticker || null
+    if (body.isin !== undefined) updates.isin = body.isin || null
     if (body.notes !== undefined) updates.notes = body.notes || null
     if (body.currency !== undefined && typeof body.currency === 'string') updates.currency = body.currency.trim().toUpperCase() || 'EUR'
     if (body.ter !== undefined) updates.ter = body.ter != null ? Number(body.ter) : null
@@ -408,22 +412,28 @@ export async function PATCH(request: NextRequest) {
     // Always bump updated_at on write so future conflict checks work
     updates.updated_at = new Date().toISOString()
 
-    // Try update with all fields; retry without TER if column doesn't exist yet
+    // Try update with all fields; retry without TER if crypto-tabel hem niet
+    // heeft (crypto_holdings heeft geen ter/ter_source kolommen).
     let { data: holding, error } = await supabase
-      .from('holdings')
+      .from(tableName)
       .update(updates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single()
 
-    if (error && error.message?.includes("'ter'")) {
-      // TER column not yet in schema — retry without TER fields
-      const { ter: _t, ter_source: _ts, ...updatesNoTer } = updates
-      void _t; void _ts
+    if (error && (error.message?.includes("'ter'") || error.message?.includes("'currency'") || error.message?.includes("'isin'"))) {
+      // Column missing in target schema (most likely crypto_holdings, that
+      // doesn't carry ticker/isin/currency/ter columns). Retry with only the
+      // fields the typed-tabel ondersteunt.
+      const safeUpdates: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(updates)) {
+        if (k === 'ter' || k === 'ter_source' || k === 'currency' || k === 'isin') continue
+        safeUpdates[k] = v
+      }
       ;({ data: holding, error } = await supabase
-        .from('holdings')
-        .update(updatesNoTer)
+        .from(tableName)
+        .update(safeUpdates)
         .eq('id', id)
         .eq('user_id', user.id)
         .select()
@@ -434,12 +444,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Sync linked asset's current_value from all holdings (aggregate)
-    if (holding && holding.asset_id && (body.current_price !== undefined || body.units !== undefined)) {
+    // Sync linked asset's current_value from holdings (alleen voor investment;
+    // crypto-aggregate komt via een eigen pad in de exchange-sync-laag).
+    if (
+      holding &&
+      holding.asset_id &&
+      resolved.bucket === 'investment' &&
+      (body.current_price !== undefined || body.units !== undefined)
+    ) {
       await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
     }
 
-    return NextResponse.json({ holding, source: 'holdings_table' })
+    return NextResponse.json({ holding, source: `${tableName}_table`, bucket: resolved.bucket })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -467,16 +483,13 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    // Fetch asset_id before deleting so we can sync the parent asset afterwards
-    const { data: holdingToDelete } = await supabase
-      .from('holdings')
-      .select('asset_id')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single()
+    const resolved = await resolveHolding(supabase, id, user.id, 'id, asset_id')
+    if (!resolved) {
+      return NextResponse.json({ success: true, already_deleted: true })
+    }
 
     const { error } = await supabase
-      .from('holdings')
+      .from(resolved.tables.holdings)
       .delete()
       .eq('id', id)
       .eq('user_id', user.id)
@@ -485,12 +498,14 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Sync parent asset's current_value after deletion
-    if (holdingToDelete?.asset_id) {
-      await syncAssetValueFromHoldings(supabase, holdingToDelete.asset_id, user.id)
+    // Sync parent asset alleen voor investment — crypto loopt via de
+    // exchange-sync.
+    const assetId = (resolved.holding as { asset_id?: string }).asset_id
+    if (assetId && resolved.bucket === 'investment') {
+      await syncAssetValueFromHoldings(supabase, assetId, user.id)
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, bucket: resolved.bucket })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
     return NextResponse.json({ error: message }, { status: 500 })

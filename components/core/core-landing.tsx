@@ -28,6 +28,12 @@ import {
   countTrackedItems,
   getDeepeningSlug,
 } from './category-deepening-registry'
+import { buildKpiContext } from '@/lib/kpi-context'
+import {
+  computeAssetCategoryKpis,
+  computeDebtCategoryKpis,
+} from '@/lib/category-kpi'
+import type { KpiPair } from '@/lib/asset-kpi'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -284,6 +290,50 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
   const assetGroups = useMemo(() => groupAssetsByType(initialData), [initialData])
   const debtGroups = useMemo(() => groupDebtsByType(initialData), [initialData])
 
+  // ── Samengestelde KPI's per categorie ───────────────────────
+  // Eén context-build per render — de helper bouwt 3 Maps (holdings per
+  // asset, linked-asset waarde per debt, linked-debt balans per asset) die
+  // de aggregator-functies hergebruiken voor elke categorie.
+  const kpiCtx = useMemo(
+    () =>
+      buildKpiContext({
+        assets: initialData.fullAssets,
+        debts: initialData.fullDebts,
+        holdings: initialData.rawHoldings,
+        cashStatsByAssetId: initialData.cashStatsByAssetId,
+      }),
+    [
+      initialData.fullAssets,
+      initialData.fullDebts,
+      initialData.rawHoldings,
+      initialData.cashStatsByAssetId,
+    ],
+  )
+
+  const assetCategoryKpis = useMemo(() => {
+    const map = new Map<string, KpiPair>()
+    for (const group of assetGroups) {
+      const items = initialData.fullAssets.filter(
+        (a) => a.is_active && a.asset_type === group.type,
+      )
+      if (items.length === 0) continue
+      map.set(group.type, computeAssetCategoryKpis(items, group.type, kpiCtx.asset))
+    }
+    return map
+  }, [assetGroups, initialData.fullAssets, kpiCtx.asset])
+
+  const debtCategoryKpis = useMemo(() => {
+    const map = new Map<string, KpiPair>()
+    for (const group of debtGroups) {
+      const items = initialData.fullDebts.filter(
+        (d) => d.is_active && d.debt_type === group.type,
+      )
+      if (items.length === 0) continue
+      map.set(group.type, computeDebtCategoryKpis(items, group.type, kpiCtx.debt))
+    }
+    return map
+  }, [debtGroups, initialData.fullDebts, kpiCtx.debt])
+
   const totalAssets = initialData.rawFinancials.totalAssets
   const totalDebts = initialData.rawFinancials.totalDebts
   const netWorth = totalAssets - totalDebts
@@ -358,6 +408,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
                     count={group.count}
                     meta={`${group.count} item${group.count === 1 ? '' : 's'}`}
                     segments={group.segments}
+                    categoryKpis={assetCategoryKpis.get(group.type)}
                     href={`/core/assets/${group.type}`}
                     staggerIndex={idx}
                     variant="asset"
@@ -404,6 +455,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
                   count={group.count}
                   meta={`${group.count} item${group.count === 1 ? '' : 's'}`}
                   segments={group.segments}
+                  categoryKpis={debtCategoryKpis.get(group.type)}
                   href={`/core/debts/${group.type}`}
                   staggerIndex={idx}
                   variant="debt"

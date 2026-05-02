@@ -1,0 +1,6 @@
+Action,Time,ISIN,Ticker,Name,No. of shares,Price / share,Currency (Price / share),Exchange rate,Result,Currency (Result),Total,Currency (Total),Notes,ID
+Market buy,2024-03-12 09:32:14.123,US0378331005,AAPL,Apple Inc,5.00000000,170.50,USD,1.0900,,,782.34,EUR,,T-001
+Market buy,2024-04-08 14:11:02.000,US0378331005,AAPL,Apple Inc,3.00000000,168.20,USD,1.0850,,,464.95,EUR,,T-002
+Market sell,2024-06-21 10:05:55.000,IE00B4L5Y983,IWDA,iShares Core MSCI World UCITS ETF,2.00000000,89.10,EUR,1.0000,12.40,EUR,178.20,EUR,,T-003
+Dividend (Dividends paid),2024-05-15 12:00:00.000,US0378331005,AAPL,Apple Inc,8.00000000,0.24,USD,1.0875,,,1.77,EUR,Q1 dividend,T-004
+Deposit,2024-03-01 08:00:00.000,,,,,,,,,,500.00,EUR,Card deposit,T-005

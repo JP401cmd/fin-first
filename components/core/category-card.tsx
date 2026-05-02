@@ -7,6 +7,8 @@ import { iconMap } from '@/components/app/budget-shared'
 import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { CategoryCardAppStrip } from './category-card-app-strip'
+import { CardKpiStrip } from './card-kpi-strip'
+import type { KpiPair } from '@/lib/asset-kpi'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -42,6 +44,12 @@ export interface CategoryCardProps {
    * Volgorde wordt aangehouden (links-naar-rechts).
    */
   segments?: CategorySegment[]
+  /**
+   * Samengesteld KPI-paar voor de categorie. Wordt gerenderd direct onder
+   * het totaalbedrag, vóór de mini-bar. Lege paar (beide slots `undefined`)
+   * vervalt automatisch dankzij `<CardKpiStrip>`.
+   */
+  categoryKpis?: KpiPair
   /** Doel-URL bij klik — opent de categorie-pagina. */
   href: string
   /** Stagger-index voor sequentiele fade-in (0 = eerste kaart). */
@@ -92,8 +100,8 @@ function buildSegmentWidths(segments: CategorySegment[] | undefined) {
 
 /**
  * Klikbare categorie-kaart in het Kern-grid. Toont icon + label + totaal +
- * mini stacked-bar + meta-regel. Klik leidt naar de categorie-pagina
- * (`/core/assets/[type]` of `/core/debts/[type]`).
+ * samengestelde KPI's + mini stacked-bar + meta-regel. Klik leidt naar de
+ * categorie-pagina (`/core/assets/[type]` of `/core/debts/[type]`).
  *
  * Design-keuzes (UX-skill):
  * - Module-kleur is **kern-bruin** voor de hele kaart (accent-streep links).
@@ -109,6 +117,7 @@ export function CategoryCard({
   count,
   meta,
   segments,
+  categoryKpis,
   href,
   staggerIndex = 0,
   variant = 'asset',
@@ -154,6 +163,13 @@ export function CategoryCard({
           <p className="font-mono text-[18px] font-bold tabular-nums leading-none text-[var(--ink)] sm:text-[22px]">
             {formatCurrency(total)}
           </p>
+
+          {/* Samengestelde KPI-strip — direct onder het totaalbedrag,
+              vóór de mini-bar. Alleen aanwezig als minstens één KPI
+              berekenbaar is voor deze categorie. */}
+          {categoryKpis && (categoryKpis.primary || categoryKpis.secondary) && (
+            <CardKpiStrip pair={categoryKpis} variant="category" />
+          )}
 
           {/* Mini stacked-bar */}
           {segmentBars.length > 0 ? (

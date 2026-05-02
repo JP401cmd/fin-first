@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
+import { syncAssetValueFromInvestmentHoldings } from '@/lib/holdings-sync'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,6 +16,7 @@ interface ImportHolding {
   purchase_date: string | null
   exchange: string | null
   asset_id: string | null
+  external_trade_id?: string | null
 }
 
 interface ImportTransaction {
@@ -27,6 +28,7 @@ interface ImportTransaction {
   date: string | null
   fees: number
   notes: string | null
+  external_trade_id?: string | null
 }
 
 interface ImportRequestBody {
@@ -35,7 +37,7 @@ interface ImportRequestBody {
   broker: string
 }
 
-const VALID_BROKERS = ['degiro', 'saxo', 'ing_beleggen']
+const VALID_BROKERS = ['degiro', 'saxo', 'ing_beleggen', 'trading212', 'etoro']
 const VALID_TX_TYPES = ['buy', 'sell', 'dividend']
 
 // ---------------------------------------------------------------------------
@@ -93,7 +95,7 @@ function validateTransaction(tx: unknown, index: number, holdingsLength: number)
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/holdings/import — Bulk import holdings and transactions
+// POST /api/holdings/import — Bulk import investment_holdings + investment_transactions
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
@@ -153,24 +155,33 @@ export async function POST(request: NextRequest) {
       .from('assets')
       .select('id')
       .eq('user_id', user.id)
-      .in('asset_type', ['investment', 'crypto', 'savings'])
+      .in('asset_type', ['investment', 'savings'])
       .limit(1)
       .single()
     defaultAssetId = investmentAsset?.id || null
 
-    // --- Fetch existing active holdings for duplicate detection ---
+    // --- Fetch existing active investment_holdings for duplicate detection ---
 
     const { data: existingHoldings } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id, ticker, isin, units, avg_purchase_price, asset_id')
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const existingByIsin = new Map<string, (typeof existingHoldings extends (infer T)[] | null ? T : never)>()
-    const existingByTicker = new Map<string, (typeof existingHoldings extends (infer T)[] | null ? T : never)>()
+    type ExistingRow = {
+      id: string
+      ticker: string | null
+      isin: string | null
+      units: number
+      avg_purchase_price: number | null
+      asset_id: string | null
+    }
+
+    const existingByIsin = new Map<string, ExistingRow>()
+    const existingByTicker = new Map<string, ExistingRow>()
 
     if (existingHoldings) {
-      for (const h of existingHoldings) {
+      for (const h of existingHoldings as ExistingRow[]) {
         if (h.isin) existingByIsin.set(h.isin.toUpperCase(), h)
         if (h.ticker) existingByTicker.set(h.ticker.toUpperCase(), h)
       }
@@ -191,17 +202,17 @@ export async function POST(request: NextRequest) {
       const isinNorm = h.isin?.toUpperCase() || null
       const tickerNorm = h.ticker?.toUpperCase() || null
 
-      // Check for existing duplicate by ISIN first, then by ticker
+      // Check for existing duplicate by ISIN first, then by ticker.
       const existing = (isinNorm && existingByIsin.get(isinNorm))
         || (tickerNorm && existingByTicker.get(tickerNorm))
         || null
 
       if (existing) {
-        // Merge into existing holding: add units, recalculate weighted average price
+        // Merge into existing holding: add units, recalculate weighted average price.
         const oldUnits = existing.units
-        const oldAvg = existing.avg_purchase_price
+        const oldAvg = existing.avg_purchase_price ?? 0
         const newUnits = oldUnits + h.units
-        // Weighted average purchase price
+        // Weighted average purchase price.
         const newAvg = newUnits > 0
           ? ((oldAvg * oldUnits) + (h.avg_purchase_price * h.units)) / newUnits
           : 0
@@ -211,14 +222,14 @@ export async function POST(request: NextRequest) {
           avg_purchase_price: Math.round(newAvg * 100) / 100,
           updated_at: new Date().toISOString(),
         }
-        // Update current_price if the import provides one
+        // Update current_price if the import provides one.
         if (h.current_price !== null && h.current_price !== undefined) {
           updates.current_price = h.current_price
           updates.last_price_update = new Date().toISOString()
         }
 
         const { error: updateError } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .update(updates)
           .eq('id', existing.id)
           .eq('user_id', user.id)
@@ -234,11 +245,7 @@ export async function POST(request: NextRequest) {
 
         if (existing.asset_id) assetIdsToSync.add(existing.asset_id)
       } else {
-        // Create new holding
-        const assetId = h.asset_id || defaultAssetId
-
-        // asset_id is NOT NULL in the schema — we must have one.
-        // If no default exists, create a generic investment asset first.
+        // Create new holding. asset_id is NOT NULL — fall back to broker-named bucket.
         let resolvedAssetId = h.asset_id || defaultAssetId
         if (!resolvedAssetId) {
           const { data: newAsset } = await supabase
@@ -262,17 +269,20 @@ export async function POST(request: NextRequest) {
         }
 
         const { data: created, error: insertError } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .insert({
             user_id: user.id,
             asset_id: resolvedAssetId,
             name: h.name.trim(),
-            ticker: h.ticker || null,
+            ticker: (h.ticker?.trim() || h.name.trim()),
             isin: h.isin || null,
+            exchange: h.exchange || null,
             units: h.units,
             avg_purchase_price: h.avg_purchase_price,
             current_price: h.current_price ?? null,
             purchase_date: h.purchase_date || null,
+            currency: 'EUR',
+            external_source: body.broker,
             is_active: true,
           })
           .select('id, asset_id')
@@ -289,27 +299,17 @@ export async function POST(request: NextRequest) {
 
         if (created.asset_id) assetIdsToSync.add(created.asset_id)
 
-        // Add to lookup maps so subsequent imports in the same batch detect duplicates
-        if (isinNorm) {
-          existingByIsin.set(isinNorm, {
-            id: created.id,
-            ticker: h.ticker || null,
-            isin: h.isin || null,
-            units: h.units,
-            avg_purchase_price: h.avg_purchase_price,
-            asset_id: created.asset_id,
-          })
+        // Update lookup maps so subsequent imports in the same batch detect duplicates.
+        const newRow: ExistingRow = {
+          id: created.id,
+          ticker: h.ticker || null,
+          isin: h.isin || null,
+          units: h.units,
+          avg_purchase_price: h.avg_purchase_price,
+          asset_id: created.asset_id,
         }
-        if (tickerNorm) {
-          existingByTicker.set(tickerNorm, {
-            id: created.id,
-            ticker: h.ticker || null,
-            isin: h.isin || null,
-            units: h.units,
-            avg_purchase_price: h.avg_purchase_price,
-            asset_id: created.asset_id,
-          })
-        }
+        if (isinNorm) existingByIsin.set(isinNorm, newRow)
+        if (tickerNorm) existingByTicker.set(tickerNorm, newRow)
       }
     }
 
@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
     if (body.transactions.length > 0) {
       const txRows = body.transactions
         .filter((tx) => {
-          // date is NOT NULL in schema — skip transactions without a date
+          // date is NOT NULL in the schema — skip transactions without a date.
           return tx.date && tx.date.trim().length > 0
         })
         .map((tx) => {
@@ -326,6 +326,10 @@ export async function POST(request: NextRequest) {
           if (!holdingId) {
             throw new Error(`Geen holding gevonden voor holding_index ${tx.holding_index}`)
           }
+          // External_trade_id is optional; when absent we leave it NULL so the
+          // partial-unique index still allows multiple rows from the same broker
+          // for the same security.
+          const externalTradeId = tx.external_trade_id || null
           return {
             user_id: user.id,
             holding_id: holdingId,
@@ -333,19 +337,38 @@ export async function POST(request: NextRequest) {
             units: tx.units,
             price_per_unit: tx.price_per_unit,
             total_amount: tx.total_amount,
-            date: tx.date,
+            currency: 'EUR',
+            date: tx.date as string,
             notes: tx.notes || null,
+            external_source: body.broker,
+            external_trade_id: externalTradeId,
           }
         })
 
-      const { error: txError } = await supabase
-        .from('holding_transactions')
-        .insert(txRows)
+      // Split rows: those with an external_trade_id go through upsert (idempotent
+      // re-imports), the rest through plain insert (no dedup possible).
+      const upsertRows = txRows.filter((r) => r.external_trade_id != null)
+      const insertRows = txRows.filter((r) => r.external_trade_id == null)
 
-      if (txError) {
-        return NextResponse.json({
-          error: `Fout bij aanmaken transacties: ${txError.message}`,
-        }, { status: 500 })
+      if (upsertRows.length > 0) {
+        const { error: upsertErr } = await supabase
+          .from('investment_transactions')
+          .upsert(upsertRows, { onConflict: 'external_source,external_trade_id', ignoreDuplicates: true })
+        if (upsertErr) {
+          return NextResponse.json({
+            error: `Fout bij upserten transacties: ${upsertErr.message}`,
+          }, { status: 500 })
+        }
+      }
+      if (insertRows.length > 0) {
+        const { error: insertErr } = await supabase
+          .from('investment_transactions')
+          .insert(insertRows)
+        if (insertErr) {
+          return NextResponse.json({
+            error: `Fout bij aanmaken transacties: ${insertErr.message}`,
+          }, { status: 500 })
+        }
       }
 
       transactionsCreated = txRows.length
@@ -354,7 +377,7 @@ export async function POST(request: NextRequest) {
     // --- Sync asset values for all affected assets ---
 
     for (const assetId of Array.from(assetIdsToSync)) {
-      await syncAssetValueFromHoldings(supabase, assetId, user.id)
+      await syncAssetValueFromInvestmentHoldings(supabase, assetId, user.id)
     }
 
     // --- Calculate total imported value ---

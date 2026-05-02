@@ -14,6 +14,7 @@ import dynamic from 'next/dynamic'
 
 const HoldingsHeatmap = dynamic(() => import('@/components/app/holdings-heatmap'), { ssr: false })
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { IsinLookupField, type IsinResolved } from '@/components/holdings/isin-lookup-field'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
@@ -1198,6 +1199,7 @@ function HoldingForm({
   onSaved: () => void
 }) {
   const [name, setName] = useState('')
+  const [isin, setIsin] = useState('')
   const [ticker, setTicker] = useState('')
   const [tickerStatus, setTickerStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
   const [tickerInfo, setTickerInfo] = useState<{
@@ -1210,7 +1212,7 @@ function HoldingForm({
   const [units, setUnits] = useState('')
   const [avgPrice, setAvgPrice] = useState('')
   const [currentPrice, setCurrentPrice] = useState('')
-  const [currency] = useState('EUR')
+  const [currency, setCurrency] = useState('EUR')
   const [isActive] = useState(true)
   const [purchaseDate, setPurchaseDate] = useState(() => {
     const today = new Date()
@@ -1280,6 +1282,7 @@ function HoldingForm({
         body: JSON.stringify({
           name,
           ticker: ticker || null,
+          isin: isin || null,
           units: units ? Number(units) : 0,
           avg_purchase_price: Number(avgPrice) || 0,
           current_price: currentPrice ? Number(currentPrice) : null,
@@ -1375,6 +1378,19 @@ function HoldingForm({
         )}
 
         <div className="space-y-3">
+          <IsinLookupField
+            id="add-holding-isin"
+            value={isin}
+            onChange={setIsin}
+            onResolved={(r: IsinResolved) => {
+              if (!ticker) {
+                setTicker(r.ticker)
+                validateTicker(r.ticker)
+              }
+              if (!name) setName(r.name)
+              if (r.currency && r.currency !== currency) setCurrency(r.currency)
+            }}
+          />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam *</label>
@@ -1591,6 +1607,7 @@ function HoldingEditForm({
   const draft = loadDraft()
 
   const [name, setName] = useState(draft?.name ?? holding.name)
+  const [isin, setIsin] = useState<string>(draft?.isin ?? (holding.isin || ''))
   const [ticker, setTicker] = useState(draft?.ticker ?? (holding.ticker || ''))
   const [tickerStatus, setTickerStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
   const [tickerInfo, setTickerInfo] = useState<{
@@ -1656,13 +1673,14 @@ function HoldingEditForm({
     return (
       name !== holding.name ||
       ticker !== (holding.ticker || '') ||
+      isin !== (holding.isin || '') ||
       units !== String(holding.units) ||
       avgPrice !== String(holding.avg_purchase_price) ||
       currentPrice !== String(holding.current_price ?? '') ||
       notes !== (holding.notes || '') ||
       ter !== originalTerStr
     )
-  }, [name, ticker, units, avgPrice, currentPrice, notes, ter, holding, originalTerStr])
+  }, [name, ticker, isin, units, avgPrice, currentPrice, notes, ter, holding, originalTerStr])
 
   // Auto-save draft to localStorage when form is dirty
   useEffect(() => {
@@ -1670,7 +1688,7 @@ function HoldingEditForm({
       try {
         localStorage.setItem(draftKey, JSON.stringify({
           holdingId: holding.id,
-          name, ticker, units, avgPrice, currentPrice, notes, ter,
+          name, ticker, isin, units, avgPrice, currentPrice, notes, ter,
           savedAt: new Date().toISOString(),
         }))
       } catch { /* ignore storage errors */ }
@@ -1678,7 +1696,7 @@ function HoldingEditForm({
       // Clean up draft when form matches original
       try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
     }
-  }, [isDirty, draftKey, holding.id, name, ticker, units, avgPrice, currentPrice, notes, ter])
+  }, [isDirty, draftKey, holding.id, name, ticker, isin, units, avgPrice, currentPrice, notes, ter])
 
   // Warn on page refresh/close when form has unsaved changes
   useEffect(() => {
@@ -1712,6 +1730,7 @@ function HoldingEditForm({
   function discardDraft() {
     setName(holding.name)
     setTicker(holding.ticker || '')
+    setIsin(holding.isin || '')
     setUnits(String(holding.units))
     setAvgPrice(String(holding.avg_purchase_price))
     setCurrentPrice(String(holding.current_price ?? ''))
@@ -1735,6 +1754,7 @@ function HoldingEditForm({
         id: holding.id,
         name,
         ticker: ticker || null,
+        isin: isin || null,
         units: Number(units) || 1,
         avg_purchase_price: Number(avgPrice) || 0,
         current_price: currentPrice ? Number(currentPrice) : null,
@@ -1917,6 +1937,18 @@ function HoldingEditForm({
         )}
 
         <div className="space-y-3">
+          <IsinLookupField
+            id="edit-holding-isin"
+            value={isin}
+            onChange={setIsin}
+            onResolved={(r: IsinResolved) => {
+              if (!ticker) {
+                setTicker(r.ticker)
+                validateTicker(r.ticker)
+              }
+              if (!name || name === holding.name) setName(r.name)
+            }}
+          />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam *</label>

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { data, error } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id, name, ticker, units, avg_purchase_price, current_price, is_active, asset_class, sector, geography')
       .eq('user_id', user.id)
       .eq('is_active', true)
@@ -116,7 +116,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { error } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .update(updates)
       .eq('id', holding_id)
       .eq('user_id', user.id)

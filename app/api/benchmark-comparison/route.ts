@@ -27,9 +27,9 @@ export async function GET(request: NextRequest) {
   const period = TIME_PERIODS.find(p => p.id === periodId) || TIME_PERIODS[3] // default 1y
 
   try {
-    // Fetch holdings
+    // Fetch holdings — investment-tracker (migratie 20260502000003 splitste tabel)
     const { data: holdings, error: holdingsError } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id, units, avg_purchase_price, current_price, purchase_date, created_at')
       .eq('user_id', user.id)
       .eq('is_active', true)
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch transactions for holdings
     const { data: transactions } = await supabase
-      .from('holding_transactions')
+      .from('investment_transactions')
       .select('holding_id, type, units, price_per_unit, date')
       .in('holding_id', holdingIds)
       .order('date', { ascending: true })

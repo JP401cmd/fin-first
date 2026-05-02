@@ -153,8 +153,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, transaction_type, budget_id').gte('date', prevMonthStart).lt('date', monthStart),
     supabase.from('next_step_completions').select('step_key, dismissed'),
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
-    supabase.from('holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
-    supabase.from('holdings').select('name, ticker, units, avg_purchase_price, current_price, ter'),
+    // Tabel-split (migratie 20260502000003): dashboard-widgets tonen
+    // investment-tracker data; crypto loopt via de exchange-sync.
+    supabase.from('investment_holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
+    supabase.from('investment_holdings').select('name, ticker, units, avg_purchase_price, current_price, ter'),
     supabase.from('aow_leeftijden').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
   ])
 
@@ -952,7 +954,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   try {
     const [rebalHoldingsRes, rebalTargetsRes] = await Promise.all([
       supabase
-        .from('holdings')
+        .from('investment_holdings')
         .select('id, name, ticker, units, avg_purchase_price, current_price, asset_class, sector, geography')
         .eq('is_active', true),
       supabase

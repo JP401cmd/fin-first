@@ -6,6 +6,18 @@ import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 import type { Asset } from '@/lib/asset-data'
 import {
+  loadConnectionForAsset,
+  type AssetConnectionSummary,
+} from '@/lib/connections-data'
+import {
+  loadCryptoHoldingsForAsset,
+  type CryptoHoldingRow,
+} from '@/lib/crypto-holdings-data'
+import {
+  loadInvestmentHoldingsForAsset,
+  type InvestmentHoldingRow,
+} from '@/lib/investment-holdings-data'
+import {
   AssetDetailModal,
   AssetForm,
   ValuationModal,
@@ -64,6 +76,17 @@ export function AssetDetailFlow({
   >(new Map())
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const [budgetingActive, setBudgetingActive] = useState(true)
+  // Externe-koppeling state (R2). Alleen relevant voor crypto-assets — andere
+  // types tonen de sectie niet, dus de fetch is voor hen geen overhead. We
+  // initialiseren op `undefined` om "nog niet geladen" te onderscheiden van
+  // "geladen, maar geen koppeling" (`null`).
+  const [connection, setConnection] = useState<AssetConnectionSummary | null | undefined>(undefined)
+  // Typed holding-rijen (R5). Alleen geladen voor crypto/investment assets
+  // — voor andere types blijven beide arrays leeg en rendert de modal de
+  // sectie niet. `null` = nog niet geladen, `[]` = geladen maar geen
+  // holdings (legitiem voor handmatig ingevoerde bezittingen).
+  const [cryptoHoldings, setCryptoHoldings] = useState<CryptoHoldingRow[] | null>(null)
+  const [investmentHoldings, setInvestmentHoldings] = useState<InvestmentHoldingRow[] | null>(null)
 
   // Sync extern selectedAsset → interne state. Reset stap naar 'detail' bij
   // wisseling van asset of bij heropenen.
@@ -74,8 +97,26 @@ export function AssetDetailFlow({
     }
   }, [asset])
 
-  const loadFlowData = useCallback(async (assetId: string) => {
+  const loadFlowData = useCallback(async (assetId: string, assetType: string) => {
     const supabase = createClient()
+    // Connection-fetch loopt parallel maar alleen voor crypto/investment —
+    // voor andere types houdt het oude gedrag stand (geen extra
+    // Supabase-roundtrip).
+    const connectionPromise: Promise<AssetConnectionSummary | null> =
+      assetType === 'crypto' || assetType === 'investment'
+        ? loadConnectionForAsset(supabase, assetId).catch(() => null)
+        : Promise.resolve(null)
+    // Typed-holdings fetches per asset — net als de connection-fetch parallel
+    // en type-gated. Bij andere asset-types resolven beide direct met `[]`
+    // zodat de modal weet dat er geen sectie te tonen is.
+    const cryptoHoldingsPromise: Promise<CryptoHoldingRow[]> =
+      assetType === 'crypto'
+        ? loadCryptoHoldingsForAsset(supabase, assetId).catch(() => [])
+        : Promise.resolve([])
+    const investmentHoldingsPromise: Promise<InvestmentHoldingRow[]> =
+      assetType === 'investment'
+        ? loadInvestmentHoldingsForAsset(supabase, assetId).catch(() => [])
+        : Promise.resolve([])
     const [
       valuationsRes,
       mortgagesRes,
@@ -84,6 +125,9 @@ export function AssetDetailFlow({
       profileRes,
       essentialBudgetsRes,
       childBudgetsRes,
+      connectionResult,
+      cryptoHoldingsResult,
+      investmentHoldingsResult,
     ] = await Promise.all([
       supabase
         .from('valuations')
@@ -116,8 +160,14 @@ export function AssetDetailFlow({
         .from('budgets')
         .select('id, parent_id, default_limit, is_essential, interval, budget_type')
         .not('parent_id', 'is', null),
+      connectionPromise,
+      cryptoHoldingsPromise,
+      investmentHoldingsPromise,
     ])
 
+    setConnection(connectionResult)
+    setCryptoHoldings(cryptoHoldingsResult)
+    setInvestmentHoldings(investmentHoldingsResult)
     setValuations((valuationsRes.data ?? []) as Valuation[])
     setMortgages((mortgagesRes.data ?? []) as MortgageRow[])
     setAllAssets((allAssetsRes.data ?? []) as Asset[])
@@ -175,7 +225,7 @@ export function AssetDetailFlow({
   // modal-open — de cache binnen Supabase + React voorkomt onnodige hits.
   useEffect(() => {
     if (!currentAsset) return
-    void loadFlowData(currentAsset.id).catch(() => {
+    void loadFlowData(currentAsset.id, currentAsset.asset_type).catch(() => {
       // Niet kritiek — modal toont met placeholder-data
     })
   }, [currentAsset, loadFlowData])
@@ -231,6 +281,7 @@ export function AssetDetailFlow({
         asset={currentAsset}
         linkedBankAccounts={linkedBankAccounts}
         budgetingActive={budgetingActive}
+        initialConnection={connection ?? null}
         onClose={() => setModalStep('detail')}
         onSaved={() => {
           setModalStep('detail')
@@ -269,6 +320,8 @@ export function AssetDetailFlow({
       mortgage={mortgageProp}
       dailyExpenses={dailyExpenses}
       allAssets={allAssets}
+      cryptoHoldings={cryptoHoldings ?? undefined}
+      investmentHoldings={investmentHoldings ?? undefined}
       onClose={onClose}
       onEdit={() => setModalStep('edit')}
       onRevalue={() => setModalStep('revalue')}

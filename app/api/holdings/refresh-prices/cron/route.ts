@@ -1,6 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { fetchPriceData } from '@/lib/price-feed'
+import { fetchCoinPricesEurBatch } from '@/lib/integrations/coingecko-client'
+import { syncAllExchangeConnections } from '@/lib/integrations/exchange-cron'
+import { syncAllWalletAddresses } from '@/lib/integrations/wallet-cron'
 
 /**
  * GET /api/holdings/refresh-prices/cron
@@ -14,16 +17,16 @@ import { fetchPriceData } from '@/lib/price-feed'
  * Uses service role key (not user auth) to update prices for ALL users.
  * Protected by CRON_SECRET environment variable.
  *
- * Behaviour:
- * - Fetches all active holdings with a ticker across all users
- * - Deduplicates tickers to minimize Yahoo Finance API calls
- * - Respects rate limits (200ms delay between requests)
- * - Updates current_price, previous_close, daily_change_percent, last_price_update
- * - Syncs parent asset values after price updates
- * - Logs successes and errors per user
+ * Behaviour (post-P2):
+ * - Loops over BOTH `investment_holdings` and `crypto_holdings`.
+ * - Investment side uses Yahoo Finance, deduplicating tickers across users.
+ * - Crypto side tries Yahoo `{symbol}-EUR` first, falls back to a single
+ *   batched CoinGecko request for the long-tail symbols Yahoo can't price.
+ * - Persists day-close in `investment_holding_prices` / `crypto_holding_prices`.
+ * - Syncs parent asset values from the typed rollup helpers.
  *
- * Recommended schedule: hourly during market hours (08:00-22:00 CET)
- * to cover European, US, and crypto markets.
+ * Recommended schedule: hourly during market hours (08:00-22:00 CET) to cover
+ * European, US, and crypto markets.
  */
 export async function GET(request: Request) {
   const startTime = Date.now()
@@ -55,180 +58,53 @@ export async function GET(request: Request) {
     }, { status: 500 })
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey)
+  // Cast to the loosely-typed `SupabaseClient` so the helpers below can call
+  // `.from('investment_holdings')` without the strict default-schema generics
+  // collapsing the row shape to `never`.
+  const supabase: SupabaseClient = createClient(supabaseUrl, serviceRoleKey) as unknown as SupabaseClient
 
   try {
-    // ── Step 1: Fetch all active holdings with a ticker ───────────
-    const { data: allHoldings, error: holdingsError } = await supabase
-      .from('holdings')
-      .select('id, user_id, asset_id, ticker, isin, name, current_price, last_price_update, units')
-      .eq('is_active', true)
-      .or('ticker.neq.null,isin.neq.null')
+    // ── Step 1: Investment holdings refresh ───────────────────────
+    const investmentSummary = await refreshInvestmentHoldings(supabase)
 
-    if (holdingsError) {
-      return NextResponse.json({ error: holdingsError.message }, { status: 500 })
-    }
+    // ── Step 2: Crypto holdings refresh ───────────────────────────
+    const cryptoSummary = await refreshCryptoHoldings(supabase)
 
-    if (!allHoldings || allHoldings.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'Geen holdings met ticker gevonden',
-        summary: { total_holdings: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0 },
-        duration_ms: Date.now() - startTime,
-      })
-    }
-
-    // Filter out holdings without a usable ticker/ISIN
-    const holdingsWithTicker = allHoldings.filter(h => h.ticker || h.isin)
-
-    // ── Step 2: Deduplicate tickers to minimize API calls ─────────
-    // Multiple users/holdings may share the same ticker (e.g., VWRL.AS)
-    const tickerMap = new Map<string, string>() // normalized ticker → original ticker
-    for (const h of holdingsWithTicker) {
-      const ticker = (h.ticker || h.isin || '').trim().toUpperCase()
-      if (ticker && !tickerMap.has(ticker)) {
-        tickerMap.set(ticker, h.ticker || h.isin || '')
+    // ── Step 3: Sync exchange connections (W1.2) ──────────────────
+    // Runs AFTER price refresh so the asset-value rollup inside each sync
+    // sees the latest crypto quotes. Failures here never abort the cron;
+    // they are recorded in `external_data_sources`.
+    let exchangeResult
+    try {
+      exchangeResult = await syncAllExchangeConnections(supabase)
+    } catch (err) {
+      exchangeResult = {
+        total: 0, ok: 0, failed: 0, skipped: 0,
+        errors: [{ connectionId: '*', error: err instanceof Error ? err.message : 'unknown' }],
       }
     }
 
-    // ── Step 3: Fetch prices for unique tickers ───────────────────
-    const priceResults = new Map<string, Awaited<ReturnType<typeof fetchPriceData>>>()
-
-    const uniqueTickers = Array.from(tickerMap.keys())
-
-    for (const normalizedTicker of uniqueTickers) {
-      const priceData = await fetchPriceData(normalizedTicker)
-      priceResults.set(normalizedTicker, priceData)
-
-      // Respect rate limits: 200ms delay between actual API calls
-      if (priceData?.source === 'yahoo_finance') {
-        await new Promise(resolve => setTimeout(resolve, 200))
+    // ── Step 4: Sync on-chain wallet addresses (W1.3) ─────────────
+    let walletResult
+    try {
+      walletResult = await syncAllWalletAddresses(supabase)
+    } catch (err) {
+      walletResult = {
+        total: 0, ok: 0, failed: 0,
+        errors: [{ walletId: '*', error: err instanceof Error ? err.message : 'unknown' }],
       }
     }
-
-    // ── Step 4: Update holdings with fetched prices ───────────────
-    let updated = 0
-    let stale = 0
-    let skipped = 0
-    const errors: { holdingId: string; ticker: string; error: string }[] = []
-    const assetsToSync = new Set<string>() // asset_id:user_id pairs
-
-    for (const holding of holdingsWithTicker) {
-      const ticker = (holding.ticker || holding.isin || '').trim().toUpperCase()
-
-      if (!ticker) {
-        skipped++
-        continue
-      }
-
-      const priceData = priceResults.get(ticker)
-
-      if (!priceData) {
-        stale++
-        continue
-      }
-
-      // Build update fields
-      const updateFields: Record<string, unknown> = {
-        current_price: priceData.price,
-        last_price_update: new Date().toISOString(),
-      }
-
-      if (priceData.previousClose !== null) {
-        updateFields.previous_close = priceData.previousClose
-      }
-      if (priceData.dailyChangePercent !== null) {
-        updateFields.daily_change_percent = priceData.dailyChangePercent
-      }
-      // Store detected currency from Yahoo Finance
-      if (priceData.currency) {
-        updateFields.currency = priceData.currency
-      }
-
-      // Update the holding
-      const { error: updateError } = await supabase
-        .from('holdings')
-        .update(updateFields)
-        .eq('id', holding.id)
-
-      if (updateError) {
-        // Fallback: try without optional columns
-        const { error: fallbackError } = await supabase
-          .from('holdings')
-          .update({
-            current_price: priceData.price,
-            last_price_update: new Date().toISOString(),
-          })
-          .eq('id', holding.id)
-
-        if (fallbackError) {
-          errors.push({
-            holdingId: holding.id,
-            ticker: holding.ticker || holding.isin || '',
-            error: fallbackError.message,
-          })
-          continue
-        }
-      }
-
-      updated++
-
-      // Track assets that need value sync
-      if (holding.asset_id) {
-        assetsToSync.add(`${holding.asset_id}:${holding.user_id}`)
-      }
-    }
-
-    // ── Step 5: Sync parent asset values ──────────────────────────
-    let assetsSynced = 0
-    const assetSyncKeys = Array.from(assetsToSync)
-    for (const key of assetSyncKeys) {
-      const [assetId, userId] = key.split(':')
-      try {
-        // Aggregate all active holdings for this asset
-        const { data: assetHoldings } = await supabase
-          .from('holdings')
-          .select('units, current_price, avg_purchase_price')
-          .eq('asset_id', assetId)
-          .eq('user_id', userId)
-          .eq('is_active', true)
-
-        if (assetHoldings && assetHoldings.length > 0) {
-          const totalValue = assetHoldings.reduce((sum, h) => {
-            const price = h.current_price ?? h.avg_purchase_price
-            return sum + (price * h.units)
-          }, 0)
-
-          await supabase
-            .from('assets')
-            .update({ current_value: totalValue })
-            .eq('id', assetId)
-            .eq('user_id', userId)
-
-          assetsSynced++
-        }
-      } catch {
-        // Non-critical: asset sync failure doesn't fail the cron
-      }
-    }
-
-    // ── Step 6: Return results ────────────────────────────────────
-    const durationMs = Date.now() - startTime
 
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       summary: {
-        total_holdings: holdingsWithTicker.length,
-        unique_tickers: tickerMap.size,
-        updated,
-        stale,
-        skipped,
-        errors: errors.length,
-        assets_synced: assetsSynced,
+        investment: investmentSummary,
+        crypto: cryptoSummary,
+        exchanges: exchangeResult,
+        wallets: walletResult,
       },
-      duration_ms: durationMs,
-      ...(errors.length > 0 ? { errors } : {}),
+      duration_ms: Date.now() - startTime,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
@@ -237,4 +113,263 @@ export async function GET(request: Request) {
       duration_ms: Date.now() - startTime,
     }, { status: 500 })
   }
+}
+
+interface BucketSummary {
+  total: number
+  unique_tickers: number
+  updated: number
+  stale: number
+  skipped: number
+  errors: number
+  assets_synced: number
+}
+
+async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<BucketSummary> {
+  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0, errors: 0, assets_synced: 0 }
+
+  const { data: rows, error } = await supabase
+    .from('investment_holdings')
+    .select('id, user_id, asset_id, ticker, isin, current_price')
+    .eq('is_active', true)
+    .or('ticker.neq.null,isin.neq.null')
+
+  if (error || !rows) return summary
+  summary.total = rows.length
+
+  // Deduplicate tickers to minimise Yahoo calls.
+  const tickerToHoldings = new Map<string, Array<typeof rows[number]>>()
+  for (const h of rows) {
+    const t = ((h.ticker as string | null) || (h.isin as string | null) || '').trim().toUpperCase()
+    if (!t) {
+      summary.skipped++
+      continue
+    }
+    const list = tickerToHoldings.get(t) ?? []
+    list.push(h)
+    tickerToHoldings.set(t, list)
+  }
+  summary.unique_tickers = tickerToHoldings.size
+
+  const tickers = Array.from(tickerToHoldings.keys())
+  const priceResults = new Map<string, Awaited<ReturnType<typeof fetchPriceData>>>()
+  for (const t of tickers) {
+    const data = await fetchPriceData(t)
+    priceResults.set(t, data)
+    if (data?.source === 'yahoo_finance') {
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+  }
+
+  const assetsToSync = new Set<string>()
+
+  for (const [ticker, holdings] of tickerToHoldings.entries()) {
+    const priceData = priceResults.get(ticker)
+    if (!priceData) {
+      summary.stale += holdings.length
+      continue
+    }
+
+    const today = new Date().toISOString().slice(0, 10)
+    for (const h of holdings) {
+      const updateFields: Record<string, unknown> = {
+        current_price: priceData.price,
+        last_price_update: new Date().toISOString(),
+      }
+      if (priceData.previousClose !== null) updateFields.previous_close = priceData.previousClose
+      if (priceData.dailyChangePercent !== null) updateFields.daily_change_percent = priceData.dailyChangePercent
+      if (priceData.currency) updateFields.currency = priceData.currency
+
+      const { error: upErr } = await supabase
+        .from('investment_holdings')
+        .update(updateFields)
+        .eq('id', h.id as string)
+
+      if (upErr) {
+        summary.errors++
+        continue
+      }
+      summary.updated++
+      if (h.asset_id) assetsToSync.add(`${h.asset_id}:${h.user_id}`)
+
+      await supabase
+        .from('investment_holding_prices')
+        .upsert(
+          {
+            holding_id: h.id as string,
+            date: today,
+            close_price: priceData.price,
+            currency: priceData.currency || 'EUR',
+            source: 'yahoo_finance',
+          },
+          { onConflict: 'holding_id,date' },
+        )
+    }
+  }
+
+  // Roll up parent assets
+  for (const key of assetsToSync) {
+    const [assetId, userId] = key.split(':')
+    try {
+      const { data: assetHoldings } = await supabase
+        .from('investment_holdings')
+        .select('units, current_price, avg_purchase_price')
+        .eq('asset_id', assetId)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+
+      if (assetHoldings && assetHoldings.length > 0) {
+        const totalValue = assetHoldings.reduce((sum, h) => {
+          const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number | null) ?? 0
+          const units = (h.units as number) ?? 0
+          return sum + price * units
+        }, 0)
+        await supabase
+          .from('assets')
+          .update({ current_value: totalValue })
+          .eq('id', assetId)
+          .eq('user_id', userId)
+        summary.assets_synced++
+      }
+    } catch {
+      // Non-critical
+    }
+  }
+
+  return summary
+}
+
+async function refreshCryptoHoldings(supabase: SupabaseClient): Promise<BucketSummary> {
+  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0, errors: 0, assets_synced: 0 }
+
+  const { data: rows, error } = await supabase
+    .from('crypto_holdings')
+    .select('id, user_id, asset_id, symbol, current_price, is_fiat_balance')
+    .eq('is_active', true)
+
+  if (error || !rows) return summary
+  summary.total = rows.length
+
+  // Group by symbol for one Yahoo + one CoinGecko fetch per symbol.
+  const symbolToHoldings = new Map<string, Array<typeof rows[number]>>()
+  for (const h of rows) {
+    if ((h.is_fiat_balance as boolean | null) === true) {
+      summary.skipped++
+      continue
+    }
+    const sym = ((h.symbol as string | null) || '').trim().toUpperCase()
+    if (!sym) {
+      summary.skipped++
+      continue
+    }
+    const list = symbolToHoldings.get(sym) ?? []
+    list.push(h)
+    symbolToHoldings.set(sym, list)
+  }
+  summary.unique_tickers = symbolToHoldings.size
+
+  const symbols = Array.from(symbolToHoldings.keys())
+  const yahooResults = new Map<string, Awaited<ReturnType<typeof fetchPriceData>>>()
+  const yahooMisses: string[] = []
+
+  for (const sym of symbols) {
+    const data = await fetchPriceData(`${sym}-EUR`)
+    yahooResults.set(sym, data)
+    if (!data) yahooMisses.push(sym)
+    if (data?.source === 'yahoo_finance') {
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+  }
+
+  const cgPrices = yahooMisses.length > 0
+    ? await fetchCoinPricesEurBatch(yahooMisses)
+    : {}
+
+  const assetsToSync = new Set<string>()
+  const today = new Date().toISOString().slice(0, 10)
+
+  for (const [sym, holdings] of symbolToHoldings.entries()) {
+    const yahooData = yahooResults.get(sym) ?? null
+    const yahooPrice = yahooData?.price ?? null
+    const yahooPriceValid = typeof yahooPrice === 'number' && Number.isFinite(yahooPrice) && yahooPrice > 0
+
+    let price: number | null = null
+    let source: 'yahoo_finance' | 'coingecko' | null = null
+    if (yahooPriceValid) {
+      price = yahooPrice
+      source = 'yahoo_finance'
+    } else {
+      const cg = cgPrices[sym]
+      if (typeof cg === 'number' && Number.isFinite(cg) && cg > 0) {
+        price = cg
+        source = 'coingecko'
+      }
+    }
+
+    if (price == null || source == null) {
+      summary.stale += holdings.length
+      continue
+    }
+
+    for (const h of holdings) {
+      const { error: upErr } = await supabase
+        .from('crypto_holdings')
+        .update({
+          current_price: price,
+          last_price_update: new Date().toISOString(),
+        })
+        .eq('id', h.id as string)
+
+      if (upErr) {
+        summary.errors++
+        continue
+      }
+      summary.updated++
+      if (h.asset_id) assetsToSync.add(`${h.asset_id}:${h.user_id}`)
+
+      await supabase
+        .from('crypto_holding_prices')
+        .upsert(
+          {
+            holding_id: h.id as string,
+            date: today,
+            close_price: price,
+            currency: 'EUR',
+            source,
+          },
+          { onConflict: 'holding_id,date' },
+        )
+    }
+  }
+
+  // Roll up parent assets
+  for (const key of assetsToSync) {
+    const [assetId, userId] = key.split(':')
+    try {
+      const { data: assetHoldings } = await supabase
+        .from('crypto_holdings')
+        .select('units, current_price, avg_purchase_price')
+        .eq('asset_id', assetId)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+
+      if (assetHoldings && assetHoldings.length > 0) {
+        const totalValue = assetHoldings.reduce((sum, h) => {
+          const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number | null) ?? 0
+          const units = (h.units as number) ?? 0
+          return sum + price * units
+        }, 0)
+        await supabase
+          .from('assets')
+          .update({ current_value: totalValue })
+          .eq('id', assetId)
+          .eq('user_id', userId)
+        summary.assets_synced++
+      }
+    } catch {
+      // Non-critical
+    }
+  }
+
+  return summary
 }

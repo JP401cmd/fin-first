@@ -12,7 +12,6 @@ import {
   Wallet,
   PiggyBank,
   TrendingUp,
-  TrendingDown,
   Vault,
   Home,
   Building,
@@ -28,6 +27,10 @@ import {
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { findDeepenings } from './category-deepening-registry'
 import { AssetAppChip } from './asset-app-chip'
+import { CardKpiStrip } from './card-kpi-strip'
+import { ConnectionIndicator } from './connection-indicator'
+import type { KpiPair } from '@/lib/asset-kpi'
+import type { AssetConnectionSummary } from '@/lib/connections-data'
 
 // ── Icon mapping ────────────────────────────────────────────
 
@@ -51,7 +54,12 @@ const ASSET_ICONS: Record<AssetType, LucideIcon> = {
 
 interface VermogenAssetCardProps {
   asset: Asset
-  monthlyChange?: number | null
+  /**
+   * KPI-paar voor de strip onder de hoofdregel. Wanneer beide slots leeg
+   * zijn rendert de strip niets (geen divider). Caller berekent dit via
+   * `computeAssetKpi(asset, ctx)` uit `lib/asset-kpi.ts`.
+   */
+  kpiPair?: KpiPair
   /**
    * Click-handler ontvangt het volledige asset-object — niet alleen het ID.
    * Reden: de caller (bv. `<AssetCategoryPage>` voor cash) moet kunnen
@@ -59,6 +67,13 @@ interface VermogenAssetCardProps {
    * geopend wordt (cash-detail-pagina vs. asset-detail-sheet).
    */
   onClick: (asset: Asset) => void
+  /**
+   * Optionele actieve externe koppeling — rendert een klein `Plug`-symbool
+   * naast de naam-regel om aan te geven dat deze post automatisch via een
+   * API wordt bijgewerkt. Caller laadt dit via `loadConnectionsByAssetIds()`
+   * voor de hele lijst en geeft per kaart het asset-specifieke summary mee.
+   */
+  connection?: AssetConnectionSummary
   staggerIndex?: number
 }
 
@@ -66,18 +81,15 @@ interface VermogenAssetCardProps {
 
 export function VermogenAssetCard({
   asset,
-  monthlyChange,
+  kpiPair,
   onClick,
+  connection,
   staggerIndex = 0,
 }: VermogenAssetCardProps) {
   const { flashClass } = useFlashChange(asset.current_value)
   const { activeModules } = useFeatureAccess()
   const Icon = ASSET_ICONS[asset.asset_type]
   const accentColor = ASSET_TYPE_COLORS[asset.asset_type]
-
-  // Determine delta direction for styling
-  const hasDelta = monthlyChange != null && monthlyChange !== 0
-  const isPositiveDelta = hasDelta && monthlyChange! > 0
 
   // App-koppeling — leest direct uit de asset zelf via de registry-helper.
   // Geen separate state, geen junction-tabel: het bezit bepaalt de app-status.
@@ -116,9 +128,12 @@ export function VermogenAssetCard({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-[var(--ink)]">
-            {asset.name}
-          </p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="truncate text-sm font-semibold text-[var(--ink)]">
+              {asset.name}
+            </p>
+            {connection && <ConnectionIndicator connection={connection} />}
+          </div>
           <p className="truncate text-[10px] text-[var(--ink-4)]">
             {ASSET_TYPE_LABELS[asset.asset_type]}
             {asset.institution ? ` · ${asset.institution}` : ''}
@@ -132,30 +147,17 @@ export function VermogenAssetCard({
           )}
         </div>
 
-        {/* Right: value + delta */}
+        {/* Right: value */}
         <div className="shrink-0 text-right">
           <p
             className={`font-mono text-sm font-bold tabular-nums text-[var(--ink)] ${flashClass}`}
           >
             {formatCurrency(asset.current_value)}
           </p>
-          {hasDelta && (
-            <span
-              className={`flex items-center justify-end gap-0.5 font-mono text-[10px] font-medium tabular-nums ${
-                isPositiveDelta ? 'text-positive' : 'text-negative'
-              }`}
-            >
-              {isPositiveDelta ? (
-                <TrendingUp className="h-2.5 w-2.5" />
-              ) : (
-                <TrendingDown className="h-2.5 w-2.5" />
-              )}
-              {isPositiveDelta ? '+' : ''}
-              {formatCurrency(monthlyChange!)}
-            </span>
-          )}
         </div>
       </div>
+
+      {kpiPair && <CardKpiStrip pair={kpiPair} variant="item" />}
     </button>
   )
 }

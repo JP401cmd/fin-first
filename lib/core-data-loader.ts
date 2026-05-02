@@ -23,6 +23,7 @@ import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { ALL_MODULES } from '@/lib/module-registry'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
+import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -135,6 +136,29 @@ export interface CorePageData {
     positionCount: number
     top3: { ticker: string; value: number }[]
   } | null
+
+  /**
+   * Raw holdings-rijen van getrackde investment-assets, voor de samengestelde
+   * KPI-strip op categoriekaarten. Bevat alleen velden die de KPI-functies
+   * gebruiken (`asset_id`, `units`, `current_price`, `avg_purchase_price`,
+   * `daily_change_percent`). De Map-vorm wordt client-side opgebouwd via
+   * `buildKpiContext` — als raw lijst doorgeven houdt de wire serializable.
+   */
+  rawHoldings: Array<{
+    asset_id: string
+    units: number
+    current_price: number | null
+    avg_purchase_price: number | null
+    daily_change_percent: number | null
+  }>
+
+  /**
+   * Cash-stats per asset_id voor de cash-KPI's (laatste transactie,
+   * maandmutatie, hoogste uitgave). Server-side berekend uit transactions ×
+   * bank_accounts. Cash-assets zonder bank-koppeling staan niet in de map —
+   * de UI valt dan terug op een rente-fallback.
+   */
+  cashStatsByAssetId: Record<string, CashAssetStats>
 }
 
 // ── Main loader ────────────────────────────────────────────────
@@ -153,6 +177,13 @@ export const loadCoreData = cache(async function loadCoreData(
   //    Kern-batches draait. We awaiten 'em pas vlak voor de return.
   //    Cache via React `cache()` zorgt voor dedup binnen één request.
   const fireTargetPromise = computeHorizonFireTarget(supabase).catch(() => null)
+
+  // ── Cash-stats promise: parallel met alle andere batches. Combineert
+  //    transactie-stats (cash mét bank-koppeling/budgetteren) en
+  //    herwaarderings-stats (cash zónder, via valuations) zodat elk
+  //    cash-asset een passende KPI-bron krijgt. Failure → leeg object,
+  //    KPI valt op de UI-laag terug op rente.
+  const cashStatsPromise = loadCombinedCashStats(supabase).catch(() => ({} as Record<string, CashAssetStats>))
 
   // ── Batch 1: Primary data fetches ──
   const [
@@ -432,9 +463,12 @@ export const loadCoreData = cache(async function loadCoreData(
     supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
     supabase.from('goals').select('id').limit(1),
     supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd),
-    // Holdings from tracked assets for portfolio card
+    // Holdings from tracked assets for portfolio card. Na de tabel-split
+    // (migratie 20260502000003) zit deze data alleen in `investment_holdings`
+    // — crypto-holdings hebben (nog) geen `daily_change_percent` en worden
+    // separaat afgehandeld via de exchange-sync.
     supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id, name, ticker, units, current_price, avg_purchase_price, daily_change_percent, asset_id, asset:assets!asset_id(has_holdings_tracking)')
       .eq('is_active', true),
     supabase.from('transactions').select('budget_id, amount').gte('date', prevMonthStart).lt('date', monthStart),
@@ -730,6 +764,11 @@ export const loadCoreData = cache(async function loadCoreData(
 
   // ── Aggregate holdings portfolio for the card ──
   let holdingsPortfolio: CorePageData['holdingsPortfolio'] = null
+  // Raw holdings exposed onto CorePageData voor de KPI-strip op
+  // categoriekaarten en (later) de investment-categorie-pagina. Wordt
+  // gevuld met dezelfde tracked-set als `holdingsPortfolio` zodat beide
+  // oppervlakken consistent dezelfde scope hanteren.
+  let rawHoldingsForKpi: CorePageData['rawHoldings'] = []
   try {
     const rawHoldings = (holdingsResult.data ?? []) as Array<Record<string, unknown>>
     // Filter to only holdings where the joined asset has has_holdings_tracking = true
@@ -767,6 +806,19 @@ export const loadCoreData = cache(async function loadCoreData(
         top3,
       }
     }
+
+    // Bouw de afgeslankte holdings-lijst voor de KPI-strip. We projecteren
+    // alleen de velden die `computeAssetKpi` gebruikt — niet het hele rij —
+    // zodat de over-de-wire payload klein blijft.
+    rawHoldingsForKpi = trackedHoldings
+      .filter((h) => h.asset_id != null)
+      .map((h) => ({
+        asset_id: h.asset_id as string,
+        units: Number(h.units) || 0,
+        current_price: h.current_price != null ? Number(h.current_price) : null,
+        avg_purchase_price: h.avg_purchase_price != null ? Number(h.avg_purchase_price) : null,
+        daily_change_percent: h.daily_change_percent != null ? Number(h.daily_change_percent) : null,
+      }))
   } catch {
     // Holdings portfolio is non-critical
   }
@@ -834,5 +886,7 @@ export const loadCoreData = cache(async function loadCoreData(
     budgetSpendingHistory,
 
     holdingsPortfolio,
+    rawHoldings: rawHoldingsForKpi,
+    cashStatsByAssetId: await cashStatsPromise,
   }
 })

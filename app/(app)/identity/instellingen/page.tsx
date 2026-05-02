@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Scale } from 'lucide-react'
+import { ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Scale, Link2 } from 'lucide-react'
 import Link from 'next/link'
 import { BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -2089,6 +2089,25 @@ export default function InstellingenPage() {
             </button>
           </div>
         )}
+      </section>
+
+      {/* ── F: Externe koppelingen ─────────────────────────────────── */}
+      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <Link
+          href="/identity/koppelingen"
+          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] text-[var(--ink-2)]">
+              <Link2 className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="label-editorial text-[var(--ink-2)]">Externe koppelingen</h2>
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Crypto-exchanges, wallets, brokers en bankrekeningen — beheer op de Koppelingen-pagina</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+        </Link>
       </section>
 
       {/* ── Data Export ─────────────────────────────────────────────── */}

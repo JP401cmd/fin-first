@@ -35,7 +35,7 @@ export async function GET() {
       supabase.from('debts').select('id').eq('user_id', user.id).eq('is_active', true).limit(1),
       supabase.from('budgets').select('id').eq('user_id', user.id).is('parent_id', null).limit(1),
       supabase.from('transactions').select('id').eq('user_id', user.id).limit(1),
-      supabase.from('holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true),
+      supabase.from('investment_holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true),
       supabase.from('goals').select('id').eq('user_id', user.id).limit(1),
       supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true),
       supabase.from('profiles').select('active_modules, expected_return, inflation_rate').eq('id', user.id).maybeSingle(),

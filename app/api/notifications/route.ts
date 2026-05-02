@@ -615,7 +615,7 @@ export async function GET(request: NextRequest) {
         const holdingIds = [...new Set(activeAlerts.filter(a => a.holding_id).map(a => a.holding_id))]
         const { data: holdingsData } = holdingIds.length > 0
           ? await supabase
-              .from('holdings')
+              .from('investment_holdings')
               .select('id, name, ticker, current_price, avg_purchase_price, units, asset_class')
               .eq('user_id', user.id)
               .in('id', holdingIds)
@@ -625,7 +625,7 @@ export async function GET(request: NextRequest) {
 
         // For rebalance alerts, compute allocation percentages
         const { data: allHoldings } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .select('id, current_price, units, asset_class')
           .eq('user_id', user.id)
           .eq('is_active', true)
@@ -737,7 +737,7 @@ export async function GET(request: NextRequest) {
         supabase.from('debts').select('id').eq('user_id', user.id).eq('is_active', true).limit(1),
         supabase.from('budgets').select('id').eq('user_id', user.id).is('parent_id', null).limit(1),
         supabase.from('transactions').select('id').eq('user_id', user.id).limit(1),
-        supabase.from('holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true),
+        supabase.from('investment_holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true),
         supabase.from('goals').select('id').eq('user_id', user.id).limit(1),
         supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true),
         supabase.from('bank_connections').select('id, status').eq('user_id', user.id),

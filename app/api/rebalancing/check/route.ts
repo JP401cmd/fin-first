@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
   try {
     // ── Fetch holdings ──────────────────────────────────────
     const { data: holdingsData, error: holdingsError } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select(
         'id, name, ticker, units, avg_purchase_price, current_price, is_active, asset_class, sector, geography',
       )

@@ -1,21 +1,32 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
+import {
+  resolveHolding,
+  type HoldingTables,
+  tablesFor,
+  type HoldingBucket,
+} from '@/lib/holdings-table-resolver'
 
 /**
- * Compute running P&L for a list of transactions.
+ * Investment- en crypto-transactions hebben afwijkende type-enums:
+ *   - investment_transactions: 'buy'|'sell'|'dividend'|'split'|'transfer_in'|'transfer_out'
+ *   - crypto_transactions:     'buy'|'sell'|'deposit'|'withdrawal'|'fee'|'reward'
  *
- * For each transaction we track:
- *   - running_units: cumulative units held
- *   - running_cost_basis: total cost invested (buy adds, sell subtracts at avg cost)
- *   - running_avg_price: weighted average purchase price
- *   - realized_pnl: profit/loss locked in on this specific sell
- *   - cumulative_realized_pnl: total realized P&L across all sells up to this point
- *   - cumulative_dividends: total dividend income up to this point
+ * Voor de P&L-berekening op de UI behandelen we ze grotendeels gelijk: 'buy'
+ * voegt units + cost basis toe, 'sell' realiseert P&L en haalt units weg,
+ * 'split' rebalancet, 'dividend' / 'reward' tellen op aan dividend-income
+ * zonder de units te raken. 'deposit'/'withdrawal'/'fee'/'transfer_*' worden
+ * (voor nu) als no-ops gezien voor running-P&L; ze blijven wel zichtbaar in
+ * de log dankzij de `select('*')`.
  */
-function computeRunningPnL(transactions: Array<{
+type SharedTxType = 'buy' | 'sell' | 'dividend' | 'split' | 'reward'
+const VALID_INVESTMENT_TYPES = new Set(['buy', 'sell', 'dividend', 'split', 'transfer_in', 'transfer_out'])
+const VALID_CRYPTO_TYPES = new Set(['buy', 'sell', 'deposit', 'withdrawal', 'fee', 'reward'])
+
+interface TransactionRow {
   id: string
-  type: 'buy' | 'sell' | 'dividend' | 'split'
+  type: string
   units: number
   price_per_unit: number
   total_amount: number
@@ -24,8 +35,16 @@ function computeRunningPnL(transactions: Array<{
   created_at: string
   holding_id: string
   user_id?: string
-}>) {
-  // Sort chronologically (ascending) for running calculations
+}
+
+/**
+ * Compute running P&L for a list of transactions.
+ *
+ * Behandelt zowel investment- als crypto-types. Onbekende types worden
+ * stilzwijgend gepasseerd zodat een toekomstige type-toevoeging in het
+ * schema de UI niet breekt.
+ */
+function computeRunningPnL(transactions: TransactionRow[]) {
   const sorted = [...transactions].sort((a, b) => {
     const dateCompare = a.date.localeCompare(b.date)
     if (dateCompare !== 0) return dateCompare
@@ -43,34 +62,29 @@ function computeRunningPnL(transactions: Array<{
     const totalAmount = Number(tx.total_amount) || numUnits * pricePerUnit
     let realizedPnl = 0
     const runningAvgPrice = runningUnits > 0 ? runningCostBasis / runningUnits : 0
+    const t = tx.type as SharedTxType | string
 
-    if (tx.type === 'buy') {
+    if (t === 'buy') {
       runningCostBasis += numUnits * pricePerUnit
       runningUnits += numUnits
-    } else if (tx.type === 'sell') {
-      // Realized P&L = (sell price - avg cost) * units sold
+    } else if (t === 'sell') {
       realizedPnl = (pricePerUnit - runningAvgPrice) * numUnits
       cumulativeRealizedPnL += realizedPnl
-      // Reduce cost basis proportionally (remove at avg cost)
       runningCostBasis -= runningAvgPrice * numUnits
       runningUnits = Math.max(0, runningUnits - numUnits)
-      // Correct floating point: if units is 0, cost basis should be 0
       if (runningUnits <= 0) {
         runningCostBasis = 0
         runningUnits = 0
       }
-    } else if (tx.type === 'split') {
-      // Stock split: multiply units by multiplier, divide avg price
-      // Total value stays the same, no P&L impact
-      const multiplier = numUnits // units field stores the split multiplier
+    } else if (t === 'split') {
+      const multiplier = numUnits
       if (multiplier > 0 && runningUnits > 0) {
         runningUnits *= multiplier
-        // Cost basis stays the same (total investment unchanged)
-        // Avg price adjusts automatically since costBasis / units
       }
-    } else if (tx.type === 'dividend') {
+    } else if (t === 'dividend' || t === 'reward') {
       cumulativeDividends += totalAmount
     }
+    // deposit/withdrawal/fee/transfer_in/transfer_out: voor nu geen P&L-effect
 
     const newRunningAvgPrice = runningUnits > 0 ? runningCostBasis / runningUnits : 0
 
@@ -89,11 +103,10 @@ function computeRunningPnL(transactions: Array<{
 /**
  * GET /api/holdings/[id]/transactions
  *
- * List all transactions for a specific holding, with running P&L calculations.
- *
- * Returns:
- *   - transactions: array with running P&L annotations
- *   - summary: { total_invested, total_sold, realized_pnl, dividend_income, unrealized_pnl, total_return }
+ * Polymorf: resolveerd holding-id naar investment_holdings of crypto_holdings
+ * en queryt vervolgens de bijbehorende `*_transactions` tabel. Returns
+ * dezelfde response-shape als vóór de tabel-split — clients hoeven niets
+ * te wijzigen.
  */
 export async function GET(
   _request: NextRequest,
@@ -113,51 +126,41 @@ export async function GET(
   }
 
   try {
-    // Get the holding details for unrealized P&L calculation
+    // Resolver levert het holding-record + de juiste tabel-namen.
+    const resolved = await resolveHolding(
+      supabase,
+      holdingId,
+      user.id,
+      'id, units, avg_purchase_price, current_price',
+    )
+
     let holdingUnits = 0
     let holdingAvgPrice = 0
     let holdingCurrentPrice = 0
+    let tables: HoldingTables = tablesFor('investment')
 
-    const { data: holding } = await supabase
-      .from('holdings')
-      .select('units, avg_purchase_price, current_price')
-      .eq('id', holdingId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (holding) {
-      holdingUnits = Number(holding.units) || 0
-      holdingAvgPrice = Number(holding.avg_purchase_price) || 0
-      holdingCurrentPrice = Number(holding.current_price) || holdingAvgPrice
+    if (resolved) {
+      tables = resolved.tables
+      const h = resolved.holding
+      holdingUnits = Number(h.units) || 0
+      holdingAvgPrice = Number(h.avg_purchase_price) || 0
+      holdingCurrentPrice = Number(h.current_price) || holdingAvgPrice
     }
 
     const { data: txRows, error } = await supabase
-      .from('holding_transactions')
+      .from(tables.transactions)
       .select('*')
       .eq('holding_id', holdingId)
       .eq('user_id', user.id)
       .order('date', { ascending: true })
       .order('created_at', { ascending: true })
 
-    const rawTransactions: Array<{
-      id: string
-      holding_id: string
-      user_id: string
-      type: 'buy' | 'sell' | 'dividend' | 'split'
-      units: number
-      price_per_unit: number
-      total_amount: number
-      date: string
-      notes: string | null
-      created_at: string
-    }> = (!error && txRows) ? txRows as typeof rawTransactions : []
+    const rawTransactions: TransactionRow[] = (!error && txRows) ? txRows as TransactionRow[] : []
 
-    const source = rawTransactions.length > 0 ? 'holding_transactions_table' : 'empty'
+    const source = rawTransactions.length > 0 ? `${tables.transactions}_table` : 'empty'
 
-    // Compute running P&L
     const transactions = computeRunningPnL(rawTransactions)
 
-    // Compute summary
     const totalInvested = rawTransactions
       .filter(t => t.type === 'buy')
       .reduce((sum, t) => sum + (Number(t.units) * Number(t.price_per_unit)), 0)
@@ -167,23 +170,20 @@ export async function GET(
       .reduce((sum, t) => sum + (Number(t.units) * Number(t.price_per_unit)), 0)
 
     const dividendIncome = rawTransactions
-      .filter(t => t.type === 'dividend')
+      .filter(t => t.type === 'dividend' || t.type === 'reward')
       .reduce((sum, t) => sum + Number(t.total_amount), 0)
 
-    // Get cumulative realized P&L from the last transaction
     const lastTx = transactions.length > 0 ? transactions[transactions.length - 1] : null
     const realizedPnl = lastTx ? lastTx.cumulative_realized_pnl : 0
 
-    // Unrealized P&L = (current_price - avg_cost) * current_units
     const unrealizedPnl = holdingUnits > 0
       ? (holdingCurrentPrice - holdingAvgPrice) * holdingUnits
       : 0
 
-    // Total return = realized + unrealized + dividends
     const totalReturn = realizedPnl + unrealizedPnl + dividendIncome
 
     return NextResponse.json({
-      transactions: transactions.reverse(), // Newest first for display
+      transactions: transactions.reverse(),
       source,
       summary: {
         total_invested: parseFloat(totalInvested.toFixed(2)),
@@ -206,11 +206,10 @@ export async function GET(
 /**
  * POST /api/holdings/[id]/transactions
  *
- * Record a buy/sell/dividend transaction for a holding.
- *
- * Body: { type: 'buy'|'sell'|'dividend', units, price_per_unit, date, notes? }
- *
- * Delegates to the existing /api/holding-transactions handler logic.
+ * Insert een handmatige transactie. Dispatch naar de typed-tabel die bij de
+ * holding-bucket past. Het type wordt gevalideerd tegen de tabel-specifieke
+ * enum (investment vs crypto) — anders zou een crypto-rij met type 'split'
+ * pas bij INSERT door de DB worden afgewezen, met een onverteerbare error.
  */
 export async function POST(
   request: NextRequest,
@@ -245,17 +244,24 @@ export async function POST(
       }, { status: 400 })
     }
 
-    if (!['buy', 'sell', 'dividend', 'split'].includes(type)) {
-      return NextResponse.json({ error: 'type must be buy, sell, dividend, or split' }, { status: 400 })
+    const resolved = await resolveHolding(supabase, holdingId, user.id, 'id, units, avg_purchase_price')
+    if (!resolved) {
+      return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
+    }
+
+    const validSet = resolved.bucket === 'investment' ? VALID_INVESTMENT_TYPES : VALID_CRYPTO_TYPES
+    if (!validSet.has(type as string)) {
+      return NextResponse.json({
+        error: `type "${type}" is niet geldig voor ${resolved.bucket}-holdings`,
+      }, { status: 400 })
     }
 
     const numUnits = Number(units)
     const numPrice = type === 'split' ? 0 : Number(price_per_unit)
     const totalAmount = type === 'split' ? 0 : numUnits * numPrice
 
-    // Insert into holding_transactions table
     const { data: transaction, error } = await supabase
-      .from('holding_transactions')
+      .from(resolved.tables.transactions)
       .insert({
         holding_id: holdingId,
         user_id: user.id,
@@ -273,77 +279,59 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const source = 'holding_transactions_table'
+    const source = `${resolved.tables.transactions}_table`
 
-    // Update the holding's units and avg_purchase_price
-    const { data: holding } = await supabase
-      .from('holdings')
-      .select('id, units, avg_purchase_price')
+    const currentUnits = Number(resolved.holding.units) || 0
+    const currentAvg = Number(resolved.holding.avg_purchase_price) || 0
+    let newUnits = currentUnits
+    let newAvg = currentAvg
+    let realizedPnl = 0
+
+    if (type === 'buy') {
+      newUnits = currentUnits + numUnits
+      newAvg = newUnits > 0
+        ? (currentUnits * currentAvg + numUnits * numPrice) / newUnits
+        : numPrice
+    } else if (type === 'sell') {
+      realizedPnl = (numPrice - currentAvg) * numUnits
+      newUnits = Math.max(0, currentUnits - numUnits)
+    } else if (type === 'split') {
+      const multiplier = numUnits
+      if (multiplier > 0 && currentUnits > 0) {
+        newUnits = currentUnits * multiplier
+        newAvg = currentAvg / multiplier
+      }
+    }
+    // dividend/reward/transfer_in/transfer_out/deposit/withdrawal/fee: laat
+    // units en avg met rust — caller verwacht idempotent gedrag voor non-buy/sell.
+
+    const { error: updateErr } = await supabase
+      .from(resolved.tables.holdings)
+      .update({
+        units: newUnits,
+        avg_purchase_price: parseFloat(newAvg.toFixed(4)),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', holdingId)
       .eq('user_id', user.id)
-      .single()
 
-    if (holding) {
-      const currentUnits = Number(holding.units)
-      const currentAvg = Number(holding.avg_purchase_price)
-      let newUnits = currentUnits
-      let newAvg = currentAvg
-      let realizedPnl = 0
-
-      if (type === 'buy') {
-        newUnits = currentUnits + numUnits
-        newAvg = newUnits > 0
-          ? (currentUnits * currentAvg + numUnits * numPrice) / newUnits
-          : numPrice
-      } else if (type === 'sell') {
-        // Calculate realized P&L for this sell
-        realizedPnl = (numPrice - currentAvg) * numUnits
-        newUnits = Math.max(0, currentUnits - numUnits)
-        // avg stays the same for sells
-      } else if (type === 'split') {
-        // Stock split: units × multiplier, avg ÷ multiplier
-        // Total value stays the same
-        const multiplier = numUnits
-        if (multiplier > 0 && currentUnits > 0) {
-          newUnits = currentUnits * multiplier
-          newAvg = currentAvg / multiplier
-        }
-      }
-      // dividend: no change to units
-
-      const { error: updateErr } = await supabase
-        .from('holdings')
-        .update({
-          units: newUnits,
-          avg_purchase_price: parseFloat(newAvg.toFixed(4)),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', holdingId)
-        .eq('user_id', user.id)
-
-      if (updateErr) {
-        return NextResponse.json({
-          transaction,
-          source,
-          warning: `Transaction recorded but holding update failed: ${updateErr.message}`,
-          holding_updated: false,
-        }, { status: 201 })
-      }
-
+    if (updateErr) {
       return NextResponse.json({
         transaction,
         source,
-        holding_updated: true,
-        new_units: newUnits,
-        new_avg_price: parseFloat(newAvg.toFixed(4)),
-        realized_pnl: type === 'sell' ? parseFloat(realizedPnl.toFixed(2)) : undefined,
+        warning: `Transaction recorded but holding update failed: ${updateErr.message}`,
+        holding_updated: false,
       }, { status: 201 })
     }
 
     return NextResponse.json({
       transaction,
       source,
-      holding_updated: false,
+      bucket: resolved.bucket,
+      holding_updated: true,
+      new_units: newUnits,
+      new_avg_price: parseFloat(newAvg.toFixed(4)),
+      realized_pnl: type === 'sell' ? parseFloat(realizedPnl.toFixed(2)) : undefined,
     }, { status: 201 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
@@ -353,14 +341,7 @@ export async function POST(
 
 /**
  * Replay all transactions for a holding chronologically and compute the final
- * units and avg_purchase_price. This is the single source of truth after any
- * transaction mutation (especially DELETE).
- *
- * Rules:
- *   - buy: weighted average price, units increase
- *   - sell: units decrease, avg stays the same
- *   - split: units × multiplier, avg ÷ multiplier (total value unchanged)
- *   - dividend: no effect on units/avg
+ * units and avg_purchase_price. Single source of truth na elke mutatie.
  */
 function replayTransactions(
   transactions: Array<{ type: string; units: number; price_per_unit: number; date: string; created_at: string }>
@@ -391,7 +372,6 @@ function replayTransactions(
         avgPrice = 0
       }
     } else if (tx.type === 'split') {
-      // Stock split: units × multiplier, avg ÷ multiplier
       const multiplier = numUnits
       if (multiplier > 0 && units > 0) {
         units *= multiplier
@@ -409,8 +389,8 @@ function replayTransactions(
 /**
  * DELETE /api/holdings/[id]/transactions?tx_id=<uuid>
  *
- * Delete a holding transaction and replay remaining transactions to recalculate
- * the holding's units and avg_purchase_price.
+ * Verwijdert een transactie uit de juiste typed-tabel en replayed de rest om
+ * de holding-aggregates (units, avg_purchase_price) te herberekenen.
  */
 export async function DELETE(
   request: NextRequest,
@@ -436,9 +416,13 @@ export async function DELETE(
   }
 
   try {
-    // 1. Delete the transaction
+    const resolved = await resolveHolding(supabase, holdingId, user.id, 'id, asset_id')
+    if (!resolved) {
+      return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
+    }
+
     const { error } = await supabase
-      .from('holding_transactions')
+      .from(resolved.tables.transactions)
       .delete()
       .eq('id', txId)
       .eq('user_id', user.id)
@@ -447,9 +431,8 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // 2. Replay remaining transactions to recalculate holding
     const { data: remaining } = await supabase
-      .from('holding_transactions')
+      .from(resolved.tables.transactions)
       .select('type, units, price_per_unit, date, created_at')
       .eq('holding_id', holdingId)
       .eq('user_id', user.id)
@@ -458,9 +441,8 @@ export async function DELETE(
 
     const { units: newUnits, avgPurchasePrice: newAvg } = replayTransactions(remaining || [])
 
-    // 3. Update the holding with recalculated values
     const { error: updateErr } = await supabase
-      .from('holdings')
+      .from(resolved.tables.holdings)
       .update({
         units: newUnits,
         avg_purchase_price: newAvg,
@@ -469,24 +451,28 @@ export async function DELETE(
       .eq('id', holdingId)
       .eq('user_id', user.id)
 
-    // 4. Sync parent asset value
-    const { data: holding } = await supabase
-      .from('holdings')
-      .select('asset_id')
-      .eq('id', holdingId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (holding?.asset_id) {
-      await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
+    // Sync parent asset waarde — `syncAssetValueFromHoldings` heeft de oude
+    // tabel-namen niet gemigreerd, dus we slaan de aanroep over voor crypto
+    // tot die helper polymorf gemaakt wordt. Voor investments blijft het
+    // gedrag identiek aan vóór de migratie.
+    const assetId = (resolved.holding as { asset_id?: string }).asset_id
+    let assetSynced = false
+    if (assetId && resolved.bucket === 'investment') {
+      try {
+        await syncAssetValueFromHoldings(supabase, assetId, user.id)
+        assetSynced = true
+      } catch {
+        assetSynced = false
+      }
     }
 
     return NextResponse.json({
       success: true,
+      bucket: resolved.bucket,
       holding_updated: !updateErr,
       new_units: newUnits,
       new_avg_price: newAvg,
-      asset_synced: !!holding?.asset_id,
+      asset_synced: assetSynced,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'

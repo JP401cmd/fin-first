@@ -40,6 +40,7 @@ export const identityNav: ModuleNavConfig = {
     { label: 'Profiel', href: '/identity/profiel' },
     { label: 'Gids', href: '/identity/gids' },
     { label: 'Instellingen', href: '/identity/instellingen' },
+    { label: 'Koppelingen', href: '/identity/koppelingen' },
     { label: 'Testscenario\u2019s', href: '/identity/testscenarios' },
     { label: 'Delen', href: '/identity/delen' },
   ],

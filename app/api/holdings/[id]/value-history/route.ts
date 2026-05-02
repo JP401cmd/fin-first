@@ -1,22 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { backfillHoldingPrices } from '@/lib/historical-prices'
+import { resolveHolding, type HoldingTables } from '@/lib/holdings-table-resolver'
 
 /**
  * GET /api/holdings/[id]/value-history
  *
  * Returns a time-series of the holding's value over time.
  *
- * Primary: uses the holding_prices table for a realistic daily curve.
- * Fallback: if no holding_prices exist, builds from transaction events
- * (the original behaviour with straight-line interpolation).
+ * Polymorf na de tabel-split (migratie 20260502000003): kijkt parallel in
+ * `investment_holdings`/`crypto_holdings` voor de holding, en queryt
+ * vervolgens de bijbehorende `*_holding_prices` + `*_transactions` tabel.
  *
- * When the holding has a ticker but no stored prices, automatically
- * triggers a backfill from Yahoo Finance (fire-and-forget).
+ * Primary: gebruikt `*_holding_prices` voor een realistische dagelijkse curve.
+ * Fallback: bouwt uit transactions met rechte interpolatie.
  *
- * Returns:
- *   - history: array of { date, value, units, price, event, cost_basis }
- *   - source: 'holding_prices' | 'transactions'
+ * Bij investment-holdings met ticker maar zonder opgeslagen prijzen wordt
+ * een Yahoo-Finance backfill gestart (fire-and-forget). Crypto-holdings
+ * krijgen die backfill (nog) niet — die data komt via de exchange-sync.
  */
 export async function GET(
   _request: NextRequest,
@@ -36,24 +37,16 @@ export async function GET(
   }
 
   try {
-    // Get holding details
-    const { data: holding, error: holdingError } = await supabase
-      .from('holdings')
-      .select('*')
-      .eq('id', holdingId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (holdingError) {
-      return NextResponse.json({ error: holdingError.message }, { status: 500 })
-    }
-
-    if (!holding) {
+    const resolved = await resolveHolding(supabase, holdingId, user.id)
+    if (!resolved) {
       return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
     }
 
-    // --- Try holding_prices table first ---
-    const priceHistory = await buildPriceBasedHistory(supabase, holding, user.id)
+    const holding = resolved.holding
+    const tables = resolved.tables
+
+    // --- Try price-based history first ---
+    const priceHistory = await buildPriceBasedHistory(supabase, holding, tables, user.id)
 
     if (priceHistory && priceHistory.length >= 2) {
       const currentPrice = Number(holding.current_price) || Number(holding.avg_purchase_price) || 0
@@ -62,22 +55,23 @@ export async function GET(
       return NextResponse.json({
         holding_id: holdingId,
         holding_name: holding.name,
-        ticker: holding.ticker,
+        ticker: (holding.ticker as string | undefined) ?? (holding.symbol as string | undefined) ?? null,
         history: priceHistory,
         current_value: parseFloat((currentPrice * currentUnits).toFixed(2)),
         current_units: currentUnits,
         current_price: currentPrice,
-        source: 'holding_prices',
+        source: tables.prices,
       })
     }
 
     // --- Fallback: transaction-based history ---
-    const txHistory = await buildTransactionBasedHistory(supabase, holding, user.id)
+    const txHistory = await buildTransactionBasedHistory(supabase, holding, tables, user.id)
 
-    // If the holding has a ticker but no price history, trigger a backfill
-    // (fire-and-forget — don't block the response)
-    if (holding.ticker && (!priceHistory || priceHistory.length === 0)) {
-      backfillHoldingPrices(supabase, holdingId, holding.ticker, user.id, '1y').catch(() => {
+    // Backfill alleen voor investment-holdings — crypto-prijzen komen via
+    // exchange-sync / coingecko-pad dat (nog) niet via deze backfill loopt.
+    const ticker = holding.ticker as string | null | undefined
+    if (resolved.bucket === 'investment' && ticker && (!priceHistory || priceHistory.length === 0)) {
+      backfillHoldingPrices(supabase, holdingId, ticker, user.id, '1y').catch(() => {
         // Silently fail — backfill is best-effort
       })
     }
@@ -88,12 +82,12 @@ export async function GET(
     return NextResponse.json({
       holding_id: holdingId,
       holding_name: holding.name,
-      ticker: holding.ticker,
+      ticker: ticker ?? (holding.symbol as string | undefined) ?? null,
       history: txHistory,
       current_value: parseFloat((currentPrice * currentUnits).toFixed(2)),
       current_units: currentUnits,
       current_price: currentPrice,
-      source: 'transactions',
+      source: tables.transactions,
     })
   } catch {
     return NextResponse.json(
@@ -104,7 +98,7 @@ export async function GET(
 }
 
 // ---------------------------------------------------------------------------
-// Price-based history (from holding_prices table)
+// Price-based history
 // ---------------------------------------------------------------------------
 
 type HistoryPoint = {
@@ -117,11 +111,10 @@ type HistoryPoint = {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function buildPriceBasedHistory(supabase: any, holding: any, userId: string): Promise<HistoryPoint[] | null> {
+async function buildPriceBasedHistory(supabase: any, holding: any, tables: HoldingTables, userId: string): Promise<HistoryPoint[] | null> {
   try {
-    // Check if holding_prices table exists and has data for this holding
     const { data: prices, error } = await supabase
-      .from('holding_prices')
+      .from(tables.prices)
       .select('date, close_price')
       .eq('holding_id', holding.id)
       .order('date', { ascending: true })
@@ -130,9 +123,8 @@ async function buildPriceBasedHistory(supabase: any, holding: any, userId: strin
       return null
     }
 
-    // Get transactions to compute units at each date
     const { data: transactions } = await supabase
-      .from('holding_transactions')
+      .from(tables.transactions)
       .select('date, type, units, price_per_unit')
       .eq('holding_id', holding.id)
       .eq('user_id', userId)
@@ -145,13 +137,10 @@ async function buildPriceBasedHistory(supabase: any, holding: any, userId: strin
       price_per_unit: number
     }>
 
-    // Build a date → cumulative units + cost basis map from transactions
-    // This lets us know how many units were held on any given date
     const txEvents: Array<{ date: string; unitsAfter: number; costBasisAfter: number }> = []
     let runningUnits = 0
     let runningCostBasis = 0
 
-    // If no transactions but holding has data, assume all units from purchase
     if (txList.length === 0) {
       const units = Number(holding.units) || 0
       const avgPrice = Number(holding.avg_purchase_price) || 0
@@ -188,9 +177,7 @@ async function buildPriceBasedHistory(supabase: any, holding: any, userId: strin
       }
     }
 
-    // Helper: find units held on a given date
     function getUnitsAndCostOnDate(date: string): { units: number; costBasis: number } {
-      // Find the last transaction on or before this date
       let units = 0
       let costBasis = 0
       for (const ev of txEvents) {
@@ -204,7 +191,6 @@ async function buildPriceBasedHistory(supabase: any, holding: any, userId: strin
       return { units, costBasis }
     }
 
-    // Sample prices to avoid too many data points (max ~120 for a year)
     const maxPoints = 120
     const step = Math.max(1, Math.floor(prices.length / maxPoints))
 
@@ -226,7 +212,6 @@ async function buildPriceBasedHistory(supabase: any, holding: any, userId: strin
       })
     }
 
-    // Always include the last price point
     const lastPrice = prices[prices.length - 1]
     const lastInHistory = history[history.length - 1]
     if (lastPrice && (!lastInHistory || lastInHistory.date !== lastPrice.date)) {
@@ -244,7 +229,6 @@ async function buildPriceBasedHistory(supabase: any, holding: any, userId: strin
       }
     }
 
-    // Add today's current price as the final point
     const currentPrice = Number(holding.current_price) || Number(holding.avg_purchase_price) || 0
     const currentUnits = Number(holding.units) || 0
     const today = new Date().toISOString().split('T')[0]
@@ -262,19 +246,18 @@ async function buildPriceBasedHistory(supabase: any, holding: any, userId: strin
 
     return history.length >= 2 ? history : null
   } catch {
-    // Table might not exist yet — gracefully fall back
     return null
   }
 }
 
 // ---------------------------------------------------------------------------
-// Transaction-based history (original fallback)
+// Transaction-based fallback
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function buildTransactionBasedHistory(supabase: any, holding: any, userId: string): Promise<HistoryPoint[]> {
+async function buildTransactionBasedHistory(supabase: any, holding: any, tables: HoldingTables, userId: string): Promise<HistoryPoint[]> {
   const { data: transactions } = await supabase
-    .from('holding_transactions')
+    .from(tables.transactions)
     .select('*')
     .eq('holding_id', holding.id)
     .eq('user_id', userId)
@@ -286,7 +269,6 @@ async function buildTransactionBasedHistory(supabase: any, holding: any, userId:
   let runningUnits = 0
   let runningCostBasis = 0
 
-  // If there's a purchase date and no transactions, start from purchase
   if (txList.length === 0 && holding.purchase_date) {
     const purchasePrice = Number(holding.avg_purchase_price) || 0
     const units = Number(holding.units) || 0
@@ -300,7 +282,6 @@ async function buildTransactionBasedHistory(supabase: any, holding: any, userId:
     })
   }
 
-  // Process each transaction chronologically
   for (const tx of txList) {
     const numUnits = Number(tx.units) || 0
     const pricePerUnit = Number(tx.price_per_unit) || 0
@@ -318,7 +299,13 @@ async function buildTransactionBasedHistory(supabase: any, holding: any, userId:
       }
     }
 
-    const eventLabel = tx.type === 'buy' ? 'Koop' : tx.type === 'sell' ? 'Verkoop' : 'Dividend'
+    const eventLabel = tx.type === 'buy'
+      ? 'Koop'
+      : tx.type === 'sell'
+        ? 'Verkoop'
+        : tx.type === 'dividend' || tx.type === 'reward'
+          ? 'Dividend'
+          : tx.type
     const valueAtEvent = runningUnits * pricePerUnit
 
     history.push({
@@ -331,7 +318,6 @@ async function buildTransactionBasedHistory(supabase: any, holding: any, userId:
     })
   }
 
-  // Add current value as final data point (today)
   const currentPrice = Number(holding.current_price) || Number(holding.avg_purchase_price) || 0
   const currentUnits = Number(holding.units) || 0
   const currentValue = currentPrice * currentUnits

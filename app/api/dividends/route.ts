@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     if (hasHoldingsTable) {
       let query = supabase
-        .from('holdings')
+        .from('investment_holdings')
         .select('id, name, ticker, units, avg_purchase_price, current_price, is_active')
         .eq('user_id', user.id)
         .eq('is_active', true)
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
 
     if (hasHoldingTxTable) {
       let query = supabase
-        .from('holding_transactions')
+        .from('investment_transactions')
         .select('id, holding_id, date, total_amount, notes')
         .eq('user_id', user.id)
         .eq('type', 'dividend')

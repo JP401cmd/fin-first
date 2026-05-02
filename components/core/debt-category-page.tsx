@@ -14,6 +14,10 @@ import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { VermogenDebtCard } from './vermogen-debt-card'
+import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
+import { computeDebtKpi } from '@/lib/debt-kpi'
+import type { KpiPair } from '@/lib/asset-kpi'
+import type { AssetConnectionSummary } from '@/lib/connections-data'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
 import { DebtDetailSheet } from './debt-detail-sheet'
@@ -64,6 +68,19 @@ interface DebtCategoryPageProps {
   type: DebtType
   /** Initiële schulden, server-side geladen. */
   initialDebts: Debt[]
+  /**
+   * Lichtgewicht refs (assets+debts+holdings) voor de KPI-strip onder elke
+   * debt-card. Gebruikt voor o.a. mortgage LTV via `linked_asset_id`.
+   * `undefined` (load-failure of geen relevante context) laat de strip
+   * vervallen op individuele kaarten — pagina blijft functioneel.
+   */
+  initialKpiRefs?: KpiContextRefs
+  /**
+   * Mapping van debt-ID → actieve externe koppeling. Voorlopig leeg
+   * (R-iteratie zonder actieve debt-API's), maar het display-pad is
+   * voorbereid voor toekomstige hypotheek/bank-koppelingen.
+   */
+  initialConnectionsByDebtId?: Record<string, AssetConnectionSummary>
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -88,6 +105,8 @@ interface DebtCategoryPageProps {
 export function DebtCategoryPage({
   type,
   initialDebts,
+  initialKpiRefs,
+  initialConnectionsByDebtId,
 }: DebtCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -165,6 +184,29 @@ export function DebtCategoryPage({
   const count = debts.length
   const isItemsTab = activeTabKey === ITEMS_TAB_KEY
 
+  // ── KPI's per debt voor de strip onder elke kaart ─────────
+  // Bouw context één keer (incl. linked-asset Map voor LTV) en dispatch
+  // per debt naar `computeDebtKpi`. Bij ontbrekende refs (load-failure)
+  // valt LTV stilzwijgend weg — overige KPI's (rente, looptijd, benutting)
+  // werken op lokale velden en blijven beschikbaar.
+  const kpiByDebtId = useMemo(() => {
+    const ctx = initialKpiRefs
+      ? buildKpiContext({
+          assets: initialKpiRefs.assets as unknown as Parameters<typeof buildKpiContext>[0]['assets'],
+          debts: initialKpiRefs.debts as unknown as Parameters<typeof buildKpiContext>[0]['debts'],
+          holdings: initialKpiRefs.holdings,
+        }).debt
+      : {}
+    const map = new Map<string, KpiPair>()
+    for (const debt of debts) {
+      const pair = computeDebtKpi(debt, ctx)
+      if (pair.primary || pair.secondary) {
+        map.set(debt.id, pair)
+      }
+    }
+    return map
+  }, [debts, initialKpiRefs])
+
   // ── Actieve deepening ─────────────────────────────────────
   // Wanneer een verdiepings-tab actief is, zoeken we de bijbehorende entry
   // en component op basis van de slug. moduleActive wordt per entry
@@ -212,6 +254,8 @@ export function DebtCategoryPage({
             <DebtItemsTab
               type={type}
               debts={debts}
+              kpiByDebtId={kpiByDebtId}
+              connectionsByDebtId={initialConnectionsByDebtId}
               onItemClick={openDebtDetail}
               onAddClick={() => setQuickAddOpen(true)}
             />
@@ -334,6 +378,8 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
 interface DebtItemsTabProps {
   type: DebtType
   debts: Debt[]
+  kpiByDebtId?: Map<string, KpiPair>
+  connectionsByDebtId?: Record<string, AssetConnectionSummary>
   onItemClick: (debtId: string) => void
   onAddClick: () => void
 }
@@ -341,6 +387,8 @@ interface DebtItemsTabProps {
 function DebtItemsTab({
   type,
   debts,
+  kpiByDebtId,
+  connectionsByDebtId,
   onItemClick,
   onAddClick,
 }: DebtItemsTabProps) {
@@ -355,6 +403,8 @@ function DebtItemsTab({
           <VermogenDebtCard
             key={debt.id}
             debt={debt}
+            kpiPair={kpiByDebtId?.get(debt.id)}
+            connection={connectionsByDebtId?.[debt.id]}
             onClick={onItemClick}
             staggerIndex={idx}
           />

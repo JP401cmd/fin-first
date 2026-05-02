@@ -1,0 +1,6 @@
+Date,Type,Details,Amount,Units,Realized Equity Change,Realized Equity,Balance,Position ID,Asset type,NWA,ISIN
+01/03/2024 09:15:00,Deposit,Bank deposit,500.00,,500.00,500.00,500.00,,,,
+05/03/2024 13:42:11,Open Position,TSLA/USD,250.00,1.50,-250.00,250.00,250.00,12345,Stocks,N,US88160R1014
+10/04/2024 10:11:45,Open Position,MSFT/USD,400.00,1.00,-400.00,250.00,-150.00,12346,Stocks,N,US5949181045
+22/05/2024 16:03:09,Position closed,TSLA/USD,310.00,1.50,60.00,310.00,160.00,12345,Stocks,N,US88160R1014
+01/06/2024 00:00:00,Withdrawal,Bank withdrawal,-100.00,,-100.00,210.00,60.00,,,,

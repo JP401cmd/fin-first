@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon, ExternalLink,
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -32,6 +32,9 @@ import {
 } from '@/lib/asset-data'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
+import { AssetEditConnectionSection } from './asset-edit-connection-section'
+import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
+import { InvestmentHoldingCard } from '@/components/holdings/investment-holding-card'
 import type { AssetsPageData } from '@/lib/assets-data-loader'
 
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
@@ -811,6 +814,8 @@ export function AssetDetailModal({
   mortgage,
   dailyExpenses,
   allAssets,
+  cryptoHoldings,
+  investmentHoldings,
   onClose,
   onEdit,
   onRevalue,
@@ -821,6 +826,17 @@ export function AssetDetailModal({
   mortgage: { name: string; balance: number } | null
   dailyExpenses: number
   allAssets?: Asset[]
+  /**
+   * Typed crypto-holdings die bij dit asset horen (R5). Geladen door
+   * `<AssetDetailFlow />` via `loadCryptoHoldingsForAsset()`. Bij `undefined`
+   * is de fetch nog niet gedaan; bij `[]` zijn er gewoon 0 holdings (legitiem
+   * voor handmatig ingevoerde "Crypto-portfolio €X" zonder details).
+   */
+  cryptoHoldings?: import('@/lib/crypto-holdings-data').CryptoHoldingRow[]
+  /**
+   * Typed investment-holdings (R5). Zelfde semantiek als `cryptoHoldings`.
+   */
+  investmentHoldings?: import('@/lib/investment-holdings-data').InvestmentHoldingRow[]
   onClose: () => void
   onEdit: () => void
   onRevalue: () => void
@@ -1222,8 +1238,24 @@ export function AssetDetailModal({
             </div>
           )}
 
-          {/* Holdings per asset — shown for investment-like asset types */}
-          {(['investment', 'crypto', 'savings', 'retirement'] as string[]).includes(asset.asset_type) && (
+          {/* Holdings per asset — typed lijst voor crypto/investment (R5),
+              legacy fallback voor savings/retirement zolang die nog op de
+              polymorfe holdings-API draaien. */}
+          {asset.asset_type === 'crypto' && (
+            <TypedHoldingsSection
+              assetType="crypto"
+              holdings={cryptoHoldings ?? []}
+              loaded={cryptoHoldings !== undefined}
+            />
+          )}
+          {asset.asset_type === 'investment' && (
+            <TypedHoldingsSection
+              assetType="investment"
+              holdings={investmentHoldings ?? []}
+              loaded={investmentHoldings !== undefined}
+            />
+          )}
+          {(['savings', 'retirement'] as string[]).includes(asset.asset_type) && (
             <HoldingsList assetId={asset.id} assetName={asset.name} />
           )}
         </div>
@@ -1278,6 +1310,149 @@ export function AssetDetailModal({
           )}
         </div>
     </BottomSheet>
+  )
+}
+
+// ── Typed holdings section (R5) ──────────────────────────────
+
+/**
+ * Compacte holdings-lijst binnen de asset-detail-sheet voor crypto/investment-
+ * assets. Hergebruikt de typed holding-cards (CryptoHoldingCard /
+ * InvestmentHoldingCard) in `compact`-vorm en biedt een deeplink naar de
+ * Holdings-app verdiepingstab op de bijbehorende categoriepagina voor het
+ * volle arsenaal (allocation, transacties, vergelijking).
+ *
+ * Bewuste keuze: cards renderen we hier zonder bron-badge — die is via de
+ * detail-context (de asset zelf, met plug-indicator op de naam-regel) al
+ * eenduidig. Cap op de eerste 12 entries om de bottom-sheet niet uit zijn
+ * voegen te laten barsten; "Open holdings (N)" verwijst door naar het volle
+ * overzicht.
+ */
+function TypedHoldingsSection({
+  assetType,
+  holdings,
+  loaded,
+}: {
+  assetType: 'crypto' | 'investment'
+  holdings:
+    | import('@/lib/crypto-holdings-data').CryptoHoldingRow[]
+    | import('@/lib/investment-holdings-data').InvestmentHoldingRow[]
+  loaded: boolean
+}) {
+  const router = useRouter()
+  const visible = holdings.slice(0, 12)
+  const hasMore = holdings.length > visible.length
+  const totalEur = holdings.reduce((sum, h) => sum + h.valueEur, 0)
+
+  const headerLabel = assetType === 'crypto' ? 'Coins' : 'Posities'
+  const deepenLink = `/core/assets/${assetType}?tab=holdings`
+
+  // Loading-state: typed-holdings nog niet binnen. We tonen een lichte
+  // skeleton-blokje in plaats van een spinner — past bij krant-stijl en
+  // voorkomt layout-shift wanneer de data binnen ms binnenkomt.
+  if (!loaded) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+            {headerLabel}
+          </p>
+        </div>
+        <div className="h-12 w-full bg-[var(--subtle)]/60" aria-hidden="true" />
+        <div className="h-12 w-full bg-[var(--subtle)]/60" aria-hidden="true" />
+      </div>
+    )
+  }
+
+  if (holdings.length === 0) {
+    return (
+      <div className="border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/40 p-4">
+        <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+          Geen {assetType === 'crypto' ? 'coins' : 'posities'} gekoppeld
+        </p>
+        <p className="mt-1 font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
+          Voeg holdings toe via een exchange-koppeling, wallet-adres of
+          {assetType === 'investment' ? ' een CSV-import' : ' handmatige invoer'} om hier
+          de detailsamenstelling te zien.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                assetType === 'crypto'
+                  ? '/identity/koppelingen'
+                  : '/core/assets/holdings/import',
+              )
+            }
+            className="inline-flex h-9 items-center gap-1.5 border border-kern-300 bg-kern-50 px-3 text-[11px] font-medium text-kern-700 transition-colors hover:bg-kern-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+          >
+            {assetType === 'crypto' ? 'Koppel exchange' : 'Importeer holdings'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+          {headerLabel}
+          <span className="ml-1.5 text-[var(--ink-3)]">({holdings.length})</span>
+        </p>
+        <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+          {formatCurrency(totalEur)}
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        {assetType === 'crypto'
+          ? (visible as import('@/lib/crypto-holdings-data').CryptoHoldingRow[]).map(
+              (h, idx) => (
+                <CryptoHoldingCard
+                  key={h.id}
+                  holding={h}
+                  staggerIndex={idx}
+                  size="compact"
+                  onClick={(holding) =>
+                    router.push(`/core/assets/crypto/${holding.id}`)
+                  }
+                />
+              ),
+            )
+          : (
+              visible as import('@/lib/investment-holdings-data').InvestmentHoldingRow[]
+            ).map((h, idx) => (
+              <InvestmentHoldingCard
+                key={h.id}
+                holding={h}
+                staggerIndex={idx}
+                size="compact"
+                onClick={(holding) =>
+                  router.push(`/core/assets/investment/${holding.id}`)
+                }
+              />
+            ))}
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        <button
+          type="button"
+          onClick={() => router.push(deepenLink)}
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-kern-700 hover:text-kern-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          Open holdings
+          {hasMore && <span className="text-[var(--ink-4)]">({holdings.length})</span>}
+          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+        </button>
+        {hasMore && (
+          <p className="text-[10px] tabular-nums text-[var(--ink-4)]">
+            +{holdings.length - visible.length} meer
+          </p>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -2165,6 +2340,7 @@ export function AssetForm({
   onClose,
   onSaved,
   budgetingActive = true,
+  initialConnection = null,
 }: {
   asset?: Asset
   defaultType?: AssetType
@@ -2172,6 +2348,13 @@ export function AssetForm({
   onClose: () => void
   onSaved: () => void
   budgetingActive?: boolean
+  /**
+   * Initiële externe-koppeling voor de R2 "Externe koppeling"-sectie. Alleen
+   * relevant voor crypto-assets — voor andere types is dit altijd `null` en
+   * wordt de sectie niet gerenderd. Wordt door `<AssetDetailFlow />`
+   * meegegeven uit de batch-fetch bij modal-open.
+   */
+  initialConnection?: import('@/lib/connections-data').AssetConnectionSummary | null
 }) {
   const isEdit = !!asset
   const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
@@ -2844,6 +3027,17 @@ export function AssetForm({
             </>
           )}
 
+          {/* Externe koppeling sectie (R2) — alleen voor crypto, en alleen
+              wanneer we een bestaand asset bewerken: een connection vereist
+              een persistente asset-ID die we via de POST kunnen meegeven. */}
+          {isEdit && asset && assetType === 'crypto' && (
+            <AssetEditConnectionSection
+              assetId={asset.id}
+              assetName={asset.name}
+              initialConnection={initialConnection}
+            />
+          )}
+
           {/* Hypotheekplanner-app toggle (eigen_huis only) — patroon analoog aan budget/holdings hierboven. */}
           {assetType === 'eigen_huis' && (
             <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
@@ -2957,6 +3151,18 @@ export function AssetForm({
                         <option key={k} value={k}>{l}</option>
                       ))}
                     </select>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                      Vraag je actuele pensioenoverzicht op (DigiD vereist) en update je waarde handmatig.{' '}
+                      <a
+                        href="https://www.mijnpensioenoverzicht.nl/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-medium text-[var(--ink-2)] underline underline-offset-4 hover:text-[var(--ink)]"
+                      >
+                        Open mijnpensioenoverzicht.nl
+                        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      </a>
+                    </p>
                   </div>
                 )}
                 {visibleFields.includes('address_postcode') && (
@@ -3030,6 +3236,18 @@ export function AssetForm({
                       onChange={(e) => setWozValue(e.target.value)}
                       className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                      Vraag de actuele WOZ-waarde gratis op bij het officiële waardeloket.{' '}
+                      <a
+                        href="https://www.wozwaardeloket.nl/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-medium text-[var(--ink-2)] underline underline-offset-4 hover:text-[var(--ink)]"
+                      >
+                        Open WOZ-waardeloket
+                        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      </a>
+                    </p>
                   </div>
                 )}
                 {visibleFields.includes('depreciation_rate') && (

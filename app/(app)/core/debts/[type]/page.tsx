@@ -5,6 +5,11 @@ import {
   type Debt,
   type DebtType,
 } from '@/lib/debt-data'
+import { loadKpiContextRefs } from '@/lib/kpi-context'
+import {
+  loadConnectionsByDebtIds,
+  type AssetConnectionSummary,
+} from '@/lib/connections-data'
 import { DebtCategoryPage } from '@/components/core/debt-category-page'
 
 // ── Type guards ──────────────────────────────────────────────
@@ -66,7 +71,36 @@ export default async function DebtCategoryServerPage({
 
   const debts = (data ?? []) as Debt[]
 
-  return <DebtCategoryPage type={type} initialDebts={debts} />
+  // KPI-context refs voor LTV (mortgage → linked asset waarde) en
+  // overige type-specifieke berekeningen. Falen we hier, dan tonen de
+  // kaarten gewoon geen LTV — geen 500.
+  const kpiRefs = await loadKpiContextRefs(supabase).catch(() => null)
+
+  // Batched-load van actieve API-koppelingen per debt — voorlopig leeg in
+  // productie (geen actieve hypotheek/bank-connectoren), maar het pad is in
+  // stelling zodat het symbool zichtbaar wordt zodra de eerste debt-API komt.
+  // Falen we hier, dan vervalt het symbool stilzwijgend; de pagina blijft
+  // functioneel.
+  let connectionsByDebtId: Record<string, AssetConnectionSummary> | undefined
+  if (debts.length > 0) {
+    try {
+      connectionsByDebtId = await loadConnectionsByDebtIds(
+        supabase,
+        debts.map((d) => d.id),
+      )
+    } catch {
+      connectionsByDebtId = undefined
+    }
+  }
+
+  return (
+    <DebtCategoryPage
+      type={type}
+      initialDebts={debts}
+      initialKpiRefs={kpiRefs ?? undefined}
+      initialConnectionsByDebtId={connectionsByDebtId}
+    />
+  )
 }
 
 // ── Editorial error-state ────────────────────────────────────

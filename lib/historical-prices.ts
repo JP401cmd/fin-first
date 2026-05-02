@@ -146,8 +146,10 @@ export async function storeHistoricalPrices(
       source: 'yahoo_finance',
     }))
 
+    // Tabel-split (migratie 20260502000003): Yahoo-Finance prijzen horen
+    // bij investment-holdings; de polymorfe `holding_prices` is hernoemd.
     const { error } = await supabase
-      .from('holding_prices')
+      .from('investment_holding_prices')
       .upsert(rows, { onConflict: 'holding_id,date' })
 
     if (error) {
@@ -212,7 +214,7 @@ export async function storeSingleDayPrice(
     const effectiveDate = date ?? new Date().toISOString().slice(0, 10)
 
     const { error } = await supabase
-      .from('holding_prices')
+      .from('investment_holding_prices')
       .upsert(
         {
           holding_id: holdingId,

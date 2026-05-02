@@ -1,12 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveHolding } from '@/lib/holdings-table-resolver'
 
 /**
  * GET /api/holdings/[id] — Fetch a single holding by its UUID.
  *
- * Returns 200 with the holding data if found,
- * 404 if the holding does not exist or was deleted,
- * 401 if not authenticated.
+ * Polymorf na de tabel-split (migratie 20260502000003): kijkt parallel in
+ * `investment_holdings` en `crypto_holdings`. Returns 200 + bucket-info,
+ * 404 als de id in geen van beide bestaat, 401 zonder auth.
  */
 export async function GET(
   _request: NextRequest,
@@ -26,25 +27,19 @@ export async function GET(
   }
 
   try {
-    const { data: holding, error } = await supabase
-      .from('holdings')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    if (!holding) {
+    const resolved = await resolveHolding(supabase, id, user.id)
+    if (!resolved) {
       return NextResponse.json(
         { error: 'Holding niet gevonden', notFound: true },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ holding, source: 'holdings_table' })
+    return NextResponse.json({
+      holding: resolved.holding,
+      bucket: resolved.bucket,
+      source: `${resolved.tables.holdings}_table`,
+    })
   } catch {
     return NextResponse.json({ error: 'Er is een fout opgetreden' }, { status: 500 })
   }
@@ -52,6 +47,11 @@ export async function GET(
 
 /**
  * PATCH /api/holdings/[id] — Update holding fields (e.g. is_favorite).
+ *
+ * Past de update toe op de juiste typed-tabel via de resolver — de tabel
+ * wordt afgeleid uit de bestaande rij, niet uit een prop in de body, zodat
+ * misbruik (proberen een investment-veld op een crypto-holding te zetten)
+ * stilzwijgend wordt afgewezen door de PostgREST-laag.
  */
 export async function PATCH(
   request: NextRequest,
@@ -82,8 +82,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Geen geldige velden om bij te werken' }, { status: 400 })
     }
 
+    // Resolver vertelt ons welke typed-tabel de bron is — de update gaat
+    // dáár naartoe. Selecteren alleen `id` houdt de lookup goedkoop.
+    const resolved = await resolveHolding(supabase, id, user.id, 'id')
+    if (!resolved) {
+      return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
+    }
+
     const { data: holding, error } = await supabase
-      .from('holdings')
+      .from(resolved.tables.holdings)
       .update(updates)
       .eq('id', id)
       .eq('user_id', user.id)
@@ -98,7 +105,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
     }
 
-    return NextResponse.json({ holding })
+    return NextResponse.json({ holding, bucket: resolved.bucket })
   } catch {
     return NextResponse.json({ error: 'Er is een fout opgetreden' }, { status: 500 })
   }

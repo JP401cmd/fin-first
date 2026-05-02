@@ -28,6 +28,7 @@ import type { Debt, DebtType } from '@/lib/debt-data'
 import type { ModuleId } from '@/lib/module-registry'
 import { CashBudgetterenTab } from './deepenings/cash-budgetteren-tab'
 import { InvestmentHoldingsTab } from './deepenings/investment-holdings-tab'
+import { CryptoHoldingsTab } from './deepenings/crypto-holdings-tab'
 import { AflosstrategieTab } from './deepenings/aflosstrategie-tab'
 import { HypotheekplannerTab } from './deepenings/hypotheekplanner-tab'
 import { VerhuurrendementTab } from './deepenings/verhuurrendement-tab'
@@ -133,6 +134,26 @@ export const CATEGORY_DEEPENINGS: DeepeningEntry[] = [
     isItemTracked: (item) =>
       'has_holdings_tracking' in item && item.has_holdings_tracking === true,
     toggleEndpoint: '/api/assets/toggle-holdings',
+  },
+  // ── Holdings (crypto) ────────────────────────────────────────
+  // Symmetrisch met de investment-Holdings-app: dezelfde label-keuze
+  // ("Holdings"), dezelfde moduleId — gebruikers die de aandelen-/crypto-
+  // registratie aanzetten krijgen direct beide apps. Voor crypto bouwt de
+  // tab zelf een lichte allocation-overview op de typed CryptoHoldingRow's.
+  {
+    type: 'crypto',
+    kind: 'asset',
+    label: 'Holdings',
+    moduleId: 'aandelenregistratie',
+    tipStripCopy:
+      'Activeer aandelen- en cryptoregistratie voor het volledige coin-overzicht per exchange of wallet.',
+    // Crypto-asset wordt door de Holdings-app gevolgd zodra hij gekoppeld is
+    // aan een exchange-connectie of wallet, óf zodra er handmatig holdings
+    // onder hangen. Op asset-niveau hebben we (nog) geen vlag — de telling
+    // op de items-tab wordt gevoed door de typed-loader, niet door deze
+    // helper. Hier `undefined` laten = "geen item-toggle van toepassing".
+    isItemTracked: undefined,
+    toggleEndpoint: undefined,
   },
   // ── Aflosstrategie — zes debt-types ─────────────────────────
   // Eén DebtType per entry. De `isItemTracked`/`toggleEndpoint`/`moduleId`/
@@ -316,6 +337,7 @@ const DEEPENING_COMPONENTS: Partial<
   asset: {
     cash: CashBudgetterenTab,
     investment: InvestmentHoldingsTab,
+    crypto: CryptoHoldingsTab,
     // `eigen_huis` heeft één app (Hypotheekplanner) — single-component vorm.
     // Slug-disambiguation is hier niet nodig; toekomstige tweede app
     // (bv. Verzekerings-tab) zou de waarde naar de nested vorm migreren.

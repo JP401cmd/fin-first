@@ -1,16 +1,17 @@
 /**
- * CSV parsers for Dutch broker portfolio/transaction exports.
- * Supports DEGIRO, Saxo Bank, and ING Beleggen formats.
+ * CSV parsers for broker portfolio/transaction exports.
  *
- * All three brokers use semicolon-delimited CSVs with Dutch number formatting
- * (comma as decimal separator, dot as thousands separator).
+ * - DEGIRO, Saxo Bank, ING Beleggen — semicolon-delimited, Dutch number
+ *   formatting (comma as decimal separator, dot as thousands separator).
+ * - Trading 212, eToro — comma-delimited, English number formatting (dot
+ *   as decimal separator, comma as thousands separator).
  */
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type BrokerType = 'degiro' | 'saxo' | 'ing_beleggen'
+export type BrokerType = 'degiro' | 'saxo' | 'ing_beleggen' | 'trading212' | 'etoro'
 
 export type HoldingRowType = 'buy' | 'sell' | 'dividend' | 'position'
 
@@ -69,6 +70,18 @@ export const BROKER_PRESETS: BrokerPreset[] = [
     description: 'Export uit Mijn ING Beleggen',
     exampleHeader: 'Datum,ISIN,Fonds,...',
   },
+  {
+    id: 'trading212',
+    label: 'Trading 212',
+    description: 'Account Statement-export uit Trading 212',
+    exampleHeader: 'Action,Time,ISIN,Ticker,Name,...',
+  },
+  {
+    id: 'etoro',
+    label: 'eToro',
+    description: 'Account Statement-export uit eToro',
+    exampleHeader: 'Date,Type,Details,Amount,Units,...',
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -88,6 +101,19 @@ export function parseNLNumber(str: string): number {
   // Dutch format: dots are thousands separators, comma is decimal separator.
   // Remove dots first, then swap comma for dot.
   const normalised = cleaned.replace(/\./g, '').replace(',', '.')
+  const value = parseFloat(normalised)
+  return Number.isFinite(value) ? value : 0
+}
+
+/**
+ * Parse an English-formatted number string (dot as decimal separator,
+ * comma as thousands separator). Used by Trading 212 and eToro exports.
+ */
+export function parseENNumber(str: string): number {
+  if (!str) return 0
+  const cleaned = str.replace(/['"]/g, '').trim()
+  if (!cleaned) return 0
+  const normalised = cleaned.replace(/,/g, '')
   const value = parseFloat(normalised)
   return Number.isFinite(value) ? value : 0
 }
@@ -114,6 +140,46 @@ export function parseNLDate(str: string): string | null {
   const d = parseInt(day, 10)
   if (m < 1 || m > 12 || d < 1 || d > 31) return null
 
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Parse a Trading 212-style timestamp ("YYYY-MM-DD HH:mm:ss[.SSS]" or
+ * "YYYY-MM-DDTHH:mm:ssZ") and return the date portion in ISO format.
+ */
+export function parseISODatePrefix(str: string): string | null {
+  if (!str) return null
+  const cleaned = str.replace(/['"]/g, '').trim()
+  if (!cleaned) return null
+  const match = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return null
+  const m = parseInt(match[2], 10)
+  const d = parseInt(match[3], 10)
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null
+  return `${match[1]}-${match[2]}-${match[3]}`
+}
+
+/**
+ * Parse an eToro-style date ("DD/MM/YYYY HH:mm:ss" or "DD/MM/YYYY") and
+ * return the date portion in ISO format. Falls back to ISO-prefix parsing
+ * if the input already starts with "YYYY-MM-DD".
+ */
+export function parseEtoroDate(str: string): string | null {
+  if (!str) return null
+  const cleaned = str.replace(/['"]/g, '').trim()
+  if (!cleaned) return null
+  // ISO prefix variant
+  const iso = parseISODatePrefix(cleaned)
+  if (iso) return iso
+  // DD/MM/YYYY [HH:mm[:ss]]
+  const match = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (!match) return null
+  const day = match[1].padStart(2, '0')
+  const month = match[2].padStart(2, '0')
+  const year = match[3]
+  const m = parseInt(month, 10)
+  const d = parseInt(day, 10)
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null
   return `${year}-${month}-${day}`
 }
 
@@ -200,6 +266,8 @@ const DEGIRO_PORTFOLIO_MARKERS = ['product', 'isin', 'beurs', 'aantal', 'slotkoe
 const DEGIRO_TRANSACTION_MARKERS = ['datum', 'product', 'isin', 'koers', 'transactiekosten']
 const SAXO_MARKERS = ['instrument', 'symbool', 'isin', 'gemiddelde openingsprijs']
 const ING_BELEGGEN_MARKERS = ['naam effect', 'isin-code', 'aantal', 'koers']
+const TRADING212_MARKERS = ['action', 'time', 'isin', 'ticker', 'no. of shares']
+const ETORO_MARKERS = ['date', 'type', 'details', 'amount', 'units']
 
 /**
  * Auto-detect the broker from the first (header) line of a CSV file.
@@ -221,8 +289,21 @@ export function detectBroker(content: string): BrokerType | null {
   if (containsAll(DEGIRO_PORTFOLIO_MARKERS)) return 'degiro'
   if (containsAll(SAXO_MARKERS)) return 'saxo'
   if (containsAll(ING_BELEGGEN_MARKERS)) return 'ing_beleggen'
+  if (containsAll(TRADING212_MARKERS)) return 'trading212'
+  // eToro detection is broad ("date,type,amount,units" is generic), so we
+  // only match when the more specific column "realized equity change" is
+  // also present — that field is unique to eToro account statements.
+  if (containsAll(ETORO_MARKERS) && lower.includes('realized equity change')) return 'etoro'
 
   return null
+}
+
+/**
+ * Pick the column delimiter for a given broker. Dutch brokers (DEGIRO, Saxo,
+ * ING) use semicolons; Trading 212 and eToro both use commas.
+ */
+function delimiterFor(broker: BrokerType): ',' | ';' {
+  return broker === 'trading212' || broker === 'etoro' ? ',' : ';'
 }
 
 // ---------------------------------------------------------------------------
@@ -355,6 +436,127 @@ function parseINGBeleggenRow(headers: string[], fields: string[]): ParsedHolding
   }
 }
 
+/**
+ * Parse a Trading 212 "Account Statement" CSV row.
+ *
+ * Trading 212 actions we map:
+ *   - "Market buy", "Limit buy", "Stop buy"   → buy
+ *   - "Market sell", "Limit sell", "Stop sell" → sell
+ *   - "Dividend (...)"                         → dividend
+ *
+ * Cash-only actions (Deposit, Withdrawal, Interest on cash, Currency
+ * conversion, Card debit) are skipped — they do not affect holdings.
+ */
+function parseTrading212Row(headers: string[], fields: string[]): ParsedHoldingRow | null {
+  const action = col(headers, fields, 'Action').toLowerCase()
+  if (!action) return null
+
+  // Only handle holdings-relevant actions; skip cash movements.
+  let type: HoldingRowType
+  if (action.startsWith('market buy') || action.startsWith('limit buy') || action.startsWith('stop buy')) {
+    type = 'buy'
+  } else if (action.startsWith('market sell') || action.startsWith('limit sell') || action.startsWith('stop sell')) {
+    type = 'sell'
+  } else if (action.startsWith('dividend')) {
+    type = 'dividend'
+  } else {
+    return null
+  }
+
+  const name = col(headers, fields, 'Name')
+  const ticker = col(headers, fields, 'Ticker') || null
+  const isin = col(headers, fields, 'ISIN') || null
+  // Without name AND identifier we cannot meaningfully import the row.
+  if (!name && !ticker && !isin) return null
+
+  const time = col(headers, fields, 'Time')
+  const units = parseENNumber(col(headers, fields, 'No. of shares'))
+  const pricePerShare = parseENNumber(col(headers, fields, 'Price / share'))
+  const total = parseENNumber(col(headers, fields, 'Total'))
+  const currency = col(headers, fields, 'Currency (Total)') || col(headers, fields, 'Currency (Price / share)') || 'EUR'
+  const notes = col(headers, fields, 'Notes')
+  const raw = buildRawRecord(headers, fields)
+
+  return {
+    name: name || ticker || isin || 'Onbekend',
+    ticker,
+    isin,
+    units: Math.abs(units),
+    price_per_unit: Math.abs(pricePerShare),
+    total_amount: Math.abs(total),
+    date: parseISODatePrefix(time),
+    type,
+    fees: 0,
+    currency,
+    exchange: null,
+    raw: notes ? { ...raw, _notes: notes } : raw,
+  }
+}
+
+/**
+ * Parse an eToro "Account Statement / Transactions" CSV row.
+ *
+ * eToro's transaction log uses a free-text "Type" column. We map common
+ * trade-related types and skip everything else (deposits, withdrawals,
+ * fees, balance updates, mirror copy events).
+ *
+ * The instrument identifier lives in the "Details" column, formatted as
+ * "TICKER/USD" or "TICKER/EUR" (e.g. "AAPL/USD"). When ISIN is provided as
+ * a separate column we prefer that.
+ */
+function parseEtoroRow(headers: string[], fields: string[]): ParsedHoldingRow | null {
+  const rawType = col(headers, fields, 'Type').trim().toLowerCase()
+  if (!rawType) return null
+
+  let type: HoldingRowType
+  if (rawType === 'open position' || rawType.startsWith('open position')) {
+    type = 'buy'
+  } else if (rawType === 'position closed' || rawType.startsWith('position closed') || rawType === 'close position') {
+    type = 'sell'
+  } else if (rawType === 'dividend' || rawType.startsWith('dividend')) {
+    type = 'dividend'
+  } else {
+    // Skip everything else (deposit, withdrawal, fee, balance, transfer, ...)
+    return null
+  }
+
+  const details = col(headers, fields, 'Details').trim()
+  const isin = col(headers, fields, 'ISIN') || null
+  // Details is typically "TICKER/USD" or "TICKER/EUR"; take the part before "/"
+  const tickerFromDetails = details.includes('/') ? details.split('/')[0].trim() : details
+  const ticker = tickerFromDetails || null
+
+  if (!details && !isin) return null
+
+  const date = col(headers, fields, 'Date')
+  const amount = parseENNumber(col(headers, fields, 'Amount'))
+  const units = parseENNumber(col(headers, fields, 'Units') || col(headers, fields, 'Units / Contracts'))
+  const equityChange = parseENNumber(col(headers, fields, 'Realized Equity Change'))
+  const raw = buildRawRecord(headers, fields)
+
+  // For dividends eToro reports the cash amount in "Amount" but no units —
+  // fall back to a unit value of 1 so the total is preserved.
+  const safeUnits = units > 0 ? units : 1
+  const totalAbs = Math.abs(amount || equityChange)
+  const pricePerUnit = safeUnits > 0 ? totalAbs / safeUnits : 0
+
+  return {
+    name: details || ticker || isin || 'Onbekend',
+    ticker,
+    isin,
+    units: Math.abs(units),
+    price_per_unit: pricePerUnit,
+    total_amount: totalAbs,
+    date: parseEtoroDate(date),
+    type,
+    fees: 0,
+    // eToro accounts are USD-based; expose explicitly for downstream FX work.
+    currency: 'USD',
+    exchange: null,
+    raw,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main parse function
 // ---------------------------------------------------------------------------
@@ -387,7 +589,8 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
     return result
   }
 
-  const rawHeaders = splitLine(lines[headerIdx], ';')
+  const delim = delimiterFor(broker)
+  const rawHeaders = splitLine(lines[headerIdx], delim)
   const headers = normaliseHeaders(rawHeaders)
 
   // Determine DEGIRO sub-format (transaction vs. portfolio)
@@ -403,7 +606,7 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
       continue
     }
 
-    const fields = splitLine(line, ';')
+    const fields = splitLine(line, delim)
 
     // Skip rows where every field is empty (trailing semicolons)
     if (fields.every((f) => f === '')) {
@@ -422,6 +625,12 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
           break
         case 'ing_beleggen':
           row = parseINGBeleggenRow(headers, fields)
+          break
+        case 'trading212':
+          row = parseTrading212Row(headers, fields)
+          break
+        case 'etoro':
+          row = parseEtoroRow(headers, fields)
           break
       }
     } catch (err) {
@@ -445,4 +654,18 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
   }
 
   return result
+}
+
+// ---------------------------------------------------------------------------
+// Convenience wrappers
+// ---------------------------------------------------------------------------
+
+/** Parse a Trading 212 Account Statement CSV. */
+export function parseTrading212(csv: string): BrokerParseResult {
+  return parseBrokerCSV(csv, 'trading212')
+}
+
+/** Parse an eToro Account Statement / Transactions CSV. */
+export function parseEtoro(csv: string): BrokerParseResult {
+  return parseBrokerCSV(csv, 'etoro')
 }

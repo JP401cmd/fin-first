@@ -13,11 +13,24 @@ import {
 import type { BudgetsPageData } from '@/lib/budgets-data-loader'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
 import type { CorePageData } from '@/lib/core-data-loader'
+import type { AssetConnectionSummary } from '@/lib/connections-data'
+import type {
+  CryptoHoldingRow,
+  CryptoTransactionRow,
+  CryptoPortfolioPoint,
+  CryptoPeriodReturnsBundle,
+  CryptoRealizedPnL,
+  CryptoSparklinePoint,
+  CryptoVolatilityMetric,
+  CryptoFeesSummary,
+} from '@/lib/crypto-holdings-data'
+import type { InvestmentHoldingRow } from '@/lib/investment-holdings-data'
 import { formatCurrency } from '@/lib/format'
+import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
+import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
-import { BottomSheet } from '@/components/app/bottom-sheet'
 import { CashOverview } from '@/components/app/cash-overview'
 import { VermogenAssetCard } from './vermogen-asset-card'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
@@ -110,6 +123,93 @@ interface AssetCategoryPageProps {
    * terug op de bestaande `<AssetDetailFlow />` bottom-sheet.
    */
   bankAccountByAssetId?: Record<string, string>
+  /**
+   * Lichtgewicht refs (assets+debts+holdings) voor de KPI-strip onder elke
+   * asset-card. Server laadt deze parallel met de hoofdquery; bij `undefined`
+   * (load-failure of KPI's nog niet relevant voor dit type) vervalt de
+   * strip op de individuele kaarten en blijft de pagina functioneel.
+   */
+  initialKpiRefs?: KpiContextRefs
+  /**
+   * Mapping van asset-ID → actieve externe koppeling, alleen relevant voor
+   * `type === 'crypto'` (R2). Wordt op de kaart als kleine indicator-badge
+   * getoond. `undefined` of een lege map → geen badges, kaart valt terug op
+   * de standaard rendering.
+   */
+  initialConnectionsByAssetId?: Record<string, AssetConnectionSummary>
+  /**
+   * Typed crypto-holding rijen (P3). Alleen relevant voor `type === 'crypto'`.
+   * Wanneer aanwezig vervangt de items-tab de oude `VermogenAssetCard`-grid
+   * door een grid van `CryptoHoldingCard` per coin — bron-badge + plug-status
+   * inbegrepen. Lege array → empty-state of fallback op asset-cards.
+   */
+  initialCryptoHoldings?: CryptoHoldingRow[]
+  /**
+   * Recente crypto-transacties — gevoed door `loadRecentCryptoTransactions`.
+   * Alleen relevant voor `type === 'crypto'`. Doorgegeven aan de Holdings-app
+   * voor de transactie-feed onderaan. Lege array → feed-sectie blijft uit.
+   */
+  initialCryptoTransactions?: CryptoTransactionRow[]
+  /**
+   * Dagelijkse waarde-snapshots over de afgelopen N dagen voor de
+   * performance-chart in de crypto Holdings-app. Alleen voor `type ==='crypto'`.
+   */
+  initialCryptoHistory?: CryptoPortfolioPoint[]
+  /**
+   * Aantal dagen dat `initialCryptoHistory` dekt. Tonen we als chart-header
+   * label ("Waarde-evolutie · 30 dagen"). Default 30 wanneer omitted.
+   */
+  cryptoHistoryDaysBack?: number
+  /**
+   * Per-periode rendementen (24u/7d/30d/1j/All) — vooraf-berekend voor de
+   * KPI-strip period-toggle. Optional; ontbreken → toggle valt terug op een
+   * "—"-cijfer per periode.
+   */
+  initialCryptoPeriodReturns?: CryptoPeriodReturnsBundle
+  /**
+   * Realized vs unrealized P&L splitsing voor de sub-strip onder de KPI-row.
+   * Optional; ontbreken → sub-strip toont 0,00 met label "Geen verkopen".
+   * Berekend via weighted-average cost basis (default).
+   */
+  initialCryptoRealizedPnL?: CryptoRealizedPnL
+  /**
+   * FIFO-variant van de realized/unrealized berekening — wordt parallel met
+   * de weighted-avg variant geladen zodat de KPI-strip toggle client-side
+   * schakelt zonder roundtrip.
+   */
+  initialCryptoRealizedPnLFifo?: CryptoRealizedPnL
+  /**
+   * Per-holding 7-daagse close-prijs reeks voor de sparkline-kolom in de
+   * tabel-view van de Holdings-app. Alleen relevant voor `type === 'crypto'`.
+   * Holdings die ontbreken in de map → tabel toont een neutrale streep.
+   */
+  initialCryptoSparklines?: Record<string, CryptoSparklinePoint[]>
+  /**
+   * Benchmark-prijshistorie (BTC) over hetzelfde venster als
+   * `initialCryptoHistory`. Wordt door de performance-chart gebruikt voor de
+   * BTC-overlay (toggle Geen|BTC|ETH). Lege array → toggle blijft, maar de
+   * BTC-optie krijgt een tooltip "Niet beschikbaar".
+   */
+  initialCryptoBenchmarkBtc?: { date: string; close: number }[]
+  /** Idem voor ETH-overlay. */
+  initialCryptoBenchmarkEth?: { date: string; close: number }[]
+  /**
+   * Portfolio-volatiliteit (90-daagse stdev van dagelijkse returns) voor de
+   * Risico-sub-strip in de KPI. Ontbreken → cel toont "—".
+   */
+  initialCryptoVolatility?: CryptoVolatilityMetric
+  /**
+   * Totaal transactiekosten over alle crypto_transactions, geconverteerd
+   * naar EUR + breakdown per exchange. Ontbreken → fees-cel toont "—".
+   */
+  initialCryptoFees?: CryptoFeesSummary
+  /**
+   * Typed investment-holding rijen (P3). Alleen relevant voor
+   * `type === 'investment'`. Items-tab toont per ISIN-positie een kaart;
+   * de Holdings-app embed (deepening) blijft zijn eigen `HoldingsPageData`-
+   * pad gebruiken.
+   */
+  initialInvestmentHoldings?: InvestmentHoldingRow[]
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -145,6 +245,21 @@ export function AssetCategoryPage({
   initialHoldingsData,
   initialCoreData,
   bankAccountByAssetId,
+  initialKpiRefs,
+  initialConnectionsByAssetId,
+  initialCryptoHoldings,
+  initialCryptoTransactions,
+  initialCryptoHistory,
+  cryptoHistoryDaysBack,
+  initialCryptoPeriodReturns,
+  initialCryptoRealizedPnL,
+  initialCryptoRealizedPnLFifo,
+  initialCryptoSparklines,
+  initialCryptoBenchmarkBtc,
+  initialCryptoBenchmarkEth,
+  initialCryptoVolatility,
+  initialCryptoFees,
+  initialInvestmentHoldings,
 }: AssetCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -236,11 +351,42 @@ export function AssetCategoryPage({
   }, [handleTabChange, requestedTab, tabs])
 
   // ── Afgeleide waarden ─────────────────────────────────────
+  // De mini-hero rapporteert per categorie altijd de som van de asset-
+  // current_value en het aantal asset-cards — symmetrisch met cash,
+  // eigen_huis en de overige types. De typed holding-rijen voor crypto/
+  // investment voeden via `initialData` de Holdings-app verdieping; ze
+  // worden niet meer als kaart op de items-tab gerenderd (R5).
   const total = useMemo(
     () => assets.reduce((sum, asset) => sum + Number(asset.current_value), 0),
     [assets],
   )
   const count = assets.length
+
+  // ── KPI's per asset voor de strip onder elke kaart ────────
+  // We bouwen de context één keer (Maps voor holdings + linked-debts) en
+  // dispatchen vervolgens per asset naar `computeAssetKpi`. Wanneer
+  // `initialKpiRefs` ontbreekt (server load failure of nog niet beschikbaar)
+  // bouwen we een lege context — `computeAssetKpi` levert dan KPI's die
+  // alleen lokale velden gebruiken (rente uit `expected_return` etc.) en
+  // overslaat wat external context nodig heeft (LTV, overwaarde).
+  const kpiByAssetId = useMemo(() => {
+    const ctx = initialKpiRefs
+      ? buildKpiContext({
+          assets: initialKpiRefs.assets as unknown as Parameters<typeof buildKpiContext>[0]['assets'],
+          debts: initialKpiRefs.debts as unknown as Parameters<typeof buildKpiContext>[0]['debts'],
+          holdings: initialKpiRefs.holdings,
+          cashStatsByAssetId: initialKpiRefs.cashStats,
+        }).asset
+      : {}
+    const map = new Map<string, KpiPair>()
+    for (const asset of assets) {
+      const pair = computeAssetKpi(asset, ctx)
+      if (pair.primary || pair.secondary) {
+        map.set(asset.id, pair)
+      }
+    }
+    return map
+  }, [assets, initialKpiRefs])
   const isItemsTab = activeTabKey === ITEMS_TAB_KEY
   // Tip-strip onderaan de items-tab: tonen wanneer de eerste app van de
   // categorie nog niet geactiveerd is. Bij multi-app wordt alleen de eerste
@@ -325,6 +471,8 @@ export function AssetCategoryPage({
               <ItemsTab
                 type={type}
                 assets={assets}
+                kpiByAssetId={kpiByAssetId}
+                connectionsByAssetId={initialConnectionsByAssetId}
                 onItemClick={openAssetDetail}
                 onAddClick={() => setQuickAddOpen(true)}
               />
@@ -358,7 +506,27 @@ export function AssetCategoryPage({
                   ? initialBudgetsData
                   : type === 'investment'
                     ? initialHoldingsData
-                    : undefined
+                    : type === 'crypto'
+                      ? {
+                          // Bundle-vorm voor de crypto Holdings-app: holdings +
+                          // transacties + dagelijkse waarde-snapshots. De tab-
+                          // wrapper (`CryptoHoldingsTab`) accepteert zowel de
+                          // legacy array-vorm als deze bundle, dus oudere
+                          // call-sites blijven werken.
+                          holdings: initialCryptoHoldings ?? [],
+                          transactions: initialCryptoTransactions ?? [],
+                          history: initialCryptoHistory ?? [],
+                          historyDaysBack: cryptoHistoryDaysBack ?? 30,
+                          periodReturns: initialCryptoPeriodReturns,
+                          realizedPnL: initialCryptoRealizedPnL,
+                          realizedPnLFifo: initialCryptoRealizedPnLFifo,
+                          sparklinesByHoldingId: initialCryptoSparklines,
+                          benchmarkBtc: initialCryptoBenchmarkBtc,
+                          benchmarkEth: initialCryptoBenchmarkEth,
+                          volatility: initialCryptoVolatility,
+                          fees: initialCryptoFees,
+                        }
+                      : undefined
               }
             />
           ) : null}
@@ -486,15 +654,27 @@ function CategoryHero({ type, total, count }: CategoryHeroProps) {
 interface ItemsTabProps {
   type: AssetType
   assets: Asset[]
+  kpiByAssetId?: Map<string, KpiPair>
+  connectionsByAssetId?: Record<string, AssetConnectionSummary>
   onItemClick: (asset: Asset) => void
   onAddClick: () => void
 }
 
 /**
- * Lijst van assets in deze categorie + toevoeg-CTA. Empty state behoudt
+ * Lijst van items in deze categorie + toevoeg-CTA. Eén kaart per asset/
+ * koppeling — symmetrisch over alle asset-types (cash, investment, crypto,
+ * eigen_huis, …). Diepere holdings-data leeft op de Holdings-app verdiepings-
+ * tab (investment, crypto) en op de asset-detail-sheet. Empty state behoudt
  * krant-toon: kicker + serif-italic uitleg + duidelijke primaire actie.
  */
-function ItemsTab({ type, assets, onItemClick, onAddClick }: ItemsTabProps) {
+function ItemsTab({
+  type,
+  assets,
+  kpiByAssetId,
+  connectionsByAssetId,
+  onItemClick,
+  onAddClick,
+}: ItemsTabProps) {
   if (assets.length === 0) {
     return <EmptyItemsState type={type} onAddClick={onAddClick} />
   }
@@ -506,6 +686,8 @@ function ItemsTab({ type, assets, onItemClick, onAddClick }: ItemsTabProps) {
           <VermogenAssetCard
             key={asset.id}
             asset={asset}
+            kpiPair={kpiByAssetId?.get(asset.id)}
+            connection={connectionsByAssetId?.[asset.id]}
             onClick={onItemClick}
             staggerIndex={idx}
           />

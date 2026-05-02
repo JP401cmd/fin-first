@@ -7,6 +7,7 @@ import HoldingValueChartClient from './value-chart-client'
 import { HoldingFavoriteButton } from './holding-favorite-button'
 import { calculateHoldingBox3 } from '@/lib/box3-holdings'
 import HoldingAlertsClient from './alerts-client'
+import { resolveHolding } from '@/lib/holdings-table-resolver'
 
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -35,40 +36,53 @@ export default async function HoldingDetailPage({
     notFound()
   }
 
-  const { data: holdingData, error } = await supabase
-    .from('holdings')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (error || !holdingData) {
+  // Polymorf: na de tabel-split in migratie 20260502000003 staat een holding
+  // in `investment_holdings` óf `crypto_holdings`. De resolver checkt beide
+  // parallel en geeft de juiste tabel-namen terug voor de downstream queries
+  // (portfolio-aggregate, value-history, transactions).
+  const resolved = await resolveHolding(supabase, id, user.id)
+  if (!resolved) {
     notFound()
   }
 
+  const holdingData = resolved.holding
   const name = holdingData.name as string
-  const ticker = holdingData.ticker as string | null
+  // Crypto-holdings hebben `symbol` ipv `ticker`, geen `currency`/`isin`/`ter`.
+  const ticker =
+    (holdingData.ticker as string | null | undefined) ??
+    (holdingData.symbol as string | null | undefined) ??
+    null
   const currency = (holdingData.currency as string) || 'EUR'
   const units = Number(holdingData.units) || 0
   const avgPrice = Number(holdingData.avg_purchase_price) || 0
   const currentPrice = Number(holdingData.current_price) || avgPrice
-  const isin = holdingData.isin as string | null
+  const isin = (holdingData.isin as string | null | undefined) ?? null
   const ter = holdingData.ter != null ? Number(holdingData.ter) : null
-  const terSource = holdingData.ter_source as string | null
+  const terSource = (holdingData.ter_source as string | null | undefined) ?? null
   const holdingValue = currentPrice * units
   const costBasis = avgPrice * units
   const returnPct = costBasis > 0 ? ((holdingValue - costBasis) / costBasis) * 100 : 0
   const returnValue = holdingValue - costBasis
   const terAnnualCost = ter != null ? ter * holdingValue : null
 
-  // Fetch total portfolio value for Box 3 proportional exemption calculation
-  const { data: allHoldings } = await supabase
-    .from('holdings')
-    .select('current_price, avg_purchase_price, units')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
+  // Box 3: portfolio-totaal over BEIDE typed-tabellen — een gebruiker kan
+  // zowel investment- als crypto-holdings hebben en die tellen samen onder
+  // box 3.
+  const [invHoldingsRes, cryHoldingsRes] = await Promise.all([
+    supabase
+      .from('investment_holdings')
+      .select('current_price, avg_purchase_price, units')
+      .eq('user_id', user.id)
+      .eq('is_active', true),
+    supabase
+      .from('crypto_holdings')
+      .select('current_price, avg_purchase_price, units')
+      .eq('user_id', user.id)
+      .eq('is_active', true),
+  ])
+  const allHoldings = [...(invHoldingsRes.data ?? []), ...(cryHoldingsRes.data ?? [])]
 
-  const totalPortfolioValue = (allHoldings || []).reduce((sum, h) => {
+  const totalPortfolioValue = allHoldings.reduce((sum, h) => {
     const price = Number(h.current_price) || Number(h.avg_purchase_price) || 0
     return sum + (price * (Number(h.units) || 0))
   }, 0)
@@ -102,7 +116,7 @@ export default async function HoldingDetailPage({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <HoldingFavoriteButton holdingId={id} initialFavorite={holdingData.is_favorite ?? false} />
+            <HoldingFavoriteButton holdingId={id} initialFavorite={(holdingData.is_favorite as boolean | null | undefined) ?? false} />
             <Link
               href="/core/assets/holdings"
               className="rounded-lg border border-kern-200 bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
