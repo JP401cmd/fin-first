@@ -46,7 +46,7 @@ import { WhatIfScenarios } from '@/components/app/horizon/whatif-scenarios'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { useChatContext } from '@/components/app/chat/chat-provider'
-import { Loader2, AlertTriangle, ArrowRight, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
+import { Loader2, AlertTriangle, ArrowRight, ChevronUp, ChevronDown, Hourglass, Target, TrendingUp, Equal } from 'lucide-react'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { type StackedRow } from '@/lib/wealth-composition'
@@ -524,10 +524,10 @@ export default function WhatIfPage() {
   if (loading) {
     return (
       <div className={dimensionClass}>
-        <div className="whatif-world mx-auto max-w-5xl px-4 py-8 sm:px-6 md:px-8">
+        <div className="whatif-world mx-auto max-w-6xl py-5 sm:py-8">
           <WhatIfHeader />
           <div className="mt-12 flex flex-col items-center justify-center gap-3 py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-wil-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-horizon-500" />
             <p className="font-sans text-sm text-[var(--ink-3)]">Scenario laden...</p>
           </div>
         </div>
@@ -538,7 +538,7 @@ export default function WhatIfPage() {
   if (error || !input || !overrides || !baseline) {
     return (
       <div className={dimensionClass}>
-        <div className="whatif-world mx-auto max-w-5xl px-4 py-8 sm:px-6 md:px-8">
+        <div className="whatif-world mx-auto max-w-6xl py-5 sm:py-8">
           <WhatIfHeader />
           <div className="mt-12 flex flex-col items-center gap-3 py-20">
             <AlertTriangle className="h-6 w-6 text-kern-500" />
@@ -554,43 +554,235 @@ export default function WhatIfPage() {
 
   return (
     <div className={dimensionClass}>
-      <div className="whatif-world mx-auto max-w-5xl px-4 py-6 sm:px-6 md:px-8">
+      <div className="whatif-world mx-auto max-w-6xl py-4 sm:py-8">
 
         {/* ── Header ────────────────────────────────────────── */}
         <WhatIfHeader />
 
-        {/* ── KPI strip (full width) ─────────────────────────── */}
-        {simResult && baselineSim && (
-          <button
-            type="button"
-            onClick={() => setComparisonOpen(true)}
-            className="mt-4 card-editorial w-full overflow-hidden text-left transition-all hover:border-wil-300 hover:shadow-sm"
-          >
-            <div className="flex h-[3px]">
-              <div className="flex-1 bg-[var(--ink-3)]" />
-              <div className="flex-1 bg-wil-500" />
-            </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <div>
-                <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-                  FIRE leeftijd
-                </span>
-                <p className="font-display text-2xl font-bold tabular-nums text-[var(--ink)]">
-                  {formatFireAgeShort(whatIfFireAge)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1 && (
-                  <span className={`rounded-full px-2.5 py-1 font-mono text-sm font-semibold ${
-                    fireAgeDelta < 0 ? 'bg-horizon-50 text-horizon-700' : 'bg-kern-50 text-kern-700'
-                  }`}>
-                    {formatFireAgeDelta(fireAgeDelta)}
+        {/* ── Resultaat-blok: KPI + verschil-analyse + chart in één paper-card ── */}
+        <section className="card-editorial overflow-hidden mt-4">
+          <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
+          <div className="p-4 sm:p-6 md:p-8">
+
+        {/* ── KPI strip — 4-koloms figures-strip (klikt naar comparison-modal) ── */}
+        {simResult && baselineSim && (() => {
+          const annualSavingsDelta = whatIfAnnualSavings - baselineAnnualSavings
+          const targetDelta = simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio
+          const isFirePositive = fireAgeDelta !== null ? fireAgeDelta < 0 : null
+          const isSavingsPositive = annualSavingsDelta > 0
+          const isTargetPositive = targetDelta < 0
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-b border-[var(--ink)]">
+              {/* KPI 1: Vrijheidsleeftijd — winner met highlight-marker */}
+              <button
+                type="button"
+                onClick={() => setComparisonOpen(true)}
+                className="p-3 sm:p-4 border-r border-[var(--rule-soft)] [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0 last:border-r-0 sm:[&:nth-child(2)]:border-r text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+                  <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
+                  <span>Vrijheidsleeftijd</span>
+                </div>
+                <div
+                  className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                  style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                >
+                  <span
+                    className="inline px-1"
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                    }}
+                  >
+                    {formatFireAgeShort(whatIfFireAge)}
                   </span>
-                )}
-                <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" />
-              </div>
+                </div>
+                <div
+                  className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  scenario
+                </div>
+              </button>
+
+              {/* KPI 2: Doelbedrag */}
+              <button
+                type="button"
+                onClick={() => setComparisonOpen(true)}
+                className="p-3 sm:p-4 sm:border-r sm:border-[var(--rule-soft)] [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+                  <Target className="h-3 w-3 shrink-0" aria-hidden />
+                  <span>Doelbedrag</span>
+                </div>
+                <div
+                  className="text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                  style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                >
+                  {formatCurrency(simResult.requiredFirePortfolio)}
+                </div>
+                <div
+                  className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  {Math.abs(targetDelta) > 100
+                    ? <span style={{ color: isTargetPositive ? 'var(--positive)' : 'var(--negative)' }}>
+                        {targetDelta > 0 ? '+' : ''}{formatCurrency(targetDelta)}
+                      </span>
+                    : 'benodigd'}
+                </div>
+              </button>
+
+              {/* KPI 3: Jaarlijks sparen */}
+              <button
+                type="button"
+                onClick={() => setComparisonOpen(true)}
+                className="p-3 sm:p-4 border-r border-[var(--rule-soft)] last:border-r-0 sm:[&:not(:last-child)]:border-r text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+                  <TrendingUp className="h-3 w-3 shrink-0" aria-hidden />
+                  <span>Jaarlijks sparen</span>
+                </div>
+                <div
+                  className="text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                  style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                >
+                  {formatCurrency(whatIfAnnualSavings)}
+                </div>
+                <div
+                  className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  {Math.abs(annualSavingsDelta) > 100
+                    ? <span style={{ color: isSavingsPositive ? 'var(--positive)' : 'var(--negative)' }}>
+                        {annualSavingsDelta > 0 ? '+' : ''}{formatCurrency(annualSavingsDelta)}/jr
+                      </span>
+                    : 'per jaar'}
+                </div>
+              </button>
+
+              {/* KPI 4: Verschil vs. werkelijkheid */}
+              <button
+                type="button"
+                onClick={() => setComparisonOpen(true)}
+                className="p-3 sm:p-4 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+                  <Equal className="h-3 w-3 shrink-0" aria-hidden />
+                  <span>Verschil</span>
+                </div>
+                <div
+                  className="text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                  style={{
+                    fontFamily: 'var(--font-playfair, Georgia, serif)',
+                    color: fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1
+                      ? (isFirePositive ? 'var(--positive)' : 'var(--negative)')
+                      : 'var(--ink)',
+                  }}
+                >
+                  {fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1
+                    ? formatFireAgeDelta(fireAgeDelta)
+                    : '–'}
+                </div>
+                <div
+                  className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  {fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1
+                    ? (isFirePositive ? 'eerder vrij' : 'later vrij')
+                    : 'gelijk aan baseline'}
+                </div>
+              </button>
             </div>
-          </button>
+          )
+        })()}
+
+        {/* ── Verschil-analyse onder de KPI-strip — directe impact-zicht ── */}
+        {simResult && baselineSim && (
+          <section className="mt-4">
+            {/* Editorial section-label met module-streep */}
+            <div className="mb-3 flex items-center justify-between border-b border-[var(--rule-soft)] pb-2">
+              <div className="flex items-center gap-2.5">
+                <span
+                  aria-hidden
+                  className="inline-block w-7 h-px shrink-0"
+                  style={{ background: 'var(--module-active-500)' }}
+                />
+                <span className="text-[10px] uppercase tracking-[0.20em] font-mono text-[var(--module-active-700)]">
+                  Verschil-analyse
+                </span>
+              </div>
+              <span
+                className="italic text-[11px] text-[var(--ink-3)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                werkelijkheid vs. wat-als
+              </span>
+            </div>
+
+            {/* Inline comparison rows — zelfde structuur als de modal-kassabon */}
+            <div className="space-y-1">
+              <ComparisonRow
+                label="FIRE leeftijd"
+                baseValue={formatFireAge(baselineFireAge)}
+                whatIfValue={formatFireAge(whatIfFireAge)}
+                delta={fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1
+                  ? formatFireAgeDelta(fireAgeDelta)
+                  : null}
+                isPositive={fireAgeDelta !== null ? fireAgeDelta < 0 : null}
+              />
+              <ComparisonRow
+                label="Doelbedrag"
+                baseValue={formatCurrency(baselineSim.result.requiredFirePortfolio)}
+                whatIfValue={formatCurrency(simResult.requiredFirePortfolio)}
+                delta={
+                  Math.abs(simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio) > 100
+                    ? formatCurrency(simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio)
+                    : null
+                }
+                isPositive={simResult.requiredFirePortfolio < baselineSim.result.requiredFirePortfolio}
+              />
+              <ComparisonRow
+                label="Jaarlijks sparen"
+                baseValue={formatCurrency(baselineAnnualSavings) + '/jr'}
+                whatIfValue={formatCurrency(whatIfAnnualSavings) + '/jr'}
+                delta={
+                  Math.abs(whatIfAnnualSavings - baselineAnnualSavings) > 100
+                    ? `${whatIfAnnualSavings > baselineAnnualSavings ? '+' : ''}${formatCurrency(whatIfAnnualSavings - baselineAnnualSavings)}`
+                    : null
+                }
+                isPositive={whatIfAnnualSavings > baselineAnnualSavings}
+              />
+            </div>
+
+            {/* Strategie totaal-rij — dubbele lijn boven, editorial */}
+            <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 border-t-2 border-double border-[var(--ink)] pt-2.5">
+              <span
+                className="italic text-[12px] text-[var(--ink-3)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                Strategie
+              </span>
+              <span className="w-3 sm:w-3.5" />
+              <span
+                className="font-mono text-[12px] font-medium text-[var(--ink)] tabular-nums"
+              >
+                {STRATEGY_LABELS[simResult.strategy].name}
+              </span>
+            </div>
+
+            {/* Optionele drill-in naar volledige kassabon */}
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setComparisonOpen(true)}
+                className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
+              >
+                Volledige kassabon
+                <ArrowRight className="h-3 w-3" aria-hidden />
+              </button>
+            </div>
+          </section>
         )}
 
         {/* ── Full-width chart (like horizon page) ─────────────── */}
@@ -614,8 +806,8 @@ export default function WhatIfPage() {
                   onClick={() => setChartMode(mode)}
                   className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
                     chartMode === mode
-                      ? 'border-wil-300 bg-wil-50 text-wil-700'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-wil-200 hover:text-[var(--ink-2)]'
+                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                   }`}
                   aria-pressed={chartMode === mode}
                   style={{ minHeight: 32 }}
@@ -771,13 +963,13 @@ export default function WhatIfPage() {
                 <>
                   <span className="flex items-center gap-1.5">
                     <svg width="20" height="2" aria-hidden="true">
-                      <line x1="0" y1="1" x2="20" y2="1" stroke="var(--horizon-500, #8b5cf6)" strokeWidth="2" />
+                      <line x1="0" y1="1" x2="20" y2="1" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2" />
                     </svg>
                     Instroom
                   </span>
                   <span className="flex items-center gap-1.5">
                     <svg width="20" height="2" aria-hidden="true">
-                      <line x1="0" y1="1" x2="20" y2="1" stroke="var(--kern-500, #f59e0b)" strokeWidth="2" />
+                      <line x1="0" y1="1" x2="20" y2="1" stroke="var(--color-kern-500, #6b4339)" strokeWidth="2" />
                     </svg>
                     Uitstroom
                   </span>
@@ -787,11 +979,11 @@ export default function WhatIfPage() {
           </section>
         )}
 
-        {/* ── Divider ───────────────────────────────────────── */}
-        <div className="my-4 border-b border-dashed border-[var(--border-ed)]" />
+          </div>
+        </section>
 
         {/* ── Two-column layout: controls ────────────────────── */}
-        <div className="lg:grid lg:grid-cols-2 lg:gap-6">
+        <div className="mt-4 px-4 sm:px-6 lg:grid lg:grid-cols-2 lg:gap-6">
 
           {/* ── Left column: sliders + events ──────────────────── */}
           <div className="min-w-0 space-y-4">
@@ -818,9 +1010,9 @@ export default function WhatIfPage() {
           <div className="mt-4 min-w-0 space-y-4 lg:mt-0">
             {/* Presets */}
             <div className="card-editorial overflow-hidden">
-              <div className="h-[3px] bg-wil-500" />
+              <div className="h-[3px] bg-horizon-500" />
               <div className="px-4 py-3">
-                <p className="mb-2.5 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
+                <p className="mb-2.5 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
                   Snelle scenario&apos;s
                 </p>
                 <WhatIfPresets
@@ -856,7 +1048,7 @@ export default function WhatIfPage() {
         </div>
 
         {/* Footer */}
-        <p className="pb-8 pt-4 text-center font-sans text-[10px] text-[var(--ink-4)]">
+        <p className="pb-8 pt-4 px-4 sm:px-6 text-center font-sans text-[10px] text-[var(--ink-4)]">
           Dit is een simulatie — geen financieel advies. Werkelijke resultaten kunnen afwijken.
         </p>
 
@@ -885,7 +1077,7 @@ export default function WhatIfPage() {
                     Werkelijkheid
                   </span>
                   <span className="w-4" />
-                  <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
+                  <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
                     Wat-als
                   </span>
                 </div>

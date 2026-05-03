@@ -1,20 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #faf9f6;
+  /* ── Editorial palet — FT-geïnspireerde tussenstap (warm-zalm, minder bruin dan FD) ── */
+  --background: #f5efe2;
   --foreground: #1a1916;
   --header-height: 57px;
 
-  /* Editorial design tokens */
-  --bg: #faf9f6;
-  --paper: #ffffff;
-  --subtle: #f3f2ee;
-  --border-ed: #e2e0d8;
-  --border-md: #c8c5ba;
+  /* Editorial design tokens — palet-tussenstap actief (plan-waardes) */
+  --bg: #f5efe2;          /* page bg — warm cream, tussen FD-cream en FT-zalmpink */
+  --paper: #fbf7ec;       /* card/container — iets lichter dan page-bg, krant-papier-toon */
+  --subtle: #f3ead9;      /* alternate rows, accent backgrounds */
+  --border-ed: #e3dac8;   /* default borders */
+  --border-md: #ccc1aa;   /* hover/medium borders */
   --ink: #1a1916;
   --ink-2: #4a4840;
   --ink-3: #888070;
   --ink-4: #bbb8b0;
+  --rule-soft: rgba(26, 25, 22, 0.18);  /* halftransparante divider voor dotted/dashed */
   --r: 0px;
   --r-lg: 0px;
   --r-sm: 0px;
@@ -69,6 +71,24 @@
   --color-horizon-800: oklch(0.474 0.0664 76.6);
   --color-horizon-900: oklch(0.414 0.0537 76.6);
   --color-horizon-950: oklch(0.292 0.0364 76.6);
+
+  /* ── Module-active CSS-variabelen (default = ink-shades, override per route layout) ──
+     Module-routes (/core, /will, /horizon) overschrijven deze met hun eigen module-shades.
+     Cross-module-routes (/dashboard, /identity, /rapportages, /berichten, /nieuws, /beheer)
+     vallen terug op deze defaults.
+     Uitzondering: --module-active-200 wordt gebruikt voor highlight-marker.
+     Default = Horizon-200 zodat cross-module-pagina's een zichtbare uitkomst-marker behouden. */
+  --module-active-50:  var(--ink-4);
+  --module-active-100: var(--ink-4);
+  --module-active-200: var(--color-horizon-200);
+  --module-active-300: var(--ink-3);
+  --module-active-400: var(--ink-3);
+  --module-active-500: var(--ink-2);
+  --module-active-600: var(--ink-2);
+  --module-active-700: var(--ink);
+  --module-active-800: var(--ink);
+  --module-active-900: var(--ink);
+  --module-active-950: var(--ink);
 
   /* ── Budget type palettes (overridden by user preferences) ── */
   /* Income: Donkergroen #2d6a4f */
@@ -491,6 +511,22 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+/* Editorial body warmth — optionele radial-gradient voor narratieve pagina's
+   (gids, briefing, jaaroverzicht, hero-secties). Niet als default body-bg —
+   dashboards en data-pagina's blijven plat var(--bg) voor leesbaarheid. */
+.bg-editorial {
+  background-image:
+    radial-gradient(circle at 20% 10%, color-mix(in oklch, var(--color-wil-500) 4%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, color-mix(in oklch, var(--color-horizon-500) 5%, transparent) 0%, transparent 45%);
+}
+@media (max-width: 640px) {
+  .bg-editorial {
+    background-image:
+      radial-gradient(circle at 20% 10%, color-mix(in oklch, var(--color-wil-500) 2%, transparent) 0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, color-mix(in oklch, var(--color-horizon-500) 3%, transparent) 0%, transparent 45%);
+  }
 }
 
 /* ── Newspaper column separators ──────────────────────── */

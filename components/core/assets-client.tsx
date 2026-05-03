@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { Kicker } from '@/components/editorial'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -352,12 +353,37 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Header */}
+      {/* Editorial header — blueprint Type 2 (List) */}
+      <header className="mb-5 space-y-2">
+        {/* Kicker met 28×1px streep */}
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Bezittingen · {activeAssets.length} item{activeAssets.length !== 1 ? 's' : ''}
+        </div>
+        {/* Headline met italic-em "vrijheid" */}
+        <h1
+          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Opgeslagen{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            vrijheid
+          </em>
+        </h1>
+      </header>
+
+      {/* Original section header (compact) */}
       <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-positive">Bezittingen</h1>
               <button
                 type="button"
                 onClick={() => setQuickAddOpen(true)}
@@ -366,10 +392,13 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                 className="inline-flex min-h-[32px] items-center gap-1.5 border border-kern-200 bg-[var(--color-kern-50)] px-2.5 py-1 text-xs font-medium text-kern-700 transition-colors hover:bg-kern-100 hover:text-kern-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
-                Bezitting
+                Bezitting toevoegen
               </button>
             </div>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
+            <p
+              className="mt-1 italic text-[12px] text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
               {activeAssets.length} bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
             </p>
             {perspective === 'household' && hiddenCategories.includes('assets') && (
@@ -448,10 +477,10 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         >
           <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${insightOpen ? 'rotate-180' : ''}`} />
           <div className="flex min-w-0 flex-1 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-kern-500" />
-              <h3 className="label-editorial text-[var(--ink-2)]">Verdeling &amp; Projectie</h3>
-            </div>
+            <Kicker>
+              <BarChart3 className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
+              Verdeling &amp; Projectie
+            </Kicker>
             <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
               {formatCurrency(totalValue)}
             </p>
@@ -463,7 +492,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           <div className="grid gap-3 sm:gap-6 lg:grid-cols-2 p-4 sm:p-6">
             {/* Allocation donut */}
             <section>
-              <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
+              <Kicker>Verdeling</Kicker>
               <div className="mt-4 flex items-center gap-6">
                 <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
                 <div className="flex-1 space-y-2">
@@ -490,7 +519,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
             {/* Projection chart */}
             <section data-testid="portfolio-projection-section">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--ink-2)]">Projectie</h2>
+                <Kicker>Projectie</Kicker>
                 <div className="flex items-center gap-1" data-testid="projection-year-buttons">
                   {[5, 10, 20, 30].map((y) => (
                     <button
@@ -932,19 +961,45 @@ export function AssetDetailModal({
           </p>
         </div>
 
-        {/* Value highlight */}
-        <div className="border-b border-[var(--border-ed)] px-6 py-4 text-center">
-          {isEigenHuis && <p className="mb-1 text-xs font-medium text-[var(--ink-3)] uppercase">Marktwaarde</p>}
-          {asset.asset_type === 'levensverzekering' && <p className="mb-1 text-xs font-medium text-[var(--ink-3)] uppercase">Afkoopwaarde</p>}
-          {asset.asset_type === 'vordering' && <p className="mb-1 text-xs font-medium text-[var(--ink-3)] uppercase">Uitstaand bedrag</p>}
-          <p className="text-3xl font-bold text-[var(--ink)]">{formatCurrency(value)}</p>
+        {/* Value highlight — editorial blueprint met HighlightMark */}
+        <div className="border-b border-[var(--border-ed)] px-6 py-5 text-center">
+          {(isEigenHuis || asset.asset_type === 'levensverzekering' || asset.asset_type === 'vordering') && (
+            <div className="mb-2 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">
+              <span
+                aria-hidden
+                className="inline-block w-5 h-px"
+                style={{ background: 'var(--module-active-500)' }}
+              />
+              {isEigenHuis && 'Marktwaarde'}
+              {asset.asset_type === 'levensverzekering' && 'Afkoopwaarde'}
+              {asset.asset_type === 'vordering' && 'Uitstaand bedrag'}
+            </div>
+          )}
+          <p
+            className="text-[32px] sm:text-[40px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+          >
+            <span
+              className="inline px-1"
+              style={{
+                backgroundImage:
+                  'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+              }}
+            >
+              {formatCurrency(value)}
+            </span>
+          </p>
           {dailyExpenses > 0 && value > 0 && (
-            <p className="mt-0.5 text-xs text-kern-600/70" data-testid="detail-value-freedom">
+            <p
+              className="mt-1.5 italic text-[12px] text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              data-testid="detail-value-freedom"
+            >
               {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'long')} vrijheid
             </p>
           )}
           {purchase > 0 && (
-            <p className={`mt-1 text-sm font-medium ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
+            <p className={`mt-2 text-sm font-medium tabular-nums ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
               {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% ({returnPct >= 0 ? '+' : ''}{formatCurrency(value - purchase)})
               {dailyExpenses > 0 && Math.abs(value - purchase) > 0 && (
                 <span className={`ml-1 text-xs ${returnPct >= 0 ? 'text-positive/60' : 'text-negative/60'}`} data-testid="detail-return-freedom">

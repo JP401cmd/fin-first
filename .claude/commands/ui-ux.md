@@ -42,6 +42,7 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Geldbedragen in DM Mono met tabular-nums?
 - [ ] Geen font-mixing binnen één element?
 - [ ] Content-secties (artikelen, uitleg, gidstekst) gebruiken `text-base` + `leading-relaxed` voor leesbare body-tekst. Data-secties (tabellen, lijsten, metrics) blijven compact (`text-sm`/`text-xs`).
+- [ ] **Mono-font blijft DM Mono**: financiële cijfers, kickers en monospace-meta gebruiken `var(--font-dm-mono)` met `tabular-nums`. JetBrains Mono (zoals in WOZ-rekenmodel) is technisch/code-georiënteerd; DM Mono is humanistic en past bij krant-warmte. Voor toekomstige calculator-modes kan een vierde `font-theme: 'computational'` worden toegevoegd aan `useFontTheme()` zonder de globale standaard te raken.
 
 ### Kleur
 - [ ] Module-kleur alleen voor de actieve module, niet voor neutrale UI?
@@ -49,6 +50,8 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Inkt-hiërarchie correct? (--ink voor primair, --ink-2 voor secundair, --ink-3 voor meta)
 - [ ] Geen pure zwart (#000) of pure wit (#fff) als achtergrond?
 - [ ] Semantische value-change tokens gebruikt? `--positive` (groen, oklch 0.50 0.09 162) voor stijging, `--negative` (rood, oklch 0.50 0.09 25) voor daling, `--neutral-change` (grijs, oklch 0.67 0.005 88) voor ongewijzigd. Gebruik `text-positive`/`text-negative` classes, NOOIT hardcoded groen/rood.
+- [ ] **Module-aware CSS-variabelen**: pagina's onder een module-route leven binnen een layout die `--module-active-50/100/.../950` zet op de bijbehorende module-shades (`--color-kern-*` / `--color-wil-*` / `--color-horizon-*`). Components verwijzen naar `--module-active-500/700/200` in plaats van hardcoded `kern`/`wil`/`horizon`. Cross-module pagina's vallen terug op `--ink`-shades (default in `:root`). Uitzondering: `--module-active-200` (highlight-marker) heeft `--color-horizon-200` als default zodat cross-module-pagina's marker-zichtbaarheid behouden.
+- [ ] **Palet-richting — minder FD, meer FT**: TriFinity zit *tussen* FD.nl (cream/bruin) en FT.com (zalm-roze) in. De pagina-achtergrond is geen warm-bruin meer maar een warm-zalm cream (`#fbf2e7`/`--bg`) met bijna-wit paper (`#fef9ef`/`--paper`). Bij twijfel: kies de minder-bruine variant. Géén pure-witte achtergrond toelaten — de warmth blijft. Géén FT-imitatie (geen FT-pink `#FFF1E5` als 1-op-1 kopie).
 
 ### Ruimte & Layout
 - [ ] Consistent gebruik van spacing (4px grid: 4, 8, 12, 16, 20, 24, 32)?
@@ -69,6 +72,8 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Hover op rijen: `hover:bg-[var(--subtle)]` voor scanbaar browsen?
 - [ ] Zebra-striping optioneel (`even:bg-[var(--subtle)]/30`) — alleen bij >10 rijen?
 - [ ] Geen verticale borders — alleen horizontale `border-b border-[var(--border-ed)]`?
+- [ ] **Dotted ritme** voor editorial-pagina's: tabellen op gids, jaaroverzicht, rapportages gebruiken `border-b border-dotted border-[var(--rule-soft)]` i.p.v. solid borders. Op data-zware dashboards blijft `border-[var(--border-ed)]` solid voor scanbaarheid.
+- [ ] **Sleep-affordance**: tabellen die op `<640px` horizontaal scrollen tonen `'sleep →'`-hint absolute top-2 right-2 in mono UPPERCASE. Verbergen via `[data-scrolled="true"]::before { opacity: 0 }` zodra `scrollLeft > 0`. Zie patroon-kaart *Sleep-affordance op overflow-tabellen*.
 
 ### Grafiek-animaties
 - [ ] Elke chart/sparkline/voortgangsbalk gebruikt `useInViewAnimation` (`lib/hooks/use-in-view-animation.ts`)?
@@ -81,13 +86,32 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Animaties herhalen bij pagina-navigatie (component remount reset hook state)?
 - [ ] `duration` dekt de volledige animatiesequentie?
 
+### Editorial signature-elementen
+- [ ] **Kicker-streep**: elke kicker heeft een 28×1px module-gekleurde streep ervoor. Implementatie: `<span class="inline-block w-7 h-px bg-[var(--module-active-500)] mr-2.5 align-middle" />` vóór de kicker-tekst, of `::before` met dezelfde dimensies. Op `<380px` reduceren naar 20px.
+- [ ] **Headline-emphasis**: H1/H2 met redactionele lading (hero, sectie-opening, gids-vraag) bevat één italic em-element in module-kleur: `<em class="font-serif italic font-normal text-[var(--module-active-700)]">woord</em>`. Niet meer dan één per headline. Niet bij data-koppen ("Saldo per categorie") — alleen narratieve koppen ("Welke route kies je?", "Hoeveel ruimte heb je nog?").
+- [ ] **Editorial deck**: subkop onder hero-headline gebruikt `border-l-2 border-[var(--module-active-500)] pl-3 italic font-serif text-[var(--ink-2)] max-w-[60ch]`. Vervangt gewone `<p>` als de pagina een redactionele intro nodig heeft.
+- [ ] **Highlight-marker (halve transparante streep)**: gebruik `bg-[linear-gradient(transparent_60%,var(--module-active-200)_60%)] inline px-0.5` op één à twee woorden of bedragen binnen een paragraaf, of op een hoofdbedrag in een figures-strip. Highlight-marker neemt de **actieve module-kleur** aan in haar transparante 200-shade — Kern-200 op `/core`, Wil-200 op `/will`, Horizon-200 op `/horizon`. Cross-module-pagina's vallen terug op Horizon-200 (universele uitkomst-marker). Het 200-niveau is van zichzelf zo licht dat de tekst eronder leesbaar blijft.
+- [ ] **Hoofdbedrag-highlight verplicht**: in elke analyse, scenario-output, kassabon-summary, jaaroverzicht of figures-strip krijgt het *eindresultaat / hoofduitkomst-bedrag* (de conclusie waar de gebruiker naartoe leest) consistent een highlight-marker. Niet meer dan één highlight-marker per pagina-sectie. Géén highlight op tussentotalen, kosten, of vergelijkings-baselines — alleen op de winnaar/uitkomst.
+- [ ] **Module-aware accenten** (incl. highlight-marker): kicker-streep, headline-em, editorial-deck én highlight-marker volgen automatisch de actieve module-kleur via `--module-active-*` (`-500` voor accent-bars/strepen, `-700` voor em-tekst, `-200` voor highlight-marker). Cross-module pagina's vallen terug op `--ink-2` voor em en `--rule-soft` voor streepjes; voor highlight-marker geldt Horizon-200 als expliciete fallback (zodat de marker zichtbaar blijft).
+- [ ] **Mini-artikel-blueprint voor entiteit-kaarten**: categorie-, asset-, debt-, en doel-kaarten (alle klikbare entiteit-tegels op kern/will/horizon-pagina's) volgen de redactionele blueprint:
+      1. Module-accent-streep (3px boven, `bg-[var(--module-active-500)]` of type-kleur).
+      2. Kicker-regel: kleine icon + UPPERCASE label in mono — geeft categorie-context.
+      3. Headline (Playfair, 16-18px) met optionele italic-em op één woord wanneer de naam meerwoordig is ("Eigen *huis*", "Spaar*pot*").
+      4. Hoofdbedrag (DM Mono, 18-22px, tabular-nums) met highlight-marker (`var(--module-active-200)`) wanneer het bedrag het *primaire scan-doel* is (categorie-totaal, asset-waarde, debt-restschuld). Sub-bedragen geen marker.
+      5. KPI-strip of mini-bar als secundaire data.
+      6. Meta-regel in italic Source Serif 4 (`text-[var(--ink-3)]`, italic, 11-12px) — "4 rekeningen", "1 huis", "12 jaar resterend". Vervangt UPPERCASE-meta op entiteit-kaarten; krant-italic past bij artikel-DNA.
+      Niet voor pure data-widgets (sparkline, kpi-tile, dashboard-totals) — die houden de bestaande compacte structuur.
+- [ ] **Dubbele lijn als finale**: total-rijen in kassabonnen, rapportage-summaries en balans-eindtotalen krijgen `border-b-4 border-double border-[var(--ink)]` als boekhoudkundige sluitstreep. Eenmalig per tabel, alleen op de eindrij — nooit als generieke divider.
+- [ ] **Ornament-colophon**: footer-meta op editorial pagina's gebruikt `✦` als scheidingsteken: `Trifinity ✦ {module} ✦ v{x.y}`. Niet `|`, niet `·`, niet `—`. Cursor-default, niet selectable.
+- [ ] **Romeinse sectie-numbering** (optioneel): long-form editorial pagina's met ≤4 secties (gids, jaaroverzicht, will-narratief) tonen `i. ii. iii. iv.` rechts in section-label, in italic Playfair `text-[var(--module-active-700)]`. Niet op dashboards/lijsten/forms. Op `<380px`: `text-xs`. Op `<320px`: verbergen.
+
 ### Consistentie
 - [ ] Past het in het bestaande design systeem?
 - [ ] Geen nieuwe kleuren, fonts of patronen zonder goede reden?
 - [ ] Hergebruik van bestaande tokens en utilities?
 - [ ] Geen `rounded-*` classes (behalve `rounded-full`) — alle hoeken zijn scherp?
 - [ ] Elke `WidgetShell` MOET een `kicker` prop hebben — het UPPERCASE label bovenaan de widget. Geen widget zonder kicker.
-- [ ] `SectionDivider` gebruiken voor visuele scheiding tussen content-blokken. Twee varianten: (1) dunne lijn `border-t border-[var(--border-ed)]` met `my-6`, of (2) redactioneel asterisk-patroon `* * *` in `text-[var(--ink-4)] text-center my-8`.
+- [ ] `SectionDivider` gebruiken voor visuele scheiding tussen content-blokken. Drie varianten: (1) dunne lijn `border-t border-[var(--border-ed)]` met `my-6`, (2) redactioneel asterisk-patroon `* * *` in `text-[var(--ink-4)] text-center my-8`, of (3) **`variant="double-rule"`** voor hero-koppen op editorial-pagina's: rendert `border-t-4 border-double border-b border-[var(--ink)]` (krant-masthead-stijl). Niet voor chrome (`AppHeader`) — kost te veel verticale ruimte op mobile.
 - [ ] Tijdnotatie krant-stijl: `HH:mm` voor vandaag, `d MMM` voor dit jaar, `d MMM yyyy` voor oudere datums. NOOIT relatieve tijden als "2 uur geleden" of "3 dagen geleden" — dit doorbreekt de krant-esthetiek.
 
 ### Navigatie
@@ -171,6 +195,7 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Pull-to-refresh alleen op scrollbare content-lijsten, niet op forms/dashboards met auto-refresh.
 - [ ] Bottom-sheets: 3 detents (peek/mid/full), drag-handle zichtbaar, expliciete sluit-knop (niet alleen swipe), `inert` op achtergrond, focus-trapped. Hergebruik `components/app/bottom-sheet.tsx`.
 - [ ] Safe-area: `env(safe-area-inset-bottom)` padding voor CTA's op iOS-notch / Android-gesture-bar (zie `safe-bottom` class in bottom-sheet).
+- [ ] **Range-thumb dimensies**: native of custom `<input type=range>` thumbs zijn 16px desktop / 18px op `(pointer:coarse)`, met `--module-active-500` fill en 2px ink-border. Geen onzichtbare/subtiele thumbs. Track: `height: 2px` desktop / `3px` mobile. Hover-state: `transform: scale(1.2)` + thumb-fill naar `--module-active-700`.
 
 ### Offline & stale-data
 - [ ] Persistente offline-banner bovenaan bij verlies connectie; writes lokaal queuen met "Synchroniseert zodra online"-label.
@@ -214,6 +239,233 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Cijfers als cijfers (behalve "één" als voornaamwoord). Valuta volgens NL-locale met `1.234,56`.
 - [ ] "Je" als aanspreking, "we" spaarzaam. Geen chatty contracties in financiële context (vertrouwen).
 - [ ] Glossarium: één woord per concept ("transactie" óf "boeking", niet beide door elkaar).
+
+## Patroon-kaarten (optionele editorial elementen)
+
+Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom vraagt.
+
+### Pull-quote met inline highlights
+- **Toepassen op**: narratieve pagina's met menselijk verhaal (gids-intro, briefing-opener, jaarafsluiting, will-narratief, rapportage-conclusie) **en** scenario-output-samenvattingen bovenaan kassabonnen/analyses.
+- **Niet toepassen op**: data-pagina's zonder narratieve laag, dashboards, lijsten, forms.
+- **Implementatie container**: `relative border-t border-b border-[var(--ink)] py-5 pl-7 mb-7`, body `font-serif italic font-normal text-lg sm:text-xl leading-snug text-[var(--ink)]`. Quote-mark (linker bovenhoek): `absolute -top-2 -left-1 font-serif font-black not-italic text-[40px] sm:text-[56px] md:text-[80px] text-[var(--module-active-500)] leading-none`. Op `<380px`: padding-left 14px, body-text 14.5px, quote-mark 40px.
+- **Inline highlight-types**:
+  - *Concept-highlight* (regelnaam, parameter): `font-bold not-italic text-[var(--module-active-700)]` — bv. "**70%-regeling**", "**jaar 10**".
+  - *Bedrag-positief*: `font-bold not-italic text-[var(--module-active-700)]` of `text-[var(--positive)]`.
+  - *Bedrag-negatief*: `font-bold not-italic text-[var(--negative)]`.
+  - *Hoofduitkomst-bedrag* (samenvattings-anker): combineer concept-highlight `text-[var(--module-active-700)]` MET highlight-marker `bg-[linear-gradient(transparent_60%,var(--module-active-200)_60%)]` — alleen op het hoogtepunt-bedrag, max één per quote.
+
+### Figures-strip (4-kolommen-summary)
+- **Toepassen op**: kassabon-modals, scenario-output-pagina's, analyse-conclusie-blokken, jaaroverzicht-headers, asset-detail mini-hero.
+- **Niet toepassen op**: dashboard-widgets (gebruik `WidgetShell`), tabel-rijen, lijst-items, forms.
+- **Implementatie container**: `grid grid-cols-2 sm:grid-cols-4 border-t border-b border-[var(--ink)] my-6`. Per kolom: `p-4 sm:p-5 border-r border-[var(--rule-soft)] last:border-r-0`. Op mobile rij-borders: `nth-child(-n+2):border-b`.
+- **Kicker**: `text-[10px] uppercase tracking-[0.20em] text-[var(--ink-3)] mb-1.5 font-mono`.
+- **Bedrag**: `font-serif font-black text-[22px] sm:text-[28px] leading-none tracking-[-0.02em] tabular-nums` (Playfair, niet DM Mono — uitzondering voor figures-strip). Kleurcodering: neutraal `text-[var(--ink)]`, negatief `text-[var(--negative)]`, positief `text-[var(--positive)]`, **eindresultaat/winnaar** `text-[var(--ink)]` MET highlight-marker. Eén per strip.
+- **Sub-meta**: `font-serif italic text-[11px] text-[var(--ink-3)] mt-1.5`.
+- **Optionele teken-prefix** voor positieve uitkomst: `+€` zoals `+€203.375`.
+
+### Scenario-callout / regime-info
+- **Toepassen op**: bovenaan kassabonnen, scenario-output, regime-vergelijkingen — uitleg van de geactiveerde regel/instelling die het scenario bepaalt.
+- **Niet toepassen op**: generieke info-tekst, tooltips, hints in forms.
+- **Implementatie**: `bg-[var(--paper)] border border-[var(--ink)] border-l-4 border-l-[var(--module-active-500)] p-3 sm:p-4 mb-5 font-serif text-sm leading-snug text-[var(--ink-2)]`. **Strong-tag** voor regelnaam: `font-serif italic font-bold not-italic text-[var(--ink)]` — bv. "*Box 1 — Tijdelijke verhuur (70%-regeling):*". Geen kicker — de callout zelf is de kicker. Op `<380px`: padding 10px 12px, font-size 12.5px.
+
+### Rekening-tag uit de rand
+- **Toepassen op**: kassabon-modals, breakdown-cards op summary-pagina's (jaaroverzicht, rapportage-segmenten), scenario-output-cards.
+- **Niet toepassen op**: `WidgetShell` (kicker doet dat al), forms, lijst-items, dashboard-widgets — twee labels = chaos.
+- **Implementatie**: container `relative pt-6 overflow-visible`, `::before` met `content: '{label}'; position: absolute; top: -10px; left: 16px; padding: 0 8px; background: var(--paper); font-family: var(--font-playfair); font-style: italic; font-size: 11px; color: var(--ink-3); white-space: nowrap`. Tag-breedte <40% van containerbreedte. Op `<640px`: `left: 14px; font-size: 10.5px`.
+
+### Toggle-pill aan/uit
+- **Toepassen op**: scenario-toggles, wat-als-knoppen, density-switches, optionele fiscale parameters in calculator-flows.
+- **Niet als checkbox-vervanger in forms** — gebruik `<Switch>`/`<Checkbox>` met label voor formulier-velden. Pill is voor *visuele wat-als-toggling*, niet voor *form-state*.
+- **Implementatie aan**: `inline-flex items-center bg-[var(--ink)] text-[var(--paper)] px-2 py-0.5 rounded-full font-mono text-[10px] font-semibold uppercase tracking-[0.15em] border border-[var(--ink)]`. **Uit**: `bg-transparent text-[var(--ink-3)] border border-[var(--rule-soft)]`. **Wrapper**: `min-h-[44px] flex items-center` voor touch-target. Tap-highlight: `-webkit-tap-highlight-color: transparent`.
+
+### Comparison-row module-highlight
+- **Toepassen op**: scenario-vergelijkingstabellen, wat-als-output, before/after-overzichten, regime-comparisons.
+- **Implementatie**: huidige/geselecteerde rij krijgt `bg-[var(--module-active-100)]/40 border-l-[3px] border-[var(--module-active-500)] -mx-2 px-3`. Padding-left minimaal 12px. Andere rijen blijven `bg-transparent`.
+
+### Range-slider thumb
+- **Toepassen op**: native `<input type=range>` voor scenario-parameters, what-if-knoppen, budget-sliders.
+- **Implementatie**: `::-webkit-slider-thumb` en `::-moz-range-thumb`: `width: 16px; height: 16px; background: var(--module-active-500); border: 2px solid var(--ink); border-radius: 50%; cursor: pointer`. Track: `height: 2px; background: var(--ink)` (3px op `<640px`). Mobile (`@media (pointer:coarse)`): thumb 18px, border 1.5px. Hover: `transform: scale(1.2)` + thumb-fill naar `var(--module-active-700)`.
+
+### Sleep-affordance op overflow-tabellen
+- **Toepassen op**: tabellen die op `<640px` horizontaal scrollen.
+- **Implementatie**: container `relative`, `::before` met `content: 'sleep →'; position: absolute; top: 14px; right: 14px; font-family: var(--font-dm-mono); font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--module-active-500); background: var(--paper); padding: 1px 6px; border: 1px solid var(--rule-soft); z-index: 2; pointer-events: none; transition: opacity 0.2s`. Verbergen via `[data-scrolled="true"]::before { opacity: 0 }` zodra `scrollLeft > 0`.
+
+### Gestreepte legenda-patronen
+- **Toepassen op**: print-mode, accessibility-kritische legenda's waar kleur niet voldoende is.
+- **Niet als default**: voor digitale weergave is OKLCH shade-variatie scherper en mobile-vriendelijker.
+- **Implementatie**: `background: repeating-linear-gradient(45deg, var(--module-active-500) 0, var(--module-active-500) 3px, var(--module-active-700) 3px, var(--module-active-700) 6px)`. Swatch-grootte: 14×14px (10×10px op `<640px`).
+
+### Body radial-gradient (`bg-editorial`)
+- **Toepassen op**: editorial pagina's (gids, jaaroverzicht, briefing, hero-secties) als optionele utility-class.
+- **Niet als default body-bg**: dashboards en data-pagina's blijven plat `var(--bg)` voor maximale leesbaarheid.
+- **Implementatie**: `.bg-editorial { background-image: radial-gradient(circle at 20% 10%, color-mix(in oklch, var(--color-wil-500) 4%, transparent) 0%, transparent 40%), radial-gradient(circle at 80% 80%, color-mix(in oklch, var(--color-horizon-500) 5%, transparent) 0%, transparent 45%); }`. Op mobile (`<640px`): opacity halveren (4→2%, 5→3%).
+
+### Romeinse sectie-numbering
+- **Toepassen op**: long-form editorial met ≤4 secties (gids-stappen, jaaroverzicht-blokken, will-narratief-fases). Vaste sectie-set, geen dynamische lengte.
+- **Niet toepassen op**: dashboards, lijsten, forms, settings, dynamische rapportages (kan vii. worden — onhandig).
+- **Implementatie**: section-label is een grid-row met label-links + cijfer-rechts: `<div className="flex items-center justify-between border-b border-[var(--rule-soft)] mb-6 pb-2"><span className="text-[10px] uppercase tracking-[0.22em] text-[var(--module-active-500)]">{label}</span><span className="font-serif italic text-sm text-[var(--module-active-700)]">{romanNumeral}.</span></div>`. Op `<380px`: cijfer `text-xs`. Op `<320px`: verbergen.
+
+## Page-type-blueprints
+
+> Elke pagina valt in één van tien archetypes. Bij review/ontwerp eerst type bepalen, dan de blueprint volgen. Pagina's mogen blokken weglaten, maar nooit volgorde of hiërarchie veranderen. Cross-cutting standaarden (back-nav, action-bar, confirmation, loading, saving, success) gelden voor alle types.
+
+Cross-cutting voor alle types: `<AppHeader>` (chrome boven) en `<BottomNav>` (chrome onder, mobile) blijven onveranderd; pagina-content leeft daartussen in een `<main>` met juiste safe-area-padding.
+
+### Type 1: Module-landing
+- **Routes**: `/dashboard`, `/core`, `/will`, `/horizon`, `/identity`, `/rapportages`, `/berichten`, `/nieuws`.
+- **Doel**: hero + categorie-overzicht — eerste indruk van een module of feed.
+- **Top-down structuur**:
+  1. Module-accent-bar (3px boven, `bg-[var(--module-active-500)]`).
+  2. Hero (mini-figures-strip of single hoofdcijfer): kicker-met-streepje → hoofdcijfer (DM Mono, met highlight-marker als de pagina een uitkomst-anker heeft) → italic Source Serif sub-meta.
+  3. Optionele `<EditorialDeck>` met italic Playfair intro (max 60ch).
+  4. `<SectionDivider />` standaard.
+  5. Sectie A: Categorie-grid (cards in mini-artikel-blueprint) of overview-cards. Section-label rij met UPPERCASE-kicker links, optionele romeinse num rechts.
+  6. `<SectionDivider />` (eventueel `variant="double-rule"` voor zware overgangen).
+  7. Sectie B: optionele app-strip / module-app-tabs.
+  8. Footer: ornament-colophon `Trifinity ✦ {module} ✦ {datum}`.
+- **Niet doen**: meerdere hero-blokken stapelen, mini-bar gebruiken in plaats van figures-strip, cards in een tabel renderen.
+
+### Type 2: Categorie / list-pagina
+- **Routes**: `/core/assets/[type]`, `/core/debts/[type]`, `/core/budgets`, `/core/cash`, `/core/assets/holdings`, `/identity/koppelingen`, `/rapportages/budget`, `/rapportages/balans`.
+- **Doel**: overzicht van entiteiten binnen één categorie.
+- **Top-down structuur**:
+  1. Back-link / breadcrumb: `← Terug naar {parent}` in mono UPPERCASE 9px, `text-[var(--ink-3)] hover:text-[var(--ink)]`.
+  2. Mini-hero: kicker-met-streepje → categorie-naam (Playfair, optionele italic-em) → mini-`<FiguresStrip cols={2}>` met `[totaal-met-highlight, count]` of `[totaal, KPI]`.
+  3. Optionele `<EditorialDeck>` (alleen als context vereist is).
+  4. Toolbar (sticky bij scroll op desktop): search-input (alleen >25 items), filter-chips, sort-control rechts, primaire CTA "Toevoegen" rechts (button-stijl met module-active accent).
+  5. Cards-grid OF tabel:
+     - Cards (≤20 items, heterogeen): `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`, mini-artikel-blueprint.
+     - Tabel (>20 items, vergelijking): editorial dotted ritme, headers in mono UPPERCASE, numerieke kolommen rechts uitgelijnd in DM Mono.
+  6. Empty-state (als count = 0): zie Type 9.
+  7. Optionele app-tab onderaan (cash → Budgetteren, investment → Holdings).
+- **Mobile**: filter-bar wordt scroll-x chip-strip; search verbergt achter een knop; sort-control wordt segmented control onder de toolbar; CTA blijft prominent.
+
+### Type 3: Detail-pagina
+- **Routes**: `/core/budgets/[id]`, `/core/assets/cash/[accountId]`, `/core/assets/holdings/[id]`, `/core/assets/crypto/[holdingId]`, `/core/assets/investment/[holdingId]`, `/rapportages/[id]`.
+- **Doel**: alles wat één entiteit toont — eigendomsinfo, KPI's, transacties, gekoppelde items.
+- **Top-down structuur**:
+  1. Back-link.
+  2. Editorial header: kicker-met-streepje (categorie/type) → entiteit-naam (Playfair, italic-em op subtype) → hoofdwaarde-bedrag (DM Mono, ~32-40px) MET highlight-marker → sub-meta italic Source Serif (provider, looptijd, "Bijgewerkt om HH:mm").
+  3. Action-bar (sticky onderaan op mobile, inline op desktop): primair "Bewerken" / "Herwaarderen" → secundair "Verwijderen" achter type-to-confirm.
+  4. `<FiguresStrip cols={4}>` met afgeleide KPI's. Maximaal één extra highlight-marker.
+  5. Section: Eigendoms-/contract-info — `<SectionLabel kicker romanNum />` + key-value-rows met dotted ritme.
+  6. Section: Transacties / historie — tabel met dotted ritme + sleep-affordance op `<640px`.
+  7. Section: Verbonden entiteiten — linked-cards (bv. hypotheek-koppeling op `eigen_huis`).
+  8. Optionele `<SectionDivider variant="double-rule" />` voor footer-notes.
+  9. Footer-notes (italic Source Serif, klein, `text-[var(--ink-3)]`).
+- **Niet doen**: hoofdwaarde dupliceren tussen header en figures-strip; meer dan één highlight-marker per scherm-sectie.
+
+### Type 4: Bewerk-/create-pagina (form-flow)
+- **Routes**: `/core/budgets/new`, `/core/budgets/[id]/edit`, `/core/assets/revalue`, `/core/cash/import`, `/core/assets/holdings/import`, en alle CRUD-sheets/modals.
+- **Doel**: gegevens aanmaken of wijzigen in een gestructureerd formulier.
+- **Variant-keuze**:
+  - Mobile: full-page (geen modal).
+  - Desktop: bottom-sheet/centered-modal voor entiteiten ≤10 velden, full-page voor >10 velden.
+- **Top-down structuur**:
+  1. Editorial header: kicker-met-streepje "BEWERKEN" / "TOEVOEGEN" / "IMPORTEREN" → entiteit-naam (Playfair).
+  2. Optionele `<ScenarioCallout>` met context/uitleg.
+  3. Form-secties: Section-label (mono UPPERCASE links + optionele romeinse num rechts) → field-rows (label boven veld, input DM Mono voor bedragen, italic help-text onder veld) → toggle-pills voor optionele velden → range-sliders met module-thumb. Smart defaults; inputs in groepen, 24-32px tussen, 8-12px binnen.
+  4. Validatie: valideer op `blur`, her-valideer op `input`. Inline error onder veld in `text-negative`. Toast alleen voor netwerk/systeem-errors.
+  5. Sticky save-bar onderaan (mobile-safe-area-bottom): primaire CTA voorwaarts → secundaire CTA terug. **Geen** "Sluiten" of "OK" als enige optie.
+  6. Voorwaartse beweging na save: sluit form → toast met "Ongedaan maken"-link OP bestemmingspagina (success-banner). Géén success-state in dezelfde modal/pagina blijven zitten.
+- **Autosave-variant** (alleen voor settings-achtige edit-flows): status-label rechtsbovenin "Saving…" / "Opgeslagen — zojuist", debounce 500ms.
+
+### Type 5: Modal / sheet (CRUD / detail / lookup)
+- **Bestanden**: `bottom-sheet.tsx` als basis, plus alle `*-modal.tsx` en `*-sheet.tsx` in `components/app/` en `components/app/{module}/`.
+- **Doel**: ingrijpen op één entiteit zonder pagina-context te verliezen, of detail-zoom.
+- **Variant-keuze**:
+  - Bottom-sheet (mobile-first, default).
+  - Centered-modal (desktop-only, alleen bij >800px viewport voor smal-form).
+  - Full-screen-modal (alleen voor multi-step-flows binnen een modal — zie Type 7).
+- **Top-down structuur**:
+  1. Drag-handle (alleen bottom-sheet, 4×40px gecentreerd).
+  2. Modal header: kicker-met-streepje (klein, 9px mono) → titel (Playfair, 18-22px) → sluit-knop ✕ rechtsboven (44×44 touch-target).
+  3. Body: korte uitleg (Source Serif, optioneel) → hoofdinhoud (form, list, detail, breakdown) → optionele `<FiguresStrip>` of `<PullQuote>`.
+  4. Footer (sticky, `border-t border-[var(--border-ed)]`, safe-area-padding): duo-CTA verplicht — primair voorwaarts + secundair annuleren. **Niet** "OK" of "Sluiten" als enige optie.
+- **Accessibility verplicht**: focus-trap actief, initial-focus op veilig element, return-focus naar trigger bij close, `inert` op achtergrond. Hergebruik `bottom-sheet.tsx` als canonical referentie.
+
+### Type 6: Kassabon / breakdown-modal
+- **Doel**: financiële uitkomst tonen als "rekening" — pure WOZ-screenshot stijl.
+- **Top-down structuur**:
+  1. `<ScenarioCallout>` — regime/scenario-uitleg met paarse linker-border.
+  2. `<PullQuote>` met inline highlights (concept-paars, hoofdbedrag-marker).
+  3. `<FiguresStrip cols={4}>` — kleurgecodeerd Playfair, één highlight-marker op winnaar.
+  4. Breakdown-card met `<RekeningTag label="rekening">` uit bovenrand: section-titles dashed border, mono UPPERCASE; rows in Source Serif body + DM Mono num; subtotal-row bold met solid border; total-row Playfair black met `border-b-4 border-double border-[var(--ink)]`; tax-calc inline-block met paarse linker-border; warn/good-rows met linker-border.
+  5. Optionele chart-section (SVG met `useInViewAnimation`).
+  6. Optionele year-table met dotted-rows + sleep-hint op `<640px`.
+
+### Type 7: Wizard / multi-step-pagina
+- **Routes**: `/core/checkin`, `/core/cash/connect/*`, `/identity/gids`, `/identity/jaaroverzicht`, `/horizon/doorrekening-test/*`.
+- **Doel**: gefaseerde flow — onboarding, jaaroverzicht, doorrekening-stappen.
+- **Top-down structuur**:
+  1. Stappen-balk bovenaan: "i / iv" of "stap 2 van 5" in italic Playfair, paarse cijfers → dunne progress-bar (height 1-2px).
+  2. Editorial header per stap: kicker-met-streepje → stap-vraag in headline (Playfair met italic-em) → `<EditorialDeck>`.
+  3. Form-blueprint per stap (zelfde als Type 4, sectie 3-4).
+  4. Navigatie-balk onderaan (sticky, safe-area-bottom): "Vorige" tekst-link links → "Volgende" primaire CTA rechts → optioneel "Skip" tekst-link in midden voor optionele stappen.
+  5. Save-progress-banner: "Voortgang opgeslagen — je kunt later terugkomen via {deeplink}".
+  6. Bij laatste stap success: redirect naar bestemming + toast met undo-link.
+
+### Type 8: Settings / preferences-pagina
+- **Routes**: `/identity/instellingen`, `/identity/profiel`, `/identity/delen`, `/beheer/*`.
+- **Doel**: configuratie en voorkeuren — meestal autosave.
+- **Top-down structuur**:
+  1. Editorial header: kicker-met-streepje "INSTELLINGEN" → titel (Playfair) → `<EditorialDeck>`.
+  2. TabBar of section-anchors: tabs (≤4) of dropdown (>4 secties op mobile). Actieve tab krijgt `border-b-3 border-[var(--module-active-500)]` + subtiele `bg-[var(--module-active-50)]/40`.
+  3. Per sectie: `card-editorial`-container met section-label (mono UPPERCASE + optionele romeinse num) → setting-rows (label links + control rechts + help-text italic onder) → toggle-pills voor on/off-knoppen.
+  4. Autosave-status-label rechtsbovenin: "Opgeslagen — zojuist" (debounce 500ms).
+  5. **Geen save-CTA** voor reguliere settings — autosave is de standaard. Uitzondering: gevoelige instellingen (e-mail, wachtwoord, betaalmethoden) krijgen expliciete save-bevestiging.
+  6. Footer: link naar gegevens-export / account verwijderen / privacy-statement.
+
+### Type 9: Empty-state (universeel patroon)
+- **Toepassen op**: elke lege lijst, eerste-gebruik-staat, "user-cleared" state, no-results filter.
+- **Top-down structuur**:
+  1. Centered container: `max-w-md mx-auto py-12 px-4 text-center`.
+  2. Icoon (`text-[var(--ink-3)]`, 32-40px) of italic serif kicker.
+  3. Headline (Playfair, 1 zin, 18-20px, met optionele italic-em).
+  4. Beschrijving (italic Source Serif, 1-2 zinnen, `text-[var(--ink-2)]`, `max-w-prose`).
+  5. Primaire CTA — voorwaartse beweging ("Voeg je eerste budget toe"). **Niet** "Sluiten" of passieve "OK".
+  6. Optionele secundaire link onder CTA — uitleg/help, mono UPPERCASE 10px.
+- **Drie types** (elk eigen copy + CTA):
+  - *First-use*: "Nog geen {type}. Voeg je eerste {type} toe om te beginnen."
+  - *User-cleared*: "Alles afgerond. Ruim."
+  - *No-results-van-filter*: "Geen resultaten. Wis filters."
+
+### Type 10: Calculator / tool-pagina (volledig WOZ-blueprint)
+- **Routes**: `/horizon/whatif`, `/tools/fire-sim`, `/horizon/strategie`, `/core/belasting`.
+- **Doel**: scenario-input + live berekening + resultaat-uitkomst.
+- **Top-down structuur**:
+  1. Masthead met dubbele lijn boven (`border-t-4 border-double border-b border-[var(--ink)]`): meta-l "Editie · {Module}" → logo "tf." met module-accent dot → meta-r (subtitle).
+  2. Headline-row: kicker-met-streepje → h1 met italic-em (Playfair, `clamp(28px, 5vw, 68px)`) → deck (italic Source Serif, linker module-border).
+  3. Optionele regime/scenario-toggle: segmented control of `<TogglePill>` rij.
+  4. 2-koloms grid (`grid-cols-[380px_1fr]` op desktop, stacked op `<980px`):
+     **Linkerkolom (inputs)**: vertical ink-border rechts; section-labels met romeinse numbering; field-rows (label + value); range-slider met module-thumb; toggle-pills voor optionele velden; derived-block (mono, `bg-[var(--paper)]`).
+     **Rechterkolom (results)**: `<ScenarioCallout>` → `<PullQuote>` met inline highlights → `<FiguresStrip cols={4}>` → Breakdown-card met `<RekeningTag label="rekening">` → Chart-section (SVG) → Year-table met sleep-hint.
+  5. Comparison-block onderaan (`border-t-4 border-double border-[var(--ink)]`): comparison-title (Playfair black + meta) → optionele comparison-summary (italic Playfair met paars/rood highlights) → comparison-bars met "current"-row highlight.
+  6. Footer-notes-grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7 border-t-4 border-double border-[var(--ink)] pt-6 mt-8`): per blok kicker (mono UPPERCASE) + 1 paragraaf body (Source Serif).
+  7. Ornament-colophon: `Trifinity ✦ {Module} ✦ {Tool} v{x}`.
+
+### Cross-cutting standaarden voor alle page-types
+
+- [ ] **Back-navigation**: elke non-landing-pagina toont een terug-affordance (mobile: native back-knop in `<AppHeader>` + breadcrumb-link bovenin content; desktop: breadcrumb "← Terug naar {parent}"). Max 3 niveaus.
+- [ ] **Action-bar**: primaire actie altijd voorwaarts geframed ("Bewerken", "Opslaan en doorgaan", "Voeg toe"), nooit destructief.
+- [ ] **Confirmation**: type-to-confirm met preview → expliciete bevestiging → success-scherm met undo-window (5s toast). Géén één-tap-destructive ooit.
+- [ ] **Loading**: skeleton voor pagina-load (matcht final layout, geen layout-shift); spinner voor enkele actie. Pagina-skeleton volgt page-type-blueprint.
+- [ ] **Saving**: autosave (Type 8) → debounced 500ms + status-label; save-CTA (Type 4-7) → expliciete primaire CTA + voorwaartse beweging na save.
+- [ ] **Success**: toast/banner OP bestemmingspagina (na redirect), niet in dezelfde modal blijven. Celebration alleen bij mijlpalen.
+
+### Mobile-aanpassing per type
+| Type | Mobile-aanpassing |
+|---|---|
+| 1. Module-landing | Cards-grid 2→1 col, mini-hero stacked. |
+| 2. List | Filter-bar wordt scroll-x chips, search verbergt achter knop, sort-control wordt segmented control. |
+| 3. Detail | Figures-strip 4→2 col, action-bar wordt sticky bottom met safe-area. |
+| 4. Bewerk-pagina | Full-page (geen modal), sticky save-bar onderaan met safe-area. |
+| 5. Modal | Bottom-sheet patroon met 3 detents (peek/mid/full), drag-handle zichtbaar. |
+| 6. Kassabon | Figures-strip 4→2 col, breakdown blijft single-col, year-table sleep-hint. |
+| 7. Wizard | Stappen-balk compact, navigatie-balk sticky bottom met safe-area. |
+| 8. Settings | Tabs worden segmented control of dropdown, setting-rows stacked. |
+| 9. Empty-state | Geen aanpassing nodig (al gecentreerd). |
+| 10. Calculator | Stacked, comparison-bars worden 2-rij grid, regime-toggle full-width. |
 
 ## Hoe je communiceert
 

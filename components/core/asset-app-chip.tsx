@@ -47,9 +47,13 @@ export function AssetAppChip({
   }
 
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-kern-700">
+    <span
+      className="inline-flex items-center gap-1 text-[10px]"
+      style={{ color: 'var(--module-active-700)' }}
+    >
       <span
-        className="block h-1.5 w-1.5 shrink-0 rounded-full bg-kern-700"
+        className="block h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ background: 'var(--module-active-700)' }}
         aria-hidden="true"
       />
       <span>in {appLabel.toLowerCase()}</span>

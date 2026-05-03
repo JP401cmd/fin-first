@@ -106,32 +106,30 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
   }
 
   return (
-    <BottomSheet open={true} onClose={onClose}>
+    <BottomSheet open={true} onClose={onClose} title={typeLabel}>
         {step === 'detail' && (
           <>
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
-              <div className="flex items-center gap-2">
-                <div className={`flex items-center gap-1.5 rounded-full ${colors.bgLight} px-3 py-1`}>
-                  <BudgetIcon name={iconName} className={`h-3.5 w-3.5 ${colors.text}`} />
-                  <span className={`text-xs font-medium ${colors.text}`}>{typeLabel}</span>
-                </div>
-                {recommendation.priority_score != null && recommendation.priority_score > 0 && (
-                  <div className="flex items-center gap-0.5">
-                    {Array.from({ length: recommendation.priority_score }).map((_, i) => (
-                      <Sparkles key={i} className="h-3 w-3 text-amber-400" />
-                    ))}
-                  </div>
-                )}
+            {/* Type-badge + priority sparkles row */}
+            <div className="flex items-center gap-2 px-6 pt-4">
+              <div className={`flex items-center gap-1.5 rounded-full ${colors.bgLight} px-3 py-1`}>
+                <BudgetIcon name={iconName} className={`h-3.5 w-3.5 ${colors.text}`} />
+                <span className={`text-xs font-medium ${colors.text}`}>{typeLabel}</span>
               </div>
-              <button type="button" onClick={onClose} className="touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-                <X className="h-5 w-5" />
-              </button>
+              {recommendation.priority_score != null && recommendation.priority_score > 0 && (
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: recommendation.priority_score }).map((_, i) => (
+                    <Sparkles key={i} className="h-3 w-3 text-amber-400" />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Body */}
             <div className="space-y-4 px-6 py-5">
-              <h2 className="text-lg font-semibold text-[var(--ink)]">{recommendation.title}</h2>
+              <h2
+                className="text-2xl font-black tracking-[-0.02em] text-[var(--ink)] leading-tight"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >{recommendation.title}</h2>
               <p className="text-sm leading-relaxed text-[var(--ink-2)]">{recommendation.description}</p>
 
               {/* Freedom days highlight */}
@@ -279,12 +277,16 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
 
         {step === 'accept-flow' && (
           <div className="px-6 py-5">
-            {/* Header */}
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[var(--ink)]">Acties plannen</h2>
-              <button type="button" onClick={onClose} className="touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-                <X className="h-5 w-5" />
-              </button>
+            {/* Section-kicker — title staat al in cascade-header */}
+            <div className="mb-4 flex items-center gap-2.5">
+              <span
+                aria-hidden
+                className="inline-block w-7 h-px shrink-0"
+                style={{ background: 'var(--module-active-500)' }}
+              />
+              <span className="text-[10px] uppercase tracking-[0.20em] font-mono text-[var(--module-active-700)]">
+                Acties plannen
+              </span>
             </div>
 
             {actionDrafts.length === 0 ? (

@@ -402,7 +402,7 @@ function CheckinPageContent() {
 
     return (
       <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
-        {/* Header */}
+        {/* Header — editorial blueprint met kicker-streep */}
         <div className="mb-6 flex items-center gap-3">
           <Link
             href={returnTo}
@@ -412,8 +412,18 @@ function CheckinPageContent() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="flex-1">
-            <span className="label-editorial text-kern-600">Geldcheck-in</span>
-            <h1 className="text-lg font-display font-semibold text-[var(--ink)] tracking-tight capitalize">
+            <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+              <span
+                aria-hidden
+                className="inline-block w-5 h-px shrink-0"
+                style={{ background: 'var(--module-active-500)' }}
+              />
+              <span>Geldcheck-in · Historisch</span>
+            </div>
+            <h1
+              className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)] capitalize"
+              style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+            >
               Check-in {monthLabel}
             </h1>
           </div>
@@ -633,7 +643,7 @@ function CheckinPageContent() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
-      {/* ── Header ─────────────────────────────────────────────────── */}
+      {/* ── Header — editorial blueprint met kicker-streep ─────────── */}
       <div className="mb-6 flex items-center gap-3">
         <Link
           href={returnTo}
@@ -643,8 +653,18 @@ function CheckinPageContent() {
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
-          <span className="label-editorial text-wil-600">Geldcheck-in</span>
-          <h1 className="text-lg font-display font-semibold text-[var(--ink)] tracking-tight">
+          <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+            <span
+              aria-hidden
+              className="inline-block w-5 h-px shrink-0"
+              style={{ background: 'var(--module-active-500)' }}
+            />
+            <span>Geldcheck-in</span>
+          </div>
+          <h1
+            className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+          >
             {overview?.monthLabel ? `Check-in ${overview.monthLabel}` : 'Maandelijkse check-in'}
           </h1>
         </div>
@@ -848,10 +868,20 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
-        <h2 className="text-base font-display font-semibold text-[var(--ink)]">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-2">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Stap · Terugblik</span>
+        </div>
+        <h2
+          className="text-[18px] sm:text-[20px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
           Terugblik {overview.prevMonthLabel || 'afgelopen maand'}
         </h2>
-        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+        <p
+          className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           Hoe hebben je financi&euml;n zich afgelopen maand ontwikkeld?
         </p>
       </div>
@@ -1024,8 +1054,18 @@ function StepBezittingen({
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
-        <h2 className="text-base font-display font-semibold text-[var(--ink)]">Bezittingen herwaarderen</h2>
-        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-2">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Stap · Bezittingen</span>
+        </div>
+        <h2
+          className="text-[18px] sm:text-[20px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >Bezittingen herwaarderen</h2>
+        <p
+          className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           Werk de huidige waarden van je bezittingen bij.
         </p>
       </div>
@@ -1226,8 +1266,18 @@ function StepSchulden({
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
-        <h2 className="text-base font-display font-semibold text-[var(--ink)]">Schulden bijwerken</h2>
-        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-2">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Stap · Schulden</span>
+        </div>
+        <h2
+          className="text-[18px] sm:text-[20px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >Schulden bijwerken</h2>
+        <p
+          className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           Werk de actuele saldi van je schulden bij.
         </p>
       </div>
@@ -1388,8 +1438,18 @@ function StepDoelen({
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
-        <h2 className="text-base font-display font-semibold text-[var(--ink)]">Doelen bijwerken</h2>
-        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-2">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Stap · Doelen</span>
+        </div>
+        <h2
+          className="text-[18px] sm:text-[20px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >Doelen bijwerken</h2>
+        <p
+          className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           Werk de voortgang van je doelen bij.
         </p>
       </div>
@@ -1600,10 +1660,20 @@ function StepBudget({
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
-        <h2 className="text-base font-display font-semibold text-[var(--ink)]">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-2">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Stap · Budget</span>
+        </div>
+        <h2
+          className="text-[18px] sm:text-[20px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
           Budget aanpassen
         </h2>
-        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+        <p
+          className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           Pas je budgetlimieten aan voor deze maand.
         </p>
       </div>
@@ -1688,10 +1758,20 @@ function StepVooruitblik({ upcoming }: { upcoming: UpcomingItem[] }) {
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
-        <h2 className="text-base font-display font-semibold text-[var(--ink)]">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-2">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Stap · Vooruitblik</span>
+        </div>
+        <h2
+          className="text-[18px] sm:text-[20px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
           Vooruitblik
         </h2>
-        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+        <p
+          className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           Verwachte uitgaven en inkomsten komende maand.
         </p>
       </div>
@@ -1759,10 +1839,20 @@ function StepReflectie({
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
-        <h2 className="text-base font-display font-semibold text-[var(--ink)]">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-2">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Stap · Reflectie</span>
+        </div>
+        <h2
+          className="text-[18px] sm:text-[20px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
           Reflectie
         </h2>
-        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+        <p
+          className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           Neem even een moment om te reflecteren op je financi&euml;le situatie.
         </p>
       </div>

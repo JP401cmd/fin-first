@@ -57,7 +57,11 @@ import {
 } from '@/lib/rebalancing'
 import type { HoldingForAllocation, TargetAllocation } from '@/lib/portfolio-allocation'
 import { compareMortgageVsInvest, type RepaymentType } from '@/lib/hypotheek-vs-beleggen'
-import { ALL_MODULES } from '@/lib/module-registry'
+import { ALL_MODULES, type ModuleId } from '@/lib/module-registry'
+import {
+  buildCategoryAppLinks,
+  type CategoryAppLink,
+} from '@/lib/category-app-nav'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -98,6 +102,12 @@ export interface DashboardDataResult {
   sharedAssets: { id: string; name: string; current_value: number }[]
   /** Raw active debts with id+name+current_balance (shared for will-data-loader) */
   sharedDebts: { id: string; name: string; current_balance: number }[]
+  /**
+   * Klikbare app-deeplinks per categorie voor de balk bovenaan het Will-
+   * dashboard. Lege array als gebruiker geen actieve apps heeft (geen items
+   * of bijbehorende module uit) — UI verbergt de balk dan.
+   */
+  categoryAppLinks: CategoryAppLink[]
 }
 
 // ── Main loader ────────────────────────────────────────────────
@@ -1711,5 +1721,22 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       name: (d as { name: string }).name,
       current_balance: Number((d as { current_balance: number }).current_balance),
     })),
+    // Categorie-balk-input voor het Will-dashboard. We projecteren naar de
+    // lichte CategoryNavAssetInput/DebtInput shapes — de builder filtert
+    // verder op actieve module + tracked-items.
+    categoryAppLinks: buildCategoryAppLinks(
+      (assetsResult.data ?? []).map((a) => ({
+        asset_type: (a as { asset_type: Asset['asset_type'] }).asset_type,
+        has_budget_tracking: (a as { has_budget_tracking?: boolean | null }).has_budget_tracking,
+        has_holdings_tracking: (a as { has_holdings_tracking?: boolean | null }).has_holdings_tracking,
+        has_woonbalans_tracking: (a as { has_woonbalans_tracking?: boolean | null }).has_woonbalans_tracking,
+        has_rental_tracking: (a as { has_rental_tracking?: boolean | null }).has_rental_tracking,
+      })),
+      (debtsResult.data ?? []).map((d) => ({
+        debt_type: (d as { debt_type: Debt['debt_type'] }).debt_type,
+        has_strategy_tracking: (d as { has_strategy_tracking?: boolean | null }).has_strategy_tracking,
+      })),
+      activeModules as ModuleId[],
+    ),
   }
 })

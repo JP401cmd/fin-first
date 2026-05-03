@@ -184,14 +184,18 @@ export function WidgetEmpty({
         return <Icon className="h-5 w-5 text-[var(--ink-4)]" strokeWidth={1.5} />
       })() : icon}
 
-      {/* Optional UPPERCASE kicker — follows the bible pattern:
-          "kicker + serif-zin in italic + CTA". Only shown when caller
-          supplies a `title`, so legacy icon+message usages keep their
-          minimalist rendering. */}
+      {/* Optional UPPERCASE kicker met 28×1px module-streep — blueprint
+          signature-element. Voor cross-module pagina's valt de streep terug
+          op --module-active-500 (= ink-2 default). */}
       {title && (
-        <p className="text-[10px] uppercase tracking-[0.08em] font-medium text-[var(--ink-3)]">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono font-medium text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
           {title}
-        </p>
+        </div>
       )}
 
       {/* Serif italic body — identical typography to the pre-refactor

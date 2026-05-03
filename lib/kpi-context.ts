@@ -360,8 +360,11 @@ export const loadCashAssetStats = cache(async (
 })
 
 /**
- * Bouw `CashAssetStats` (kind: 'revaluation') voor cash-assets zonder
- * bank-koppeling (handmatige rekeningen). Bron: de `valuations`-tabel.
+ * Bouw `CashAssetStats` (kind: 'revaluation') voor álle cash-assets uit de
+ * `valuations`-tabel. Wordt door `loadCombinedCashStats` als basis gebruikt;
+ * transactie-stats voor gelinkte rekeningen mét tx-historie overschrijven
+ * deze entries vervolgens. Daardoor krijgen budgetteer-rekeningen zonder
+ * recente transacties tóch een gevulde KPI-strip via hun valuation-historie.
  *
  * Per asset:
  *   - `lastDate` = laatste `valuation_date`
@@ -380,34 +383,21 @@ export const loadCashRevaluationStats = cache(async (
     .toISOString()
     .split('T')[0]
 
-  // 1. Welke cash-assets hebben GEEN bank-koppeling? Die vallen onder
-  //    de revaluation-track. We pakken alleen actieve assets.
-  const [cashAssetsRes, bankRows] = await Promise.all([
-    supabase
-      .from('assets')
-      .select('id, current_value')
-      .eq('is_active', true)
-      .eq('asset_type', 'cash'),
-    supabase
-      .from('bank_accounts')
-      .select('linked_asset_id')
-      .eq('is_active', true)
-      .not('linked_asset_id', 'is', null),
-  ])
-  if (cashAssetsRes.error || !cashAssetsRes.data) return {}
+  // Alle actieve cash-assets — zowel handmatige als bank-gekoppelde.
+  // Voorheen filterden we hier op niet-gelinkte assets; dat liet
+  // budgetteer-rekeningen zonder recente transacties met een lege strip
+  // achter. Door alle cash-assets mee te nemen en transactie-stats later
+  // te laten overschrijven krijgen die rekeningen tóch een fallback.
+  const cashAssetsRes = await supabase
+    .from('assets')
+    .select('id, current_value')
+    .eq('is_active', true)
+    .eq('asset_type', 'cash')
+  if (cashAssetsRes.error || !cashAssetsRes.data || cashAssetsRes.data.length === 0) return {}
 
-  const linkedIds = new Set<string>()
-  for (const row of bankRows.data ?? []) {
-    const id = row.linked_asset_id as string | null
-    if (id) linkedIds.add(id)
-  }
-
-  const handmatigeAssets = cashAssetsRes.data.filter((a) => !linkedIds.has(a.id as string))
-  if (handmatigeAssets.length === 0) return {}
-
-  const assetIds = handmatigeAssets.map((a) => a.id as string)
+  const assetIds = cashAssetsRes.data.map((a) => a.id as string)
   const valueById = new Map<string, number>()
-  for (const a of handmatigeAssets) {
+  for (const a of cashAssetsRes.data) {
     valueById.set(a.id as string, Number(a.current_value) || 0)
   }
 

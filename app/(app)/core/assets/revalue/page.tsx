@@ -7,6 +7,7 @@ import { ArrowLeft, RefreshCw, Loader2, AlertCircle, Lock, Check } from 'lucide-
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import {
   type Asset,
@@ -263,41 +264,45 @@ export default function RevaluePage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Header */}
-      <div className="mb-6">
+      {/* Header — editorial blueprint */}
+      <header className="mb-6 space-y-2">
         <Link
           href="/core/assets"
-          className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)] mb-3"
+          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-3 w-3" aria-hidden />
           Terug naar bezittingen
         </Link>
-        <h1 className="text-xl font-bold text-[var(--ink)]">Assets herwaarderen</h1>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Werk alle waardes tegelijk bij — één netto-vermogenswijziging
-        </p>
+        <Kicker>Bezittingen · Herwaarderen</Kicker>
+        <EditorialHeadline level="h1" emphasis="herwaarderen" size="lg">
+          Assets herwaarderen
+        </EditorialHeadline>
+        <EditorialDeck>
+          Werk alle waardes tegelijk bij — één netto-vermogenswijziging.
+        </EditorialDeck>
 
-        {/* Date + Notes */}
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div>
-            <label className="block text-xs font-medium text-[var(--ink-3)] mb-1">Peildatum</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-xs font-medium text-[var(--ink-3)] mb-1">Notitie (optioneel)</label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="bijv. Maandelijkse herwaardering maart"
-              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
-            />
-          </div>
+      </header>
+
+      {/* Date + Notes */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div>
+          <label className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1">Peildatum</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1">Notitie (optioneel)</label>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="bijv. Maandelijkse herwaardering maart"
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+          />
         </div>
       </div>
 

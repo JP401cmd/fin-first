@@ -6,6 +6,7 @@ import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import type { WillPageData } from '@/lib/will-data-loader'
 import type { TemporalContext } from '@/lib/briefing/types'
+import type { CategoryAppLink } from '@/lib/category-app-nav'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { SectionDivider } from '@/components/app/section-divider'
 import { DAIshboard } from '@/components/daishboard/daishboard'
@@ -13,9 +14,12 @@ import { NieuwsOnlyClient } from '@/components/berichten/nieuws-only-client'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { ActionCenter } from './action-center'
+import { DoelenStrook } from './doelen-strook'
 import { VasteKostenAnalyse, type RecurringItem } from './vaste-kosten-analyse'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { MonthlyCheckinCard } from '@/components/dashboard/monthly-checkin-card'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 
 interface WillLandingProps {
@@ -26,6 +30,8 @@ interface WillLandingProps {
   temporal: TemporalContext
   userName?: string
   aiEnabled: boolean
+  /** Klikbare app-deeplinks per actieve categorie — voor de balk bovenaan. */
+  categoryAppLinks: CategoryAppLink[]
 }
 
 export function WillLanding({
@@ -36,6 +42,7 @@ export function WillLanding({
   temporal,
   userName,
   aiEnabled,
+  categoryAppLinks,
 }: WillLandingProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -88,16 +95,48 @@ export function WillLanding({
     router.refresh()
   }, [router])
 
-  const { kpiData, recommendations, actions, goals, goalProgresses, goalAssets, goalDebts, partnerInfo, currentUserId, completedGoalCount, totalGoalCount, userProfile } = willData
+  const { kpiData, recommendations, actions, goals, goalProgresses, goalAssets, goalDebts, partnerInfo, currentUserId, userProfile } = willData
 
   // Compute average goal progress for KPI card
   const avgGoalProgress = kpiData.goalProgresses.length > 0
     ? Math.round(kpiData.goalProgresses.reduce((s, g) => s + g.pct, 0) / kpiData.goalProgresses.length)
     : 0
 
+  // Doelen-feature-flag — bepaalt of de Doelvoortgang-cel in de header zichtbaar is
+  // en of de DoelenStrook überhaupt rendert (FeatureGate binnen DoelenStrook handelt fallback af).
+  const { features } = useFeatureAccess()
+  const doelenEnabled = isFeatureAccessible(features, 'doelen_systeem')
+
   return (
     <FreedomDaysAnimationProvider>
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-6xl py-5 sm:py-8">
+
+        {/* ── Editorial header — blueprint Type 1 (Module-landing) ── */}
+        <header className="mb-6 space-y-2 px-4 sm:px-6">
+          {/* Kicker met 28×1px Wil-streep */}
+          <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+            <span
+              aria-hidden
+              className="inline-block h-px w-7 shrink-0"
+              style={{ background: 'var(--module-active-500)' }}
+            />
+            Wil · {userName ? `welkom ${userName}` : 'jouw daadkracht'}
+          </div>
+          {/* Headline met italic-em "wil" in Wil-700 */}
+          <h1
+            className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            Wat is je{' '}
+            <em
+              className="font-normal italic"
+              style={{ color: 'var(--module-active-700)' }}
+            >
+              wil
+            </em>{' '}
+            voor vandaag?
+          </h1>
+        </header>
 
         {/* ── Sectie 1: Widget grid, DAIshboard of Nieuws ── */}
         <section
@@ -105,13 +144,15 @@ export function WillLanding({
           data-testid="will-widget-grid"
           className="card-editorial overflow-hidden"
         >
-          <div className="h-1.5 bg-wil-500" />
+          {/* Module-active accent (Wil-500 op /will/**) */}
+          <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
           <div className="p-4 sm:p-6 md:p-8">
             <DraggableWidgetGrid
               initialPrefs={activeWidgets}
               allPrefs={allPrefs}
               data={dashboardData}
               showDashboardTypeToggle
+              categoryAppLinks={categoryAppLinks}
             />
             {dashboardType === 'briefing' && !isCollapsed && (
               <div className="mt-4">
@@ -138,17 +179,11 @@ export function WillLanding({
 
         <SectionDivider variant="asterisk" />
 
-        {/* ── Sectie 3: Actiecentrum met KPI-header ──────────── */}
+        {/* ── Sectie 3a: Actiecentrum (2-koloms werk-board) ──── */}
         <section className="mt-4" aria-label="Actiecentrum">
           <ActionCenter
             recommendations={recommendations}
             actions={actions}
-            goals={goals}
-            goalProgresses={goalProgresses}
-            goalAssets={goalAssets}
-            goalDebts={goalDebts}
-            completedGoalCount={completedGoalCount}
-            totalGoalCount={totalGoalCount}
             partnerInfo={partnerInfo}
             currentUserId={currentUserId}
             onCancellationOpen={handleCancellationOpen}
@@ -156,6 +191,23 @@ export function WillLanding({
             openRecommendationCount={kpiData.allPendingRecs.length}
             openActionCount={kpiData.openActions.length}
             avgGoalProgress={avgGoalProgress}
+            doelenEnabled={doelenEnabled}
+          />
+        </section>
+
+        {/* ── Sectie 3b: Doelen (Kompas) — gescheiden door double-rule ── */}
+        <SectionDivider variant="double-rule" />
+
+        <section className="mt-4" aria-label="Doelen">
+          <DoelenStrook
+            goals={goals}
+            goalProgresses={goalProgresses}
+            goalAssets={goalAssets}
+            goalDebts={goalDebts}
+            partnerInfo={partnerInfo}
+            currentUserId={currentUserId}
+            onGoalsChanged={handleDataChanged}
+            onDataChanged={handleDataChanged}
           />
         </section>
 

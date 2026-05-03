@@ -421,14 +421,27 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
           <div className="h-1 w-10 rounded-full bg-[var(--border-md)]" />
         </div>
 
-        {/* Header */}
+        {/* Header — blueprint Type 5 (Modal) met kicker-streep + Playfair titel */}
         {title && (
           <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
-            <h3 id={titleId} className="font-semibold text-[var(--ink)]">{title}</h3>
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <span
+                aria-hidden
+                className="inline-block h-px w-7 shrink-0"
+                style={{ background: 'var(--module-active-500)' }}
+              />
+              <h3
+                id={titleId}
+                className="font-bold text-[var(--ink)] truncate"
+                style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              >
+                {title}
+              </h3>
+            </div>
             <button
               onClick={handleProgrammaticClose}
               aria-label="Sluiten"
-              className="touch-target rounded-md text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+              className="touch-target rounded-md text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] shrink-0 ml-2"
             >
               <X className="h-5 w-5" />
             </button>

@@ -72,19 +72,44 @@ export default function ConnectBankPage() {
       {/* Back link */}
       <Link
         href="/core/cash"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+        className="mb-6 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-3 w-3" />
         Terug naar Kas
       </Link>
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--ink)]">Bank koppelen</h1>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Koppel je bankrekening om transacties automatisch te synchroniseren
+      {/* Editorial header — blueprint Type 7 (Wizard) */}
+      <header className="mb-8 space-y-2">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Cash · automatisch synchroniseren
+        </div>
+        <h1
+          className="font-bold text-2xl sm:text-3xl tracking-[-0.02em]"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Bank{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            koppelen
+          </em>
+        </h1>
+        <p
+          className="italic text-[14px] leading-snug text-[var(--ink-2)] pl-4"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            borderLeft: '2px solid var(--module-active-500)',
+          }}
+        >
+          Koppel je bankrekening om transacties automatisch te synchroniseren.
         </p>
-      </div>
+      </header>
 
       {/* Error message */}
       {connectError && (

@@ -410,20 +410,49 @@ export function HypotheekVsBeleggenSectie({
           </div>
         </div>
 
-        {/* ── Netto verschil banner ───────────────────────────────────────── */}
+        {/* ── Netto verschil banner — kassabon-blueprint pull-quote-stijl ───── */}
         {!isGelijk && (
-          <div className={`rounded-[var(--r)] px-4 py-3 text-center ${
-            result.verschil > 0
-              ? 'bg-emerald-50 text-emerald-800'
-              : 'bg-blue-50 text-blue-800'
-          }`}>
-            <p className="text-xs font-medium uppercase tracking-wider">
+          <div
+            className="relative border-t border-b border-[var(--ink)] py-4 pl-7 sm:pl-9 my-3"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            {/* Module-quote-mark linksboven */}
+            <span
+              aria-hidden
+              className="absolute -top-2 -left-1 font-black not-italic text-[40px] sm:text-[56px] leading-none"
+              style={{ color: 'var(--module-active-500)' }}
+            >
+              &ldquo;
+            </span>
+            {/* Kicker met streep */}
+            <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono font-semibold mb-2 text-[var(--module-active-700)]">
+              <span
+                aria-hidden
+                className="inline-block h-px w-7 shrink-0"
+                style={{ background: 'var(--module-active-500)' }}
+              />
               {result.aanbeveling === 'beleggen' ? 'Beleggen wint' : 'Aflossen wint'}
+            </div>
+            {/* Hoofdcijfer met halve transparante streep (Kern-200) */}
+            <p className="font-mono text-[24px] sm:text-[32px] font-bold tabular-nums leading-none">
+              <span
+                className="inline px-1"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                  color: result.verschil > 0 ? 'var(--positive)' : 'var(--ink)',
+                }}
+              >
+                {result.verschil > 0 ? '+' : ''}{formatCurrency(Math.abs(result.verschil))}
+              </span>
             </p>
-            <p className="mt-0.5 font-mono text-lg font-bold tabular-nums">
-              {result.verschil > 0 ? '+' : ''}{formatCurrency(Math.abs(result.verschil))}
+            {/* Sub-meta italic Source Serif */}
+            <p
+              className="italic text-[12px] text-[var(--ink-3)] mt-1.5"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              netto verschil over {horizonJaren} jaar
             </p>
-            <p className="text-[11px]">netto verschil over {horizonJaren} jaar</p>
           </div>
         )}
         {isGelijk && (

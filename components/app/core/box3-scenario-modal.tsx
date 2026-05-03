@@ -78,11 +78,16 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
         Verschuif vermogen van beleggingen naar spaargeld. Spaargeld heeft een lager forfaitair rendement.
       </p>
 
-      {/* Slider */}
+      {/* Slider met module-active accent */}
       <div className="mb-6">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs text-[var(--ink-3)]">Beleggingen &rarr; Spaargeld</span>
-          <span className="text-sm font-semibold text-kern-700">{formatCurrency(shiftAmount)}</span>
+          <span
+            className="text-sm font-semibold tabular-nums"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            {formatCurrency(shiftAmount)}
+          </span>
         </div>
         <input
           type="range"
@@ -91,7 +96,8 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
           step={1000}
           value={shiftAmount}
           onChange={e => setShiftAmount(Number(e.target.value))}
-          className="w-full accent-kern-500"
+          className="w-full"
+          style={{ accentColor: 'var(--module-active-500)' }}
         />
         <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-3)]">
           <span>{formatCurrency(0)}</span>
@@ -99,35 +105,94 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
         </div>
       </div>
 
-      {/* Result comparison */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
-          <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Huidige situatie</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(result.tax)}</p>
-          <p className="text-xs text-[var(--ink-3)]">Box 3 belasting</p>
-          <div className="mt-2 text-xs text-[var(--ink-3)]">
+      {/* Result comparison — figures-strip-stijl met top+bottom borders */}
+      <div className="grid grid-cols-2 border-t border-b border-[var(--ink)] my-3">
+        <div className="p-3 sm:p-4 border-r border-[var(--rule-soft)]">
+          <p className="text-[10px] font-semibold tracking-[0.18em] font-mono text-[var(--ink-3)] uppercase">Huidige situatie</p>
+          <p
+            className="mt-1.5 text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            {formatCurrency(result.tax)}
+          </p>
+          <p
+            className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Box 3 belasting
+          </p>
+          <div className="mt-2 text-[11px] text-[var(--ink-3)] tabular-nums font-mono">
             <p>Spaargeld: {formatCurrency(result.totaalSpaargeld)}</p>
             <p>Beleggingen: {formatCurrency(result.totaalBeleggingen)}</p>
           </div>
         </div>
-        <div className={`rounded-[var(--r-lg)] border p-4 ${delta > 0 ? 'border-emerald-200 bg-emerald-50' : 'border-[var(--border-ed)] bg-[var(--subtle)]'}`}>
-          <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Na verschuiving</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(shifted.tax)}</p>
-          <p className="text-xs text-[var(--ink-3)]">Box 3 belasting</p>
-          <div className="mt-2 text-xs text-[var(--ink-3)]">
+        <div className="p-3 sm:p-4">
+          <p className="text-[10px] font-semibold tracking-[0.18em] font-mono text-[var(--ink-3)] uppercase">Na verschuiving</p>
+          <p
+            className="mt-1.5 text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums"
+            style={{ fontFamily: 'var(--font-playfair, serif)', color: delta > 0 ? 'var(--positive)' : 'var(--ink)' }}
+          >
+            {delta > 0 ? (
+              <span
+                className="inline px-1"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                }}
+              >
+                {formatCurrency(shifted.tax)}
+              </span>
+            ) : (
+              formatCurrency(shifted.tax)
+            )}
+          </p>
+          <p
+            className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Box 3 belasting
+          </p>
+          <div className="mt-2 text-[11px] text-[var(--ink-3)] tabular-nums font-mono">
             <p>Spaargeld: {formatCurrency(shifted.totaalSpaargeld)}</p>
             <p>Beleggingen: {formatCurrency(shifted.totaalBeleggingen)}</p>
           </div>
         </div>
       </div>
 
+      {/* Pull-quote-stijl uitkomst — alleen bij positieve besparing */}
       {delta > 0 && (
-        <div className="mt-4 rounded-lg bg-emerald-50 p-3 text-center">
-          <p className="text-sm font-semibold text-emerald-700">
-            Besparing: {formatCurrency(delta)}
-          </p>
-          <p className="text-xs text-emerald-600">
-            {deltaVrijheid} vrijheidsdagen teruggewonnen
+        <div
+          className="relative border-t border-b border-[var(--ink)] py-3 pl-7 mt-4"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          <span
+            aria-hidden
+            className="absolute -top-1 -left-1 font-black not-italic text-[36px] leading-none"
+            style={{ color: 'var(--module-active-500)' }}
+          >
+            &ldquo;
+          </span>
+          <p className="italic text-base leading-snug text-[var(--ink)]">
+            Besparing van{' '}
+            <strong
+              className="font-bold not-italic"
+              style={{
+                color: 'var(--module-active-700)',
+                backgroundImage:
+                  'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                padding: '0 0.25rem',
+              }}
+            >
+              {formatCurrency(delta)}
+            </strong>
+            {' '}— dat is{' '}
+            <strong
+              className="font-bold not-italic"
+              style={{ color: 'var(--module-active-700)' }}
+            >
+              {deltaVrijheid}
+            </strong>
+            {' '}vrijheidsdagen terug.
           </p>
         </div>
       )}

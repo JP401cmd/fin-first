@@ -200,12 +200,12 @@ export function WhatIfActions({
           className="flex w-full items-center justify-between px-4 py-3 text-left"
         >
           <div className="flex items-center gap-2">
-            <Zap className="h-3.5 w-3.5 text-wil-600" />
-            <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
+            <Zap className="h-3.5 w-3.5 text-horizon-600" />
+            <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
               Scenario-acties
             </span>
             {actions.length > 0 && (
-              <span className="rounded-full bg-wil-50 px-1.5 py-0.5 font-mono text-[10px] text-wil-700">
+              <span className="rounded-full bg-horizon-50 px-1.5 py-0.5 font-mono text-[10px] text-horizon-700">
                 {actions.length}
               </span>
             )}
@@ -246,7 +246,7 @@ export function WhatIfActions({
                 {actions.map(action => (
                   <div key={action.id} className="py-2.5">
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--r-sm)] bg-wil-50 text-wil-600">
+                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--r-sm)] bg-horizon-50 text-horizon-600">
                         {action.icon}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -256,7 +256,7 @@ export function WhatIfActions({
                         <p className="mt-0.5 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
                           {action.description}
                         </p>
-                        <span className="mt-1 inline-flex rounded-full bg-wil-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-wil-700">
+                        <span className="mt-1 inline-flex rounded-full bg-horizon-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-horizon-700">
                           {action.impact}
                         </span>
                       </div>
@@ -270,7 +270,7 @@ export function WhatIfActions({
             <button
               type="button"
               onClick={() => openWithMessage(buildWillMessage())}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-wil-600 px-4 py-3 font-sans text-sm font-medium text-white transition-colors hover:bg-wil-700"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-horizon-600 px-4 py-3 font-sans text-sm font-medium text-white transition-colors hover:bg-horizon-700"
             >
               <MessageCircle className="h-4 w-4" />
               Bespreek met Will

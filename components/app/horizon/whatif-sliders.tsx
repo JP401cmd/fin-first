@@ -76,7 +76,7 @@ function SliderRow({
         step={step}
         value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="mt-1 w-full accent-wil-600"
+        className="mt-1 w-full accent-horizon-600"
       />
       <div className="flex justify-between font-sans text-[10px] text-[var(--ink-4)]">
         <span>{minLabel}</span>
@@ -105,7 +105,7 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
         className="flex w-full items-center justify-between px-4 py-2.5 text-left md:hidden"
       >
         <div>
-          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
+          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
             Scenario-parameters
           </p>
           {!expanded && (
@@ -121,7 +121,7 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
 
       {/* Desktop: always-visible label */}
       <div className="hidden px-4 pb-3 pt-3 md:block">
-        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
+        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
           Scenario-parameters
         </p>
       </div>
@@ -219,7 +219,7 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
           <button
             type="button"
             onClick={() => onChange(baseline)}
-            className="mt-3 w-full rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-3 py-2 font-sans text-xs font-medium text-[var(--ink-3)] transition-colors hover:border-wil-300 hover:text-wil-700"
+            className="mt-3 w-full rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-3 py-2 font-sans text-xs font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-700"
           >
             Terug naar werkelijkheid
           </button>

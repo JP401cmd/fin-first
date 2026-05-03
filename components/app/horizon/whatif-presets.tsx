@@ -172,11 +172,11 @@ export function WhatIfPresets({
               onClick={() => handlePresetClick(preset)}
               className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2 transition-all ${
                 isActive
-                  ? 'border-wil-400 bg-wil-50 text-wil-700 shadow-sm'
-                  : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-wil-300 hover:shadow-sm'
+                  ? 'border-horizon-400 bg-horizon-50 text-horizon-700 shadow-sm'
+                  : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-horizon-300 hover:shadow-sm'
               }`}
             >
-              <span className={isActive ? 'text-wil-600' : 'text-[var(--ink-3)]'}>
+              <span className={isActive ? 'text-horizon-600' : 'text-[var(--ink-3)]'}>
                 {preset.icon}
               </span>
               <span className="font-sans text-xs font-semibold">

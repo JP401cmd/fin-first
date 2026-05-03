@@ -5,6 +5,7 @@ import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { Kicker } from '@/components/editorial'
 import {
   runMonteCarlo, ageAtDate, NL_SWR,
   type FinancialInput, type MonteCarloResult,
@@ -91,7 +92,7 @@ export function SimulationsModal({
 
   if (computing || !mc) {
     return (
-      <BottomSheet open={true} onClose={onClose}>
+      <BottomSheet open={true} onClose={onClose} title="Monte Carlo Simulaties">
           <div className="flex flex-col items-center justify-center p-12 py-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-horizon-500 border-t-transparent" />
             <p className="mt-4 text-sm text-[var(--ink-3)]">
@@ -149,44 +150,81 @@ export function SimulationsModal({
             </div>
           )}
 
-          {/* Confidence summary */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div
-              className="cursor-pointer rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
+          {/* Confidence summary — figures-strip met klikbare metric-keuze */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-b border-[var(--ink)]">
+            <button
+              type="button"
               onClick={() => setSelectedMetric('fire_prob')}
+              className="p-4 sm:p-5 border-r border-[var(--rule-soft)] last:border-r-0 [&:not(:last-child)]:border-b sm:[&:not(:last-child)]:border-b-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
-              <p className="text-xs font-medium text-horizon-600 uppercase">FIRE kans</p>
-              <p className="mt-1 text-4xl font-bold text-[var(--ink)]">
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1.5">
+                FIRE-kans
+              </div>
+              <div
+                className="text-[28px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
                 {Math.round(mc.fireProb * 100)}%
-              </p>
-              <p className="mt-1 text-sm text-[var(--ink-3)]">
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
                 van {mc.simulations.toLocaleString('nl-NL')} simulaties
-              </p>
-            </div>
-            <div
-              className="cursor-pointer rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
+              </div>
+            </button>
+            <button
+              type="button"
               onClick={() => setSelectedMetric('p50')}
+              className="p-4 sm:p-5 border-r border-[var(--rule-soft)] last:border-r-0 [&:not(:last-child)]:border-b sm:[&:not(:last-child)]:border-b-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
-              <p className="text-xs font-medium text-horizon-600 uppercase">Verwachte FIRE leeftijd (P50)</p>
-              <p className="mt-1 text-4xl font-bold text-[var(--ink)]">
-                {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
-              </p>
-              <p className="mt-1 text-sm text-[var(--ink-3)]">
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1.5">
+                Verwachte FIRE-leeftijd (P50)
+              </div>
+              <div
+                className="text-[28px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                <span
+                  className="inline px-1"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                  }}
+                >
+                  {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '–'}
+                </span>
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
                 {mc.p10FireAge !== null && mc.p90FireAge !== null
-                  ? `range: ${Math.round(mc.p10FireAge)} - ${Math.round(mc.p90FireAge)}`
+                  ? `range: ${Math.round(mc.p10FireAge)} – ${Math.round(mc.p90FireAge)}`
                   : 'onvoldoende data'}
-              </p>
-            </div>
-            <div
-              className="cursor-pointer rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
+              </div>
+            </button>
+            <button
+              type="button"
               onClick={() => setSelectedMetric('p10')}
+              className="p-4 sm:p-5 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
-              <p className="text-xs font-medium text-horizon-600 uppercase">Beste scenario (P10)</p>
-              <p className="mt-1 text-4xl font-bold text-[var(--ink)]">
-                {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
-              </p>
-              <p className="mt-1 text-sm text-[var(--ink-3)]">10% kans op eerder</p>
-            </div>
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1.5">
+                Beste scenario (P10)
+              </div>
+              <div
+                className="text-[28px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '–'}
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                10% kans op eerder
+              </div>
+            </button>
           </div>
 
           {/* Metric detail submodal */}
@@ -204,11 +242,12 @@ export function SimulationsModal({
           {/* Cone of Freedom chart */}
           <section>
             <div className="mb-4">
-              <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                Cone of Freedom
-              </h2>
-              <p className="mt-1 text-sm text-[var(--ink-3)]">
-                Spreiding van vermogensgroei over {mc.years} jaar (P10-P90 band)
+              <Kicker>Cone of Freedom</Kicker>
+              <p
+                className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                Spreiding van vermogensgroei over {mc.years} jaar (P10–P90 band).
               </p>
             </div>
             <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
@@ -256,11 +295,12 @@ export function SimulationsModal({
           {histogram.length > 0 && (
             <section>
               <div className="mb-4">
-                <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                  Verdeling FIRE-leeftijden
-                </h2>
-                <p className="mt-1 text-sm text-[var(--ink-3)]">
-                  Hoe vaak elke FIRE-leeftijd voorkomt in {mc.simulations.toLocaleString('nl-NL')} simulaties
+                <Kicker>Verdeling FIRE-leeftijden</Kicker>
+                <p
+                  className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  Hoe vaak elke FIRE-leeftijd voorkomt in {mc.simulations.toLocaleString('nl-NL')} simulaties.
                 </p>
               </div>
               <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">

@@ -28,12 +28,34 @@ export default function VragenlijstenPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <header className="mb-10 border-b border-[var(--border-ed)] pb-6">
-        <p className="label-editorial text-[var(--ink-3)]">Feedback</p>
-        <h1 className="mt-2 font-display text-3xl font-bold leading-tight text-[var(--ink)] sm:text-4xl">
-          Vragenlijsten
+      <header className="mb-10 border-b border-[var(--border-ed)] pb-6 space-y-2">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Feedback
+        </div>
+        <h1
+          className="font-bold text-3xl sm:text-4xl tracking-[-0.02em] leading-tight"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Vragen&shy;{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            lijsten
+          </em>
         </h1>
-        <p className="mt-3 max-w-xl font-serif text-base leading-relaxed text-[var(--ink-3)]">
+        <p
+          className="italic text-base leading-relaxed text-[var(--ink-2)] max-w-xl pl-4"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            borderLeft: '2px solid var(--module-active-500)',
+          }}
+        >
           Deel je ervaringen met TriFinity. Elke vragenlijst duurt een paar minuten en
           helpt ons de app te verbeteren.
         </p>

@@ -269,7 +269,7 @@ export function WhatIfEventsPanel({
                         <button
                           type="button"
                           onClick={() => openFormForEdit(ev)}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-4)] transition-colors hover:bg-wil-50 hover:text-wil-600"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-4)] transition-colors hover:bg-horizon-50 hover:text-horizon-600"
                           title="Bewerken"
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -665,9 +665,9 @@ function EventFormSheet({
 
       {/* ── DB event notice ────────────────────────── */}
       {isEditing && isDbEvent && (
-        <div className="flex items-start gap-2 rounded-[var(--r-sm)] bg-wil-50/50 px-3 py-2.5">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-wil-600" />
-          <p className="font-sans text-[11px] leading-relaxed text-wil-700">
+        <div className="flex items-start gap-2 rounded-[var(--r-sm)] bg-horizon-50/50 px-3 py-2.5">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-horizon-600" />
+          <p className="font-sans text-[11px] leading-relaxed text-horizon-700">
             Dit is een bestaande gebeurtenis. Wijzigingen worden alleen in dit scenario toegepast — het origineel op de Horizon-pagina blijft ongewijzigd.
           </p>
         </div>

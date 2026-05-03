@@ -411,13 +411,36 @@ export default function JaaroverzichtPage() {
         {/* Report content */}
         {data && !loading && (
           <div className="space-y-8" data-testid="year-in-review-report">
-            {/* Hero: Year + Name */}
-            <div className="text-center">
-              <h1 className="mb-1 text-6xl font-bold tracking-tight" data-testid="review-year">
+            {/* Hero: Year + Name — blueprint editorial intro */}
+            <div className="text-center space-y-2">
+              {/* Kicker met streep — gecentreerd */}
+              <div className="inline-flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+                <span
+                  aria-hidden
+                  className="inline-block h-px w-7 shrink-0"
+                  style={{ background: 'var(--module-active-500)' }}
+                />
+                Jaaroverzicht
+                <span
+                  aria-hidden
+                  className="inline-block h-px w-7 shrink-0"
+                  style={{ background: 'var(--module-active-500)' }}
+                />
+              </div>
+              <h1
+                className="mb-1 text-6xl font-bold tracking-tight"
+                data-testid="review-year"
+                style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              >
                 {data.year}
               </h1>
               {data.displayName && (
-                <p className="text-lg text-zinc-400">{data.displayName}</p>
+                <p
+                  className="italic text-lg text-zinc-400"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  {data.displayName}
+                </p>
               )}
             </div>
 

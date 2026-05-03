@@ -9,6 +9,8 @@ import type { Budget } from '@/lib/budget-data'
 import { iconMap, iconOptions } from '@/components/app/budget-shared'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { GoalForm } from '@/components/app/goal-form'
+import { Kicker, EditorialHeadline } from '@/components/editorial'
+import { PageBackLink } from '@/components/editorial/page-blueprints'
 
 type FormData = {
   name: string
@@ -439,16 +441,19 @@ export function BudgetForm({
         <a
           href="/core/budgets"
           onClick={(e) => handleNavClick(e, '/core/budgets')}
-          className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-3 w-3" aria-hidden />
           Terug naar budgetten
         </a>
       </div>
 
-      <h1 className="mb-8 text-2xl font-bold text-[var(--ink)]">
-        {budget ? 'Budget bewerken' : 'Nieuw budget'}
-      </h1>
+      <header className="mb-8 space-y-2">
+        <Kicker>{budget ? 'Bewerken' : 'Nieuw'} · Budget</Kicker>
+        <EditorialHeadline level="h1" emphasis={budget ? 'bewerken' : 'budget'} size="lg">
+          {budget ? `Budget ${form.name || 'bewerken'} bewerken` : 'Een nieuw budget'}
+        </EditorialHeadline>
+      </header>
 
       {/* Unsaved changes navigation warning */}
       {showNavWarning && (

@@ -22,6 +22,7 @@ import {
   type ParsedHoldingRow,
   type BrokerParseResult,
 } from '@/lib/parsers/broker-csv'
+import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -447,22 +448,22 @@ export default function HoldingsImportPage() {
       {/* Back link */}
       <Link
         href="/core/assets/holdings"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
+        className="mb-6 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="h-3 w-3" aria-hidden />
         Terug naar holdings
       </Link>
 
-      {/* Page header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2.5">
-          <Upload className="h-6 w-6 text-amber-600" />
-          <h1 className="text-2xl font-bold text-[var(--ink)]">CSV Import</h1>
-        </div>
-        <p className="mt-1 text-[var(--ink-3)]">
-          Importeer holdings en transacties vanuit je broker
-        </p>
-      </div>
+      {/* Page header — editorial blueprint */}
+      <header className="mb-8 space-y-2">
+        <Kicker>Holdings · Importeren</Kicker>
+        <EditorialHeadline level="h1" emphasis="importeren" size="lg">
+          CSV importeren
+        </EditorialHeadline>
+        <EditorialDeck>
+          Importeer holdings en transacties vanuit je broker.
+        </EditorialDeck>
+      </header>
 
       {/* Step indicator */}
       <div className="mb-8 flex items-center gap-2">

@@ -206,13 +206,38 @@ export function KoppelingenClient({ initialData }: KoppelingenClientProps) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Page header */}
-      <header className="mb-6">
-        <p className="label-editorial text-[var(--ink-3)] mb-1">Identiteit</p>
-        <h1 className="font-display text-[28px] font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.03em' }}>
-          Koppelingen
+      {/* Editorial header — blueprint Type 2 (List) */}
+      <header className="mb-6 space-y-2">
+        {/* Kicker met streep */}
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Identiteit · automatische koppelingen
+        </div>
+        {/* Headline met italic-em "automatisch" */}
+        <h1
+          className="font-bold text-[28px] tracking-[-0.02em] leading-tight"
+          style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.03em' }}
+        >
+          Koppelingen{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            automatisch
+          </em>
         </h1>
-        <p className="mt-1 max-w-2xl font-serif italic text-[14px] leading-relaxed text-[var(--ink-3)]">
+        {/* Editorial deck */}
+        <p
+          className="italic text-[14px] leading-snug max-w-[60ch] text-[var(--ink-2)] pl-4 mt-2"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            borderLeft: '2px solid var(--module-active-500)',
+          }}
+        >
           Houd je vermogen automatisch up-to-date. Koppel je crypto-exchanges, wallets,
           beleggingsbroker en bankrekeningen — of laat het bij handmatige invoer.
         </p>

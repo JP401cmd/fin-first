@@ -171,7 +171,7 @@ export function WhatIfScenarios({
                 setShowSaveDialog(!showSaveDialog)
                 setShowList(false)
               }}
-              className="flex items-center gap-1 rounded-md border border-wil-300 bg-wil-50 px-2 py-1 font-sans text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-100"
+              className="flex items-center gap-1 rounded-md border border-horizon-300 bg-horizon-50 px-2 py-1 font-sans text-[11px] font-medium text-horizon-700 transition-colors hover:bg-horizon-100"
             >
               <Save className="h-3 w-3" />
               Opslaan
@@ -193,7 +193,7 @@ export function WhatIfScenarios({
 
         {/* Save dialog */}
         {showSaveDialog && (
-          <div className="mb-2 rounded-[var(--r)] border border-wil-200 bg-wil-50/40 p-3">
+          <div className="mb-2 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/40 p-3">
             <label className="mb-1 block font-sans text-[11px] font-medium text-[var(--ink-2)]">
               Naam voor dit scenario
             </label>
@@ -209,13 +209,13 @@ export function WhatIfScenarios({
                 placeholder="bijv. Part-time met kinderen"
                 maxLength={100}
                 autoFocus
-                className="flex-1 rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1.5 font-sans text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:border-wil-400 focus:outline-none focus:ring-1 focus:ring-wil-300"
+                className="flex-1 rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1.5 font-sans text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-300"
               />
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={saving || !saveName.trim()}
-                className="flex items-center gap-1 rounded-md bg-wil-600 px-3 py-1.5 font-sans text-[11px] font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-md bg-horizon-600 px-3 py-1.5 font-sans text-[11px] font-medium text-white transition-colors hover:bg-horizon-700 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                 Opslaan

@@ -54,6 +54,16 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Pre-hydration script — leest opgeslagen palette-keuze uit localStorage en zet
+ * de CSS-vars (`--bg`, `--paper`, `--subtle`, `--border-ed`, `--border-md`,
+ * `--background`) op `<html>` voordat de React-app rendert. Voorkomt een korte
+ * flash van het default-palet (cream) wanneer de gebruiker een ander palet had
+ * gekozen. De waardes hier zijn een 1:1 spiegel van `PALETTE_THEMES` in
+ * `module-color-provider.tsx`; bij een nieuwe palette-optie beide updaten.
+ */
+const PALETTE_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('tf-palette-theme');if(!t)return;var p={cream:{bg:'#f5efe2',paper:'#fbf7ec',subtle:'#f3ead9',ed:'#e3dac8',md:'#ccc1aa'},licht:{bg:'#fbf2e7',paper:'#fef9ef',subtle:'#f5ecd6',ed:'#e6dcc4',md:'#d4c8a8'},'fd-bruin':{bg:'#e9dcb8',paper:'#f0e6cf',subtle:'#e0d2a8',ed:'#c9b88e',md:'#a89968'}}[t];if(!p)return;var r=document.documentElement.style;r.setProperty('--bg',p.bg);r.setProperty('--paper',p.paper);r.setProperty('--subtle',p.subtle);r.setProperty('--border-ed',p.ed);r.setProperty('--border-md',p.md);r.setProperty('--background',p.bg);}catch(e){}})();`
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -61,6 +71,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="nl">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
+      </head>
       <body
         className={`${playfair.variable} ${sourceSerif.variable} ${dmMono.variable} ${inter.variable} ${andadaPro.variable} antialiased`}
         suppressHydrationWarning

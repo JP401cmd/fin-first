@@ -44,6 +44,230 @@ function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// ─── Editorial header voor de Budgetteren-app ─────────────────────
+//
+// Implementatie van Type "App · Budgetteren" uit de ui-ux skill blueprint.
+// Bovenaan de pagina, boven de bestaande maand-selector. Pure presentatie —
+// gebruikt alleen al bestaande state (monthLabel, teVerdelen, totalIncome).
+
+function BudgetEditorialHeader({
+  monthLabel,
+  teVerdelen,
+  totalIncome,
+  totalIncomeActual,
+  totalActualOutflow,
+}: {
+  monthLabel: string
+  teVerdelen: number
+  totalIncome: number
+  totalIncomeActual: number
+  /**
+   * Som van werkelijke uitgaven + sparen + aflossingen deze periode.
+   * Wordt gebruikt voor de "Werkelijk"-kolom: hoeveel van het verwachte
+   * inkomen is feitelijk al uit het huishouden gestroomd.
+   */
+  totalActualOutflow: number
+}) {
+  const periodKicker = monthLabel
+    ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+    : ''
+
+  // Twee perspectieven op "ruimte":
+  //  - Volgens plan: verwacht inkomen − toegewezen budgetten (`teVerdelen`).
+  //    Toont of het BUDGET dat je hebt opgesteld klopt met je inkomen.
+  //  - Werkelijk: verwacht inkomen − werkelijke outflow tot nu toe.
+  //    Toont hoeveel je deze maand nog vrij hebt op basis van wat al weg is.
+  const planRuimte = teVerdelen
+  const planPositive = planRuimte >= 0
+  const planLabel = planPositive ? '€' : '−€'
+  const planBedrag = formatCurrency(Math.abs(planRuimte))
+
+  const werkelijkRuimte = totalIncome - totalActualOutflow
+  const werkelijkPositive = werkelijkRuimte >= 0
+  const werkelijkLabel = werkelijkPositive ? '€' : '−€'
+  const werkelijkBedrag = formatCurrency(Math.abs(werkelijkRuimte))
+
+  return (
+    <header className="mb-6 space-y-3">
+      <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+        <span
+          aria-hidden
+          className="inline-block h-px w-7 shrink-0"
+          style={{ background: 'var(--module-active-500)' }}
+        />
+        Budgetteren {periodKicker && `· ${periodKicker}`}
+      </div>
+
+      <h1
+        className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px] md:text-[44px]"
+        style={{ fontFamily: 'var(--font-playfair, serif)' }}
+      >
+        Hoeveel{' '}
+        <em
+          className="font-normal italic"
+          style={{ color: 'var(--module-active-700)' }}
+        >
+          ruimte
+        </em>{' '}
+        heb je nog?
+      </h1>
+
+      {/* Twee kolommen: plan vs. werkelijk. Plan gebruikt highlight-marker
+          (Kern-200), werkelijk blijft sober — zo vormt het plan-cijfer het
+          anker en is werkelijk de aanvullende lezing. */}
+      <div className="mt-2 grid grid-cols-1 gap-4 border-t border-[var(--border-ed)] pt-3 sm:grid-cols-2 sm:divide-x sm:divide-[var(--border-ed)] sm:gap-0">
+        <div className="sm:pr-6">
+          <p className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">
+            Volgens plan
+          </p>
+          <p className="mt-1 font-mono tabular-nums text-[28px] sm:text-[36px] font-bold leading-none">
+            <span
+              className="inline px-1"
+              style={{
+                backgroundImage:
+                  'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                color: planPositive ? 'var(--ink)' : 'var(--negative)',
+              }}
+            >
+              {planLabel} {planBedrag}
+            </span>
+          </p>
+          <p
+            className="mt-2 italic text-[12px] text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            {planPositive
+              ? `Te verdelen van € ${formatCurrency(totalIncome).replace('€', '').trim()} verwacht inkomen`
+              : `Over-toegewezen — ${formatCurrency(Math.abs(planRuimte))} meer dan verwacht inkomen`}
+          </p>
+        </div>
+
+        <div className="sm:pl-6">
+          <p className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
+            Werkelijk
+          </p>
+          <p
+            className="mt-1 font-mono tabular-nums text-[28px] sm:text-[36px] font-bold leading-none"
+            style={{ color: werkelijkPositive ? 'var(--ink)' : 'var(--negative)' }}
+          >
+            {werkelijkLabel} {werkelijkBedrag}
+          </p>
+          <p
+            className="mt-2 italic text-[12px] text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            {werkelijkPositive
+              ? `Nog te besteden — ${formatCurrency(totalActualOutflow)} al weg deze maand`
+              : `Boven inkomen — ${formatCurrency(Math.abs(werkelijkRuimte))} meer uitgegeven dan verwacht`}
+            {totalIncomeActual > 0 &&
+              totalIncome > 0 &&
+              ` · ontvangen: € ${formatCurrency(totalIncomeActual).replace('€', '').trim()}`}
+          </p>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+/**
+ * Eén kolom in de 4-koloms KPI-strip onder de maand-selector.
+ * Format: kicker (UPPERCASE, in eigen kleur) + bedrag in Playfair (x/y format)
+ * + sub-meta in italic Source Serif. Sparen kan een halve transparante streep
+ * (highlight-marker) krijgen. Klikbaar via `href` (deeplink naar #-anchor).
+ */
+function BudgetKpiCell({
+  kicker,
+  kickerColor,
+  actual,
+  target,
+  actionLabel,
+  tagline,
+  taglineColor,
+  highlight = false,
+  href,
+}: {
+  kicker: string
+  kickerColor: string
+  actual: number
+  target: number
+  actionLabel: string
+  tagline?: string
+  taglineColor?: string
+  highlight?: boolean
+  href?: string
+}) {
+  const cellClass =
+    'p-3 sm:p-4 border-r border-[var(--rule-soft)] last:border-r-0 [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0 last:border-b-0 text-center'
+
+  const inner = (
+    <>
+      {/* Kicker UPPERCASE in eigen kleur — geen streep want compact */}
+      <p
+        className="text-[10px] uppercase tracking-[0.18em] font-mono font-semibold"
+        style={{ color: kickerColor }}
+      >
+        {kicker}
+      </p>
+      {/* Hoofdbedrag (x/y) — actual links + " / " + budget rechts.
+          Sparen krijgt halve transparante streep. */}
+      <p
+        className="mt-1 sm:mt-1.5 text-[15px] sm:text-[20px] font-bold leading-none tracking-[-0.01em] tabular-nums"
+        style={{
+          fontFamily: 'var(--font-playfair, serif)',
+          color: 'var(--ink)',
+        }}
+      >
+        {highlight ? (
+          <span
+            className="inline px-1"
+            style={{
+              backgroundImage:
+                'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+            }}
+          >
+            {formatCurrency(actual)} / {formatCurrency(target)}
+          </span>
+        ) : (
+          <>
+            {formatCurrency(actual)} / {formatCurrency(target)}
+          </>
+        )}
+      </p>
+      {/* Sub-meta italic — actie-label */}
+      <p
+        className="mt-1 italic text-[10px] sm:text-[11px] text-[var(--ink-3)]"
+        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+      >
+        {actionLabel}
+      </p>
+      {/* Optionele tagline (vrijheid opbouwen / terugkopen) */}
+      {tagline && (
+        <p
+          className="hidden sm:block mt-0.5 italic text-[10px]"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            color: taglineColor ?? 'var(--ink-3)',
+          }}
+        >
+          {tagline}
+        </p>
+      )}
+    </>
+  )
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={`${cellClass} block transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]`}
+      >
+        {inner}
+      </a>
+    )
+  }
+  return <div className={cellClass}>{inner}</div>
+}
+
 type HubAlert = { id: string; name: string; spent: number; limit: number; pct: number; severity: 'over' | 'bijna' }
 
 function BudgetHub({
@@ -1190,55 +1414,80 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['budgets']} />
         </div>
       )}
-      {/* Month selector */}
-      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-6">
-        <div className="mb-3 sm:mb-6 flex items-center justify-between gap-2">
-          {periodMode === 'maand' && (
-            <button
-              onClick={prevMonth}
-              className="rounded-lg p-1.5 sm:p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-          )}
-          <h2 className="text-base sm:text-lg font-semibold capitalize text-[var(--ink)]">
-            {periodMode === 'ytd'
-              ? `${monthDate.getFullYear()} YTD`
-              : periodMode === '12m'
-                ? 'Afgelopen 12 maanden'
-                : monthLabel}
-          </h2>
-          {periodMode === 'maand' && (
-            <button
-              onClick={nextMonth}
-              className="rounded-lg p-1.5 sm:p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          )}
 
-          {/* Period toggle pill */}
-          <div className="flex items-center gap-0.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
-            {(['maand', 'ytd', '12m'] as const).map((mode) => (
+      {/* Editorial header — blueprint stijl (Type App: Budgetteren).
+          Toont kicker met streep, headline met italic-em, hoofdcijfer 'Te besteden'
+          met halve transparante streep (Kern-200) en italic Source Serif sub-meta. */}
+      <BudgetEditorialHeader
+        monthLabel={monthLabel}
+        teVerdelen={teVerdelen}
+        totalIncome={totalIncome}
+        totalIncomeActual={totalIncomeActual}
+        totalActualOutflow={totalExpenseSpent + totalSavingsActual + totalDebtActual}
+      />
+
+      {/* Month selector + KPI-strip — figures-strip-stijl met top+bottom borders.
+          Top-rij: maand-nav + periode-toggle + rapport + kopieer-knoppen.
+          Onder: 4-koloms KPI-strip (Inkomen/Uitgaven/Sparen/Schulden) met
+          dividers tussen kolommen, kicker-kleur, x/x format en sub-meta. */}
+      <section className="border-t border-b border-[var(--ink)] bg-[var(--paper)]">
+        {/* Top action-bar: maand-nav + periode-toggle + rapport + kopieer */}
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-[var(--rule-soft)] flex-wrap">
+          {/* Maand-nav links */}
+          <div className="flex items-center gap-1">
+            {periodMode === 'maand' && (
               <button
-                key={mode}
-                onClick={() => setPeriodMode(mode)}
-                className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  periodMode === mode
-                    ? 'bg-zinc-900 text-white'
-                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                }`}
+                onClick={prevMonth}
+                aria-label="Vorige maand"
+                className="p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               >
-                {mode === 'maand' ? 'Maand' : mode === 'ytd' ? 'YTD' : '12 mnd'}
+                <ChevronLeft className="h-4 w-4" />
               </button>
-            ))}
+            )}
+            <h2
+              className="px-2 text-base font-bold capitalize text-[var(--ink)] sm:text-lg"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+            >
+              {periodMode === 'ytd'
+                ? `${monthDate.getFullYear()} YTD`
+                : periodMode === '12m'
+                  ? 'Afgelopen 12 maanden'
+                  : monthLabel}
+            </h2>
+            {periodMode === 'maand' && (
+              <button
+                onClick={nextMonth}
+                aria-label="Volgende maand"
+                className="p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Period toggle pill — donker actief, transparant rest */}
+            <div className="ml-2 flex items-center gap-0.5 rounded-full border border-[var(--border-ed)] bg-[var(--bg)] p-0.5">
+              {(['maand', 'ytd', '12m'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setPeriodMode(mode)}
+                  className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors ${
+                    periodMode === mode
+                      ? 'bg-[var(--ink)] text-[var(--paper)]'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  {mode === 'maand' ? 'Maand' : mode === 'ytd' ? 'YTD' : '12 mnd'}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="ml-auto hidden sm:flex items-center gap-2">
+          {/* Rapport + kopieer-knoppen rechts */}
+          <div className="hidden sm:flex items-center gap-2">
             <button
               type="button"
               onClick={() => router.push(`/rapportages/budget?month=${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`)}
-              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 font-inter text-xs text-[var(--ink-2)] transition-all hover:shadow-[var(--s0)] hover:-translate-y-px hover:text-[var(--ink)]"
+              className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--bg)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-2)] transition-all hover:shadow-[var(--s0)] hover:-translate-y-px hover:text-[var(--ink)]"
             >
               <FileText className="h-3 w-3" />
               Rapport
@@ -1249,12 +1498,12 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 onClick={copyFromLastMonth}
                 disabled={copyingMonth}
                 title="Kopieer budgetbedragen van vorige maand"
-                className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--bg)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
               >
                 {copyingMonth ? (
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
+                  <span className="h-3 w-3 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
                 ) : (
-                  <Save className="h-3.5 w-3.5" />
+                  <Save className="h-3 w-3" />
                 )}
                 Kopieer vorige maand
               </button>
@@ -1262,30 +1511,49 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           </div>
         </div>
 
-        {/* Totals split: Income / Expenses / Savings / Debt — budget limits as primary */}
-        <div className="grid grid-cols-4 gap-1 sm:gap-4 text-center">
-          <div>
-            <p className="text-[9px] sm:text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
-            <p className="mt-0.5 sm:mt-1 text-sm sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
-            <p className="text-[10px] sm:text-xs text-[var(--ink-3)]">{formatCurrency(totalIncomeActual)} ontvangen</p>
-          </div>
-          <div>
-            <p className="text-[9px] sm:text-xs font-medium text-kern-600 uppercase">Uitgaven</p>
-            <p className="mt-0.5 sm:mt-1 text-sm sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalExpenseBudget)}</p>
-            <p className="text-[10px] sm:text-xs text-[var(--ink-3)]">{formatCurrency(totalExpenseSpent)} besteed</p>
-          </div>
-          <div>
-            <p className="text-[9px] sm:text-xs font-medium text-wil-600 uppercase">Sparen</p>
-            <p className="mt-0.5 sm:mt-1 text-sm sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalSavingsBudget)}</p>
-            <p className="text-[10px] sm:text-xs text-[var(--ink-3)]">{formatCurrency(totalSavingsActual)} gespaard</p>
-            <p className="text-[10px] text-wil-500/70 hidden sm:block">vrijheid opbouwen</p>
-          </div>
-          <div>
-            <p className="text-[9px] sm:text-xs font-medium text-red-600 uppercase">Schulden</p>
-            <p className="mt-0.5 sm:mt-1 text-sm sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalDebtBudget)}</p>
-            <p className="text-[10px] sm:text-xs text-[var(--ink-3)]">{formatCurrency(totalDebtActual)} afgelost</p>
-            <p className="text-[10px] text-red-500/70 hidden sm:block">vrijheid terugkopen</p>
-          </div>
+        {/* 4-koloms KPI-strip: Inkomen / Uitgaven / Sparen / Schulden.
+            Format per cell: kicker-kleur (positive/negative/wil/red) UPPERCASE,
+            hoofd in Playfair 'x / y' (besteed / budget), italic sub-meta.
+            Sparen krijgt halve transparante streep (winner). Cellen met data
+            zijn klikbaar (deeplink naar #-anchor van detail-tree). */}
+        <div className="grid grid-cols-2 sm:grid-cols-4">
+          <BudgetKpiCell
+            kicker="Inkomen"
+            kickerColor="var(--positive)"
+            actual={totalIncomeActual}
+            target={totalIncome}
+            actionLabel="ontvangen"
+            href={incomeBudgets.length > 0 ? '#inkomen' : undefined}
+          />
+          <BudgetKpiCell
+            kicker="Uitgaven"
+            kickerColor="var(--negative)"
+            actual={totalExpenseSpent}
+            target={totalExpenseBudget}
+            actionLabel="besteed"
+            href={expenseBudgets.length > 0 ? '#uitgaven' : undefined}
+          />
+          <BudgetKpiCell
+            kicker="Sparen"
+            kickerColor="var(--color-wil-600)"
+            actual={totalSavingsActual}
+            target={totalSavingsBudget}
+            actionLabel="gespaard"
+            tagline="vrijheid opbouwen"
+            taglineColor="var(--color-wil-600)"
+            highlight
+            href={savingsBudgets.length > 0 ? '#sparen' : undefined}
+          />
+          <BudgetKpiCell
+            kicker="Schulden"
+            kickerColor="var(--negative)"
+            actual={totalDebtActual}
+            target={totalDebtBudget}
+            actionLabel="afgelost"
+            tagline="vrijheid terugkopen"
+            taglineColor="var(--negative)"
+            href={debtBudgets.length > 0 ? '#schulden' : undefined}
+          />
         </div>
 
       </section>
@@ -1366,7 +1634,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       {viewMode === 'tree' ? (
         <>
           {incomeBudgets.length > 0 && (
-            <div className="mt-4 sm:mt-8">
+            <div id="inkomen" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
               <BudgetTree
                 groups={incomeBudgets}
@@ -1378,7 +1646,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
             </div>
           )}
           {expenseBudgets.length > 0 && (
-            <div className="mt-4 sm:mt-8">
+            <div id="uitgaven" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
               <BudgetTree
                 groups={expenseBudgets}
@@ -1390,7 +1658,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
             </div>
           )}
           {savingsBudgets.length > 0 && (
-            <div className="mt-4 sm:mt-8">
+            <div id="sparen" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-wil-400/70">— vrijheid opbouwen</span></h3>
               <BudgetTree
                 groups={savingsBudgets}
@@ -1402,7 +1670,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
             </div>
           )}
           {debtBudgets.length > 0 && (
-            <div className="mt-4 sm:mt-8">
+            <div id="schulden" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
               <BudgetTree
                 groups={debtBudgets}
@@ -1442,8 +1710,8 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         <div className="mt-4 sm:mt-8">
           <BudgetHeatmap
             sections={[
-              ...(incomeBudgets.length > 0 ? [{ label: 'Inkomen', budgetType: 'income' as const, groups: incomeBudgets }] : []),
               ...(expenseBudgets.length > 0 ? [{ label: 'Uitgaven', budgetType: 'expense' as const, groups: expenseBudgets }] : []),
+              ...(incomeBudgets.length > 0 ? [{ label: 'Inkomen', budgetType: 'income' as const, groups: incomeBudgets }] : []),
               ...(savingsBudgets.length > 0 ? [{ label: 'Sparen', budgetType: 'savings' as const, groups: savingsBudgets }] : []),
               ...(debtBudgets.length > 0 ? [{ label: 'Schulden', budgetType: 'debt' as const, groups: debtBudgets }] : []),
             ] satisfies HeatmapSection[]}

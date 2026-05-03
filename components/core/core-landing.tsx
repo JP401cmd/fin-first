@@ -355,6 +355,33 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
 
   return (
     <div className="mx-auto max-w-6xl">
+      {/* Editorial opening — blueprint Type 1 (Module-landing) zonder begroeting.
+          Welkom-strip leeft op /will (de ingang); /core is een functionele
+          registratie-pagina met een neutrale kicker. */}
+      <header className="px-4 pt-5 sm:px-6 sm:pt-8 mb-6 space-y-2">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Kern · vermogen &amp; schulden
+        </div>
+        <h1
+          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Hoe staat je{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            vermogen
+          </em>
+          ?
+        </h1>
+      </header>
+
       {/* Hero — vol-bleed boven, dan inset content. */}
       <CoreHero
         netWorth={netWorth}

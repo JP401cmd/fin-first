@@ -13,6 +13,7 @@ import {
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { X, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { Kicker, ScenarioCallout } from '@/components/editorial'
 
 const STRATEGY_INFO: Record<WithdrawalStrategy, { label: string; description: string }> = {
   classic: {
@@ -296,51 +297,82 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
             </section>
           )}
 
-          {/* Results */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-center">
-              <p className="text-xs font-medium text-[var(--ink-3)]">Maandelijkse opname</p>
-              <p className="mt-1 text-3xl font-bold text-horizon-700">{formatCurrency(result.monthlyWithdrawal)}</p>
-              <p className="mt-1 text-xs text-[var(--ink-3)]">per maand</p>
+          {/* Results — figures-strip stijl met highlight-marker op winnaar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-b border-[var(--ink)]">
+            <div className="p-4 sm:p-5 border-r border-[var(--rule-soft)] last:border-r-0 [&:not(:last-child)]:border-b sm:[&:not(:last-child)]:border-b-0">
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1.5">
+                Maandelijkse opname
+              </div>
+              <div
+                className="text-[26px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                <span
+                  className="inline px-1"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                  }}
+                >
+                  {formatCurrency(result.monthlyWithdrawal)}
+                </span>
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                per maand
+              </div>
             </div>
-            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-center">
-              <p className="text-xs font-medium text-[var(--ink-3)]">Houdbaar tot</p>
-              <p className={`mt-1 text-3xl font-bold ${result.depleted ? 'text-red-600' : 'text-emerald-600'}`}>
+            <div className="p-4 sm:p-5 border-r border-[var(--rule-soft)] last:border-r-0 [&:not(:last-child)]:border-b sm:[&:not(:last-child)]:border-b-0">
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1.5">
+                Houdbaar tot
+              </div>
+              <div
+                className="text-[26px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{
+                  fontFamily: 'var(--font-playfair, Georgia, serif)',
+                  color: result.depleted ? 'var(--negative)' : 'var(--positive)',
+                }}
+              >
                 {result.depleted ? `${result.successYears} jaar` : `${result.totalYears} jaar`}
-              </p>
-              <p className="mt-1 text-xs text-[var(--ink-3)]">
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
                 {result.depleted ? 'vermogen op voor doelleeftijd' : 'voldoende tot doelleeftijd'}
-              </p>
+              </div>
             </div>
-            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-center">
-              <p className="text-xs font-medium text-[var(--ink-3)]">Startportfolio</p>
-              <p className="mt-1 text-3xl font-bold text-[var(--ink)]">
+            <div className="p-4 sm:p-5 border-r border-[var(--rule-soft)] last:border-r-0">
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1.5">
+                Startportfolio
+              </div>
+              <div
+                className="text-[26px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
                 {formatCurrency(result.schedule[0]?.startBalance ?? 0)}
-              </p>
-              <p className="mt-1 text-xs text-[var(--ink-3)]">verwacht op pensioenleeftijd</p>
-            </div>
-          </div>
-
-          {/* NL-specific AOW info */}
-          <div className="rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5">
-            <div className="flex items-start gap-3">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" />
-              <div>
-                <p className="text-sm font-medium text-horizon-700">AOW en je opnamestrategie</p>
-                <p className="mt-1 text-sm text-[var(--ink-2)]">
-                  Tot {NL_AOW_AGE}: volledig uit vermogen. Vanaf {NL_AOW_AGE}: AOW ({formatCurrency(NL_AOW_MONTHLY)}/mnd alleenstaand)
-                  + aanvulling uit je portfolio. Dit verlaagt je opname aanzienlijk.
-                </p>
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                verwacht op pensioenleeftijd
               </div>
             </div>
           </div>
 
+          {/* NL-specific AOW info — scenario-callout stijl */}
+          <ScenarioCallout title="AOW en je opnamestrategie">
+            Tot {NL_AOW_AGE}: volledig uit vermogen. Vanaf {NL_AOW_AGE}: AOW ({formatCurrency(NL_AOW_MONTHLY)}/mnd alleenstaand)
+            + aanvulling uit je portfolio. Dit verlaagt je opname aanzienlijk.
+          </ScenarioCallout>
+
           {/* Drawdown chart */}
           <section>
             <div className="mb-4">
-              <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                Vermogensverloop na pensioen
-              </h2>
+              <Kicker>Vermogensverloop na pensioen</Kicker>
             </div>
             <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
               <DrawdownChart schedule={result.schedule} />

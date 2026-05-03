@@ -129,7 +129,15 @@ function kpiCash(asset: Asset, ctx: AssetKpiContext): KpiPair {
         },
       }
     }
-    return {}
+    // Laatste fallback — geen stats én geen rente: toon een neutrale
+    // "geen activiteit"-marker zodat de strip dezelfde hoogte krijgt als
+    // andere kaarten en de gebruiker meteen ziet waarom er geen cijfers zijn.
+    return {
+      primary: {
+        value: 'Geen activiteit',
+        tone: 'neutral',
+      },
+    }
   }
 
   // KPI 1 — laatste activiteit X dagen geleden. Het label hangt af van de

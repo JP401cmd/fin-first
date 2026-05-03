@@ -14,6 +14,7 @@ import { GoalForm } from '@/components/app/goal-form'
 import { GoalProgressTimeline, buildGoalHistory } from '@/components/app/will/goal-progress-timeline'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
+import { Kicker } from '@/components/editorial'
 
 type HouseholdInfo = {
   householdId: string
@@ -209,8 +210,14 @@ export function GoalDetailModal({
             </div>
           ) : goals.length === 0 ? (
             <div className="rounded-[var(--r-lg)] border border-dashed border-wil-300 bg-wil-50/50 p-8 text-center">
-              <h3 className="text-lg font-bold text-[var(--ink)]">Geen doelen ingesteld</h3>
-              <p className="mt-2 text-sm text-[var(--ink-3)]">
+              <h3
+                className="text-2xl font-black tracking-[-0.02em] text-[var(--ink)]"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >Geen doelen ingesteld</h3>
+              <p
+                className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
                 Begin met het instellen van je eerste financiele doel. Koppel het aan je assets of schulden voor live voortgang.
               </p>
             </div>
@@ -219,9 +226,9 @@ export function GoalDetailModal({
               {/* Active goals */}
               {activeGoals.length > 0 && (
                 <section>
-                  <h3 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                    Actief ({activeGoals.length})
-                  </h3>
+                  <div className="mb-3">
+                    <Kicker>Actief ({activeGoals.length})</Kicker>
+                  </div>
                   <div className="space-y-3">
                     {activeGoals.map((goal) => (
                       <GoalCard
@@ -251,10 +258,15 @@ export function GoalDetailModal({
                 <section className="mt-6">
                   <button
                     onClick={() => setShowCompleted(v => !v)}
-                    className="flex items-center gap-2 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase hover:text-[var(--ink-2)]"
+                    className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.20em] font-mono text-[var(--module-active-700)] hover:text-[var(--ink)]"
                   >
-                    {showCompleted ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    <span
+                      aria-hidden
+                      className="inline-block w-7 h-px shrink-0"
+                      style={{ background: 'var(--module-active-500)' }}
+                    />
                     Voltooid ({completedGoals.length})
+                    {showCompleted ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                   </button>
                   {showCompleted && (
                     <div className="mt-3 space-y-3">

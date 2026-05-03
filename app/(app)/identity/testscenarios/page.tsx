@@ -271,13 +271,35 @@ export default function TestScenariosPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      {/* ── Masthead ── */}
-      <header className="mb-10 border-b border-[var(--border-ed)] pb-6">
-        <p className="label-editorial text-[var(--ink-3)]">Testscenario&rsquo;s</p>
-        <h1 className="mt-2 font-display text-3xl font-bold leading-tight text-[var(--ink)] sm:text-4xl">
-          Ontdek TriFinity
+      {/* ── Editorial masthead — blueprint Type 2 ── */}
+      <header className="mb-10 border-b border-[var(--border-ed)] pb-6 space-y-2">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Testscenario&rsquo;s
+        </div>
+        <h1
+          className="font-bold text-3xl sm:text-4xl tracking-[-0.02em] leading-tight"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Ontdek{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            TriFinity
+          </em>
         </h1>
-        <p className="mt-3 max-w-xl font-serif text-base leading-relaxed text-[var(--ink-3)]">
+        <p
+          className="italic text-base leading-relaxed text-[var(--ink-2)] max-w-xl pl-4"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            borderLeft: '2px solid var(--module-active-500)',
+          }}
+        >
           Concrete opdrachten om de app te verkennen. Elke opdracht leidt naar een
           functie die een inzicht oplevert of invloed heeft op je financi&euml;le plaatje.
           Begin met de algemene opdrachten bovenaan, of kies de groep die bij je past.

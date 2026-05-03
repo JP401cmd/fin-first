@@ -113,8 +113,8 @@ export function EventsTimeline({
   const maxRow = Math.max(0, ...rows)
   const totalH = H + maxRow * ROW_HEIGHT
 
-  // Module-kleuren: Wil voor positief/inkomen, Kern voor negatief/uitgaven
-  const COLOR_INCOME = 'var(--color-wil, #3d3048)'
+  // Module-kleuren: Horizon voor positief/inkomen (toekomstige cashflow), Kern voor negatief/uitgaven
+  const COLOR_INCOME = 'var(--color-horizon, #c4a06b)'
   const COLOR_EXPENSE = 'var(--color-kern, #6b4339)'
 
   return (

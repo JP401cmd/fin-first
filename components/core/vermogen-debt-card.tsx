@@ -127,18 +127,30 @@ export function VermogenDebtCard({
             </p>
             {connection && <ConnectionIndicator connection={connection} />}
           </div>
-          <p className="truncate text-[10px] text-[var(--ink-4)]">
+          {/* Sub-meta in italic Source Serif (mini-artikel-blueprint) */}
+          <p
+            className="truncate text-[11px] italic text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
             {DEBT_TYPE_LABELS[debt.debt_type]}
             {subtitle ? ` · ${subtitle}` : ''}
           </p>
         </div>
 
-        {/* Right: balance + monthly payment */}
+        {/* Right: balance (negatief, met highlight-marker als hoofdcijfer) + monthly payment */}
         <div className="shrink-0 text-right">
           <p
             className={`font-mono text-sm font-bold tabular-nums text-negative ${flashClass}`}
           >
-            {formatCurrency(-Math.abs(debt.current_balance))}
+            <span
+              className="inline px-1"
+              style={{
+                backgroundImage:
+                  'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+              }}
+            >
+              {formatCurrency(-Math.abs(debt.current_balance))}
+            </span>
           </p>
           {debt.monthly_payment > 0 && (
             <span className="font-mono text-[10px] font-medium tabular-nums text-[var(--ink-3)]">
@@ -149,7 +161,24 @@ export function VermogenDebtCard({
         </div>
       </div>
 
-      {kpiPair && <CardKpiStrip pair={kpiPair} variant="item" />}
+      {kpiPair && (kpiPair.primary || kpiPair.secondary) ? (
+        <CardKpiStrip pair={kpiPair} variant="item" />
+      ) : (
+        <>
+          {/* Alignment-placeholder: matcht hoogte van <CardKpiStrip variant="item">
+              zodat kaarten zonder KPI's op dezelfde y-as afsluiten in het grid. */}
+          <div
+            className="mx-3 h-px bg-[var(--border-md)]/40 sm:mx-4"
+            aria-hidden="true"
+          />
+          <div
+            className="flex items-center px-3 py-2 text-[11px] sm:px-4"
+            aria-hidden="true"
+          >
+            &nbsp;
+          </div>
+        </>
+      )}
     </button>
   )
 }

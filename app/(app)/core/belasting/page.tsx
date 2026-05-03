@@ -217,24 +217,46 @@ export default function BelastingPage() {
       <section className="card-editorial overflow-hidden mb-6">
         <div className="h-1.5 bg-kern-500" />
         <div className="p-4 sm:p-6 md:p-8">
-          <div className="mb-3 sm:mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-kern-100">
-              <Calculator className="h-5 w-5 text-kern-600" />
+          {/* Editorial header — blueprint Type 10 (Calculator) */}
+          <header className="mb-3 sm:mb-4 space-y-1.5">
+            <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+              <span
+                aria-hidden
+                className="inline-block h-px w-7 shrink-0"
+                style={{ background: 'var(--module-active-500)' }}
+              />
+              Box 3 · vermogensheffing {year}
             </div>
-            <div>
-              <h1 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-[var(--ink)]">
-                Box 3 Belasting
+            <div className="flex items-center gap-3">
+              <Calculator
+                className="h-5 w-5 shrink-0"
+                style={{ color: 'var(--module-active-700)' }}
+              />
+              <h1
+                className="font-bold text-xl sm:text-2xl tracking-[-0.02em]"
+                style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              >
+                Box 3{' '}
+                <em
+                  className="font-normal italic"
+                  style={{ color: 'var(--module-active-700)' }}
+                >
+                  belasting
+                </em>
               </h1>
-              <p className="text-xs text-[var(--ink-3)]">
-                Vermogensrendementsheffing {year}
-              </p>
+              {isHouseholdMode && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{
+                    background: 'var(--module-active-50)',
+                    color: 'var(--module-active-700)',
+                  }}
+                >
+                  <Users className="h-3 w-3" /> Huishouden
+                </span>
+              )}
             </div>
-            {isHouseholdMode && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
-                <Users className="h-3 w-3" /> Huishouden
-              </span>
-            )}
-          </div>
+          </header>
 
           {/* Year selector */}
           <div className="mb-4 flex items-center gap-2">
@@ -307,25 +329,25 @@ export default function BelastingPage() {
 
       {activeResult && (
         <>
-          {/* === KPI Cards === */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
+          {/* === KPI figures-strip — editorial blueprint === */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-b border-[var(--ink)] mb-6">
             <KpiCard
               label="Box 3 vermogen"
               value={formatCurrency(activeResult.totaalSpaargeld + activeResult.totaalBeleggingen)}
-              icon={<Wallet className="h-4 w-4 text-kern-500" />}
+              icon={<Wallet className="h-3 w-3" />}
               tooltip={BOX3_TOOLTIPS.box3}
             />
             <KpiCard
               label="Spaargeld"
               value={formatCurrency(activeResult.totaalSpaargeld)}
               sub={`Forfait: ${formatPct(activeResult.params.forfaitSpaargeld)}`}
-              icon={<PiggyBank className="h-4 w-4 text-kern-500" />}
+              icon={<PiggyBank className="h-3 w-3" />}
             />
             <KpiCard
               label="Beleggingen"
               value={formatCurrency(activeResult.totaalBeleggingen)}
               sub={`Forfait: ${formatPct(activeResult.params.forfaitBeleggingen)}`}
-              icon={<BarChart3 className="h-4 w-4 text-kern-500" />}
+              icon={<BarChart3 className="h-3 w-3" />}
             />
             <KpiCard
               label="Effectief tarief"
@@ -333,7 +355,7 @@ export default function BelastingPage() {
                 ? formatPct(activeResult.tax / activeResult.rendementsgrondslag)
                 : '0%'}
               sub={`Nominaal: ${formatPct(activeResult.params.tarief)}`}
-              icon={<TrendingDown className="h-4 w-4 text-kern-500" />}
+              icon={<TrendingDown className="h-3 w-3" />}
               tooltip={BOX3_TOOLTIPS.effectiefTarief}
             />
           </div>
@@ -801,31 +823,31 @@ function Box2Section({
         </div>
       </section>
 
-      {/* Box 2 KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
+      {/* Box 2 KPI figures-strip — editorial blueprint */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-b border-[var(--ink)] mb-6">
         <KpiCard
           label="Box 2 inkomen"
           value={formatCurrency(result.totalIncome)}
-          icon={<Wallet className="h-4 w-4 text-teal-500" />}
+          icon={<Wallet className="h-3 w-3" />}
           tooltip={BOX2_TOOLTIPS.aanmerkelijkBelang}
         />
         <KpiCard
           label="Totaal dividend"
           value={formatCurrency(result.totalDividend)}
-          icon={<PiggyBank className="h-4 w-4 text-teal-500" />}
+          icon={<PiggyBank className="h-3 w-3" />}
           tooltip={BOX2_TOOLTIPS.dividend}
         />
         <KpiCard
           label="Vervreemdingswinst"
           value={formatCurrency(result.totalDisposalGain)}
-          icon={<BarChart3 className="h-4 w-4 text-teal-500" />}
+          icon={<BarChart3 className="h-3 w-3" />}
           tooltip={BOX2_TOOLTIPS.vervreemdingswinst}
         />
         <KpiCard
           label="Effectief tarief"
           value={result.totalIncome > 0 ? formatPct(result.effectiveRate) : '0%'}
           sub={`Laag: ${formatPct(result.params.tariefLaag)} · Hoog: ${formatPct(result.params.tariefHoog)}`}
-          icon={<TrendingDown className="h-4 w-4 text-teal-500" />}
+          icon={<TrendingDown className="h-3 w-3" />}
           tooltip={BOX2_TOOLTIPS.tariefStaffel}
         />
       </div>
@@ -1194,16 +1216,28 @@ function KpiCard({
   tooltip?: string
 }) {
   return (
-    <div className="card-editorial p-3 sm:p-4">
-      <div className="flex items-center gap-1.5 mb-1.5">
+    <div className="p-3 sm:p-4 border-r border-[var(--rule-soft)] last:border-r-0 [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
         {icon}
-        <span className="text-[11px] font-medium text-[var(--ink-3)]">
+        <span>
           {label}
           {tooltip && <InfoTooltip text={tooltip} />}
         </span>
       </div>
-      <p className="font-mono text-lg sm:text-xl font-bold tabular-nums text-[var(--ink)]">{value}</p>
-      {sub && <p className="text-[10px] text-[var(--ink-3)] mt-0.5">{sub}</p>}
+      <p
+        className="text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums"
+        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p
+          className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          {sub}
+        </p>
+      )}
     </div>
   )
 }

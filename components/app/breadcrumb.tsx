@@ -81,7 +81,7 @@ export function Breadcrumb({
   return (
     <nav
       aria-label="Breadcrumb navigatie"
-      className="flex items-center gap-1.5 text-sm"
+      className="flex items-center gap-1.5 pt-4 text-sm"
     >
       {segments.map((segment, index) => {
         const isLast = index === segments.length - 1

@@ -113,13 +113,21 @@ export function ConfirmDestructive({
   return (
     <BottomSheet open={open} onClose={handleCancel} size="sm">
       <div className="px-5 pb-5 pt-2 md:px-6 md:pb-6 md:pt-4">
-        {/* Kicker — ONOMKEERBAAR in rood, 10-11px uppercase, tracking 0.08em */}
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-negative">
+        {/* Kicker met streep — ONOMKEERBAAR in rood (geen module-active hier:
+            destructive-context vereist semantisch rood, niet de actieve module) */}
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono font-semibold text-negative">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0 bg-negative"
+          />
           Onomkeerbaar
         </div>
 
         {/* Titel — Playfair display font, serieuze krant-kop */}
-        <h2 className="mt-2 font-display text-[22px] leading-tight font-semibold text-[var(--ink)] md:text-[26px]">
+        <h2
+          className="mt-2 text-[22px] leading-tight font-bold text-[var(--ink)] md:text-[26px] tracking-[-0.02em]"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
           {resolvedTitle}
         </h2>
 

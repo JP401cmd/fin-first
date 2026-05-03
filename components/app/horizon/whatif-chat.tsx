@@ -144,13 +144,13 @@ function ActionSuggestionCard({
       className={`mt-2 w-full rounded-[var(--r-lg)] border text-left transition-all ${
         added
           ? 'border-emerald-200 bg-emerald-50'
-          : 'border-wil-200 bg-wil-50/40 hover:border-wil-400 hover:shadow-[var(--s0)] active:scale-[0.98]'
+          : 'border-horizon-200 bg-horizon-50/40 hover:border-horizon-400 hover:shadow-[var(--s0)] active:scale-[0.98]'
       }`}
     >
       <div className="px-3 py-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <Target className={`h-3.5 w-3.5 ${added ? 'text-emerald-500' : 'text-wil-600'}`} />
+            <Target className={`h-3.5 w-3.5 ${added ? 'text-emerald-500' : 'text-horizon-600'}`} />
             <span className="text-xs font-semibold text-[var(--ink)]">{data.title}</span>
           </div>
           {added ? (
@@ -158,11 +158,11 @@ function ActionSuggestionCard({
               <Check className="h-3 w-3" /> Toegevoegd
             </span>
           ) : loading ? (
-            <span className="flex items-center gap-0.5 rounded-full bg-wil-100 px-1.5 py-0.5 text-xs font-medium text-wil-700">
+            <span className="flex items-center gap-0.5 rounded-full bg-horizon-100 px-1.5 py-0.5 text-xs font-medium text-horizon-700">
               <Loader2 className="h-3 w-3 animate-spin" /> Toevoegen...
             </span>
           ) : (
-            <span className="flex items-center gap-0.5 rounded-full bg-wil-100 px-1.5 py-0.5 text-xs font-medium text-wil-700">
+            <span className="flex items-center gap-0.5 rounded-full bg-horizon-100 px-1.5 py-0.5 text-xs font-medium text-horizon-700">
               <Plus className="h-3 w-3" /> Voeg toe aan De Wil
             </span>
           )}
@@ -378,9 +378,9 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
 
         if (isLoading) {
           elements.push(
-            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
+            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-horizon-100 bg-[var(--paper)] px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-horizon-400" />
                 <span className="text-xs text-[var(--ink-3)]">Actie wordt voorbereid...</span>
               </div>
             </div>
@@ -406,15 +406,15 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
 
   return (
     <div className="card-editorial overflow-hidden">
-      {/* 3px wil-accent top border */}
-      <div className="h-[3px] bg-wil-500" />
+      {/* 3px horizon-accent top border */}
+      <div className="h-[3px] bg-horizon-500" />
 
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-[var(--border-ed)] px-4 py-2.5">
         <WillDots size={28} />
         <div>
-          <span className="text-sm font-semibold text-wil-600">Will</span>
-          <span className={`ml-1 text-[11px] transition-colors ${isPlannerMode ? 'text-wil-600 font-medium' : 'text-[var(--ink-3)]'}`}>
+          <span className="text-sm font-semibold text-horizon-700">Will</span>
+          <span className={`ml-1 text-[11px] transition-colors ${isPlannerMode ? 'text-horizon-700 font-medium' : 'text-[var(--ink-3)]'}`}>
             {isPlannerMode ? 'Planner' : 'Droomgids'}
           </span>
         </div>
@@ -425,7 +425,7 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-4 text-center">
             <WillDots size={36} />
-            <p className="mt-2 font-[family-name:var(--font-source-serif)] text-sm italic text-wil-600">
+            <p className="mt-2 font-[family-name:var(--font-source-serif)] text-sm italic text-horizon-700">
               Stel je voor dat alles mogelijk is...
             </p>
             <p className="mt-1 max-w-[260px] text-xs text-[var(--ink-3)]">
@@ -465,7 +465,7 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
               <div className="mr-2 mt-1 shrink-0">
                 <WillDots size={24} state={isStreaming ? 'streaming' : 'idle'} />
               </div>
-              <div className="max-w-[85%] rounded-[var(--r-lg)] bg-wil-50 px-3 py-2 text-sm leading-relaxed text-[var(--ink-2)]">
+              <div className="max-w-[85%] rounded-[var(--r-lg)] bg-horizon-50 px-3 py-2 text-sm leading-relaxed text-[var(--ink-2)]">
                 {renderAssistantMessage(parts)}
               </div>
             </div>
@@ -477,8 +477,8 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
             <div className="mr-2 mt-1 shrink-0">
               <WillDots size={24} state="streaming" />
             </div>
-            <div className="rounded-[var(--r-lg)] bg-wil-50 px-3 py-2">
-              <Loader2 className="h-4 w-4 animate-spin text-wil-600" />
+            <div className="rounded-[var(--r-lg)] bg-horizon-50 px-3 py-2">
+              <Loader2 className="h-4 w-4 animate-spin text-horizon-600" />
             </div>
           </div>
         )}
@@ -501,7 +501,7 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
             type="button"
             onClick={submit}
             disabled={isStreaming || !input.trim()}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-wil-600 text-white transition-colors hover:bg-wil-700 disabled:bg-zinc-300 disabled:text-[var(--ink-3)]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-horizon-600 text-white transition-colors hover:bg-horizon-700 disabled:bg-zinc-300 disabled:text-[var(--ink-3)]"
           >
             <Send className="h-4 w-4" />
           </button>

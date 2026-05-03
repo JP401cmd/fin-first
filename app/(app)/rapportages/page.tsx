@@ -187,18 +187,41 @@ export default function RapportagesPage() {
 
   return (
     <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
-      {/* Hero */}
-      <div className="mb-8">
-        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)] mb-2">
+      {/* Editorial header — blueprint Type 1 (cross-module landing) */}
+      <header className="mb-8 space-y-2">
+        {/* Kicker met 28×1px streep — cross-module valt terug op ink-2 */}
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
           Rapportages
-        </p>
-        <h1 className="font-playfair text-3xl font-bold tracking-tight text-[var(--ink)] md:text-4xl" style={{ letterSpacing: '-0.03em' }}>
-          Jouw Financieel Archief
+        </div>
+        {/* Headline met italic-em "archief" */}
+        <h1
+          className="font-bold tracking-[-0.02em] text-3xl md:text-4xl"
+          style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.03em' }}
+        >
+          Jouw financieel{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            archief
+          </em>
         </h1>
-        <p className="mt-2 font-source-serif text-base text-[var(--ink-2)]">
+        {/* Editorial deck */}
+        <p
+          className="italic text-[14px] sm:text-[15px] leading-snug max-w-[60ch] text-[var(--ink-2)] pl-4 mt-3"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            borderLeft: '2px solid var(--module-active-500)',
+          }}
+        >
           Genereer een overzicht van elke periode in je financiele leven.
         </p>
-      </div>
+      </header>
 
       {/* Report generator */}
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-[var(--s0)]">

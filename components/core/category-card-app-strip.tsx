@@ -102,7 +102,8 @@ function StatusDot({
   if (trackedCount > 0) {
     return (
       <span
-        className="block h-1.5 w-1.5 rounded-full bg-kern-700"
+        className="block h-1.5 w-1.5 rounded-full"
+        style={{ background: 'var(--module-active-700)' }}
         aria-hidden="true"
       />
     )

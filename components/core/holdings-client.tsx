@@ -14,6 +14,7 @@ import dynamic from 'next/dynamic'
 
 const HoldingsHeatmap = dynamic(() => import('@/components/app/holdings-heatmap'), { ssr: false })
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { Kicker } from '@/components/editorial'
 import { IsinLookupField, type IsinResolved } from '@/components/holdings/isin-lookup-field'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -428,23 +429,55 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Header */}
-      <section className="rounded-[var(--r-lg)] border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Link
-            href="/core/assets"
-            className="inline-flex items-center gap-1 text-sm text-kern-600 hover:text-kern-700"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Vermogen
-          </Link>
+      {/* Editorial header — blueprint Type 2 (List) */}
+      <header className="mb-5 space-y-2">
+        <Link
+          href="/core/assets"
+          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
+        >
+          <ArrowLeft className="h-3 w-3" />
+          Terug naar Vermogen
+        </Link>
+        {/* Kicker met streep */}
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] mt-3">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Holdings · {holdings.length} actief
         </div>
+        {/* Headline met italic-em "portfolio" */}
+        <h1
+          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Jouw{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            portfolio
+          </em>
+        </h1>
+        <p
+          className="italic text-[12.5px] text-[var(--ink-3)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          {holdings.length} actieve holding{holdings.length !== 1 ? 's' : ''} in je portfolio
+        </p>
+      </header>
+
+      {/* Original action-bar */}
+      <section className="rounded-[var(--r-lg)] border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-[var(--ink)]">Holdings</h1>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              {holdings.length} actieve holding{holdings.length !== 1 ? 's' : ''} in je portfolio
-            </p>
+            <h2
+              className="font-bold text-base"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+            >
+              Acties
+            </h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -565,9 +598,11 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       {/* Portfolio allocation visualization — donut chart with sector/geography/asset class views */}
       {holdingsForAllocation.length > 0 && (
         <section className="mt-3 sm:mt-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6" data-testid="portfolio-allocation">
-          <div className="flex items-center gap-2 mb-4">
-            <PieChart className="h-4 w-4 text-kern-600" />
-            <h2 className="text-sm font-semibold text-[var(--ink-2)]">Portfolio verdeling</h2>
+          <div className="mb-4">
+            <Kicker>
+              <PieChart className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
+              Portfolio verdeling
+            </Kicker>
           </div>
           <PortfolioAllocationVisualization
             holdings={holdingsForAllocation}
@@ -611,7 +646,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       {/* View toggle: list vs heatmap */}
       {holdings.length > 0 && (
         <div className="mt-3 sm:mt-6 flex items-center justify-between" data-testid="holdings-view-toggle">
-          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Holdings</h2>
+          <Kicker>Holdings</Kicker>
           <div className="flex gap-0.5 rounded-lg bg-[var(--subtle)] p-0.5">
             <button
               type="button"
@@ -720,9 +755,14 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
             {/* Group header — only show when multiple groups are visible */}
             {groupedHoldings.length > 1 && (
               <div className={`flex items-center gap-2 ${groupIdx > 0 ? 'mt-6 pt-4 border-t border-kern-100' : ''}`}>
-                <Briefcase className="h-4 w-4 text-kern-500" />
-                <h2 className="text-sm font-semibold text-kern-700">{group.assetName}</h2>
-                <span className="text-xs text-[var(--ink-3)]">
+                <Kicker>
+                  <Briefcase className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
+                  {group.assetName}
+                </Kicker>
+                <span
+                  className="italic text-[11px] text-[var(--ink-3)] ml-1"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
                   {group.items.length} holding{group.items.length !== 1 ? 's' : ''}
                 </span>
               </div>

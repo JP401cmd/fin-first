@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Check, Clock, Trash2, CalendarDays } from 'lucide-react'
+import { Check, Clock, Trash2, CalendarDays } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import {
@@ -62,18 +62,12 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
   }
 
   return (
-    <BottomSheet open={true} onClose={onClose}>
-      {/* Header - custom because it has badges */}
-      <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-[var(--ink)]">Actie bewerken</h3>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${sourceBadge}`}>
-            {ACTION_SOURCE_LABELS[action.source]}
-          </span>
-        </div>
-        <button onClick={onClose} className="touch-target rounded-md text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-          <X className="h-4 w-4" />
-        </button>
+    <BottomSheet open={true} onClose={onClose} title="Actie bewerken">
+      {/* Source-badge row — onder de cascade-header */}
+      <div className="px-5 pt-3">
+        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${sourceBadge}`}>
+          {ACTION_SOURCE_LABELS[action.source]}
+        </span>
       </div>
 
       {/* Body */}

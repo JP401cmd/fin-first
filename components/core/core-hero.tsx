@@ -9,6 +9,7 @@ import {
 } from '@/lib/format'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { Kicker, HighlightMark, FiguresStrip } from '@/components/editorial'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import { ModuleTipStrip } from './module-tip-strip'
 
@@ -93,11 +94,20 @@ export function CoreHero({
       data-testid="kern-hero"
       className="border-b border-[var(--border-ed)] bg-[var(--paper)]"
     >
-      {/* Kern-bruin accent-streep — module-signatuur. */}
-      <div className="h-1 bg-kern-700" />
+      {/* Module-active accent-streep — automatisch Kern-700 op /core. */}
+      <div
+        className="h-1"
+        style={{ background: 'var(--module-active-700)' }}
+      />
 
       <div className="px-4 py-7 sm:px-6 sm:py-9">
-        {/* Hoofdbedrag + "netto vermogen" inline */}
+        {/* Kicker met 28×1px module-streep — editorial signature-element.
+            Vervangt het inline "netto vermogen"-label hieronder als primaire context. */}
+        <div className="mb-3">
+          <Kicker>Netto vermogen</Kicker>
+        </div>
+
+        {/* Hoofdbedrag + "netto vermogen" inline (klein label voor mobile-context) */}
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           {onShowNetWorthReceipt ? (
             <button
@@ -141,34 +151,34 @@ export function CoreHero({
         {/* Bezittingen/schulden-bar */}
         <AssetsDebtsBar totalAssets={totalAssets} totalDebts={totalDebts} />
 
-        {/* Drie kolommen onderaan — bezittingen + schulden zijn klikbaar
-            en navigeren naar de respectievelijke overzichtspagina's. */}
-        <dl className="mt-6 grid grid-cols-1 gap-y-5 sm:mt-8 sm:grid-cols-3 sm:gap-x-6">
-          <SummaryColumn
-            kicker="Totale bezittingen"
-            kickerClass="text-positive"
-            value={totalAssets}
-            valueClass="text-[var(--ink)]"
-            meta={`${assetCount} ${assetCount === 1 ? 'bezitting' : 'bezittingen'}`}
-            href="/core/assets"
-          />
-          <SummaryColumn
-            kicker="Totale schulden"
-            kickerClass="text-negative"
-            value={totalDebts}
-            valueClass="text-negative"
-            meta={`${debtCount} ${debtCount === 1 ? 'schuld' : 'schulden'}`}
-            href="/core/debts"
-          />
-          <SummaryColumn
-            kicker="Schuldgraad"
-            kickerClass="text-[var(--ink-3)]"
-            value={debtRatio}
-            valueClass="text-[var(--ink)]"
-            asPercentage
-            meta={debtRatioLabel}
-          />
-        </dl>
+        {/* Drie kolommen onderaan — Type 1 blueprint figures-strip met
+            top + bottom solid borders en verticale rule-soft dividers.
+            Bezittingen en Schulden zijn klikbaar; Schuldgraad blijft static. */}
+        <FiguresStrip
+          cols={3}
+          figures={[
+            {
+              kicker: 'Totale bezittingen',
+              amount: formatCurrency(totalAssets),
+              sub: `${assetCount} ${assetCount === 1 ? 'bezitting' : 'bezittingen'}`,
+              variant: 'positive',
+              href: '/core/assets',
+            },
+            {
+              kicker: 'Totale schulden',
+              amount: formatCurrency(totalDebts),
+              sub: `${debtCount} ${debtCount === 1 ? 'schuld' : 'schulden'}`,
+              variant: 'negative',
+              href: '/core/debts',
+            },
+            {
+              kicker: 'Schuldgraad',
+              amount: `${(Math.round(debtRatio * 10) / 10).toString().replace('.', ',')}%`,
+              sub: debtRatioLabel,
+              variant: 'neutral',
+            },
+          ]}
+        />
       </div>
     </section>
   )
@@ -194,7 +204,9 @@ function HeroAmount({
         .join(' ')}
       style={{ fontFamily: 'var(--font-playfair, var(--font-mono, monospace))' }}
     >
-      {formatCurrency(netWorth)}
+      {/* Halve transparante streep in module-active-200 (Kern-200 op /core).
+          Markeert het netto vermogen als hoofduitkomst-cijfer van de pagina. */}
+      <HighlightMark>{formatCurrency(netWorth)}</HighlightMark>
     </span>
   )
 }
@@ -241,10 +253,16 @@ function FireProgressBar({
   return (
     <Wrapper {...wrapperProps}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-mono text-sm font-semibold tabular-nums text-kern-700 sm:text-base">
+        <span
+          className="font-mono text-sm font-semibold tabular-nums sm:text-base"
+          style={{ color: 'var(--module-active-700)' }}
+        >
           {pctRounded.toString().replace('.', ',')}%
         </span>
-        <span className="font-mono text-sm font-semibold tabular-nums text-kern-700 sm:text-base">
+        <span
+          className="font-mono text-sm font-semibold tabular-nums sm:text-base"
+          style={{ color: 'var(--module-active-700)' }}
+        >
           {formatCurrency(targetAmount)}
         </span>
       </div>
@@ -258,8 +276,9 @@ function FireProgressBar({
         aria-label="FIRE-voortgang"
       >
         <div
-          className="h-full bg-kern-700"
+          className="h-full"
           style={{
+            background: 'var(--module-active-700)',
             width: hasEntered ? `${pct}%` : '0%',
             transition: 'width 700ms cubic-bezier(.22,1,.36,1)',
           }}

@@ -117,15 +117,46 @@ export function DebtDetailModal({
           </p>
         </div>
 
-        {/* Balance highlight */}
-        <div className="border-b border-[var(--border-ed)] px-6 py-4 text-center">
-          <p className="text-3xl font-bold text-[var(--ink)]" data-testid="modal-debt-balance">{formatCurrency(balance)}</p>
+        {/* Balance highlight — editorial blueprint met HighlightMark */}
+        <div className="border-b border-[var(--border-ed)] px-6 py-5 text-center">
+          <div className="mb-2 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--negative,#dc2626)]">
+            <span
+              aria-hidden
+              className="inline-block w-5 h-px"
+              style={{ background: 'var(--negative, #dc2626)' }}
+            />
+            Restschuld
+          </div>
+          <p
+            className="text-[32px] sm:text-[40px] font-black leading-none tracking-[-0.02em] tabular-nums"
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative, #dc2626)' }}
+            data-testid="modal-debt-balance"
+          >
+            <span
+              className="inline px-1"
+              style={{
+                backgroundImage:
+                  'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+              }}
+            >
+              {formatCurrency(balance)}
+            </span>
+          </p>
           {dailyExpenses > 0 && balance >= 100 && (
-            <p className="mt-0.5 text-sm text-kern-600" data-testid="modal-debt-freedom-time">
+            <p
+              className="mt-1.5 italic text-[12px] text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              data-testid="modal-debt-freedom-time"
+            >
               je koopt deze tijd terug in {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'long')}
             </p>
           )}
-          <p className="mt-1 text-sm text-[var(--ink-3)]">van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)</p>
+          <p
+            className="mt-1 italic text-[12px] text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)
+          </p>
           <div className="mx-auto mt-2 h-2 w-48 overflow-hidden rounded-full bg-zinc-100">
             <div className="h-full rounded-full bg-kern-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
           </div>

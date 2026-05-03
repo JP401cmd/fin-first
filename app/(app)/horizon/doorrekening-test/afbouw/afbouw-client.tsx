@@ -31,6 +31,7 @@ import {
   type WithdrawalRow,
   type InflationExpenseRow,
 } from '../calc/afbouw-projection'
+import { Kicker } from '@/components/editorial'
 
 // ── Withdrawal strategy types ─────────────────────────────────
 
@@ -370,11 +371,26 @@ export function AfbouwClient({
         localEndPortfolio={sim.rows.at(-1)?.endPortfolio ?? null}
       />
 
-      {/* ── Summary header ── */}
+      {/* ── Summary header — editorial blueprint ── */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-        <h2 className="text-lg font-bold text-[var(--ink)]">Afbouw — Decumulatiefase</h2>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Hoe je vermogen wordt opgebruikt na financiele onafhankelijkheid
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-2">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Doorrekening · Afbouw</span>
+        </div>
+        <h2
+          className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
+          Afbouw <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >Decumulatiefase</em>
+        </h2>
+        <p
+          className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          Hoe je vermogen wordt opgebruikt na financi&euml;le onafhankelijkheid.
         </p>
 
         {/* Key metrics */}
@@ -428,8 +444,10 @@ export function AfbouwClient({
           className="flex w-full items-center gap-2 text-left"
         >
           {expensesExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
-          <Landmark className="h-4 w-4 text-horizon-500" />
-          <h3 className="text-base font-bold text-[var(--ink)]">Noodzakelijke uitgaven</h3>
+          <Kicker>
+            <Landmark className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
+            Noodzakelijke uitgaven
+          </Kicker>
         </button>
 
         {expensesExpanded && (
@@ -557,8 +575,10 @@ export function AfbouwClient({
           className="flex w-full items-center gap-2 text-left"
         >
           {inflationTableExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
-          <CalendarClock className="h-4 w-4 text-horizon-500" />
-          <h3 className="text-base font-bold text-[var(--ink)]">Uitgaven met inflatie</h3>
+          <Kicker>
+            <CalendarClock className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
+            Uitgaven met inflatie
+          </Kicker>
           <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold text-horizon-700">
             {(fireParams.inflationRate * 100).toFixed(1)}% /jr
           </span>
@@ -655,8 +675,10 @@ export function AfbouwClient({
           className="flex w-full items-center gap-2 text-left"
         >
           {strategyExpanded ? <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronRight className="h-4 w-4 text-[var(--ink-3)]" />}
-          <TrendingDown className="h-4 w-4 text-horizon-500" />
-          <h3 className="text-base font-bold text-[var(--ink)]">Eindstrategie-tabellen</h3>
+          <Kicker>
+            <TrendingDown className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
+            Eindstrategie-tabellen
+          </Kicker>
           <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold text-horizon-700">
             {STRATEGY_LABELS[strategyConfig.strategy]?.name ?? strategyConfig.strategy}
           </span>

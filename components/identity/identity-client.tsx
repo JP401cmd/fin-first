@@ -75,16 +75,43 @@ export default function IdentityClient({ initialData }: IdentityClientProps) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Page header */}
-      <div className="mb-5 sm:mb-8">
-        <p className="label-editorial text-[var(--ink-3)] mb-1">Persoonlijk profiel</p>
-        <h1 className="font-display text-[32px] font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.03em' }}>
-          Identiteit &amp; Vrijheidspad
+      {/* Editorial page header — blueprint Type 1 / Type 8 hybride.
+          Identity is cross-module: --module-active-* valt terug op ink-shades,
+          highlight-marker fallback = Horizon-200 (universele uitkomst-marker). */}
+      <header className="mb-6 sm:mb-8 space-y-2">
+        {/* Kicker met 28×1px streep */}
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Persoonlijk profiel
+        </div>
+        {/* Headline met italic-em "vrijheidspad" */}
+        <h1
+          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Identiteit &amp;{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            vrijheidspad
+          </em>
         </h1>
-        <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
+        {/* Editorial deck met linker module-border */}
+        <p
+          className="italic text-[14px] sm:text-[15px] leading-snug max-w-[60ch] text-[var(--ink-2)] pl-4"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            borderLeft: '2px solid var(--module-active-500)',
+          }}
+        >
           Wie ben je en hoe sta je in het leven? Jouw positie op de reis naar vrijheid.
         </p>
-      </div>
+      </header>
 
       {/* ── Demo user banner ──────────────────────────────────────── */}
       {isDemoUser && (

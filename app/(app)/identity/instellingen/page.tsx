@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { useModuleColors, useBudgetColors, usePhaseColors, useFontTheme } from '@/components/app/module-color-provider'
+import { useModuleColors, useBudgetColors, usePhaseColors, useFontTheme, usePaletteTheme, PALETTE_THEMES, type PaletteTheme } from '@/components/app/module-color-provider'
 import type { FontTheme } from '@/components/app/module-color-provider'
 import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } from '@/lib/color-palette'
 import type { ModuleColorConfig, ModuleName, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
@@ -183,6 +183,7 @@ export default function InstellingenPage() {
 
   // ─ Section D: Weergave ─
   const { fontTheme, setFontTheme } = useFontTheme()
+  const { paletteTheme, setPaletteTheme } = usePaletteTheme()
   const { setConfig } = useModuleColors()
   const { setBudgetConfig } = useBudgetColors()
   const { setPhaseConfig } = usePhaseColors()
@@ -735,16 +736,39 @@ export default function InstellingenPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Page header */}
-      <div className="mb-5 sm:mb-8">
-        <p className="label-editorial text-[var(--ink-3)] mb-1">Identiteit</p>
-        <h1 className="font-display text-[28px] font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.03em' }}>
-          Instellingen
+      {/* Editorial header — blueprint Type 8 (Settings) */}
+      <header className="mb-5 sm:mb-8 space-y-2">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Identiteit · voorkeuren
+        </div>
+        <h1
+          className="font-bold text-[28px] tracking-[-0.02em]"
+          style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.03em' }}
+        >
+          Maak het{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            jouw
+          </em>{' '}
+          TriFinity
         </h1>
-        <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
+        <p
+          className="italic text-[14px] leading-snug max-w-[60ch] text-[var(--ink-2)] pl-4 mt-2"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            borderLeft: '2px solid var(--module-active-500)',
+          }}
+        >
           Modules, notificaties, berekeningen, weergave en gegevensbeheer.
         </p>
-      </div>
+      </header>
 
       {/* ── Modules ──────────────────────────────────────────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
@@ -1675,6 +1699,70 @@ export default function InstellingenPage() {
 
         {weergaveOpen && (
           <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 py-6">
+
+        {/* Achtergrondkleur — palet-thema */}
+        <div className="mb-6">
+          <div className="mb-3 flex items-center gap-2">
+            <Palette className="h-4 w-4 text-[var(--ink-3)]" />
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Achtergrondkleur</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {(Object.entries(PALETTE_THEMES) as [PaletteTheme, typeof PALETTE_THEMES[PaletteTheme]][]).map(([id, theme]) => {
+              const active = paletteTheme === id
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPaletteTheme(id)}
+                  className={`rounded-xl border-2 p-4 text-left transition-all ${
+                    active ? 'border-zinc-900' : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
+                  }`}
+                  style={{ background: theme.bg }}
+                  aria-pressed={active}
+                >
+                  {/* Voorbeeld: page + paper-kaart + accent-streep */}
+                  <div className="flex items-start gap-2">
+                    <div
+                      className="h-12 w-16 shrink-0 border"
+                      style={{ background: theme.paper, borderColor: theme.borderEd }}
+                    >
+                      <div className="h-1 w-full" style={{ background: theme.borderMd }} />
+                      <div className="px-1.5 py-1">
+                        <div className="h-1 w-8 rounded-sm" style={{ background: theme.borderEd }} />
+                        <div className="mt-1 h-1 w-10 rounded-sm" style={{ background: theme.subtle }} />
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className="text-sm font-bold tracking-tight text-[var(--ink)]"
+                        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                      >
+                        {theme.label}
+                      </p>
+                      <p
+                        className="mt-0.5 italic text-[11px] text-[var(--ink-3)] leading-tight"
+                        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                      >
+                        {theme.description}
+                      </p>
+                      <p className="mt-1.5 text-[10px] uppercase tracking-[0.12em] font-mono text-[var(--ink-4)] tabular-nums">
+                        {theme.bg}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          <p
+            className="mt-3 italic text-[12px] text-[var(--ink-3)] leading-snug"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Wijziging gaat direct in en wordt lokaal opgeslagen op dit apparaat.
+          </p>
+        </div>
+
+        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
 
         {/* Typography */}
         <div className="mb-6">

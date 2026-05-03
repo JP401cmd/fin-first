@@ -6,6 +6,7 @@ import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { X, ArrowDown, ArrowUp, TrendingDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { Kicker } from '@/components/editorial'
 import {
   MARKET_WEATHER, type MarketWeather, type FinancialInput,
   type ScenarioPath,
@@ -129,10 +130,13 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
 
           {/* Market weather */}
           <section>
-            <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-              Marktweeer
-            </h2>
-            <p className="mb-4 text-base leading-relaxed text-[var(--ink-3)]">Hoe presteren de scenario&apos;s bij verschillende marktomstandigheden?</p>
+            <Kicker>Marktweer</Kicker>
+            <p
+              className="mt-2 mb-4 italic text-[14px] leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Hoe presteren de scenario&apos;s bij verschillende marktomstandigheden?
+            </p>
 
             <div className="flex flex-wrap gap-2">
               {(Object.entries(MARKET_WEATHER) as [MarketWeather, typeof MARKET_WEATHER[MarketWeather]][]).map(([key, val]) => (
@@ -156,9 +160,9 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
           {/* Health score (6 pillars) */}
           {healthScore && (
             <section>
-              <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                Financiële Gezondheid
-              </h2>
+              <div className="mb-3">
+                <Kicker>Financiële Gezondheid</Kicker>
+              </div>
               <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
                 <div className="flex flex-col items-center gap-6 sm:flex-row">
                   <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
@@ -440,11 +444,14 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-        <TrendingDown className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
+      <Kicker>
+        <TrendingDown className="mr-1.5 inline h-3 w-3 -mt-0.5" aria-hidden />
         Aflossingsstrategieën vergelijken
-      </h2>
-      <p className="mb-4 text-base leading-relaxed text-[var(--ink-3)]">
+      </Kicker>
+      <p
+        className="mt-2 mb-4 italic text-[14px] leading-snug text-[var(--ink-3)]"
+        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+      >
         Vergelijk snowball (kleinste schuld eerst) vs. avalanche (hoogste rente eerst) om je FIRE-datum te versnellen.
       </p>
 

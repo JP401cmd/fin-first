@@ -22,6 +22,7 @@ export default async function WillPage() {
     userId,
     sharedAssets,
     sharedDebts,
+    categoryAppLinks,
   } = dashboardResult
 
   // Load Will data with shared data from dashboard (avoids ~5 duplicate queries)
@@ -44,6 +45,7 @@ export default async function WillPage() {
       temporal={temporal}
       userName={userName ?? undefined}
       aiEnabled={aiEnabled}
+      categoryAppLinks={categoryAppLinks}
     />
   )
 }

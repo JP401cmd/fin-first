@@ -6,6 +6,7 @@ import { Circle } from 'lucide-react'
 import { iconMap } from '@/components/app/budget-shared'
 import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { HighlightMark } from '@/components/editorial'
 import { CategoryCardAppStrip } from './category-card-app-strip'
 import { CardKpiStrip } from './card-kpi-strip'
 import type { KpiPair } from '@/lib/asset-kpi'
@@ -127,8 +128,13 @@ export function CategoryCard({
   const segmentBars = useMemo(() => buildSegmentWidths(segments), [segments])
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
 
-  const accentClass =
-    variant === 'asset' ? 'bg-kern-500' : 'bg-[var(--negative)]'
+  // Module-active accent voor assets (= Kern-500 op /core), negative voor debts.
+  // De variant bepaalt ook of de kicker-streep en het bedrag de module-tint
+  // krijgen of een rode tint (debts blijven semantisch los van module-kleur).
+  const accentColor =
+    variant === 'asset' ? 'var(--module-active-500)' : 'var(--negative)'
+  const kickerColor =
+    variant === 'asset' ? 'var(--module-active-700)' : 'var(--negative)'
 
   // Kaart + optionele app-strip wordt in één buitenste kolom gerenderd.
   // De Link kan geen `<button>` als kind hebben (HTML-validatie), dus
@@ -144,13 +150,30 @@ export function CategoryCard({
         href={href}
         className="flex flex-1 flex-col text-left no-underline aspect-square sm:aspect-[5/4]"
       >
-        {/* Accent-streep — kern-bruin voor assets, rood voor schulden. */}
-        <div className={`h-[3px] w-full ${accentClass}`} aria-hidden="true" />
+        {/* Accent-streep — module-active voor assets, rood voor schulden. */}
+        <div
+          className="h-[3px] w-full"
+          style={{ background: accentColor }}
+          aria-hidden="true"
+        />
 
         <div className="flex h-full flex-col gap-2 p-3 sm:p-4">
-          {/* Bovenzijde: icon + label */}
+          {/* Kicker-regel: 28×1px streep + icon + label.
+              Streep krijgt module-active-500 (asset) of negative (debt);
+              icon volgt dezelfde kleur voor visuele binding. */}
           <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 shrink-0 text-kern-700" aria-hidden="true" />
+            <span
+              aria-hidden
+              className="inline-block h-px w-7 shrink-0"
+              style={{ background: accentColor }}
+            />
+            <span
+              aria-hidden
+              className="inline-flex shrink-0"
+              style={{ color: kickerColor }}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+            </span>
             <h3
               className="truncate font-serif text-base font-semibold leading-tight text-[var(--ink)] sm:text-lg"
               style={{ fontFamily: 'var(--font-playfair, serif)' }}
@@ -159,9 +182,11 @@ export function CategoryCard({
             </h3>
           </div>
 
-          {/* Bedrag — DM Mono, tabular-nums, 22px desktop / 18px mobile */}
+          {/* Hoofdbedrag — DM Mono, tabular-nums, met halve transparante streep.
+              `<HighlightMark>` gebruikt --module-active-200 als achtergrond, dus
+              op /core wordt het Kern-200 (lichtbruin); cross-module fallback = Horizon-200. */}
           <p className="font-mono text-[18px] font-bold tabular-nums leading-none text-[var(--ink)] sm:text-[22px]">
-            {formatCurrency(total)}
+            <HighlightMark>{formatCurrency(total)}</HighlightMark>
           </p>
 
           {/* Samengestelde KPI-strip — direct onder het totaalbedrag,
@@ -195,16 +220,20 @@ export function CategoryCard({
             <div className="mt-auto h-2 w-full bg-[var(--subtle)]/40" aria-hidden="true" />
           )}
 
-          {/* Meta-regel — items-aantal of toelichting */}
+          {/* Meta-regel — italic Source Serif (mini-artikel-blueprint)
+              vervangt de oude UPPERCASE-meta. Krant-italic past bij artikel-DNA. */}
           {(meta || count > 0) && (
-            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            <p
+              className="text-[11px] italic leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
               {meta ?? `${count} item${count === 1 ? '' : 's'}`}
             </p>
           )}
         </div>
       </Link>
 
-      {appStrip && (
+      {appStrip ? (
         <CategoryCardAppStrip
           appLabel={appStrip.appLabel}
           moduleActive={appStrip.moduleActive}
@@ -212,6 +241,16 @@ export function CategoryCard({
           totalCount={appStrip.totalCount}
           tabHref={appStrip.tabHref}
         />
+      ) : (
+        // Alignment-placeholder: kaarten zonder app krijgen dezelfde
+        // border-top + footer-hoogte als <CategoryCardAppStrip> zodat
+        // het grid op één y-as afsluit.
+        <div
+          aria-hidden="true"
+          className="border-t border-[var(--border-ed)] px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] leading-[1.4]"
+        >
+          &nbsp;
+        </div>
       )}
     </div>
   )

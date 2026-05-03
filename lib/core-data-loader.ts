@@ -33,6 +33,8 @@ const isRealTx = (t: { transaction_type?: string | null }) =>
 
 export interface CorePageData {
   // Profile / budgeting
+  /** Volledige naam uit profile.full_name — voor editorial begroeting in hero. */
+  userName: string | null
   budgetingActive: boolean
   activeModules: string[]
   profileIncome: number
@@ -243,7 +245,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .limit(1),
     supabase
       .from('profiles')
-      .select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth')
+      .select('full_name, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth')
       .single(),
     supabase
       .from('bank_accounts')
@@ -823,8 +825,12 @@ export const loadCoreData = cache(async function loadCoreData(
     // Holdings portfolio is non-critical
   }
 
+  // Volledige naam voor editorial begroeting (op /core hero)
+  const userName = (profileResult.data?.full_name as string | null) ?? null
+
   // ── Return complete data bundle ──
   return {
+    userName,
     budgetingActive,
     activeModules,
     profileIncome: profileMonthlyIncome,

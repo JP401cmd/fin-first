@@ -98,7 +98,7 @@ export default function CheckinHistoriePage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
-      {/* Header */}
+      {/* Header — editorial blueprint met kicker-streep */}
       <div className="mb-6 flex items-center gap-3">
         <Link
           href="/core/checkin"
@@ -108,9 +108,19 @@ export default function CheckinHistoriePage() {
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
-          <span className="label-editorial text-wil-600">Geldcheck-in</span>
-          <h1 className="text-lg font-display font-semibold text-[var(--ink)] tracking-tight">
-            Check-in historie
+          <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+            <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+            <span>Geldcheck-in · Archief</span>
+          </div>
+          <h1
+            className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+          >
+            <em
+              className="font-normal italic"
+              style={{ color: 'var(--module-active-700)' }}
+            >Historie</em>
+            {' '}van je check-ins
           </h1>
         </div>
       </div>
@@ -299,12 +309,16 @@ function MiniMetric({
 }) {
   return (
     <div className="rounded-xl bg-[var(--subtle)] p-3">
-      <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase tracking-wider">{label}</p>
-      <p className={`mt-0.5 text-sm font-mono tabular-nums font-semibold ${
-        typeof positive === 'boolean'
-          ? positive ? 'text-emerald-600' : 'text-red-500'
-          : 'text-[var(--ink)]'
-      }`}>
+      <p className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">{label}</p>
+      <p
+        className="mt-1 text-[18px] font-black leading-none tracking-[-0.02em] tabular-nums"
+        style={{
+          fontFamily: 'var(--font-playfair, Georgia, serif)',
+          color: typeof positive === 'boolean'
+            ? positive ? 'var(--positive, #10b981)' : 'var(--negative, #dc2626)'
+            : 'var(--ink)',
+        }}
+      >
         {value}
       </p>
     </div>

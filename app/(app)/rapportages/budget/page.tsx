@@ -616,12 +616,28 @@ export default function BudgetReportPage() {
         </button>
       </div>
 
-      {/* ── Masthead ── */}
-      <div className="border-b-2 border-[var(--ink)] pb-4 mb-8">
-        <p className="text-center font-inter text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)] mb-1">
+      {/* ── Editorial masthead met dubbele lijn ── */}
+      <div
+        className="pb-4 mb-8"
+        style={{ borderBottom: '4px double var(--ink)' }}
+      >
+        <div className="inline-flex items-center justify-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] mb-1 w-full">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
           Budgetrapport
-        </p>
-        <h1 className="text-center font-playfair text-3xl font-bold tracking-tight text-[var(--ink)] md:text-[42px] md:leading-[1.1]" style={{ letterSpacing: '-0.03em' }}>
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+        </div>
+        <h1
+          className="text-center text-3xl font-bold tracking-tight text-[var(--ink)] md:text-[42px] md:leading-[1.1]"
+          style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.03em' }}
+        >
           {data.monthLabel}
         </h1>
         <div className="mt-3 flex items-center justify-center gap-2 text-[13px] font-source-serif italic text-[var(--ink-3)]">

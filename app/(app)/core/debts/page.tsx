@@ -234,6 +234,31 @@ export default function DebtsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      {/* Editorial header — blueprint Type 2 (List) */}
+      <header className="mb-5 space-y-2">
+        {/* Kicker met streep — debts in negative-rood voor semantische scheiding */}
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--negative)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--negative)' }}
+          />
+          Schulden · {activeDebts.length} item{activeDebts.length !== 1 ? 's' : ''}
+        </div>
+        {/* Headline met italic-em "vrijheid" */}
+        <h1
+          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Vrijheid die je{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            terugkoopt
+          </em>
+        </h1>
+      </header>
 
       {/* ═══ Hero — pure registratie ═══════════════════════════ */}
       <section
@@ -243,7 +268,6 @@ export default function DebtsPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-negative">Schulden</h1>
               <button
                 type="button"
                 onClick={() => setQuickAddOpen(true)}
@@ -252,10 +276,13 @@ export default function DebtsPage() {
                 className="inline-flex min-h-[32px] items-center gap-1.5 border border-[var(--color-debt-200)] bg-[var(--color-debt-50)] px-2.5 py-1 text-xs font-medium text-[var(--color-debt-700)] transition-colors hover:bg-[var(--color-debt-100)] hover:text-[var(--color-debt-800)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-debt-500)]"
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
-                Schuld
+                Schuld toevoegen
               </button>
             </div>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
+            <p
+              className="mt-1 italic text-[12px] text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
               {activeDebts.length} schuld{activeDebts.length !== 1 ? 'en' : ''} — vrijheid die je terugkoopt
             </p>
             {perspective === 'household' && hiddenCategories.includes('debts') && (

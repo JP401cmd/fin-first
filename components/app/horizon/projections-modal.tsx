@@ -13,6 +13,7 @@ import {
 import { X, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { Kicker, HighlightMark } from '@/components/editorial'
 
 type Props = {
   input: FinancialInput
@@ -165,18 +166,35 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
 
             {/* Countdown */}
             <div className="mt-6 rounded-[var(--r-lg)] bg-[var(--paper)] p-6 text-center">
-              <p className="text-sm font-medium text-[var(--ink-3)]">Aftellen tot FIRE</p>
-              <p className="mt-2 text-5xl font-bold text-horizon-700">
-                {fire.countdownDays > 0 ? fire.countdownDays.toLocaleString('nl-NL') : '0'}
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-2">
+                Aftellen tot FIRE
+              </div>
+              <p
+                className="text-5xl font-black tabular-nums tracking-[-0.02em] leading-none"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                <HighlightMark>
+                  {fire.countdownDays > 0 ? fire.countdownDays.toLocaleString('nl-NL') : '0'}
+                </HighlightMark>
               </p>
-              <p className="mt-1 text-sm text-[var(--ink-3)]">dagen</p>
+              <p
+                className="mt-2 italic text-[12px] text-[var(--ink-3)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                dagen
+              </p>
             </div>
           </section>
 
           {/* Scenario sliders */}
           <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
-            <h2 className="text-sm font-semibold text-[var(--ink-2)]">Alternatieve scenario&apos;s</h2>
-            <p className="mt-1 text-xs text-[var(--ink-3)]">Pas aan en zie het effect op je FIRE-datum</p>
+            <Kicker>Alternatieve scenario&apos;s</Kicker>
+            <p
+              className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Pas aan en zie het effect op je FIRE-datum.
+            </p>
 
             <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
@@ -251,10 +269,13 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
           <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                  Toekomstige vrijheidsbronnen
-                </h2>
-                <p className="mt-0.5 text-xs text-[var(--ink-4)]">AOW, pensioen, bijverdienste</p>
+                <Kicker>Toekomstige vrijheidsbronnen</Kicker>
+                <p
+                  className="mt-1.5 italic text-[12px] text-[var(--ink-4)]"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  AOW, pensioen, bijverdienste
+                </p>
               </div>
               <button
                 onClick={() => setShowCashflowForm(!showCashflowForm)}
@@ -393,11 +414,12 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
           {/* Projection chart with 3 lines */}
           <section>
             <div className="mb-4">
-              <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-                Projectiegrafiek
-              </h2>
-              <p className="mt-1 text-sm text-[var(--ink-3)]">
-                Optimistisch, verwacht en pessimistisch pad naar FIRE
+              <Kicker>Projectiegrafiek</Kicker>
+              <p
+                className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                Optimistisch, verwacht en pessimistisch pad naar FIRE.
               </p>
             </div>
             <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">

@@ -18,6 +18,7 @@ import type { Budget } from '@/lib/budget-data'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { useToast } from '@/components/app/toast-provider'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 
 type Account = {
   id: string
@@ -1309,15 +1310,22 @@ export default function ImportPage() {
       <div className="mb-3 sm:mb-6">
         <Link
           href="/core/cash"
-          className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-3 w-3" aria-hidden />
           Terug naar Cash
         </Link>
       </div>
 
-      <h1 className="mb-2 text-2xl font-bold text-[var(--ink)]">Transacties importeren</h1>
-      <p className="mb-5 sm:mb-8 text-sm text-[var(--ink-3)]">Upload een bankbestand (MT940, CSV of OFX) van je bank.</p>
+      <header className="mb-5 sm:mb-8 space-y-2">
+        <Kicker>Cash · Importeren</Kicker>
+        <EditorialHeadline level="h1" emphasis="importeren" size="lg">
+          Transacties importeren
+        </EditorialHeadline>
+        <EditorialDeck>
+          Upload een bankbestand (MT940, CSV of OFX) van je bank.
+        </EditorialDeck>
+      </header>
 
       {/* Steps indicator */}
       <div className="mb-5 sm:mb-8 flex items-center gap-2 text-sm">
@@ -2143,7 +2151,10 @@ export default function ImportPage() {
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
                 <Check className="h-6 w-6 text-emerald-600" />
               </div>
-              <h2 className="text-xl font-bold text-[var(--ink)]">Import geslaagd!</h2>
+              <h2
+                className="text-2xl font-black tracking-[-0.02em] text-[var(--ink)]"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >Import geslaagd!</h2>
               <p className="mt-2 text-sm text-[var(--ink-2)]">
                 <strong>{importedCount}</strong> transacties geïmporteerd
                 {importDateRange && (() => {

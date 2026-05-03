@@ -76,24 +76,60 @@ function NumberInput({
   )
 }
 
-// ── KPI Card ───────────────────────────────────────────────────────────────
+// ── KPI Cell — figures-strip blueprint stijl ─────────────────────────────
 
 function KpiCard({
-  label, value, sub, highlight, onClick,
+  label, value, sub, highlight, onClick, isWinner,
 }: {
   label: string; value: string; sub?: string
-  highlight?: 'green' | 'orange' | 'red' | 'neutral'; onClick?: () => void
+  highlight?: 'green' | 'orange' | 'red' | 'neutral'
+  onClick?: () => void
+  /** Winner-cell krijgt highlight-marker op het bedrag (zoals figures-strip). */
+  isWinner?: boolean
 }) {
   const Tag = onClick ? 'button' : 'div'
-  const colors = { green: 'text-green-700', orange: 'text-orange-600', red: 'text-red-600', neutral: 'text-[var(--ink)]' }
+  const valueColor =
+    highlight === 'green' ? 'var(--positive)' :
+    highlight === 'orange' ? 'var(--warning, #c2410c)' :
+    highlight === 'red' ? 'var(--negative)' :
+    'var(--ink)'
+  const cellClass = `p-4 text-left border-r border-[var(--rule-soft)] last:border-r-0 [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0 ${
+    onClick
+      ? 'transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]'
+      : ''
+  }`
   return (
     <Tag
       {...(onClick ? { type: 'button' as const, onClick } : {})}
-      className="flex flex-col gap-0.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-left shadow-[var(--s0)] transition-all hover:shadow-[var(--s1)]"
+      className={cellClass}
     >
-      <span className="font-sans text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">{label}</span>
-      <span className={`font-mono text-base font-semibold tabular-nums ${colors[highlight ?? 'neutral']}`}>{value}</span>
-      {sub && <span className="font-sans text-[10px] text-[var(--ink-4)]">{sub}</span>}
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+        {label}
+      </div>
+      <div
+        className="text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums"
+        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: valueColor }}
+      >
+        {isWinner ? (
+          <span
+            className="inline px-1"
+            style={{
+              backgroundImage:
+                'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+            }}
+          >
+            {value}
+          </span>
+        ) : value}
+      </div>
+      {sub && (
+        <div
+          className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          {sub}
+        </div>
+      )}
     </Tag>
   )
 }
@@ -560,20 +596,39 @@ export default function FireSimPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 pb-20 md:py-10">
-      {/* Header */}
-      <div className="mb-6">
-        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-          Gereedschappen
-        </p>
-        <h1 className="mt-1 text-3xl font-bold text-[var(--ink)]"
-          style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.02em' }}>
-          FIRE-simulator
+      {/* Editorial header — blueprint Type 10 (Calculator) */}
+      <header className="mb-6 space-y-2">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Gereedschappen · simulatie
+        </div>
+        <h1
+          className="text-3xl font-bold tracking-[-0.02em]"
+          style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.02em' }}
+        >
+          FIRE-{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            simulator
+          </em>
         </h1>
-        <p className="mt-1 font-sans text-[13px] leading-relaxed text-[var(--ink-3)]">
+        <p
+          className="italic text-[13px] leading-relaxed text-[var(--ink-2)] pl-4 mt-1"
+          style={{
+            fontFamily: 'var(--font-source-serif, Georgia, serif)',
+            borderLeft: '2px solid var(--module-active-500)',
+          }}
+        >
           De FIRE-leeftijd is een berekende uitkomst: het eerste moment waarop je vermogen
           groot genoeg is om tot eindleeftijd te leven. Doel: portfolio = €0 op eindleeftijd.
         </p>
-      </div>
+      </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         {/* Left: chart + KPIs */}
@@ -611,15 +666,16 @@ export default function FireSimPage() {
             </ZoomableChartContainer>
           </div>
 
-          {/* KPI grid */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* KPI figures-strip — 2x2 mobile, 4-col desktop, editorial blueprint */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-b border-[var(--ink)]">
             <KpiCard
               label="FIRE-leeftijd"
-              value={result.fireAgeFractional !== null ? `leeftijd ${result.fireAgeFractional.toFixed(1)}` : 'Niet haalbaar'}
+              value={result.fireAgeFractional !== null ? `${result.fireAgeFractional.toFixed(1)}` : '–'}
               sub={result.fireAgeFractional !== null
                 ? `over ${(result.fireAgeFractional - currentAge).toFixed(1)} jaar`
                 : 'Verhoog inleg of verlaag uitgaven'}
               highlight={result.fireReachable ? 'green' : 'red'}
+              isWinner={result.fireReachable}
             />
             <KpiCard
               label="Benodigd bij FIRE"
@@ -630,7 +686,7 @@ export default function FireSimPage() {
             />
             <KpiCard
               label="Impliciete onttrekking"
-              value={result.fireReachable ? `${(result.implicitWithdrawalRate * 100).toFixed(1)}%` : '—'}
+              value={result.fireReachable ? `${(result.implicitWithdrawalRate * 100).toFixed(1)}%` : '–'}
               sub="vs. klassiek 4% SWR"
               highlight={result.fireReachable
                 ? (result.implicitWithdrawalRate > 0.04 ? 'orange' : 'green')

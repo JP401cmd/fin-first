@@ -190,7 +190,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
   const [showResilienceReceipt, setShowResilienceReceipt] = useState(false)
   const [showSwrReceipt, setShowSwrReceipt] = useState(false)
-  const [horizonHeroExpanded, setHorizonHeroExpanded] = useState(false)
+  // Mobile KPI's tonen nu volledig 2x2 — `horizonHeroExpanded` toggle is verwijderd.
 
   // Saved scenario overlay state
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
@@ -1802,7 +1802,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   if (!fire || !range || !healthScore) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-6xl py-5 sm:py-12 px-4 sm:px-6">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">Er ging iets mis bij het berekenen van je projecties.</p>
         </div>
@@ -1819,10 +1819,38 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-6xl py-5 sm:py-8">
+      {/* === Editorial header — blueprint Type 1 (Module-landing) === */}
+      <header className="mb-6 space-y-2 px-4 sm:px-6">
+        {/* Kicker met 28×1px Horizon-streep */}
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Horizon · jouw vrijheidshorizon
+        </div>
+        {/* Headline met italic-em "vrij" in Horizon-700 */}
+        <h1
+          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+        >
+          Wanneer ben je{' '}
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >
+            vrij
+          </em>
+          ?
+        </h1>
+      </header>
+
       {/* === 1. Hero + Simulatie (één gecombineerd blok) === */}
       <section data-testid="horizon-hero" className="card-editorial overflow-hidden">
-        <div className="h-1.5 bg-horizon-500" />
+        {/* Module-active accent (Horizon-500 op /horizon/**) */}
+        <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
 
         <div className="p-4 sm:p-6 md:p-8">
           {/* Header rij: kicker + Details pill */}
@@ -1871,95 +1899,131 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </button>
           </div>
 
-          {/* Desktop: 4-col stat grid */}
-          <div className="hidden sm:grid sm:grid-cols-4 gap-3 mb-5">
-            {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd */}
+          {/* Desktop: 4-col figures-strip — editorial blueprint */}
+          <div className="hidden sm:grid sm:grid-cols-4 border-t border-b border-[var(--ink)] mb-5">
+            {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner met highlight-marker */}
             <button
               type="button"
               onClick={() => setShowFireAgeReceipt(true)}
-              className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
+              className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-fire-age"
               title={hasPerspectiveHero ? (isPartnerView ? `FIRE-leeftijd van ${perspectiveHero!.householdName}` : 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven') : isPensioenMode ? 'AOW-leeftijd op basis van je geboortedatum' : undefined}
             >
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <Hourglass className="h-3.5 w-3.5 text-horizon-500" />
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+                <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
+                <span>{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
               </div>
-              <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-                {hasPerspectiveHero
-                  ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
-                  : isPensioenMode
-                    ? aowAgeFormatted
-                    : simResult?.fireAgeFractional != null
-                      ? simResult.fireAgeFractional.toFixed(1)
-                      : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
-              </p>
-              <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+              <div
+                className="text-[28px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                <span
+                  className="inline px-1"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                  }}
+                >
+                  {hasPerspectiveHero
+                    ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
+                    : isPensioenMode
+                      ? aowAgeFormatted
+                      : simResult?.fireAgeFractional != null
+                        ? simResult.fireAgeFractional.toFixed(1)
+                        : fire.fireAge !== null ? Math.round(fire.fireAge) : '–'}
+                </span>
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
                 {hasPerspectiveHero ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)') : isPensioenMode ? 'AOW-leeftijd' : 'jaar'}
-              </p>
+              </div>
             </button>
 
             {/* KPI 2: Doelbedrag / Verwacht vermogen op AOW */}
             <button
               type="button"
               onClick={() => setShowFireTargetReceipt(true)}
-              className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
+              className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-fire-target"
               title={hasPerspectiveHero ? (isPartnerView ? `FIRE-doelbedrag van ${perspectiveHero!.householdName}` : 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven') : isPensioenMode ? 'Geprojecteerd vermogen op je AOW-leeftijd' : undefined}
             >
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <Target className="h-3.5 w-3.5 text-horizon-500" />
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Vermogen op AOW' : 'Doelbedrag'}</span>
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+                <Target className="h-3 w-3 shrink-0" aria-hidden />
+                <span>{isPensioenMode ? 'Vermogen op AOW' : 'Doelbedrag'}</span>
               </div>
-              <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+              <div
+                className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
                 {hasPerspectiveHero
                   ? formatCurrency(perspectiveHero!.fireTarget)
                   : formatCurrency(isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget))}
-              </p>
-              <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">{isPensioenMode ? 'geprojecteerd' : 'benodigd'}</p>
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                {isPensioenMode ? 'geprojecteerd' : 'benodigd'}
+              </div>
             </button>
 
             {/* KPI 3: Opnamerate / Maandelijkse onttrekking */}
             <button
               type="button"
               onClick={() => setShowSwrReceipt(true)}
-              className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
+              className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-swr"
             >
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <Percent className="h-3.5 w-3.5 text-horizon-500" />
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Mnd. onttrekking' : 'Opnamerate'}</span>
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+                <Percent className="h-3 w-3 shrink-0" aria-hidden />
+                <span>{isPensioenMode ? 'Mnd. onttrekking' : 'Opnamerate'}</span>
               </div>
-              <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+              <div
+                className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
                 {isPensioenMode && monthlyWithdrawalAtAow != null
                   ? formatCurrency(Math.round(monthlyWithdrawalAtAow))
                   : simResult?.implicitWithdrawalRate != null
                     ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
                     : `${(fireSwr * 100).toFixed(2)}%`}
-              </p>
-              <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
                 {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
-              </p>
+              </div>
             </button>
 
-            {/* Aftellen */}
+            {/* KPI 4: Aftellen */}
             <button
               type="button"
               onClick={() => setShowCountdownReceipt(true)}
-              className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
+              className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-countdown"
               title={hasPerspectiveHero ? (isPartnerView ? `Aftellen tot FIRE-datum van ${perspectiveHero!.householdName}` : 'Aftellen tot gezamenlijke FIRE-datum') : undefined}
             >
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-horizon-500" />
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Aftellen</span>
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+                <Calendar className="h-3 w-3 shrink-0" aria-hidden />
+                <span>Aftellen</span>
               </div>
-              <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+              <div
+                className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
                 {hasPerspectiveHero
                   ? (perspectiveHero!.countdownDays > 0 ? perspectiveHero!.countdownDays.toLocaleString('nl-NL') : '0')
                   : effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
-              </p>
-              <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">dagen</p>
+              </div>
+              <div
+                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                dagen
+              </div>
             </button>
           </div>
 
@@ -1984,65 +2048,125 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </div>
           </div>
 
-          {/* Mobile: 2 compact stats + expandable */}
-          <div className="sm:hidden mb-3">
-            <div className="flex gap-3 mb-3">
-              <button
-                type="button"
-                onClick={() => setShowFireTargetReceipt(true)}
-                className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-horizon-300"
-              >
-                <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Vermogen op AOW' : 'Doelbedrag'}</p>
-                <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                  {hasPerspectiveHero
-                    ? formatCurrency(perspectiveHero!.fireTarget)
-                    : formatCurrency(isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget))}
-                </p>
-                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">{isPensioenMode ? 'geprojecteerd' : 'benodigd'}</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowCountdownReceipt(true)}
-                className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-horizon-300"
-              >
-                <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Aftellen</p>
-                <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                  {hasPerspectiveHero
-                    ? (perspectiveHero!.countdownDays > 0 ? perspectiveHero!.countdownDays.toLocaleString('nl-NL') : '0')
-                    : effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
-                </p>
-                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">dagen</p>
-              </button>
-            </div>
+          {/* Mobile: 2x2 figures-strip — editorial blueprint */}
+          <div className="grid grid-cols-2 sm:hidden border-t border-b border-[var(--ink)] mb-5">
+            {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner */}
             <button
               type="button"
-              onClick={() => setHorizonHeroExpanded(!horizonHeroExpanded)}
-              className="flex w-full items-center justify-between py-2 text-xs text-[var(--ink-3)]"
+              onClick={() => setShowFireAgeReceipt(true)}
+              className="p-3 border-r border-b border-[var(--rule-soft)] text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
-              <span>Meer details</span>
-              <ChevronDown className={`h-4 w-4 transition-transform ${horizonHeroExpanded ? 'rotate-180' : ''}`} />
-            </button>
-            {horizonHeroExpanded && (
-              <div className="animate-fade-up">
-                <button
-                  type="button"
-                  onClick={() => setShowSwrReceipt(true)}
-                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-horizon-300"
-                >
-                  <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{isPensioenMode ? 'Mnd. onttrekking' : 'Opnamerate'}</p>
-                  <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                    {isPensioenMode && monthlyWithdrawalAtAow != null
-                      ? formatCurrency(Math.round(monthlyWithdrawalAtAow))
-                      : simResult?.implicitWithdrawalRate != null
-                        ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
-                        : `${(fireSwr * 100).toFixed(2)}%`}
-                  </p>
-                  <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
-                    {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
-                  </p>
-                </button>
+              <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+                <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
+                <span>{isPensioenMode ? 'Pensioenlft' : 'Vrijheidslft'}</span>
               </div>
-            )}
+              <div
+                className="text-[22px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                <span
+                  className="inline px-1"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                  }}
+                >
+                  {hasPerspectiveHero
+                    ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
+                    : isPensioenMode
+                      ? aowAgeFormatted
+                      : simResult?.fireAgeFractional != null
+                        ? simResult.fireAgeFractional.toFixed(1)
+                        : fire.fireAge !== null ? Math.round(fire.fireAge) : '–'}
+                </span>
+              </div>
+              <div
+                className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                jaar
+              </div>
+            </button>
+
+            {/* KPI 2: Doelbedrag */}
+            <button
+              type="button"
+              onClick={() => setShowFireTargetReceipt(true)}
+              className="p-3 border-b border-[var(--rule-soft)] text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+            >
+              <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+                <Target className="h-3 w-3 shrink-0" aria-hidden />
+                <span>{isPensioenMode ? 'Vermogen' : 'Doelbedrag'}</span>
+              </div>
+              <div
+                className="text-[18px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                {hasPerspectiveHero
+                  ? formatCurrency(perspectiveHero!.fireTarget)
+                  : formatCurrency(isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget))}
+              </div>
+              <div
+                className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                {isPensioenMode ? 'geprojecteerd' : 'benodigd'}
+              </div>
+            </button>
+
+            {/* KPI 3: Opnamerate */}
+            <button
+              type="button"
+              onClick={() => setShowSwrReceipt(true)}
+              className="p-3 border-r border-[var(--rule-soft)] text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+            >
+              <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+                <Percent className="h-3 w-3 shrink-0" aria-hidden />
+                <span>{isPensioenMode ? 'Mnd.' : 'Opnamerate'}</span>
+              </div>
+              <div
+                className="text-[18px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                {isPensioenMode && monthlyWithdrawalAtAow != null
+                  ? formatCurrency(Math.round(monthlyWithdrawalAtAow))
+                  : simResult?.implicitWithdrawalRate != null
+                    ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
+                    : `${(fireSwr * 100).toFixed(2)}%`}
+              </div>
+              <div
+                className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
+              </div>
+            </button>
+
+            {/* KPI 4: Aftellen */}
+            <button
+              type="button"
+              onClick={() => setShowCountdownReceipt(true)}
+              className="p-3 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+            >
+              <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+                <Calendar className="h-3 w-3 shrink-0" aria-hidden />
+                <span>Aftellen</span>
+              </div>
+              <div
+                className="text-[18px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+              >
+                {hasPerspectiveHero
+                  ? (perspectiveHero!.countdownDays > 0 ? perspectiveHero!.countdownDays.toLocaleString('nl-NL') : '0')
+                  : effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
+              </div>
+              <div
+                className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                dagen
+              </div>
+            </button>
           </div>
 
           {/* Profile error warning — shown when profile query failed but page loads with defaults */}
@@ -2448,13 +2572,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 type="button"
                 onClick={() => triggerDream('/horizon/whatif')}
                 disabled={phase !== 'idle'}
-                className={`mt-4 flex w-full items-center gap-3 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/30 px-4 py-3 text-left transition-all hover:border-wil-400 hover:bg-wil-50/60 hover:shadow-[0_0_20px_rgba(196,160,107,0.15)] ${phase !== 'idle' ? 'dream-cta-active' : ''}`}
+                className={`mt-4 flex w-full items-center gap-3 rounded-[var(--r)] border border-dashed border-horizon-300 bg-horizon-50/30 px-4 py-3 text-left transition-all hover:border-horizon-400 hover:bg-horizon-50/60 hover:shadow-[0_0_20px_rgba(196,160,107,0.15)] ${phase !== 'idle' ? 'dream-cta-active' : ''}`}
               >
-                <Sparkles className="h-5 w-5 shrink-0 text-wil-500" />
+                <Sparkles className="h-5 w-5 shrink-0 text-horizon-600" />
                 <div className="min-w-0">
-                  <span className="font-serif text-sm italic text-wil-700">Wat als...? Speel met je toekomst &rarr;</span>
+                  <span className="font-serif text-sm italic text-horizon-700">Wat als...? Speel met je toekomst &rarr;</span>
                   {savedScenarios.length === 0 && (
-                    <p className="mt-1 font-sans text-[11px] leading-relaxed text-wil-600/70">
+                    <p className="mt-1 font-sans text-[11px] leading-relaxed text-horizon-700/70">
                       Stel een alternatief scenario op met andere inkomsten, uitgaven of levensgebeurtenissen.
                       Sla het op en bekijk het als overlay op deze pagina om te vergelijken met je huidige pad.
                     </p>
@@ -3142,7 +3266,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       {actions.length > 0 && (
         <section className="mt-4 sm:mt-8">
           <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
-            <Zap className="mr-1.5 inline h-3.5 w-3.5 text-wil-500" />
+            <Zap className="mr-1.5 inline h-3.5 w-3.5 text-horizon-600" />
             Geplande acties (komend jaar)
           </h2>
           <div className="space-y-2">

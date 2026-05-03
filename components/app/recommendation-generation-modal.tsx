@@ -490,6 +490,7 @@ export function RecommendationGenerationModal({
       <BottomSheet
         open={open}
         onClose={handleClose}
+        title={phase === 'generating' ? 'Aanbevelingen genereren' : 'Nieuwe aanbevelingen'}
         size="lg"
         initialMobileHeight="65vh"
       >

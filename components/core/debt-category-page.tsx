@@ -325,32 +325,52 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
 
   return (
     <section className="border-b border-[var(--border-ed)] bg-[var(--paper)]">
-      {/* Kern-bruin module-streep — schulden vallen onder de Kern-module. */}
-      <div className="h-1 bg-kern-500" />
+      {/* Module-active accent (Kern-500 op /core/debts/**) */}
+      <div className="h-1" style={{ background: 'var(--module-active-500)' }} />
 
       <div className="px-4 py-5 sm:px-6 sm:py-7">
+        {/* Back-link in mono UPPERCASE (Type 2 blueprint: back-navigation) */}
         <Link
           href="/core"
-          className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+          className="inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
           <ArrowLeft className="h-3 w-3" aria-hidden="true" />
-          <span>Kern</span>
+          <span>Terug naar Kern</span>
         </Link>
 
-        <p className="mt-3 text-[11px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+        {/* Kicker met 28×1px streep — debts gebruiken negative-rood voor semantische scheiding */}
+        <div className="mt-4 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--negative)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7 shrink-0"
+            style={{ background: 'var(--negative)' }}
+          />
           {DEBT_TYPE_LABELS[type]}
-        </p>
+        </div>
 
+        {/* Hoofdbedrag (restschuld) met halve transparante streep */}
         <p
-          className="mt-1 font-mono text-[28px] font-bold tabular-nums leading-none tracking-tight text-[var(--ink)] sm:text-[36px]"
+          className="mt-2 font-mono text-[28px] font-bold tabular-nums leading-none tracking-tight text-[var(--ink)] sm:text-[36px]"
           style={{
             fontFamily: 'var(--font-playfair, var(--font-mono, monospace))',
           }}
         >
-          {formatCurrency(total)}
+          <span
+            className="inline px-1"
+            style={{
+              backgroundImage:
+                'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+            }}
+          >
+            {formatCurrency(total)}
+          </span>
         </p>
 
-        <div ref={ref as unknown as React.RefObject<HTMLDivElement>} className="mt-3 flex items-center gap-3">
+        {/* Sub-meta in italic Source Serif + type-bar */}
+        <div
+          ref={ref as unknown as React.RefObject<HTMLDivElement>}
+          className="mt-3 flex items-center gap-3"
+        >
           <div
             className="h-1 w-16 overflow-hidden bg-[var(--subtle)]"
             aria-hidden="true"
@@ -364,7 +384,10 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
               }}
             />
           </div>
-          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+          <p
+            className="italic text-[12px] text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
             {count} {counterLabel}
           </p>
         </div>

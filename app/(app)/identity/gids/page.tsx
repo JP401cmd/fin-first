@@ -128,23 +128,57 @@ export default function GidsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* ── 1. Hero ── */}
+      {/* ── 1. Editorial hero — blueprint Type 7 (Wizard) met drie module-strips ── */}
       <section className="card-editorial overflow-hidden mb-6 sm:mb-8">
+        {/* Drie module-strips: Kern bruin, Wil paars, Horizon zandgoud — gids touch alle drie */}
         <div className="flex h-1.5">
-          <div className="flex-1 bg-kern-500" />
-          <div className="flex-1 bg-wil-500" />
-          <div className="flex-1 bg-horizon-500" />
+          <div className="flex-1" style={{ background: 'var(--color-kern-500)' }} />
+          <div className="flex-1" style={{ background: 'var(--color-wil-500)' }} />
+          <div className="flex-1" style={{ background: 'var(--color-horizon-500)' }} />
         </div>
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 space-y-2">
+          {/* Kicker met streep — gebruikt cross-module fallback (ink-shades) */}
+          <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+            <span
+              aria-hidden
+              className="inline-block h-px w-7 shrink-0"
+              style={{ background: 'var(--module-active-500)' }}
+            />
+            Gids · jouw startpunt
+          </div>
           <h1
-            className="font-display text-[24px] font-bold text-[var(--ink)] sm:text-[30px]"
-            style={{ letterSpacing: "-0.02em" }}
+            className="font-bold text-[24px] sm:text-[30px] tracking-[-0.02em] leading-tight"
+            style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.02em' }}
           >
-            {firstName
-              ? `${firstName}, jouw reis naar vrijheid`
-              : "Jouw reis naar financiële vrijheid"}
+            {firstName ? (
+              <>
+                {firstName}, jouw reis naar{' '}
+                <em
+                  className="font-normal italic"
+                  style={{ color: 'var(--color-horizon-700)' }}
+                >
+                  vrijheid
+                </em>
+              </>
+            ) : (
+              <>
+                Jouw reis naar{' '}
+                <em
+                  className="font-normal italic"
+                  style={{ color: 'var(--color-horizon-700)' }}
+                >
+                  vrijheid
+                </em>
+              </>
+            )}
           </h1>
-          <p className="mt-2 max-w-prose font-serif text-[13px] leading-relaxed text-[var(--ink-3)] italic sm:text-sm">
+          <p
+            className="italic text-[13px] sm:text-sm leading-relaxed text-[var(--ink-2)] max-w-prose pl-4"
+            style={{
+              fontFamily: 'var(--font-source-serif, Georgia, serif)',
+              borderLeft: '2px solid var(--color-horizon-500)',
+            }}
+          >
             &ldquo;Geld is opgeslagen tijd.&rdquo; Elke euro vertegenwoordigt een stukje levenstijd.
             TriFinity vertaalt je financiën naar vrijheidstijd — dagen, maanden en jaren dat werken
             optioneel wordt.

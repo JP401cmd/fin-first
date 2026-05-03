@@ -38,6 +38,7 @@ import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { AccountFormModal, ACCOUNT_TYPES, type Account } from '@/components/app/account-form-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { Kicker } from '@/components/editorial'
 
 type Transaction = {
   id: string
@@ -1070,7 +1071,7 @@ export function CashAccountView({
         </Link>
       )}
 
-      {/* Account header */}
+      {/* Account header — editorial blueprint met kicker-streep */}
       <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -1078,8 +1079,20 @@ export function CashAccountView({
               <Wallet className="h-5 w-5 text-kern-600" />
             </div>
             <div>
+              {/* Kicker-streep + Playfair-titel */}
+              <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+                <span
+                  aria-hidden
+                  className="inline-block w-5 h-px shrink-0"
+                  style={{ background: 'var(--module-active-500)' }}
+                />
+                <span>{isCombined ? 'Alle rekeningen' : 'Rekening'}</span>
+              </div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-[var(--ink)]">{account.name}</h1>
+                <h1
+                  className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+                  style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                >{account.name}</h1>
                 {isCombined && (
                   <span className="rounded-full bg-kern-100 px-2 py-0.5 text-[10px] font-medium text-kern-700">
                     {allAccounts.length} rekeningen
@@ -1310,39 +1323,77 @@ export function CashAccountView({
         )
       })()}
 
-      {/* Monthly overview */}
-      <section className="mt-5 sm:mt-8 grid grid-cols-3 gap-3 sm:gap-5" data-testid="monthly-summary">
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5">
-            <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
-            <p className="text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
+      {/* Monthly overview — figures-strip editorial blueprint */}
+      <section className="mt-5 sm:mt-8 grid grid-cols-3 border-t border-b border-[var(--ink)]" data-testid="monthly-summary">
+        <div className="p-4 text-left border-r border-[var(--rule-soft)]">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--positive,#10b981)] mb-1.5">
+            <ArrowDownLeft className="h-3 w-3 shrink-0" aria-hidden />
+            <span>Inkomen</span>
           </div>
-          <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrencyShort(totalIncome)}</p>
+          <p
+            className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--positive, #10b981)' }}
+          >
+            {formatCurrencyShort(totalIncome)}
+          </p>
           {incomeFreedomDays && (
-            <p className="mt-0.5 text-xs text-emerald-500/70" data-testid="income-freedom-days">
+            <p
+              className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              data-testid="income-freedom-days"
+            >
               {incomeFreedomDays.totalDays.toFixed(1)} dagen vrijheid verdiend
             </p>
           )}
         </div>
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5">
-            <ArrowUpRight className="h-4 w-4 text-red-500" />
-            <p className="text-xs font-medium text-red-600 uppercase">Uitgaven</p>
+        <div className="p-4 text-left border-r border-[var(--rule-soft)]">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--negative,#dc2626)] mb-1.5">
+            <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden />
+            <span>Uitgaven</span>
           </div>
-          <p className="mt-1 text-xl font-bold text-red-600">{formatCurrencyShort(totalExpenses)}</p>
+          <p
+            className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative, #dc2626)' }}
+          >
+            {formatCurrencyShort(totalExpenses)}
+          </p>
           {expensesFreedomDays && (
-            <p className="mt-0.5 text-xs text-red-400/70" data-testid="expenses-freedom-days">
+            <p
+              className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              data-testid="expenses-freedom-days"
+            >
               {expensesFreedomDays.totalDays.toFixed(1)} dagen vrijheid
             </p>
           )}
         </div>
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
-          <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Netto</p>
-          <p className={`mt-1 text-xl font-bold ${netAmount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {formatCurrencyShort(netAmount)}
+        <div className="p-4 text-left">
+          <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
+            Netto
+          </div>
+          <p
+            className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
+            style={{
+              fontFamily: 'var(--font-playfair, Georgia, serif)',
+              color: netAmount >= 0 ? 'var(--positive, #10b981)' : 'var(--negative, #dc2626)',
+            }}
+          >
+            <span
+              className="inline px-1"
+              style={{
+                backgroundImage:
+                  'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+              }}
+            >
+              {formatCurrencyShort(netAmount)}
+            </span>
           </p>
           {netFreedomDays && (
-            <p className={`mt-0.5 text-xs ${netAmount >= 0 ? 'text-emerald-500/70' : 'text-red-400/70'}`} data-testid="net-freedom-days">
+            <p
+              className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              data-testid="net-freedom-days"
+            >
               {netAmount >= 0 ? '+' : '-'}{netFreedomDays.totalDays.toFixed(1)} dagen
             </p>
           )}
@@ -1575,9 +1626,14 @@ export function CashAccountView({
           <section className="mt-5 sm:mt-8" data-testid="cashflow-forecast-section">
             <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
               <div className="mb-3 flex items-center gap-2">
-                <LineChart className="h-4 w-4 text-kern-600" />
-                <h3 className="text-sm font-semibold text-[var(--ink-2)]">Cashflow Prognose</h3>
-                <span className="ml-auto text-xs text-[var(--ink-3)]">
+                <Kicker>
+                  <LineChart className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
+                  Cashflow Prognose
+                </Kicker>
+                <span
+                  className="ml-auto italic text-[11px] text-[var(--ink-3)]"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
                   {cashFlowForecast.length - 1} maanden vooruit
                 </span>
               </div>
@@ -1657,9 +1713,16 @@ export function CashAccountView({
         <section className="mt-5 sm:mt-8" data-testid="partner-tx-privacy-summary">
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
             <div className="mb-3 flex items-center gap-2">
-              <Shield className="h-4 w-4 text-[var(--ink-3)]" />
-              <h3 className="text-sm font-semibold text-[var(--ink-2)]">Partner transacties — Totalen</h3>
-              <span className="ml-auto text-[10px] text-[var(--ink-4)]">{partnerCategorySummary.transactionCount} transacties</span>
+              <Kicker>
+                <Shield className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
+                Partner transacties — Totalen
+              </Kicker>
+              <span
+                className="ml-auto italic text-[11px] text-[var(--ink-4)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                {partnerCategorySummary.transactionCount} transacties
+              </span>
             </div>
             <p className="mb-3 text-xs text-[var(--ink-3)]">
               Je partner deelt alleen totalen. Individuele transacties zijn niet zichtbaar.
@@ -1960,9 +2023,8 @@ export function CashAccountView({
       {activeTab === 'transacties' && perspective === 'household' && hasHousehold && householdId && currentUserId && (
         <section className="mt-5 sm:mt-8" data-testid="settlement-section">
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-            <div className="mb-4 flex items-center gap-2 border-b border-[var(--border-ed)] pb-3">
-              <div className="h-3 w-[3px] rounded-full bg-wil-500" />
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Verrekening</h3>
+            <div className="mb-4 border-b border-[var(--border-ed)] pb-3">
+              <Kicker>Verrekening</Kicker>
             </div>
             <SettlementOverview
               householdId={householdId}

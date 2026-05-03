@@ -754,20 +754,49 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
 
   if (typeGroups.length === 0) return null
 
+  // Uitgaven hebben een eigen volle-breedte rij; inkomen/sparen/schulden
+  // vullen daaronder een 3-koloms strip. Dat geeft uitgaven visuele
+  // prominentie zonder het SVG-formaat zelf te wijzigen — de centrale
+  // donut staat alleen op zijn rij en oogt daardoor groter en ankert
+  // de blik.
+  const expenseGroup = typeGroups.find((g) => g.type === 'expense')
+  const restGroups = typeGroups.filter((g) => g.type !== 'expense')
+
   return (
-    <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-      {typeGroups.map(({ type, segments: typeSegs }) => (
-        <TypeDonut
-          key={type}
-          budgetType={type}
-          segments={typeSegs}
-          onNavigate={onNavigate}
-          hiddenBudgets={hiddenBudgets}
-          onToggleHidden={toggleHidden}
-          isCollapsed={collapsedTypes.has(type)}
-          onToggleCollapse={() => toggleCollapsedType(type)}
-        />
-      ))}
+    <div className="mt-8 space-y-6">
+      {expenseGroup && (
+        <div className="flex justify-center">
+          <div className="w-full max-w-2xl">
+            <TypeDonut
+              key={expenseGroup.type}
+              budgetType={expenseGroup.type}
+              segments={expenseGroup.segments}
+              onNavigate={onNavigate}
+              hiddenBudgets={hiddenBudgets}
+              onToggleHidden={toggleHidden}
+              isCollapsed={collapsedTypes.has(expenseGroup.type)}
+              onToggleCollapse={() => toggleCollapsedType(expenseGroup.type)}
+            />
+          </div>
+        </div>
+      )}
+
+      {restGroups.length > 0 && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          {restGroups.map(({ type, segments: typeSegs }) => (
+            <TypeDonut
+              key={type}
+              budgetType={type}
+              segments={typeSegs}
+              onNavigate={onNavigate}
+              hiddenBudgets={hiddenBudgets}
+              onToggleHidden={toggleHidden}
+              isCollapsed={collapsedTypes.has(type)}
+              onToggleCollapse={() => toggleCollapsedType(type)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

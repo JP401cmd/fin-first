@@ -64,8 +64,31 @@ export default function ConnectSuccessPage() {
         <CheckCircle2 className="h-8 w-8 text-green-600" />
       </div>
 
-      <h1 className="mt-4 text-2xl font-bold text-[var(--ink)]">Bank gekoppeld!</h1>
-      <p className="mt-2 text-sm text-[var(--ink-3)]">
+      {/* Editorial success-header */}
+      <div className="inline-flex items-center justify-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] mt-4">
+        <span
+          aria-hidden
+          className="inline-block h-px w-7 shrink-0"
+          style={{ background: 'var(--module-active-500)' }}
+        />
+        Cash · gelukt
+      </div>
+      <h1
+        className="mt-2 font-bold text-2xl sm:text-3xl tracking-[-0.02em]"
+        style={{ fontFamily: 'var(--font-playfair, serif)' }}
+      >
+        Bank{' '}
+        <em
+          className="font-normal italic"
+          style={{ color: 'var(--module-active-700)' }}
+        >
+          gekoppeld
+        </em>
+      </h1>
+      <p
+        className="mt-2 italic text-sm text-[var(--ink-2)]"
+        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+      >
         Je bankrekening is succesvol verbonden. Je kunt nu transacties synchroniseren.
       </p>
 

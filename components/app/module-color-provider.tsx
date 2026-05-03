@@ -12,6 +12,53 @@ import {
 
 export type FontTheme = 'editorial' | 'andada' | 'digital'
 
+/**
+ * Palette-thema's voor de page-bg / paper / subtle / borders.
+ * Uitsluitend de "papieren onderlaag" — module-kleuren, ink-shades en accenten
+ * blijven onafhankelijk gestuurd via `ModuleColorConfig`.
+ */
+export type PaletteTheme = 'cream' | 'licht' | 'fd-bruin'
+
+export const PALETTE_THEMES: Record<PaletteTheme, {
+  label: string
+  description: string
+  bg: string
+  paper: string
+  subtle: string
+  borderEd: string
+  borderMd: string
+}> = {
+  cream: {
+    label: 'Cream',
+    description: 'Warm cream (default)',
+    bg: '#f5efe2',
+    paper: '#fbf7ec',
+    subtle: '#f3ead9',
+    borderEd: '#e3dac8',
+    borderMd: '#ccc1aa',
+  },
+  licht: {
+    label: 'Licht',
+    description: 'Lichter cream, dichter bij wit',
+    bg: '#fbf2e7',
+    paper: '#fef9ef',
+    subtle: '#f5ecd6',
+    borderEd: '#e6dcc4',
+    borderMd: '#d4c8a8',
+  },
+  'fd-bruin': {
+    label: 'FD-bruin',
+    description: 'Donkerder cream, FD.nl-stijl',
+    bg: '#e9dcb8',
+    paper: '#f0e6cf',
+    subtle: '#e0d2a8',
+    borderEd: '#c9b88e',
+    borderMd: '#a89968',
+  },
+}
+
+const PALETTE_STORAGE_KEY = 'tf-palette-theme'
+
 type ModuleColorContextType = {
   // Module colors (unchanged API)
   config: ModuleColorConfig
@@ -31,6 +78,10 @@ type ModuleColorContextType = {
   // Font theme
   fontTheme: FontTheme
   setFontTheme: (theme: FontTheme) => void
+
+  // Palette (page-bg / paper / subtle / borders)
+  paletteTheme: PaletteTheme
+  setPaletteTheme: (theme: PaletteTheme) => void
 }
 
 const ModuleColorContext = createContext<ModuleColorContextType | null>(null)
@@ -63,6 +114,7 @@ export function ModuleColorProvider({
     initialPhaseConfig ?? DEFAULT_PHASE_COLORS
   )
   const [fontTheme, setFontThemeState] = useState<FontTheme>(initialFontTheme)
+  const [paletteTheme, setPaletteThemeState] = useState<PaletteTheme>('cream')
 
   // Refs to avoid stale closures when any one config setter is called
   const moduleRef = useRef(config)
@@ -121,10 +173,37 @@ export function ModuleColorProvider({
     applyFontVars(theme)
   }, [applyFontVars])
 
+  const applyPaletteVars = useCallback((theme: PaletteTheme) => {
+    const palette = PALETTE_THEMES[theme]
+    if (!palette) return
+    const root = document.documentElement
+    root.style.setProperty('--bg', palette.bg)
+    root.style.setProperty('--paper', palette.paper)
+    root.style.setProperty('--subtle', palette.subtle)
+    root.style.setProperty('--border-ed', palette.borderEd)
+    root.style.setProperty('--border-md', palette.borderMd)
+    root.style.setProperty('--background', palette.bg)
+  }, [])
+
+  const setPaletteTheme = useCallback((theme: PaletteTheme) => {
+    setPaletteThemeState(theme)
+    applyPaletteVars(theme)
+    try { localStorage.setItem(PALETTE_STORAGE_KEY, theme) } catch { /* private mode / quota */ }
+  }, [applyPaletteVars])
+
   // Apply on mount (in case server-side style and client config diverge)
   useEffect(() => {
     applyVars()
     applyFontVars(initialFontTheme)
+    // Hydrate palette from localStorage
+    try {
+      const stored = localStorage.getItem(PALETTE_STORAGE_KEY)
+      if (stored && stored in PALETTE_THEMES) {
+        const t = stored as PaletteTheme
+        setPaletteThemeState(t)
+        applyPaletteVars(t)
+      }
+    } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getHex = useCallback((module: ModuleName, shade: Shade = 500): string => {
@@ -151,6 +230,7 @@ export function ModuleColorProvider({
       budgetConfig, setBudgetConfig, getBudgetHex,
       phaseConfig, setPhaseConfig, getPhaseHex,
       fontTheme, setFontTheme,
+      paletteTheme, setPaletteTheme,
     }}>
       {children}
     </ModuleColorContext.Provider>
@@ -179,6 +259,12 @@ export function useFontTheme() {
   const ctx = useContext(ModuleColorContext)
   if (!ctx) throw new Error('useFontTheme must be used within ModuleColorProvider')
   return { fontTheme: ctx.fontTheme, setFontTheme: ctx.setFontTheme }
+}
+
+export function usePaletteTheme() {
+  const ctx = useContext(ModuleColorContext)
+  if (!ctx) throw new Error('usePaletteTheme must be used within ModuleColorProvider')
+  return { paletteTheme: ctx.paletteTheme, setPaletteTheme: ctx.setPaletteTheme }
 }
 
 /**

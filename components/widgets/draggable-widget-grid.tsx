@@ -22,8 +22,14 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, ChevronDown, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard } from 'lucide-react'
+import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, ChevronDown, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
+import { CategoryAppNavBar } from './category-app-nav-bar'
+import {
+  readCategoryNavBarVisible,
+  saveCategoryNavBarVisible,
+} from '@/lib/dashboard-prefs'
+import type { CategoryAppLink } from '@/lib/category-app-nav'
 import { reassignOrders } from '@/lib/widget-order'
 import { AutoDashboardWizard } from './auto-dashboard-wizard'
 import { useDisplaySize } from '@/lib/hooks/use-display-size'
@@ -184,6 +190,12 @@ interface DraggableWidgetGridProps {
   allPrefs: WidgetPref[]
   data: DashboardData
   showDashboardTypeToggle?: boolean
+  /**
+   * Klikbare deeplinks naar de app-tabs binnen actieve categorieën — bron
+   * voor de balk bovenaan het dashboard. Lege array of undefined → de balk
+   * wordt nooit getoond, ook niet als de gebruiker hem aan heeft staan.
+   */
+  categoryAppLinks?: CategoryAppLink[]
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -214,7 +226,7 @@ function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: Das
   return true
 }
 
-export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle }: DraggableWidgetGridProps) {
+export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle, categoryAppLinks }: DraggableWidgetGridProps) {
   const router = useRouter()
   const { features } = useFeatureAccess()
 
@@ -253,6 +265,23 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   useEffect(() => {
     if (showDashboardTypeToggle) setBriefingPrefs(readBriefingContentPrefs())
   }, [showDashboardTypeToggle])
+
+  // Categorie-balk toggle — pure UI-pref (localStorage). Default `true`,
+  // maar pas zichtbaar zodra de hydratatie heeft uitgelezen zodat we geen
+  // flash krijgen op clients waar de gebruiker hem heeft uitgezet. Voor
+  // gebruikers zonder actieve apps is `categoryAppLinks` leeg en valt de
+  // balk sowieso weg.
+  const [categoryNavVisible, setCategoryNavVisible] = useState<boolean>(true)
+  useEffect(() => {
+    setCategoryNavVisible(readCategoryNavBarVisible())
+  }, [])
+  const toggleCategoryNavVisible = useCallback(() => {
+    setCategoryNavVisible(prev => {
+      const next = !prev
+      saveCategoryNavBarVisible(next)
+      return next
+    })
+  }, [])
 
   // Store previous state for rollback on error
   const previousWidgets = useRef<WidgetPref[]>(initialPrefs)
@@ -490,6 +519,20 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const activePref = activeId ? activeWidgets.find(p => p.id === activeId) ?? null : null
   const ids = activeWidgets.map(p => p.id)
 
+  // De balk verschijnt onder de "Mijn Dashboard"-titel zodra:
+  //   • er data is (`categoryAppLinks` met >0 entries),
+  //   • de gebruiker hem aan heeft staan,
+  //   • het Will-dashboard de Widgets-modus toont (op andere hosts zonder
+  //     de dashboard-type-toggle valt deze conditie weg en wordt de balk
+  //     direct gerendeerd zodra de data beschikbaar is).
+  // De `!isCollapsed`-check zit in de wrapper (regel ~613), waardoor de
+  // balk vanzelf weg valt wanneer de gebruiker het dashboard inklapt.
+  const showCategoryNavBar =
+    !!categoryAppLinks &&
+    categoryAppLinks.length > 0 &&
+    categoryNavVisible &&
+    (!showDashboardTypeToggle || dashboardType === 'widgets')
+
   const gridContent = (
     <div>
       {/* Section header with edit mode toggle */}
@@ -565,6 +608,14 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       </div>
 
       {!isCollapsed && (<>
+      {/* Categorie-app-balk — direct onder de titel zodat de Kern-apps van
+          de gebruiker (Bezittingen + Schulden) als snelkoppelingen zichtbaar
+          zijn vóór de widget-grid. Conditioneel via `categoryNavVisible`
+          (modify-toggle) en `dashboardType === 'widgets'`. */}
+      {showCategoryNavBar && (
+        <CategoryAppNavBar links={categoryAppLinks!} />
+      )}
+
       {/* Briefing content toggles — only visible when dashboard type is briefing */}
       {showDashboardTypeToggle && dashboardType === 'briefing' && (
         <div className="mb-3 flex items-center gap-4 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-2">
@@ -672,6 +723,41 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         <div className="mb-3 rounded-[var(--r-sm)] border border-dashed border-kern-200 bg-kern-50/50 px-3 py-2 text-xs text-kern-700">
           <span className="hidden sm:inline">Sleep widgets om de volgorde te wijzigen. Gebruik <span className="inline-flex rounded border border-kern-200 text-[9px] font-semibold px-0.5 mx-0.5 align-text-bottom">S M L</span> om de grootte te kiezen, <X className="inline h-3 w-3 mx-0.5" /> om te verbergen. Klik <strong>Gereed</strong> als je klaar bent.</span>
           <span className="sm:hidden">Houd een widget ingedrukt om te verslepen. Tik <span className="inline-flex rounded border border-kern-200 text-[9px] font-semibold px-0.5 mx-0.5 align-text-bottom">S M L</span> voor grootte, <X className="inline h-3 w-3 mx-0.5" /> om te verbergen.</span>
+        </div>
+      )}
+
+      {/* Categorie-balk toggle — alleen zichtbaar in modify-mode wanneer er
+          actieve apps zijn. Patroon volgt de briefing-pref-toggle hierboven
+          zodat de modify-mode één visuele taal houdt. */}
+      {isEditMode && categoryAppLinks && categoryAppLinks.length > 0 && (
+        <div
+          className="mb-3 flex items-center justify-between gap-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-2"
+          data-testid="category-nav-toggle-row"
+        >
+          <label className="flex min-w-0 items-center gap-2 text-xs cursor-pointer">
+            <Compass className="h-3.5 w-3.5 shrink-0 text-[var(--ink-3)]" />
+            <span className="min-w-0">
+              <span className="block font-medium text-[var(--ink-2)]">Categorie-balk</span>
+              <span className="block text-[10px] text-[var(--ink-4)]">Snelkoppeling naar je apps in de Kern.</span>
+            </span>
+          </label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={categoryNavVisible}
+            aria-label="Categorie-balk weergeven"
+            onClick={toggleCategoryNavVisible}
+            data-testid="category-nav-toggle"
+            className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
+              categoryNavVisible ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
+            }`}
+          >
+            <span
+              className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                categoryNavVisible ? 'translate-x-3.5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
         </div>
       )}
       {saveError && (

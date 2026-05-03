@@ -1,32 +1,47 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronLeft, Sparkles } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 
+/**
+ * Editorial header voor /horizon/whatif (Type 10: Calculator).
+ * Volgt blueprint: back-link → kicker met streep → headline met italic-em.
+ */
 export function WhatIfHeader() {
   return (
-    <div className="mb-4">
-      {/* Back link */}
+    <header className="mb-4 space-y-2 px-4 sm:px-6">
+      {/* Back link in mono UPPERCASE */}
       <Link
         href="/horizon"
-        className="inline-flex items-center gap-1 font-sans text-sm text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+        className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
       >
-        <ChevronLeft className="h-4 w-4" />
-        De Horizon
+        <ChevronLeft className="h-3 w-3" />
+        Terug naar Horizon
       </Link>
 
-      {/* Kicker */}
-      <div className="mt-3 flex items-center gap-1.5">
-        <Sparkles className="h-3.5 w-3.5 text-wil-600" />
-        <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
-          Wat als...
-        </span>
+      {/* Kicker met 28×1px module-streep (Wil-actief op /horizon → Horizon-shades) */}
+      <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] mt-3">
+        <span
+          aria-hidden
+          className="inline-block h-px w-7 shrink-0"
+          style={{ background: 'var(--module-active-500)' }}
+        />
+        Wat als…
       </div>
 
-      {/* Heading */}
-      <h1 className="mt-1 font-display text-[28px] font-bold leading-tight tracking-tight text-[var(--ink)] sm:text-[36px]">
-        Jouw toekomst, jouw keuze
+      {/* Headline met italic-em "keuze" */}
+      <h1
+        className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+        style={{ fontFamily: 'var(--font-playfair, serif)' }}
+      >
+        Jouw toekomst, jouw{' '}
+        <em
+          className="font-normal italic"
+          style={{ color: 'var(--module-active-700)' }}
+        >
+          keuze
+        </em>
       </h1>
-    </div>
+    </header>
   )
 }
