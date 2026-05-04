@@ -10,7 +10,6 @@ import type { CategoryAppLink } from '@/lib/category-app-nav'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { SectionDivider } from '@/components/app/section-divider'
 import { DAIshboard } from '@/components/daishboard/daishboard'
-import { NieuwsOnlyClient } from '@/components/berichten/nieuws-only-client'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { ActionCenter } from './action-center'
@@ -140,7 +139,7 @@ export function WillLanding({
 
         {/* ── Sectie 1: Widget grid, DAIshboard of Nieuws ── */}
         <section
-          aria-label={dashboardType === 'widgets' ? 'Mijn Widgets' : dashboardType === 'briefing' ? "Will's Briefing" : 'TriFinity Post'}
+          aria-label={dashboardType === 'widgets' ? 'Mijn Widgets' : "Will's Briefing"}
           data-testid="will-widget-grid"
           className="card-editorial overflow-hidden"
         >
@@ -162,11 +161,6 @@ export function WillLanding({
                   userName={userName}
                   aiEnabled={aiEnabled}
                 />
-              </div>
-            )}
-            {dashboardType === 'nieuws' && !isCollapsed && (
-              <div className="mt-4 -mx-4 sm:-mx-6 md:-mx-8">
-                <NieuwsOnlyClient />
               </div>
             )}
           </div>

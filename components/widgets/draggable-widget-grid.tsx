@@ -609,17 +609,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
               >
                 Briefing
               </button>
-              <button
-                type="button"
-                onClick={() => setDashboardType('nieuws')}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  dashboardType === 'nieuws'
-                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
-                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                }`}
-              >
-                Nieuws
-              </button>
             </div>
           )}
           <button
@@ -696,8 +685,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         </div>
       )}
 
-      {/* Widget content — hidden when briefing or nieuws mode is active */}
-      {!(showDashboardTypeToggle && (dashboardType === 'briefing' || dashboardType === 'nieuws')) && (<>
+      {/* Widget content — hidden when briefing mode is active */}
+      {!(showDashboardTypeToggle && dashboardType === 'briefing') && (<>
 
       {activeWidgets.length === 0 && !isEditMode ? (
         <div className="py-12 flex flex-col items-center text-center">

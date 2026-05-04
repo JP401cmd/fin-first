@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, Users } from 'lucide-react'
+import { Bell, Newspaper, Users } from 'lucide-react'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { getActiveNavModules, getHomePath } from '@/lib/module-registry'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
@@ -105,6 +105,16 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
 
           {/* Privacy toggle — mask/unmask monetary amounts across the app */}
           <PrivacyToggle />
+
+          {/* News shortcut — navigates to TriFinity Post */}
+          <Link
+            href="/nieuws"
+            className="relative flex h-11 w-11 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+            aria-label="Nieuws"
+            title="Nieuws"
+          >
+            <Newspaper className="h-5 w-5" aria-hidden="true" />
+          </Link>
 
           {/* Notification bell — opens modal */}
           <button

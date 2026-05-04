@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 
-type DashboardType = 'widgets' | 'briefing' | 'nieuws'
+type DashboardType = 'widgets' | 'briefing'
 
 interface DashboardTypeContextValue {
   dashboardType: DashboardType
@@ -41,7 +41,7 @@ export function DashboardTypeProvider({ children }: { children: ReactNode }) {
     fetch('/api/dashboard-type')
       .then(r => r.json())
       .then(d => {
-        if (d.dashboard_type === 'widgets' || d.dashboard_type === 'briefing' || d.dashboard_type === 'nieuws') {
+        if (d.dashboard_type === 'widgets' || d.dashboard_type === 'briefing') {
           setType(d.dashboard_type)
         }
       })
