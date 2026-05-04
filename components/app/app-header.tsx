@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bell, Newspaper, Users } from 'lucide-react'
@@ -39,9 +39,13 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
   const { perspective, isHousehold, partnerName } = usePerspective()
   const { unreadCount, openModal } = useNotifications()
 
-  // Derive which nav tabs to show from active modules.
-  const activeNavModules = getActiveNavModules(activeModules)
-  const navItems = activeNavModules.map(m => navConfig[m])
+  // Derive which nav tabs to show from active modules. Memoized: getActiveNavModules
+  // builds a Set + array each call, and the result only changes when the set of
+  // active modules changes — not on every parent re-render (e.g. notification poll).
+  const navItems = useMemo(
+    () => getActiveNavModules(activeModules).map(m => navConfig[m]),
+    [activeModules],
+  )
 
   // Close dropdown on click outside or Escape
   useEffect(() => {
@@ -137,22 +141,34 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="flex items-center gap-2 rounded-full bg-[var(--subtle)] px-3 py-1.5 text-sm text-[var(--ink-2)] hover:bg-[var(--border-ed)]"
+              className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-[var(--subtle)]"
+              aria-label="Account"
+              title={email}
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-medium text-[var(--paper)]">
-                {email[0]?.toUpperCase() ?? '?'}
-              </span>
-              <span className="hidden max-w-[140px] truncate sm:inline">
-                {email}
-              </span>
-              {isHousehold && perspective !== 'personal' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
-                  <Users className="h-3 w-3" /> {perspective === 'partner' ? (partnerName ?? 'Partner') : 'Huishouden'}
+              <span className="relative">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-medium text-[var(--paper)]">
+                  {email[0]?.toUpperCase() ?? '?'}
                 </span>
-              )}
+                {isHousehold && perspective !== 'personal' && (
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-kern-500 ring-2 ring-[var(--paper)]"
+                    aria-hidden="true"
+                  />
+                )}
+              </span>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
+              <div className="absolute right-0 mt-2 w-56 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
+                {/* Header: signed-in identity + perspective context */}
+                <div className="px-4 py-3 border-b border-[var(--border-ed)]">
+                  <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] mb-1">Ingelogd als</div>
+                  <div className="text-sm font-medium text-[var(--ink)] truncate">{email}</div>
+                  {isHousehold && perspective !== 'personal' && (
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
+                      <Users className="h-3 w-3" /> {perspective === 'partner' ? (partnerName ?? 'Partner') : 'Huishouden'}
+                    </span>
+                  )}
+                </div>
                 {role === 'superadmin' && (
                   <Link
                     href="/beheer"

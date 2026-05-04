@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 
 type DashboardType = 'widgets' | 'briefing'
 
@@ -63,8 +63,16 @@ export function DashboardTypeProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem('dashboard-collapsed', String(collapsed)) } catch { /* noop */ }
   }, [])
 
+  // Stable context value — without this, the inline object literal triggers
+  // re-renders in every consumer on every parent re-render even when nothing
+  // actually changed.
+  const value = useMemo(
+    () => ({ dashboardType, setDashboardType, loading, isCollapsed, setIsCollapsed }),
+    [dashboardType, setDashboardType, loading, isCollapsed, setIsCollapsed],
+  )
+
   return (
-    <DashboardTypeContext.Provider value={{ dashboardType, setDashboardType, loading, isCollapsed, setIsCollapsed }}>
+    <DashboardTypeContext.Provider value={value}>
       {children}
     </DashboardTypeContext.Provider>
   )

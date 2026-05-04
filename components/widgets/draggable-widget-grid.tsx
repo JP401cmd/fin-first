@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
   DndContext,
   closestCenter,
@@ -31,7 +32,13 @@ import {
 } from '@/lib/dashboard-prefs'
 import type { CategoryAppLink } from '@/lib/category-app-nav'
 import { reassignOrders } from '@/lib/widget-order'
-import { AutoDashboardWizard } from './auto-dashboard-wizard'
+// AutoDashboardWizard ships in its own chunk and only loads when the user
+// opens it (showAutoWizard becomes true). Cuts ~8-15KB from the initial
+// dashboard JS bundle.
+const AutoDashboardWizard = dynamic(
+  () => import('./auto-dashboard-wizard').then(m => ({ default: m.AutoDashboardWizard })),
+  { ssr: false },
+)
 import { useDisplaySize } from '@/lib/hooks/use-display-size'
 import type { WidgetPref, WidgetSize, WidgetModule } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef } from '@/lib/widget-catalog'
@@ -917,14 +924,18 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       </>)}
       </>)}
 
-      {/* Wizard rendered outside conditional/DndContext to avoid fixed-positioning issues from transforms */}
-      <AutoDashboardWizard
-        open={showAutoWizard}
-        onClose={() => setShowAutoWizard(false)}
-        onApply={handleAutoApply}
-        features={features}
-        allBudgets={data.allBudgets}
-      />
+      {/* Wizard rendered outside conditional/DndContext to avoid fixed-positioning issues from transforms.
+          Mounted only when the user opens it so the dynamic import chunk
+          isn't fetched until first interaction. */}
+      {showAutoWizard && (
+        <AutoDashboardWizard
+          open={showAutoWizard}
+          onClose={() => setShowAutoWizard(false)}
+          onApply={handleAutoApply}
+          features={features}
+          allBudgets={data.allBudgets}
+        />
+      )}
 
       {/* ── Preset confirmation dialog ───────────────────────── */}
       {selectedPreset && (

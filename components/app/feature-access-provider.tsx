@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { FeatureAccessData, FeatureAccessMap } from '@/lib/compute-feature-access'
 import { UNIFIED_FEATURES, isPhaseSufficient, type PhaseId } from '@/lib/feature-registry'
 import { PhaseTransitionModal } from '@/components/app/phase-transition-modal'
@@ -53,19 +53,24 @@ export function FeatureAccessProvider({
   const [showTransitionModal, setShowTransitionModal] = useState(!!phaseTransition)
   const [featureOverrides, setFeatureOverrides] = useState<FeatureAccessMap>(data.features)
 
-  // Compute newly unlocked features when there's a phase transition
-  const newlyUnlockedFeatures = phaseTransition
-    ? UNIFIED_FEATURES
-        .filter(f => {
-          const wasDefault = isPhaseSufficient(phaseTransition.oldPhase as PhaseId, f.defaultPhase)
-          const isDefault = isPhaseSufficient(phaseTransition.newPhase as PhaseId, f.defaultPhase)
-          return isDefault && !wasDefault
-        })
-        .map(f => f.id)
-    : []
+  // Compute newly unlocked features when there's a phase transition.
+  // Memoized so consumers downstream don't see a fresh array on every parent render.
+  const newlyUnlockedFeatures = useMemo<string[]>(
+    () =>
+      phaseTransition
+        ? UNIFIED_FEATURES
+            .filter(f => {
+              const wasDefault = isPhaseSufficient(phaseTransition.oldPhase as PhaseId, f.defaultPhase)
+              const isDefault = isPhaseSufficient(phaseTransition.newPhase as PhaseId, f.defaultPhase)
+              return isDefault && !wasDefault
+            })
+            .map(f => f.id)
+        : [],
+    [phaseTransition],
+  )
 
   // Allow optimistic refresh after user toggles
-  function refreshFeaturePrefs(prefs: Record<string, boolean>) {
+  const refreshFeaturePrefs = useCallback((prefs: Record<string, boolean>) => {
     setFeatureOverrides(prev => {
       const next = { ...prev }
       for (const [id, enabled] of Object.entries(prefs)) {
@@ -75,23 +80,28 @@ export function FeatureAccessProvider({
       }
       return next
     })
-  }
+  }, [])
 
   const [moduleOverrides, setModuleOverrides] = useState<ModuleId[]>(activeModules)
 
   /** Update active modules client-side without page reload */
-  function refreshModules(modules: ModuleId[]) {
+  const refreshModules = useCallback((modules: ModuleId[]) => {
     setModuleOverrides(modules)
-  }
+  }, [])
 
-  const contextValue: FeatureAccessContextValue = {
-    ...data,
-    features: featureOverrides,
-    newlyUnlockedFeatures,
-    refreshFeaturePrefs,
-    activeModules: moduleOverrides,
-    refreshModules,
-  }
+  // Stable context value — re-renders consumers only when something they
+  // actually depend on changes (not on every parent re-render).
+  const contextValue = useMemo<FeatureAccessContextValue>(
+    () => ({
+      ...data,
+      features: featureOverrides,
+      newlyUnlockedFeatures,
+      refreshFeaturePrefs,
+      activeModules: moduleOverrides,
+      refreshModules,
+    }),
+    [data, featureOverrides, newlyUnlockedFeatures, refreshFeaturePrefs, moduleOverrides, refreshModules],
+  )
 
   return (
     <FeatureAccessContext.Provider value={contextValue}>

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export type Perspective = 'personal' | 'household' | 'partner'
@@ -185,18 +185,23 @@ export function PerspectiveProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Stable context value — without memoization the inline object literal
+  // changes identity on every parent render and re-renders all consumers.
+  const value = useMemo(
+    () => ({
+      perspective,
+      isHousehold,
+      availablePerspectives,
+      setPerspective,
+      partnerName,
+      loading,
+      perspectiveVersion,
+    }),
+    [perspective, isHousehold, availablePerspectives, setPerspective, partnerName, loading, perspectiveVersion],
+  )
+
   return (
-    <PerspectiveContext.Provider
-      value={{
-        perspective,
-        isHousehold,
-        availablePerspectives,
-        setPerspective,
-        partnerName,
-        loading,
-        perspectiveVersion,
-      }}
-    >
+    <PerspectiveContext.Provider value={value}>
       {children}
     </PerspectiveContext.Provider>
   )
