@@ -13,6 +13,7 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ interface AssetJoin {
 // ── Loader ─────────────────────────────────────────────────────
 
 export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<HoldingsPageData> => {
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser(supabase)
   if (!user) throw new Error('Not authenticated')
 
   const [{ data: invRows }, { data: cryRows }] = await Promise.all([

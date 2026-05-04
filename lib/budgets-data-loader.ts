@@ -4,6 +4,7 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import type { BudgetRollover } from '@/lib/budget-rollover'
 import { formatPeriod } from '@/lib/budget-rollover'
@@ -67,7 +68,7 @@ export interface BudgetsPageData {
 // ── Loader ────────────────────────────────────────────────────
 
 export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<BudgetsPageData> => {
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser(supabase)
   if (!user) {
     throw new Error('Not authenticated')
   }

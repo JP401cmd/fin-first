@@ -5,6 +5,7 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import type {
   DashboardData,
   TopAction,
@@ -126,7 +127,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const prev3MonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1)).toISOString().split('T')[0]
 
   // ── Auth: fetch once, reuse throughout ─────────────────────
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const authUser = await getCachedUser(supabase)
   const currentUserId = authUser?.id ?? null
 
   const [

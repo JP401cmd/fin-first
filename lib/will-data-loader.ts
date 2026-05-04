@@ -7,6 +7,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Recommendation, Action } from '@/lib/recommendation-data'
 import { computeGoalProgress, type Goal } from '@/lib/goal-data'
 
@@ -103,7 +104,7 @@ export async function loadWillData(
   if (shared) {
     currentUserId = shared.userId
   } else {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const authUser = await getCachedUser(supabase)
     currentUserId = authUser?.id ?? null
   }
 
