@@ -152,7 +152,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
       .in('status', ['open', 'postponed', 'completed']),
-    supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
+    supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('recurring_transactions').select('id, name, amount, frequency, budget_id').eq('is_active', true),

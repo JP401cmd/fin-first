@@ -108,42 +108,52 @@ export async function loadWillData(
     currentUserId = authUser?.id ?? null
   }
 
-  // 2. Check household membership for shared goals
-  let householdFilter = ''
-  let partnerInfo: WillPageData['partnerInfo'] = null
-
-  if (currentUserId) {
+  // 2. Household membership + partner-name resolution.
+  //    Started as a single chained promise so it runs in parallel with the
+  //    main queries below. Goals depends on `householdFilter`, so its query
+  //    is chained on this promise — it kicks off the moment membership
+  //    resolves and runs in parallel with whatever else is still in flight.
+  const householdPromise = (async (): Promise<{
+    householdFilter: string
+    partnerInfo: WillPageData['partnerInfo']
+  }> => {
+    if (!currentUserId) return { householdFilter: '', partnerInfo: null }
     const { data: membership } = await supabase
       .from('household_members')
       .select('household_id')
       .eq('user_id', currentUserId)
       .maybeSingle()
-
-    if (membership?.household_id) {
-      householdFilter = `,and(ownership.eq.shared,household_id.eq.${membership.household_id})`
-
-      // One query: get all members + their profile names in a single join
-      const { data: allMembers } = await supabase
-        .from('household_members')
-        .select('user_id, profile:profiles!user_id(full_name)')
-        .eq('household_id', membership.household_id)
-
-      type HouseholdMemberRow = { user_id: string; profile: { full_name: string | null }[] }
-      const partner = (allMembers as HouseholdMemberRow[] ?? []).find(
-        (m) => m.user_id !== currentUserId,
-      )
-      if (partner) {
-        partnerInfo = {
-          partnerId: partner.user_id,
-          partnerName: partner.profile?.[0]?.full_name ?? 'Partner',
-        }
-      }
+    if (!membership?.household_id) return { householdFilter: '', partnerInfo: null }
+    const householdFilter = `,and(ownership.eq.shared,household_id.eq.${membership.household_id})`
+    const { data: allMembers } = await supabase
+      .from('household_members')
+      .select('user_id, profile:profiles!user_id(full_name)')
+      .eq('household_id', membership.household_id)
+    type HouseholdMemberRow = { user_id: string; profile: { full_name: string | null }[] }
+    const partner = (allMembers as HouseholdMemberRow[] ?? []).find(
+      (m) => m.user_id !== currentUserId,
+    )
+    return {
+      householdFilter,
+      partnerInfo: partner
+        ? { partnerId: partner.user_id, partnerName: partner.profile?.[0]?.full_name ?? 'Partner' }
+        : null,
     }
-  }
+  })()
 
-  const goalFilter = currentUserId
-    ? `user_id.eq.${currentUserId}${householdFilter}`
-    : `user_id.eq.00000000-0000-0000-0000-000000000000`
+  // Goals query depends on `householdFilter`. Chain on the household promise
+  // so the request starts as soon as the filter is known, while the
+  // independent queries below also run in parallel.
+  const goalsPromise = householdPromise.then(({ householdFilter }) => {
+    const goalFilter = currentUserId
+      ? `user_id.eq.${currentUserId}${householdFilter}`
+      : `user_id.eq.00000000-0000-0000-0000-000000000000`
+    return supabase
+      .from('goals')
+      .select('*, budgets:budget_id(id, name)')
+      .or(goalFilter)
+      .order('sort_order', { ascending: true })
+  })
 
   // 3. Consolidated parallel queries
   // - Actions: 1 broad query (was 2) — derive KPI + board data from same result
@@ -165,12 +175,9 @@ export async function loadWillData(
       .in('status', ['pending', 'postponed'])
       .order('priority_score', { ascending: false })
       .order('created_at', { ascending: false }),
-    // [2] All goals (derive active list + counts in JS)
-    supabase
-      .from('goals')
-      .select('*, budgets:budget_id(id, name)')
-      .or(goalFilter)
-      .order('sort_order', { ascending: true }),
+    // [2] All goals (derive active list + counts in JS) — runs in parallel
+    //     with [0] and [1], gated on household resolution.
+    goalsPromise,
   ]
 
   // Only query assets/debts/profile if not provided via shared data
@@ -187,7 +194,11 @@ export async function loadWillData(
     )
   }
 
-  const results = await Promise.all(queries)
+  const [results, household] = await Promise.all([
+    Promise.all(queries),
+    householdPromise,
+  ])
+  const { partnerInfo } = household
 
   // Unpack results
   const actionsResult = results[0] as { data: unknown[] | null }

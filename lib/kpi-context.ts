@@ -452,7 +452,7 @@ export const loadCashRevaluationStats = cache(async (
  * stats, cash-assets mét bank-koppeling krijgen transaction-based stats.
  * Bij dubbele asset-id wint de transaction-stat (mocht dat ooit gebeuren).
  */
-export async function loadCombinedCashStats(
+export const loadCombinedCashStats = cache(async function loadCombinedCashStats(
   supabase: SupabaseClient,
 ): Promise<Record<string, CashAssetStats>> {
   const [txStats, revalStats] = await Promise.all([
@@ -460,4 +460,4 @@ export async function loadCombinedCashStats(
     loadCashRevaluationStats(supabase).catch(() => ({} as Record<string, CashAssetStats>)),
   ])
   return { ...revalStats, ...txStats }
-}
+})

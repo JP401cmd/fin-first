@@ -98,11 +98,11 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
       .order('date', { ascending: false }),
     supabase
       .from('budget_rollovers')
-      .select('*')
+      .select('id, user_id, budget_id, period, carried_amount, rollover_type, created_at')
       .eq('period', currentPeriod),
     supabase
       .from('budget_amounts')
-      .select('*'),
+      .select('id, budget_id, effective_from, amount'),
     supabase
       .from('goals')
       .select('id, name, goal_type, target_value, current_value, target_date, icon, color, is_completed, budget_id')

@@ -130,7 +130,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
 
   const [
     txResult,
-    assetsResult,
+    fullAssetsResult,
     debtsResult,
     profileResult,
     allBudgetsResult,
@@ -142,15 +142,19 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     earliestIncomeResult,
     tx6mResult,
     bankAccountsResult,
-    fullAssetsResult,
+    wsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct, asset_type').eq('is_active', true),
+    // Single assets query: returns full rows (typed as Asset[]) used for both
+    // aggregations (totalAssets, monthlyContributions, asset-type set) and the
+    // unified projection. Replaces the previous trimmed-select + full-select
+    // duplicate pair on the same table.
+    supabase.from('assets').select('*').eq('is_active', true).limit(500),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
     supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
-    supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+    supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
       .from('actions')
       .select('*, recommendation:recommendations(title, recommendation_type)')
@@ -170,8 +174,18 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     // 6-month transactions for stable health score calculation (budget_id for savings-budget correction)
     supabase.from('transactions').select('amount, budget_id, date').gte('date', sixMonthsAgo).lt('date', monthEnd),
     supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
-    supabase.from('assets').select('*').eq('is_active', true).limit(500),
+    // Withdrawal-strategy profile columns. Folded into the main batch via
+    // .maybeSingle() so a missing-column error on legacy DBs (migration
+    // 20260318000001 still pending) returns null data instead of throwing —
+    // saving the previous post-batch waterfall round-trip.
+    supabase
+      .from('profiles')
+      .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
+      .maybeSingle(),
   ])
+
+  // Same row both consumers want: alias instead of re-querying.
+  const assetsResult = fullAssetsResult
 
   // Check profile query for errors and use fallback if needed
   if (profileResult.error) {
@@ -182,9 +196,6 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   }
   const baseProfile = profileResult.data ?? PROFILE_DEFAULTS
 
-  // Fetch withdrawal strategy columns separately — these may not exist yet
-  // (migration 20260318000001). By splitting, we prevent a missing-column error
-  // from killing the entire profile query and making the horizon chart invisible.
   let wsData: {
     withdrawal_strategy?: string | null
     guardrail_floor?: number | null
@@ -192,10 +203,6 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     guardrail_cut_step?: number | null
     guardrail_raise_step?: number | null
   } = {}
-  const wsResult = await supabase
-    .from('profiles')
-    .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
-    .single()
   if (wsResult.error) {
     // Columns likely don't exist yet — use defaults silently
     console.warn(
