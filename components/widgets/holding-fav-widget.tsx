@@ -1,8 +1,8 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { WidgetShell } from './widget-shell'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FavoriteHolding } from './widget-renderer'
@@ -70,7 +70,7 @@ function ReturnRing({
 }
 
 /* ── KPI cell for full layout ── */
-function KpiCell({ label, value, color }: { label: string; value: string; color?: string }) {
+function KpiCell({ label, value, color }: { label: string; value: ReactNode; color?: string }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] text-[var(--ink-3)] leading-none">{label}</span>
@@ -110,8 +110,8 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
                   {holding.ticker}
                 </span>
               )}
-              <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-                {formatCurrency(holding.currentPrice)}
+              <span className="text-[var(--ink)]">
+                <MaskedAmount value={holding.currentPrice} tone="kern" className="text-lg font-semibold" />
               </span>
             </div>
             <span
@@ -130,16 +130,24 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
 
           {/* KPI strip */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-1">
-            <KpiCell label="Totale waarde" value={formatCurrency(holding.totalValue)} />
-            <KpiCell label="Kostprijs" value={formatCurrency(holding.totalCost)} />
+            <KpiCell label="Totale waarde" value={<MaskedAmount value={holding.totalValue} tone="kern" />} />
+            <KpiCell label="Kostprijs" value={<MaskedAmount value={holding.totalCost} tone="kern" />} />
             <KpiCell
               label="Rendement"
-              value={`${returnPositive ? '+' : ''}${formatCurrency(returnAmount)}`}
+              value={
+                returnPositive
+                  ? <MaskedAmount value={returnAmount} signPrefix="+" tone="kern" />
+                  : <MaskedAmount value={returnAmount} tone="kern" />
+              }
               color={returnPositive ? 'text-positive' : 'text-negative'}
             />
             <KpiCell
               label="Dagverandering"
-              value={`${changeSign}${formatCurrency(dailyChangeAmount)}`}
+              value={
+                isPositive
+                  ? <MaskedAmount value={dailyChangeAmount} signPrefix="+" tone="kern" />
+                  : <MaskedAmount value={dailyChangeAmount} tone="kern" />
+              }
               color={isPositive ? 'text-positive' : 'text-negative'}
             />
             <KpiCell label="Eenheden" value={holding.units.toLocaleString('nl-NL', { maximumFractionDigits: 4 })} />
@@ -177,19 +185,18 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
                 {holding.ticker}
               </p>
             )}
-            <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none">
-              {formatCurrency(holding.totalValue)}
+            <p className="text-[var(--ink)] leading-none">
+              <MaskedAmount value={holding.totalValue} tone="kern" className="text-[15px] font-semibold" />
             </p>
-            <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)] leading-none">
-              Kosten {formatCurrency(holding.totalCost)}
+            <p className="text-[var(--ink-3)] leading-none">
+              Kosten <MaskedAmount value={holding.totalCost} tone="kern" className="text-[11px]" />
             </p>
             <div className="flex items-center gap-2">
-              <span
-                className={`font-mono text-[11px] tabular-nums leading-none ${
-                  returnPositive ? 'text-positive' : 'text-negative'
-                }`}
-              >
-                {returnPositive ? '+' : ''}{formatCurrency(returnAmount)}
+              <span className={`leading-none ${returnPositive ? 'text-positive' : 'text-negative'}`}>
+                {returnPositive
+                  ? <MaskedAmount value={returnAmount} signPrefix="+" tone="kern" className="text-[11px]" />
+                  : <MaskedAmount value={returnAmount} tone="kern" className="text-[11px]" />
+                }
               </span>
               <span
                 className={`font-mono text-[11px] tabular-nums leading-none ${
@@ -220,8 +227,8 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
           }}
         >
           <ReturnRing pct={holding.returnPct} hasEntered={hasEntered} />
-          <p className="font-mono text-[13px] font-semibold tabular-nums text-[var(--ink)] leading-none">
-            {formatCurrency(holding.totalValue)}
+          <p className="text-[var(--ink)] leading-none">
+            <MaskedAmount value={holding.totalValue} tone="kern" className="text-[13px] font-semibold" />
           </p>
         </div>
       </WidgetShell>
@@ -240,8 +247,8 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
           transition: 'opacity 400ms ease-out, transform 400ms ease-out',
         }}
       >
-        <p className="font-mono text-[15px] font-semibold tabular-nums leading-none text-[var(--ink)] truncate">
-          {formatCurrency(holding.currentPrice)}
+        <p className="leading-none text-[var(--ink)] truncate">
+          <MaskedAmount value={holding.currentPrice} tone="kern" className="text-[15px] font-semibold" />
         </p>
         <span
           className={`font-mono text-xs tabular-nums leading-none whitespace-nowrap ${

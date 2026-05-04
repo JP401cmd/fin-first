@@ -11,6 +11,7 @@ import { FfinAvatar } from '@/components/app/avatars'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { formatCurrency } from '@/lib/format'
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Phase styling ──────────────────────────────────────────
 
@@ -115,7 +116,7 @@ function ArticleTeaser({ icon: Icon, title, body }: { icon: LucideIcon; title: s
   )
 }
 
-function StatBlock({ label, value, color }: { label: string; value: string; color?: string }) {
+function StatBlock({ label, value, color }: { label: string; value: React.ReactNode; color?: string }) {
   return (
     <div className="text-center">
       <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-4)]">{label}</p>
@@ -124,7 +125,7 @@ function StatBlock({ label, value, color }: { label: string; value: string; colo
   )
 }
 
-function KernCheckRow({ label, value }: { label: string; value: string }) {
+function KernCheckRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between border-b border-dotted border-[var(--border-ed)] py-1.5">
       <span className="flex items-center gap-1.5 text-[13px] text-[var(--ink-2)]">
@@ -245,7 +246,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
               <div className="grid grid-cols-3">
                 <StatBlock
                   label="Vermogen"
-                  value={formatCurrency(data.netWorth)}
+                  value={<MaskedAmount value={data.netWorth} tone="horizon" />}
                   color={data.netWorth >= 0 ? 'text-green-700' : 'text-red-600'}
                 />
                 <div className="border-x border-[var(--border-ed)]">
@@ -281,7 +282,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
 
               {/* Ledger-style check rows */}
               <div>
-                <KernCheckRow label="Vermogen in kaart" value={formatCurrency(Math.abs(data.netWorth))} />
+                <KernCheckRow label="Vermogen in kaart" value={<MaskedAmount value={Math.abs(data.netWorth)} tone="horizon" />} />
                 <KernCheckRow
                   label="Schulden"
                   value={data.netWorth < 0 ? formatCurrency(Math.abs(data.netWorth)) : 'Geen'}

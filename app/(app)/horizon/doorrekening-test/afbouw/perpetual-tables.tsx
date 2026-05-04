@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { formatCurrency } from "@/lib/format";
+import { useMemo, useState, useCallback } from "react";
+import { formatMaskedCurrency } from "@/lib/format";
+import { useMaskedAmounts } from "@/lib/hooks/use-privacy";
+
+/** Masked-aware currency formatter hook used across this file. */
+function useFc() {
+  const { masked } = useMaskedAmounts();
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked]);
+}
 import { NL_SWR } from "@/lib/constants";
 
 // ── Types ────────────────────────────────────────────────────
@@ -87,6 +94,7 @@ export function PerpetualStrategyTables({
   hasPartner: boolean;
   activeWithdrawalStrategy?: string;
 }) {
+  const fc = useFc();
   const totalYears = Math.max(0, endAge - retirementAge);
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1;
 
@@ -383,6 +391,7 @@ function BucketStrategyTable({
   yearlyRows: PerpetualRow[];
   yearlyExpenses: number;
 }) {
+  const fc = useFc();
   const [expanded, setExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<"monthly" | "yearly">("monthly");
   const displayRows = useMemo(
@@ -400,9 +409,9 @@ function BucketStrategyTable({
               Bucket (Emmer-strategie)
             </h4>
             <p className="text-[11px] text-[var(--ink-3)]">
-              3 emmers: cash ({formatCurrency(Math.round(yearlyExpenses * 2))},
+              3 emmers: cash ({fc(Math.round(yearlyExpenses * 2))},
               2j, 0%), obligaties (
-              {formatCurrency(Math.round(yearlyExpenses * 5))}, 5j, ~2%),
+              {fc(Math.round(yearlyExpenses * 5))}, 5j, ~2%),
               aandelen (rest, profiel-rendement)
             </p>
           </div>
@@ -479,28 +488,28 @@ function BucketStrategyTable({
                         </td>
                         <td className="px-2 py-1 font-mono tabular-nums text-[var(--ink)]">{row.age}j</td>
                         <td className="px-2 py-1 text-right font-mono tabular-nums text-red-600">
-                          -{formatCurrency(row.withdrawal)}
+                          -{fc(row.withdrawal)}
                         </td>
                         <td className="px-2 py-1 text-right font-mono tabular-nums text-amber-700">
-                          {formatCurrency(row.cashBalance)}
+                          {fc(row.cashBalance)}
                         </td>
                         <td className="px-2 py-1 text-right font-mono tabular-nums text-blue-700">
-                          {formatCurrency(row.bondBalance)}
+                          {fc(row.bondBalance)}
                         </td>
                         <td className="px-2 py-1 text-right font-mono tabular-nums text-emerald-700">
-                          {formatCurrency(row.stockBalance)}
+                          {fc(row.stockBalance)}
                         </td>
                         <td className="px-2 py-1 text-right font-mono tabular-nums font-medium text-[var(--ink)]">
-                          {formatCurrency(row.totalBalance)}
+                          {fc(row.totalBalance)}
                         </td>
                         <td className="px-2 py-1 text-center text-[11px]">
                           {isRefillMonth ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-horizon-100 px-2 py-0.5 font-medium text-horizon-700">
                               {row.refillCash > 0 && (
-                                <span>C+{formatCurrency(row.refillCash)}</span>
+                                <span>C+{fc(row.refillCash)}</span>
                               )}
                               {row.refillBonds > 0 && (
-                                <span>O+{formatCurrency(row.refillBonds)}</span>
+                                <span>O+{fc(row.refillBonds)}</span>
                               )}
                             </span>
                           ) : (
@@ -517,19 +526,19 @@ function BucketStrategyTable({
                       Totaal ({rows.length} mnd)
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                      -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                      -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono font-bold tabular-nums text-amber-700">
-                      {formatCurrency(rows[rows.length - 1]?.cashBalance ?? 0)}
+                      {fc(rows[rows.length - 1]?.cashBalance ?? 0)}
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono font-bold tabular-nums text-blue-700">
-                      {formatCurrency(rows[rows.length - 1]?.bondBalance ?? 0)}
+                      {fc(rows[rows.length - 1]?.bondBalance ?? 0)}
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-700">
-                      {formatCurrency(rows[rows.length - 1]?.stockBalance ?? 0)}
+                      {fc(rows[rows.length - 1]?.stockBalance ?? 0)}
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                      {formatCurrency(rows[rows.length - 1]?.totalBalance ?? 0)}
+                      {fc(rows[rows.length - 1]?.totalBalance ?? 0)}
                     </td>
                     <td className="px-2 py-1.5" />
                   </tr>
@@ -561,6 +570,7 @@ function BucketStrategyTable({
 // ── Yearly Bucket View ──────────────────────────────────────
 
 function YearlyBucketView({ rows }: { rows: PerpetualRow[] }) {
+  const fc = useFc();
   const [expanded, setExpanded] = useState(false);
   const displayRows = useMemo(
     () => (expanded ? rows : samplePerpetualRows(rows)),
@@ -610,19 +620,19 @@ function YearlyBucketView({ rows }: { rows: PerpetualRow[] }) {
                   <td className="px-3 py-1 font-mono tabular-nums font-medium text-[var(--ink)]">{row.year}</td>
                   <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink)]">{row.age}j</td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.startBalance)}
+                    {fc(row.startBalance)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                    -{formatCurrency(row.withdrawal)}
+                    -{fc(row.withdrawal)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(row.remainder)}
+                    {fc(row.remainder)}
                   </td>
                   <td
                     className={`px-3 py-1 text-right font-mono tabular-nums ${row.growth >= 0 ? "text-emerald-600" : "text-red-600"}`}
                   >
                     {row.growth >= 0 ? "+" : ""}
-                    {formatCurrency(row.growth)}
+                    {fc(row.growth)}
                   </td>
                 </tr>
               ))}
@@ -633,14 +643,14 @@ function YearlyBucketView({ rows }: { rows: PerpetualRow[] }) {
                   Totaal ({rows.length}j)
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[0]?.startBalance ?? 0)}
+                  {fc(rows[0]?.startBalance ?? 0)}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                  -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                  -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                 </td>
                 <td className="px-3 py-1.5" />
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                  +{formatCurrency(rows.reduce((s, r) => s + r.growth, 0))}
+                  +{fc(rows.reduce((s, r) => s + r.growth, 0))}
                 </td>
               </tr>
             </tfoot>
@@ -681,6 +691,7 @@ function PerpetualSubTable({
   showVpwColumns?: boolean;
   showGuardrailColumn?: boolean;
 }) {
+  const fc = useFc();
   const [expanded, setExpanded] = useState(false);
   const displayRows = useMemo(
     () => (expanded ? rows : samplePerpetualRows(rows)),
@@ -762,19 +773,19 @@ function PerpetualSubTable({
                     </>
                   )}
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.startBalance)}
+                    {fc(row.startBalance)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                    -{formatCurrency(row.withdrawal)}
+                    -{fc(row.withdrawal)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(row.remainder)}
+                    {fc(row.remainder)}
                   </td>
                   <td
                     className={`px-3 py-1 text-right font-mono tabular-nums ${row.growth >= 0 ? "text-emerald-600" : "text-red-600"}`}
                   >
                     {row.growth >= 0 ? "+" : ""}
-                    {formatCurrency(row.growth)}
+                    {fc(row.growth)}
                   </td>
                   {showGuardrailColumn && (
                     <td className="px-3 py-1 text-center text-[11px] font-medium">
@@ -803,14 +814,14 @@ function PerpetualSubTable({
                   Totaal ({rows.length}j)
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[0]?.startBalance ?? 0)}
+                  {fc(rows[0]?.startBalance ?? 0)}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                  -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                  -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                 </td>
                 <td className="px-3 py-1.5" />
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                  +{formatCurrency(rows.reduce((s, r) => s + r.growth, 0))}
+                  +{fc(rows.reduce((s, r) => s + r.growth, 0))}
                 </td>
               </tr>
             </tfoot>

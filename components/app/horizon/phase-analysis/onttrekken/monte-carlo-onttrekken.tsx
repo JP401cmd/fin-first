@@ -13,6 +13,7 @@ import {
 } from '@/lib/phase-monte-carlo'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // -- Types --------------------------------------------------------------------
 
@@ -176,8 +177,8 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
             <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-4)]" />
             <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
               Deze analyse simuleert 1.000 mogelijke scenario&apos;s voor je onttrekkingsfase.
-              Startend met {formatCurrency(startPortfolio)} vermogen en een jaarlijkse onttrekking
-              van {formatCurrency(yearlyWithdrawal)}{yearlyAowIncome > 0 ? ` (waarvan ${formatCurrency(yearlyAowIncome)} via AOW)` : ''}.
+              Startend met {<MaskedAmount value={startPortfolio} tone="horizon" />} vermogen en een jaarlijkse onttrekking
+              van {<MaskedAmount value={yearlyWithdrawal} tone="horizon" />}{yearlyAowIncome > 0 ? ` (waarvan ${formatCurrency(yearlyAowIncome)} via AOW)` : ''}.
               De &ldquo;slagingskans&rdquo; toont hoe vaak je vermogen niet opraakt vóór leeftijd {Math.round(endAge)}.
             </p>
           </div>
@@ -209,7 +210,7 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
                 Mediaan eindvermogen
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(state.main.medianEndPortfolio)}
+                {<MaskedAmount value={state.main.medianEndPortfolio} tone="horizon" />}
               </p>
             </div>
 
@@ -219,7 +220,7 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
                 Optimistisch (p90)
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(state.main.p90EndPortfolio)}
+                {<MaskedAmount value={state.main.p90EndPortfolio} tone="horizon" />}
               </p>
             </div>
 

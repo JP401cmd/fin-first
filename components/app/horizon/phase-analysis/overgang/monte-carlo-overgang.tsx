@@ -2,7 +2,8 @@
 
 import { memo, useState, useEffect } from 'react'
 import { BarChart3, CheckCircle2, Info } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
 import { successColor } from '../phase-analysis-utils'
@@ -13,6 +14,7 @@ import {
 } from '@/lib/phase-monte-carlo'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +76,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
   fireAge,
   aowAge,
 }: MonteCarloOvergangProps) {
+  const { masked } = useMaskedAmounts()
   const [state, setState] = useState<MCComputedState | null>(null)
 
   const yearsInPhase = Math.max(Math.round(endAge - startAge), 1)
@@ -171,9 +174,9 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
       willContext={
         state
           ? `Monte Carlo overgangsfase: slagingskans ${Math.round(state.main.successRate * 100)}%, ` +
-            `mediaan eindvermogen ${formatCurrency(state.main.medianEndPortfolio)}, ` +
-            `pessimistisch eindvermogen ${formatCurrency(state.main.p10EndPortfolio)}, ` +
-            `kritische onttrekkingsgrens ${formatCurrency(state.kritischeGrens)}/jaar.`
+            `mediaan eindvermogen ${formatMaskedCurrency(state.main.medianEndPortfolio, masked)}, ` +
+            `pessimistisch eindvermogen ${formatMaskedCurrency(state.main.p10EndPortfolio, masked)}, ` +
+            `kritische onttrekkingsgrens ${formatMaskedCurrency(state.kritischeGrens, masked)}/jaar.`
           : 'Monte Carlo simulatie (laden...)'
       }
     >
@@ -211,7 +214,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
                 Mediaan eindvermogen
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(state.main.medianEndPortfolio)}
+                {<MaskedAmount value={state.main.medianEndPortfolio} tone="horizon" />}
                 <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
                   bij AOW
                 </span>
@@ -224,7 +227,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
                 Pessimistisch (p10)
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(state.main.p10EndPortfolio)}
+                {<MaskedAmount value={state.main.p10EndPortfolio} tone="horizon" />}
                 <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
                   bij AOW
                 </span>
@@ -237,7 +240,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
                 Kritische onttrekkingsgrens
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(state.kritischeGrens)}
+                {<MaskedAmount value={state.kritischeGrens} tone="horizon" />}
                 <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
                   /jaar (90% kans)
                 </span>

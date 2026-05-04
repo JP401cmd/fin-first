@@ -3,8 +3,9 @@
 import React, { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { FfinAvatar } from '@/components/app/avatars'
-import { formatCurrency } from '@/lib/format'
+
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 const PHASE_GRADIENT_STYLE: Record<string, React.CSSProperties> = {
   recovery:  { background: 'linear-gradient(to right, var(--color-phase-recovery-500), var(--color-phase-recovery-600))' },
@@ -96,7 +97,7 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
                 <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
                   <p className="text-xs font-medium text-[var(--ink-3)]">Netto vermogen</p>
                   <p className={`mt-1 text-lg font-bold ${data.netWorth >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                    {formatCurrency(data.netWorth)}
+                    {<MaskedAmount value={data.netWorth} tone="kern" />}
                   </p>
                 </div>
 
@@ -110,7 +111,7 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
                 <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
                   <p className="text-xs font-medium text-[var(--ink-3)]">Maandlasten</p>
                   <p className="mt-1 text-lg font-bold text-[var(--ink-2)]">
-                    {formatCurrency(data.monthlyExpenses)}
+                    {<MaskedAmount value={data.monthlyExpenses} tone="kern" />}
                   </p>
                 </div>
 

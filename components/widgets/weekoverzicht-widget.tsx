@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 interface Props {
@@ -54,8 +54,8 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Weekoverzicht" href={href}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
-          {formatCurrency(weekExpenses)}
+        <p className={`leading-none truncate ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
+          <MaskedAmount value={weekExpenses} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -65,8 +65,8 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Weekoverzicht" href={href}>
-        <p className={`font-mono text-lg font-semibold tabular-nums ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
-          {formatCurrency(weekExpenses)}
+        <p className={overBudget ? 'text-negative' : 'text-[var(--ink)]'}>
+          <MaskedAmount value={weekExpenses} tone="kern" className="text-lg font-semibold" />
         </p>
         {weekBudget > 0 && (
           <>
@@ -77,7 +77,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
               />
             </div>
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-              <span className="font-mono tabular-nums">{Math.round(budgetPct)}%</span> van weekbudget ({formatCurrency(weekBudget)})
+              <span className="font-mono tabular-nums">{Math.round(budgetPct)}%</span> van weekbudget (<MaskedAmount value={weekBudget} tone="kern" />)
             </p>
           </>
         )}
@@ -97,13 +97,13 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
       <WidgetShell module="kern" size={size} kicker="Weekoverzicht" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className={`font-mono text-xl font-semibold tabular-nums ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
-              {formatCurrency(weekExpenses)}
+            <p className={overBudget ? 'text-negative' : 'text-[var(--ink)]'}>
+              <MaskedAmount value={weekExpenses} tone="kern" className="text-xl font-semibold" />
             </p>
             <DeltaIndicator current={weekExpenses} previous={prevWeekExpenses} compact />
             {weekBudget > 0 && (
               <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">
-                Budget: <span className="font-mono tabular-nums">{formatCurrency(weekBudget)}</span>
+                Budget: <MaskedAmount value={weekBudget} tone="kern" />
               </p>
             )}
           </div>
@@ -147,19 +147,21 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <p className={`font-mono text-lg font-semibold tabular-nums ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
-                {formatCurrency(weekExpenses)}
+              <p className={overBudget ? 'text-negative' : 'text-[var(--ink)]'}>
+                <MaskedAmount value={weekExpenses} tone="kern" className="text-lg font-semibold" />
               </p>
               <DeltaIndicator current={weekExpenses} previous={prevWeekExpenses} />
             </div>
             <p className="text-[10px] text-[var(--ink-3)]">
-              gem. <span className="font-mono tabular-nums">{formatCurrency(dailyAvg)}</span>/dag
+              gem. <MaskedAmount value={dailyAvg} tone="kern" />/dag
             </p>
           </div>
           {weekBudget > 0 && (
             <div className="text-right">
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Weekbudget</p>
-              <p className="font-mono text-sm tabular-nums text-[var(--ink-2)]">{formatCurrency(weekBudget)}</p>
+              <p className="text-[var(--ink-2)]">
+                <MaskedAmount value={weekBudget} tone="kern" className="text-sm" />
+              </p>
             </div>
           )}
         </div>
@@ -210,7 +212,9 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
                       <span className="text-xs text-[var(--ink-2)] truncate">{cat.name}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="font-mono text-xs tabular-nums text-[var(--ink-3)]">{formatCurrency(cat.amount)}</span>
+                      <span className="text-[var(--ink-3)]">
+                        <MaskedAmount value={cat.amount} tone="kern" className="text-xs" />
+                      </span>
                       <DeltaIndicator current={cat.amount} previous={cat.prevAmount} compact />
                     </div>
                   </div>
@@ -230,8 +234,8 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
             <p className={`font-mono text-sm tabular-nums ${weekDelta > 0 ? 'text-negative' : weekDelta < 0 ? 'text-positive' : 'text-[var(--ink-3)]'}`}>
               {weekDelta > 0 ? '+' : ''}{weekDeltaPct}%
             </p>
-            <span className="font-mono text-[10px] tabular-nums text-[var(--ink-4)] ml-0.5">
-              ({formatCurrency(prevWeekExpenses)})
+            <span className="text-[var(--ink-4)] ml-0.5">
+              (<MaskedAmount value={prevWeekExpenses} tone="kern" className="text-[10px]" />)
             </span>
           </div>
         </div>

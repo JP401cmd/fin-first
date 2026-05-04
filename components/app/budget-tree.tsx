@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
+import { BudgetIcon, getTypeColors, isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface BudgetTreeProps {
   groups: BudgetWithChildren[]
@@ -61,9 +62,9 @@ function ChildBar({
         </span>
         <span className="shrink-0 font-mono text-xs tabular-nums">
           <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>
-            {formatCurrency(spent)}
+            {<MaskedAmount value={spent} tone="wil" />}
           </span>
-          <span className="text-[var(--ink-3)]"> / {formatCurrency(limit)}</span>
+          <span className="text-[var(--ink-3)]"> / {<MaskedAmount value={limit} tone="wil" />}</span>
         </span>
       </div>
 
@@ -203,8 +204,8 @@ function TreeGroup({
             {pct}%
           </span>
           <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-            <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>{formatCurrency(totalSpent)}</span>
-            {' / '}{formatCurrency(totalLimit)}
+            <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
+            {' / '}{<MaskedAmount value={totalLimit} tone="wil" />}
           </span>
         </div>
         {/* Progress bar */}
@@ -282,8 +283,8 @@ function TreeGroup({
         </span>
         {/* Amount */}
         <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-          <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>{formatCurrency(totalSpent)}</span>
-          {' / '}{formatCurrency(totalLimit)}
+          <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
+          {' / '}{<MaskedAmount value={totalLimit} tone="wil" />}
         </span>
         {/* Chevron */}
         <ChevronDown

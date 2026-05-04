@@ -29,6 +29,7 @@ import {
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 function KpiTooltip({ text }: { text: string }) {
   return (
@@ -191,7 +192,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <span className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)] sm:text-[36px]" data-testid="belasting-hero-amount">
-                  {formatCurrency(result.tax)}
+                  {<MaskedAmount value={result.tax} tone="kern" />}
                 </span>
                 <div className="mt-1 flex items-center gap-2">
                   <p className="font-serif italic text-[var(--ink-3)]" data-testid="belasting-hero-freedom-days">
@@ -256,7 +257,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
               <KpiTooltip text="De totale Box 3 belasting die je verschuldigd bent, berekend op basis van je vermogen op de peildatum." />
             </div>
             <p className="text-sm font-medium text-[var(--ink-3)]">Totale Belasting</p>
-            <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(result.tax)}</p>
+            <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.tax} tone="kern" />}</p>
             <FreedomTimeBadge amount={result.tax} className="mt-2" />
           </button>
 
@@ -275,7 +276,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
             <p className="text-sm font-medium text-[var(--ink-3)]">Effectief Tarief</p>
             <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{effectiefTariefPct.toFixed(2)}%</p>
             <p className="mt-1 text-xs text-[var(--ink-3)]" data-testid="kpi-tarief-freedom">
-              {formatCurrency(result.tax)} belasting
+              {<MaskedAmount value={result.tax} tone="kern" />} belasting
             </p>
           </button>
 
@@ -553,11 +554,11 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
                     {hasRealData ? 'Jouw jaaruitgaven' : 'Bij €40.000/jr'} nodig:
                   </p>
                   <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(displayExpenses * CLASSIC_MULTIPLIER)}
+                    {<MaskedAmount value={displayExpenses * CLASSIC_MULTIPLIER} tone="kern" />}
                   </p>
                   {hasRealData && (
                     <p className="font-sans text-[10px] text-[var(--ink-4)]">
-                      ({formatCurrency(displayExpenses)}/jr)
+                      ({<MaskedAmount value={displayExpenses} tone="kern" />}/jr)
                     </p>
                   )}
                   <FreedomTimeBadge amount={displayExpenses * CLASSIC_MULTIPLIER} className="mt-1.5" />
@@ -589,7 +590,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
                     {hasRealData ? 'Jouw jaaruitgaven' : 'Bij €40.000/jr'} nodig:
                   </p>
                   <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(Math.round(displayExpenses * NL_MULTIPLIER))}
+                    {<MaskedAmount value={Math.round(displayExpenses * NL_MULTIPLIER)} tone="kern" />}
                   </p>
                   <FreedomTimeBadge amount={Math.round(displayExpenses * NL_MULTIPLIER)} className="mt-1.5" />
                   <span className="mt-2 inline-block rounded-full border border-kern-100 bg-kern-50 px-2 py-0.5 font-sans text-[10px] font-medium text-kern-700">
@@ -699,15 +700,15 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Rendementsgrondslag</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.rendementsgrondslag)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.rendementsgrondslag} tone="kern" />}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Heffingsvrij vermogen</span>
-              <span className="tabular-nums text-emerald-700">−{formatCurrency(result.heffingsvrijVermogen)}</span>
+              <span className="tabular-nums text-emerald-700">−{<MaskedAmount value={result.heffingsvrijVermogen} tone="kern" />}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Belastbare grondslag</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Math.max(0, result.rendementsgrondslag - result.heffingsvrijVermogen))}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.max(0, result.rendementsgrondslag - result.heffingsvrijVermogen)} tone="kern" />}</span>
             </div>
           </div>
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
@@ -722,7 +723,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
           </div>
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
             <span className="text-[var(--ink)]">Totale belasting</span>
-            <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.tax)}</span>
+            <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.tax} tone="kern" />}</span>
           </div>
           <FreedomTimeBadge amount={result.tax} className="mx-auto mt-3 block" />
           <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
@@ -748,21 +749,21 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Totaal spaargeld</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.totaalSpaargeld)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.totaalSpaargeld} tone="kern" />}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Totaal beleggingen</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.totaalBeleggingen)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.totaalBeleggingen} tone="kern" />}</span>
             </div>
           </div>
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Totaal belastbaar vermogen</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.totaalSpaargeld + result.totaalBeleggingen)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.totaalSpaargeld + result.totaalBeleggingen} tone="kern" />}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Belasting betaald</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.tax)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.tax} tone="kern" />}</span>
             </div>
           </div>
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
@@ -795,7 +796,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Totale belasting</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.tax)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.tax} tone="kern" />}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Dagelijkse uitgaven</span>
@@ -827,16 +828,16 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
             </p>
           </div>
           <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-            De eerste {formatCurrency(result.heffingsvrijVermogen)} van je vermogen is vrijgesteld van Box 3 belasting. Dit percentage geeft aan hoeveel je hiervan benut.
+            De eerste {<MaskedAmount value={result.heffingsvrijVermogen} tone="kern" />} van je vermogen is vrijgesteld van Box 3 belasting. Dit percentage geeft aan hoeveel je hiervan benut.
           </div>
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Heffingsvrij vermogen</span>
-              <span className="tabular-nums text-emerald-700">{formatCurrency(result.heffingsvrijVermogen)}</span>
+              <span className="tabular-nums text-emerald-700">{<MaskedAmount value={result.heffingsvrijVermogen} tone="kern" />}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Jouw rendementsgrondslag</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.rendementsgrondslag)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={result.rendementsgrondslag} tone="kern" />}</span>
             </div>
           </div>
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
@@ -845,7 +846,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
           </div>
           {heffingsvrijBenut < 100 && (
             <div className="mt-3 rounded-[var(--r-sm)] border border-dashed border-kern-300 bg-kern-50/50 px-3 py-2 font-sans text-[11px] text-kern-700">
-              ✓ Je benut je heffingsvrije ruimte nog niet volledig — {formatCurrency(Math.max(0, result.heffingsvrijVermogen - result.rendementsgrondslag))} ruimte beschikbaar.
+              ✓ Je benut je heffingsvrije ruimte nog niet volledig — {<MaskedAmount value={Math.max(0, result.heffingsvrijVermogen - result.rendementsgrondslag)} tone="kern" />} ruimte beschikbaar.
             </div>
           )}
           <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
@@ -920,7 +921,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
             <p className="mb-2 font-sans text-[11px] font-semibold text-[var(--ink-2)]">Benodigde FIRE-vermogens</p>
             {hasRealData && (
               <div className="mb-1 flex justify-between rounded-[var(--r-sm)] border border-kern-100 bg-kern-50/50 px-2 py-1.5">
-                <span className="font-sans text-xs font-semibold text-kern-700">Jouw situatie ({formatCurrency(displayExpenses)}/jr)</span>
+                <span className="font-sans text-xs font-semibold text-kern-700">Jouw situatie ({<MaskedAmount value={displayExpenses} tone="kern" />}/jr)</span>
                 <div className="text-right">
                   <span className="font-sans text-[10px] text-[var(--ink-4)]">
                     VS: €{(displayExpenses * CLASSIC_MULTIPLIER).toLocaleString('nl-NL')}

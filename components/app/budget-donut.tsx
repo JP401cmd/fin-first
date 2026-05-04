@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { type BudgetWithChildren } from '@/lib/budget-data'
-import { BudgetIcon, formatCurrency, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
+import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Eye, EyeOff, ChevronDown } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 const HIDDEN_BUDGETS_KEY = 'donut-hidden-budgets'
 const COLLAPSED_TYPES_KEY = 'donut-collapsed-types'
@@ -282,7 +283,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
           {activeChild.name}
         </text>
         <text x={cx} y={cy + 4} textAnchor="middle" className="fill-[var(--ink-3)] font-mono text-[9px]">
-          {formatCurrency(activeChild.spent)} / {formatCurrency(activeChild.limit)}
+          {<MaskedAmount value={activeChild.spent} tone="wil" />} / {<MaskedAmount value={activeChild.limit} tone="wil" />}
         </text>
         <text x={cx} y={cy + 18} textAnchor="middle"
           className={`font-mono text-[10px] font-bold ${activeChild.spent > activeChild.limit ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink)]'}`}
@@ -299,7 +300,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
           {activeSeg.name}
         </text>
         <text x={cx} y={cy + 4} textAnchor="middle" className="fill-[var(--ink-3)] font-mono text-[9px]">
-          {formatCurrency(activeSeg.spent)} / {formatCurrency(activeSeg.limit)}
+          {<MaskedAmount value={activeSeg.spent} tone="wil" />} / {<MaskedAmount value={activeSeg.limit} tone="wil" />}
         </text>
         <text x={cx} y={cy + 18} textAnchor="middle"
           className={`font-mono text-[10px] font-semibold ${activeSeg.spent > activeSeg.limit ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink)]'}`}
@@ -312,10 +313,10 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
     centerContent = (
       <g>
         <text x={cx} y={cy - 10} textAnchor="middle" className="fill-[var(--ink)] font-mono text-[14px] font-bold">
-          {formatCurrency(totalSpent)}
+          {<MaskedAmount value={totalSpent} tone="wil" />}
         </text>
         <text x={cx} y={cy + 6} textAnchor="middle" className="fill-[var(--ink-4)] font-sans text-[9px]">
-          van {formatCurrency(totalBudget)}
+          van {<MaskedAmount value={totalBudget} tone="wil" />}
         </text>
         <text x={cx} y={cy + 20} textAnchor="middle"
           className={`font-mono text-[10px] font-semibold ${pctUsed > 100 ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink-3)]'}`}
@@ -350,8 +351,8 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
           <span className="font-mono text-[10px] text-[var(--ink-4)]">{segments.length}</span>
         </div>
         <p className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(segments.reduce((s, seg) => s + seg.spent, 0))}
-          <span className="font-normal text-[var(--ink-4)]"> / {formatCurrency(segments.reduce((s, seg) => s + seg.limit, 0))}</span>
+          {<MaskedAmount value={segments.reduce((s, seg) => s + seg.spent, 0)} tone="wil" />}
+          <span className="font-normal text-[var(--ink-4)]"> / {<MaskedAmount value={segments.reduce((s, seg) => s + seg.limit, 0)} tone="wil" />}</span>
         </p>
       </button>
 
@@ -546,10 +547,10 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
                       <p className={`truncate text-xs font-medium ${isHidden ? 'text-[var(--ink-4)] line-through' : 'text-[var(--ink)]'}`}>{seg.name}</p>
                       <p className="font-mono text-[10px] text-[var(--ink-3)]">
                         <span className={isOver && !isHidden ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
-                          {formatCurrency(seg.spent)}
+                          {<MaskedAmount value={seg.spent} tone="wil" />}
                         </span>
                         {' / '}
-                        {formatCurrency(seg.limit)}
+                        {<MaskedAmount value={seg.limit} tone="wil" />}
                       </p>
                     </div>
                     <span className={`shrink-0 font-mono text-[10px] font-bold ${isOver && !isHidden ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
@@ -592,10 +593,10 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
                           <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--ink-2)]">{child.name}</span>
                           <span className="font-mono text-[10px] text-[var(--ink-3)]">
                             <span className={childOver ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
-                              {formatCurrency(child.spent)}
+                              {<MaskedAmount value={child.spent} tone="wil" />}
                             </span>
                             {' / '}
-                            {formatCurrency(child.limit)}
+                            {<MaskedAmount value={child.limit} tone="wil" />}
                           </span>
                           <span className={`w-7 text-right font-mono text-[10px] font-medium ${childOver ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>
                             {childPct}%

@@ -18,6 +18,7 @@ import type { Budget } from '@/lib/budget-data'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { useToast } from '@/components/app/toast-provider'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 
 type Account = {
@@ -1769,10 +1770,10 @@ export default function ImportPage() {
                                   <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
                                 )}
                               </td>
-                              <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
+                              <td className={`whitespace-nowrap px-4 py-2 font-medium ${
                                 row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
                               }`}>
-                                {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
+                                <MaskedAmount value={row.amount} signPrefix={row.amount > 0 ? '+' : ''} tone="kern" decimals />
                               </td>
                               <td className="px-4 py-2">
                                 {row.isDuplicate ? (
@@ -2036,10 +2037,10 @@ export default function ImportPage() {
                             <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
                           )}
                         </td>
-                        <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
+                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${
                           row.isTransfer ? 'text-[var(--ink-2)]' : row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
                         }`}>
-                          {!row.isTransfer && (row.amount > 0 ? '+' : '')}{formatCurrency(row.amount)}
+                          <MaskedAmount value={row.amount} signPrefix={!row.isTransfer && row.amount > 0 ? '+' : ''} tone="kern" decimals />
                         </td>
                         <td className="px-4 py-2">
                           {row.isTransfer ? (
@@ -2247,14 +2248,14 @@ export default function ImportPage() {
               <div className="mt-3 flex justify-center gap-6 text-sm text-[var(--ink-3)]">
                 <span>
                   Totaal bij:{" "}
-                  <strong className="text-emerald-600 font-mono tabular-nums">
-                    {formatCurrency(totalBij)}
+                  <strong className="text-emerald-600">
+                    <MaskedAmount value={totalBij} tone="kern" decimals />
                   </strong>
                 </span>
                 <span>
                   Totaal af:{" "}
-                  <strong className="text-red-600 font-mono tabular-nums">
-                    {formatCurrency(Math.abs(totalAf))}
+                  <strong className="text-red-600">
+                    <MaskedAmount value={Math.abs(totalAf)} tone="kern" decimals />
                   </strong>
                 </span>
               </div>

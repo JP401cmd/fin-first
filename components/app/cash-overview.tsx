@@ -15,6 +15,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { Kicker } from '@/components/editorial'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 const DynCashAccountView = dynamic(
   () => import('@/components/app/cash-account-view').then(m => ({ default: m.CashAccountView })),
@@ -639,7 +640,7 @@ export function CashOverview({
                   )}
 
                   <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(Number(acc.balance))}
+                    {<MaskedAmount value={Number(acc.balance)} tone="kern" decimals />}
                   </p>
 
                   <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
@@ -713,7 +714,7 @@ export function CashOverview({
                 className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--positive, #10b981)' }}
               >
-                {formatCurrency(totalIncome)}
+                {<MaskedAmount value={totalIncome} tone="kern" decimals />}
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -735,7 +736,7 @@ export function CashOverview({
                 className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative, #dc2626)' }}
               >
-                {formatCurrency(totalExpenses)}
+                {<MaskedAmount value={totalExpenses} tone="kern" decimals />}
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -763,7 +764,7 @@ export function CashOverview({
                       'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
                   }}
                 >
-                  {netAmount >= 0 ? '+' : ''}{formatCurrency(netAmount)}
+                  <MaskedAmount value={netAmount} signPrefix={netAmount >= 0 ? '+' : ''} tone="kern" decimals />
                 </span>
               </div>
               <div
@@ -886,14 +887,14 @@ export function CashOverview({
                 return (
                   <div key={acc.id} className="flex items-center justify-between">
                     <span className="text-[var(--ink-2)]">{acc.name}</span>
-                    <span className="font-bold tabular-nums">{formatCurrency(amt)}</span>
+                    <span className="font-bold tabular-nums">{<MaskedAmount value={amt} tone="kern" decimals />}</span>
                   </div>
                 )
               })}
             <div className="border-t border-dashed border-[var(--border-md)] pt-2 mt-2">
               <div className="flex items-center justify-between font-bold">
                 <span>Totaal</span>
-                <span className="tabular-nums">{formatCurrency(totalIncome)}</span>
+                <span className="tabular-nums">{<MaskedAmount value={totalIncome} tone="kern" decimals />}</span>
               </div>
               <FreedomTimeBadge amount={totalIncome} className="mt-1" />
             </div>
@@ -913,7 +914,7 @@ export function CashOverview({
               <div key={item.id} className="flex items-center justify-between">
                 <span className="text-[var(--ink-2)]">{item.name}</span>
                 <div className="text-right">
-                  <span className="font-bold tabular-nums">{formatCurrency(item.amount)}</span>
+                  <span className="font-bold tabular-nums">{<MaskedAmount value={item.amount} tone="kern" decimals />}</span>
                   {item.limit > 0 && (
                     <span className="ml-1 text-[10px] text-[var(--ink-4)]">/ {formatCurrencyShort(item.limit)}</span>
                   )}
@@ -923,7 +924,7 @@ export function CashOverview({
             <div className="border-t border-dashed border-[var(--border-md)] pt-2 mt-2">
               <div className="flex items-center justify-between font-bold">
                 <span>Totaal</span>
-                <span className="tabular-nums">{formatCurrency(totalExpenses)}</span>
+                <span className="tabular-nums">{<MaskedAmount value={totalExpenses} tone="kern" decimals />}</span>
               </div>
               <FreedomTimeBadge amount={totalExpenses} className="mt-1" />
             </div>
@@ -945,7 +946,7 @@ export function CashOverview({
                   <div key={child.id} className="flex items-center justify-between">
                     <span className="text-[var(--ink-2)]">{child.name}</span>
                     <div className="text-right">
-                      <span className="font-bold tabular-nums">{formatCurrency(child.amount)}</span>
+                      <span className="font-bold tabular-nums">{<MaskedAmount value={child.amount} tone="kern" decimals />}</span>
                       {child.limit > 0 && (
                         <span className="ml-1 text-[10px] text-[var(--ink-4)]">/ {formatCurrencyShort(child.limit)}</span>
                       )}
@@ -956,7 +957,7 @@ export function CashOverview({
                   <div className="flex items-center justify-between font-bold">
                     <span>Totaal</span>
                     <span className="tabular-nums">
-                      {formatCurrency(expensesByBudget.find((b) => b.id === expenseReceiptBudgetId)?.amount ?? 0)}
+                      {<MaskedAmount value={expensesByBudget.find((b) => b.id === expenseReceiptBudgetId)?.amount ?? 0} tone="kern" decimals />}
                     </span>
                   </div>
                 </div>
@@ -965,7 +966,7 @@ export function CashOverview({
               <div className="flex items-center justify-between font-bold">
                 <span>{expensesByBudget.find((b) => b.id === expenseReceiptBudgetId)?.name ?? ''}</span>
                 <span className="tabular-nums">
-                  {formatCurrency(expensesByBudget.find((b) => b.id === expenseReceiptBudgetId)?.amount ?? 0)}
+                  {<MaskedAmount value={expensesByBudget.find((b) => b.id === expenseReceiptBudgetId)?.amount ?? 0} tone="kern" decimals />}
                 </span>
               </div>
             )}
@@ -1320,17 +1321,17 @@ function CashflowChart({
         <div>
           <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">Inkomsten</div>
           <div className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
-            {formatCurrency(totalIncome)}
+            {<MaskedAmount value={totalIncome} tone="kern" decimals />}
           </div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">Uitgaven</div>
           <div className="font-mono text-sm font-semibold tabular-nums text-red-600">
-            {formatCurrency(totalExpenses)}
+            {<MaskedAmount value={totalExpenses} tone="kern" decimals />}
           </div>
           {totalMonthlyBudget > 0 && (
             <div className="mt-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">
-              van {formatCurrency(totalMonthlyBudget)}
+              van {<MaskedAmount value={totalMonthlyBudget} tone="kern" decimals />}
             </div>
           )}
         </div>
@@ -1352,10 +1353,10 @@ function CashflowChart({
           <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
             {forecast.isCurrentMonth ? 'Prognose' : 'Netto'}
           </div>
-          <div className={`font-mono text-sm font-semibold tabular-nums ${forecast.isCurrentMonth ? forecastTone : netAmount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <div className={`text-sm font-semibold ${forecast.isCurrentMonth ? forecastTone : netAmount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {forecast.isCurrentMonth
-              ? formatCurrency(forecast.projectedExpenses)
-              : `${netAmount >= 0 ? '+' : ''}${formatCurrency(netAmount)}`}
+              ? <MaskedAmount value={forecast.projectedExpenses} tone="kern" decimals className="text-sm font-semibold" />
+              : <MaskedAmount value={netAmount} signPrefix={netAmount >= 0 ? '+' : ''} tone="kern" decimals className="text-sm font-semibold" />}
           </div>
           {forecast.isCurrentMonth && (
             <div className="mt-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">

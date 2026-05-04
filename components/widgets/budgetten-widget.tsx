@@ -4,7 +4,8 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { isOverPositive, computeBarSegments } from '@/components/app/budget-shared'
 import type { DashboardData } from './widget-renderer'
 import { TrendingUp, ShoppingCart, PiggyBank, CreditCard, LayoutGrid, Sparkles } from 'lucide-react'
@@ -126,8 +127,12 @@ function BudgetRow({ config, limit, spent, hasEntered, trend }: BudgetRowProps) 
               {trend === 'up' ? '↑' : '↓'}
             </span>
           )}
-          <span className={`font-mono tabular-nums text-[10px] ${overBudget ? (overPositive ? 'text-positive font-semibold' : 'text-negative font-semibold') : 'text-[var(--ink-3)]'}`}>
-            {hasData ? `${formatCurrency(spent)} / ${formatCurrency(limit)}` : '—'}
+          <span className={`text-[10px] ${overBudget ? (overPositive ? 'text-positive font-semibold' : 'text-negative font-semibold') : 'text-[var(--ink-3)]'}`}>
+            {hasData ? (
+              <>
+                <MaskedAmount value={spent} tone="kern" /> / <MaskedAmount value={limit} tone="kern" />
+              </>
+            ) : '—'}
           </span>
         </div>
       </div>
@@ -409,8 +414,13 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
                 </p>
               </div>
               <div className="text-right">
-                <p className={`font-mono tabular-nums text-2xl font-semibold ${isNettoPositief ? 'text-positive' : 'text-negative'}`}>
-                  {isNettoPositief ? '+' : ''}{formatCurrency(nettoBalans)}
+                <p className={isNettoPositief ? 'text-positive' : 'text-negative'}>
+                  <MaskedAmount
+                    value={nettoBalans}
+                    signPrefix={isNettoPositief ? '+' : ''}
+                    tone="kern"
+                    className="text-2xl font-semibold"
+                  />
                 </p>
                 {freedomStr && (
                   <p className="font-serif italic text-[11px] text-[var(--ink-3)]">

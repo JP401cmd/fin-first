@@ -4,7 +4,7 @@ import { useState, useMemo, memo } from 'react'
 import { Target, ArrowRightLeft, BarChart3, Globe, Briefcase, Edit3, Check, Info } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/components/app/budget-shared'
+
 import {
   type AllocationViewMode,
   type HoldingForAllocation,
@@ -20,6 +20,7 @@ import {
   DEFAULT_TARGETS,
   ALLOCATION_COLORS,
 } from '@/lib/portfolio-allocation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // Re-export types and utilities for consumers
 export type { AllocationViewMode, HoldingForAllocation, TargetAllocation, AllocationSlice }
@@ -93,7 +94,7 @@ function AllocationDonut({
         )
       })}
       <text x={cx} y={cy - 6} textAnchor="middle" fontSize="12" fontWeight="700" fill="#18181b">
-        {formatCurrency(total)}
+        {<MaskedAmount value={total} tone="kern" />}
       </text>
       <text x={cx} y={cy + 8} textAnchor="middle" fontSize="8" fill="#a1a1aa">
         totaal
@@ -378,7 +379,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
               <span className="text-xs font-medium text-[var(--ink)] shrink-0" data-testid={`slice-pct-${slice.key}`}>
                 {slice.pct.toFixed(1)}%
               </span>
-              <span className="text-xs text-[var(--ink-3)] shrink-0">{formatCurrency(slice.value)}</span>
+              <span className="text-xs text-[var(--ink-3)] shrink-0">{<MaskedAmount value={slice.value} tone="kern" />}</span>
             </div>
           ))}
         </div>
@@ -471,7 +472,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
                 <span className={`shrink-0 text-xs font-semibold ${
                   s.action === 'buy' ? 'text-emerald-600' : 'text-red-600'
                 }`}>
-                  {s.action === 'buy' ? '+' : '-'}{formatCurrency(s.amount)}
+                  {s.action === 'buy' ? '+' : '-'}{<MaskedAmount value={s.amount} tone="kern" />}
                 </span>
               </div>
             ))}

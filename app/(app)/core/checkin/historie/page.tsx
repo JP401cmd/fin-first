@@ -13,7 +13,19 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { useCallback } from 'react'
+import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/**
+ * Masked-aware currency formatter hook. Returns a stable callback that
+ * yields either the masked placeholder or a formatted EUR string based on
+ * the global privacy toggle.
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 interface CheckinSnapshot {
@@ -179,6 +191,7 @@ function CheckinHistoryCard({
   previousCheckin: CheckinSnapshot | null
   hasHousehold: boolean
 }) {
+  const fc = useFc()
   const { metrics } = checkin
   const dailyExpenses = metrics.monthlyExpenses > 0 ? metrics.monthlyExpenses / 30 : 0
 
@@ -214,10 +227,10 @@ function CheckinHistoryCard({
             )}
           </div>
           <div className="mt-0.5 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
-            <span className="font-mono tabular-nums">{formatCurrency(metrics.netWorth)}</span>
+            <span className="font-mono tabular-nums">{fc(metrics.netWorth)}</span>
             {netWorthDelta !== null && netWorthDelta !== 0 && (
               <span className={`font-mono tabular-nums font-medium ${netWorthDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {netWorthDelta >= 0 ? '+' : ''}{formatCurrency(netWorthDelta)}
+                {netWorthDelta >= 0 ? '+' : ''}{fc(netWorthDelta)}
               </span>
             )}
             <span>{formatDate(checkin.savedAt)}</span>
@@ -236,12 +249,12 @@ function CheckinHistoryCard({
         <div className="border-t border-[var(--border-ed)] px-4 py-4 space-y-4">
           {/* Metrics grid */}
           <div className="grid grid-cols-2 gap-3">
-            <MiniMetric label="Netto vermogen" value={formatCurrency(metrics.netWorth)} />
-            <MiniMetric label="Inkomen" value={formatCurrency(metrics.monthlyIncome)} />
-            <MiniMetric label="Uitgaven" value={formatCurrency(metrics.monthlyExpenses)} />
+            <MiniMetric label="Netto vermogen" value={fc(metrics.netWorth)} />
+            <MiniMetric label="Inkomen" value={fc(metrics.monthlyIncome)} />
+            <MiniMetric label="Uitgaven" value={fc(metrics.monthlyExpenses)} />
             <MiniMetric
               label="Gespaard"
-              value={formatCurrency(metrics.monthlySavings)}
+              value={fc(metrics.monthlySavings)}
               positive={metrics.monthlySavings > 0}
             />
           </div>

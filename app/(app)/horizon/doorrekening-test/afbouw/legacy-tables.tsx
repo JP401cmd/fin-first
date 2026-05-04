@@ -1,7 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { formatCurrency } from '@/lib/format'
+import { useMemo, useState, useCallback } from 'react'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware currency formatter hook used by the sub-tables below. */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { NL_AOW_AGE, NL_SWR } from '@/lib/constants'
 import {
   computeTableSchedule,
@@ -60,6 +67,7 @@ function WithdrawalSubTable({
   rows: WithdrawalRow[]
   isActive?: boolean
 }) {
+  const fc = useFc()
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : sampleRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
@@ -104,19 +112,19 @@ function WithdrawalSubTable({
                     )}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.startBalance)}
+                    {fc(row.startBalance)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                    -{formatCurrency(row.withdrawal)}
+                    -{fc(row.withdrawal)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
-                    {row.aowIncome > 0 ? `+${formatCurrency(row.aowIncome)}` : '\u2014'}
+                    {row.aowIncome > 0 ? `+${fc(row.aowIncome)}` : '\u2014'}
                   </td>
                   <td className={`px-3 py-1 text-right font-mono tabular-nums ${row.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {row.growth >= 0 ? '+' : ''}{formatCurrency(row.growth)}
+                    {row.growth >= 0 ? '+' : ''}{fc(row.growth)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.endBalance)}
+                    {fc(row.endBalance)}
                   </td>
                 </tr>
               ))}
@@ -125,19 +133,19 @@ function WithdrawalSubTable({
               <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
                 <td className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal ({rows.length}j)</td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[0]?.startBalance ?? 0)}
+                  {fc(rows[0]?.startBalance ?? 0)}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                  -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                  -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                  +{formatCurrency(rows.reduce((s, r) => s + r.aowIncome, 0))}
+                  +{fc(rows.reduce((s, r) => s + r.aowIncome, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                  +{formatCurrency(rows.reduce((s, r) => s + r.growth, 0))}
+                  +{fc(rows.reduce((s, r) => s + r.growth, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[rows.length - 1]?.endBalance ?? 0)}
+                  {fc(rows[rows.length - 1]?.endBalance ?? 0)}
                 </td>
               </tr>
             </tfoot>
@@ -174,6 +182,7 @@ function BucketSubTable({
   rows: BucketRow[]
   isActive?: boolean
 }) {
+  const fc = useFc()
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : sampleRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
@@ -218,19 +227,19 @@ function BucketSubTable({
                     )}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.cash)}
+                    {fc(row.cash)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.bonds)}
+                    {fc(row.bonds)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.equity)}
+                    {fc(row.equity)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.total)}
+                    {fc(row.total)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                    -{formatCurrency(row.withdrawal)}
+                    -{fc(row.withdrawal)}
                   </td>
                 </tr>
               ))}
@@ -240,7 +249,7 @@ function BucketSubTable({
                 <td className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal ({rows.length}j)</td>
                 <td colSpan={4} />
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                  -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                  -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                 </td>
               </tr>
             </tfoot>
@@ -287,6 +296,7 @@ export function LegacyStrategyTables({
   legacyAmount: number
   activeWithdrawalStrategy?: string
 }) {
+  const fc = useFc()
   const totalYears = Math.max(0, endAge - retirementAge)
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
 
@@ -334,16 +344,16 @@ export function LegacyStrategyTables({
       {/* Info strip with key figures */}
       <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5 text-xs text-[var(--ink-3)]">
         Vier onttrekkingsmethoden die een doelvermogen van{' '}
-        <span className="font-semibold text-[var(--ink-2)]">{formatCurrency(legacyAmount)}</span>{' '}
+        <span className="font-semibold text-[var(--ink-2)]">{fc(legacyAmount)}</span>{' '}
         nalaten bij leeftijd {endAge}. Contante waarde bij pensioen:{' '}
-        <span className="font-semibold text-[var(--ink-2)]">{formatCurrency(Math.round(pvLegacy))}</span>.{' '}
+        <span className="font-semibold text-[var(--ink-2)]">{fc(Math.round(pvLegacy))}</span>.{' '}
         Beschikbaar voor onttrekking:{' '}
-        <span className="font-semibold text-[var(--ink-2)]">{formatCurrency(Math.round(availableForWithdrawal))}</span>.
+        <span className="font-semibold text-[var(--ink-2)]">{fc(Math.round(availableForWithdrawal))}</span>.
       </div>
 
       <WithdrawalSubTable
         label="A. SWR — Vaste onttrekking (met nalatenschap)"
-        subtitle={`Jaarlijkse onttrekking: (portfolio \u2212 CW nalatenschap) \u00d7 SWR (${(NL_SWR * 100).toFixed(2)}%) = ${formatCurrency(Math.round(swrAnnual))}/jr`}
+        subtitle={`Jaarlijkse onttrekking: (portfolio \u2212 CW nalatenschap) \u00d7 SWR (${(NL_SWR * 100).toFixed(2)}%) = ${fc(Math.round(swrAnnual))}/jr`}
         rows={swrRows}
         isActive={activeWithdrawalStrategy === 'swr'}
       />
@@ -364,7 +374,7 @@ export function LegacyStrategyTables({
 
       <BucketSubTable
         label="D. Bucket — Emmerstrategie (met nalatenschapsbuffer)"
-        subtitle={`Drie emmers + buffer van ${formatCurrency(legacyAmount)} in aandelen. Cash (2j, 0%), Obligaties (5j, ${(BOND_RETURN * 100).toFixed(0)}%), Aandelen (rest).`}
+        subtitle={`Drie emmers + buffer van ${fc(legacyAmount)} in aandelen. Cash (2j, 0%), Obligaties (5j, ${(BOND_RETURN * 100).toFixed(0)}%), Aandelen (rest).`}
         rows={bucketRows}
         isActive={activeWithdrawalStrategy === 'bucket'}
       />

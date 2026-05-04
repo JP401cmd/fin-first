@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import type { Budget } from '@/lib/budget-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface EnvelopeTransferSheetProps {
   budgets: BudgetWithChildren[]
@@ -135,7 +136,7 @@ export function EnvelopeTransferSheet({
                   const lim = getEffectiveLimitForBudget(b.id, Number(b.default_limit))
                   return (
                     <option key={b.id} value={b.id}>
-                      {b.name} — {formatCurrency(lim)}
+                      {b.name} — {<MaskedAmount value={lim} tone="wil" />}
                     </option>
                   )
                 })}
@@ -144,7 +145,7 @@ export function EnvelopeTransferSheet({
           </select>
           {fromBudget && (
             <p className="mt-1 text-xs text-[var(--ink-3)]">
-              Huidig limiet: <span className="font-mono font-medium">{formatCurrency(fromCurrentLimit)}</span>
+              Huidig limiet: <span className="font-mono font-medium">{<MaskedAmount value={fromCurrentLimit} tone="wil" />}</span>
             </p>
           )}
         </div>
@@ -171,7 +172,7 @@ export function EnvelopeTransferSheet({
                   const lim = getEffectiveLimitForBudget(b.id, Number(b.default_limit))
                   return (
                     <option key={b.id} value={b.id} disabled={b.id === fromId}>
-                      {b.name} — {formatCurrency(lim)}
+                      {b.name} — {<MaskedAmount value={lim} tone="wil" />}
                     </option>
                   )
                 })}
@@ -180,7 +181,7 @@ export function EnvelopeTransferSheet({
           </select>
           {toBudget && (
             <p className="mt-1 text-xs text-[var(--ink-3)]">
-              Huidig limiet: <span className="font-mono font-medium">{formatCurrency(toCurrentLimit)}</span>
+              Huidig limiet: <span className="font-mono font-medium">{<MaskedAmount value={toCurrentLimit} tone="wil" />}</span>
             </p>
           )}
         </div>
@@ -207,11 +208,11 @@ export function EnvelopeTransferSheet({
           <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-3 font-mono text-sm">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">{fromBudget.name} wordt</span>
-              <span className="tabular-nums text-kern-700">{formatCurrency(fromCurrentLimit - transferAmount)}</span>
+              <span className="tabular-nums text-kern-700">{<MaskedAmount value={fromCurrentLimit - transferAmount} tone="wil" />}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">{toBudget.name} wordt</span>
-              <span className="tabular-nums text-emerald-700">{formatCurrency(toCurrentLimit + transferAmount)}</span>
+              <span className="tabular-nums text-emerald-700">{<MaskedAmount value={toCurrentLimit + transferAmount} tone="wil" />}</span>
             </div>
           </div>
         )}

@@ -11,6 +11,7 @@ import { BottomNav } from '@/components/app/bottom-nav'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { ToastProvider } from '@/components/app/toast-provider'
+import { GlobalSyncProvider } from '@/components/sync/global-sync-provider'
 import { PrivacyProvider } from '@/lib/hooks/use-privacy'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
@@ -169,6 +170,7 @@ export default async function AppLayout({
           <PerspectiveProvider>
             <ChatProvider>
               <NotificationProvider>
+              <GlobalSyncProvider>
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
                   <DashboardTypeProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
@@ -189,6 +191,7 @@ export default async function AppLayout({
                   </DashboardTypeProvider>
                 </ModuleColorProvider>
                 <NotificationModal />
+              </GlobalSyncProvider>
               </NotificationProvider>
             </ChatProvider>
           </PerspectiveProvider>

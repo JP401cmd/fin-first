@@ -1,4 +1,8 @@
-import { formatCurrency } from '@/lib/format'
+'use client'
+
+import { useCallback } from 'react'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 interface KassabonRow {
   label: string
@@ -20,6 +24,8 @@ export function KassabonTable({
   totalLabel?: string
   footer?: string
 }) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   return (
     <div className="kassabon-block rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] p-4 font-mono text-sm">
       {title && (
@@ -38,7 +44,7 @@ export function KassabonTable({
               )}
             </span>
             <span className="shrink-0 tabular-nums font-dm-mono text-xs">
-              {formatCurrency(row.value)}
+              {fc(row.value)}
             </span>
           </div>
         ))}
@@ -49,7 +55,7 @@ export function KassabonTable({
           <div className="my-2 border-t-2 border-[var(--ink)]" />
           <div className="flex items-baseline justify-between font-bold text-[var(--ink)]">
             <span className="font-inter text-xs">{total.label || totalLabel}</span>
-            <span className="font-dm-mono text-sm tabular-nums">{formatCurrency(total.value)}</span>
+            <span className="font-dm-mono text-sm tabular-nums">{fc(total.value)}</span>
           </div>
         </>
       )}

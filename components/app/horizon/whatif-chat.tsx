@@ -6,12 +6,13 @@ import { DefaultChatTransport } from 'ai'
 import { WillDots } from '@/components/app/will-dots'
 import { LIFE_EVENT_CATALOG } from '@/lib/horizon-data'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
-import { formatCurrency } from '@/lib/format'
+
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from '@/components/app/chat/markdown-helpers'
 import {
   Send, Loader2, Check, Calendar, Target, Clock, Plus,
 } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,13 +107,13 @@ function LifeEventSuggestionCard({
         <p className="mt-1 text-xs leading-snug text-[var(--ink-3)]">{data.explanation}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
           {data.one_time_cost > 0 && (
-            <span>{formatCurrency(data.one_time_cost)} eenmalig</span>
+            <span>{<MaskedAmount value={data.one_time_cost} tone="horizon" />} eenmalig</span>
           )}
           {data.monthly_cost_change !== 0 && (
-            <span>{formatCurrency(data.monthly_cost_change)}/mnd</span>
+            <span>{<MaskedAmount value={data.monthly_cost_change} tone="horizon" />}/mnd</span>
           )}
           {data.monthly_income_change !== 0 && (
-            <span>{data.monthly_income_change > 0 ? '+' : ''}{formatCurrency(data.monthly_income_change)}/mnd inkomen</span>
+            <span>{data.monthly_income_change > 0 ? '+' : ''}{<MaskedAmount value={data.monthly_income_change} tone="horizon" />}/mnd inkomen</span>
           )}
           {data.target_age != null && (
             <span>leeftijd {data.target_age}</span>
@@ -178,7 +179,7 @@ function ActionSuggestionCard({
             </span>
           )}
           {data.euro_impact_monthly != null && data.euro_impact_monthly !== 0 && (
-            <span>{formatCurrency(data.euro_impact_monthly)}/mnd</span>
+            <span>{<MaskedAmount value={data.euro_impact_monthly} tone="horizon" />}/mnd</span>
           )}
         </div>
       </div>

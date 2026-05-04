@@ -10,6 +10,7 @@ import {
   DEBT_TYPE_LABELS,
   debtProjection,
 } from '@/lib/debt-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -313,7 +314,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
             Totale schuld
           </span>
           <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
-            {formatCurrency(totalDebt)}
+            {<MaskedAmount value={totalDebt} tone="horizon" />}
           </span>
         </div>
 
@@ -336,14 +337,14 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
                         {debt.name}
                       </p>
                       <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">
-                        {formatCurrency(debt.monthly_payment)}/mnd
+                        {<MaskedAmount value={debt.monthly_payment} tone="horizon" />}/mnd
                         {projection.payoffDate
                           ? ` · afgelost ${formatPayoffDate(projection.payoffDate)}`
                           : ''}
                       </p>
                     </div>
                     <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink)]">
-                      {formatCurrency(debt.current_balance)}
+                      {<MaskedAmount value={debt.current_balance} tone="horizon" />}
                     </span>
                   </div>
                 )
@@ -358,7 +359,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
             Totale maandlast
           </span>
           <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
-            {formatCurrency(totalMonthlyPayment)}/mnd
+            {<MaskedAmount value={totalMonthlyPayment} tone="horizon" />}/mnd
           </span>
         </div>
 
@@ -369,7 +370,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
               Totale rentelast
             </span>
             <span className="font-mono text-sm tabular-nums text-[var(--negative)]">
-              {formatCurrency(baselineInterest)}
+              {<MaskedAmount value={baselineInterest} tone="horizon" />}
             </span>
           </div>
         )}
@@ -414,7 +415,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
                       >
                         <td className="px-2 py-1.5">
                           <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                            {formatCurrency(scenario.extraPerMonth)}
+                            {<MaskedAmount value={scenario.extraPerMonth} tone="horizon" />}
                           </span>
                           <span className="ml-1 text-[10px] text-[var(--ink-4)]">
                             ({scenario.label})
@@ -458,7 +459,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
                         </td>
                         <td />
                         <td className="px-2 py-1.5 text-right font-mono text-xs font-semibold tabular-nums text-[var(--positive)]">
-                          {formatCurrency(maxSaved)}
+                          {<MaskedAmount value={maxSaved} tone="horizon" />}
                         </td>
                         <td />
                       </tr>
@@ -468,7 +469,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
               </table>
             </div>
             <p className="text-[10px] leading-relaxed text-[var(--ink-4)]">
-              Na aflossing gaat je maandlast ({formatCurrency(totalMonthlyPayment)}/mnd) naar besparingen — dit versnelt je pad naar FIRE.
+              Na aflossing gaat je maandlast ({<MaskedAmount value={totalMonthlyPayment} tone="horizon" />}/mnd) naar besparingen — dit versnelt je pad naar FIRE.
             </p>
           </div>
         )}

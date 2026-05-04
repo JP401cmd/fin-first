@@ -2,7 +2,8 @@
 
 import { memo, useMemo, useState } from 'react'
 import { Home, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import {
   analyzeHuisVerkopen,
@@ -11,6 +12,7 @@ import {
 } from '@/lib/phase-analysis'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // -- Types --------------------------------------------------------------------
 
@@ -60,8 +62,8 @@ function aanbevelingKort(a: HuisVerkopenResult['aanbeveling']): {
 }
 
 /** Format a monthly cost value as a readable string. */
-function formatMonthly(yearly: number): string {
-  return formatCurrency(Math.round(yearly / 12)) + '/mnd'
+function formatMonthly(yearly: number, masked: boolean): string {
+  return formatMaskedCurrency(Math.round(yearly / 12), masked) + '/mnd'
 }
 
 /** Growth rate scenarios for sensitivity analysis. */
@@ -86,6 +88,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
   expectedReturn,
   inflationRate,
 }: HuisVerkopenProps) {
+  const { masked } = useMaskedAmounts()
   // Build base input from assets/debts (shared across all scenarios)
   const baseInput = useMemo<HuisVerkopenInput | null>(() => {
     const house = assets.find((a) => a.asset_type === 'eigen_huis')
@@ -167,7 +170,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
       icon={Home}
       willContext={
         hasHouse
-          ? `Huis verkopen analyse: aanbeveling ${result.aanbeveling}. Verschil: ${formatCurrency(result.verschil)} over 20 jaar. Breakeven huur: ${formatCurrency(result.breakevenHuur)}/mnd.`
+          ? `Huis verkopen analyse: aanbeveling ${result.aanbeveling}. Verschil: ${formatMaskedCurrency(result.verschil, masked)} over 20 jaar. Breakeven huur: ${formatMaskedCurrency(result.breakevenHuur, masked)}/mnd.`
           : 'Huis verkopen analyse: niet beschikbaar — geen eigen woning in portefeuille.'
       }
     >
@@ -203,10 +206,10 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   Maandelijkse woonlasten
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatMonthly(result.behouden.totaleCumulatieveKosten / 20)}
+                  {formatMonthly(result.behouden.totaleCumulatieveKosten / 20, masked)}
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatMonthly(result.verkopen.totaleCumulatieveHuur / 20)}
+                  {formatMonthly(result.verkopen.totaleCumulatieveHuur / 20, masked)}
                 </td>
               </tr>
 
@@ -219,7 +222,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   &ndash;
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--positive)]">
-                  {formatCurrency(result.verkopen.nettoVerkoopopbrengst)}
+                  {<MaskedAmount value={result.verkopen.nettoVerkoopopbrengst} tone="horizon" />}
                 </td>
               </tr>
 
@@ -229,10 +232,10 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   Rendement op vermogen
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(Math.round(result.behouden.woningWaardeNaHorizon - (assets.find(a => a.asset_type === 'eigen_huis')?.current_value ?? 0)))}
+                  {<MaskedAmount value={Math.round(result.behouden.woningWaardeNaHorizon - (assets.find(a => a.asset_type === 'eigen_huis')?.current_value ?? 0))} tone="horizon" />}
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(Math.round(result.verkopen.beleggingswaarde - result.verkopen.nettoVerkoopopbrengst + result.verkopen.totaleCumulatieveHuur))}
+                  {<MaskedAmount value={Math.round(result.verkopen.beleggingswaarde - result.verkopen.nettoVerkoopopbrengst + result.verkopen.totaleCumulatieveHuur)} tone="horizon" />}
                 </td>
               </tr>
 
@@ -248,7 +251,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                       : 'text-[var(--ink)]'
                   }`}
                 >
-                  {formatCurrency(result.behouden.nettoPositie)}
+                  {<MaskedAmount value={result.behouden.nettoPositie} tone="horizon" />}
                 </td>
                 <td
                   className={`px-1 py-1.5 text-right font-mono tabular-nums font-semibold ${
@@ -257,7 +260,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                       : 'text-[var(--ink)]'
                   }`}
                 >
-                  {formatCurrency(result.verkopen.nettoPositie)}
+                  {<MaskedAmount value={result.verkopen.nettoPositie} tone="horizon" />}
                 </td>
               </tr>
             </tbody>
@@ -308,10 +311,10 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                           )}
                         </td>
                         <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                          {formatCurrency(row.result.behouden.nettoPositie)}
+                          {<MaskedAmount value={row.result.behouden.nettoPositie} tone="horizon" />}
                         </td>
                         <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                          {formatCurrency(row.result.verkopen.nettoPositie)}
+                          {<MaskedAmount value={row.result.verkopen.nettoPositie} tone="horizon" />}
                         </td>
                         <td
                           className={`px-1 py-1.5 text-right font-mono tabular-nums ${
@@ -323,7 +326,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                           }`}
                         >
                           {row.result.verschil > 0 ? '+' : ''}
-                          {formatCurrency(row.result.verschil)}
+                          {<MaskedAmount value={row.result.verschil} tone="horizon" />}
                         </td>
                         <td className={`px-1 py-1.5 text-right text-[11px] font-semibold ${label.colorClass}`}>
                           {label.text}
@@ -350,7 +353,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
               <div className="flex items-baseline justify-between">
                 <span className="text-[var(--ink-3)]">Huidige overwaarde</span>
                 <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(opportunityData.netEquity)}
+                  {<MaskedAmount value={opportunityData.netEquity} tone="horizon" />}
                 </span>
               </div>
               <div className="flex items-baseline justify-between">
@@ -358,7 +361,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   Belegd rendement ({(expectedReturn * 100).toFixed(1)}%, {baseInput.horizonJaren} jr)
                 </span>
                 <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(opportunityData.fvInvested)}
+                  {<MaskedAmount value={opportunityData.fvInvested} tone="horizon" />}
                 </span>
               </div>
               <div className="flex items-baseline justify-between">
@@ -366,7 +369,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   Woningwaarde na {baseInput.horizonJaren} jr
                 </span>
                 <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(opportunityData.houseEquityAtEnd)}
+                  {<MaskedAmount value={opportunityData.houseEquityAtEnd} tone="horizon" />}
                 </span>
               </div>
               <div className="flex items-baseline justify-between border-t border-[var(--ink)] pt-1.5">
@@ -383,7 +386,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   }`}
                 >
                   {opportunityData.opportuniteitskosten > 0 ? '+' : ''}
-                  {formatCurrency(opportunityData.opportuniteitskosten)}
+                  {<MaskedAmount value={opportunityData.opportuniteitskosten} tone="horizon" />}
                 </span>
               </div>
             </div>
@@ -393,7 +396,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   Door je overwaarde in het huis te laten zitten in plaats van te beleggen,
                   loop je over {baseInput.horizonJaren} jaar{' '}
                   <span className="font-mono tabular-nums text-[var(--negative)]">
-                    {formatCurrency(opportunityData.opportuniteitskosten)}
+                    {<MaskedAmount value={opportunityData.opportuniteitskosten} tone="horizon" />}
                   </span>{' '}
                   aan potentieel rendement mis.
                 </>
@@ -402,7 +405,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   De woningwaardestijging overtreft het verwachte beleggingsrendement.
                   Je overwaarde levert in het huis{' '}
                   <span className="font-mono tabular-nums text-[var(--positive)]">
-                    {formatCurrency(Math.abs(opportunityData.opportuniteitskosten))}
+                    {<MaskedAmount value={Math.abs(opportunityData.opportuniteitskosten)} tone="horizon" />}
                   </span>{' '}
                   meer op dan belegd vermogen.
                 </>
@@ -416,7 +419,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
           <div className="flex items-baseline justify-between">
             <span className="text-xs text-[var(--ink-3)]">Breakeven huur</span>
             <span className="font-mono text-xs tabular-nums text-[var(--ink-2)]">
-              {formatCurrency(result.breakevenHuur)}/mnd
+              {<MaskedAmount value={result.breakevenHuur} tone="horizon" />}/mnd
             </span>
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
@@ -424,7 +427,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
               <>
                 Bij de huidige uitgangspunten is verkopen en huren over 20 jaar{' '}
                 <span className="font-mono tabular-nums text-[var(--positive)]">
-                  {formatCurrency(Math.abs(result.verschil))}
+                  {<MaskedAmount value={Math.abs(result.verschil)} tone="horizon" />}
                 </span>{' '}
                 voordeliger.
               </>
@@ -433,7 +436,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
               <>
                 Bij de huidige uitgangspunten is het huis behouden over 20 jaar{' '}
                 <span className="font-mono tabular-nums text-[var(--color-kern-500)]">
-                  {formatCurrency(Math.abs(result.verschil))}
+                  {<MaskedAmount value={Math.abs(result.verschil)} tone="horizon" />}
                 </span>{' '}
                 voordeliger.
               </>
@@ -472,7 +475,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
 
 // ── Assumption row helper ────────────────────────────────────────────────────
 
-function AssumptionRow({ label, value }: { label: string; value: string }) {
+function AssumptionRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between py-0.5">
       <span className="font-sans text-xs text-[var(--ink-3)]">{label}</span>
@@ -500,6 +503,7 @@ function AannameSectie({
   expectedReturn: number
   inflationRate: number
 }) {
+  const { masked } = useMaskedAmounts()
   const [open, setOpen] = useState(false)
 
   return (
@@ -526,11 +530,11 @@ function AannameSectie({
             />
             <AssumptionRow
               label="Woonlasten (OZB/VvE/onderhoud)"
-              value={formatCurrency(maandlastOverig) + '/mnd'}
+              value={formatMaskedCurrency(maandlastOverig, masked) + '/mnd'}
             />
             <AssumptionRow
               label="Verwachte huur"
-              value={formatCurrency(verwachteHuur) + '/mnd'}
+              value={formatMaskedCurrency(verwachteHuur, masked) + '/mnd'}
             />
             <AssumptionRow
               label="Verkoopkosten"

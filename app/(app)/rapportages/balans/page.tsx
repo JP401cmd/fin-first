@@ -1,9 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency, formatTimestamp } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import {
+  FiguresStrip,
+  ScenarioCallout,
+  SectionLabel,
+  OrnamentColophon,
+} from '@/components/editorial'
+
+/**
+ * Masked-aware currency formatter hook. Returns a stable callback that
+ * yields either the masked placeholder or a formatted EUR string based on
+ * the global privacy toggle.
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import type { BalansData, BalansCategory } from '@/app/api/report/balans/route'
 import { eurToFreedomTime } from '@/components/app/freedom-time-label'
 
@@ -11,6 +28,7 @@ import { eurToFreedomTime } from '@/components/app/freedom-time-label'
 
 /** Renders a balance category with sub-groups organized by type */
 function BalansCategoryBlock({ category, sign }: { category: BalansCategory; sign?: 'negative' }) {
+  const fc = useFc()
   if (category.items.length === 0) return null
   const neg = sign === 'negative'
   const hasSubGroups = category.subGroups.length > 1
@@ -38,8 +56,8 @@ function BalansCategoryBlock({ category, sign }: { category: BalansCategory; sig
               {group.items.length > 1 && (
                 <div className="mt-0.5 flex justify-between pl-2 text-[var(--ink-3)]">
                   <span className="font-inter text-[10px] italic">Subtotaal {group.label.toLowerCase()}</span>
-                  <span className={`font-dm-mono text-[10px] tabular-nums ${neg ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
-                    {formatCurrency(group.subtotal)}
+                  <span className={`font-dm-mono text-[10px] tabular-nums ${neg ? 'text-[var(--negative)]' : 'text-[var(--ink-2)]'}`}>
+                    {fc(group.subtotal)}
                   </span>
                 </div>
               )}
@@ -58,8 +76,8 @@ function BalansCategoryBlock({ category, sign }: { category: BalansCategory; sig
       {/* Category subtotal */}
       <div className="mt-1.5 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1">
         <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">{category.label}</span>
-        <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${neg ? 'text-red-700' : 'text-[var(--ink)]'}`}>
-          {formatCurrency(category.subtotal)}
+        <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${neg ? 'text-[var(--negative)]' : 'text-[var(--ink)]'}`}>
+          {fc(category.subtotal)}
         </span>
       </div>
     </div>
@@ -67,6 +85,7 @@ function BalansCategoryBlock({ category, sign }: { category: BalansCategory; sig
 }
 
 function BalansItemRow({ item, neg }: { item: { id: string; name: string; value: number; inclusionPct: number; interestRate?: number }; neg: boolean }) {
+  const fc = useFc()
   return (
     <div className="flex justify-between gap-2 py-px">
       <span className="truncate font-source-serif text-[13px] text-[var(--ink-2)]">
@@ -78,8 +97,8 @@ function BalansItemRow({ item, neg }: { item: { id: string; name: string; value:
           <span className="ml-1 font-dm-mono text-[10px] text-[var(--ink-4)]">{item.interestRate}%</span>
         )}
       </span>
-      <span className={`shrink-0 font-dm-mono text-[13px] tabular-nums ${neg ? 'text-red-700' : 'text-[var(--ink)]'}`}>
-        {formatCurrency(item.value)}
+      <span className={`shrink-0 font-dm-mono text-[13px] tabular-nums ${neg ? 'text-[var(--negative)]' : 'text-[var(--ink)]'}`}>
+        {fc(item.value)}
       </span>
     </div>
   )
@@ -91,8 +110,8 @@ function KengetalRow({ label, value, variant, tooltip }: {
   variant?: 'positive' | 'negative' | 'neutral'
   tooltip?: string
 }) {
-  const colorClass = variant === 'positive' ? 'text-kern-600'
-    : variant === 'negative' ? 'text-red-600'
+  const colorClass = variant === 'positive' ? 'text-[var(--positive)]'
+    : variant === 'negative' ? 'text-[var(--negative)]'
     : 'text-[var(--ink)]'
 
   return (
@@ -111,6 +130,7 @@ function KengetalRow({ label, value, variant, tooltip }: {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function BalansPage() {
+  const fc = useFc()
   const router = useRouter()
   const searchParams = useSearchParams()
   const date = searchParams.get('date') || new Date().toISOString().split('T')[0]
@@ -141,7 +161,7 @@ export default function BalansPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent" />
           <p className="font-inter text-sm text-[var(--ink-3)]">Balans wordt opgesteld...</p>
         </div>
       </div>
@@ -166,13 +186,7 @@ export default function BalansPage() {
     day: 'numeric',
   })
 
-  const generatedDate = new Date(data.generatedAt).toLocaleDateString('nl-NL', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const generatedDate = formatTimestamp(data.generatedAt)
 
   const freedom = data.dailyExpenseRate > 0 && data.eigenVermogen >= 100
     ? eurToFreedomTime(data.eigenVermogen, data.dailyExpenseRate)
@@ -242,6 +256,47 @@ export default function BalansPage() {
         </div>
       </div>
 
+      {/* ── Methodologie-callout — uitleg vóór de cijfers ── */}
+      <ScenarioCallout title="Hoe deze balans is opgesteld">
+        Activa worden gewaardeerd op marktwaarde per peildatum. Schulden op restschuld
+        inclusief opgebouwde rente. Eigen vermogen is het verschil — wat overblijft als
+        alles vandaag verkocht en alle schulden afbetaald zouden worden.
+      </ScenarioCallout>
+
+      {/* ── Mini-hero figures-strip — 4 hoofdgetallen, eigen vermogen als winnaar ── */}
+      <FiguresStrip
+        cols={4}
+        figures={[
+          {
+            kicker: 'Activa',
+            amount: fc(data.totalActiva),
+            sub: `${totalAssetItems} ${totalAssetItems === 1 ? 'bezitting' : 'bezittingen'}`,
+            variant: 'neutral',
+          },
+          {
+            kicker: 'Passiva',
+            amount: fc(data.totalPassiva),
+            sub: `${totalDebtItems} ${totalDebtItems === 1 ? 'schuld' : 'schulden'}`,
+            variant: 'neutral',
+          },
+          {
+            kicker: 'Eigen vermogen',
+            amount: fc(data.eigenVermogen),
+            sub: 'netto',
+            // Hoofduitkomst → highlight-marker. Cross-module fallback = Horizon-200.
+            variant: 'winner',
+          },
+          {
+            kicker: 'Vrijheidstijd',
+            amount: freedom?.formatted ?? '—',
+            sub: data.dailyExpenseRate > 0
+              ? `${fc(Math.round(data.dailyExpenseRate))}/dag`
+              : 'geen rate',
+            variant: 'neutral',
+          },
+        ]}
+      />
+
       {/* ── Dateline ── */}
       <div className="mb-6 flex items-center justify-between border-b border-[var(--border-ed)] pb-2">
         <span className="font-inter text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-3)]">
@@ -259,18 +314,36 @@ export default function BalansPage() {
          ════════════════════════════════════════════════════════════════════════ */}
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
 
-        {/* Column headers */}
+        {/* Column headers — met Romeinse num rechts (i. / ii.) als editorial sectie-marker */}
         <div className="grid grid-cols-1 md:grid-cols-2">
           <div className="border-b-2 border-[var(--ink)] bg-[var(--subtle)]/40 px-5 py-2.5">
-            <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink)]">
-              Activa <span className="font-normal text-[var(--ink-3)]">(debet)</span>
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink)]">
+                Activa <span className="font-normal text-[var(--ink-3)]">(debet)</span>
+              </p>
+              <span
+                className="italic text-sm text-[var(--module-active-700)] shrink-0"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                aria-hidden
+              >
+                i.
+              </span>
+            </div>
             <p className="mt-0.5 font-source-serif text-[11px] italic text-[var(--ink-3)]">Wat je bezit</p>
           </div>
           <div className="border-b-2 border-[var(--ink)] border-l-0 md:border-l border-[var(--border-ed)] bg-[var(--subtle)]/40 px-5 py-2.5">
-            <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink)]">
-              Passiva <span className="font-normal text-[var(--ink-3)]">(credit)</span>
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink)]">
+                Passiva <span className="font-normal text-[var(--ink-3)]">(credit)</span>
+              </p>
+              <span
+                className="italic text-sm text-[var(--module-active-700)] shrink-0"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                aria-hidden
+              >
+                ii.
+              </span>
+            </div>
             <p className="mt-0.5 font-source-serif text-[11px] italic text-[var(--ink-3)]">Hoe het gefinancierd is</p>
           </div>
         </div>
@@ -290,11 +363,11 @@ export default function BalansPage() {
             {/* III. Liquide middelen (bank accounts) */}
             <BalansCategoryBlock category={data.liquideMiddelen} />
 
-            {/* ═══ TOTAAL ACTIVA ═══ */}
-            <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2">
+            {/* ═══ TOTAAL ACTIVA — boekhoudkundige sluitstreep (dubbele-lijn-finale) ═══ */}
+            <div className="mt-2 flex justify-between border-b-4 border-double border-[var(--ink)] pt-2 pb-2">
               <span className="font-inter text-sm font-bold text-[var(--ink)]">Totaal activa</span>
               <span className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">
-                {formatCurrency(data.totalActiva)}
+                {fc(data.totalActiva)}
               </span>
             </div>
           </div>
@@ -311,17 +384,18 @@ export default function BalansPage() {
                 <span className="font-source-serif text-[13px] text-[var(--ink-2)]">
                   Netto vermogen
                 </span>
-                <span className={`font-dm-mono text-[13px] font-medium tabular-nums ${data.eigenVermogen >= 0 ? 'text-kern-700' : 'text-red-700'}`}>
-                  {formatCurrency(data.eigenVermogen)}
+                <span className={`font-dm-mono text-[13px] font-medium tabular-nums ${data.eigenVermogen >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+                  {fc(data.eigenVermogen)}
                 </span>
               </div>
               <p className="mt-0.5 font-inter text-[10px] italic text-[var(--ink-4)]">
-                Activa {formatCurrency(data.totalActiva)} − schulden {formatCurrency(data.totalSchulden)}
+                Activa {fc(data.totalActiva)} − schulden {fc(data.totalSchulden)}
               </p>
-              <div className="mt-1.5 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1">
+              {/* Eigen vermogen sluitstreep — dubbele-lijn-finale onder de hoofduitkomst */}
+              <div className="mt-1.5 flex justify-between border-b-4 border-double border-[var(--ink)] pt-1 pb-1">
                 <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">Eigen vermogen</span>
-                <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${data.eigenVermogen >= 0 ? 'text-kern-700' : 'text-red-700'}`}>
-                  {formatCurrency(data.eigenVermogen)}
+                <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${data.eigenVermogen >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+                  {fc(data.eigenVermogen)}
                 </span>
               </div>
             </div>
@@ -332,11 +406,11 @@ export default function BalansPage() {
             {/* III. Kort vreemd vermogen */}
             <BalansCategoryBlock category={data.kortVreemdVermogen} sign="negative" />
 
-            {/* ═══ TOTAAL PASSIVA ═══ */}
-            <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2">
+            {/* ═══ TOTAAL PASSIVA — boekhoudkundige sluitstreep (dubbele-lijn-finale) ═══ */}
+            <div className="mt-2 flex justify-between border-b-4 border-double border-[var(--ink)] pt-2 pb-2">
               <span className="font-inter text-sm font-bold text-[var(--ink)]">Totaal passiva</span>
               <span className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">
-                {formatCurrency(data.totalPassiva)}
+                {fc(data.totalPassiva)}
               </span>
             </div>
           </div>
@@ -345,21 +419,22 @@ export default function BalansPage() {
         {/* Balance check bar */}
         <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30 px-5 py-2 text-center">
           <span className="font-inter text-[10px] text-[var(--ink-4)]">
-            Activa {formatCurrency(data.totalActiva)} = Passiva {formatCurrency(data.totalPassiva)}
+            Activa {fc(data.totalActiva)} = Passiva {fc(data.totalPassiva)}
             {data.totalActiva === data.totalPassiva ? ' — in evenwicht' : ''}
           </span>
         </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════════
-          KENGETALLEN — Financiële gezondheid
+          KENGETALLEN — Financiële gezondheid (sectie iii.)
          ════════════════════════════════════════════════════════════════════════ */}
-      <div className="mt-8 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-5 font-mono text-sm">
+      <div className="mt-8">
+        {/* Sectie-label rij — kicker links + Romeinse num iii. rechts */}
+        <SectionLabel num="iii.">Kengetallen</SectionLabel>
+      </div>
+      <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-5 font-mono text-sm">
         <div className="mb-3 text-center">
-          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-            Kengetallen
-          </p>
-          <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
+          <p className="font-sans text-[10px] text-[var(--ink-3)]">
             Financiële gezondheid op {new Date(data.date).toLocaleDateString('nl-NL')}
           </p>
         </div>
@@ -373,17 +448,17 @@ export default function BalansPage() {
         <p className="mb-1 mt-2 font-sans text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vermogenspositie</p>
         <KengetalRow
           label="Eigen vermogen"
-          value={formatCurrency(data.eigenVermogen)}
+          value={fc(data.eigenVermogen)}
           variant={data.eigenVermogen >= 0 ? 'positive' : 'negative'}
         />
         <KengetalRow
           label="Totaal schulden"
-          value={formatCurrency(data.totalSchulden)}
+          value={fc(data.totalSchulden)}
           variant={data.totalSchulden > 0 ? 'negative' : 'neutral'}
         />
         <KengetalRow
           label="Balanstotaal"
-          value={formatCurrency(data.totalActiva)}
+          value={fc(data.totalActiva)}
         />
 
         <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
@@ -425,7 +500,7 @@ export default function BalansPage() {
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--border-ed)]">
                 <div
                   className={`h-full rounded-full transition-all ${
-                    data.solvabiliteitsratio >= 40 ? 'bg-kern-500' : data.solvabiliteitsratio >= 0 ? 'bg-horizon-500' : 'bg-red-500'
+                    data.solvabiliteitsratio >= 40 ? 'bg-[var(--positive)]' : data.solvabiliteitsratio >= 0 ? 'bg-[var(--module-active-500)]' : 'bg-[var(--negative)]'
                   }`}
                   style={{ width: `${Math.max(0, Math.min(100, data.solvabiliteitsratio))}%` }}
                 />
@@ -453,40 +528,46 @@ export default function BalansPage() {
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════════
-          VRIJHEIDSTIJD — TriFinity filosofie
+          VRIJHEIDSTIJD — TriFinity filosofie (sectie iv.)
+          Geen highlight-marker hier: de FiguresStrip-mini-hero heeft al een
+          winner-cell op eigen vermogen, en de skill verbiedt meer dan één
+          highlight per pagina-sectie.
          ════════════════════════════════════════════════════════════════════════ */}
       {freedom && (
-        <div className="mt-8 text-center">
-          <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)] mb-3">
-            Geld is opgeslagen tijd
-          </p>
-          <div className="inline-block rounded-[var(--r-lg)] border border-[var(--hor-m)] bg-[var(--hor-l)] px-8 py-5">
-            <p className="font-playfair text-4xl font-bold text-[var(--hor-t)]" style={{ letterSpacing: '-0.03em' }}>
-              {freedom.formatted}
+        <div className="mt-8">
+          {/* Sectie-label rij — kicker links + Romeinse num iv. rechts */}
+          <SectionLabel num="iv.">Vrijheidstijd</SectionLabel>
+          <div className="text-center">
+            <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)] mb-3">
+              Geld is opgeslagen tijd
             </p>
-            <p className="mt-1 font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--hor-t)]">
-              vrijheid
+            <div className="inline-block border border-[var(--module-active-300)] bg-[var(--module-active-50)]/40 px-8 py-5">
+              <p className="font-playfair text-4xl font-bold text-[var(--module-active-700)]" style={{ letterSpacing: '-0.03em' }}>
+                {freedom.formatted}
+              </p>
+              <p className="mt-1 font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--module-active-700)]">
+                vrijheid
+              </p>
+            </div>
+            <p className="mt-3 font-source-serif text-[13px] italic text-[var(--ink-3)]">
+              Je eigen vermogen van {fc(data.eigenVermogen)} vertegenwoordigt {freedom.formattedDagen} aan financiële vrijheid,
+              gebaseerd op je dagelijkse uitgaven van {fc(Math.round(data.dailyExpenseRate))}/dag.
             </p>
           </div>
-          <p className="mt-3 font-source-serif text-[13px] italic text-[var(--ink-3)]">
-            Je eigen vermogen van {formatCurrency(data.eigenVermogen)} vertegenwoordigt {freedom.formattedDagen} aan financiële vrijheid,
-            gebaseerd op je dagelijkse uitgaven van {formatCurrency(Math.round(data.dailyExpenseRate))}/dag.
-          </p>
         </div>
       )}
 
-      {/* ── Footer ── */}
-      <footer className="mt-10 border-t-2 border-[var(--ink)] pt-4 text-center">
+      {/* ── Footer — editorial colophon met "tf." monogram + ornament-meta ── */}
+      <div className="mt-10 border-t-4 border-double border-[var(--ink)]" />
+      <div className="text-center pt-4">
         <p className="font-playfair text-lg font-bold text-[var(--ink)]">
-          <span>t</span><span className="text-kern-600">f.</span>
+          <span>t</span><span style={{ color: 'var(--module-active-700)' }}>f.</span>
         </p>
         <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">
           &ldquo;Geld is opgeslagen tijd&rdquo;
         </p>
-        <p className="mt-2 font-inter text-[10px] text-[var(--ink-4)]">
-          Gegenereerd door TriFinity &middot; {generatedDate}
-        </p>
-      </footer>
+      </div>
+      <OrnamentColophon module="Balans" text={generatedDate} />
     </div>
   )
 }

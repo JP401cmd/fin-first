@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 
 interface Props {
@@ -53,8 +53,8 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
               {yearsToAow} jaar
             </p>
             <p className="text-[10px] text-[var(--ink-3)]">tot AOW-leeftijd ({aowAge})</p>
-            <p className="mt-1.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-              {formatCurrency(aowMonthly)}
+            <p className="mt-1.5 text-[var(--ink)]">
+              <MaskedAmount value={aowMonthly} tone="horizon" className="text-sm" />
             </p>
             <p className="text-[10px] text-[var(--ink-3)]">/maand (alleenstaand)</p>
           </>
@@ -95,20 +95,20 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
           <div className="space-y-0.5">
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-[var(--ink-3)]">Alleenstaand</span>
-              <span className="font-mono tabular-nums text-[var(--ink)]">
-                {formatCurrency(NL_AOW_MONTHLY)}/mnd
+              <span className="text-[var(--ink)]">
+                <MaskedAmount value={NL_AOW_MONTHLY} tone="horizon" />/mnd
               </span>
-              <span className="font-mono tabular-nums text-[var(--ink-3)]">
-                {formatCurrency(NL_AOW_MONTHLY * 12)}/jaar
+              <span className="text-[var(--ink-3)]">
+                <MaskedAmount value={NL_AOW_MONTHLY * 12} tone="horizon" />/jaar
               </span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-[var(--ink-3)]">Samenwonend</span>
-              <span className="font-mono tabular-nums text-[var(--ink)]">
-                {formatCurrency(NL_AOW_MONTHLY_SAMENWONEND)}/mnd
+              <span className="text-[var(--ink)]">
+                <MaskedAmount value={NL_AOW_MONTHLY_SAMENWONEND} tone="horizon" />/mnd
               </span>
-              <span className="font-mono tabular-nums text-[var(--ink-3)]">
-                {formatCurrency(NL_AOW_MONTHLY_SAMENWONEND * 12)}/jaar
+              <span className="text-[var(--ink-3)]">
+                <MaskedAmount value={NL_AOW_MONTHLY_SAMENWONEND * 12} tone="horizon" />/jaar
               </span>
             </div>
           </div>
@@ -128,7 +128,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
           </div>
           {selfSupplementMonthly > 0 && (
             <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
-              Zelf aanvullen: {formatCurrency(selfSupplementMonthly)}/mnd
+              Zelf aanvullen: <MaskedAmount value={selfSupplementMonthly} tone="horizon" />/mnd
             </p>
           )}
         </div>
@@ -141,20 +141,20 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
           <div className="space-y-0.5 text-[11px]">
             <div className="flex justify-between">
               <span className="text-[var(--ink-3)] truncate mr-2">AOW-vermogensequivalent</span>
-              <span className="font-mono tabular-nums text-[var(--ink)] shrink-0">
-                {formatCurrency(aowFireReduction)}
+              <span className="text-[var(--ink)] shrink-0">
+                <MaskedAmount value={aowFireReduction} tone="horizon" />
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--ink-3)] truncate mr-2">FIRE-pot v&oacute;&oacute;r AOW</span>
-              <span className="font-mono tabular-nums text-[var(--ink)] shrink-0">
-                {formatCurrency(data.fireTarget)}
+              <span className="text-[var(--ink)] shrink-0">
+                <MaskedAmount value={data.fireTarget} tone="horizon" />
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--ink-3)] truncate mr-2">FIRE-pot na AOW</span>
-              <span className="font-mono tabular-nums text-[var(--ink)] shrink-0">
-                {formatCurrency(postAowTarget)}
+              <span className="text-[var(--ink)] shrink-0">
+                <MaskedAmount value={postAowTarget} tone="horizon" />
               </span>
             </div>
           </div>
@@ -179,8 +179,8 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
             </p>
             <span className="text-[10px] text-[var(--ink-3)]">tot AOW ({aowAge})</span>
           </div>
-          <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-            {formatCurrency(aowMonthly)}/mnd
+          <p className="mt-1 text-[var(--ink)]">
+            <MaskedAmount value={aowMonthly} tone="horizon" className="text-sm" />/mnd
           </p>
           <p className="text-[10px] text-[var(--ink-3)]">(alleenstaand, netto)</p>
 
@@ -197,7 +197,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
 
           {/* FIRE pot reduction */}
           <p className="mt-2 text-xs text-[var(--ink-3)]">
-            Na AOW-leeftijd heb je {formatCurrency(aowFireReduction)} minder nodig
+            Na AOW-leeftijd heb je <MaskedAmount value={aowFireReduction} tone="horizon" /> minder nodig
           </p>
         </>
       ) : (

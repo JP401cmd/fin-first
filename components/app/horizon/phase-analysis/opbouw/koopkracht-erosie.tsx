@@ -5,6 +5,7 @@ import { ArrowDownRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,7 +100,7 @@ export const KoopkrachtErosie = memo(function KoopkrachtErosie({
             Koopkrachtverlies over {jaren} jaar
           </p>
           <p className="mt-1.5 font-mono text-xl tabular-nums text-[var(--negative)]">
-            −{formatCurrency(Math.round(erosie))}
+            −{<MaskedAmount value={Math.round(erosie)} tone="horizon" />}
           </p>
           {/* ── Progress bar for erosion share ────────────── */}
           <div className="mx-auto mt-2.5 max-w-[200px]">
@@ -119,20 +120,20 @@ export const KoopkrachtErosie = memo(function KoopkrachtErosie({
         <div className="flex items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Nominaal</p>
-            <p className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatCurrency(Math.round(nominaalEind))}</p>
+            <p className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(nominaalEind)} tone="horizon" />}</p>
           </div>
           <ArrowDownRight className="h-4 w-4 text-[var(--ink-4)]" />
           <div className="text-right">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Reëel</p>
-            <p className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatCurrency(Math.round(reeelEind))}</p>
+            <p className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(reeelEind)} tone="horizon" />}</p>
           </div>
         </div>
 
         {/* ── Planning context ─────────────────────────────── */}
         <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
           Bij {(inflationRate * 100).toFixed(1)}% inflatie is je eindvermogen
-          van {formatCurrency(Math.round(nominaalEind))} in werkelijkheid
-          {' '}{formatCurrency(Math.round(reeelEind))} waard in euro&apos;s van vandaag.
+          van {<MaskedAmount value={Math.round(nominaalEind)} tone="horizon" />} in werkelijkheid
+          {' '}{<MaskedAmount value={Math.round(reeelEind)} tone="horizon" />} waard in euro&apos;s van vandaag.
           {extraMaanden > 0 && (
             <> Dat is ruwweg <strong className="text-[var(--ink-2)]">{extraMaanden} maanden</strong> extra sparen om te compenseren.</>
           )}

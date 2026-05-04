@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
-import { formatCurrency } from '@/components/app/budget-shared'
+
 import {
   computeFireProjection, computeFireRange, projectForward,
   formatFireAge,
@@ -14,6 +14,7 @@ import { X, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { Kicker, HighlightMark } from '@/components/editorial'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type Props = {
   input: FinancialInput
@@ -211,7 +212,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
 
               <div>
                 <label className="text-xs font-medium text-[var(--ink-3)]">
-                  Extra maandelijkse inleg: {formatCurrency(extraMonthly)}
+                  Extra maandelijkse inleg: {<MaskedAmount value={extraMonthly} tone="horizon" />}
                 </label>
                 <input
                   type="range" min={0} max={2000} step={50} value={extraMonthly}
@@ -219,7 +220,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                   className="mt-1 w-full accent-horizon-600"
                 />
                 <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
-                  <span>{formatCurrency(0)}</span><span>{formatCurrency(2000)}</span>
+                  <span>{<MaskedAmount value={0} tone="horizon" />}</span><span>{<MaskedAmount value={2000} tone="horizon" />}</span>
                 </div>
               </div>
             </div>
@@ -310,7 +311,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-[var(--ink)]">{cf.name}</p>
                         <p className="text-[10px] text-[var(--ink-3)]">
-                          {formatCurrency(cf.monthlyAmount)}/mnd · v.a. leeftijd {cf.fromAge}
+                          {<MaskedAmount value={cf.monthlyAmount} tone="horizon" />}/mnd · v.a. leeftijd {cf.fromAge}
                           {cf.toAge !== null ? ` t/m ${cf.toAge}` : ' · levenslang'}
                         </p>
                       </div>

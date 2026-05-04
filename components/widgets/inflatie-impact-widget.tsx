@@ -3,6 +3,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface Props {
   size: WidgetSize
@@ -132,8 +133,8 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
                     -{formatCurrency(loss)}
                   </span>
                   {fireExtra != null && (
-                    <span className="font-mono tabular-nums text-horizon-700 text-right">
-                      +{formatCurrency(fireExtra)}
+                    <span className="text-horizon-700 text-right">
+                      <MaskedAmount value={fireExtra} signPrefix="+" tone="horizon" />
                     </span>
                   )}
                 </div>

@@ -1,7 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { formatCurrency } from '@/lib/format'
+import { useMemo, useState, useCallback } from 'react'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware currency formatter hook used across this file's tables. */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { NL_AOW_AGE } from '@/lib/constants'
 import {
   computeTableSchedule,
@@ -65,6 +72,7 @@ function WithdrawalSubTable({
   subtitle: string
   rows: WithdrawalRow[]
 }) {
+  const fc = useFc()
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : sampleRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
@@ -102,19 +110,19 @@ function WithdrawalSubTable({
                     )}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.startBalance)}
+                    {fc(row.startBalance)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                    -{formatCurrency(row.withdrawal)}
+                    -{fc(row.withdrawal)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
-                    {row.aowIncome > 0 ? `+${formatCurrency(row.aowIncome)}` : '\u2014'}
+                    {row.aowIncome > 0 ? `+${fc(row.aowIncome)}` : '\u2014'}
                   </td>
                   <td className={`px-3 py-1 text-right font-mono tabular-nums ${row.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {row.growth >= 0 ? '+' : ''}{formatCurrency(row.growth)}
+                    {row.growth >= 0 ? '+' : ''}{fc(row.growth)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.endBalance)}
+                    {fc(row.endBalance)}
                   </td>
                 </tr>
               ))}
@@ -123,19 +131,19 @@ function WithdrawalSubTable({
               <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
                 <td className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal ({rows.length}j)</td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[0]?.startBalance ?? 0)}
+                  {fc(rows[0]?.startBalance ?? 0)}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                  -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                  -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                  +{formatCurrency(rows.reduce((s, r) => s + r.aowIncome, 0))}
+                  +{fc(rows.reduce((s, r) => s + r.aowIncome, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                  +{formatCurrency(rows.reduce((s, r) => s + r.growth, 0))}
+                  +{fc(rows.reduce((s, r) => s + r.growth, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[rows.length - 1]?.endBalance ?? 0)}
+                  {fc(rows[rows.length - 1]?.endBalance ?? 0)}
                 </td>
               </tr>
             </tfoot>
@@ -170,6 +178,7 @@ function VpwSubTable({
   subtitle: string
   rows: VpwRow[]
 }) {
+  const fc = useFc()
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : sampleRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
@@ -209,7 +218,7 @@ function VpwSubTable({
                     )}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.startBalance)}
+                    {fc(row.startBalance)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
                     {row.remainingYears ?? '\u2014'}
@@ -218,16 +227,16 @@ function VpwSubTable({
                     {(row.vpwRate ?? 0).toFixed(1)}%
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                    -{formatCurrency(row.withdrawal)}
+                    -{fc(row.withdrawal)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
-                    {row.aowIncome > 0 ? `+${formatCurrency(row.aowIncome)}` : '\u2014'}
+                    {row.aowIncome > 0 ? `+${fc(row.aowIncome)}` : '\u2014'}
                   </td>
                   <td className={`px-3 py-1 text-right font-mono tabular-nums ${row.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {row.growth >= 0 ? '+' : ''}{formatCurrency(row.growth)}
+                    {row.growth >= 0 ? '+' : ''}{fc(row.growth)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.endBalance)}
+                    {fc(row.endBalance)}
                   </td>
                 </tr>
               ))}
@@ -236,20 +245,20 @@ function VpwSubTable({
               <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
                 <td className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal ({rows.length}j)</td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[0]?.startBalance ?? 0)}
+                  {fc(rows[0]?.startBalance ?? 0)}
                 </td>
                 <td colSpan={2} />
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                  -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                  -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                  +{formatCurrency(rows.reduce((s, r) => s + r.aowIncome, 0))}
+                  +{fc(rows.reduce((s, r) => s + r.aowIncome, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                  +{formatCurrency(rows.reduce((s, r) => s + r.growth, 0))}
+                  +{fc(rows.reduce((s, r) => s + r.growth, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[rows.length - 1]?.endBalance ?? 0)}
+                  {fc(rows[rows.length - 1]?.endBalance ?? 0)}
                 </td>
               </tr>
             </tfoot>
@@ -284,6 +293,7 @@ function BucketSubTable({
   subtitle: string
   rows: BucketRow[]
 }) {
+  const fc = useFc()
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => expanded ? rows : sampleRows(rows), [rows, expanded])
   const hasTooMany = rows.length > 20
@@ -321,19 +331,19 @@ function BucketSubTable({
                     )}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.cash)}
+                    {fc(row.cash)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.bonds)}
+                    {fc(row.bonds)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.equity)}
+                    {fc(row.equity)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.total)}
+                    {fc(row.total)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                    -{formatCurrency(row.withdrawal)}
+                    -{fc(row.withdrawal)}
                   </td>
                 </tr>
               ))}
@@ -343,7 +353,7 @@ function BucketSubTable({
                 <td className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal ({rows.length}j)</td>
                 <td colSpan={4} />
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                  -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                  -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                 </td>
               </tr>
             </tfoot>
@@ -386,6 +396,7 @@ export function DepleteStrategyTables({
   inflationRate: number
   hasPartner: boolean
 }) {
+  const fc = useFc()
   const totalYears = Math.max(0, endAge - retirementAge)
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
 
@@ -434,7 +445,7 @@ export function DepleteStrategyTables({
     <>
       <WithdrawalSubTable
         label="A. Annuiteit — Vaste jaarlijkse onttrekking"
-        subtitle={`Annuïtaire onttrekking: portfolio × r / (1 \u2212 (1+r)^(\u2212n)) = ${formatCurrency(Math.round(annuityAnnual))}/jr. Vermogen is exact ${formatCurrency(0)} bij leeftijd ${endAge}.`}
+        subtitle={`Annuïtaire onttrekking: portfolio × r / (1 \u2212 (1+r)^(\u2212n)) = ${fc(Math.round(annuityAnnual))}/jr. Vermogen is exact ${fc(0)} bij leeftijd ${endAge}.`}
         rows={swrRows}
       />
 

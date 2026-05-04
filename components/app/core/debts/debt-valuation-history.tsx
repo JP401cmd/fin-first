@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { formatCurrency } from '@/components/app/budget-shared'
+
 import type { Valuation } from './debt-types'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 export function ValuationHistory({
   entityId,
@@ -36,10 +37,10 @@ export function ValuationHistory({
               <span className="w-20 shrink-0 text-[var(--ink-3)]">
                 {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
               </span>
-              <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
+              <span className="font-medium text-[var(--ink-2)]">{<MaskedAmount value={Number(v.value)} tone="kern" />}</span>
               {diff !== null && (
                 <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                  {diff >= 0 ? '+' : ''}{<MaskedAmount value={diff} tone="kern" />}
                 </span>
               )}
               {v.notes && (

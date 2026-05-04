@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { Info, ShoppingCart, TrendingUp } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 
 interface MustExpenseItem {
@@ -171,8 +171,8 @@ function KengetalCard({
             <Info className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
         </div>
-        <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-[var(--ink)] sm:text-2xl">
-          {formatCurrency(value)}
+        <p className="mt-1 text-[var(--ink)]">
+          <MaskedAmount value={value} tone="kern" className="text-xl font-semibold sm:text-2xl" />
         </p>
         <p className="mt-1 text-[11px] text-[var(--ink-4)]">{context}</p>
       </div>
@@ -227,8 +227,8 @@ function IncomeKassabon({
             return (
               <div key={month} className="flex justify-between py-0.5">
                 <span className="capitalize text-[var(--ink-2)]">{label}</span>
-                <span className="tabular-nums text-[var(--ink)]">
-                  {formatCurrency(amount)}
+                <span className="text-[var(--ink)]">
+                  <MaskedAmount value={amount} tone="kern" />
                 </span>
               </div>
             )
@@ -239,8 +239,8 @@ function IncomeKassabon({
       {incomeByMonth.length > 0 && (
         <div className="flex justify-between py-1">
           <span className="text-[var(--ink-3)]">Subtotaal werkelijk</span>
-          <span className="tabular-nums font-medium text-[var(--ink)]">
-            {formatCurrency(subtotal)}
+          <span className="font-medium text-[var(--ink)]">
+            <MaskedAmount value={subtotal} tone="kern" />
           </span>
         </div>
       )}
@@ -248,7 +248,8 @@ function IncomeKassabon({
       {incomeMonths > 0 && incomeMonths < 12 && incomeByMonth.length > 0 && (
         <div className="mt-2 border-t border-dashed border-[var(--border-ed)] pt-2">
           <p className="font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-            Gemiddeld per maand: {formatCurrency(subtotal / incomeMonths)}
+            Gemiddeld per maand:{' '}
+            <MaskedAmount value={subtotal / incomeMonths} tone="kern" />
             {' '}({incomeMonths} mnd) → geëxtrapoleerd naar 12 maanden
           </p>
         </div>
@@ -256,8 +257,8 @@ function IncomeKassabon({
 
       <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2">
         <span className="font-bold text-[var(--ink)]">Geschat jaarinkomen</span>
-        <span className="tabular-nums font-bold text-[var(--ink)]">
-          {formatCurrency(yearlyIncome)}
+        <span className="font-bold text-[var(--ink)]">
+          <MaskedAmount value={yearlyIncome} tone="kern" />
         </span>
       </div>
 
@@ -328,8 +329,8 @@ function MustExpenseKassabon({
                     {intervalLabel}
                   </span>
                 </span>
-                <span className="tabular-nums text-[var(--ink)]">
-                  {formatCurrency(item.annualAmount)}
+                <span className="text-[var(--ink)]">
+                  <MaskedAmount value={item.annualAmount} tone="kern" />
                 </span>
               </div>
             )
@@ -338,14 +339,14 @@ function MustExpenseKassabon({
 
         <div className="mt-1 flex justify-between border-t-2 border-[var(--ink)] pt-2">
           <span className="font-bold text-[var(--ink)]">Totaal per jaar</span>
-          <span className="tabular-nums font-bold text-[var(--ink)]">
-            {formatCurrency(yearlyMustExpenses)}
+          <span className="font-bold text-[var(--ink)]">
+            <MaskedAmount value={yearlyMustExpenses} tone="kern" />
           </span>
         </div>
 
         <div className="mt-1 flex justify-between text-[var(--ink-3)]">
           <span>Gemiddeld per maand</span>
-          <span className="tabular-nums">{formatCurrency(monthlyAverage)}</span>
+          <MaskedAmount value={monthlyAverage} tone="kern" />
         </div>
 
         <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
@@ -389,22 +390,22 @@ function MustExpenseKassabon({
                 ? 'Huidig jaarinkomen'
                 : 'Geschatte jaarlijkse uitgaven'}
           </span>
-          <span className="tabular-nums text-[var(--ink)]">
-            {formatCurrency(yearlyMustExpenses)}
+          <span className="text-[var(--ink)]">
+            <MaskedAmount value={yearlyMustExpenses} tone="kern" />
           </span>
         </div>
       </div>
 
       <div className="mt-1 flex justify-between border-t-2 border-[var(--ink)] pt-2">
         <span className="font-bold text-[var(--ink)]">Totaal per jaar</span>
-        <span className="tabular-nums font-bold text-[var(--ink)]">
-          {formatCurrency(yearlyMustExpenses)}
+        <span className="font-bold text-[var(--ink)]">
+          <MaskedAmount value={yearlyMustExpenses} tone="kern" />
         </span>
       </div>
 
       <div className="mt-1 flex justify-between text-[var(--ink-3)]">
         <span>Gemiddeld per maand</span>
-        <span className="tabular-nums">{formatCurrency(monthlyAverage)}</span>
+        <MaskedAmount value={monthlyAverage} tone="kern" />
       </div>
 
       <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">

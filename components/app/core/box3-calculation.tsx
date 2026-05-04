@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Info } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
 import type { Box3Result } from '@/lib/box3-data'
 import { BOX3_TOOLTIPS } from '@/lib/box3-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 function Tooltip({ text }: { text: string }) {
   return (
@@ -19,7 +19,7 @@ function Tooltip({ text }: { text: string }) {
 
 interface StepProps {
   label: string
-  value: string
+  value: React.ReactNode
   tooltip?: string
   highlight?: boolean
   indent?: boolean
@@ -74,13 +74,13 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
             <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Bezittingen op peildatum
             </p>
-            <Step label="Spaargeld" value={formatCurrency(result.totaalSpaargeld)} />
-            <Step label="Beleggingen" value={formatCurrency(result.totaalBeleggingen)} />
-            <Step label="Uitgesloten (Box 1 e.d.)" value={formatCurrency(result.totaalUitgesloten)} tooltip={BOX3_TOOLTIPS.eigenWoning} />
+            <Step label="Spaargeld" value={<MaskedAmount value={result.totaalSpaargeld} tone="kern" />} />
+            <Step label="Beleggingen" value={<MaskedAmount value={result.totaalBeleggingen} tone="kern" />} />
+            <Step label="Uitgesloten (Box 1 e.d.)" value={<MaskedAmount value={result.totaalUitgesloten} tone="kern" />} tooltip={BOX3_TOOLTIPS.eigenWoning} />
             <div className="my-2 border-t border-dashed border-[var(--border-ed)]" />
             <Step
               label="Totaal Box 3 bezittingen"
-              value={formatCurrency(result.totaalSpaargeld + result.totaalBeleggingen)}
+              value={<MaskedAmount value={result.totaalSpaargeld + result.totaalBeleggingen} tone="kern" />}
               highlight
             />
           </div>
@@ -90,10 +90,10 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
             <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Schulden
             </p>
-            <Step label="Box 3 schulden" value={formatCurrency(result.totaalBox3Schulden)} />
-            <Step label="Schuldendrempel" value={`-/- ${formatCurrency(result.schuldendrempel)}`} tooltip={BOX3_TOOLTIPS.schuldendrempel} />
+            <Step label="Box 3 schulden" value={<MaskedAmount value={result.totaalBox3Schulden} tone="kern" />} />
+            <Step label="Schuldendrempel" value={<>-/- <MaskedAmount value={result.schuldendrempel} tone="kern" /></>} tooltip={BOX3_TOOLTIPS.schuldendrempel} />
             <div className="my-2 border-t border-dashed border-[var(--border-ed)]" />
-            <Step label="Aftrekbare schulden" value={formatCurrency(result.aftrekbareSchulden)} highlight />
+            <Step label="Aftrekbare schulden" value={<MaskedAmount value={result.aftrekbareSchulden} tone="kern" />} highlight />
           </div>
 
           {/* Section: Forfaitair rendement */}
@@ -103,20 +103,20 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
             </p>
             <Step
               label={`Spaargeld (${pct(result.params.forfaitSpaargeld)})`}
-              value={formatCurrency(result.forfaitairSpaargeld)}
+              value={<MaskedAmount value={result.forfaitairSpaargeld} tone="kern" />}
               tooltip={BOX3_TOOLTIPS.forfaitairRendement}
             />
             <Step
               label={`Beleggingen (${pct(result.params.forfaitBeleggingen)})`}
-              value={formatCurrency(result.forfaitairBeleggingen)}
+              value={<MaskedAmount value={result.forfaitairBeleggingen} tone="kern" />}
             />
             <Step
               label={`Schulden (${pct(result.params.forfaitSchulden)})`}
-              value={`-/- ${formatCurrency(result.forfaitairSchulden)}`}
+              value={<>-/- <MaskedAmount value={result.forfaitairSchulden} tone="kern" /></>}
               negative
             />
             <div className="my-2 border-t border-dashed border-[var(--border-ed)]" />
-            <Step label="Voordeel uit sparen en beleggen" value={formatCurrency(result.voordeelUitSparen)} highlight />
+            <Step label="Voordeel uit sparen en beleggen" value={<MaskedAmount value={result.voordeelUitSparen} tone="kern" />} highlight />
           </div>
 
           {/* Section: Grondslag */}
@@ -126,16 +126,16 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
             </p>
             <Step
               label="Rendementsgrondslag"
-              value={formatCurrency(result.rendementsgrondslag)}
+              value={<MaskedAmount value={result.rendementsgrondslag} tone="kern" />}
               tooltip={BOX3_TOOLTIPS.rendementsgrondslag}
             />
             <Step
               label="Heffingsvrij vermogen"
-              value={`-/- ${formatCurrency(result.heffingsvrijVermogen)}`}
+              value={<>-/- <MaskedAmount value={result.heffingsvrijVermogen} tone="kern" /></>}
               tooltip={BOX3_TOOLTIPS.heffingsvrijVermogen}
             />
             <div className="my-2 border-t border-dashed border-[var(--border-ed)]" />
-            <Step label="Grondslag sparen en beleggen" value={formatCurrency(result.grondslagSparen)} highlight />
+            <Step label="Grondslag sparen en beleggen" value={<MaskedAmount value={result.grondslagSparen} tone="kern" />} highlight />
           </div>
 
           {/* Section: Belasting */}
@@ -148,12 +148,12 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
               value={pct(result.effectiefRendement)}
               tooltip={BOX3_TOOLTIPS.effectiefTarief}
             />
-            <Step label="Box 3 inkomen" value={formatCurrency(result.box3Income)} />
+            <Step label="Box 3 inkomen" value={<MaskedAmount value={result.box3Income} tone="kern" />} />
             <Step label={`Tarief (${pct(result.params.tarief)})`} value="" />
             <div className="my-2 border-t border-dashed border-kern-200" />
             <Step
               label="Te betalen Box 3 belasting"
-              value={formatCurrency(result.tax)}
+              value={<MaskedAmount value={result.tax} tone="kern" />}
               highlight
             />
           </div>

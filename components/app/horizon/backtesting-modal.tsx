@@ -11,6 +11,7 @@ import {
   type BacktestPath,
 } from '@/lib/horizon-data'
 import { NAMED_PERIODS } from '@/lib/msci-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type Props = {
   input: FinancialInput
@@ -131,7 +132,7 @@ export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }
                       <p className="text-xs text-[var(--ink-3)]">
                         Eindvermogen:{' '}
                         <span className="tabular-nums font-medium text-[var(--ink-2)]">
-                          {formatCurrency(path.values[path.values.length - 1] ?? 0)}
+                          {<MaskedAmount value={path.values[path.values.length - 1] ?? 0} tone="horizon" />}
                         </span>
                       </p>
                     </div>
@@ -391,7 +392,7 @@ function PeriodKassabon({ path, onClose }: { path: BacktestPath; onClose: () => 
                     Na {y === 0 ? 'start' : `${y} jaar`}
                   </span>
                   <span className="tabular-nums text-[var(--ink)]">
-                    {formatCurrency(val)}
+                    {<MaskedAmount value={val} tone="horizon" />}
                     {pctChange !== null && (
                       <span className={`ml-1 text-[10px] ${pctChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                         {pctChange >= 0 ? '+' : ''}{pctChange.toFixed(0)}%
@@ -409,7 +410,7 @@ function PeriodKassabon({ path, onClose }: { path: BacktestPath; onClose: () => 
               {path.success ? 'Vrijheid bewaard' : 'Portfolio leeggelopen'}
             </span>
             <span className={`tabular-nums ${path.success ? 'text-emerald-700' : 'text-red-700'}`}>
-              {formatCurrency(path.values[path.values.length - 1] ?? 0)}
+              {<MaskedAmount value={path.values[path.values.length - 1] ?? 0} tone="horizon" />}
             </span>
           </div>
 

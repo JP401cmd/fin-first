@@ -33,7 +33,8 @@ import {
   Activity,
   Home,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { formatMaskedCurrency } from "@/lib/format";
+import { useMaskedAmounts } from "@/lib/hooks/use-privacy";
 import { createClient } from "@/lib/supabase/client";
 import ConceptFlipCards from "@/components/app/concept-flip-cards";
 import { OntdekkenSection } from "@/components/app/ontdekken-section";
@@ -86,6 +87,7 @@ export default function GidsPage() {
   const [fullName, setFullName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<GuideProgress | null>(null);
+  const { masked } = useMaskedAmounts();
 
   useEffect(() => {
     async function loadData() {
@@ -208,7 +210,7 @@ export default function GidsPage() {
                 ? [
                     `Je hebt ${progress.counts.assets} bezitting${progress.counts.assets !== 1 ? "en" : ""} en ${progress.counts.debts} schuld${progress.counts.debts !== 1 ? "en" : ""} geregistreerd.`,
                     progress.financial.netWorth !== 0
-                      ? `Netto vermogen: ${formatCurrency(progress.financial.netWorth)}`
+                      ? `Netto vermogen: ${formatMaskedCurrency(progress.financial.netWorth, masked)}`
                       : "",
                   ].filter(Boolean)
                 : ["Je hebt nog geen vermogen ingevoerd."]

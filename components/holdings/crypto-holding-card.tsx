@@ -19,7 +19,7 @@
 
 import { Bitcoin, Coins, Euro, type LucideIcon } from 'lucide-react'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { CryptoHoldingRow } from '@/lib/crypto-holdings-data'
 import { HoldingSourceBadge } from './holding-source-badge'
 
@@ -142,10 +142,8 @@ export function CryptoHoldingCard({
         </div>
 
         <div className="shrink-0 text-right">
-          <p
-            className={`font-mono text-sm font-bold tabular-nums text-[var(--ink)] ${flashClass}`}
-          >
-            {formatCurrency(holding.valueEur)}
+          <p className={`text-[var(--ink)] ${flashClass}`}>
+            <MaskedAmount value={holding.valueEur} tone="kern" className="text-sm font-bold" />
           </p>
           {!holding.isFiatBalance && (
             <p className="mt-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">

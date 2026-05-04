@@ -1,12 +1,9 @@
-import type { HistoricalPeriodSummary } from '@/lib/report-data'
+'use client'
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
+import { useCallback } from 'react'
+import type { HistoricalPeriodSummary } from '@/lib/report-data'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 function DeltaArrow({
   current,
@@ -22,7 +19,7 @@ function DeltaArrow({
   if (diff === 0) return null
   const isPositive = invert ? diff < 0 : diff > 0
   return (
-    <span className={isPositive ? 'text-horizon-700' : 'text-[#b84040]'}>
+    <span className={isPositive ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}>
       {diff > 0 ? '↑' : '↓'}
     </span>
   )
@@ -49,13 +46,25 @@ export function HistoricalComparison({
   currentSavingsRate,
   currentFirePercentage,
 }: Props) {
+  const { masked } = useMaskedAmounts()
+  const formatCurrency = useCallback(
+    (amount: number): string => {
+      if (masked) return MASKED_AMOUNT_PLACEHOLDER
+      return new Intl.NumberFormat('nl-NL', {
+        style: 'currency',
+        currency: 'EUR',
+        maximumFractionDigits: 0,
+      }).format(amount)
+    },
+    [masked],
+  )
   if (historicalPeriods.length === 0) {
     return (
       <div className="report-section mb-8">
-        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-kern-600 mb-3">
+        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--module-active-700)] mb-3">
           Historisch Perspectief — afgelopen periodes
         </p>
-        <div className="rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4">
+        <div className="border border-dotted border-[var(--rule-soft)] bg-[var(--subtle)]/50 p-4">
           <p className="text-center font-source-serif text-base italic text-[var(--ink-3)]">
             Geen eerdere periodes beschikbaar voor vergelijking.
           </p>
@@ -134,37 +143,37 @@ export function HistoricalComparison({
 
   return (
     <div className="report-section mb-8">
-      <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-kern-600 mb-3">
+      <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--module-active-700)] mb-3">
         Historisch Perspectief — afgelopen periodes
       </p>
 
-      <div className="rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 overflow-x-auto">
+      <div className="overflow-x-auto">
         <table className="w-full font-dm-mono text-sm">
           <thead>
-            <tr className="border-b border-dashed border-[var(--border-ed)]">
-              <th className="py-2.5 pl-4 pr-2 text-left font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            <tr className="border-b border-dotted border-[var(--rule-soft)]">
+              <th className="py-2.5 pl-4 pr-2 text-left text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
                 Metriek
               </th>
               {period1 && (
-                <th className="py-2.5 px-2 text-right font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                <th className="py-2.5 px-2 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
                   {period1.periodLabel}
                 </th>
               )}
               {period2 && (
-                <th className="py-2.5 px-2 text-right font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                <th className="py-2.5 px-2 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
                   {period2.periodLabel}
                 </th>
               )}
-              <th className="py-2.5 pl-2 pr-4 text-right font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink)] bg-[var(--subtle)]">
+              <th className="py-2.5 pl-2 pr-4 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink)] font-mono bg-[var(--subtle)]">
                 {currentPeriodLabel}
               </th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
+            {rows.map((row) => (
               <tr
                 key={row.label}
-                className={i < rows.length - 1 ? 'border-b border-[var(--border-ed)]' : ''}
+                className="border-b border-dotted border-[var(--rule-soft)] last:border-b-0"
               >
                 <td className="py-2 pl-4 pr-2 font-inter text-[11px] text-[var(--ink-2)]">
                   {row.label}

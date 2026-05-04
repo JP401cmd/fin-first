@@ -32,7 +32,9 @@
 import { memo, useMemo, useState } from 'react'
 import type { Debt } from '@/lib/debt-data'
 import { simulatePayoff, payoffSummary, type PayoffStrategy } from '@/lib/debt-data'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import {
   DebtPayoffTrajectoryChart,
   StrategyComparisonMessage,
@@ -239,8 +241,8 @@ function ExtraPaymentSlider({
             Bovenop de minimum-betaling. Verdeling volgt je gekozen strategie.
           </p>
         </div>
-        <p className="font-mono tabular-nums text-base font-semibold text-kern-700">
-          {formatCurrency(value)}
+        <p className="text-kern-700">
+          <MaskedAmount value={value} tone="kern" className="text-base font-semibold" />
           <span className="ml-1 text-[11px] font-normal text-[var(--ink-3)]">/mnd</span>
         </p>
       </div>
@@ -273,7 +275,7 @@ function ExtraPaymentSlider({
         <p className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-3 text-[12px] leading-relaxed text-[var(--ink-2)]">
           {betterMonthsLabel && (
             <span className="block">
-              Bij <span className="font-mono tabular-nums">{formatCurrency(value)}</span> extra:{' '}
+              Bij <MaskedAmount value={value} tone="kern" /> extra:{' '}
               <span className="text-[var(--ink)]">{betterMonthsLabel}</span>
             </span>
           )}
@@ -477,11 +479,11 @@ function DebtTableRow({
       <td className="px-3 py-2.5 text-right font-mono tabular-nums text-sm text-[var(--ink-2)]">
         {rate.toFixed(rate < 1 ? 2 : 1)}%
       </td>
-      <td className="px-3 py-2.5 text-right font-mono tabular-nums text-sm font-semibold text-negative">
-        {formatCurrency(balance)}
+      <td className="px-3 py-2.5 text-right text-negative">
+        <MaskedAmount value={balance} tone="kern" className="text-sm font-semibold" />
       </td>
-      <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-sm text-[var(--ink-2)] sm:table-cell">
-        {formatCurrency(monthly)}
+      <td className="hidden px-3 py-2.5 text-right text-[var(--ink-2)] sm:table-cell">
+        <MaskedAmount value={monthly} tone="kern" className="text-sm" />
       </td>
       <td className="px-3 py-2.5 text-right font-mono tabular-nums text-xs text-[var(--ink-2)]">
         {isInterestOnly ? (
@@ -542,6 +544,7 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
 }: DebtPayoffStrategyProps) {
   const [strategy, setStrategy] = useState<PayoffStrategy>(initialStrategy)
   const [extraPayment, setExtraPayment] = useState<number>(initialExtraPayment)
+  const { masked } = useMaskedAmounts()
 
   // Filter de "echt actieve" debts éénmaal per props-wijziging — wordt
   // hergebruikt door header (totaal/aantal), simulatie en tabel.
@@ -603,7 +606,7 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
 
   const betterInterestLabel: string | null =
     extraPayment > 0 && interestSaved > 0
-      ? formatCurrency(interestSaved)
+      ? formatMaskedCurrency(interestSaved, masked)
       : null
 
   // Suppress unused-variable warning: `baselineForStrategy` kan in
@@ -634,9 +637,15 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
           <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
             {kicker}
           </p>
-          <p className="mt-1 font-mono tabular-nums text-sm text-[var(--ink-2)]">
-            {activeDebts.length} {activeDebts.length === 1 ? 'lening' : 'leningen'} open ·{' '}
-            <span className="text-negative">{formatCurrency(totalBalance)}</span> totaal
+          <p className="mt-1 text-sm text-[var(--ink-2)]">
+            <span className="font-mono tabular-nums">
+              {activeDebts.length} {activeDebts.length === 1 ? 'lening' : 'leningen'} open
+            </span>{' '}
+            ·{' '}
+            <span className="text-negative">
+              <MaskedAmount value={totalBalance} tone="kern" />
+            </span>{' '}
+            totaal
           </p>
         </div>
       </header>

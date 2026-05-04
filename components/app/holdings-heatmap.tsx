@@ -8,6 +8,7 @@ import {
   CATEGORY_LABELS,
   VIEW_MODE_LABELS,
 } from '@/lib/portfolio-allocation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -580,7 +581,7 @@ function TreemapCell({
               className="font-mono text-[9px] tabular-nums leading-tight text-white/90"
               style={{ textShadow }}
             >
-              {formatCurrency(value)}
+              {<MaskedAmount value={value} tone="kern" />}
             </p>
           )}
 
@@ -664,7 +665,7 @@ function HeatmapTooltip({
           <div className="flex justify-between">
             <span className="text-[var(--ink-3)]">Huidige koers</span>
             <span className="font-mono tabular-nums text-[var(--ink)]">
-              {formatCurrency(holding.current_price)}
+              {<MaskedAmount value={holding.current_price} tone="kern" />}
               {holding.currency && holding.currency !== 'EUR' && (
                 <span className="ml-1 inline-flex items-center rounded-sm bg-kern-100 px-1 text-[9px] font-medium text-kern-600">
                   {holding.currency}
@@ -686,7 +687,7 @@ function HeatmapTooltip({
         <div className="flex justify-between">
           <span className="text-[var(--ink-3)]">Kostprijs</span>
           <span className="font-mono tabular-nums text-[var(--ink)]">
-            {formatCurrency(cost)}
+            {<MaskedAmount value={cost} tone="kern" />}
           </span>
         </div>
 
@@ -695,7 +696,7 @@ function HeatmapTooltip({
           <div className="flex justify-between">
             <span className="text-[var(--ink-3)]">Onger. P&amp;L</span>
             <span className={`font-mono tabular-nums ${plAbs >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {plAbs >= 0 ? '+' : ''}{formatCurrency(plAbs)} ({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)
+              {plAbs >= 0 ? '+' : ''}{<MaskedAmount value={plAbs} tone="kern" />} ({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)
             </span>
           </div>
         )}
@@ -833,7 +834,7 @@ function MobileHeatmap({
               {group.label}
             </span>
             <span className="font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
-              {formatCurrency(group.totalValue)}
+              {<MaskedAmount value={group.totalValue} tone="kern" />}
             </span>
           </div>
 

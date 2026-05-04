@@ -21,6 +21,7 @@ import { usePerspective } from '@/components/app/perspective-provider'
 import type { Valuation } from './debt-types'
 import { DebtTrajectoryChart } from './debt-trajectory-chart'
 import HypotheekVsBeleggenModal from './hypotheek-vs-beleggen-modal'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 export function DebtDetailModal({
   debt,
@@ -139,7 +140,7 @@ export function DebtDetailModal({
                   'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
               }}
             >
-              {formatCurrency(balance)}
+              {<MaskedAmount value={balance} tone="kern" />}
             </span>
           </p>
           {dailyExpenses > 0 && balance >= 100 && (
@@ -155,7 +156,7 @@ export function DebtDetailModal({
             className="mt-1 italic text-[12px] text-[var(--ink-3)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)
+            van {<MaskedAmount value={original} tone="kern" />} ({pct.toFixed(1)}% afgelost)
           </p>
           <div className="mx-auto mt-2 h-2 w-48 overflow-hidden rounded-full bg-zinc-100">
             <div className="h-full rounded-full bg-kern-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -191,7 +192,7 @@ export function DebtDetailModal({
                 <div>
                   <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{partnerSplit.myName}</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(balance * partnerSplit.mySharePct / 100)}
+                    {<MaskedAmount value={balance * partnerSplit.mySharePct / 100} tone="kern" />}
                   </p>
                   {dailyExpenses > 0 && balance * partnerSplit.mySharePct / 100 >= 100 && (
                     <p className="text-[10px] text-kern-600/70">
@@ -203,7 +204,7 @@ export function DebtDetailModal({
                 <div>
                   <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{partnerSplit.partnerName}</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(balance * (100 - partnerSplit.mySharePct) / 100)}
+                    {<MaskedAmount value={balance * (100 - partnerSplit.mySharePct) / 100} tone="kern" />}
                   </p>
                   {dailyExpenses > 0 && balance * (100 - partnerSplit.mySharePct) / 100 >= 100 && (
                     <p className="text-[10px] text-kern-600/70">
@@ -220,13 +221,13 @@ export function DebtDetailModal({
                   <div className="grid grid-cols-2 gap-3 text-center">
                     <div>
                       <p className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">
-                        {formatCurrency(Number(debt.monthly_payment) * partnerSplit.mySharePct / 100)}
+                        {<MaskedAmount value={Number(debt.monthly_payment) * partnerSplit.mySharePct / 100} tone="kern" />}
                       </p>
                       <p className="text-[9px] text-[var(--ink-4)]">p/m</p>
                     </div>
                     <div>
                       <p className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">
-                        {formatCurrency(Number(debt.monthly_payment) * (100 - partnerSplit.mySharePct) / 100)}
+                        {<MaskedAmount value={Number(debt.monthly_payment) * (100 - partnerSplit.mySharePct) / 100} tone="kern" />}
                       </p>
                       <p className="text-[9px] text-[var(--ink-4)]">p/m</p>
                     </div>
@@ -262,14 +263,14 @@ export function DebtDetailModal({
             <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3" data-testid="modal-monthly-payment">
               <p className="text-xs text-[var(--ink-3)]">Maandelijkse betaling</p>
               <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
-                {formatCurrency(split ? split.monthlyPayment : Number(debt.monthly_payment))}
+                {<MaskedAmount value={split ? split.monthlyPayment : Number(debt.monthly_payment)} tone="kern" />}
               </p>
               {split && split.monthlyPayment > 0 && (
                 <>
                   <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
                     <span className="text-[var(--ink-3)]">Rente</span>
                     <span className="ml-auto font-mono tabular-nums text-[var(--ink-2)]">
-                      {formatCurrency(split.currentRente)}
+                      {<MaskedAmount value={split.currentRente} tone="kern" />}
                     </span>
                     <span className="text-[var(--ink-4)]">({split.rentePercentage.toFixed(0)}%)</span>
                   </div>
@@ -277,7 +278,7 @@ export function DebtDetailModal({
                     <div className="flex items-center gap-1.5 text-[10px]">
                       <span className="text-[var(--ink-3)]">Aflossing</span>
                       <span className="ml-auto font-mono tabular-nums text-[var(--ink-2)]">
-                        {formatCurrency(split.currentAflossing)}
+                        {<MaskedAmount value={split.currentAflossing} tone="kern" />}
                       </span>
                       <span className="text-[var(--ink-4)]">({(100 - split.rentePercentage).toFixed(0)}%)</span>
                     </div>
@@ -373,10 +374,10 @@ export function DebtDetailModal({
                       <span className="w-20 shrink-0 text-[var(--ink-3)]">
                         {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                       </span>
-                      <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
+                      <span className="font-medium text-[var(--ink-2)]">{<MaskedAmount value={Number(v.value)} tone="kern" />}</span>
                       {diff !== null && (
                         <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                          {diff >= 0 ? '+' : ''}{<MaskedAmount value={diff} tone="kern" />}
                         </span>
                       )}
                     </div>

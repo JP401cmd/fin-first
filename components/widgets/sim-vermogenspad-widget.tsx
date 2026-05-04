@@ -5,7 +5,9 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface Props {
   size: WidgetSize
@@ -15,6 +17,7 @@ interface Props {
 
 export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size, data, href }: Props) {
   const { simRows, fireAgeFractional } = data
+  const { masked } = useMaskedAmounts()
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
 
   // ── Mini-size: FIRE portfolio amount ────────────────────
@@ -25,8 +28,11 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
     const firePortfolio = fireRow?.endPortfolio
     return (
       <WidgetShell module="horizon" size="mini" kicker="Vermogenspad" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {firePortfolio != null ? formatCurrency(firePortfolio) : '—'}
+        <p className="text-[var(--ink)] leading-none truncate">
+          {firePortfolio != null
+            ? <MaskedAmount value={firePortfolio} tone="horizon" className="text-[15px] font-semibold" />
+            : <span className="font-mono text-[15px] font-semibold tabular-nums">—</span>
+          }
         </p>
       </WidgetShell>
     )
@@ -107,8 +113,8 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
             )}
           </svg>
           <div className="mt-0.5 flex items-center justify-between">
-            <p className="font-mono text-[11px] font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(simRows[simRows.length - 1].endPortfolio)}
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={simRows[simRows.length - 1].endPortfolio} tone="horizon" className="text-[11px] font-semibold" />
             </p>
             {fireAgeFractional != null && (
               <p className="text-[10px] text-horizon-600 font-mono font-semibold">
@@ -161,8 +167,8 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
                 FIRE {fireAgeFractional.toFixed(1)}j
               </p>
             )}
-            <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(endRow?.endPortfolio ?? 0)}
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={endRow?.endPortfolio ?? 0} tone="horizon" className="text-sm font-semibold" />
             </p>
             <p className="text-[10px] text-[var(--ink-3)]">eindvermogen</p>
             {(() => {
@@ -348,7 +354,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               fontWeight="600"
               style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 700ms' }}
             >
-              {formatCurrency(peakRow.endPortfolio)}
+              {formatMaskedCurrency(peakRow.endPortfolio, masked)}
             </text>
           )}
 
@@ -363,7 +369,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               textAnchor="end"
               style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 750ms' }}
             >
-              {formatCurrency(endRow.endPortfolio)}
+              {formatMaskedCurrency(endRow.endPortfolio, masked)}
             </text>
           )}
         </svg>
@@ -383,8 +389,8 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           <div className="mt-2 flex items-center justify-between">
             <div>
               <p className="text-[10px] text-[var(--ink-3)]">Eindvermogen (90j)</p>
-              <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                {formatCurrency(endRow?.endPortfolio ?? 0)}
+              <p className="text-[var(--ink)]">
+                <MaskedAmount value={endRow?.endPortfolio ?? 0} tone="horizon" className="text-sm font-semibold" />
               </p>
             </div>
             {(() => {

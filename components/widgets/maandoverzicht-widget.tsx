@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 interface Props {
@@ -53,8 +53,13 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Maandoverzicht" href={href}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
-          {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
+        <p className={`leading-none truncate ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
+          <MaskedAmount
+            value={netWorthDelta}
+            signPrefix={deltaPositive ? '+' : ''}
+            tone="kern"
+            className="text-[15px] font-semibold"
+          />
         </p>
       </WidgetShell>
     )
@@ -64,8 +69,13 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Maandoverzicht" href={href}>
-        <p className={`font-mono text-lg font-semibold tabular-nums ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
-          {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
+        <p className={deltaPositive ? 'text-positive' : 'text-negative'}>
+          <MaskedAmount
+            value={netWorthDelta}
+            signPrefix={deltaPositive ? '+' : ''}
+            tone="kern"
+            className="text-lg font-semibold"
+          />
         </p>
         <p className={`mt-0.5 font-serif italic text-[11px] ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
           {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon} vrijheidsdagen
@@ -85,8 +95,13 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vermogen</p>
               <TrendArrow value={netWorthDelta} />
             </div>
-            <p className={`font-mono text-base font-semibold tabular-nums ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
-              {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
+            <p className={deltaPositive ? 'text-positive' : 'text-negative'}>
+              <MaskedAmount
+                value={netWorthDelta}
+                signPrefix={deltaPositive ? '+' : ''}
+                tone="kern"
+                className="text-base font-semibold"
+              />
             </p>
           </div>
 
@@ -169,8 +184,13 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vermogen</p>
               <MiniSparkline data={histValues.slice(-6)} color={deltaPositive ? 'var(--positive)' : 'var(--negative)'} />
             </div>
-            <p className={`font-mono text-lg font-semibold tabular-nums ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
-              {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
+            <p className={deltaPositive ? 'text-positive' : 'text-negative'}>
+              <MaskedAmount
+                value={netWorthDelta}
+                signPrefix={deltaPositive ? '+' : ''}
+                tone="kern"
+                className="text-lg font-semibold"
+              />
             </p>
           </div>
 
@@ -214,15 +234,15 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Beste budget</p>
               <p className="text-sm font-medium text-positive">{bestBudget.label}</p>
-              <p className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
-                {formatCurrency(bestBudget.spent)} / {formatCurrency(bestBudget.limit)}
+              <p className="text-[var(--ink-3)]">
+                <MaskedAmount value={bestBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={bestBudget.limit} tone="kern" className="text-xs" />
               </p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Aandachtspunt</p>
               <p className="text-sm font-medium text-[var(--ink-2)]">{worstBudget.label}</p>
-              <p className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
-                {formatCurrency(worstBudget.spent)} / {formatCurrency(worstBudget.limit)}
+              <p className="text-[var(--ink-3)]">
+                <MaskedAmount value={worstBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={worstBudget.limit} tone="kern" className="text-xs" />
               </p>
             </div>
           </div>
@@ -234,8 +254,13 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
         {/* 3-month average comparison */}
         <div className="flex items-center justify-between">
           <p className="text-xs text-[var(--ink-3)]">3-maandsgemiddelde</p>
-          <p className={`font-mono text-sm font-semibold tabular-nums ${avg3MonthDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
-            {avg3MonthDelta >= 0 ? '+' : ''}{formatCurrency(avg3MonthDelta)}/mnd
+          <p className={avg3MonthDelta >= 0 ? 'text-positive' : 'text-negative'}>
+            <MaskedAmount
+              value={avg3MonthDelta}
+              signPrefix={avg3MonthDelta >= 0 ? '+' : ''}
+              tone="kern"
+              className="text-sm font-semibold"
+            />/mnd
           </p>
         </div>
 

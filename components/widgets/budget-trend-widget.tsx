@@ -4,7 +4,8 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { TrendingUp, ShoppingCart, PiggyBank, CreditCard } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -242,8 +243,9 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
 
     return (
       <WidgetShell module="kern" size="mini" kicker={config.kicker} href={href}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${trendColor}`}>
-          {trendArrow}{formatCurrency(current.value)}
+        <p className={`leading-none truncate ${trendColor}`}>
+          <span className="font-mono">{trendArrow}</span>
+          <MaskedAmount value={current.value} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -258,8 +260,8 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
             <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--r-sm)] ${config.iconBg}`}>
               <Icon className={config.iconText} size={9} strokeWidth={2} />
             </div>
-            <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(current.value)}
+            <span className="text-[var(--ink)]">
+              <MaskedAmount value={current.value} tone="kern" className="text-lg font-semibold" />
             </span>
           </div>
 
@@ -296,8 +298,8 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
         <div ref={inViewRef} className="flex flex-col gap-1.5 h-full">
           {/* Header: current + delta */}
           <div className="flex items-baseline justify-between gap-2">
-            <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(current.value)}
+            <span className="text-[var(--ink)]">
+              <MaskedAmount value={current.value} tone="kern" className="text-lg font-semibold" />
             </span>
             {momDelta != null && (
               <span className={`text-[11px] font-medium ${isUp ? 'text-positive' : 'text-negative'}`}>
@@ -323,7 +325,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
 
           {/* Monthly average */}
           <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
-            Gem. {formatCurrency(avg6m)}/maand
+            Gem. <MaskedAmount value={avg6m} tone="kern" />/maand
           </p>
         </div>
       </WidgetShell>
@@ -336,8 +338,8 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
       <div ref={inViewRef} className="flex flex-col gap-2 h-full">
         {/* Header: current + delta */}
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(current.value)}
+          <span className="text-[var(--ink)]">
+            <MaskedAmount value={current.value} tone="kern" className="text-xl font-semibold" />
           </span>
           {momDelta != null && (
             <span className={`text-xs font-medium ${isUp ? 'text-positive' : 'text-negative'}`}>
@@ -369,13 +371,13 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
         <div className="flex items-end justify-between gap-2">
           <div className="space-y-0.5">
             <p className="text-[10px] text-[var(--ink-3)]">
-              <span className="font-semibold">3m</span> {formatCurrency(avg3m)}
+              <span className="font-semibold">3m</span> <MaskedAmount value={avg3m} tone="kern" />
               <span className="mx-1.5 text-[var(--border-md)]">·</span>
-              <span className="font-semibold">6m</span> {formatCurrency(avg6m)}
+              <span className="font-semibold">6m</span> <MaskedAmount value={avg6m} tone="kern" />
             </p>
             {budgetLimit > 0 && (
               <p className="text-[10px] text-[var(--ink-4)]">
-                Budget: {formatCurrency(budgetLimit)}/maand
+                Budget: <MaskedAmount value={budgetLimit} tone="kern" />/maand
               </p>
             )}
           </div>

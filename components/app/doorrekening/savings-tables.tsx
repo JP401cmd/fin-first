@@ -37,6 +37,7 @@ import { useMemo } from 'react'
 import { formatCurrency } from '@/lib/format'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── SavingsRateTable ────────────────────────────────────────────────
 
@@ -77,10 +78,10 @@ export function SavingsRateTable({
         <div>
           <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Geschat jaarinkomen</p>
           <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-            {formatCurrency(estimatedYearlyIncome)}
+            {<MaskedAmount value={estimatedYearlyIncome} tone="ink" />}
           </p>
           <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-            {formatCurrency(monthlyFromYearly)}/mnd
+            {<MaskedAmount value={monthlyFromYearly} tone="ink" />}/mnd
           </p>
         </div>
         <div>
@@ -89,20 +90,20 @@ export function SavingsRateTable({
             {savingsRate6m.toFixed(1)}%
           </p>
           <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-            {formatCurrency((monthlyFromYearly * savingsRate6m) / 100)}/mnd
+            {<MaskedAmount value={(monthlyFromYearly * savingsRate6m) / 100} tone="ink" />}/mnd
           </p>
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Inleg bezittingen</p>
           <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-emerald-600">
-            {formatCurrency(totalContributions)}
+            {<MaskedAmount value={totalContributions} tone="ink" />}
           </p>
           <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per maand</p>
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Aflossing schulden</p>
           <p className="mt-1 font-mono tabular-nums text-sm font-semibold text-red-500">
-            {formatCurrency(totalDebtPayments)}
+            {<MaskedAmount value={totalDebtPayments} tone="ink" />}
           </p>
           <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per maand</p>
         </div>
@@ -196,7 +197,7 @@ export function SavingsProjectionTable({
           Spaarquote doorrekening — maand-op-maand
         </h3>
         <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-          {formatCurrency(monthlySavings)}/mnd bij {profileSavingsRate.toFixed(1)}% spaarquote
+          {<MaskedAmount value={monthlySavings} tone="ink" />}/mnd bij {profileSavingsRate.toFixed(1)}% spaarquote
         </p>
       </div>
       <div className="overflow-auto max-h-[70vh]">
@@ -244,7 +245,7 @@ export function SavingsProjectionTable({
                       isAfterCrossover ? 'text-[var(--ink-4)]' : 'text-[var(--ink-2)]'
                     }`}
                   >
-                    {formatCurrency(effectiveIncome)}
+                    {<MaskedAmount value={effectiveIncome} tone="ink" />}
                   </td>
                   <td
                     className={`px-3 py-1 text-right font-mono tabular-nums ${
@@ -258,10 +259,10 @@ export function SavingsProjectionTable({
                       isAfterCrossover ? 'text-[var(--ink-4)]' : 'text-emerald-600'
                     }`}
                   >
-                    {formatCurrency(effectiveSavings)}
+                    {<MaskedAmount value={effectiveSavings} tone="ink" />}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-horizon-600">
-                    {formatCurrency(cumulative)}
+                    {<MaskedAmount value={cumulative} tone="ink" />}
                   </td>
                 </tr>
               )

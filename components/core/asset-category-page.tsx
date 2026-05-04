@@ -25,13 +25,14 @@ import type {
   CryptoFeesSummary,
 } from '@/lib/crypto-holdings-data'
 import type { InvestmentHoldingRow } from '@/lib/investment-holdings-data'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { CashOverview } from '@/components/app/cash-overview'
+import { AddCategoryCard } from './add-category-card'
 import { VermogenAssetCard } from './vermogen-asset-card'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
 import { ModuleTipStrip } from './module-tip-strip'
@@ -210,6 +211,13 @@ interface AssetCategoryPageProps {
    * pad gebruiken.
    */
   initialInvestmentHoldings?: InvestmentHoldingRow[]
+  /**
+   * Per-asset 6-maands sparkline-waarden voor de achtergrond-breuklijn op
+   * elke `<VermogenAssetCard>`. Server-side gebouwd uit `balance_snapshots`
+   * via `loadEntitySparklines()`. Assets zonder historie staan niet in de
+   * map — de overlay valt dan terug op een rechte scheidingslijn.
+   */
+  initialAssetSparklines?: Record<string, number[]>
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -260,6 +268,7 @@ export function AssetCategoryPage({
   initialCryptoVolatility,
   initialCryptoFees,
   initialInvestmentHoldings,
+  initialAssetSparklines,
 }: AssetCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -473,6 +482,7 @@ export function AssetCategoryPage({
                 assets={assets}
                 kpiByAssetId={kpiByAssetId}
                 connectionsByAssetId={initialConnectionsByAssetId}
+                sparklinesByAssetId={initialAssetSparklines}
                 onItemClick={openAssetDetail}
                 onAddClick={() => setQuickAddOpen(true)}
               />
@@ -541,6 +551,7 @@ export function AssetCategoryPage({
         open={quickAddOpen}
         onClose={() => setQuickAddOpen(false)}
         initialIntent="asset"
+        initialAssetType={type}
         onSaved={() => {
           setQuickAddOpen(false)
           router.refresh()
@@ -627,7 +638,7 @@ function CategoryHero({ type, total, count }: CategoryHeroProps) {
 
         {/* Hoofdbedrag met halve transparante streep (module-active-200) */}
         <p
-          className="mt-2 font-mono text-[28px] font-bold tabular-nums leading-none tracking-tight text-[var(--ink)] sm:text-[36px]"
+          className="mt-2 leading-none tracking-tight text-[var(--ink)]"
           style={{
             fontFamily: 'var(--font-playfair, var(--font-mono, monospace))',
           }}
@@ -639,7 +650,12 @@ function CategoryHero({ type, total, count }: CategoryHeroProps) {
                 'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
             }}
           >
-            {formatCurrency(total)}
+            <MaskedAmount
+              value={total}
+              tone="kern"
+              monoWhenVisible={false}
+              className="text-[28px] font-bold leading-none tracking-tight sm:text-[36px]"
+            />
           </span>
         </p>
 
@@ -680,6 +696,7 @@ interface ItemsTabProps {
   assets: Asset[]
   kpiByAssetId?: Map<string, KpiPair>
   connectionsByAssetId?: Record<string, AssetConnectionSummary>
+  sparklinesByAssetId?: Record<string, number[]>
   onItemClick: (asset: Asset) => void
   onAddClick: () => void
 }
@@ -696,6 +713,7 @@ function ItemsTab({
   assets,
   kpiByAssetId,
   connectionsByAssetId,
+  sparklinesByAssetId,
   onItemClick,
   onAddClick,
 }: ItemsTabProps) {
@@ -704,30 +722,25 @@ function ItemsTab({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {assets.map((asset, idx) => (
-          <VermogenAssetCard
-            key={asset.id}
-            asset={asset}
-            kpiPair={kpiByAssetId?.get(asset.id)}
-            connection={connectionsByAssetId?.[asset.id]}
-            onClick={onItemClick}
-            staggerIndex={idx}
-          />
-        ))}
-      </div>
-
-      <div className="pt-2">
-        <button
-          type="button"
-          onClick={onAddClick}
-          className="inline-flex h-11 items-center gap-2 border border-kern-200 bg-kern-50 px-4 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100 hover:text-kern-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {addItemCta(type)}
-        </button>
-      </div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {assets.map((asset, idx) => (
+        <VermogenAssetCard
+          key={asset.id}
+          asset={asset}
+          kpiPair={kpiByAssetId?.get(asset.id)}
+          connection={connectionsByAssetId?.[asset.id]}
+          sparklineValues={sparklinesByAssetId?.[asset.id]}
+          onClick={onItemClick}
+          staggerIndex={idx}
+        />
+      ))}
+      <AddCategoryCard
+        label={addItemCta(type)}
+        onClick={onAddClick}
+        variant="asset"
+        shape="item"
+        staggerIndex={assets.length}
+      />
     </div>
   )
 }

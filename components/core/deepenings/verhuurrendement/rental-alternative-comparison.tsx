@@ -28,7 +28,8 @@
  */
 
 import { useMemo } from 'react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   BOX3_TARIEF,
   NL_FICTIEF_BELEGGINGEN,
@@ -78,6 +79,8 @@ export function RentalAlternativeComparison({
   calc,
   capital,
 }: RentalAlternativeComparisonProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Default-kapitaal = eigen geld in het pand. Wanneer ownEquity = 0
   // gebruiken we de marktwaarde als proxy zodat de tabel toch leesbaar
   // is — anders zou alles op 0 staan.
@@ -188,11 +191,11 @@ export function RentalAlternativeComparison({
                     {formatPercent(row.grossPct)}
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono tabular-nums text-[var(--ink-3)]">
-                    −{formatCurrency(row.taxAmount)}
+                    −{fc(row.taxAmount)}
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     <p className="font-mono tabular-nums font-semibold text-[var(--ink)]">
-                      {formatCurrency(row.netAmount)}
+                      {fc(row.netAmount)}
                     </p>
                     <p className="mt-0.5 text-[10px] font-mono tabular-nums text-[var(--ink-4)]">
                       {formatPercent(row.netPct)}
@@ -211,7 +214,7 @@ export function RentalAlternativeComparison({
                   >
                     {isVastgoed
                       ? '—'
-                      : `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${formatCurrency(Math.abs(delta))}`}
+                      : `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${fc(Math.abs(delta))}`}
                   </td>
                 </tr>
               )
@@ -223,7 +226,7 @@ export function RentalAlternativeComparison({
       <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
         Vergelijking op{' '}
         <span className="font-mono tabular-nums text-[var(--ink-2)]">
-          {formatCurrency(investableCapital)}
+          {fc(investableCapital)}
         </span>{' '}
         eigen geld. Vastgoed-rendementen bevatten cashflow én waardestijging.
         Aandelen- en spaarrendementen zijn lange-termijn gemiddelden — feitelijke

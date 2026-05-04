@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { Users, ArrowRight } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -71,8 +71,8 @@ export const HuishoudenActiviteitWidget = memo(function HuishoudenActiviteitWidg
           {preview.map(item => (
             <div key={item.id} className="flex items-center justify-between gap-1">
               <span className="text-[11px] text-[var(--ink-3)] truncate">{item.description || 'Transactie'}</span>
-              <span className="font-mono text-[11px] tabular-nums text-[var(--ink-2)] shrink-0">
-                {formatCurrency(item.amount)}
+              <span className="text-[var(--ink-2)] shrink-0">
+                <MaskedAmount value={item.amount} tone="kern" className="text-[11px]" />
               </span>
             </div>
           ))}
@@ -123,10 +123,10 @@ export const HuishoudenActiviteitWidget = memo(function HuishoudenActiviteitWidg
                 )}
               </div>
             </div>
-            <span className={`font-mono tabular-nums text-sm shrink-0 ${
+            <span className={`shrink-0 ${
               item.amount < 0 ? 'text-[var(--ink)]' : 'text-positive'
             }`}>
-              {formatCurrency(item.amount)}
+              <MaskedAmount value={item.amount} tone="kern" className="text-sm" />
             </span>
           </div>
         ))}

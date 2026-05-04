@@ -6,6 +6,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type SubscriptionItem = {
   id: string
@@ -154,7 +155,7 @@ ${nameVal}`
         {/* Header */}
         <div className="text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-wil-600">OPZEGBRIEF</p>
-          <p className="mt-1 text-[11px] text-[var(--ink-3)]">{subscription.name} — {formatCurrency(subscription.monthlyAmount)}/mnd</p>
+          <p className="mt-1 text-[11px] text-[var(--ink-3)]">{subscription.name} — {<MaskedAmount value={subscription.monthlyAmount} tone="horizon" />}/mnd</p>
         </div>
 
         {/* NAW-sectie */}

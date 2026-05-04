@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { Compass } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -106,8 +106,8 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
                 }}
               />
             </div>
-            <p className="text-[10px] text-[var(--ink-3)] font-mono tabular-nums">
-              {formatCurrency(netWorth)} / {formatCurrency(effectiveFire)}
+            <p className="text-[10px] text-[var(--ink-3)]">
+              <MaskedAmount value={netWorth} tone="ink" /> / <MaskedAmount value={effectiveFire} tone="ink" />
             </p>
             <p className="text-[10px] text-[var(--ink-4)]">
               {fireStatusLabel}
@@ -220,16 +220,16 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
 
           {/* Right column: wealth + growth */}
           <div className="flex-1 min-w-0 pt-1">
-            <p className="text-[11px] text-[var(--ink-3)] font-mono tabular-nums truncate">
-              {formatCurrency(netWorth)}
+            <p className="text-[var(--ink-3)] truncate">
+              <MaskedAmount value={netWorth} tone="ink" className="text-[11px]" />
             </p>
-            <p className="text-[10px] text-[var(--ink-4)] font-mono tabular-nums truncate">
-              / {formatCurrency(effectiveFire)}{simRequiredPortfolio ? ' (sim)' : ''}
+            <p className="text-[var(--ink-4)] truncate">
+              / <MaskedAmount value={effectiveFire} tone="ink" className="text-[10px]" />{simRequiredPortfolio ? ' (sim)' : ''}
             </p>
             {monthlyGrowthRate !== null && (
               <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">
                 <span className="text-[var(--ink-2)] font-medium">Groei</span>{' '}
-                <span className="font-mono tabular-nums">{formatCurrency(monthlyGrowthRate)}/mnd</span>
+                <MaskedAmount value={monthlyGrowthRate} tone="ink" />/mnd
               </p>
             )}
           </div>

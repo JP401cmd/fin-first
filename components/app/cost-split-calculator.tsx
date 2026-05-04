@@ -6,13 +6,14 @@ import {
   Wallet, UserCheck, Settings, PiggyBank,
   TrendingDown, Info, ChevronDown, ChevronUp,
 } from 'lucide-react'
-import { formatCurrency } from '@/components/app/budget-shared'
+
 import {
   computeSharePct,
   SPLIT_MODE_LABELS,
   SPLIT_MODE_DESCRIPTIONS,
   type SplitMode,
 } from '@/lib/household-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ function ContributionBar({
         </span>
       </div>
       <span className="text-xs font-semibold text-zinc-800 w-20 text-right tabular-nums" data-testid={`amount-${partner.isCurrentUser ? 'me' : 'partner'}`}>
-        {formatCurrency(partner.shareAmount)}
+        {<MaskedAmount value={partner.shareAmount} tone="wil" />}
       </span>
     </div>
   )
@@ -302,7 +303,7 @@ export function PartnerContributionSummary({
       <div className="flex items-center justify-between mb-3 pb-3 border-b border-[var(--border-ed)]">
         <span className="text-xs text-[var(--ink-3)]">{itemLabel || 'Totaal gedeeld'}</span>
         <span className="text-sm font-bold text-[var(--ink)]" data-testid="split-total-amount">
-          {formatCurrency(result.totalAmount)}
+          {<MaskedAmount value={result.totalAmount} tone="wil" />}
         </span>
       </div>
 
@@ -335,11 +336,11 @@ export function PartnerContributionSummary({
             </div>
             <div className="text-right">
               <p className="text-sm font-bold text-[var(--ink)] tabular-nums" data-testid={`partner-amount-${partner.isCurrentUser ? 'me' : 'partner'}`}>
-                {formatCurrency(partner.shareAmount)}
+                {<MaskedAmount value={partner.shareAmount} tone="wil" />}
               </p>
               {partner.income !== undefined && partner.income > 0 && (
                 <p className="text-[10px] text-[var(--ink-3)] tabular-nums">
-                  Inkomen: {formatCurrency(partner.income)}/mnd
+                  Inkomen: {<MaskedAmount value={partner.income} tone="wil" />}/mnd
                 </p>
               )}
             </div>
@@ -354,7 +355,7 @@ export function PartnerContributionSummary({
           <p className="text-[10px] text-blue-700">
             Verdeling gebaseerd op inkomenratio:{' '}
             <span className="font-medium">
-              {formatCurrency(result.partners[0].income!)} vs {formatCurrency(result.partners[1].income!)}
+              {<MaskedAmount value={result.partners[0].income!} tone="wil" />} vs {<MaskedAmount value={result.partners[1].income!} tone="wil" />}
             </span>
           </p>
         </div>
@@ -409,17 +410,17 @@ export function SharedBudgetSplitList({
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-[var(--ink-2)]">{budget.name}</span>
                 <span className="text-xs font-semibold text-[var(--ink)] tabular-nums">
-                  {formatCurrency(budget.totalAmount)}
+                  {<MaskedAmount value={budget.totalAmount} tone="wil" />}
                 </span>
               </div>
               <div className="flex gap-4">
                 <div className="flex items-center gap-1 text-[10px] text-[var(--ink-3)]">
                   <User className="h-2.5 w-2.5" />
-                  Jij: <span className="font-medium text-[var(--ink-2)] tabular-nums">{formatCurrency(myAmount)}</span>
+                  Jij: <span className="font-medium text-[var(--ink-2)] tabular-nums">{<MaskedAmount value={myAmount} tone="wil" />}</span>
                 </div>
                 <div className="flex items-center gap-1 text-[10px] text-[var(--ink-3)]">
                   <Users className="h-2.5 w-2.5" />
-                  Partner: <span className="font-medium text-[var(--ink-2)] tabular-nums">{formatCurrency(partnerAmount)}</span>
+                  Partner: <span className="font-medium text-[var(--ink-2)] tabular-nums">{<MaskedAmount value={partnerAmount} tone="wil" />}</span>
                 </div>
               </div>
             </div>
@@ -432,18 +433,18 @@ export function SharedBudgetSplitList({
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-semibold text-[var(--ink-2)]">Totaal gedeeld</span>
           <span className="text-sm font-bold text-[var(--ink)] tabular-nums">
-            {formatCurrency(sharedBudgets.reduce((s, b) => s + b.totalAmount, 0))}
+            {<MaskedAmount value={sharedBudgets.reduce((s, b) => s + b.totalAmount, 0)} tone="wil" />}
           </span>
         </div>
         <div className="flex gap-4">
           <span className="text-[10px] text-[var(--ink-3)]">
             Jij: <span className="font-medium text-[var(--ink-2)] tabular-nums">
-              {formatCurrency(sharedBudgets.reduce((s, b) => s + b.totalAmount * (myPct / 100), 0))}
+              {<MaskedAmount value={sharedBudgets.reduce((s, b) => s + b.totalAmount * (myPct / 100), 0)} tone="wil" />}
             </span> ({myPct}%)
           </span>
           <span className="text-[10px] text-[var(--ink-3)]">
             Partner: <span className="font-medium text-[var(--ink-2)] tabular-nums">
-              {formatCurrency(sharedBudgets.reduce((s, b) => s + b.totalAmount * (partnerPct / 100), 0))}
+              {<MaskedAmount value={sharedBudgets.reduce((s, b) => s + b.totalAmount * (partnerPct / 100), 0)} tone="wil" />}
             </span> ({partnerPct}%)
           </span>
         </div>
@@ -501,7 +502,7 @@ export function SharedDebtSplitList({
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-[var(--ink-2)]">{debt.name}</span>
                 <span className="text-xs font-semibold text-rose-600 tabular-nums">
-                  {formatCurrency(debt.currentBalance)}
+                  {<MaskedAmount value={debt.currentBalance} tone="wil" />}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -511,11 +512,11 @@ export function SharedDebtSplitList({
                     Jij
                   </div>
                   <div className="mt-0.5 font-medium text-[var(--ink-2)] tabular-nums">
-                    Saldo: {formatCurrency(myBalance)}
+                    Saldo: {<MaskedAmount value={myBalance} tone="wil" />}
                   </div>
                   {debt.monthlyPayment > 0 && (
                     <div className="font-medium text-[var(--ink-2)] tabular-nums">
-                      Aflossing: {formatCurrency(myPayment)}/mnd
+                      Aflossing: {<MaskedAmount value={myPayment} tone="wil" />}/mnd
                     </div>
                   )}
                 </div>
@@ -525,11 +526,11 @@ export function SharedDebtSplitList({
                     Partner
                   </div>
                   <div className="mt-0.5 font-medium text-[var(--ink-2)] tabular-nums">
-                    Saldo: {formatCurrency(partnerBalance)}
+                    Saldo: {<MaskedAmount value={partnerBalance} tone="wil" />}
                   </div>
                   {debt.monthlyPayment > 0 && (
                     <div className="font-medium text-[var(--ink-2)] tabular-nums">
-                      Aflossing: {formatCurrency(partnerPayment)}/mnd
+                      Aflossing: {<MaskedAmount value={partnerPayment} tone="wil" />}/mnd
                     </div>
                   )}
                 </div>
@@ -544,18 +545,18 @@ export function SharedDebtSplitList({
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-semibold text-[var(--ink-2)]">Totaal gedeelde schuld</span>
           <span className="text-sm font-bold text-rose-600 tabular-nums">
-            {formatCurrency(sharedDebts.reduce((s, d) => s + d.currentBalance, 0))}
+            {<MaskedAmount value={sharedDebts.reduce((s, d) => s + d.currentBalance, 0)} tone="wil" />}
           </span>
         </div>
         <div className="flex gap-4">
           <span className="text-[10px] text-[var(--ink-3)]">
             Jij: <span className="font-medium text-[var(--ink-2)] tabular-nums">
-              {formatCurrency(sharedDebts.reduce((s, d) => s + d.currentBalance * (myPct / 100), 0))}
+              {<MaskedAmount value={sharedDebts.reduce((s, d) => s + d.currentBalance * (myPct / 100), 0)} tone="wil" />}
             </span> ({myPct}%)
           </span>
           <span className="text-[10px] text-[var(--ink-3)]">
             Partner: <span className="font-medium text-[var(--ink-2)] tabular-nums">
-              {formatCurrency(sharedDebts.reduce((s, d) => s + d.currentBalance * (partnerPct / 100), 0))}
+              {<MaskedAmount value={sharedDebts.reduce((s, d) => s + d.currentBalance * (partnerPct / 100), 0)} tone="wil" />}
             </span> ({partnerPct}%)
           </span>
         </div>
@@ -639,11 +640,11 @@ export function CostSplitCalculator({
       <div className="flex items-center gap-2 text-xs" data-testid="cost-split-calculator-compact">
         <span className="text-[var(--ink-3)]">{SPLIT_MODE_LABELS[activeMode]}:</span>
         <span className="font-medium text-[var(--ink-2)] tabular-nums">
-          Jij {me?.sharePct}% ({formatCurrency(me?.shareAmount ?? 0)})
+          Jij {me?.sharePct}% ({<MaskedAmount value={me?.shareAmount ?? 0} tone="wil" />})
         </span>
         <ArrowRight className="h-3 w-3 text-[var(--ink-4)]" />
         <span className="font-medium text-[var(--ink-2)] tabular-nums">
-          {partnerName} {partner?.sharePct}% ({formatCurrency(partner?.shareAmount ?? 0)})
+          {partnerName} {partner?.sharePct}% ({<MaskedAmount value={partner?.shareAmount ?? 0} tone="wil" />})
         </span>
       </div>
     )
@@ -727,10 +728,10 @@ export function CostSplitCalculator({
               </div>
               <div className="flex justify-between mt-2 text-xs">
                 <span className="font-medium text-kern-700">
-                  Jij: {formatCurrency(totalAmount * (localCustomPct / 100))}
+                  Jij: {<MaskedAmount value={totalAmount * (localCustomPct / 100)} tone="wil" />}
                 </span>
                 <span className="font-medium text-kern-700">
-                  Partner: {formatCurrency(totalAmount * ((100 - localCustomPct) / 100))}
+                  Partner: {<MaskedAmount value={totalAmount * ((100 - localCustomPct) / 100)} tone="wil" />}
                 </span>
               </div>
             </div>

@@ -3,7 +3,18 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/**
+ * Masked-aware currency formatter hook. Returns a stable callback that
+ * yields either the masked placeholder or a formatted EUR string based on
+ * the global privacy toggle.
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import {
   type FinancialInput,
   ageAtDate,
@@ -55,6 +66,7 @@ import { buildBreakdownFromSimRows } from '@/lib/income-expense-breakdown'
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function WhatIfPage() {
+  const fc = useFc()
   // ── Dream gate detection ──────────────────────────────────
   const searchParams = useSearchParams()
   const viaDreamgate = useRef(searchParams.get('via') === 'dreamgate')
@@ -446,8 +458,8 @@ export default function WhatIfPage() {
         ? scenarioEvents.map(e => {
             const parts = [e.name]
             if (e.target_age) parts.push(`leeftijd ${e.target_age}`)
-            if (Number(e.one_time_cost) > 0) parts.push(formatCurrency(Number(e.one_time_cost)) + ' eenmalig')
-            if (Number(e.monthly_cost_change) !== 0) parts.push(formatCurrency(Number(e.monthly_cost_change)) + '/mnd')
+            if (Number(e.one_time_cost) > 0) parts.push(fc(Number(e.one_time_cost)) + ' eenmalig')
+            if (Number(e.monthly_cost_change) !== 0) parts.push(fc(Number(e.monthly_cost_change)) + '/mnd')
             return parts.join(', ')
           }).join('; ')
         : 'geen'
@@ -456,20 +468,20 @@ export default function WhatIfPage() {
         'Ik zit op de Wat-Als scenario pagina. Hier is mijn scenario:',
         '',
         `Werkelijkheid: FIRE op ${baselineFireAge !== null ? Math.floor(baselineFireAge) + ' jaar' : 'onbekend'}, ` +
-          `${formatCurrency(baselineAnnualSavings)}/jr sparen, ` +
-          `inkomen ${formatCurrency(baseline.monthlyIncome)}/mnd`,
+          `${fc(baselineAnnualSavings)}/jr sparen, ` +
+          `inkomen ${fc(baseline.monthlyIncome)}/mnd`,
         '',
-        `Mijn wat-als scenario: inkomen ${formatCurrency(overrides.monthlyIncome)}/mnd, ` +
+        `Mijn wat-als scenario: inkomen ${fc(overrides.monthlyIncome)}/mnd, ` +
           `${overrides.workDaysPerWeek} werkdagen/week, ` +
           `spaarquote ${Math.round(overrides.savingsRate)}%, ` +
           `rendement ${overrides.expectedReturn.toFixed(1)}%` +
-          (overrides.extraContribution > 0 ? `, extra inleg ${formatCurrency(overrides.extraContribution)}/mnd` : ''),
+          (overrides.extraContribution > 0 ? `, extra inleg ${fc(overrides.extraContribution)}/mnd` : ''),
         '',
         `Resultaat: FIRE op ${whatIfFireAge !== null ? Math.floor(whatIfFireAge) + ' jaar' : 'onbereikbaar'}` +
           (fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1
             ? ` (${formatFireAgeDelta(fireAgeDelta)} verschil)`
             : '') +
-          `, ${formatCurrency(whatIfAnnualSavings)}/jr sparen`,
+          `, ${fc(whatIfAnnualSavings)}/jr sparen`,
         '',
         `Levensgebeurtenissen in scenario: ${eventsDesc}`,
         '',
@@ -619,7 +631,7 @@ export default function WhatIfPage() {
                   className="text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums"
                   style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                 >
-                  {formatCurrency(simResult.requiredFirePortfolio)}
+                  {fc(simResult.requiredFirePortfolio)}
                 </div>
                 <div
                   className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -627,7 +639,7 @@ export default function WhatIfPage() {
                 >
                   {Math.abs(targetDelta) > 100
                     ? <span style={{ color: isTargetPositive ? 'var(--positive)' : 'var(--negative)' }}>
-                        {targetDelta > 0 ? '+' : ''}{formatCurrency(targetDelta)}
+                        {targetDelta > 0 ? '+' : ''}{fc(targetDelta)}
                       </span>
                     : 'benodigd'}
                 </div>
@@ -647,7 +659,7 @@ export default function WhatIfPage() {
                   className="text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums"
                   style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                 >
-                  {formatCurrency(whatIfAnnualSavings)}
+                  {fc(whatIfAnnualSavings)}
                 </div>
                 <div
                   className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -655,7 +667,7 @@ export default function WhatIfPage() {
                 >
                   {Math.abs(annualSavingsDelta) > 100
                     ? <span style={{ color: isSavingsPositive ? 'var(--positive)' : 'var(--negative)' }}>
-                        {annualSavingsDelta > 0 ? '+' : ''}{formatCurrency(annualSavingsDelta)}/jr
+                        {annualSavingsDelta > 0 ? '+' : ''}{fc(annualSavingsDelta)}/jr
                       </span>
                     : 'per jaar'}
                 </div>
@@ -733,22 +745,22 @@ export default function WhatIfPage() {
               />
               <ComparisonRow
                 label="Doelbedrag"
-                baseValue={formatCurrency(baselineSim.result.requiredFirePortfolio)}
-                whatIfValue={formatCurrency(simResult.requiredFirePortfolio)}
+                baseValue={fc(baselineSim.result.requiredFirePortfolio)}
+                whatIfValue={fc(simResult.requiredFirePortfolio)}
                 delta={
                   Math.abs(simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio) > 100
-                    ? formatCurrency(simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio)
+                    ? fc(simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio)
                     : null
                 }
                 isPositive={simResult.requiredFirePortfolio < baselineSim.result.requiredFirePortfolio}
               />
               <ComparisonRow
                 label="Jaarlijks sparen"
-                baseValue={formatCurrency(baselineAnnualSavings) + '/jr'}
-                whatIfValue={formatCurrency(whatIfAnnualSavings) + '/jr'}
+                baseValue={fc(baselineAnnualSavings) + '/jr'}
+                whatIfValue={fc(whatIfAnnualSavings) + '/jr'}
                 delta={
                   Math.abs(whatIfAnnualSavings - baselineAnnualSavings) > 100
-                    ? `${whatIfAnnualSavings > baselineAnnualSavings ? '+' : ''}${formatCurrency(whatIfAnnualSavings - baselineAnnualSavings)}`
+                    ? `${whatIfAnnualSavings > baselineAnnualSavings ? '+' : ''}${fc(whatIfAnnualSavings - baselineAnnualSavings)}`
                     : null
                 }
                 isPositive={whatIfAnnualSavings > baselineAnnualSavings}
@@ -1096,11 +1108,11 @@ export default function WhatIfPage() {
 
                   <ComparisonRow
                     label="Doelbedrag"
-                    baseValue={formatCurrency(baselineSim.result.requiredFirePortfolio)}
-                    whatIfValue={formatCurrency(simResult.requiredFirePortfolio)}
+                    baseValue={fc(baselineSim.result.requiredFirePortfolio)}
+                    whatIfValue={fc(simResult.requiredFirePortfolio)}
                     delta={
                       Math.abs(simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio) > 100
-                        ? formatCurrency(simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio)
+                        ? fc(simResult.requiredFirePortfolio - baselineSim.result.requiredFirePortfolio)
                         : null
                     }
                     isPositive={simResult.requiredFirePortfolio < baselineSim.result.requiredFirePortfolio}
@@ -1108,11 +1120,11 @@ export default function WhatIfPage() {
 
                   <ComparisonRow
                     label="Jaarlijks sparen"
-                    baseValue={formatCurrency(baselineAnnualSavings) + '/jr'}
-                    whatIfValue={formatCurrency(whatIfAnnualSavings) + '/jr'}
+                    baseValue={fc(baselineAnnualSavings) + '/jr'}
+                    whatIfValue={fc(whatIfAnnualSavings) + '/jr'}
                     delta={
                       Math.abs(whatIfAnnualSavings - baselineAnnualSavings) > 100
-                        ? `${whatIfAnnualSavings > baselineAnnualSavings ? '+' : ''}${formatCurrency(whatIfAnnualSavings - baselineAnnualSavings)}`
+                        ? `${whatIfAnnualSavings > baselineAnnualSavings ? '+' : ''}${fc(whatIfAnnualSavings - baselineAnnualSavings)}`
                         : null
                     }
                     isPositive={whatIfAnnualSavings > baselineAnnualSavings}

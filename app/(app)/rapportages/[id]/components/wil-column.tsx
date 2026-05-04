@@ -1,29 +1,41 @@
-import type { ReportWilSection } from '@/lib/report-data'
-import { SectionKicker } from './section-kicker'
-import { ReportSparkline } from './report-sparkline'
-import { CheckCircle2, AlertTriangle, Info, TrendingUp, Target } from 'lucide-react'
+'use client'
 
-export function WilColumn({ wil }: { wil: ReportWilSection }) {
+import type { ReportWilSection } from '@/lib/report-data'
+import { useResolvedModuleColor } from '@/lib/hooks/use-resolved-module-color'
+import { SectionLabel } from '@/components/editorial'
+import { ReportSparkline } from './report-sparkline'
+import { CheckCircle2, AlertTriangle, Info, TrendingUp } from 'lucide-react'
+
+export function WilColumn({
+  wil,
+  accentColor = '#3d3048',
+}: {
+  wil: ReportWilSection
+  /** Hex-fallback for the sparkline stroke. See `useResolvedModuleColor` notes. */
+  accentColor?: string
+}) {
+  const resolvedAccent = useResolvedModuleColor('--module-active-700', accentColor)
+
   return (
     <div className="space-y-6">
-      <SectionKicker module="wil" title="De Wil" subtitle="Acties & Inzichten" />
+      <SectionLabel num="ii.">De Wil</SectionLabel>
 
       {/* Actions completed */}
       <div className="report-section">
         <div className="flex items-baseline justify-between mb-1">
           <span className="font-inter text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Acties voltooid</span>
-          <span className="font-dm-mono text-lg tabular-nums font-bold text-wil-600">{wil.actionsCompleted}</span>
+          <span className="font-dm-mono text-lg tabular-nums font-bold text-[var(--module-active-700)]">{wil.actionsCompleted}</span>
         </div>
         <div className="flex items-baseline justify-between">
           <span className="font-inter text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Vrijheidsdagen gewonnen</span>
-          <span className="font-dm-mono text-lg tabular-nums font-bold text-wil-600">{wil.freedomDaysWon}</span>
+          <span className="font-dm-mono text-lg tabular-nums font-bold text-[var(--module-active-700)]">{wil.freedomDaysWon}</span>
         </div>
 
         {/* Vrijheidsdagen sparkline */}
         {wil.freedomDaysByPeriod.length >= 2 && (
           <ReportSparkline
             values={wil.freedomDaysByPeriod.map(p => p.days)}
-            color="#3d3048"
+            color={resolvedAccent}
             height={40}
             showFill={true}
             className="mt-2"
@@ -31,10 +43,10 @@ export function WilColumn({ wil }: { wil: ReportWilSection }) {
         )}
 
         {wil.topActions.length > 0 && (
-          <div className="mt-3 space-y-1.5 border-t border-dashed border-[var(--border-ed)] pt-3">
+          <div className="mt-3 space-y-1.5 border-t border-dotted border-[var(--rule-soft)] pt-3">
             {wil.topActions.slice(0, 3).map(a => (
               <div key={a.id} className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-wil-500" />
+                <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-[var(--module-active-500)]" />
                 <span className="font-inter text-[11px] text-[var(--ink-2)] leading-snug">{a.title}</span>
               </div>
             ))}
@@ -54,7 +66,7 @@ export function WilColumn({ wil }: { wil: ReportWilSection }) {
                 : insight.severity === 'positive' ? TrendingUp
                   : Info
               const iconColor = insight.severity === 'warning' ? 'text-amber-500'
-                : insight.severity === 'positive' ? 'text-kern-500'
+                : insight.severity === 'positive' ? 'text-[var(--positive)]'
                   : 'text-[var(--ink-3)]'
 
               return (
@@ -84,9 +96,9 @@ export function WilColumn({ wil }: { wil: ReportWilSection }) {
                   <span className="font-inter text-[11px] text-[var(--ink-2)]">{g.name}</span>
                   <span className="font-dm-mono text-[11px] tabular-nums text-[var(--ink-3)]">{g.pct}%</span>
                 </div>
-                <div className="h-1.5 rounded-full bg-wil-100 overflow-hidden">
+                <div className="h-1.5 rounded-full bg-[var(--module-active-100)]/40 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-wil-500 transition-all"
+                    className="h-full rounded-full bg-[var(--module-active-500)] transition-all"
                     style={{ width: `${Math.min(g.pct, 100)}%` }}
                   />
                 </div>

@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/components/app/budget-shared'
+
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 export function ValuationModal({
   entityId,
@@ -93,7 +94,7 @@ export function ValuationModal({
               className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
             <p className="mt-1 text-xs text-[var(--ink-3)]">
-              Huidige waarde: {formatCurrency(currentValue)}
+              Huidige waarde: {<MaskedAmount value={currentValue} tone="kern" />}
             </p>
           </div>
           <div>

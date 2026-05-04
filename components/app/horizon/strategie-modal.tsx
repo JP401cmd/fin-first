@@ -29,6 +29,7 @@ import {
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { ArrowLeft, Shield, TrendingUp, Landmark, Settings, Info, Check, CircleDot, Loader2, AlertTriangle, Banknote, Heart, Infinity as InfinityIcon } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Strategy metadata (Dutch) ──────────────────────────────────────────────
 
@@ -1202,11 +1203,11 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                     <p className="mt-1 font-sans text-sm text-[var(--ink)]">
                       Je kunt flexen tussen{' '}
                       <span className="font-mono tabular-nums font-semibold">
-                        {formatCurrency(spendingRange.minMonthly)}
+                        {<MaskedAmount value={spendingRange.minMonthly} tone="horizon" />}
                       </span>
                       {' '}en{' '}
                       <span className="font-mono tabular-nums font-semibold">
-                        {formatCurrency(spendingRange.maxMonthly)}
+                        {<MaskedAmount value={spendingRange.maxMonthly} tone="horizon" />}
                       </span>
                       {' '}per maand
                     </p>
@@ -1299,7 +1300,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                 </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   <SummaryRow label={localEndStrategy === 'pensioen' ? 'AOW-leeftijd' : 'FIRE leeftijd'} value={localEndStrategy === 'pensioen' ? `${NL_AOW_AGE} jaar` : fireAge !== null ? `${fireAge} jaar` : 'Niet bereikbaar'} />
-                  <SummaryRow label="Doelbedrag" value={formatCurrency(selectedSim.requiredFirePortfolio)} />
+                  <SummaryRow label="Doelbedrag" value={<MaskedAmount value={selectedSim.requiredFirePortfolio} tone="horizon" />} />
                   <SummaryRow label="Onttrekkingspercentage" value={`${(selectedSim.implicitWithdrawalRate * 100).toFixed(1)}%`} />
                   <SummaryRow label="Eindvermogen" value={
                     selectedSim.rows.length > 0
@@ -1475,7 +1476,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
 
 // ── Summary row ───────────────────────────────────────────────────────────────
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <span className="font-sans text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">{label}</span>

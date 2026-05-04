@@ -3,6 +3,18 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useParams } from 'next/navigation'
 import type { ReportData } from '@/lib/report-data'
+import {
+  formatTimestamp,
+  formatCurrency,
+  formatFreedomTimeString,
+  calculateFreedomTime,
+} from '@/lib/format'
+import {
+  FiguresStrip,
+  ScenarioCallout,
+  OrnamentColophon,
+} from '@/components/editorial'
+import { SectionDivider } from '@/components/app/section-divider'
 import { PrintToolbar } from './components/print-toolbar'
 import { ReportMasthead } from './components/report-masthead'
 import { LeadStory } from './components/lead-story'
@@ -62,8 +74,8 @@ export default function ReportViewerPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
-          <p className="font-inter text-sm text-[var(--ink-3)]">Rapport wordt gegenereerd...</p>
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent" />
+          <p className="font-inter text-sm text-[var(--ink-3)]">Pagina&apos;s worden opgesteld...</p>
         </div>
       </div>
     )
@@ -80,24 +92,80 @@ export default function ReportViewerPage() {
     )
   }
 
+  // ── Hero figures ─────────────────────────────────────────────────
+  // Pre-compute the four headline numbers shown in the editorial figures-strip
+  // directly under the masthead. These are scan-anchors — the four metrics a
+  // reader expects to find without effort: hoeveel groeide het vermogen, hoe
+  // sober is gespaard, hoe ver naar FIRE, en hoeveel tijd zit er nu in de pot.
+  const growth = data.kern.netWorthGrowth ?? 0
+  const growthSign = growth >= 0 ? '+' : ''
+  const savingsRate = data.kern.savingsRate ?? 0
+  const firePercentage = data.horizon.fireEnd?.percentage ?? 0
+  const fireDelta = data.horizon.fireProgressDelta
+  const netWorthEnd = data.kern.netWorthEnd ?? 0
+  // Freedom time falls back to '—' when we cannot translate the eindstand into
+  // days — either because there's no balance to project or no expense-rate to
+  // divide by. The hero must never invent time the reader cannot verify.
+  const canShowFreedomTime =
+    netWorthEnd >= 100 && data.dailyExpenseRate > 0
+  const freedomTimeShort = canShowFreedomTime
+    ? formatFreedomTimeString(
+        calculateFreedomTime(netWorthEnd, data.dailyExpenseRate),
+        'short',
+      )
+    : '—'
+
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8">
       <PrintToolbar />
 
       <ReportMasthead data={data} />
 
+      <FiguresStrip
+        cols={4}
+        figures={[
+          {
+            kicker: 'Vermogensgroei',
+            amount: `${growthSign}${formatCurrency(growth)}`,
+            sub:
+              data.kern.netWorthStart != null
+                ? `vs. ${formatCurrency(data.kern.netWorthStart)}`
+                : undefined,
+            variant: growth >= 0 ? 'positive' : 'negative',
+          },
+          {
+            kicker: 'Spaarquote',
+            amount: `${savingsRate}%`,
+            sub:
+              data.kern.totalSaved != null
+                ? `${formatCurrency(data.kern.totalSaved)} gespaard`
+                : undefined,
+            variant: 'neutral',
+          },
+          {
+            kicker: 'FIRE-voortgang',
+            amount: `${firePercentage}%`,
+            sub:
+              fireDelta != null
+                ? `${fireDelta >= 0 ? '+' : ''}${fireDelta}% deze periode`
+                : undefined,
+            variant: 'neutral',
+          },
+          {
+            kicker: 'Vrijheidstijd',
+            amount: freedomTimeShort,
+            sub: 'opgespaarde tijd',
+            variant: 'winner',
+          },
+        ]}
+      />
+
       <LeadStory kern={data.kern} />
 
-      {/* AI Editorial Introduction */}
       {data.aiIntroduction && (
-        <div className="report-section mb-8">
-          <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-wil-600 mb-2">
-            Redactionele Inleiding — Will
-          </p>
-          <blockquote className="border-l-[3px] border-wil-400 pl-4 font-source-serif text-[15px] italic leading-[1.65] text-[var(--ink-2)]">
-            {data.aiIntroduction}
-          </blockquote>
-        </div>
+        <ScenarioCallout title="Will — redactie">
+          {data.aiIntroduction}
+        </ScenarioCallout>
       )}
 
       {/* Historical Comparison */}
@@ -132,17 +200,20 @@ export default function ReportViewerPage() {
       />
 
       {/* Report footer */}
-      <footer className="mt-10 border-t-2 border-[var(--ink)] pt-4 text-center">
-        <p className="font-playfair text-lg font-bold text-[var(--ink)]">
-          <span>t</span><span className="text-kern-600">f.</span>
+      <SectionDivider variant="double-rule" />
+      <div className="text-center pt-2">
+        <p className="font-playfair text-lg font-bold">
+          <span>t</span>
+          <span style={{ color: 'var(--module-active-700)' }}>f.</span>
         </p>
         <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">
           &ldquo;Geld is opgeslagen tijd&rdquo;
         </p>
-        <p className="mt-2 font-inter text-[10px] text-[var(--ink-4)]">
-          Gegenereerd door TriFinity &middot; {new Date(data.generatedAt).toLocaleDateString('nl-NL')}
-        </p>
-      </footer>
+      </div>
+      <OrnamentColophon
+        module="Rapportages"
+        text={formatTimestamp(data.generatedAt)}
+      />
     </div>
   )
 }

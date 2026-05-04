@@ -6,6 +6,7 @@ import { FinTable } from '@/components/app/fin-table'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { compareMortgageVsInvest, type HvBParams, type HvBResult, type RepaymentType } from '@/lib/hypotheek-vs-beleggen'
 import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,13 +132,13 @@ function ScenarioCard({
           <p className={`font-mono text-xl font-bold tabular-nums ${
             nettoVoordeel >= 0 ? 'text-emerald-600' : 'text-red-500'
           }`}>
-            {nettoVoordeel >= 0 ? '+' : ''}{formatCurrency(nettoVoordeel)}
+            {nettoVoordeel >= 0 ? '+' : ''}{<MaskedAmount value={nettoVoordeel} tone="kern" />}
           </p>
         </div>
         <div>
           <p className="text-xs text-[var(--ink-3)]">Eindwaarde</p>
           <p className="font-mono text-sm font-medium tabular-nums text-[var(--ink)]">
-            {formatCurrency(eindwaarde)}
+            {<MaskedAmount value={eindwaarde} tone="kern" />}
           </p>
         </div>
         {children}
@@ -183,12 +184,12 @@ function JaarVergelijkingTabel({ result }: { result: HvBResult }) {
               {result.jaarlijkseVergelijking.map((row) => (
                 <FinTable.Row key={row.jaar}>
                   <FinTable.Td numeric>{row.jaar}</FinTable.Td>
-                  <FinTable.Td numeric>{formatCurrency(row.aflossen)}</FinTable.Td>
-                  <FinTable.Td numeric>{formatCurrency(row.beleggen)}</FinTable.Td>
+                  <FinTable.Td numeric>{<MaskedAmount value={row.aflossen} tone="kern" />}</FinTable.Td>
+                  <FinTable.Td numeric>{<MaskedAmount value={row.beleggen} tone="kern" />}</FinTable.Td>
                   <FinTable.Td numeric bold color={
                     row.verschil > 0 ? 'text-emerald-600' : row.verschil < 0 ? 'text-red-500' : 'text-[var(--ink-3)]'
                   }>
-                    {row.verschil > 0 ? '+' : ''}{formatCurrency(row.verschil)}
+                    {row.verschil > 0 ? '+' : ''}{<MaskedAmount value={row.verschil} tone="kern" />}
                   </FinTable.Td>
                 </FinTable.Row>
               ))}
@@ -443,7 +444,7 @@ export function HypotheekVsBeleggenSectie({
                   color: result.verschil > 0 ? 'var(--positive)' : 'var(--ink)',
                 }}
               >
-                {result.verschil > 0 ? '+' : ''}{formatCurrency(Math.abs(result.verschil))}
+                {result.verschil > 0 ? '+' : ''}{<MaskedAmount value={Math.abs(result.verschil)} tone="kern" />}
               </span>
             </p>
             {/* Sub-meta italic Source Serif */}

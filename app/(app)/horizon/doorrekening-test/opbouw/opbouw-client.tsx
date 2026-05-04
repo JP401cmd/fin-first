@@ -2,7 +2,14 @@
 
 import { useMemo, useState, useCallback, useRef } from 'react'
 import { ChevronDown, ChevronRight, TrendingUp, Landmark, PiggyBank, BarChart3 } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware currency formatter hook used across this file. */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { ASSET_TYPE_LABELS, type Asset, type AssetType } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS, type Debt, type DebtType } from '@/lib/debt-data'
 import type { FireParams } from '@/lib/fire-params'
@@ -106,6 +113,7 @@ function StackedAreaChart({
   projectionYears: number
   crossoverMonth: number | null
 }) {
+  const fc = useFc()
   const totalMonths = projectionYears * 12
   const monthlySavings = profileMonthlyIncome * (profileSavingsRate / 100)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -388,7 +396,7 @@ function StackedAreaChart({
           <g key={val}>
             <line x1={px} y1={y} x2={w - px} y2={y} stroke="var(--border-ed)" strokeWidth={0.5} />
             <text x={px - 6} y={y + 3} textAnchor="end" fontSize={7} fill="var(--ink-4)" className="font-mono">
-              {formatCurrency(val)}
+              {fc(val)}
             </text>
           </g>
         ))}
@@ -463,7 +471,7 @@ function StackedAreaChart({
                 Netto vermogen
               </span>
               <span className="font-mono text-xs font-bold tabular-nums" style={{ color: '#8b5cf6' }}>
-                {formatCurrency(hoverData.netWorth)}
+                {fc(hoverData.netWorth)}
               </span>
             </div>
 
@@ -480,7 +488,7 @@ function StackedAreaChart({
                         <span className="truncate max-w-[100px]">{it.label}</span>
                       </span>
                       <span className="font-mono text-[10px] font-semibold tabular-nums text-emerald-600">
-                        {formatCurrency(it.value)}
+                        {fc(it.value)}
                       </span>
                     </div>
                   ))}
@@ -488,7 +496,7 @@ function StackedAreaChart({
                   <div className="flex items-center justify-between gap-3 border-t border-[var(--border-ed)] pt-0.5">
                     <span className="text-[10px] font-medium text-[var(--ink-3)]">Totaal</span>
                     <span className="font-mono text-[10px] font-bold tabular-nums text-emerald-700">
-                      {formatCurrency(hoverData.totalAssets)}
+                      {fc(hoverData.totalAssets)}
                     </span>
                   </div>
                 )}
@@ -508,7 +516,7 @@ function StackedAreaChart({
                         <span className="truncate max-w-[100px]">{it.label}</span>
                       </span>
                       <span className="font-mono text-[10px] font-semibold tabular-nums text-red-600">
-                        -{formatCurrency(it.value)}
+                        -{fc(it.value)}
                       </span>
                     </div>
                   ))}
@@ -516,7 +524,7 @@ function StackedAreaChart({
                   <div className="flex items-center justify-between gap-3 border-t border-[var(--border-ed)] pt-0.5">
                     <span className="text-[10px] font-medium text-[var(--ink-3)]">Totaal</span>
                     <span className="font-mono text-[10px] font-bold tabular-nums text-red-700">
-                      -{formatCurrency(hoverData.totalDebts)}
+                      -{fc(hoverData.totalDebts)}
                     </span>
                   </div>
                 )}
@@ -549,6 +557,7 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears, lif
   lifeEvents: LifeEvent[]
   currentAge: number | null
 }) {
+  const fc = useFc()
   const [hoveredEvent, setHoveredEvent] = useState<string | null>(null)
 
   const allValues = [...assetTotals, ...debtTotals, ...netTotals]
@@ -642,7 +651,7 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears, lif
           <g key={frac}>
             <line x1={px} y1={yy} x2={w - px} y2={yy} stroke="var(--border-ed)" strokeWidth={0.5} />
             <text x={px - 6} y={yy + 3} textAnchor="end" fontSize={8} fill="var(--ink-4)" className="font-mono">
-              {formatCurrency(val)}
+              {fc(val)}
             </text>
           </g>
         )
@@ -782,7 +791,7 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears, lif
                   fill={marker.isPositive ? 'var(--color-emerald-600)' : 'var(--color-amber-600)'}
                   fontWeight={500}
                 >
-                  {marker.isPositive ? '\u25B2' : '\u25BC'} {formatCurrency(Math.abs(marker.netImpact))} netto impact
+                  {marker.isPositive ? '\u25B2' : '\u25BC'} {fc(Math.abs(marker.netImpact))} netto impact
                 </text>
                 {/* Details line for duration events */}
                 {marker.hasDuration && (
@@ -792,9 +801,9 @@ function SummaryChart({ assetTotals, debtTotals, netTotals, projectionYears, lif
                     fontSize={7}
                     fill="var(--ink-4)"
                   >
-                    {marker.oneTimeCost > 0 && `Eenmalig: ${formatCurrency(marker.oneTimeCost)}`}
-                    {marker.monthlyCost > 0 && ` Mnd: -${formatCurrency(marker.monthlyCost)}`}
-                    {marker.monthlyIncome > 0 && ` Mnd: +${formatCurrency(marker.monthlyIncome)}`}
+                    {marker.oneTimeCost > 0 && `Eenmalig: ${fc(marker.oneTimeCost)}`}
+                    {marker.monthlyCost > 0 && ` Mnd: -${fc(marker.monthlyCost)}`}
+                    {marker.monthlyIncome > 0 && ` Mnd: +${fc(marker.monthlyIncome)}`}
                   </text>
                 )}
               </g>
@@ -846,6 +855,7 @@ function ProjectionTable({ title, columns, color, projectionYears, defaultExpand
   projectionYears: number
   defaultExpanded?: boolean
 }) {
+  const fc = useFc()
   const [expanded, setExpanded] = useState(defaultExpanded ?? true)
 
   if (columns.length === 0) return null
@@ -871,8 +881,8 @@ function ProjectionTable({ title, columns, color, projectionYears, defaultExpand
         </div>
         {!expanded && (
           <div className="flex items-center gap-3 text-[11px] font-mono tabular-nums">
-            <span className="text-[var(--ink-3)]">Jaar 1: {formatCurrency(currentTotal)}</span>
-            <span className="text-[var(--ink-2)]">Jaar {projectionYears}: {formatCurrency(finalTotal)}</span>
+            <span className="text-[var(--ink-3)]">Jaar 1: {fc(currentTotal)}</span>
+            <span className="text-[var(--ink-2)]">Jaar {projectionYears}: {fc(finalTotal)}</span>
           </div>
         )}
       </button>
@@ -897,11 +907,11 @@ function ProjectionTable({ title, columns, color, projectionYears, defaultExpand
                   <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{yr}</td>
                   {columns.map((col, ci) => (
                     <td key={`col-${yr}-${ci}-${col.label}`} className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                      {formatCurrency(col.rows[yr - 1]?.value ?? 0)}
+                      {fc(col.rows[yr - 1]?.value ?? 0)}
                     </td>
                   ))}
                   <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-[var(--ink)]">
-                    {formatCurrency(total)}
+                    {fc(total)}
                   </td>
                 </tr>
               )
@@ -933,6 +943,7 @@ function AssetMonthlyTable({ asset, projectionYears, crossoverMonth }: {
   projectionYears: number
   crossoverMonth: number | null
 }) {
+  const fc = useFc()
   const totalMonths = projectionYears * 12
   const rows = useMemo(() => computeAssetMonthly(asset, totalMonths, crossoverMonth), [asset, totalMonths, crossoverMonth])
   const displayMonths = useMemo(() => getDisplayMonths(totalMonths), [totalMonths])
@@ -949,7 +960,7 @@ function AssetMonthlyTable({ asset, projectionYears, crossoverMonth }: {
           )}
         </h3>
         <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-          Startwaarde {formatCurrency(Number(asset.current_value))} · Rendement {annualReturn.toFixed(1)}%/jr · Inleg {formatCurrency(Number(asset.monthly_contribution))}/mnd
+          Startwaarde {fc(Number(asset.current_value))} · Rendement {annualReturn.toFixed(1)}%/jr · Inleg {fc(Number(asset.monthly_contribution))}/mnd
         </p>
       </div>
       <div className="overflow-auto max-h-[70vh]">
@@ -971,16 +982,16 @@ function AssetMonthlyTable({ asset, projectionYears, crossoverMonth }: {
                 <tr key={m} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
                   <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{m}</td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(row.startValue)}
+                    {fc(row.startValue)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(row.rendement)}
+                    {fc(row.rendement)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(row.inleg)}
+                    {fc(row.inleg)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-emerald-600">
-                    {formatCurrency(row.endValue)}
+                    {fc(row.endValue)}
                   </td>
                 </tr>
               )
@@ -1059,6 +1070,7 @@ function DebtAmortizationTable({ debt, projectionYears }: {
   debt: Debt
   projectionYears: number
 }) {
+  const fc = useFc()
   const maxMonths = projectionYears * 12
   const rows = useMemo(() => computeAmortization(debt, maxMonths), [debt, maxMonths])
   const displayMonths = useMemo(() => getAmortizationDisplayMonths(rows), [rows])
@@ -1087,9 +1099,9 @@ function DebtAmortizationTable({ debt, projectionYears }: {
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold text-[var(--ink)]">{debt.name}</h3>
           <div className="flex items-center gap-3 text-[10px] text-[var(--ink-4)]">
-            <span>Saldo: <span className="font-mono tabular-nums font-semibold text-red-500">{formatCurrency(Number(debt.current_balance))}</span></span>
+            <span>Saldo: <span className="font-mono tabular-nums font-semibold text-red-500">{fc(Number(debt.current_balance))}</span></span>
             <span>Rente: <span className="font-mono tabular-nums">{Number(debt.interest_rate).toFixed(2)}%</span></span>
-            <span>Betaling: <span className="font-mono tabular-nums">{formatCurrency(Number(debt.monthly_payment))}/mnd</span></span>
+            <span>Betaling: <span className="font-mono tabular-nums">{fc(Number(debt.monthly_payment))}/mnd</span></span>
             {paidOffMonth && (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700 font-medium">
                 Afgelost in {paidOffMonth} mnd
@@ -1118,16 +1130,16 @@ function DebtAmortizationTable({ debt, projectionYears }: {
                 <tr key={month} className={`border-b border-[var(--border-ed)] last:border-b-0 hover:bg-[var(--subtle)]/50 ${isZeroBalance ? 'bg-emerald-50/60' : idx % 2 === 1 ? 'bg-[var(--subtle)]/30' : ''}`}>
                   <td className="px-3 py-1 font-mono tabular-nums text-[var(--ink-3)]">{month}</td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(row.startBalance)}
+                    {fc(row.startBalance)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
-                    {formatCurrency(row.interest)}
+                    {fc(row.interest)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
-                    {formatCurrency(row.repayment)}
+                    {fc(row.repayment)}
                   </td>
                   <td className={`px-3 py-1 text-right font-mono tabular-nums font-semibold ${isZeroBalance ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {formatCurrency(row.endBalance)}
+                    {fc(row.endBalance)}
                     {isZeroBalance && <span className="ml-1 text-[9px]">✓</span>}
                   </td>
                 </tr>
@@ -1139,13 +1151,13 @@ function DebtAmortizationTable({ debt, projectionYears }: {
               <td className="px-3 py-1 font-medium text-[var(--ink-3)]">Totaal</td>
               <td className="px-3 py-1" />
               <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-[var(--ink-3)]">
-                {formatCurrency(totalInterest)}
+                {fc(totalInterest)}
               </td>
               <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-emerald-600">
-                {formatCurrency(totalRepayment)}
+                {fc(totalRepayment)}
               </td>
               <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-red-500">
-                {formatCurrency(rows[rows.length - 1].endBalance)}
+                {fc(rows[rows.length - 1].endBalance)}
               </td>
             </tr>
           </tfoot>
@@ -1173,6 +1185,7 @@ function NetWorthMonthlyTable({
   projectionYears: number
   crossoverMonth: number | null
 }) {
+  const fc = useFc()
   const totalMonths = projectionYears * 12
   const monthlySavings = profileMonthlyIncome * (profileSavingsRate / 100)
 
@@ -1282,12 +1295,12 @@ function NetWorthMonthlyTable({
                       key={`a-${i}`}
                       className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]"
                     >
-                      {formatCurrency(val)}
+                      {fc(val)}
                     </td>
                   ))}
                   {hasAssets && (
                     <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-emerald-700 bg-emerald-50/20">
-                      {formatCurrency(assetTotal)}
+                      {fc(assetTotal)}
                     </td>
                   )}
                   {debtValues.map((val, i) => (
@@ -1295,21 +1308,21 @@ function NetWorthMonthlyTable({
                       key={`d-${i}`}
                       className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]"
                     >
-                      {formatCurrency(val)}
+                      {fc(val)}
                     </td>
                   ))}
                   {hasDebts && (
                     <td className="px-3 py-1 text-right font-mono tabular-nums font-semibold text-red-600 bg-red-50/20">
-                      {formatCurrency(debtTotal)}
+                      {fc(debtTotal)}
                     </td>
                   )}
                   {hasSavings && (
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-amber-600">
-                      {formatCurrency(savings)}
+                      {fc(savings)}
                     </td>
                   )}
                   <td className="px-3 py-1 text-right font-mono tabular-nums font-bold text-horizon-600 bg-horizon-50/15">
-                    {formatCurrency(netWorth)}
+                    {fc(netWorth)}
                   </td>
                 </tr>
               )
@@ -1346,6 +1359,7 @@ function EventAllocationsSummary({
   assetNames: string[]
   strategyLabel: string
 }) {
+  const fc = useFc()
   if (!eventAllocations || eventGroups.length === 0) return null
 
   // Som per event-idx → per asset-idx over alle jaren.
@@ -1395,7 +1409,7 @@ function EventAllocationsSummary({
                   )}
                 </div>
                 <span className={`font-mono tabular-nums text-[12px] font-semibold ${isInflow ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {isInflow ? '+' : ''}{formatCurrency(Math.round(ev.total))}
+                  {isInflow ? '+' : ''}{fc(Math.round(ev.total))}
                 </span>
               </div>
               <div className="space-y-1">
@@ -1414,7 +1428,7 @@ function EventAllocationsSummary({
                       </div>
                       <span className="w-10 text-right font-mono tabular-nums text-[10px] text-[var(--ink-4)]">{pct.toFixed(0)}%</span>
                       <span className={`w-24 text-right font-mono tabular-nums ${amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {amount > 0 ? '+' : ''}{formatCurrency(Math.round(amount))}
+                        {amount > 0 ? '+' : ''}{fc(Math.round(amount))}
                       </span>
                     </div>
                   )
@@ -1432,6 +1446,7 @@ function EventAllocationTooltip({ allocation, assetNames }: {
   allocation: EventAssetAllocation
   assetNames: string[]
 }) {
+  const fc = useFc()
   const hasAllocations = allocation.perAsset.some(v => v !== 0)
   if (!hasAllocations) return null
 
@@ -1444,7 +1459,7 @@ function EventAllocationTooltip({ allocation, assetNames }: {
           <div key={i} className="flex justify-between gap-2">
             <span className="text-[var(--ink-3)] truncate">{assetNames[i]}</span>
             <span className={`font-mono tabular-nums whitespace-nowrap ${amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-              {amount > 0 ? '+' : ''}{formatCurrency(amount)}
+              {amount > 0 ? '+' : ''}{fc(amount)}
             </span>
           </div>
         )
@@ -1467,6 +1482,7 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
   assetNames: string[]
   allocationStrategyLabel?: string
 }) {
+  const fc = useFc()
   const hasEvents = yearlyEventCashflows.some((v) => v !== 0)
   const [hoveredCell, setHoveredCell] = useState<string | null>(null)
   const displayYears = useMemo(() => {
@@ -1536,13 +1552,13 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
                   {isAfterCrossover && <span className="ml-1 text-[9px] text-[var(--ink-4)]">na kruispunt</span>}
                 </td>
                 <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600 bg-emerald-50/30">
-                  {formatCurrency(assetTotals[yr - 1])}
+                  {fc(assetTotals[yr - 1])}
                 </td>
                 <td className="px-3 py-1 text-right font-mono tabular-nums text-red-500 bg-red-50/30">
-                  {formatCurrency(debtTotals[yr - 1])}
+                  {fc(debtTotals[yr - 1])}
                 </td>
                 <td className="px-3 py-1 text-right font-mono tabular-nums font-bold text-horizon-700 bg-horizon-50/40 border-l-2 border-horizon-200">
-                  {formatCurrency(netTotals[yr - 1])}
+                  {fc(netTotals[yr - 1])}
                 </td>
                 {hasEvents && eventGroups.map((_g, ei) => {
                   const evVal = perEventYearlyCashflows[ei]?.[yr - 1] ?? 0
@@ -1556,7 +1572,7 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
                       onMouseEnter={() => allocation && setHoveredCell(cellKey)}
                       onMouseLeave={() => setHoveredCell(null)}
                     >
-                      {evVal !== 0 ? formatCurrency(evVal) : '\u2014'}
+                      {evVal !== 0 ? fc(evVal) : '\u2014'}
                       {allocation && isHovered && (
                         <EventAllocationTooltip allocation={allocation} assetNames={assetNames} />
                       )}
@@ -1565,14 +1581,14 @@ function TotalTable({ assetTotals, debtTotals, netTotals, box3Taxes, projectionY
                 })}
                 {hasEvents && eventGroups.length > 1 && (
                   <td className={`px-3 py-1 text-right font-mono tabular-nums border-l border-purple-200/50 font-semibold ${yearlyEventCashflows[yr - 1] > 0 ? 'text-emerald-600' : yearlyEventCashflows[yr - 1] < 0 ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
-                    {yearlyEventCashflows[yr - 1] !== 0 ? formatCurrency(yearlyEventCashflows[yr - 1]) : '\u2014'}
+                    {yearlyEventCashflows[yr - 1] !== 0 ? fc(yearlyEventCashflows[yr - 1]) : '\u2014'}
                   </td>
                 )}
                 <td className="px-3 py-1 text-right font-mono tabular-nums text-amber-600">
-                  {box3Taxes[yr - 1] > 0 ? formatCurrency(box3Taxes[yr - 1]) : '\u2014'}
+                  {box3Taxes[yr - 1] > 0 ? fc(box3Taxes[yr - 1]) : '\u2014'}
                 </td>
                 <td className="px-3 py-1 text-right font-mono tabular-nums text-amber-500">
-                  {cumulativeTax[yr - 1] > 0 ? formatCurrency(cumulativeTax[yr - 1]) : '\u2014'}
+                  {cumulativeTax[yr - 1] > 0 ? fc(cumulativeTax[yr - 1]) : '\u2014'}
                 </td>
               </tr>
               )
@@ -1619,6 +1635,7 @@ export function OpbouwClient({
   /** Gewogen asset-return (zelfde bron als overzicht). */
   weightedGrossReturn: number
 }) {
+  const fc = useFc()
   // ── Profile-derived values with safe defaults (feature #628) ──
   // Use core page values (transaction-based) with profile fallback
   const profileMonthlyIncome = estimatedYearlyIncome > 0
@@ -1951,7 +1968,7 @@ export function OpbouwClient({
               Huidige bezittingen
             </p>
             <p className="font-mono tabular-nums text-lg font-bold text-emerald-600">
-              {formatCurrency(totalAssetValue)}
+              {fc(totalAssetValue)}
             </p>
           </div>
           <div>
@@ -1959,7 +1976,7 @@ export function OpbouwClient({
               Huidige schulden
             </p>
             <p className="font-mono tabular-nums text-lg font-bold text-red-500">
-              {formatCurrency(totalDebtValue)}
+              {fc(totalDebtValue)}
             </p>
           </div>
           <div>
@@ -1967,7 +1984,7 @@ export function OpbouwClient({
               Netto vermogen
             </p>
             <p className="font-mono tabular-nums text-xl font-bold text-horizon-600">
-              {formatCurrency(displayNetWorth)}
+              {fc(displayNetWorth)}
             </p>
           </div>
           <div>
@@ -1975,7 +1992,7 @@ export function OpbouwClient({
               Netto inkomen
             </p>
             <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-              {formatCurrency(profileMonthlyIncome)}
+              {fc(profileMonthlyIncome)}
               <span className="ml-1 text-[10px] text-[var(--ink-4)]">
                 /mnd
               </span>
@@ -2055,7 +2072,7 @@ export function OpbouwClient({
           <SectionHeader
             icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
             title="Bezittingen"
-            subtitle={`${formatCurrency(totalAssetValueRaw)} huidige waarde`}
+            subtitle={`${fc(totalAssetValueRaw)} huidige waarde`}
             color="bg-emerald-50/30"
             count={assets.length}
             expanded={assetsExpanded}
@@ -2092,7 +2109,7 @@ export function OpbouwClient({
           <SectionHeader
             icon={<Landmark className="h-4 w-4 text-red-500" />}
             title="Schulden"
-            subtitle={`${formatCurrency(totalDebtValue)} openstaand`}
+            subtitle={`${fc(totalDebtValue)} openstaand`}
             color="bg-red-50/20"
             count={debts.length}
             expanded={debtsExpanded}

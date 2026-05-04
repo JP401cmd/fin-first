@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
+import { BudgetIcon } from '@/components/app/budget-shared'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import {
   type Debt,
   type DebtType,
@@ -294,8 +295,8 @@ export default function DebtsPage() {
         <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2">
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale schuld</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)] tabular-nums">
-              {formatCurrency(totalBalance)}
+            <p className="mt-1 text-[var(--ink)]">
+              <MaskedAmount value={totalBalance} tone="kern" className="text-xl font-bold" />
             </p>
           </div>
           <div>
@@ -335,8 +336,8 @@ export default function DebtsPage() {
                 >
                   {DEBT_TYPE_LABELS[type]}
                 </Link>
-                <span className="text-xs tabular-nums text-[var(--ink-3)]">
-                  {formatCurrency(group.total)}
+                <span className="text-[var(--ink-3)]">
+                  <MaskedAmount value={group.total} tone="kern" className="text-xs" />
                 </span>
               </div>
 
@@ -379,11 +380,11 @@ export default function DebtsPage() {
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold text-[var(--ink)] tabular-nums">
-                          {formatCurrency(balance)}
+                        <p className="text-[var(--ink)]">
+                          <MaskedAmount value={balance} tone="kern" className="text-sm font-semibold" />
                         </p>
-                        <p className="text-xs text-[var(--ink-3)] tabular-nums">
-                          van {formatCurrency(original)}
+                        <p className="text-[var(--ink-3)]">
+                          van <MaskedAmount value={original} tone="kern" className="text-xs" />
                         </p>
                       </div>
                     </div>

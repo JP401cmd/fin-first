@@ -18,6 +18,7 @@ import {
 } from '@/lib/debt-data'
 import type { SimRow } from '@/lib/fire-simulation'
 import { buildScenarioPathsFromSim, SCENARIO_VARIANTS } from '@/components/app/horizon/sim-chart'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type Props = {
   input: FinancialInput
@@ -263,7 +264,7 @@ function ScenarioDetailModal({
               : `FIRE-doelvermogen wordt niet bereikt binnen de simulatiehorizon`}
           </p>
           <p className="mt-2 text-xs text-[var(--ink-3)]">
-            Benodigd doelvermogen: {formatCurrency(fireTarget)}
+            Benodigd doelvermogen: {<MaskedAmount value={fireTarget} tone="horizon" />}
           </p>
         </div>
 
@@ -291,7 +292,7 @@ function ScenarioDetailModal({
                     />
                   </div>
                   <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--ink-2)]">
-                    {formatCurrency(pt.netWorth)}
+                    {<MaskedAmount value={pt.netWorth} tone="horizon" />}
                   </span>
                   <span className="w-10 shrink-0 text-right text-xs text-[var(--ink-3)]">{pctOfFire}%</span>
                 </div>
@@ -458,7 +459,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
       {/* Extra monthly payment slider */}
       <div className="mb-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
         <label className="text-xs font-medium text-[var(--ink-3)]">
-          Extra maandelijkse aflossing: {formatCurrency(extraMonthly)}
+          Extra maandelijkse aflossing: {<MaskedAmount value={extraMonthly} tone="horizon" />}
         </label>
         <input
           type="range"
@@ -470,8 +471,8 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
           className="mt-2 w-full accent-horizon-600"
         />
         <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
-          <span>{formatCurrency(0)}</span>
-          <span>{formatCurrency(1000)}</span>
+          <span>{<MaskedAmount value={0} tone="horizon" />}</span>
+          <span>{<MaskedAmount value={1000} tone="horizon" />}</span>
         </div>
       </div>
 
@@ -520,7 +521,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
         <div className="mt-4 rounded-[var(--r-lg)] border border-emerald-200 bg-emerald-50 p-4 text-center">
           <p className="text-sm font-medium text-emerald-700">
             Met de {bestStrategy === 'avalanche' ? 'avalanche' : 'snowball'}-strategie bespaar je{' '}
-            <span className="font-bold">{formatCurrency(interestSaved)}</span> aan rente
+            <span className="font-bold">{<MaskedAmount value={interestSaved} tone="horizon" />}</span> aan rente
             {monthsSaved > 0 && (
               <> en ben je <span className="font-bold">{monthsSaved} maanden</span> eerder schuldenvrij</>
             )}
@@ -589,11 +590,11 @@ function StrategyCard({
       <div className="mt-3 space-y-1">
         <div className="flex justify-between text-xs">
           <span className="text-[var(--ink-3)]">Totale rente</span>
-          <span className="font-medium text-red-600">{formatCurrency(totalInterest)}</span>
+          <span className="font-medium text-red-600">{<MaskedAmount value={totalInterest} tone="horizon" />}</span>
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-[var(--ink-3)]">Totaal betaald</span>
-          <span className="font-medium text-[var(--ink-2)]">{formatCurrency(totalPaid)}</span>
+          <span className="font-medium text-[var(--ink-2)]">{<MaskedAmount value={totalPaid} tone="horizon" />}</span>
         </div>
       </div>
     </div>
@@ -642,7 +643,7 @@ function StrategyDetail({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-zinc-800">{debt.name}</p>
                 <p className="text-xs text-[var(--ink-3)]">
-                  {formatCurrency(debt.balance)} · {debt.rate}% rente
+                  {<MaskedAmount value={debt.balance} tone="horizon" />} · {debt.rate}% rente
                 </p>
               </div>
               <span className="shrink-0 text-xs font-medium text-[var(--ink-2)]">

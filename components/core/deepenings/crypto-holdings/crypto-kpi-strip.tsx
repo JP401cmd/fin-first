@@ -22,7 +22,14 @@
 
 import { useState } from 'react'
 import { Info } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware currency formatter hook used across this file. */
+function useFcLocal() {
+  const { masked } = useMaskedAmounts()
+  return (v: number) => formatMaskedCurrency(v, masked)
+}
 import {
   computeConcentrationMetrics,
   type ConcentrationMetrics,
@@ -82,6 +89,7 @@ export function CryptoKpiStrip({
   volatility,
   fees,
 }: CryptoKpiStripProps) {
+  const fc = useFcLocal()
   let totalValue = 0
   let coinCount = 0
   let fiatTotal = 0
@@ -143,8 +151,8 @@ export function CryptoKpiStrip({
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <KpiCell
           label="Totale waarde"
-          value={formatCurrency(totalValue)}
-          sub={fiatTotal > 0 ? `${formatCurrency(fiatTotal)} cash` : undefined}
+          value={fc(totalValue)}
+          sub={fiatTotal > 0 ? `${fc(fiatTotal)} cash` : undefined}
         />
         <KpiCell
           label="Posities"
@@ -160,7 +168,7 @@ export function CryptoKpiStrip({
           }
           sub={
             hasReturnData && returnEur != null
-              ? `${returnEur >= 0 ? '+' : ''}${formatCurrency(returnEur)}`
+              ? `${returnEur >= 0 ? '+' : ''}${fc(returnEur)}`
               : 'geen koers-historie'
           }
           tone={
@@ -341,6 +349,7 @@ function RealizedPnLSubStrip({
   onMethodChange,
   fifoAvailable,
 }: RealizedPnLSubStripProps) {
+  const fc = useFcLocal()
   const total = data.unrealizedEur + data.realizedEur
   const totalTone =
     total > 0.005 ? 'positive' : total < -0.005 ? 'negative' : 'neutral'
@@ -388,7 +397,7 @@ function RealizedPnLSubStrip({
             }`}
           >
             {total >= 0 ? '+' : ''}
-            {formatCurrency(total)}
+            {fc(total)}
           </p>
           <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[var(--ink-4)]">
             inclusief alle handel
@@ -406,6 +415,7 @@ interface PnLCellProps {
 }
 
 function PnLCell({ label, value, sub }: PnLCellProps) {
+  const fc = useFcLocal()
   const tone =
     value > 0.005 ? 'positive' : value < -0.005 ? 'negative' : 'neutral'
   const toneClass =
@@ -421,7 +431,7 @@ function PnLCell({ label, value, sub }: PnLCellProps) {
       </p>
       <p className={`mt-1 font-mono text-lg font-bold tabular-nums ${toneClass}`}>
         {value >= 0 ? '+' : ''}
-        {formatCurrency(value)}
+        {fc(value)}
       </p>
       <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[var(--ink-4)]">
         {sub}
@@ -710,6 +720,7 @@ function Box3Block({
 }: {
   data: ReturnType<typeof computeCryptoBox3Impact>
 }) {
+  const fc = useFcLocal()
   const tooltip = `Indicatieve Box 3-jaarheffing: ${data.ratePct.toFixed(2)}% forfait × ${data.taxRatePct.toFixed(0)}% tarief op de bruto crypto-waarde. Werkelijke heffing hangt af van de drempelvrijstelling (€${data.drempelvrijstellingEur.toLocaleString('nl-NL')} p.p.), partner-grondslag en peildatum 1 januari.`
   return (
     <div className="min-w-0">
@@ -727,7 +738,7 @@ function Box3Block({
         </span>
       </div>
       <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-        {data.belastingEur > 0 ? formatCurrency(data.belastingEur) : '—'}
+        {data.belastingEur > 0 ? fc(data.belastingEur) : '—'}
       </p>
       <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[var(--ink-4)]">
         forfait {data.ratePct.toFixed(2)}% × heffing {data.taxRatePct.toFixed(0)}%
@@ -737,6 +748,7 @@ function Box3Block({
 }
 
 function FeesBlock({ data }: { data?: CryptoFeesSummary }) {
+  const fc = useFcLocal()
   const hasFees = !!data && data.feeCount > 0
   // Hover-tooltip met breakdown — in krant-stijl als één regel "Bron · €123 · 4". Bij
   // veel exchanges (>3) tonen we alleen de top-3 om de tooltip-regel niet te
@@ -748,7 +760,7 @@ function FeesBlock({ data }: { data?: CryptoFeesSummary }) {
     const breakdown = top
       .map(
         (b) =>
-          `${b.source}: ${formatCurrency(b.eur)} (${b.count} ${b.count === 1 ? 'tx' : 'tx'})`,
+          `${b.source}: ${fc(b.eur)} (${b.count} ${b.count === 1 ? 'tx' : 'tx'})`,
       )
       .join('  ·  ')
     const more =
@@ -773,7 +785,7 @@ function FeesBlock({ data }: { data?: CryptoFeesSummary }) {
         </span>
       </div>
       <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-        {hasFees ? formatCurrency(data!.totalFeesEur) : '—'}
+        {hasFees ? fc(data!.totalFeesEur) : '—'}
       </p>
       <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[var(--ink-4)]">
         {hasFees

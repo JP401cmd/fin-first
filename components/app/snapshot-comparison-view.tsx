@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import { formatCurrency } from '@/components/app/budget-shared'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { ArrowRight, TrendingUp, TrendingDown, Minus, ChevronDown } from 'lucide-react'
 
 /* ─── helpers ─── */
@@ -29,12 +31,12 @@ function formatMonthLabel(key: string): string {
 }
 
 /** Format number with sign prefix */
-function formatDelta(value: number, suffix?: string): string {
+function formatDelta(value: number, suffix?: string, masked = false): string {
   const prefix = value > 0 ? '+' : ''
   if (suffix) {
     return `${prefix}${value.toFixed(1)}${suffix}`
   }
-  return `${prefix}${formatCurrency(value)}`
+  return `${prefix}${formatMaskedCurrency(value, masked)}`
 }
 
 /** Sovereignty level label mapping */
@@ -280,6 +282,7 @@ interface SnapshotComparisonViewProps {
 }
 
 export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProps) {
+  const { masked } = useMaskedAmounts()
   const monthMap = useMemo(() => groupByMonth(snapshots), [snapshots])
   const monthKeys = useMemo(
     () => Array.from(monthMap.keys()).sort(),

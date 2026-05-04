@@ -4,7 +4,18 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
-import { formatTimestamp } from '@/lib/format'
+import { formatTimestamp, formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/**
+ * Masked-aware EUR formatter hook used across this file's many sub-views
+ * (modals, tables, inline previews). Each call site invokes `useFc()` so
+ * masking propagates through the privacy-toggle context.
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { calculatePortfolioBox3 } from '@/lib/box3-holdings'
 import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/components/app/portfolio-allocation-chart'
 import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
@@ -67,6 +78,7 @@ type HoldingPriceUpdate = {
 export default function HoldingsPage({ initialData }: { initialData?: HoldingsPageData } = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const fc = useFc()
   // Optional URL filter: ?asset=<uuid> shows only holdings from that asset
   const assetFilter = searchParams.get('asset')
   const [holdings, setHoldings] = useState<Holding[]>(initialData ? initialData.holdings as Holding[] : [])
@@ -553,11 +565,11 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale waarde</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalValue)}</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{fc(totalValue)}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale kostprijs</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalCost)}</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{fc(totalCost)}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Rendement</p>
@@ -565,7 +577,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
               <p className={`mt-1 text-xl font-bold ${totalReturn >= 0 ? 'text-positive' : 'text-negative'}`}>
                 {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(1)}%
                 <span className="ml-1 text-sm font-medium">
-                  ({totalReturn >= 0 ? '+' : ''}{formatCurrency(totalValue - totalCost)})
+                  ({totalReturn >= 0 ? '+' : ''}{fc(totalValue - totalCost)})
                 </span>
               </p>
             ) : (
@@ -581,7 +593,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
               <div>
                 <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Totale Box 3 heffing</p>
                 <p className="mt-1 text-lg font-bold font-mono tabular-nums text-[var(--ink)]">
-                  {formatCurrency(box3Summary.totalTax)}
+                  {fc(box3Summary.totalTax)}
                 </p>
               </div>
               <div className="text-right">
@@ -854,7 +866,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
                       <p className={`text-sm font-semibold ${soldOut ? 'text-[var(--ink-3)]' : stale ? 'text-kern-700' : 'text-[var(--ink)]'}`} data-testid={`holding-value-${holding.id}`}>
                         {holding.currency && holding.currency !== 'EUR'
                           ? new Intl.NumberFormat('nl-NL', { style: 'currency', currency: holding.currency }).format(Math.max(0, value))
-                          : formatCurrency(Math.max(0, value))
+                          : fc(Math.max(0, value))
                         }
                         {stale && !soldOut && <span className="text-[10px] font-normal text-kern-500 block">laatste bekende prijs</span>}
                       </p>
@@ -1002,6 +1014,7 @@ function ManualPriceOverrideModal({
   onClose: () => void
   onSaved: () => void
 }) {
+  const fc = useFc()
   const [price, setPrice] = useState(String(holding.current_price ?? holding.avg_purchase_price ?? ''))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1096,19 +1109,19 @@ function ManualPriceOverrideModal({
               <span className="text-xs font-medium text-kern-700">
                 Nieuwe waarde ({holding.units} eenheden)
               </span>
-              <span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(currentValue)}</span>
+              <span className="text-sm font-bold text-[var(--ink)]">{fc(currentValue)}</span>
             </div>
             {currentValue !== oldValue && (
               <p className={`mt-1 text-xs font-medium ${currentValue >= oldValue ? 'text-positive' : 'text-negative'}`}>
-                {currentValue >= oldValue ? '+' : ''}{formatCurrency(currentValue - oldValue)} verschil
+                {currentValue >= oldValue ? '+' : ''}{fc(currentValue - oldValue)} verschil
               </p>
             )}
           </div>
 
           <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5">
             <p className="text-[10px] text-[var(--ink-3)]">
-              Vorige prijs: {holding.current_price != null ? formatCurrency(holding.current_price) : 'Niet ingesteld'}
-              {' · '}Aankoopprijs: {formatCurrency(holding.avg_purchase_price)}
+              Vorige prijs: {holding.current_price != null ? fc(holding.current_price) : 'Niet ingesteld'}
+              {' · '}Aankoopprijs: {fc(holding.avg_purchase_price)}
             </p>
           </div>
         </div>
@@ -1160,6 +1173,7 @@ function HoldingsAllocationPie({
   holdings: { id: string; name: string; ticker: string | null; value: number }[]
   total: number
 }) {
+  const fc = useFc()
   const size = 140
   const cx = size / 2
   const cy = size / 2
@@ -1217,7 +1231,7 @@ function HoldingsAllocationPie({
         )
       })}
       <text x={cx} y={cy - 6} textAnchor="middle" fontSize="11" fontWeight="700" fill="#18181b">
-        {formatCurrency(total)}
+        {fc(total)}
       </text>
       <text x={cx} y={cy + 8} textAnchor="middle" fontSize="8" fill="#a1a1aa">
         totaal
@@ -1626,6 +1640,7 @@ function HoldingEditForm({
   onClose: () => void
   onSaved: () => void
 }) {
+  const fc = useFc()
   // LocalStorage key for draft state
   const draftKey = `holding-edit-draft-${holding.id}`
 
@@ -1950,7 +1965,7 @@ function HoldingEditForm({
                     <p className="text-xs text-[var(--ink-2)]">
                       Naam: <span className="font-medium">{String(conflictData.server_state.name || '-')}</span>
                       {' · '}Eenheden: <span className="font-medium">{String(conflictData.server_state.units || '-')}</span>
-                      {' · '}Prijs: <span className="font-medium">{conflictData.server_state.current_price != null ? formatCurrency(Number(conflictData.server_state.current_price)) : '-'}</span>
+                      {' · '}Prijs: <span className="font-medium">{conflictData.server_state.current_price != null ? fc(Number(conflictData.server_state.current_price)) : '-'}</span>
                     </p>
                   </div>
                 )}
@@ -2066,11 +2081,11 @@ function HoldingEditForm({
           <div className="rounded-lg border border-kern-200 bg-kern-50/50 p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-kern-700">Portfolio waarde (deze holding)</span>
-              <span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(newValue)}</span>
+              <span className="text-sm font-bold text-[var(--ink)]">{fc(newValue)}</span>
             </div>
             {newValue !== oldValue && (
               <p className={`mt-1 text-xs font-medium ${newValue >= oldValue ? 'text-positive' : 'text-negative'}`}>
-                {newValue >= oldValue ? '+' : ''}{formatCurrency(newValue - oldValue)} t.o.v. huidige waarde
+                {newValue >= oldValue ? '+' : ''}{fc(newValue - oldValue)} t.o.v. huidige waarde
               </p>
             )}
           </div>
@@ -2169,6 +2184,7 @@ function HoldingTransactionForm({
   onClose: () => void
   onSaved: () => void
 }) {
+  const fc = useFc()
   const [txType, setTxType] = useState<'buy' | 'sell' | 'dividend'>('buy')
   const [units, setUnits] = useState('')
   const [pricePerUnit, setPricePerUnit] = useState(
@@ -2373,7 +2389,7 @@ function HoldingTransactionForm({
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Totaal bedrag</label>
                     <div className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm font-medium text-[var(--ink-2)]">
-                      {formatCurrency(totalAmount)}
+                      {fc(totalAmount)}
                     </div>
                   </div>
                 </div>
@@ -2419,7 +2435,7 @@ function HoldingTransactionForm({
                       )}
                     </span>
                     <span className="font-medium text-[var(--ink)]">
-                      Gem. prijs: {formatCurrency(previewAvg)}
+                      Gem. prijs: {fc(previewAvg)}
                     </span>
                   </div>
                 </div>
@@ -2478,7 +2494,7 @@ function HoldingTransactionForm({
                               <span className="text-xs font-medium text-kern-700">Totaal dividend inkomen</span>
                             </div>
                             <span className="text-sm font-bold text-kern-700" data-testid="total-dividend-income">
-                              {formatCurrency(totalDividendIncome)}
+                              {fc(totalDividendIncome)}
                             </span>
                           </div>
                           <p className="mt-1 text-xs text-kern-600/70">{dividendTxs.length} dividend uitkering{dividendTxs.length !== 1 ? 'en' : ''}</p>
@@ -2499,7 +2515,7 @@ function HoldingTransactionForm({
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium text-[var(--ink)]">
-                              {cfg.label}: {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {formatCurrency(tx.price_per_unit)}
+                              {cfg.label}: {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {fc(tx.price_per_unit)}
                             </p>
                             <p className="text-xs text-[var(--ink-3)]">
                               {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -2507,7 +2523,7 @@ function HoldingTransactionForm({
                             </p>
                           </div>
                           <span className={`shrink-0 text-xs font-semibold ${cfg.color}`}>
-                            {tx.type === 'sell' ? '-' : '+'}{formatCurrency(tx.total_amount)}
+                            {tx.type === 'sell' ? '-' : '+'}{fc(tx.total_amount)}
                           </span>
                         </div>
                       )

@@ -12,6 +12,7 @@ import {
   type MonteCarloPhaseResult,
 } from '@/lib/phase-monte-carlo'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
             <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-4)]" />
             <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
               Deze analyse simuleert 1.000 mogelijke toekomstscenario&apos;s op basis van jouw
-              huidige vermogen ({formatCurrency(startPortfolio)}), jaarlijkse inleg ({formatCurrency(annualSavings)}),
+              huidige vermogen ({<MaskedAmount value={startPortfolio} tone="horizon" />}), jaarlijkse inleg ({<MaskedAmount value={annualSavings} tone="horizon" />}),
               en verwacht rendement ({(expectedReturn * 100).toFixed(1)}%).
               De grafiek toont de bandbreedte: hoe breder de waaier, hoe groter de onzekerheid.
             </p>
@@ -229,7 +230,7 @@ export const MonteCarloOpbouw = memo(function MonteCarloOpbouw({
                 Mediaan eindvermogen
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(state.main.medianEndPortfolio)}
+                {<MaskedAmount value={state.main.medianEndPortfolio} tone="horizon" />}
               </p>
             </div>
 

@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Clock } from 'lucide-react'
-import { formatWithFreedom, formatCurrency } from '@/lib/format'
+import { formatWithFreedom } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 /**
  * Context that provides the user's real daily expense rate
@@ -227,8 +228,6 @@ export function FreedomTimeLabel({
   // Only show freedom time for amounts over €100 (per spec)
   const showFreedomTime = absAmount >= 100 && hasExpenseData && safeDailyRate > 0
 
-  const formattedCurrency = formatCurrency(safeAmount)
-
   // Use formatWithFreedom() utility internally for freedom time string
   // Pass original amount (not abs) so deficit framing ("achter") is applied
   const freedomTimeStr = showFreedomTime
@@ -258,7 +257,7 @@ export function FreedomTimeLabel({
       <span className={`${className}`} data-testid="freedom-time-label">
         {showCurrency && (
           <span className={`font-bold ${sizeClasses[size]} ${currencyClassName}`} data-testid="freedom-time-label-currency">
-            {formattedCurrency}
+            <MaskedAmount value={safeAmount} tone="ink" />
           </span>
         )}
         {timeAnnotation && !loading && (
@@ -275,7 +274,7 @@ export function FreedomTimeLabel({
     <span className={`inline-flex items-center gap-1.5 ${className}`} data-testid="freedom-time-label">
       {showCurrency && (
         <span className={`font-semibold ${sizeClasses[size]} ${currencyClassName}`} data-testid="freedom-time-label-currency">
-          {formattedCurrency}
+          <MaskedAmount value={safeAmount} tone="ink" />
         </span>
       )}
       {timeAnnotation && !loading && (

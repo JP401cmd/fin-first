@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, Calendar, Hash, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   computeCounterpartyStats,
   computeMonthCategoryBreakdown,
@@ -13,6 +14,7 @@ import {
 } from '@/lib/counterparty-analysis'
 import { TransactionForm } from '@/components/app/transaction-form'
 import type { Budget } from '@/lib/budget-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,7 @@ export function CounterpartyAnalysisPanel({
   onBack,
   budgetGroups,
 }: CounterpartyAnalysisPanelProps) {
+  const { masked } = useMaskedAmounts()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [stats, setStats] = useState<CounterpartyStats | null>(null)
@@ -242,10 +245,10 @@ export function CounterpartyAnalysisPanel({
 
       {/* Summary metrics */}
       <div className="grid grid-cols-1 gap-2 min-[375px]:grid-cols-2">
-        <MetricCell label="Totaal uitgegeven" value={formatCurrency(stats.totalSpent)} negative={stats.totalSpent < 0} />
-        <MetricCell label="Totaal ontvangen" value={formatCurrency(stats.totalReceived)} positive={stats.totalReceived > 0} />
+        <MetricCell label="Totaal uitgegeven" value={<MaskedAmount value={stats.totalSpent} tone="wil" />} negative={stats.totalSpent < 0} />
+        <MetricCell label="Totaal ontvangen" value={<MaskedAmount value={stats.totalReceived} tone="wil" />} positive={stats.totalReceived > 0} />
         <MetricCell label="Aantal transacties" value={String(stats.transactionCount)} icon={<Hash className="h-3 w-3" />} />
-        <MetricCell label="Gemiddeld bedrag" value={formatCurrency(stats.averageAmount)} />
+        <MetricCell label="Gemiddeld bedrag" value={<MaskedAmount value={stats.averageAmount} tone="wil" />} />
       </div>
 
       {/* Frequency + Period */}
@@ -312,7 +315,7 @@ export function CounterpartyAnalysisPanel({
                   aria-pressed={isSelected}
                   className="group relative flex flex-1 flex-col items-center focus-visible:outline-none"
                   style={{ height: '100%' }}
-                  title={`${m.label}: ${formatCurrency(m.total)} (${m.count}x)`}
+                  title={`${m.label}: ${formatMaskedCurrency(m.total, masked)} (${m.count}x)`}
                 >
                   {/* Spent bar */}
                   <div className="mt-auto w-full">
@@ -333,7 +336,7 @@ export function CounterpartyAnalysisPanel({
                   </p>
                   {/* Tooltip */}
                   <div className="pointer-events-none absolute -top-10 z-10 rounded bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-[var(--s2)] transition-opacity group-hover:opacity-100">
-                    {formatCurrency(m.total)} ({m.count}x)
+                    {<MaskedAmount value={m.total} tone="wil" />} ({m.count}x)
                   </div>
                 </button>
               )
@@ -356,7 +359,7 @@ export function CounterpartyAnalysisPanel({
               {selectedMonthLabel}
             </h5>
             <span className="font-mono text-sm tabular-nums text-[var(--ink-2)]">
-              {formatCurrency(monthTransactions.reduce((s, t) => s + t.amount, 0))}
+              {<MaskedAmount value={monthTransactions.reduce((s, t) => s + t.amount, 0)} tone="wil" />}
               <span className="ml-1.5 text-xs text-[var(--ink-3)]">({monthTransactions.length}x)</span>
             </span>
           </div>
@@ -392,7 +395,7 @@ export function CounterpartyAnalysisPanel({
                 <span className={`shrink-0 font-mono text-sm tabular-nums ${
                   tx.amount >= 0 ? 'text-[var(--color-income-600)]' : 'text-[var(--ink)]'
                 }`}>
-                  {formatCurrency(tx.amount)}
+                  {<MaskedAmount value={tx.amount} tone="wil" />}
                 </span>
               </button>
             ))}
@@ -444,7 +447,7 @@ export function CounterpartyAnalysisPanel({
                     <span className={`shrink-0 font-mono text-sm tabular-nums ${
                       tx.amount >= 0 ? 'text-[var(--color-income-600)]' : 'text-[var(--ink)]'
                     }`}>
-                      {formatCurrency(tx.amount)}
+                      {<MaskedAmount value={tx.amount} tone="wil" />}
                     </span>
                   </button>
                 ))}
@@ -484,7 +487,7 @@ function CategoryRow({ cat, colorIndex }: { cat: CategoryBreakdown; colorIndex: 
         {cat.budgetName}
       </span>
       <span className="shrink-0 font-mono text-sm tabular-nums text-[var(--ink-2)]">
-        {formatCurrency(cat.total)}
+        {<MaskedAmount value={cat.total} tone="wil" />}
       </span>
       <span className="shrink-0 text-xs text-[var(--ink-3)]">
         {cat.percentage}%
@@ -497,7 +500,7 @@ function CategoryRow({ cat, colorIndex }: { cat: CategoryBreakdown; colorIndex: 
 
 function MetricCell({ label, value, negative, positive, icon }: {
   label: string
-  value: string
+  value: React.ReactNode
   negative?: boolean
   positive?: boolean
   icon?: React.ReactNode

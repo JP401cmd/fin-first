@@ -46,6 +46,38 @@ describe('wizardReducer', () => {
     expect(next).toEqual({ step: 'type', intent: 'debt' })
   })
 
+  it('OPEN met intent + matching assetType springt direct naar details', () => {
+    const next = wizardReducer(
+      { step: 'choice' },
+      { type: 'OPEN', initialIntent: 'asset', initialAssetType: 'cash' },
+    )
+    expect(next).toEqual({
+      step: 'details',
+      intent: 'asset',
+      assetDraft: { asset_type: 'cash' },
+    })
+  })
+
+  it('OPEN met intent + matching debtType springt direct naar details', () => {
+    const next = wizardReducer(
+      { step: 'choice' },
+      { type: 'OPEN', initialIntent: 'debt', initialDebtType: 'mortgage' },
+    )
+    expect(next).toEqual({
+      step: 'details',
+      intent: 'debt',
+      debtDraft: { debt_type: 'mortgage' },
+    })
+  })
+
+  it('OPEN negeert prefill-type bij intent-mismatch (soft-fail naar type-stap)', () => {
+    const next = wizardReducer(
+      { step: 'choice' },
+      { type: 'OPEN', initialIntent: 'debt', initialAssetType: 'cash' },
+    )
+    expect(next).toEqual({ step: 'type', intent: 'debt' })
+  })
+
   // ── SELECT_INTENT ────────────────────────────────────────────
 
   it('SELECT_INTENT uit choice gaat naar type', () => {

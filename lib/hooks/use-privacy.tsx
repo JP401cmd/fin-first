@@ -99,20 +99,22 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
   return <PrivacyContext.Provider value={value}>{children}</PrivacyContext.Provider>
 }
 
+// Fallback context used when the hook is called outside a provider — keeps
+// unit tests, storybook stories, and dev sandboxes working without forcing
+// every render tree to wrap in a provider. The toggle is a no-op there since
+// there's no UI driving it anyway. The real provider is mounted at the
+// authenticated app-layout so all real routes get the live, persisted state.
+const FALLBACK_CONTEXT: PrivacyContextValue = {
+  masked: false,
+  setMasked: () => {},
+  toggle: () => {},
+}
+
 /**
- * Access the current masking state.
- *
- * @throws Error when called outside a `<PrivacyProvider>` — catches the most
- *   common integration bug (forgetting to wrap the app root) at first render
- *   instead of silently defaulting to visible-amounts behaviour.
+ * Access the current masking state. Returns a safe fallback (masked=false,
+ * no-op setters) when called outside a PrivacyProvider so currency-rendering
+ * components work in isolation.
  */
 export function useMaskedAmounts(): PrivacyContextValue {
-  const ctx = useContext(PrivacyContext)
-  if (ctx === null) {
-    throw new Error(
-      'useMaskedAmounts must be used within a <PrivacyProvider>. ' +
-        'Wrap your app root (e.g. app/(app)/layout.tsx) with <PrivacyProvider>.',
-    )
-  }
-  return ctx
+  return useContext(PrivacyContext) ?? FALLBACK_CONTEXT
 }

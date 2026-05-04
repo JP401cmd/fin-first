@@ -2,10 +2,12 @@
 
 import { memo, useState, useEffect } from 'react'
 import { PieChart, AlertTriangle, CheckCircle2, Award } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import { compareOvergangStrategieen } from '@/lib/phase-analysis'
 import type { Debt } from '@/lib/debt-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,6 +114,7 @@ export const GapAnalyse = memo(function GapAnalyse({
   fireAge,
   aowAge,
 }: GapAnalyseProps) {
+  const { masked } = useMaskedAmounts()
   // Default: 50% of monthly expenses as part-time income
   const effectiveDeeltijdInkomen = deeltijdInkomen ?? Math.round((yearlyExpenses / 12) * 0.5)
   const [state, setState] = useState<StrategieState | null>(null)
@@ -183,7 +186,7 @@ export const GapAnalyse = memo(function GapAnalyse({
       loading={loading}
       willContext={
         state
-          ? `Gap-analyse overgangsfase: totale brug ${formatCurrency(state.totalBridge)}, ` +
+          ? `Gap-analyse overgangsfase: totale brug ${formatMaskedCurrency(state.totalBridge, masked)}, ` +
             `dekking ${Math.round(state.coverage)}%, ` +
             `${state.strategies.filter((s) => s.overleeft).length} van 3 strategie\u00ebn haalbaar.`
           : 'Gap-analyse (laden...)'
@@ -199,7 +202,7 @@ export const GapAnalyse = memo(function GapAnalyse({
                 Jaarlijkse onttrekking benodigd
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(Math.round(yearlyExpenses))}
+                {<MaskedAmount value={Math.round(yearlyExpenses)} tone="horizon" />}
               </p>
             </div>
 
@@ -209,7 +212,7 @@ export const GapAnalyse = memo(function GapAnalyse({
                 Totaal benodigde brug
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(state.totalBridge)}
+                {<MaskedAmount value={state.totalBridge} tone="horizon" />}
                 <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
                   ({years} jaar)
                 </span>
@@ -274,7 +277,7 @@ export const GapAnalyse = memo(function GapAnalyse({
                         Deeltijdinkomen
                       </span>
                       <span className="font-mono text-xs tabular-nums text-[var(--positive)]">
-                        {formatCurrency(effectiveDeeltijdInkomen)}/mnd
+                        {<MaskedAmount value={effectiveDeeltijdInkomen} tone="horizon" />}/mnd
                       </span>
                     </div>
                   )}
@@ -291,7 +294,7 @@ export const GapAnalyse = memo(function GapAnalyse({
                           : 'text-[var(--negative)]'
                       }`}
                     >
-                      {formatCurrency(s.eindVermogenOvergang)}
+                      {<MaskedAmount value={s.eindVermogenOvergang} tone="horizon" />}
                     </span>
                   </div>
                 </div>
@@ -318,8 +321,8 @@ export const GapAnalyse = memo(function GapAnalyse({
                     </p>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
                       {surviving.length === state.strategies.length
-                        ? `Alle ${surviving.length} strategieën overleven de overgangsperiode. ${best.label} laat het hoogste eindsaldo achter: ${formatCurrency(best.eindVermogenOvergang)}.`
-                        : `${surviving.length} van ${state.strategies.length} strategieën overleven. ${best.label} is het meest robuust met een eindsaldo van ${formatCurrency(best.eindVermogenOvergang)}.`}
+                        ? `Alle ${surviving.length} strategieën overleven de overgangsperiode. ${best.label} laat het hoogste eindsaldo achter: ${formatMaskedCurrency(best.eindVermogenOvergang, masked)}.`
+                        : `${surviving.length} van ${state.strategies.length} strategieën overleven. ${best.label} is het meest robuust met een eindsaldo van ${formatMaskedCurrency(best.eindVermogenOvergang, masked)}.`}
                     </p>
                   </div>
                 </div>
@@ -334,7 +337,7 @@ export const GapAnalyse = memo(function GapAnalyse({
                     Geen strategie overleeft de overgang
                   </p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
-                    Je portfolio van {formatCurrency(Math.round(startPortfolio))} is onvoldoende voor {years} jaar overbrugging. Overweeg langer werken, uitgaven verlagen, of meer deeltijdwerk.
+                    Je portfolio van {<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} is onvoldoende voor {years} jaar overbrugging. Overweeg langer werken, uitgaven verlagen, of meer deeltijdwerk.
                   </p>
                 </div>
               </div>

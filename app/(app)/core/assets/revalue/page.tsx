@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, RefreshCw, Loader2, AlertCircle, Lock, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { BudgetIcon } from '@/components/app/budget-shared'
+import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import {
@@ -22,6 +23,8 @@ type LinkedBankMap = Set<string>
 
 export default function RevaluePage() {
   const router = useRouter()
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -374,7 +377,7 @@ export default function RevaluePage() {
                         <div className="sm:w-32 shrink-0">
                           <p className="text-xs text-[var(--ink-3)] sm:hidden">Huidig</p>
                           <p className="text-sm font-mono tabular-nums text-[var(--ink-2)]">
-                            {formatCurrency(current)}
+                            {fc(current)}
                           </p>
                         </div>
 
@@ -408,7 +411,7 @@ export default function RevaluePage() {
                             <p className={`text-sm font-mono tabular-nums font-medium ${
                               delta > 0 ? 'text-emerald-600' : 'text-red-600'
                             }`}>
-                              {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                              {delta > 0 ? '+' : ''}{fc(delta)}
                             </p>
                           )}
                         </div>
@@ -430,7 +433,7 @@ export default function RevaluePage() {
             <div>
               <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Huidig totaal</p>
               <p className="text-lg font-bold font-mono tabular-nums text-[var(--ink)]">
-                {formatCurrency(totalCurrent)}
+                {fc(totalCurrent)}
               </p>
             </div>
 
@@ -441,7 +444,7 @@ export default function RevaluePage() {
             <div>
               <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Nieuw totaal</p>
               <p className="text-lg font-bold font-mono tabular-nums text-[var(--ink)]">
-                {formatCurrency(totalNew)}
+                {fc(totalNew)}
               </p>
             </div>
 
@@ -452,7 +455,7 @@ export default function RevaluePage() {
                 <p className={`text-lg font-bold font-mono tabular-nums ${
                   totalDelta > 0 ? 'text-emerald-600' : 'text-red-600'
                 }`}>
-                  {totalDelta > 0 ? '+' : ''}{formatCurrency(totalDelta)}
+                  {totalDelta > 0 ? '+' : ''}{fc(totalDelta)}
                 </p>
                 {dailyExpenses > 0 && (
                   <p className={`text-xs ${totalDelta > 0 ? 'text-emerald-500/70' : 'text-red-500/70'}`}>

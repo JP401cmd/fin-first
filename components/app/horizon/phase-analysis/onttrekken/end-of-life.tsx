@@ -2,12 +2,14 @@
 
 import { memo, useState, useEffect } from 'react'
 import { Heart } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import { analyzeEndOfLife, type EndOfLifeAnalysis } from '@/lib/phase-analysis'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // -- Types --------------------------------------------------------------------
 
@@ -54,6 +56,7 @@ export const EndOfLife = memo(function EndOfLife({
   nabestaandenPensioen,
   currentAge,
 }: EndOfLifeProps) {
+  const { masked } = useMaskedAmounts()
   const [analysis, setAnalysis] = useState<EndOfLifeAnalysis | null>(null)
 
   // Whether real heir/partner data was provided (vs. engine defaults)
@@ -92,8 +95,8 @@ export const EndOfLife = memo(function EndOfLife({
       loading={loading}
       willContext={
         analysis
-          ? `Einde levensfase: eindvermogen ${formatCurrency(analysis.eindVermogen)} bij ${endAge} jaar. ` +
-            `Strategie: ${strategyLabel}. Netto nalatenschap: ${formatCurrency(analysis.erfenisIndicatie.nettoBedrag)}.`
+          ? `Einde levensfase: eindvermogen ${formatMaskedCurrency(analysis.eindVermogen, masked)} bij ${endAge} jaar. ` +
+            `Strategie: ${strategyLabel}. Netto nalatenschap: ${formatMaskedCurrency(analysis.erfenisIndicatie.nettoBedrag, masked)}.`
           : 'Einde levensfase (laden...)'
       }
     >
@@ -106,7 +109,7 @@ export const EndOfLife = memo(function EndOfLife({
                 Eindvermogen bij {Math.round(endAge)} jaar
               </span>
               <span className="font-mono text-sm tabular-nums font-semibold text-[var(--ink)]">
-                {formatCurrency(analysis.eindVermogen)}
+                {<MaskedAmount value={analysis.eindVermogen} tone="horizon" />}
               </span>
             </div>
             <div className="mt-1 flex items-baseline justify-between">
@@ -144,13 +147,13 @@ export const EndOfLife = memo(function EndOfLife({
                         {g.leeftijd}
                       </td>
                       <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink)]">
-                        {formatCurrency(g.eindVermogen)}
+                        {<MaskedAmount value={g.eindVermogen} tone="horizon" />}
                       </td>
                       <td className="hidden px-1 py-1.5 text-right font-mono tabular-nums text-[var(--negative)] sm:table-cell">
-                        {g.erfbelastingTotaal > 0 ? `\u2212 ${formatCurrency(g.erfbelastingTotaal)}` : '\u2013'}
+                        {g.erfbelastingTotaal > 0 ? `\u2212 ${formatMaskedCurrency(g.erfbelastingTotaal, masked)}` : '\u2013'}
                       </td>
                       <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink)]">
-                        {formatCurrency(g.nettoNalatenschap)}
+                        {<MaskedAmount value={g.nettoNalatenschap} tone="horizon" />}
                       </td>
                     </tr>
                   ))}
@@ -191,12 +194,12 @@ export const EndOfLife = memo(function EndOfLife({
                             {ig.label}
                           </td>
                           <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink)]">
-                            {formatCurrency(ig.reëelEindVermogen)}
+                            {<MaskedAmount value={ig.reëelEindVermogen} tone="horizon" />}
                           </td>
                           <td className={`px-1 py-1.5 text-right font-mono tabular-nums ${colorClass}`}>
                             {ig.verschil === 0
                               ? '\u2013'
-                              : `${ig.verschil > 0 ? '+' : '\u2212'} ${formatCurrency(Math.abs(ig.verschil))}`}
+                              : `${ig.verschil > 0 ? '+' : '\u2212'} ${formatMaskedCurrency(Math.abs(ig.verschil), masked)}`}
                           </td>
                         </tr>
                       )
@@ -219,14 +222,14 @@ export const EndOfLife = memo(function EndOfLife({
               <div className="flex items-baseline justify-between">
                 <span className="text-xs text-[var(--ink-3)]">Bruto nalatenschap</span>
                 <span className="font-mono text-xs tabular-nums text-[var(--ink)]">
-                  {formatCurrency(analysis.erfenisIndicatie.brutoBedrag)}
+                  {<MaskedAmount value={analysis.erfenisIndicatie.brutoBedrag} tone="horizon" />}
                 </span>
               </div>
               {analysis.erfenisIndicatie.totaalBelasting > 0 && (
                 <div className="flex items-baseline justify-between">
                   <span className="text-xs text-[var(--ink-3)]">Erfbelasting</span>
                   <span className="font-mono text-xs tabular-nums text-[var(--negative)]">
-                    &minus; {formatCurrency(analysis.erfenisIndicatie.totaalBelasting)}
+                    &minus; {<MaskedAmount value={analysis.erfenisIndicatie.totaalBelasting} tone="horizon" />}
                   </span>
                 </div>
               )}
@@ -235,7 +238,7 @@ export const EndOfLife = memo(function EndOfLife({
                   Netto nalatenschap
                 </span>
                 <span className="font-mono text-xs tabular-nums font-semibold text-[var(--ink)]">
-                  {formatCurrency(analysis.erfenisIndicatie.nettoBedrag)}
+                  {<MaskedAmount value={analysis.erfenisIndicatie.nettoBedrag} tone="horizon" />}
                 </span>
               </div>
 
@@ -251,7 +254,7 @@ export const EndOfLife = memo(function EndOfLife({
                         {' '}({Math.round(erf.fractie * 100)}%)
                       </span>
                       <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                        {formatCurrency(erf.netto)}
+                        {<MaskedAmount value={erf.netto} tone="horizon" />}
                       </span>
                     </div>
                   ))}
@@ -276,7 +279,7 @@ export const EndOfLife = memo(function EndOfLife({
                     Maandelijks beschikbaar
                   </span>
                   <span className="font-mono text-xs tabular-nums text-[var(--ink)]">
-                    {formatCurrency(analysis.partnerVoortzetting.maandelijksBeschikbaar)}/mnd
+                    {<MaskedAmount value={analysis.partnerVoortzetting.maandelijksBeschikbaar} tone="horizon" />}/mnd
                   </span>
                 </div>
                 <div className="mt-1.5 flex items-baseline justify-between">
@@ -285,7 +288,7 @@ export const EndOfLife = memo(function EndOfLife({
                     <span className="text-xs font-semibold text-[var(--positive)]">Ja</span>
                   ) : (
                     <span className="text-xs font-semibold text-[var(--negative)]">
-                      Nee &mdash; tekort {formatCurrency(Math.round(analysis.partnerVoortzetting.tekort / 12))}/mnd
+                      Nee &mdash; tekort {<MaskedAmount value={Math.round(analysis.partnerVoortzetting.tekort / 12)} tone="horizon" />}/mnd
                     </span>
                   )}
                 </div>

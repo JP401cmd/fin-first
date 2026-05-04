@@ -9,12 +9,13 @@ import {
   computeGoalProgress, getGoalColorClasses, formatGoalValue,
 } from '@/lib/goal-data'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
-import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
+import { BudgetIcon } from '@/components/app/budget-shared'
 import { GoalForm } from '@/components/app/goal-form'
 import { GoalProgressTimeline, buildGoalHistory } from '@/components/app/will/goal-progress-timeline'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { Kicker } from '@/components/editorial'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type HouseholdInfo = {
   householdId: string
@@ -693,7 +694,7 @@ function GoalCard({
                         {new Date(c.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                         {c.notes && <span className="ml-1 text-[var(--ink-3)]">· {c.notes}</span>}
                       </span>
-                      <span className="font-medium text-emerald-600">+{formatCurrency(Number(c.amount))}</span>
+                      <span className="font-medium text-emerald-600">+{<MaskedAmount value={Number(c.amount)} tone="wil" />}</span>
                     </div>
                   ))}
                 </div>

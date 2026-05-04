@@ -17,6 +17,7 @@ import {
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 export function DebtForm({
   debt,
@@ -391,7 +392,7 @@ export function DebtForm({
             </p>
             {netWorthInclusionPct < 100 && Number(currentBalance) > 0 && (
               <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
-                Effectief saldo: {formatCurrency(Number(currentBalance) * netWorthInclusionPct / 100)}
+                Effectief saldo: {<MaskedAmount value={Number(currentBalance) * netWorthInclusionPct / 100} tone="kern" />}
               </p>
             )}
           </div>
@@ -446,7 +447,7 @@ export function DebtForm({
               )}
               {useCalculatedBalance && calculatedBalance != null ? (
                 <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
-                  <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatCurrency(calculatedBalance)}</span>
+                  <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={calculatedBalance} tone="kern" />}</span>
                 </div>
               ) : (
                 <input
@@ -508,7 +509,7 @@ export function DebtForm({
               )}
               {useCalculatedPayment && calculatedPayment != null ? (
                 <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
-                  <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatCurrency(calculatedPayment)}</span>
+                  <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={calculatedPayment} tone="kern" />}</span>
                   <span className="text-[10px] text-[var(--ink-4)]">p/m</span>
                 </div>
               ) : (
@@ -774,7 +775,7 @@ export function DebtForm({
                     Wet excessief lenen drempel overschreden
                   </div>
                   <p className="text-xs text-red-600">
-                    Totaal DGA-schulden: {formatCurrency(totalDga)} — bovenmatig deel: {formatCurrency(bovenmatig)}.
+                    Totaal DGA-schulden: {<MaskedAmount value={totalDga} tone="kern" />} — bovenmatig deel: {<MaskedAmount value={bovenmatig} tone="kern" />}.
                     Dit bovenmatige deel wordt als fictief regulier voordeel belast in Box 2.
                   </p>
                   <a
@@ -797,7 +798,7 @@ export function DebtForm({
                     Nadert Wet excessief lenen drempel
                   </div>
                   <p className="text-xs text-orange-600">
-                    Totaal DGA-schulden: {formatCurrency(totalDga)} (drempel: {formatCurrency(drempel)}).
+                    Totaal DGA-schulden: {<MaskedAmount value={totalDga} tone="kern" />} (drempel: {<MaskedAmount value={drempel} tone="kern" />}).
                     Houd rekening met Box 2-heffing bij overschrijding.
                   </p>
                   <a
@@ -863,7 +864,7 @@ export function DebtForm({
                     )}
                     {!useCustomAflossing && berekendAflossing > 0 ? (
                       <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
-                        <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatCurrency(berekendAflossing)}</span>
+                        <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={berekendAflossing} tone="kern" />}</span>
                         <span className="text-[10px] text-[var(--ink-4)]">p/m</span>
                       </div>
                     ) : (
@@ -879,7 +880,7 @@ export function DebtForm({
                     )}
                     {gewogenAflossing > 0 && (
                       <p className="mt-1.5 font-mono text-[11px] tabular-nums text-positive">
-                        +{formatCurrency(gewogenAflossing)} p/m in spaarquote{netWorthInclusionPct < 100 ? ` (${netWorthInclusionPct}% van ${formatCurrency(effectiefAflossing)})` : ''}
+                        +{<MaskedAmount value={gewogenAflossing} tone="kern" />} p/m in spaarquote{netWorthInclusionPct < 100 ? ` (${netWorthInclusionPct}% van ${formatCurrency(effectiefAflossing)})` : ''}
                       </p>
                     )}
                   </div>

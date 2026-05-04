@@ -14,7 +14,8 @@ import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowDownAZ, ArrowDownWideNarrow, LayoutGrid, List, TrendingUp, Hash } from 'lucide-react'
 import type { CryptoHoldingRow, CryptoSparklinePoint } from '@/lib/crypto-holdings-data'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
 import { CryptoSparkline } from '@/components/holdings/crypto-sparkline'
 import { labelForSource } from './crypto-source-breakdown'
@@ -237,6 +238,8 @@ function CryptoHoldingsTable({
   holdings,
   sparklinesByHoldingId,
 }: CryptoHoldingsTableProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const router = useRouter()
   return (
     <div className="overflow-x-auto">
@@ -302,7 +305,7 @@ function CryptoHoldingsTable({
                   {h.isFiatBalance ? '—' : formatUnitsCompact(h.units)}
                 </td>
                 <td className="py-2 px-3 text-right font-mono text-[12px] tabular-nums text-[var(--ink-2)]">
-                  {h.currentPrice != null ? formatCurrency(h.currentPrice) : '—'}
+                  {h.currentPrice != null ? fc(h.currentPrice) : '—'}
                 </td>
                 <td className="py-2 px-3 align-middle">
                   {h.isFiatBalance ? (
@@ -325,7 +328,7 @@ function CryptoHoldingsTable({
                     : '—'}
                 </td>
                 <td className="py-2 pl-3 text-right font-mono text-[12px] font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(h.valueEur)}
+                  {fc(h.valueEur)}
                 </td>
               </tr>
             )

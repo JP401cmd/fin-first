@@ -27,7 +27,19 @@ import {
   Lock,
   Link2,
 } from 'lucide-react'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/**
+ * Masked-aware currency formatter hook. Returns a stable callback that
+ * yields either the masked placeholder or a formatted EUR string based on
+ * the global privacy toggle. Used across the many sub-step components
+ * below so each rendering site stays mechanical.
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import {
@@ -150,6 +162,7 @@ export default function CheckinPage() {
 }
 
 function CheckinPageContent() {
+  const fc = useFc()
   const router = useRouter()
   const searchParams = useSearchParams()
   const readOnlyMonth = searchParams.get('month')
@@ -447,30 +460,30 @@ function CheckinPageContent() {
               <div className="card-editorial p-4">
                 <p className="label-editorial text-[var(--ink-3)] mb-1">Netto vermogen</p>
                 <p className="text-lg font-mono tabular-nums font-semibold text-[var(--ink)]">
-                  {formatCurrency(snap.metrics?.netWorth ?? 0)}
+                  {fc(snap.metrics?.netWorth ?? 0)}
                 </p>
                 {snap.details?.netWorthChange != null && snap.details.netWorthChange !== 0 && (
                   <p className={`text-xs font-mono tabular-nums font-medium mt-0.5 ${snap.details.netWorthChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {snap.details.netWorthChange >= 0 ? '+' : ''}{formatCurrency(snap.details.netWorthChange)}
+                    {snap.details.netWorthChange >= 0 ? '+' : ''}{fc(snap.details.netWorthChange)}
                   </p>
                 )}
               </div>
               <div className="card-editorial p-4">
                 <p className="label-editorial text-[var(--ink-3)] mb-1">Inkomen</p>
                 <p className="text-lg font-mono tabular-nums font-semibold text-[var(--ink)]">
-                  {formatCurrency(snap.metrics?.monthlyIncome ?? 0)}
+                  {fc(snap.metrics?.monthlyIncome ?? 0)}
                 </p>
               </div>
               <div className="card-editorial p-4">
                 <p className="label-editorial text-[var(--ink-3)] mb-1">Uitgaven</p>
                 <p className="text-lg font-mono tabular-nums font-semibold text-[var(--ink)]">
-                  {formatCurrency(snap.metrics?.monthlyExpenses ?? 0)}
+                  {fc(snap.metrics?.monthlyExpenses ?? 0)}
                 </p>
               </div>
               <div className="card-editorial p-4">
                 <p className="label-editorial text-[var(--ink-3)] mb-1">Gespaard</p>
                 <p className={`text-lg font-mono tabular-nums font-semibold ${(snap.metrics?.monthlySavings ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {formatCurrency(snap.metrics?.monthlySavings ?? 0)}
+                  {fc(snap.metrics?.monthlySavings ?? 0)}
                 </p>
               </div>
             </div>
@@ -513,14 +526,14 @@ function CheckinPageContent() {
                         <p className="text-[11px] text-[var(--ink-3)]">{ASSET_TYPE_LABELS[a.type as AssetType] || a.type}</p>
                       </div>
                       <p className="text-sm font-mono tabular-nums font-semibold text-[var(--ink)] ml-3 shrink-0">
-                        {formatCurrency(a.value)}
+                        {fc(a.value)}
                       </p>
                     </div>
                   ))}
                   <div className="border-t border-[var(--border-ed)] pt-2 mt-2 flex items-center justify-between">
                     <p className="text-xs font-semibold text-[var(--ink-2)]">Totaal</p>
                     <p className="text-sm font-mono tabular-nums font-bold text-[var(--ink)]">
-                      {formatCurrency(snap.details.assets.reduce((s: number, a: { value: number }) => s + a.value, 0))}
+                      {fc(snap.details.assets.reduce((s: number, a: { value: number }) => s + a.value, 0))}
                     </p>
                   </div>
                 </div>
@@ -539,7 +552,7 @@ function CheckinPageContent() {
                         <p className="text-[11px] text-[var(--ink-3)]">{DEBT_TYPE_LABELS[d.type as keyof typeof DEBT_TYPE_LABELS] || d.type}</p>
                       </div>
                       <p className="text-sm font-mono tabular-nums font-semibold text-red-500 ml-3 shrink-0">
-                        {formatCurrency(d.balance)}
+                        {fc(d.balance)}
                       </p>
                     </div>
                   ))}
@@ -565,7 +578,7 @@ function CheckinPageContent() {
                             {g.completed ? (
                               <span className="text-emerald-600 font-semibold">Voltooid</span>
                             ) : (
-                              <>{formatCurrency(g.current)} / {formatCurrency(g.target)}</>
+                              <>{fc(g.current)} / {fc(g.target)}</>
                             )}
                           </span>
                         </div>
@@ -601,7 +614,7 @@ function CheckinPageContent() {
                             {b.name}
                           </span>
                           <span className={`text-xs font-mono tabular-nums ${isOver ? (overPos ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
-                            {formatCurrency(b.spent)} / {formatCurrency(b.limit)}
+                            {fc(b.spent)} / {fc(b.limit)}
                           </span>
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
@@ -838,6 +851,7 @@ function CheckinStepProgress({ current }: { current: StepKey }) {
 
 /* ── Step 1: Terugblik ───────────────────────────────────────────────── */
 function StepTerugblik({ overview, previous }: { overview: CheckinOverview | null; previous: PreviousSnapshot | null }) {
+  const fc = useFc()
   if (!overview) {
     return (
       <div className="card-editorial p-6">
@@ -889,18 +903,18 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
       <div className="grid grid-cols-2 gap-3">
         <MetricCard
           label="Netto vermogen"
-          value={formatCurrency(overview.netWorth)}
+          value={fc(overview.netWorth)}
           change={overview.netWorthChange}
           delta={netWorthDelta}
         />
         <MetricCard
           label="Inkomen"
-          value={formatCurrency(overview.monthlyIncome)}
+          value={fc(overview.monthlyIncome)}
           delta={prevMetrics ? overview.monthlyIncome - prevMetrics.monthlyIncome : null}
         />
         <MetricCard
           label="Uitgaven"
-          value={formatCurrency(overview.monthlyExpenses)}
+          value={fc(overview.monthlyExpenses)}
           change={expenseChange}
           invertColor
           delta={prevMetrics ? overview.monthlyExpenses - prevMetrics.monthlyExpenses : null}
@@ -908,7 +922,7 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
         />
         <MetricCard
           label="Gespaard"
-          value={formatCurrency(overview.monthlySavings)}
+          value={fc(overview.monthlySavings)}
           positive={overview.monthlySavings > 0}
           delta={prevMetrics ? overview.monthlySavings - prevMetrics.monthlySavings : null}
         />
@@ -924,7 +938,7 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
             {netWorthDelta !== null && (
               <p>
                 Vermogen: <span className={`font-mono tabular-nums font-medium ${netWorthDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {netWorthDelta >= 0 ? '+' : ''}{formatCurrency(netWorthDelta)}
+                  {netWorthDelta >= 0 ? '+' : ''}{fc(netWorthDelta)}
                 </span>
                 {freedomGrowth && !freedomGrowth.isInfinite && (
                   <span className="text-[var(--ink-3)] ml-1.5">
@@ -976,6 +990,7 @@ function StepBezittingen({
   saved: boolean
   setSaved: (v: boolean) => void
 }) {
+  const fc = useFc()
   const [savingAssets, setSavingAssets] = useState(false)
 
   // Group by asset_type
@@ -1108,7 +1123,7 @@ function StepBezittingen({
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-[var(--ink)] truncate">{asset.name}</p>
                           <p className="text-xs text-[var(--ink-3)] font-mono tabular-nums">
-                            {formatCurrency(current)}
+                            {fc(current)}
                           </p>
                         </div>
                         {locked ? (
@@ -1134,7 +1149,7 @@ function StepBezittingen({
                           <span className={`text-xs font-mono tabular-nums font-medium shrink-0 ${
                             delta > 0 ? 'text-emerald-600' : 'text-red-500'
                           }`}>
-                            {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                            {delta > 0 ? '+' : ''}{fc(delta)}
                           </span>
                         )}
                       </div>
@@ -1192,6 +1207,7 @@ function StepSchulden({
   saved: boolean
   setSaved: (v: boolean) => void
 }) {
+  const fc = useFc()
   const [savingDebts, setSavingDebts] = useState(false)
 
   const changedCount = useMemo(() => {
@@ -1308,7 +1324,7 @@ function StepSchulden({
                         {debt.name}
                       </p>
                       <p className="text-xs text-[var(--ink-3)]">
-                        <span className="font-mono tabular-nums">{formatCurrency(current)}</span>
+                        <span className="font-mono tabular-nums">{fc(current)}</span>
                         {' · '}
                         {DEBT_TYPE_LABELS[debt.debt_type]}
                       </p>
@@ -1329,7 +1345,7 @@ function StepSchulden({
                       <span className={`text-xs font-mono tabular-nums font-medium shrink-0 ${
                         delta < 0 ? 'text-emerald-600' : 'text-red-500'
                       }`}>
-                        {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                        {delta > 0 ? '+' : ''}{fc(delta)}
                       </span>
                     )}
                   </div>
@@ -1383,6 +1399,7 @@ function StepDoelen({
   saved: boolean
   setSaved: (v: boolean) => void
 }) {
+  const fc = useFc()
   const [savingGoals, setSavingGoals] = useState(false)
   const activeGoals = goals.filter(g => !g.is_completed)
   const completedGoals = goals.filter(g => g.is_completed)
@@ -1479,7 +1496,7 @@ function StepDoelen({
                       {goal.name}
                     </p>
                     <p className="text-xs text-[var(--ink-3)] mt-0.5 font-mono tabular-nums">
-                      {formatCurrency(goal.current_value)} / {formatCurrency(goal.target_value)}
+                      {fc(goal.current_value)} / {fc(goal.target_value)}
                     </p>
                   </div>
                   {isLinked ? (
@@ -1755,6 +1772,7 @@ function StepBudget({
 
 /* ── Step 6: Vooruitblik ─────────────────────────────────────────────── */
 function StepVooruitblik({ upcoming }: { upcoming: UpcomingItem[] }) {
+  const fc = useFc()
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
@@ -1798,7 +1816,7 @@ function StepVooruitblik({ upcoming }: { upcoming: UpcomingItem[] }) {
               <span className={`text-sm font-mono tabular-nums font-medium ${
                 item.amount < 0 ? 'text-[var(--ink)]' : 'text-emerald-600'
               }`}>
-                {formatCurrency(item.amount)}
+                {fc(item.amount)}
               </span>
             </div>
           ))}
@@ -1826,6 +1844,7 @@ function StepReflectie({
   previous: PreviousSnapshot | null
   gespreksstarters: GesprekStarterData[]
 }) {
+  const fc = useFc()
   const overBudgetCount = budgets.filter(b => b.budget_type === 'expense' && b.limit > 0 && b.spent > b.limit).length
   const activeGoalCount = goals.filter(g => !g.is_completed).length
   const prevMetrics = previous?.metrics
@@ -1863,7 +1882,7 @@ function StepReflectie({
         <div className="space-y-1.5 text-sm text-[var(--ink-2)]">
           {overview && (
             <p>
-              Je hebt deze maand <span className="font-mono tabular-nums font-medium">{formatCurrency(overview.monthlySavings)}</span> gespaard
+              Je hebt deze maand <span className="font-mono tabular-nums font-medium">{fc(overview.monthlySavings)}</span> gespaard
               {savingsFreedom && !savingsFreedom.isInfinite && savingsFreedom.totalDays > 0 && (
                 <span className="text-[var(--ink-3)]">
                   {' '}({overview.monthlySavings >= 0 ? '+' : '-'}{formatFreedomTimeString(savingsFreedom, 'short', true)} vrijheid)
@@ -2066,6 +2085,7 @@ function MetricCard({
   delta?: number | null
   deltaInverted?: boolean
 }) {
+  const fc = useFc()
   const showChange = typeof change === 'number' && change !== 0
   const isPositiveChange = invertColor ? change! < 0 : change! > 0
   const showDelta = typeof delta === 'number' && delta !== 0
@@ -2087,7 +2107,7 @@ function MetricCard({
       )}
       {showDelta && (
         <p className={`mt-0.5 text-[10px] font-mono tabular-nums font-medium ${isDeltaPositive ? 'text-emerald-600' : 'text-red-500'}`}>
-          {delta! > 0 ? '+' : ''}{formatCurrency(delta!)} sinds check-in
+          {delta! > 0 ? '+' : ''}{fc(delta!)} sinds check-in
         </p>
       )}
     </div>
@@ -2106,6 +2126,7 @@ function BudgetRow({
   editValue?: string
   onValueChange?: (id: string, value: string) => void
 }) {
+  const fc = useFc()
   const editedLimit = Number(editValue) || budget.limit
   const pct = editedLimit > 0 ? Math.min(120, (budget.spent / editedLimit) * 100) : 0
   const isOver = budget.spent > editedLimit
@@ -2120,7 +2141,7 @@ function BudgetRow({
           {budget.name}
         </p>
         <p className="text-xs font-mono tabular-nums text-[var(--ink-2)] shrink-0">
-          {formatCurrency(budget.spent)} / {formatCurrency(budget.limit)}
+          {fc(budget.spent)} / {fc(budget.limit)}
         </p>
       </div>
       {onValueChange && (
@@ -2139,7 +2160,7 @@ function BudgetRow({
           </div>
           {hasChanged && (
             <span className={`text-xs font-mono tabular-nums font-medium ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-              {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+              {delta > 0 ? '+' : ''}{fc(delta)}
             </span>
           )}
         </div>

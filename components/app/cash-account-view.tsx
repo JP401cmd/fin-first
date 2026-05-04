@@ -39,6 +39,7 @@ import { AccountFormModal, ACCOUNT_TYPES, type Account } from '@/components/app/
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { Kicker } from '@/components/editorial'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type Transaction = {
   id: string
@@ -1014,7 +1015,7 @@ export function CashAccountView({
           <div className="mb-4 card-editorial p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Totaal saldo</p>
             <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-              {formatCurrency(totalBalance)}
+              {<MaskedAmount value={totalBalance} tone="kern" />}
             </p>
           </div>
         )}
@@ -1033,7 +1034,7 @@ export function CashAccountView({
                   </div>
                 </div>
                 <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(Number(acc.balance))}
+                  {<MaskedAmount value={Number(acc.balance)} tone="kern" />}
                 </p>
               </div>
             </div>
@@ -1141,7 +1142,7 @@ export function CashAccountView({
           <div className="text-right">
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">{isCombined ? 'Totaal saldo' : 'Saldo'}</p>
             <p className="text-2xl font-bold text-[var(--ink)]">
-              {formatCurrency(Number(account.balance))}
+              {<MaskedAmount value={Number(account.balance)} tone="kern" />}
             </p>
           </div>
         </div>
@@ -1159,7 +1160,7 @@ export function CashAccountView({
               </div>
               <div className="text-right">
                 <span className="font-mono text-sm font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(Number(account.balance))}
+                  {<MaskedAmount value={Number(account.balance)} tone="kern" />}
                 </span>
                 <span className="ml-2 text-xs text-[var(--ink-3)]">totaal</span>
               </div>
@@ -1191,7 +1192,7 @@ export function CashAccountView({
                   <span className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${
                     Number(acc.balance) >= 0 ? 'text-[var(--ink)]' : 'text-red-600'
                   }`}>
-                    {formatCurrency(Number(acc.balance))}
+                    {<MaskedAmount value={Number(acc.balance)} tone="kern" />}
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
                 </button>
@@ -1588,7 +1589,7 @@ export function CashAccountView({
                     </span>
                   )}
                   <span className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${isPositive ? 'text-[var(--hor-t)]' : 'text-[var(--ink)]'}`}>
-                    {isPositive ? '+' : ''}{formatCurrency(amount)}
+                    {isPositive ? '+' : ''}{<MaskedAmount value={amount} tone="kern" />}
                   </span>
                   <button
                     onClick={() => setEditRecurring(r)}
@@ -1927,7 +1928,7 @@ export function CashAccountView({
                             <span className={`font-mono text-sm font-semibold tabular-nums ${
                               isTransfer || isPendingTransfer ? 'text-[var(--ink-2)]' : isPositive ? 'text-emerald-600' : 'text-[var(--ink)]'
                             }`}>
-                              {!isTransfer && !isPendingTransfer && (isPositive ? '+' : '')}{formatCurrency(amount)}
+                              {!isTransfer && !isPendingTransfer && (isPositive ? '+' : '')}{<MaskedAmount value={amount} tone="kern" />}
                             </span>
                             {!isTransfer && !isPendingTransfer && dailyExpenses > 0 && (
                               <>
@@ -1998,7 +1999,7 @@ export function CashAccountView({
                                       </span>
                                     )}
                                     <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-2)]">
-                                      {formatCurrency(Number(split.amount))}
+                                      {<MaskedAmount value={Number(split.amount)} tone="kern" />}
                                     </span>
                                   </div>
                                 )
@@ -2171,7 +2172,7 @@ export function CashAccountView({
                     <p className="mt-0.5 font-sans text-xs text-[var(--ink-3)]">{p.frequency} · dag {p.dayOfMonth ?? p.dayOfWeek}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-mono text-sm font-medium tabular-nums text-[var(--ink)]">{formatCurrency(Math.abs(p.averageAmount))}</p>
+                    <p className="font-mono text-sm font-medium tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.abs(p.averageAmount)} tone="kern" />}</p>
                     <p className="font-sans text-[10px] text-[var(--ink-4)]">{p.isIncome ? 'inkomsten' : 'uitgave'}</p>
                   </div>
                   <button

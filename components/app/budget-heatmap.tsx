@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useCallback, useRef, memo } from 'react'
 import type { BudgetWithChildren } from '@/lib/budget-data'
-import { BudgetIcon, formatCurrency, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
+import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { WidgetSize } from '@/lib/widget-catalog'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -448,9 +449,9 @@ function HeatmapTooltip({
       {/* Spent / limit */}
       <div className="mb-1.5 font-mono text-xs tabular-nums">
         <span className={isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}>
-          {formatCurrency(rect.spent)}
+          {<MaskedAmount value={rect.spent} tone="wil" />}
         </span>
-        <span className="text-[var(--ink-3)]"> / {formatCurrency(rect.limit)}</span>
+        <span className="text-[var(--ink-3)]"> / {<MaskedAmount value={rect.limit} tone="wil" />}</span>
       </div>
 
       {/* Percentage bar */}
@@ -478,7 +479,7 @@ function HeatmapTooltip({
 
       {/* Remaining */}
       <div className="text-[10px] text-[var(--ink-3)]">
-        Resterend: <span className="font-mono tabular-nums">{formatCurrency(remaining)}</span>
+        Resterend: <span className="font-mono tabular-nums">{<MaskedAmount value={remaining} tone="wil" />}</span>
       </div>
     </div>
   )
@@ -590,7 +591,7 @@ function MobileCombinedHeatmap({
                         <BudgetIcon name={group.icon} className="h-3.5 w-3.5 text-[var(--ink-2)]" />
                         <span className="flex-1 truncate text-xs font-semibold text-[var(--ink)]">{group.name}</span>
                         <span className="font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
-                          {formatCurrency(groupTotalSpent)} / {formatCurrency(groupTotalLimit)}
+                          {<MaskedAmount value={groupTotalSpent} tone="wil" />} / {<MaskedAmount value={groupTotalLimit} tone="wil" />}
                         </span>
                       </div>
 
@@ -767,7 +768,7 @@ function TreemapCell({
                 className="font-mono text-[8px] tabular-nums leading-tight text-white/80"
                 style={{ textShadow }}
               >
-                {formatCurrency(rect.spent)}
+                {<MaskedAmount value={rect.spent} tone="wil" />}
               </p>
             )}
           </div>

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { type Goal, type GoalType, GOAL_TYPE_META, computeGoalProgress, getGoalColorClasses, formatGoalValue } from '@/lib/goal-data'
-import { formatCurrency } from '@/components/app/budget-shared'
+
 import { TrendingUp, TrendingDown, Minus, Flag, AlertTriangle, Clock } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 

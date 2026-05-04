@@ -26,7 +26,8 @@
  */
 
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 interface EquityBuildupBarProps {
   /** Huidige marktwaarde van het huis (€). */
@@ -45,6 +46,8 @@ export function EquityBuildupBar({
   monthlyPrincipal,
   kicker = 'Vermogensopbouw',
 }: EquityBuildupBarProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Equity = marktwaarde minus schuld, niet onder 0 (overwaarde-only). Bij
   // onderwaarde zou de berekening moeten omkeren — voor nu klampen we omdat
   // negatieve equity een ander UI-pattern verdient (waarschuwing, niet
@@ -66,7 +69,7 @@ export function EquityBuildupBar({
           {kicker}
         </p>
         <p className="font-mono tabular-nums text-[11px] text-[var(--ink-3)]">
-          {formatCurrency(marketValue)} totaal
+          {fc(marketValue)} totaal
         </p>
       </header>
 
@@ -74,7 +77,7 @@ export function EquityBuildupBar({
           continuiteit te bewaren. Twee segmenten: schuld + equity. */}
       <div
         role="img"
-        aria-label={`Marktwaarde ${formatCurrency(marketValue)}, waarvan ${formatCurrency(debtBalance)} schuld en ${formatCurrency(equity)} eigen vermogen`}
+        aria-label={`Marktwaarde ${fc(marketValue)}, waarvan ${fc(debtBalance)} schuld en ${fc(equity)} eigen vermogen`}
         className="relative h-[18px] w-full overflow-hidden bg-[var(--subtle)]"
       >
         {/* Schuld-segment — grijze tint (kern-300 bewust laag in de
@@ -107,17 +110,17 @@ export function EquityBuildupBar({
       <div className="grid grid-cols-3 gap-3 text-[11px]">
         <Stat
           label="Schuld"
-          value={formatCurrency(debtBalance)}
+          value={fc(debtBalance)}
           tone="muted"
         />
         <Stat
           label="Eigen vermogen"
-          value={formatCurrency(equity)}
+          value={fc(equity)}
           tone="primary"
         />
         <Stat
           label="Per maand"
-          value={`+${formatCurrency(monthlyPrincipal)}`}
+          value={`+${fc(monthlyPrincipal)}`}
           tone="positive"
           help="Aflossingsdeel van je maandlast — direct equity-opbouw."
         />

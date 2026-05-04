@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { formatCurrency } from '@/lib/format'
+import { useState, useEffect, useCallback } from 'react'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { CATEGORY_LABELS, type RecurringCategory } from '@/lib/recurring-detection'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 import {
@@ -94,6 +95,8 @@ export function VasteKostenAnalyse({
   onCancellationOpen,
   onRefresh,
 }: VasteKostenAnalyseProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   const [scanning, setScanning] = useState(false)
   const [classifyItem, setClassifyItem] = useState<ClassifyItemData | null>(null)
   const [aiSheetOpen, setAiSheetOpen] = useState(false)
@@ -176,7 +179,7 @@ export function VasteKostenAnalyse({
             </span>
           </div>
           <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(totalMonthly)}/mnd
+            {fc(totalMonthly)}/mnd
           </p>
         </div>
       </button>
@@ -258,7 +261,7 @@ export function VasteKostenAnalyse({
                   <button
                     type="button"
                     onClick={() => handleClassifyClick(sub)}
-                    aria-label={`${sub.name} classificeren — ${formatCurrency(sub.monthlyAmount)} per maand`}
+                    aria-label={`${sub.name} classificeren — ${fc(sub.monthlyAmount)} per maand`}
                     className="flex min-w-0 flex-1 items-center justify-between px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wil-500"
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
@@ -269,7 +272,7 @@ export function VasteKostenAnalyse({
                       </div>
                     </div>
                     <p className="shrink-0 font-mono text-sm tabular-nums text-[var(--ink)]">
-                      {formatCurrency(sub.monthlyAmount)}/mnd
+                      {fc(sub.monthlyAmount)}/mnd
                     </p>
                   </button>
                   {/* Opzeg button — opens cancellation modal */}
@@ -288,7 +291,7 @@ export function VasteKostenAnalyse({
               <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-3">
                 <span className="text-xs font-medium text-[var(--ink-2)]">Subtotaal</span>
                 <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(totalMonthlySubscriptions)}/mnd
+                  {fc(totalMonthlySubscriptions)}/mnd
                 </span>
               </div>
             </div>
@@ -318,7 +321,7 @@ export function VasteKostenAnalyse({
                   key={item.id}
                   type="button"
                   onClick={() => handleClassifyClick(item)}
-                  aria-label={`${item.name} classificeren — ${formatCurrency(item.monthlyAmount)} per maand`}
+                  aria-label={`${item.name} classificeren — ${fc(item.monthlyAmount)} per maand`}
                   className="flex w-full items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wil-500 focus-visible:ring-offset-1"
                 >
                   <div className="flex min-w-0 items-center gap-2.5">
@@ -332,7 +335,7 @@ export function VasteKostenAnalyse({
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <p className="font-mono text-sm tabular-nums text-[var(--ink)]">
-                      {formatCurrency(item.monthlyAmount)}/mnd
+                      {fc(item.monthlyAmount)}/mnd
                     </p>
                     <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" aria-hidden="true" />
                   </div>
@@ -342,7 +345,7 @@ export function VasteKostenAnalyse({
               <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-3">
                 <span className="text-xs font-medium text-[var(--ink-2)]">Subtotaal</span>
                 <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(totalMonthlyVasteKosten)}/mnd
+                  {fc(totalMonthlyVasteKosten)}/mnd
                 </span>
               </div>
             </div>
@@ -356,10 +359,10 @@ export function VasteKostenAnalyse({
           <span className="text-sm font-semibold text-[var(--ink)]">Totaal vaste lasten</span>
           <div className="text-right">
             <span className="font-mono text-base font-bold tabular-nums text-[var(--ink)]">
-              {formatCurrency(totalMonthly)}/mnd
+              {fc(totalMonthly)}/mnd
             </span>
             <p className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
-              {formatCurrency(totalMonthly * 12)}/jaar
+              {fc(totalMonthly * 12)}/jaar
             </p>
           </div>
         </div>

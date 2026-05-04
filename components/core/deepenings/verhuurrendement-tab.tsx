@@ -34,7 +34,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Building2 } from 'lucide-react'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
 import { WaardestijgingSlider } from './hypotheekplanner/waardestijging-slider'
@@ -91,6 +92,8 @@ interface LoadedData {
 }
 
 function VerhuurrendementActive() {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const [data, setData] = useState<LoadedData | null>(null)
 
   // Slider-state — gedeeld voor alle objecten op deze pagina (de slider zelf
@@ -186,21 +189,21 @@ function VerhuurrendementActive() {
         <div className="mt-3 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
           <Stat
             label="Marktwaarde totaal"
-            value={formatCurrency(totalCurrentValue)}
+            value={fc(totalCurrentValue)}
           />
           <Stat
             label="Eigen geld"
-            value={formatCurrency(totalOwnEquity)}
+            value={fc(totalOwnEquity)}
             tone="primary"
           />
           <Stat
             label="Cashflow per maand"
-            value={`${totalMonthlyCashflow >= 0 ? '+' : '−'}${formatCurrency(Math.abs(totalMonthlyCashflow))}`}
+            value={`${totalMonthlyCashflow >= 0 ? '+' : '−'}${fc(Math.abs(totalMonthlyCashflow))}`}
             tone={totalMonthlyCashflow >= 0 ? 'positive' : 'negative'}
           />
           <Stat
             label="Cashflow per jaar"
-            value={`${totalMonthlyCashflow >= 0 ? '+' : '−'}${formatCurrency(Math.abs(totalMonthlyCashflow * 12))}`}
+            value={`${totalMonthlyCashflow >= 0 ? '+' : '−'}${fc(Math.abs(totalMonthlyCashflow * 12))}`}
             tone={totalMonthlyCashflow >= 0 ? 'positive' : 'negative'}
           />
         </div>

@@ -1,10 +1,22 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportConfig } from '@/lib/report-data'
-import { FileText, Trash2, Eye, Sparkles, CheckCircle2, Scale, BarChart3 } from 'lucide-react'
+import { FileText, Trash2, Eye, Sparkles, Scale, BarChart3 } from 'lucide-react'
+import {
+  Kicker,
+  EditorialHeadline,
+  EditorialDeck,
+  CardEditorial,
+  RekeningTag,
+  OrnamentColophon,
+  SectionLabel,
+  TogglePill,
+} from '@/components/editorial'
+import { SectionDivider } from '@/components/app/section-divider'
+import { formatTimestamp } from '@/lib/format'
 
 type PeriodType = 'month' | 'quarter' | 'year'
 
@@ -12,6 +24,12 @@ const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
   { value: 'month', label: 'Maand' },
   { value: 'quarter', label: 'Kwartaal' },
   { value: 'year', label: 'Jaar' },
+]
+
+// Romeinse cijfers — bestaande report_configs query is gecapt op 20.
+const ROMAN = [
+  'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x',
+  'xi', 'xii', 'xiii', 'xiv', 'xv', 'xvi', 'xvii', 'xviii', 'xix', 'xx',
 ]
 
 function getMonthOptions(): { value: string; label: string }[] {
@@ -38,7 +56,6 @@ function getQuarterOptions(): { value: string; label: string }[] {
     const year = now.getFullYear() + Math.floor(totalQ / 4)
     const q = ((totalQ % 4) + 4) % 4
     const monthStart = q * 3
-    const value = `${year}-Q${q + 1}`
     const label = `Q${q + 1} ${year}`
     options.push({ value: `${year}-${String(monthStart + 1).padStart(2, '0')}`, label })
   }
@@ -187,287 +204,332 @@ export default function RapportagesPage() {
 
   return (
     <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
-      {/* Editorial header — blueprint Type 1 (cross-module landing) */}
-      <header className="mb-8 space-y-2">
-        {/* Kicker met 28×1px streep — cross-module valt terug op ink-2 */}
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
-          <span
-            aria-hidden
-            className="inline-block h-px w-7 shrink-0"
-            style={{ background: 'var(--module-active-500)' }}
-          />
-          Rapportages
-        </div>
-        {/* Headline met italic-em "archief" */}
-        <h1
-          className="font-bold tracking-[-0.02em] text-3xl md:text-4xl"
-          style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.03em' }}
-        >
-          Jouw financieel{' '}
-          <em
-            className="font-normal italic"
-            style={{ color: 'var(--module-active-700)' }}
-          >
-            archief
-          </em>
-        </h1>
-        {/* Editorial deck */}
-        <p
-          className="italic text-[14px] sm:text-[15px] leading-snug max-w-[60ch] text-[var(--ink-2)] pl-4 mt-3"
-          style={{
-            fontFamily: 'var(--font-source-serif, Georgia, serif)',
-            borderLeft: '2px solid var(--module-active-500)',
-          }}
-        >
+      {/* Editorial header — Type 1 Module-landing */}
+      <header className="mb-6 space-y-3">
+        <Kicker>Rapportages</Kicker>
+        <EditorialHeadline level="h1" size="lg" emphasis="archief">
+          Jouw financieel archief
+        </EditorialHeadline>
+        <EditorialDeck>
           Genereer een overzicht van elke periode in je financiele leven.
-        </p>
+        </EditorialDeck>
       </header>
 
-      {/* Report generator */}
-      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-[var(--s0)]">
-        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-4">
-          Nieuw rapport
-        </p>
+      <SectionDivider variant="double-rule" />
 
-        {/* Period type selector */}
-        <div className="mb-4">
-          <label className="mb-1.5 block font-inter text-xs text-[var(--ink-2)]">Periode</label>
-          <div className="flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1">
-            {PERIOD_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setPeriodType(opt.value)}
-                className={`flex-1 rounded-[var(--r-sm)] px-3 py-1.5 font-inter text-xs font-medium transition-all ${
-                  periodType === opt.value
-                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s0)]'
-                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Period selector */}
-        <div className="mb-5">
-          <label className="mb-1.5 block font-inter text-xs text-[var(--ink-2)]">
-            {periodType === 'month' ? 'Maand' : periodType === 'quarter' ? 'Kwartaal' : 'Jaar'}
-          </label>
-          <select
-            value={selection}
-            onChange={(e) => setSelection(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-kern-400"
-          >
-            {options.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* AI toggle */}
-        <div className="mb-5">
-          <label className="mb-2 block font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Rapport type</label>
-          <div className="grid grid-cols-2 gap-3">
-            {/* Standaard rapport */}
-            <button
-              type="button"
-              aria-pressed={!useAi}
-              onClick={() => setUseAi(false)}
-              className={`relative rounded-[var(--r)] border-2 p-3 text-left transition-all ${
-                !useAi
-                  ? 'border-wil-400 bg-wil-50'
-                  : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
-              }`}
+      {/* === I. Periodiek rapport === */}
+      <CardEditorial accent className="mt-6">
+        <div className="p-6 sm:p-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Kicker size="small">
+              <FileText className="h-3 w-3" aria-hidden />
+              <span>Periodiek rapport</span>
+            </Kicker>
+            <span
+              className="italic text-sm text-[var(--module-active-700)]"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              aria-hidden
             >
-              {!useAi && (
-                <CheckCircle2 className="absolute right-2 top-2 h-3.5 w-3.5 text-wil-500" />
-              )}
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <FileText className={`h-3.5 w-3.5 ${!useAi ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
-                <span className={`font-inter text-[10px] font-bold uppercase tracking-[0.08em] ${!useAi ? 'text-wil-700' : 'text-[var(--ink-3)]'}`}>
-                  Standaard
-                </span>
-              </div>
-              <p className="font-source-serif text-[12px] italic leading-snug text-[var(--ink-2)]">
-                Volledige analyse — inkomen, uitgaven, FIRE-voortgang, historisch vergelijk
-              </p>
-              <p className="mt-1.5 font-inter text-[10px] text-[var(--ink-3)]">Direct beschikbaar</p>
-            </button>
-
-            {/* Met AI-inleiding */}
-            <button
-              type="button"
-              aria-pressed={useAi}
-              onClick={() => setUseAi(true)}
-              className={`relative rounded-[var(--r)] border-2 p-3 text-left transition-all ${
-                useAi
-                  ? 'border-wil-400 bg-wil-50'
-                  : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
-              }`}
-            >
-              {useAi && (
-                <CheckCircle2 className="absolute right-2 top-2 h-3.5 w-3.5 text-wil-500" />
-              )}
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <Sparkles className={`h-3.5 w-3.5 ${useAi ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
-                <span className={`font-inter text-[10px] font-bold uppercase tracking-[0.08em] ${useAi ? 'text-wil-700' : 'text-[var(--ink-3)]'}`}>
-                  Met AI-inleiding
-                </span>
-              </div>
-              <p className="font-source-serif text-[12px] italic leading-snug text-[var(--ink-2)]">
-                Inclusief persoonlijke redactionele inleiding door Will, gebaseerd op jouw data
-              </p>
-              <p className="mt-1.5 font-inter text-[10px] text-[var(--ink-3)]">+5–10 seconden</p>
-            </button>
+              i.
+            </span>
           </div>
-        </div>
 
-        {/* Generate button */}
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={generating}
-          className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)] disabled:opacity-50"
-        >
-          {generating ? (
-            <>
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--paper)] border-t-transparent" />
-              Genereren...
-            </>
-          ) : (
-            <>
-              <FileText className="h-4 w-4" />
-              Genereer rapport
-            </>
-          )}
-        </button>
-      </div>
+          <EditorialHeadline level="h2" size="sm" emphasis="samenvatting" className="mb-2">
+            Een redactionele samenvatting
+          </EditorialHeadline>
 
-      {/* Persoonlijke Balans */}
-      <div className="mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-[var(--s0)]">
-        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-1">
-          Persoonlijke Balans
-        </p>
-        <p className="font-source-serif text-[12px] italic leading-snug text-[var(--ink-2)] mb-4">
-          Momentopname van al je bezittingen en schulden — je financiële staat op één datum.
-        </p>
+          <EditorialDeck className="mb-5">
+            Hoe groei je vermogen, waar gaat je geld heen, en hoeveel dichter bij je horizon ben je gekomen?
+          </EditorialDeck>
 
-        <div className="mb-4">
-          <label className="mb-1.5 block font-inter text-xs text-[var(--ink-2)]">Peildatum</label>
-          <input
-            type="date"
-            value={balansDate}
-            onChange={(e) => setBalansDate(e.target.value)}
-            max={new Date().toISOString().split('T')[0]}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-kern-400"
-          />
-        </div>
-
-        <button
-          type="button"
-          onClick={() => router.push(`/rapportages/balans?date=${balansDate}`)}
-          className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
-        >
-          <Scale className="h-4 w-4" />
-          Genereer balans
-        </button>
-      </div>
-
-      {/* Budgetrapport */}
-      <div className="mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-[var(--s0)]">
-        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-1">
-          Budgetrapport
-        </p>
-        <p className="font-source-serif text-[12px] italic leading-snug text-[var(--ink-2)] mb-4">
-          Maandelijks overzicht van je budgetten — besteed vs. begroot met trends en vrijheidstijd.
-        </p>
-
-        <div className="mb-4">
-          <label className="mb-1.5 block font-inter text-xs text-[var(--ink-2)]">Maand</label>
-          <select
-            value={budgetMonth}
-            onChange={(e) => setBudgetMonth(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-kern-400"
-          >
-            {getMonthOptions().map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => router.push(`/rapportages/budget?month=${budgetMonth}`)}
-          className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
-        >
-          <BarChart3 className="h-4 w-4" />
-          Genereer budgetrapport
-        </button>
-      </div>
-
-      {/* Saved reports */}
-      <div className="mt-8">
-        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-3">
-          Opgeslagen rapporten
-        </p>
-
-        {configsLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
-          </div>
-        ) : savedConfigs.length === 0 ? (
-          <p className="py-6 text-center font-source-serif text-sm italic text-[var(--ink-3)]">
-            Je hebt nog geen rapporten gegenereerd.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {savedConfigs.map(config => (
-              <div
-                key={config.id}
-                className="group flex items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
-              >
+          {/* Periode-segmented + dropdown */}
+          <div className="mb-4">
+            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Periode</label>
+            <div className="flex gap-1 border border-[var(--border-ed)] bg-[var(--subtle)] p-1">
+              {PERIOD_OPTIONS.map(opt => (
                 <button
+                  key={opt.value}
                   type="button"
-                  onClick={() => handleView(config)}
-                  className="min-w-0 flex-1 px-4 py-3 text-left"
+                  onClick={() => setPeriodType(opt.value)}
+                  className={`flex-1 px-3 py-1.5 font-inter text-xs font-medium transition-all ${
+                    periodType === opt.value
+                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s0)]'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                  }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <p className="font-inter text-sm font-medium text-[var(--ink)] truncate">{config.name}</p>
-                    {config.use_ai && (
-                      <span className="shrink-0 rounded-[var(--r-sm)] bg-wil-50 border border-wil-200 px-1.5 py-0.5 font-inter text-[9px] font-bold uppercase tracking-[0.06em] text-wil-600">
-                        AI
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-inter text-[11px] text-[var(--ink-3)]">
-                    {new Date(config.date_from).toLocaleDateString('nl-NL')} – {new Date(config.date_to).toLocaleDateString('nl-NL')}
-                  </p>
+                  {opt.label}
                 </button>
-                <div className="flex items-center gap-1 px-2">
-                  <button
-                    type="button"
-                    onClick={() => handleView(config)}
-                    className="rounded-[var(--r-sm)] p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink)]"
-                    title="Bekijken"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(config.id)}
-                    className="rounded-[var(--r-sm)] p-2 text-[var(--ink-4)] transition-colors hover:bg-red-50 hover:text-red-600"
-                    title="Verwijderen"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        )}
+
+          <div className="mb-5">
+            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
+              {periodType === 'month' ? 'Maand' : periodType === 'quarter' ? 'Kwartaal' : 'Jaar'}
+            </label>
+            <select
+              value={selection}
+              onChange={(e) => setSelection(e.target.value)}
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-[var(--module-active-500)]"
+            >
+              {options.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* AI-toggle als TogglePill-row */}
+          <div className="mb-5">
+            <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Inleiding</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <TogglePill on={!useAi} label="standaard" onClick={() => setUseAi(false)} />
+              <TogglePill on={useAi} label="met ai-inleiding" onClick={() => setUseAi(true)} />
+              {useAi && <Sparkles className="h-3.5 w-3.5 text-[var(--module-active-700)]" aria-hidden />}
+            </div>
+          </div>
+
+          {/* Primary CTA — bestaande button-stijl */}
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={generating}
+            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)] disabled:opacity-50"
+          >
+            {generating ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--paper)] border-t-transparent" />
+                Pagina&apos;s worden opgesteld...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4" />
+                Genereer rapport
+              </>
+            )}
+          </button>
+
+          <p
+            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            {useAi ? 'Will leest je cijfers en schrijft een korte editie. +5–10 seconden.' : 'Direct beschikbaar — een redactionele samenvatting in jouw context.'}
+          </p>
+        </div>
+      </CardEditorial>
+
+      {/* === II. Persoonlijke balans === */}
+      <CardEditorial accent className="mt-6">
+        <div className="p-6 sm:p-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Kicker size="small">
+              <Scale className="h-3 w-3" aria-hidden />
+              <span>Balansstaat</span>
+            </Kicker>
+            <span
+              className="italic text-sm text-[var(--module-active-700)]"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              aria-hidden
+            >
+              ii.
+            </span>
+          </div>
+
+          <EditorialHeadline level="h2" size="sm" emphasis="zaken" className="mb-2">
+            Een staat van zaken
+          </EditorialHeadline>
+
+          <EditorialDeck className="mb-5">
+            Wat je hebt, wat je verschuldigd bent, en wat er overblijft op een peildatum.
+          </EditorialDeck>
+
+          <div className="mb-5">
+            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Peildatum</label>
+            <input
+              type="date"
+              value={balansDate}
+              onChange={(e) => setBalansDate(e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-[var(--module-active-500)]"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => router.push(`/rapportages/balans?date=${balansDate}`)}
+            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+          >
+            <Scale className="h-4 w-4" />
+            Genereer balans
+          </button>
+
+          <p
+            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Activa, passiva en netto vermogen op een moment vastgelegd.
+          </p>
+        </div>
+      </CardEditorial>
+
+      {/* === III. Budgetrapport === */}
+      <CardEditorial accent className="mt-6">
+        <div className="p-6 sm:p-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Kicker size="small">
+              <BarChart3 className="h-3 w-3" aria-hidden />
+              <span>Maandbudget</span>
+            </Kicker>
+            <span
+              className="italic text-sm text-[var(--module-active-700)]"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              aria-hidden
+            >
+              iii.
+            </span>
+          </div>
+
+          <EditorialHeadline level="h2" size="sm" emphasis="werkelijkheid" className="mb-2">
+            Budget tegenover de werkelijkheid
+          </EditorialHeadline>
+
+          <EditorialDeck className="mb-5">
+            Hoe je budget zich verhield tot de werkelijkheid. Met de vrijheidstijd-impact onderaan.
+          </EditorialDeck>
+
+          <div className="mb-5">
+            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Maand</label>
+            <select
+              value={budgetMonth}
+              onChange={(e) => setBudgetMonth(e.target.value)}
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-[var(--module-active-500)]"
+            >
+              {getMonthOptions().map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => router.push(`/rapportages/budget?month=${budgetMonth}`)}
+            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Genereer budgetrapport
+          </button>
+
+          <p
+            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Per categorie en per maand, inclusief trendanalyse over zes maanden.
+          </p>
+        </div>
+      </CardEditorial>
+
+      <SectionDivider variant="line" className="mt-10" />
+
+      {/* === Archief === */}
+      <div className="mt-8">
+        <RekeningTag label="archief">
+          <SectionLabel>Eerder verschenen</SectionLabel>
+
+          {configsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent" />
+            </div>
+          ) : savedConfigs.length === 0 ? (
+            // Type 9 Empty-state
+            <div className="mx-auto max-w-md py-12 px-4 text-center">
+              <FileText className="mx-auto mb-4 h-8 w-8 text-[var(--ink-3)]" aria-hidden />
+              <p
+                className="mb-2 text-xl text-[var(--ink)]"
+                style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              >
+                Je archief is leeg.
+              </p>
+              <p
+                className="italic text-[15px] leading-relaxed text-[var(--ink-2)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                Genereer je eerste rapport hierboven. Het verschijnt hier zodra het klaar is.
+              </p>
+            </div>
+          ) : (
+            <ul className="-mx-2">
+              {savedConfigs.map((config, idx) => (
+                <Fragment key={config.id}>
+                  <li className="group flex items-center gap-3 px-2 py-3 transition-colors hover:bg-[var(--subtle)]">
+                    <span
+                      className="mr-1 min-w-[2.5ch] shrink-0 italic text-sm text-[var(--module-active-700)]"
+                      style={{ fontFamily: 'var(--font-playfair, serif)' }}
+                      aria-hidden
+                    >
+                      {ROMAN[idx] ?? `${idx + 1}`}.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleView(config)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="truncate text-sm text-[var(--ink)]"
+                          style={{ fontFamily: 'var(--font-playfair, serif)' }}
+                        >
+                          {config.name}
+                        </span>
+                        {config.use_ai && (
+                          <span className="shrink-0 border border-[var(--module-active-300)] bg-[var(--module-active-50)]/40 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--module-active-700)]">
+                            AI
+                          </span>
+                        )}
+                      </div>
+                      <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.10em] text-[var(--ink-3)]">
+                        {formatTimestamp(config.date_from)} – {formatTimestamp(config.date_to)}
+                      </span>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleView(config)}
+                        className="p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)]"
+                        title="Bekijken"
+                        aria-label={`Bekijk ${config.name}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(config.id)}
+                        className="p-2 text-[var(--ink-4)] transition-colors hover:bg-[var(--negative)]/10 hover:text-[var(--negative)]"
+                        title="Verwijderen"
+                        aria-label={`Verwijder ${config.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </li>
+                  {/* Dotted ritme tussen rijen — niet onder laatste */}
+                  {idx < savedConfigs.length - 1 && (
+                    <li
+                      aria-hidden
+                      className="border-b border-dotted border-[var(--rule-soft)]"
+                    />
+                  )}
+                </Fragment>
+              ))}
+            </ul>
+          )}
+        </RekeningTag>
       </div>
+
+      {/* Footer */}
+      <SectionDivider variant="double-rule" className="mt-10" />
+      <OrnamentColophon
+        module="Archief"
+        text={formatTimestamp(new Date().toISOString())}
+      />
     </div>
   )
 }

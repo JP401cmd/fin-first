@@ -4,7 +4,6 @@ import { memo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
-import { formatCurrency } from '@/lib/format'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
 import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
 import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-events-in-phase'
@@ -22,6 +21,7 @@ import { ASSET_TYPE_LABELS, type AssetType, type Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -196,7 +196,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
         {/* 2. Fase-header — compact summary line */}
         <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
-            Opbouw &middot; {formatCurrency(Math.round(startVermogen))} &rarr; {formatCurrency(Math.round(eindVermogen))} &middot; {yearsAccumulation} jaar
+            Opbouw &middot; {<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} &middot; {yearsAccumulation} jaar
           </p>
         </div>
 
@@ -214,9 +214,9 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
 
           {/* Waterval receipt rows */}
           <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-            <ReceiptRow label="Startvermogen" value={formatCurrency(Math.round(startVermogen))} />
-            <ReceiptRow label="Totale inleg" value={formatCurrency(Math.round(totalInleg))} positive />
-            <ReceiptRow label="Totaal rendement" value={formatCurrency(Math.round(totalRendement))} positive />
+            <ReceiptRow label="Startvermogen" value={<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} />
+            <ReceiptRow label="Totale inleg" value={<MaskedAmount value={Math.round(totalInleg)} tone="horizon" />} positive />
+            <ReceiptRow label="Totaal rendement" value={<MaskedAmount value={Math.round(totalRendement)} tone="horizon" />} positive />
 
             {/* Rendement sub-breakdown per wealthgroup */}
             {activeTypes.length > 1 && (
@@ -225,7 +225,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
                   <ReceiptRow
                     key={type}
                     label={wealthGroupLabel(type)}
-                    value={formatCurrency(Math.round(growthByType[type] ?? 0))}
+                    value={<MaskedAmount value={Math.round(growthByType[type] ?? 0)} tone="horizon" />}
                     subtle
                   />
                 ))}
@@ -234,15 +234,15 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
 
             <ReceiptRow
               label="Box 3 belasting"
-              value={totalBox3 > 0 ? `\u2212${formatCurrency(Math.round(totalBox3)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
+              value={totalBox3 > 0 ? <MaskedAmount value={Math.round(totalBox3)} signPrefix="-" tone="horizon" /> : <MaskedAmount value={0} tone="horizon" />}
               negative={totalBox3 > 0}
             />
             {Math.abs(totalEvents) > 0.5 && (
               <ReceiptRow
                 label="Life events"
                 value={totalEvents >= 0
-                  ? formatCurrency(Math.round(totalEvents))
-                  : `\u2212${formatCurrency(Math.round(Math.abs(totalEvents))).replace('\u20AC', '\u20AC ')}`}
+                  ? <MaskedAmount value={Math.round(totalEvents)} tone="horizon" />
+                  : <MaskedAmount value={Math.round(Math.abs(totalEvents))} signPrefix="-" tone="horizon" />}
                 positive={totalEvents > 0}
                 negative={totalEvents < 0}
               />
@@ -250,7 +250,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
             {totalAfgelost > 0.5 && (
               <ReceiptRow
                 label="Schuldaflossing"
-                value={formatCurrency(Math.round(totalAfgelost))}
+                value={<MaskedAmount value={Math.round(totalAfgelost)} tone="horizon" />}
                 positive
               />
             )}
@@ -260,7 +260,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
             <span className="font-sans text-sm text-[var(--ink)]">Vermogen bij FIRE</span>
             <span className="font-mono tabular-nums text-[var(--ink)]">
-              {formatCurrency(Math.round(eindVermogen))}
+              {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />}
             </span>
           </div>
         </KassabonShell>
@@ -423,7 +423,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
 
 // ── Assumption row helper ────────────────────────────────────────────────────
 
-function AssumptionRow({ label, value }: { label: string; value: string }) {
+function AssumptionRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between py-0.5">
       <span className="font-sans text-xs text-[var(--ink-3)]">{label}</span>

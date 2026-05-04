@@ -10,6 +10,7 @@ import {
   loadConnectionsByDebtIds,
   type AssetConnectionSummary,
 } from '@/lib/connections-data'
+import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { DebtCategoryPage } from '@/components/core/debt-category-page'
 
 // ── Type guards ──────────────────────────────────────────────
@@ -93,12 +94,19 @@ export default async function DebtCategoryServerPage({
     }
   }
 
+  // Per-debt sparklines voor de items-grid. Faalt non-fataal: lege map →
+  // kaarten tonen alleen de tweelagentint zonder breuklijn.
+  const debtSparklines = debts.length > 0
+    ? await loadEntitySparklines(supabase, 'debt', debts.map((d) => d.id))
+    : {}
+
   return (
     <DebtCategoryPage
       type={type}
       initialDebts={debts}
       initialKpiRefs={kpiRefs ?? undefined}
       initialConnectionsByDebtId={connectionsByDebtId}
+      initialDebtSparklines={debtSparklines}
     />
   )
 }

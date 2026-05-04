@@ -35,7 +35,8 @@ import {
   type AmortizationRow,
   type RepaymentType,
 } from '@/lib/debt-data'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -68,6 +69,8 @@ export function AmortisationChart({
   repaymentType,
   kicker = 'Rente vs aflossing per jaar',
 }: AmortisationChartProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Bouw schedule via de juiste engine — branche per repayment-type.
   // We hergebruiken de bestaande functies uit `lib/debt-data.ts` in plaats
   // van de math hier te dupliceren.
@@ -201,7 +204,7 @@ export function AmortisationChart({
                   className="fill-[var(--ink-4)]"
                   style={{ fontSize: '9px', fontFamily: 'var(--font-mono)' }}
                 >
-                  {tick === 0 ? '0' : formatCurrency(tick).replace(/\s/g, '')}
+                  {tick === 0 ? '0' : fc(tick).replace(/\s/g, '')}
                 </text>
               </g>
             )
@@ -235,8 +238,8 @@ export function AmortisationChart({
                   }}
                 >
                   <title>
-                    Jaar {y.year} — rente {formatCurrency(y.interest)}, aflossing{' '}
-                    {formatCurrency(y.principal)}
+                    Jaar {y.year} — rente {fc(y.interest)}, aflossing{' '}
+                    {fc(y.principal)}
                   </title>
                 </rect>
                 {/* Aflossing-segment (boven) — kern-700 */}
@@ -257,7 +260,7 @@ export function AmortisationChart({
                   }}
                 >
                   <title>
-                    Jaar {y.year} — aflossing {formatCurrency(y.principal)}
+                    Jaar {y.year} — aflossing {fc(y.principal)}
                   </title>
                 </rect>
               </g>

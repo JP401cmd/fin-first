@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Check, X, Loader2, ChevronDown, AlertTriangle } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { formatCurrency } from '@/lib/format'
+
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -303,7 +304,7 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <p className="font-mono text-sm tabular-nums text-[var(--ink)]">
-                        {formatCurrency(row.suggestion.monthlyAmount)}/mnd
+                        {<MaskedAmount value={row.suggestion.monthlyAmount} tone="wil" />}/mnd
                       </p>
                     </div>
                   </div>
@@ -382,7 +383,7 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <p className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
-                            {formatCurrency(s.monthlyAmount)}/mnd
+                            {<MaskedAmount value={s.monthlyAmount} tone="wil" />}/mnd
                           </p>
                           <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                             Overslaan

@@ -14,6 +14,7 @@ import { DEFAULT_RETURN } from '@/lib/constants'
 import { X, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { Kicker, ScenarioCallout } from '@/components/editorial'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 const STRATEGY_INFO: Record<WithdrawalStrategy, { label: string; description: string }> = {
   classic: {
@@ -314,7 +315,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
                   }}
                 >
-                  {formatCurrency(result.monthlyWithdrawal)}
+                  {<MaskedAmount value={result.monthlyWithdrawal} tone="horizon" />}
                 </span>
               </div>
               <div
@@ -352,7 +353,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                 className="text-[26px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
-                {formatCurrency(result.schedule[0]?.startBalance ?? 0)}
+                {<MaskedAmount value={result.schedule[0]?.startBalance ?? 0} tone="horizon" />}
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -365,7 +366,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
 
           {/* NL-specific AOW info — scenario-callout stijl */}
           <ScenarioCallout title="AOW en je opnamestrategie">
-            Tot {NL_AOW_AGE}: volledig uit vermogen. Vanaf {NL_AOW_AGE}: AOW ({formatCurrency(NL_AOW_MONTHLY)}/mnd alleenstaand)
+            Tot {NL_AOW_AGE}: volledig uit vermogen. Vanaf {NL_AOW_AGE}: AOW ({<MaskedAmount value={NL_AOW_MONTHLY} tone="horizon" />}/mnd alleenstaand)
             + aanvulling uit je portfolio. Dit verlaagt je opname aanzienlijk.
           </ScenarioCallout>
 
@@ -406,14 +407,14 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                     {result.schedule.map((row) => (
                       <tr key={row.age} className={row.endBalance <= 0 ? 'bg-red-50/50' : ''}>
                         <td className="px-3 py-2 font-medium text-[var(--ink-2)]">{row.age}</td>
-                        <td className="px-3 py-2 text-right text-[var(--ink-2)]">{formatCurrency(row.startBalance)}</td>
-                        <td className="px-3 py-2 text-right text-red-600">-{formatCurrency(row.withdrawal)}</td>
+                        <td className="px-3 py-2 text-right text-[var(--ink-2)]">{<MaskedAmount value={row.startBalance} tone="horizon" />}</td>
+                        <td className="px-3 py-2 text-right text-red-600">-{<MaskedAmount value={row.withdrawal} tone="horizon" />}</td>
                         <td className="px-3 py-2 text-right text-emerald-600">
                           {row.aowIncome > 0 ? formatCurrency(row.aowIncome) : '-'}
                         </td>
-                        <td className="px-3 py-2 text-right text-[var(--ink-2)]">{formatCurrency(row.growth)}</td>
+                        <td className="px-3 py-2 text-right text-[var(--ink-2)]">{<MaskedAmount value={row.growth} tone="horizon" />}</td>
                         <td className={`px-3 py-2 text-right font-medium ${row.endBalance <= 0 ? 'text-red-600' : 'text-[var(--ink)]'}`}>
-                          {formatCurrency(row.endBalance)}
+                          {<MaskedAmount value={row.endBalance} tone="horizon" />}
                         </td>
                       </tr>
                     ))}

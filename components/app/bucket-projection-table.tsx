@@ -8,6 +8,7 @@ import { REPAYMENT_TYPE_LABELS } from '@/lib/debt-data'
 import { formatCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
 import { ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react'
 import { FinTable } from '@/components/app/fin-table'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 /**
  * Per-bucket projection table with expandable asset details, debt summaries,
@@ -94,7 +95,7 @@ export function BucketProjectionTable({
                 <div className="mt-1 grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs sm:grid-cols-3">
                   <AssumptionRow
                     label="Jaarinkomen"
-                    value={formatCurrency(assumptions.estimatedYearlyIncome ?? cf.monthlyIncome * 12)}
+                    value={<MaskedAmount value={assumptions.estimatedYearlyIncome ?? cf.monthlyIncome * 12} tone="horizon" />}
                     source="Kern (geschat)"
                   />
                   <AssumptionRow label="Vaste lasten" value={`${formatCurrency(cf.impliedLivingExpenses)}/mo`} source="Transacties" />
@@ -134,7 +135,7 @@ export function BucketProjectionTable({
                 />
                 <AssumptionRow
                   label="Heffingsvrij"
-                  value={formatCurrency(heffingsvrij)}
+                  value={<MaskedAmount value={heffingsvrij} tone="horizon" />}
                   source={assumptions.hasPartner ? 'Profiel (fiscaal partner)' : 'Profiel (alleenstaand)'}
                 />
                 <AssumptionRow label="Horizon" value={`${horizonYears} jaar`} source="Vast" />
@@ -209,11 +210,11 @@ export function BucketProjectionTable({
               {/* Total assets row */}
               <FinTable.Row total>
                 <FinTable.Td bold>Totaal bezittingen</FinTable.Td>
-                <FinTable.Td numeric bold>{formatCurrency(totalCurrentAssets)}</FinTable.Td>
+                <FinTable.Td numeric bold>{<MaskedAmount value={totalCurrentAssets} tone="horizon" />}</FinTable.Td>
                 <FinTable.Td />
                 <FinTable.Td />
-                <FinTable.Td numeric bold>{formatCurrency(deflate(totalAssets1y, factor1y))}</FinTable.Td>
-                <FinTable.Td numeric bold>{formatCurrency(deflate(totalAssetsEnd, factorEnd))}</FinTable.Td>
+                <FinTable.Td numeric bold>{<MaskedAmount value={deflate(totalAssets1y, factor1y)} tone="horizon" />}</FinTable.Td>
+                <FinTable.Td numeric bold>{<MaskedAmount value={deflate(totalAssetsEnd, factorEnd)} tone="horizon" />}</FinTable.Td>
               </FinTable.Row>
             </FinTable.Body>
           </FinTable>
@@ -244,11 +245,11 @@ export function BucketProjectionTable({
               {/* Total debts row */}
               <FinTable.Row total>
                 <FinTable.Td bold>Totaal schulden</FinTable.Td>
-                <FinTable.Td numeric bold color="text-red-600">{formatCurrency(totalCurrentDebts)}</FinTable.Td>
+                <FinTable.Td numeric bold color="text-red-600">{<MaskedAmount value={totalCurrentDebts} tone="horizon" />}</FinTable.Td>
                 <FinTable.Td />
                 <FinTable.Td />
-                <FinTable.Td numeric bold color="text-red-600">{formatCurrency(deflate(totalDebts1y, factor1y))}</FinTable.Td>
-                <FinTable.Td numeric bold color="text-red-600">{formatCurrency(deflate(totalDebtsEnd, factorEnd))}</FinTable.Td>
+                <FinTable.Td numeric bold color="text-red-600">{<MaskedAmount value={deflate(totalDebts1y, factor1y)} tone="horizon" />}</FinTable.Td>
+                <FinTable.Td numeric bold color="text-red-600">{<MaskedAmount value={deflate(totalDebtsEnd, factorEnd)} tone="horizon" />}</FinTable.Td>
               </FinTable.Row>
             </FinTable.Body>
           </FinTable>
@@ -285,14 +286,14 @@ export function BucketProjectionTable({
                       </div>
                     </FinTable.Td>
                     <FinTable.Td numeric color="text-orange-600">
-                      {formatCurrency(cost.current)}/jr
+                      {<MaskedAmount value={cost.current} tone="horizon" />}/jr
                     </FinTable.Td>
                     <FinTable.Td colSpan={2} />
                     <FinTable.Td numeric color="text-orange-600">
-                      {formatCurrency(deflate(cost.cumulative1y, factor1y))}
+                      {<MaskedAmount value={deflate(cost.cumulative1y, factor1y)} tone="horizon" />}
                     </FinTable.Td>
                     <FinTable.Td numeric color="text-orange-600">
-                      {formatCurrency(deflate(cumulEnd, factorEnd))}
+                      {<MaskedAmount value={deflate(cumulEnd, factorEnd)} tone="horizon" />}
                     </FinTable.Td>
                   </FinTable.Row>
                 )
@@ -304,12 +305,12 @@ export function BucketProjectionTable({
                 <FinTable.Td colSpan={2} />
                 <FinTable.Td />
                 <FinTable.Td numeric bold color="text-orange-600">
-                  {formatCurrency(deflate(
+                  {<MaskedAmount value={deflate(
                     isLongHorizon
                       ? (rows[rows.length - 1]?.cumulativeBox3Tax ?? costSummaries.reduce((s, c) => s + c.cumulative5y, 0))
                       : costSummaries.reduce((s, c) => s + c.cumulative5y, 0),
                     factorEnd
-                    ))}
+                    )} tone="horizon" />}
                 </FinTable.Td>
               </FinTable.Row>
             </FinTable.Body>
@@ -327,20 +328,20 @@ export function BucketProjectionTable({
             <div className="flex items-center justify-between">
               <span className="text-[var(--ink-2)]">Inkomen</span>
               <span className="font-mono tabular-nums text-[var(--ink)]">
-                {formatCurrency(projection.cashFlowSummary.monthlyIncome)}/mo
+                {<MaskedAmount value={projection.cashFlowSummary.monthlyIncome} tone="horizon" />}/mo
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[var(--ink-2)]">{'\u2212'} Vaste lasten</span>
               <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                {formatCurrency(projection.cashFlowSummary.impliedLivingExpenses)}/mo
+                {<MaskedAmount value={projection.cashFlowSummary.impliedLivingExpenses} tone="horizon" />}/mo
               </span>
             </div>
             {projection.cashFlowSummary.totalDebtPayments > 0 && (
               <div className="flex items-center justify-between">
                 <span className="text-[var(--ink-2)]">{'\u2212'} Aflossing schulden</span>
                 <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(projection.cashFlowSummary.totalDebtPayments)}/mo
+                  {<MaskedAmount value={projection.cashFlowSummary.totalDebtPayments} tone="horizon" />}/mo
                 </span>
               </div>
             )}
@@ -348,21 +349,21 @@ export function BucketProjectionTable({
               <div className="flex items-center justify-between">
                 <span className="text-[var(--ink-2)]">{'\u2212'} Inleg bezittingen</span>
                 <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(projection.cashFlowSummary.totalAssetContributions)}/mo
+                  {<MaskedAmount value={projection.cashFlowSummary.totalAssetContributions} tone="horizon" />}/mo
                 </span>
               </div>
             )}
             <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-1.5 font-semibold">
               <span className="text-[var(--ink)]">= Resterend surplus</span>
               <span className={`font-mono tabular-nums ${projection.cashFlowSummary.monthlySurplus >= 0 ? 'text-[var(--ink)]' : 'text-red-500'}`}>
-                {formatCurrency(projection.cashFlowSummary.monthlySurplus)}/mo
+                {<MaskedAmount value={projection.cashFlowSummary.monthlySurplus} tone="horizon" />}/mo
               </span>
             </div>
             {projection.cashFlowSummary.isOvercommitted && (
               <div className="mt-2 flex items-start gap-2 rounded-[var(--r-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
-                  Inleg + aflossing is {formatCurrency(projection.cashFlowSummary.overcommitAmount)}/mo meer dan je inkomen.
+                  Inleg + aflossing is {<MaskedAmount value={projection.cashFlowSummary.overcommitAmount} tone="horizon" />}/mo meer dan je inkomen.
                   Controleer of je geplande bijdragen realistisch zijn.
                 </span>
               </div>
@@ -377,23 +378,23 @@ export function BucketProjectionTable({
         <div className="mb-3 space-y-1.5 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-[var(--ink-2)]">Bezittingen ({endColLabel})</span>
-            <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(deflate(endSnapshot.totalAssets, endSnapshot.inflationFactor))}</span>
+            <span className="font-mono tabular-nums text-[var(--ink)]">{<MaskedAmount value={deflate(endSnapshot.totalAssets, endSnapshot.inflationFactor)} tone="horizon" />}</span>
           </div>
           {totalCurrentDebts > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-[var(--ink-2)]">− Schulden ({endColLabel})</span>
-              <span className="font-mono tabular-nums text-red-600">− {formatCurrency(deflate(endSnapshot.totalDebts, endSnapshot.inflationFactor))}</span>
+              <span className="font-mono tabular-nums text-red-600">− {<MaskedAmount value={deflate(endSnapshot.totalDebts, endSnapshot.inflationFactor)} tone="horizon" />}</span>
             </div>
           )}
           {endSnapshot.totalCosts > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-[var(--ink-2)]">− Kosten (cumulatief {endColLabel})</span>
-              <span className="font-mono tabular-nums text-orange-600">− {formatCurrency(deflate(endSnapshot.totalCosts, endSnapshot.inflationFactor))}</span>
+              <span className="font-mono tabular-nums text-orange-600">− {<MaskedAmount value={deflate(endSnapshot.totalCosts, endSnapshot.inflationFactor)} tone="horizon" />}</span>
             </div>
           )}
           <div className="border-t border-[var(--border-md)] pt-1.5 flex items-center justify-between font-semibold">
             <span className="text-[var(--ink)]">= Netto vermogen</span>
-            <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(deflate(endSnapshot.netWorth, endSnapshot.inflationFactor))}</span>
+            <span className="font-mono tabular-nums text-[var(--ink)]">{<MaskedAmount value={deflate(endSnapshot.netWorth, endSnapshot.inflationFactor)} tone="horizon" />}</span>
           </div>
         </div>
 
@@ -401,30 +402,30 @@ export function BucketProjectionTable({
         <div className="flex flex-wrap items-center gap-4 text-sm border-t border-dashed border-[var(--border-ed)] pt-3">
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">Nu</div>
-            <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(currentNetWorth)}</div>
+            <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{<MaskedAmount value={currentNetWorth} tone="horizon" />}</div>
           </div>
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">1 jaar</div>
-            <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(deflate(projection.year1.netWorth, projection.year1.inflationFactor))}</div>
+            <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{<MaskedAmount value={deflate(projection.year1.netWorth, projection.year1.inflationFactor)} tone="horizon" />}</div>
           </div>
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">3 jaar</div>
-            <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(deflate(projection.year3.netWorth, projection.year3.inflationFactor))}</div>
+            <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{<MaskedAmount value={deflate(projection.year3.netWorth, projection.year3.inflationFactor)} tone="horizon" />}</div>
           </div>
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">5 jaar</div>
-            <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(deflate(projection.year5.netWorth, projection.year5.inflationFactor))}</div>
+            <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{<MaskedAmount value={deflate(projection.year5.netWorth, projection.year5.inflationFactor)} tone="horizon" />}</div>
           </div>
           {projection.year10 && (
             <div className="text-center">
               <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">10 jaar</div>
-              <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(deflate(projection.year10.netWorth, projection.year10.inflationFactor))}</div>
+              <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{<MaskedAmount value={deflate(projection.year10.netWorth, projection.year10.inflationFactor)} tone="horizon" />}</div>
             </div>
           )}
           {projection.year20 && (
             <div className="text-center">
               <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">20 jaar</div>
-              <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(deflate(projection.year20.netWorth, projection.year20.inflationFactor))}</div>
+              <div className="font-mono font-semibold tabular-nums text-[var(--ink)]">{<MaskedAmount value={deflate(projection.year20.netWorth, projection.year20.inflationFactor)} tone="horizon" />}</div>
             </div>
           )}
           {dailyExpenses && dailyExpenses > 0 && (
@@ -489,15 +490,15 @@ export function BucketProjectionTable({
                       return (
                         <FinTable.Row key={row.month} className="border-b border-dotted border-[var(--border-ed)]">
                           <FinTable.Td numeric muted>{year}</FinTable.Td>
-                          <FinTable.Td numeric>{formatCurrency(yearlyIncome / f)}</FinTable.Td>
-                          <FinTable.Td numeric color="text-kern-600">{formatCurrency(yearlyInleg / f)}</FinTable.Td>
+                          <FinTable.Td numeric>{<MaskedAmount value={yearlyIncome / f} tone="horizon" />}</FinTable.Td>
+                          <FinTable.Td numeric color="text-kern-600">{<MaskedAmount value={yearlyInleg / f} tone="horizon" />}</FinTable.Td>
                           <FinTable.Td numeric color="text-kern-600">
                             {kernSpaarquote != null ? `${kernSpaarquote.toFixed(1)}%` : '—'}
                           </FinTable.Td>
-                          <FinTable.Td numeric>{formatCurrency(row.netWorth / f)}</FinTable.Td>
-                          <FinTable.Td numeric color="text-orange-600">{formatCurrency(row.cumulativeBox3Tax / f)}</FinTable.Td>
+                          <FinTable.Td numeric>{<MaskedAmount value={row.netWorth / f} tone="horizon" />}</FinTable.Td>
+                          <FinTable.Td numeric color="text-orange-600">{<MaskedAmount value={row.cumulativeBox3Tax / f} tone="horizon" />}</FinTable.Td>
                           <FinTable.Td numeric color={growth >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                            {idx === 0 ? '—' : `${growth >= 0 ? '+' : ''}${formatCurrency(growth / f)}`}
+                            {idx === 0 ? '—' : <MaskedAmount value={growth / f} signPrefix={growth >= 0 ? '+' : ''} tone="horizon" />}
                           </FinTable.Td>
                           <FinTable.Td numeric muted>{row.inflationFactor.toFixed(3)}×</FinTable.Td>
                         </FinTable.Row>
@@ -562,7 +563,7 @@ function BucketRow({
           </div>
         </td>
         <td className="py-2 px-3 text-right font-mono tabular-nums text-[var(--ink)]">
-          {formatCurrency(bucket.currentValue)}
+          {<MaskedAmount value={bucket.currentValue} tone="horizon" />}
         </td>
         <td className="py-2 px-3 text-right font-mono tabular-nums text-[var(--ink-2)]">
           {(bucket.weightedReturn * 100).toFixed(1)}%
@@ -571,10 +572,10 @@ function BucketRow({
           {bucket.box3DragPct > 0 ? `${bucket.box3DragPct.toFixed(2)}%` : '—'}
         </td>
         <td className="py-2 px-3 text-right font-mono tabular-nums text-[var(--ink)]">
-          {formatCurrency(deflate(bucket.projected1y, factor1y))}
+          {<MaskedAmount value={deflate(bucket.projected1y, factor1y)} tone="horizon" />}
         </td>
         <td className="py-2 pl-3 text-right font-mono tabular-nums text-[var(--ink)]">
-          {formatCurrency(deflate(endValue, endFactor))}
+          {<MaskedAmount value={deflate(endValue, endFactor)} tone="horizon" />}
         </td>
       </tr>
 
@@ -585,17 +586,17 @@ function BucketRow({
             <span className="text-xs text-[var(--ink-2)]">{asset.name}</span>
           </td>
           <td className="py-1.5 px-3 text-right font-mono text-xs tabular-nums text-[var(--ink-2)]">
-            {formatCurrency(asset.currentValue)}
+            {<MaskedAmount value={asset.currentValue} tone="horizon" />}
           </td>
           <td className="py-1.5 px-3 text-right font-mono text-xs tabular-nums text-[var(--ink-3)]">
             {asset.expectedReturn.toFixed(1)}%
           </td>
           <td className="py-1.5 px-3" />
           <td className="py-1.5 px-3 text-right font-mono text-xs tabular-nums text-[var(--ink-2)]">
-            {formatCurrency(deflate(asset.projected1y, factor1y))}
+            {<MaskedAmount value={deflate(asset.projected1y, factor1y)} tone="horizon" />}
           </td>
           <td className="py-1.5 pl-3 text-right font-mono text-xs tabular-nums text-[var(--ink-2)]">
-            {formatCurrency(deflate(asset.projected5y, factorEnd))}
+            {<MaskedAmount value={deflate(asset.projected5y, factorEnd)} tone="horizon" />}
           </td>
         </tr>
       ))}
@@ -626,19 +627,19 @@ function DebtRow({ debt, showReal, factor1y, factorEnd, isLongHorizon }: {
         </div>
       </td>
       <td className="py-2 px-3 text-right font-mono tabular-nums text-red-600">
-        {formatCurrency(debt.currentBalance)}
+        {<MaskedAmount value={debt.currentBalance} tone="horizon" />}
       </td>
       <td className="py-2 px-3 text-right font-mono tabular-nums text-[var(--ink-2)]">
         {debt.interestRate.toFixed(1)}%
       </td>
       <td className="py-2 px-3 text-right font-mono tabular-nums text-[var(--ink-2)]">
-        {formatCurrency(debt.monthlyPayment)}
+        {<MaskedAmount value={debt.monthlyPayment} tone="horizon" />}
       </td>
       <td className="py-2 px-3 text-right font-mono tabular-nums text-red-600">
-        {formatCurrency(deflate(debt.projected1y, factor1y))}
+        {<MaskedAmount value={deflate(debt.projected1y, factor1y)} tone="horizon" />}
       </td>
       <td className="py-2 pl-3 text-right font-mono tabular-nums text-red-600">
-        {formatCurrency(deflate(endValue, factorEnd))}
+        {<MaskedAmount value={deflate(endValue, factorEnd)} tone="horizon" />}
       </td>
     </tr>
   )
@@ -646,7 +647,7 @@ function DebtRow({ debt, showReal, factor1y, factorEnd, isLongHorizon }: {
 
 function AssumptionRow({ label, value, source, highlight }: {
   label: string
-  value: string
+  value: React.ReactNode
   source: string
   highlight?: boolean
 }) {

@@ -3,7 +3,7 @@ import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { TrendingUp } from 'lucide-react'
 
 interface Props {
@@ -100,8 +100,8 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
         <p className="mt-0.5 text-xs text-[var(--ink-3)]">
           totaalrendement
         </p>
-        <p className={`mt-1 font-mono text-xs tabular-nums ${returnColor}`}>
-          {formatCurrency(sinceInceptionAbsolute)}
+        <p className={`mt-1 ${returnColor}`}>
+          <MaskedAmount value={sinceInceptionAbsolute} tone="kern" className="text-xs" />
         </p>
       </WidgetShell>
     )
@@ -123,7 +123,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
           </p>
         </div>
         <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-          totaalrendement &middot; {formatCurrency(sinceInceptionAbsolute)}
+          totaalrendement &middot; <MaskedAmount value={sinceInceptionAbsolute} tone="kern" />
         </p>
 
         {/* Sparkline SVG */}
@@ -158,11 +158,11 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
               return (
                 <div key={asset.type} className="flex items-center justify-between text-xs">
                   <span className="text-[var(--ink-3)] w-24 truncate">{label}</span>
-                  <span className="font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(asset.value)}
+                  <span className="text-[var(--ink)]">
+                    <MaskedAmount value={asset.value} tone="kern" />
                   </span>
-                  <span className={`font-mono tabular-nums ${rowColor}`}>
-                    {formatCurrency(gain)}
+                  <span className={rowColor}>
+                    <MaskedAmount value={gain} tone="kern" />
                   </span>
                   <span className={`font-mono tabular-nums w-14 text-right ${rowColor}`}>
                     {gain >= 0 ? '+' : ''}{pct.toFixed(1)}%
@@ -209,8 +209,8 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
           <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
             totaalrendement
           </p>
-          <p className={`mt-0.5 font-mono text-[11px] tabular-nums ${returnColor}`}>
-            {formatCurrency(sinceInceptionAbsolute)}
+          <p className={`mt-0.5 ${returnColor}`}>
+            <MaskedAmount value={sinceInceptionAbsolute} tone="kern" className="text-[11px]" />
           </p>
           <div className="mt-1.5 space-y-0.5">
             <p className="font-serif italic text-[11px] text-[var(--ink-3)]">

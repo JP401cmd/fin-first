@@ -20,7 +20,8 @@
 
 import { useMemo, useState } from 'react'
 import { Info } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -58,6 +59,8 @@ export function WaardestijgingSlider({
   initialValue = DEFAULT_VALUE,
   onChange,
 }: WaardestijgingSliderProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const [value, setValue] = useState(initialValue)
   const [showTooltip, setShowTooltip] = useState(false)
 
@@ -142,14 +145,14 @@ export function WaardestijgingSlider({
           <span className="font-mono tabular-nums">{PROJECTION_YEARS}</span> jaar
           naar{' '}
           <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
-            {formatCurrency(projected)}
+            {fc(projected)}
           </span>
           .
         </p>
         <p className="mt-1 text-[11px] text-[var(--ink-3)]">
           Dat is{' '}
           <span className="font-mono tabular-nums text-positive">
-            +{formatCurrency(delta)}
+            +{fc(delta)}
           </span>{' '}
           aan verwachte waardestijging.
         </p>

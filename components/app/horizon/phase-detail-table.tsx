@@ -3,11 +3,13 @@
 import { useState, useMemo, Fragment } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { FinTable } from '@/components/app/fin-table'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 import type { Debt } from '@/lib/debt-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -90,6 +92,7 @@ interface DetailPanelProps {
 }
 
 function DetailPanel({ row, d, debtLabelMap, colSpan }: DetailPanelProps) {
+  const { masked } = useMaskedAmounts()
   // Collect asset buckets with value > 0
   const activeBuckets = Object.entries(row.assetBuckets)
     .filter(([, b]) => b && (Math.abs(b.startValue) > 0.5 || Math.abs(b.endValue) > 0.5))
@@ -149,16 +152,16 @@ function DetailPanel({ row, d, debtLabelMap, colSpan }: DetailPanelProps) {
                             {SHORT_ASSET_LABELS[type] ?? ASSET_TYPE_LABELS[type]}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                            {formatCurrency(d(bucket.startValue))}
+                            {<MaskedAmount value={d(bucket.startValue)} tone="horizon" />}
                           </td>
                           <td className={cx('py-1 text-right font-mono tabular-nums', colorClass(bucket.growth))}>
-                            {formatCurrency(d(bucket.growth))}
+                            {<MaskedAmount value={d(bucket.growth)} tone="horizon" />}
                           </td>
                           <td className={cx('py-1 text-right font-mono tabular-nums', colorClass(bucket.contributions))}>
-                            {formatCurrency(d(bucket.contributions))}
+                            {<MaskedAmount value={d(bucket.contributions)} tone="horizon" />}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums font-medium text-[var(--ink)]">
-                            {formatCurrency(d(bucket.endValue))}
+                            {<MaskedAmount value={d(bucket.endValue)} tone="horizon" />}
                           </td>
                         </tr>
                       ))}
@@ -189,7 +192,7 @@ function DetailPanel({ row, d, debtLabelMap, colSpan }: DetailPanelProps) {
                             {SHORT_ASSET_LABELS[type as AssetType] ?? ASSET_TYPE_LABELS[type as AssetType]}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums text-[var(--negative)]">
-                            −{formatCurrency(d(amount)).replace('€', '€ ').trim()}
+                            −{formatMaskedCurrency(d(amount), masked).replace('€', '€ ').trim()}
                           </td>
                         </tr>
                       ))}
@@ -223,16 +226,16 @@ function DetailPanel({ row, d, debtLabelMap, colSpan }: DetailPanelProps) {
                             {debtLabelMap[debtId] ?? debtId.slice(0, 8)}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                            {formatCurrency(d(db.startBalance))}
+                            {<MaskedAmount value={d(db.startBalance)} tone="horizon" />}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums text-[var(--negative)]">
-                            −{formatCurrency(d(db.interestPaid)).replace('€', '€ ').trim()}
+                            −{formatMaskedCurrency(d(db.interestPaid), masked).replace('€', '€ ').trim()}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                            {formatCurrency(d(db.principalPaid))}
+                            {<MaskedAmount value={d(db.principalPaid)} tone="horizon" />}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums font-medium text-[var(--ink)]">
-                            {formatCurrency(d(db.endBalance))}
+                            {<MaskedAmount value={d(db.endBalance)} tone="horizon" />}
                           </td>
                         </tr>
                       ))}
@@ -263,7 +266,7 @@ function DetailPanel({ row, d, debtLabelMap, colSpan }: DetailPanelProps) {
                             {SHORT_ASSET_LABELS[type] ?? ASSET_TYPE_LABELS[type]}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums text-[var(--negative)]">
-                            −{formatCurrency(d(bucket.box3Drag)).replace('€', '€ ').trim()}
+                            −{formatMaskedCurrency(d(bucket.box3Drag), masked).replace('€', '€ ').trim()}
                           </td>
                         </tr>
                       ))}
@@ -279,7 +282,7 @@ function DetailPanel({ row, d, debtLabelMap, colSpan }: DetailPanelProps) {
                 Netto vermogen (assets − schulden)
               </span>
               <span className={cx('text-xs font-semibold font-mono tabular-nums', colorClass(netWorth))}>
-                {formatCurrency(d(netWorth))}
+                {<MaskedAmount value={d(netWorth)} tone="horizon" />}
               </span>
             </div>
           </div>
@@ -298,6 +301,7 @@ export function PhaseDetailTable({
   showAssetDetail = false,
   debts,
 }: PhaseDetailTableProps) {
+  const { masked } = useMaskedAmounts()
   const [expanded, setExpanded] = useState(false)
   const [showReal, setShowReal] = useState(false)
   const [expandedAge, setExpandedAge] = useState<number | null>(null)
@@ -455,7 +459,7 @@ export function PhaseDetailTable({
                         }
                       </FinTable.Td>
                       <FinTable.Td>{row.age}</FinTable.Td>
-                      <FinTable.Td numeric>{formatCurrency(d(row.startNetWorth))}</FinTable.Td>
+                      <FinTable.Td numeric>{<MaskedAmount value={d(row.startNetWorth)} tone="horizon" />}</FinTable.Td>
 
                       {isAccumulation ? (
                         <>
@@ -465,46 +469,46 @@ export function PhaseDetailTable({
                               const growth = bucket?.growth ?? 0
                               return (
                                 <FinTable.Td key={t} numeric color={colorClass(growth)}>
-                                  {formatCurrency(d(growth))}
+                                  {<MaskedAmount value={d(growth)} tone="horizon" />}
                                 </FinTable.Td>
                               )
                             })
                           ) : (
                             <>
                               <FinTable.Td numeric color={colorClass(savingsGrowth)}>
-                                {formatCurrency(d(savingsGrowth))}
+                                {<MaskedAmount value={d(savingsGrowth)} tone="horizon" />}
                               </FinTable.Td>
                               <FinTable.Td numeric color={colorClass(investmentGrowth)}>
-                                {formatCurrency(d(investmentGrowth))}
+                                {<MaskedAmount value={d(investmentGrowth)} tone="horizon" />}
                               </FinTable.Td>
                             </>
                           )}
                           <FinTable.Td numeric color={colorClass(row.savings)}>
-                            {formatCurrency(d(row.savings))}
+                            {<MaskedAmount value={d(row.savings)} tone="horizon" />}
                           </FinTable.Td>
                         </>
                       ) : (
                         <>
                           <FinTable.Td numeric color={colorClass(row.totalGrowth)}>
-                            {formatCurrency(d(row.totalGrowth))}
+                            {<MaskedAmount value={d(row.totalGrowth)} tone="horizon" />}
                           </FinTable.Td>
                           <FinTable.Td numeric color={row.withdrawal > 0.5 ? 'text-[var(--negative)]' : undefined}>
-                            {row.withdrawal > 0 ? `−${formatCurrency(d(row.withdrawal)).replace('€', '€ ').trim()}` : formatCurrency(0)}
+                            {row.withdrawal > 0 ? `−${formatMaskedCurrency(d(row.withdrawal), masked).replace('€', '€ ').trim()}` : formatMaskedCurrency(0, masked)}
                           </FinTable.Td>
                           <FinTable.Td numeric color={aowPensioenIncome > 0.5 ? 'text-[var(--positive)]' : undefined}>
-                            {formatCurrency(d(aowPensioenIncome))}
+                            {<MaskedAmount value={d(aowPensioenIncome)} tone="horizon" />}
                           </FinTable.Td>
                         </>
                       )}
 
                       <FinTable.Td numeric color={colorClass(row.cashflowNet + row.oneTimeNet)}>
-                        {formatCurrency(d(row.cashflowNet + row.oneTimeNet))}
+                        {<MaskedAmount value={d(row.cashflowNet + row.oneTimeNet)} tone="horizon" />}
                       </FinTable.Td>
                       <FinTable.Td numeric color={row.totalBox3 > 0.5 ? 'text-[var(--negative)]' : undefined}>
-                        {row.totalBox3 > 0 ? `−${formatCurrency(d(row.totalBox3)).replace('€', '€ ').trim()}` : formatCurrency(0)}
+                        {row.totalBox3 > 0 ? `−${formatMaskedCurrency(d(row.totalBox3), masked).replace('€', '€ ').trim()}` : formatMaskedCurrency(0, masked)}
                       </FinTable.Td>
                       <FinTable.Td numeric bold color={colorClass(row.netWorth)}>
-                        {formatCurrency(d(row.netWorth))}
+                        {<MaskedAmount value={d(row.netWorth)} tone="horizon" />}
                       </FinTable.Td>
                     </FinTable.Row>
 
@@ -529,10 +533,10 @@ export function PhaseDetailTable({
                   {/* Empty cell for chevron column */}
                   <FinTable.Td>&nbsp;</FinTable.Td>
                   <FinTable.Td bold>Σ</FinTable.Td>
-                  <FinTable.Td numeric>{formatCurrency(deflate(
+                  <FinTable.Td numeric>{<MaskedAmount value={deflate(
                     rows[0].startNetWorth,
                     rows[0].inflationFactor, showReal
-                  ))}</FinTable.Td>
+                  )} tone="horizon" />}</FinTable.Td>
 
                   {isAccumulation ? (
                     <>
@@ -542,7 +546,7 @@ export function PhaseDetailTable({
                           const avgFactor = rows[rows.length - 1].inflationFactor
                           return (
                             <FinTable.Td key={t} numeric bold color={colorClass(total)}>
-                              {formatCurrency(deflate(total, showReal ? avgFactor : 1, showReal))}
+                              {<MaskedAmount value={deflate(total, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
                             </FinTable.Td>
                           )
                         })
@@ -564,10 +568,10 @@ export function PhaseDetailTable({
                             return (
                               <>
                                 <FinTable.Td numeric bold color={colorClass(totalSavingsGrowth)}>
-                                  {formatCurrency(deflate(totalSavingsGrowth, showReal ? avgFactor : 1, showReal))}
+                                  {<MaskedAmount value={deflate(totalSavingsGrowth, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
                                 </FinTable.Td>
                                 <FinTable.Td numeric bold color={colorClass(totalInvestmentGrowth)}>
-                                  {formatCurrency(deflate(totalInvestmentGrowth, showReal ? avgFactor : 1, showReal))}
+                                  {<MaskedAmount value={deflate(totalInvestmentGrowth, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
                                 </FinTable.Td>
                               </>
                             )
@@ -579,7 +583,7 @@ export function PhaseDetailTable({
                         const avgFactor = rows[rows.length - 1].inflationFactor
                         return (
                           <FinTable.Td numeric bold color={colorClass(totalSavings)}>
-                            {formatCurrency(deflate(totalSavings, showReal ? avgFactor : 1, showReal))}
+                            {<MaskedAmount value={deflate(totalSavings, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
                           </FinTable.Td>
                         )
                       })()}
@@ -594,13 +598,13 @@ export function PhaseDetailTable({
                         return (
                           <>
                             <FinTable.Td numeric bold color={colorClass(totalGrowth)}>
-                              {formatCurrency(deflate(totalGrowth, showReal ? avgFactor : 1, showReal))}
+                              {<MaskedAmount value={deflate(totalGrowth, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
                             </FinTable.Td>
                             <FinTable.Td numeric bold color={totalWithdrawal > 0.5 ? 'text-[var(--negative)]' : undefined}>
-                              {totalWithdrawal > 0 ? `−${formatCurrency(deflate(totalWithdrawal, showReal ? avgFactor : 1, showReal)).replace('€', '€ ').trim()}` : formatCurrency(0)}
+                              {totalWithdrawal > 0 ? `−${formatMaskedCurrency(deflate(totalWithdrawal, showReal ? avgFactor : 1, showReal), masked).replace('€', '€ ').trim()}` : formatMaskedCurrency(0, masked)}
                             </FinTable.Td>
                             <FinTable.Td numeric bold color={totalAow > 0.5 ? 'text-[var(--positive)]' : undefined}>
-                              {formatCurrency(deflate(totalAow, showReal ? avgFactor : 1, showReal))}
+                              {<MaskedAmount value={deflate(totalAow, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
                             </FinTable.Td>
                           </>
                         )
@@ -616,13 +620,13 @@ export function PhaseDetailTable({
                     return (
                       <>
                         <FinTable.Td numeric bold color={colorClass(totalEvents)}>
-                          {formatCurrency(deflate(totalEvents, showReal ? avgFactor : 1, showReal))}
+                          {<MaskedAmount value={deflate(totalEvents, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
                         </FinTable.Td>
                         <FinTable.Td numeric bold color={totalBox3 > 0.5 ? 'text-[var(--negative)]' : undefined}>
-                          {totalBox3 > 0 ? `−${formatCurrency(deflate(totalBox3, showReal ? avgFactor : 1, showReal)).replace('€', '€ ').trim()}` : formatCurrency(0)}
+                          {totalBox3 > 0 ? `−${formatMaskedCurrency(deflate(totalBox3, showReal ? avgFactor : 1, showReal), masked).replace('€', '€ ').trim()}` : formatMaskedCurrency(0, masked)}
                         </FinTable.Td>
                         <FinTable.Td numeric bold color={colorClass(endNetWorth)}>
-                          {formatCurrency(deflate(endNetWorth, rows[rows.length - 1].inflationFactor, showReal))}
+                          {<MaskedAmount value={deflate(endNetWorth, rows[rows.length - 1].inflationFactor, showReal)} tone="horizon" />}
                         </FinTable.Td>
                       </>
                     )

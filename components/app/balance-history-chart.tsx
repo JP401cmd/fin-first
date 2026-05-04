@@ -2,8 +2,9 @@
 
 import { useState, useMemo, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+
 import type { EntityBalanceHistory } from '@/lib/net-worth-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Color palette for entities (warm, editorial tones) ─────────
 const ENTITY_COLORS = [
@@ -206,9 +207,9 @@ export const BalanceHistoryChart = memo(function BalanceHistoryChart({
       <div className="mb-3 flex items-baseline justify-between">
         <h3 className="text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
         <div className="flex items-center gap-4 text-xs text-[var(--ink-3)]">
-          <span className="font-mono tabular-nums">{formatCurrency(latestAssetTotal)} bezittingen</span>
+          <span className="font-mono tabular-nums">{<MaskedAmount value={latestAssetTotal} tone="kern" />} bezittingen</span>
           {latestDebtTotal > 0 && (
-            <span className="font-mono tabular-nums">{formatCurrency(latestDebtTotal)} schulden</span>
+            <span className="font-mono tabular-nums">{<MaskedAmount value={latestDebtTotal} tone="kern" />} schulden</span>
           )}
         </div>
       </div>
@@ -337,7 +338,7 @@ export const BalanceHistoryChart = memo(function BalanceHistoryChart({
                     />
                     <span className="text-[var(--ink-2)]">{e.entity_name}</span>
                   </span>
-                  <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(val)}</span>
+                  <span className="font-mono tabular-nums text-[var(--ink)]">{<MaskedAmount value={val} tone="kern" />}</span>
                 </div>
               )
             })}
@@ -353,7 +354,7 @@ export const BalanceHistoryChart = memo(function BalanceHistoryChart({
                     />
                     <span className="text-[var(--ink-2)]">{e.entity_name}</span>
                   </span>
-                  <span className="font-mono tabular-nums text-red-600">−{formatCurrency(val)}</span>
+                  <span className="font-mono tabular-nums text-red-600">−{<MaskedAmount value={val} tone="kern" />}</span>
                 </div>
               )
             })}

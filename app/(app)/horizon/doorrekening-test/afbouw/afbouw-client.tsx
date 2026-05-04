@@ -1,8 +1,19 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { ChevronDown, ChevronRight, TrendingDown, Landmark, Target, AlertTriangle, CalendarClock, Shield, Gift, Zap } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/**
+ * Masked-aware currency formatter hook. Returns a stable callback that
+ * yields either the masked placeholder or a formatted EUR string based on
+ * the global privacy toggle.
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { FireParams } from '@/lib/fire-params'
@@ -147,6 +158,7 @@ export function AfbouwClient({
   savingsRate6m: number
   estimatedYearlyIncome: number
 }) {
+  const fc = useFc()
   // ── Profile-derived values ──
   const dateOfBirth = typeof profile?.date_of_birth === 'string' ? profile.date_of_birth : null
   const currentAge = dateOfBirth ? ageFromDob(dateOfBirth) : null
@@ -398,13 +410,13 @@ export function AfbouwClient({
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Huidig netto vermogen</p>
             <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(netWorth)}
+              {fc(netWorth)}
             </p>
           </div>
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">FIRE-doelvermogen</p>
             <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(fireTarget)}
+              {fc(fireTarget)}
             </p>
           </div>
           <div>
@@ -457,7 +469,7 @@ export function AfbouwClient({
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Maandelijks bedrag</span>
                 <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                  {monthlyRetirementExpenses > 0 ? formatCurrency(monthlyRetirementExpenses) : '—'}
+                  {monthlyRetirementExpenses > 0 ? fc(monthlyRetirementExpenses) : '—'}
                 </span>
                 {monthlyRetirementExpenses <= 0 && (
                   <span className="flex items-center gap-1 text-[11px] text-amber-600">
@@ -470,7 +482,7 @@ export function AfbouwClient({
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Jaarlijks bedrag</span>
                 <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                  {yearlyRetirementExpenses > 0 ? formatCurrency(yearlyRetirementExpenses) : '—'}
+                  {yearlyRetirementExpenses > 0 ? fc(yearlyRetirementExpenses) : '—'}
                 </span>
               </div>
               <div className="h-4 w-px bg-[var(--border-ed)]" />
@@ -510,10 +522,10 @@ export function AfbouwClient({
                   <tr className="border-b border-[var(--border-ed)]/50 odd:bg-[var(--subtle)]/30 hover:bg-[var(--subtle)]/50">
                     <td className="px-3 py-1 font-medium text-[var(--ink)]">Levensonderhoud</td>
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                      {formatCurrency(monthlyRetirementExpenses)}
+                      {fc(monthlyRetirementExpenses)}
                     </td>
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                      {formatCurrency(yearlyRetirementExpenses)}
+                      {fc(yearlyRetirementExpenses)}
                     </td>
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">100%</td>
                   </tr>
@@ -522,10 +534,10 @@ export function AfbouwClient({
                   <tr className="border-b border-[var(--border-ed)]/50 odd:bg-[var(--subtle)]/30 hover:bg-[var(--subtle)]/50">
                     <td className="px-3 py-1 font-medium text-emerald-700">AOW-uitkering (aftrek)</td>
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
-                      -{formatCurrency(hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY)}
+                      -{fc(hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY)}
                     </td>
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
-                      -{formatCurrency((hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12)}
+                      -{fc((hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12)}
                     </td>
                     <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
                       {yearlyRetirementExpenses > 0
@@ -538,10 +550,10 @@ export function AfbouwClient({
                   <tr className="border-b border-[var(--border-ed)]/50 bg-horizon-50/30">
                     <td className="px-3 py-1.5 font-bold text-[var(--ink)]">Netto uit vermogen nodig</td>
                     <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-horizon-700">
-                      {formatCurrency(Math.max(0, monthlyRetirementExpenses - (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY)))}
+                      {fc(Math.max(0, monthlyRetirementExpenses - (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY)))}
                     </td>
                     <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-horizon-700">
-                      {formatCurrency(Math.max(0, yearlyRetirementExpenses - (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12))}
+                      {fc(Math.max(0, yearlyRetirementExpenses - (hasPartner ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY) * 12))}
                     </td>
                     <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink-3)]">
                       {yearlyRetirementExpenses > 0
@@ -588,7 +600,7 @@ export function AfbouwClient({
           <div className="mt-4 space-y-3">
             {/* Info strip */}
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5 text-xs text-[var(--ink-3)]">
-              Startbedrag {formatCurrency(monthlyRetirementExpenses)}/mnd &times; maandelijkse inflatiecorrectie ({(fireParams.inflationRate * 100).toFixed(1)}%/jr).
+              Startbedrag {fc(monthlyRetirementExpenses)}/mnd &times; maandelijkse inflatiecorrectie ({(fireParams.inflationRate * 100).toFixed(1)}%/jr).
               Tabel loopt van{' '}
               <span className="font-semibold text-[var(--ink-2)]">{currentAge ?? '?'}j</span> tot{' '}
               <span className="font-semibold text-[var(--ink-2)]">{displayEndAge}j</span>
@@ -621,13 +633,13 @@ export function AfbouwClient({
                             {row.ageMonth > 0 && <span className="text-[var(--ink-4)]">+{row.ageMonth}m</span>}
                           </td>
                           <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
-                            {formatCurrency(row.baseExpense)}
+                            {fc(row.baseExpense)}
                           </td>
                           <td className={`px-3 py-1 text-right font-mono tabular-nums ${row.inflationCorrection > 0 ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
-                            {row.inflationCorrection > 0 ? `+${formatCurrency(row.inflationCorrection)}` : '\u2014'}
+                            {row.inflationCorrection > 0 ? `+${fc(row.inflationCorrection)}` : '\u2014'}
                           </td>
                           <td className="px-3 py-1 text-right font-mono font-semibold tabular-nums text-[var(--ink)]">
-                            {formatCurrency(row.adjustedExpense)}
+                            {fc(row.adjustedExpense)}
                           </td>
                         </tr>
                       ))}
@@ -638,13 +650,13 @@ export function AfbouwClient({
                           Laatste maand (mnd {inflationExpenseSchedule.length})
                         </td>
                         <td className="px-3 py-1.5 text-right font-mono tabular-nums text-[var(--ink-3)]">
-                          {formatCurrency(monthlyRetirementExpenses)}
+                          {fc(monthlyRetirementExpenses)}
                         </td>
                         <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-500">
-                          +{formatCurrency(inflationExpenseSchedule[inflationExpenseSchedule.length - 1]?.inflationCorrection ?? 0)}
+                          +{fc(inflationExpenseSchedule[inflationExpenseSchedule.length - 1]?.inflationCorrection ?? 0)}
                         </td>
                         <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                          {formatCurrency(inflationExpenseSchedule[inflationExpenseSchedule.length - 1]?.adjustedExpense ?? 0)}
+                          {fc(inflationExpenseSchedule[inflationExpenseSchedule.length - 1]?.adjustedExpense ?? 0)}
                         </td>
                       </tr>
                     </tfoot>
@@ -706,18 +718,18 @@ export function AfbouwClient({
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Vermogen bij start</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(portfolioAtRetirement)}
+                    {fc(portfolioAtRetirement)}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Einddoel</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
                     {strategyConfig.strategy === 'legacy'
-                      ? formatCurrency(strategyConfig.legacyAmount)
+                      ? fc(strategyConfig.legacyAmount)
                       : strategyConfig.strategy === 'perpetual'
                         ? 'Behouden'
                         : strategyConfig.strategy === 'deplete'
-                          ? `${formatCurrency(0)} op ${displayEndAge}j`
+                          ? `${fc(0)} op ${displayEndAge}j`
                           : `AOW op ${NL_AOW_AGE}j`}
                   </p>
                 </div>
@@ -769,21 +781,21 @@ export function AfbouwClient({
                             )}
                           </td>
                           <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                            {formatCurrency(row.startBalance)}
+                            {fc(row.startBalance)}
                           </td>
                           <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                            -{formatCurrency(row.withdrawal)}
+                            -{fc(row.withdrawal)}
                           </td>
                           <td className="px-3 py-1 text-right font-mono tabular-nums text-emerald-600">
-                            {row.aowIncome > 0 ? `+${formatCurrency(row.aowIncome)}` : '-'}
+                            {row.aowIncome > 0 ? `+${fc(row.aowIncome)}` : '-'}
                           </td>
                           <td className={`px-3 py-1 text-right font-mono tabular-nums ${row.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {row.growth >= 0 ? '+' : ''}{formatCurrency(row.growth)}
+                            {row.growth >= 0 ? '+' : ''}{fc(row.growth)}
                           </td>
                           <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${
                             row.endBalance <= 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
                           }`}>
-                            {row.endBalance <= 0 ? `${formatCurrency(0)} \u2713` : formatCurrency(row.endBalance)}
+                            {row.endBalance <= 0 ? `${fc(0)} \u2713` : fc(row.endBalance)}
                           </td>
                         </tr>
                       ))}
@@ -792,19 +804,19 @@ export function AfbouwClient({
                       <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
                         <td className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal</td>
                         <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                          {formatCurrency(withdrawalSchedule[0]?.startBalance ?? 0)}
+                          {fc(withdrawalSchedule[0]?.startBalance ?? 0)}
                         </td>
                         <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                          -{formatCurrency(withdrawalSchedule.reduce((s, r) => s + r.withdrawal, 0))}
+                          -{fc(withdrawalSchedule.reduce((s, r) => s + r.withdrawal, 0))}
                         </td>
                         <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                          +{formatCurrency(withdrawalSchedule.reduce((s, r) => s + r.aowIncome, 0))}
+                          +{fc(withdrawalSchedule.reduce((s, r) => s + r.aowIncome, 0))}
                         </td>
                         <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-emerald-600">
-                          +{formatCurrency(withdrawalSchedule.reduce((s, r) => s + r.growth, 0))}
+                          +{fc(withdrawalSchedule.reduce((s, r) => s + r.growth, 0))}
                         </td>
                         <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                          {formatCurrency(withdrawalSchedule[withdrawalSchedule.length - 1]?.endBalance ?? 0)}
+                          {fc(withdrawalSchedule[withdrawalSchedule.length - 1]?.endBalance ?? 0)}
                         </td>
                       </tr>
                     </tfoot>
@@ -818,12 +830,12 @@ export function AfbouwClient({
                   {depleted ? (
                     <span>Vermogen raakt op voor leeftijd {displayEndAge}. Overweeg een langere opbouwfase of lagere uitgaven.</span>
                   ) : strategyConfig.strategy === 'perpetual' ? (
-                    <span>Vermogen blijft behouden op {formatCurrency(withdrawalSchedule[withdrawalSchedule.length - 1]?.endBalance ?? 0)} na {withdrawalSchedule.length} jaar.</span>
+                    <span>Vermogen blijft behouden op {fc(withdrawalSchedule[withdrawalSchedule.length - 1]?.endBalance ?? 0)} na {withdrawalSchedule.length} jaar.</span>
                   ) : (
                     <span>
                       {strategyConfig.strategy === 'legacy'
-                        ? `Restvermogen op ${displayEndAge}j: ${formatCurrency(withdrawalSchedule[withdrawalSchedule.length - 1]?.endBalance ?? 0)} (doel: ${formatCurrency(strategyConfig.legacyAmount)})`
-                        : `Vermogen wordt over ${withdrawalSchedule.length} jaar afgebouwd tot ${formatCurrency(withdrawalSchedule[withdrawalSchedule.length - 1]?.endBalance ?? 0)}.`}
+                        ? `Restvermogen op ${displayEndAge}j: ${fc(withdrawalSchedule[withdrawalSchedule.length - 1]?.endBalance ?? 0)} (doel: ${fc(strategyConfig.legacyAmount)})`
+                        : `Vermogen wordt over ${withdrawalSchedule.length} jaar afgebouwd tot ${fc(withdrawalSchedule[withdrawalSchedule.length - 1]?.endBalance ?? 0)}.`}
                     </span>
                   )}
                 </div>
@@ -908,7 +920,7 @@ export function AfbouwClient({
                   <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Doelvermogen bij leeftijd {displayEndAge}</p>
                   {strategyConfig.legacyAmount > 0 ? (
                     <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                      {formatCurrency(legacyTarget)}
+                      {fc(legacyTarget)}
                     </p>
                   ) : (
                     <div className="mt-1 flex items-center gap-2">
@@ -929,7 +941,7 @@ export function AfbouwClient({
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Startportfolio</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(portfolioAtRetirement)}
+                    {fc(portfolioAtRetirement)}
                   </p>
                 </div>
                 <div className="h-8 w-px bg-[var(--border-ed)]" />
@@ -958,7 +970,7 @@ export function AfbouwClient({
               <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/50 px-4 py-6 text-center">
                 <AlertTriangle className="mx-auto h-8 w-8 text-amber-500" />
                 <p className="mt-2 text-sm font-medium text-amber-800">
-                  Doelvermogen ({formatCurrency(legacyTarget)}) is gelijk aan of groter dan de startportfolio ({formatCurrency(portfolioAtRetirement)}).
+                  Doelvermogen ({fc(legacyTarget)}) is gelijk aan of groter dan de startportfolio ({fc(portfolioAtRetirement)}).
                 </p>
                 <p className="mt-1 text-xs text-amber-700">
                   Er is geen ruimte voor onttrekkingen. Verlaag het doelvermogen of verhoog je portfolio.
@@ -1004,7 +1016,7 @@ export function AfbouwClient({
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-2.5 text-xs text-[var(--ink-3)]">
               Vier onttrekkingsmethoden die het vermogen volledig opgebruiken bij leeftijd {displayEndAge}.
               Annuïtaire onttrekking:{' '}
-              <span className="font-semibold text-[var(--ink-2)]">{formatCurrency(Math.round(annuityWithdrawal))}</span>/jr.
+              <span className="font-semibold text-[var(--ink-2)]">{fc(Math.round(annuityWithdrawal))}</span>/jr.
             </div>
             <DepleteStrategyTables
               startPortfolio={portfolioAtRetirement}
@@ -1120,7 +1132,7 @@ export function AfbouwClient({
                       <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Vermogen bij kruispunt</p>
                       <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
                         {monthlyCrossoverResult != null
-                          ? formatCurrency(monthlyCrossoverResult.portfolioAtCrossover)
+                          ? fc(monthlyCrossoverResult.portfolioAtCrossover)
                           : '-'}
                       </p>
                     </div>
@@ -1128,8 +1140,8 @@ export function AfbouwClient({
                       <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Benodigd vermogen</p>
                       <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-[var(--ink-2)]">
                         {monthlyCrossoverResult != null
-                          ? formatCurrency(monthlyCrossoverResult.requiredPortfolio)
-                          : formatCurrency(computeRequiredPortfolio(
+                          ? fc(monthlyCrossoverResult.requiredPortfolio)
+                          : fc(computeRequiredPortfolio(
                               yearlyRetirementExpenses, currentAge, displayEndAge,
                               fireParams.grossReturn, fireParams.inflationRate,
                               selectedEndStrategy, selectedWithdrawalStrategy,
@@ -1196,6 +1208,7 @@ function CrossoverTable({
   maxAge: number
   monthlyCrossover?: MonthlyCrossover | null
 }) {
+  const fc = useFc()
   const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
   const displayMaxAge = Math.min(maxAge, currentAge + 50)
   const monthlyCrossoverAge = monthlyCrossover?.ageYears ?? crossoverAge
@@ -1273,13 +1286,13 @@ function CrossoverTable({
                     )}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.portfolio)}
+                    {fc(row.portfolio)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-3)]">
-                    {formatCurrency(row.target)}
+                    {fc(row.target)}
                   </td>
                   <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${row.gap >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {row.gap >= 0 ? '+' : ''}{formatCurrency(row.gap)}
+                    {row.gap >= 0 ? '+' : ''}{fc(row.gap)}
                   </td>
                 </tr>
               )
@@ -1400,6 +1413,7 @@ function StrategyComparisonChart({
   inflationRate: number
   selectedEndStrategy: string
 }) {
+  const fc = useFc()
   const strategies = ['swr', 'guardrails', 'vpw', 'bucket'] as const
 
   const paths = useMemo(() => {
@@ -1449,7 +1463,7 @@ function StrategyComparisonChart({
     <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
       <h4 className="text-sm font-semibold text-[var(--ink)] mb-1">Vermogensverloop per onttrekkingsstrategie</h4>
       <p className="text-[11px] text-[var(--ink-3)] mb-3">
-        Vergelijking van 4 strategieën vanaf {retirementAge}j tot {endAge}j · startportfolio {formatCurrency(startPortfolio)}
+        Vergelijking van 4 strategieën vanaf {retirementAge}j tot {endAge}j · startportfolio {fc(startPortfolio)}
       </p>
 
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMidYMid meet">
@@ -1548,6 +1562,7 @@ function DecumulationChart({
   endAge: number
   retirementAge: number
 }) {
+  const fc = useFc()
   const width = 800
   const height = 200
   const margin = { top: 12, right: 16, bottom: 28, left: 60 }

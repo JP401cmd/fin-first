@@ -22,7 +22,8 @@
  */
 
 import { Home, MapPin } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { Asset } from '@/lib/asset-data'
 import type { RentalCalculation } from './calc'
 
@@ -38,6 +39,8 @@ interface RentalROICardProps {
 // ── Component ────────────────────────────────────────────────
 
 export function RentalROICard({ asset, calc }: RentalROICardProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const addressLine = formatAddress(asset)
 
   return (
@@ -69,7 +72,7 @@ export function RentalROICard({ asset, calc }: RentalROICardProps) {
             Marktwaarde
           </p>
           <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-            {formatCurrency(calc.currentValue)}
+            {fc(calc.currentValue)}
           </p>
         </div>
       </header>
@@ -82,19 +85,19 @@ export function RentalROICard({ asset, calc }: RentalROICardProps) {
         <dl className="mt-2 space-y-1.5">
           <CashflowRow
             label="Huurinkomsten"
-            value={`+${formatCurrency(calc.monthlyRent)}`}
+            value={`+${fc(calc.monthlyRent)}`}
             tone="positive"
           />
           {calc.mortgageBalance > 0 && (
             <CashflowRow
               label="Hypotheekrente"
-              value={`−${formatCurrency(calc.monthlyInterest)}`}
+              value={`−${fc(calc.monthlyInterest)}`}
               tone="muted"
             />
           )}
           <CashflowRow
             label="Onderhoud"
-            value={`−${formatCurrency(calc.monthlyMaintenance)}`}
+            value={`−${fc(calc.monthlyMaintenance)}`}
             tone="muted"
             note={
               calc.maintenanceIsEstimate
@@ -105,14 +108,14 @@ export function RentalROICard({ asset, calc }: RentalROICardProps) {
           {calc.monthlyVva > 0 && (
             <CashflowRow
               label="VVE / verzekering"
-              value={`−${formatCurrency(calc.monthlyVva)}`}
+              value={`−${fc(calc.monthlyVva)}`}
               tone="muted"
             />
           )}
           <div className="border-t border-dashed border-[var(--border-ed)] pt-2">
             <CashflowRow
               label="Netto cashflow"
-              value={`${calc.monthlyNetCashflow >= 0 ? '+' : '−'}${formatCurrency(Math.abs(calc.monthlyNetCashflow))}`}
+              value={`${calc.monthlyNetCashflow >= 0 ? '+' : '−'}${fc(Math.abs(calc.monthlyNetCashflow))}`}
               tone={calc.monthlyNetCashflow >= 0 ? 'primary' : 'negative'}
               bold
             />
@@ -124,7 +127,7 @@ export function RentalROICard({ asset, calc }: RentalROICardProps) {
       <footer className="grid grid-cols-3 gap-3 border-t border-[var(--border-ed)] bg-[var(--subtle)]/40 px-4 py-3 text-[11px]">
         <ROIStat
           label="Eigen geld"
-          value={formatCurrency(calc.ownEquity)}
+          value={fc(calc.ownEquity)}
           tone="default"
         />
         <ROIStat

@@ -14,7 +14,7 @@ import {
   type Goal,
   type GoalType,
 } from '@/lib/goal-data'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // Goal-card editorial color tokens (accent line + highlight-marker per goal color).
 // Mirrors the palette emitted by `getGoalColorClasses` but in raw OKLCH so we can
@@ -304,14 +304,16 @@ function GoalEditorialCard({
 
         {/* Hoofdcijfer — current/target with translucent highlight-marker.
             formatCurrency() already prepends "€", so no extra symbol here. */}
-        <p className="mt-2 font-mono tabular-nums text-[20px] sm:text-[22px] font-bold leading-none">
+        <p className="mt-2 leading-none">
           <span
             className="inline px-1"
             style={{
               backgroundImage: `linear-gradient(transparent 60%, ${colorVars.marker} 60%)`,
             }}
           >
-            {formatCurrency(progress.current)} / {formatCurrency(progress.target)}
+            <MaskedAmount value={progress.current} tone="wil" className="text-[20px] font-bold sm:text-[22px]" />
+            {' / '}
+            <MaskedAmount value={progress.target} tone="wil" className="text-[20px] font-bold sm:text-[22px]" />
           </span>
         </p>
 

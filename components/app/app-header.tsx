@@ -3,13 +3,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, Newspaper, Users } from 'lucide-react'
+import { Activity, Bell, Newspaper, Users } from 'lucide-react'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { getActiveNavModules, getHomePath } from '@/lib/module-registry'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { PrivacyToggle } from '@/components/app/privacy-toggle'
+import { GlobalSyncButton } from '@/components/sync/global-sync-button'
+import { SyncReportModal } from '@/components/sync/sync-report-modal'
 
 // Static config for each nav module — label, path, and color token
 const navConfig: Record<string, { label: string; href: string; color: string }> = {
@@ -33,6 +35,7 @@ const hoverClasses: Record<string, string> = {
 export function AppHeader({ email, role }: { email: string; role?: string }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const { activeModules } = useModuleAccess()
@@ -68,7 +71,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
 
   return (
     <header className="sticky top-0 z-50 border-b-2 border-[var(--ink)] bg-[var(--paper)] shadow-[var(--s0)]">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-3 py-2 md:px-6 md:py-3">
         <div className="flex items-center gap-8">
           <Link href={getHomePath(activeModules)} className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">
             <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity<span className="text-kern-500">.</span>
@@ -104,7 +107,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 md:gap-3">
           <PerspectiveSwitcher />
 
           {/* Privacy toggle — mask/unmask monetary amounts across the app */}
@@ -113,11 +116,11 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
           {/* News shortcut — navigates to TriFinity Post */}
           <Link
             href="/nieuws"
-            className="relative flex h-11 w-11 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+            className="relative flex h-7 w-7 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] md:h-11 md:w-11"
             aria-label="Nieuws"
             title="Nieuws"
           >
-            <Newspaper className="h-5 w-5" aria-hidden="true" />
+            <Newspaper className="h-3 w-3 md:h-5 md:w-5" aria-hidden="true" />
           </Link>
 
           {/* Notification bell — opens modal */}
@@ -126,27 +129,32 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
               setMenuOpen(false)
               openModal()
             }}
-            className="relative rounded-[var(--r)] p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+            className="relative rounded-[var(--r)] p-1 text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] md:p-2"
             aria-label="Meldingen"
           >
-            <Bell className="h-5 w-5" />
+            <Bell className="h-3 w-3 md:h-5 md:w-5" />
             {unreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white md:h-4 md:min-w-4 md:text-[10px]">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
 
+          {/* Global sync — desktop only; on mobile it lives in the account dropdown */}
+          <div className="hidden md:flex">
+            <GlobalSyncButton onOpenReport={() => setReportOpen(true)} />
+          </div>
+
           {/* Profile dropdown */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-[var(--subtle)]"
+              className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--subtle)] md:h-11 md:w-11"
               aria-label="Account"
               title={email}
             >
               <span className="relative">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-medium text-[var(--paper)]">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink)] text-[9px] font-medium text-[var(--paper)] md:h-7 md:w-7 md:text-xs">
                   {email[0]?.toUpperCase() ?? '?'}
                 </span>
                 {isHousehold && perspective !== 'personal' && (
@@ -192,6 +200,48 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                 >
                   Rapportages
                 </Link>
+                {/* Mobile: sync trigger + sync-rapport side-by-side */}
+                <div className="grid grid-cols-2 border-y border-[var(--border-ed)] md:hidden">
+                  <div className="flex flex-col items-center justify-center gap-1 py-2 hover:bg-[var(--subtle)]">
+                    <GlobalSyncButton
+                      onOpenReport={() => {
+                        setMenuOpen(false)
+                        setReportOpen(true)
+                      }}
+                    />
+                    <span className="text-[10px] uppercase tracking-[0.06em] text-[var(--ink-3)]">
+                      Sync nu
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setReportOpen(true)
+                    }}
+                    className="flex flex-col items-center justify-center gap-1 border-l border-[var(--border-ed)] py-2 text-[var(--ink-3)] hover:bg-[var(--subtle)]"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center">
+                      <Activity className="h-3.5 w-3.5" aria-hidden="true" />
+                    </span>
+                    <span className="text-[10px] uppercase tracking-[0.06em]">
+                      Rapport
+                    </span>
+                  </button>
+                </div>
+
+                {/* Desktop: standard sync-rapport menu item (sync trigger lives in header) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setReportOpen(true)
+                  }}
+                  className="hidden w-full items-center gap-2 px-4 py-2 text-left text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)] md:flex"
+                >
+                  <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  Sync-rapport
+                </button>
                 {/* News-only users: subtle upgrade link to discover the full app */}
                 {activeModules.length === 1 && activeModules[0] === 'nieuws' && (
                   <>
@@ -218,6 +268,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
           </div>
         </div>
       </div>
+      <SyncReportModal open={reportOpen} onClose={() => setReportOpen(false)} />
     </header>
   )
 }

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { LifeEvent } from '@/lib/horizon-data'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { CHART_PAD } from '@/lib/chart-constants'
 import { EVENT_ICONS } from './log-timeline'
 
@@ -28,6 +29,7 @@ export function EventsTimeline({
   scenarioEvents?: Array<{ name: string; target_age: number | null; event_type: string }>
   scenarioColor?: string
 }) {
+  const { masked } = useMaskedAmounts()
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerW, setContainerW] = useState(600)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -79,15 +81,15 @@ export function EventsTimeline({
   function eventAmountLines(ev: LifeEvent): { label: string; color: string }[] {
     const lines: { label: string; color: string }[] = []
     if (ev.one_time_cost > 0) {
-      lines.push({ label: `−${formatCurrency(ev.one_time_cost)} eenmalig`, color: '#ef4444' })
+      lines.push({ label: `−${formatMaskedCurrency(ev.one_time_cost, masked)} eenmalig`, color: '#ef4444' })
     } else if (ev.one_time_cost < 0) {
-      lines.push({ label: `+${formatCurrency(Math.abs(ev.one_time_cost))} eenmalig`, color: '#10b981' })
+      lines.push({ label: `+${formatMaskedCurrency(Math.abs(ev.one_time_cost), masked)} eenmalig`, color: '#10b981' })
     }
     if (ev.monthly_cost_change > 0) {
-      lines.push({ label: `−${formatCurrency(ev.monthly_cost_change)}/mnd · ${ev.duration_months} mnd`, color: '#ef4444' })
+      lines.push({ label: `−${formatMaskedCurrency(ev.monthly_cost_change, masked)}/mnd · ${ev.duration_months} mnd`, color: '#ef4444' })
     }
     if (ev.monthly_income_change > 0) {
-      lines.push({ label: `+${formatCurrency(ev.monthly_income_change)}/mnd · ${ev.duration_months} mnd`, color: '#10b981' })
+      lines.push({ label: `+${formatMaskedCurrency(ev.monthly_income_change, masked)}/mnd · ${ev.duration_months} mnd`, color: '#10b981' })
     }
     return lines
   }

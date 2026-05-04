@@ -11,7 +11,10 @@ import {
   type CellLayout,
   type BlobInputGroup,
 } from '@/lib/blob-layout'
-import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
+import { BudgetIcon } from '@/components/app/budget-shared'
+import { MaskedAmount } from '@/components/app/masked-amount'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 
 interface BudgetBlobProps {
@@ -21,6 +24,7 @@ interface BudgetBlobProps {
 }
 
 export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
+  const { masked } = useMaskedAmounts()
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(900)
@@ -380,7 +384,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                       fontWeight="500"
                       fontFamily="'DM Mono', monospace"
                     >
-                      {formatCurrency(lobeSpent)} / {formatCurrency(lobeLimit)} ({lobeLimit > 0 ? Math.round((lobeSpent / lobeLimit) * 100) : 0}%)
+                      {formatMaskedCurrency(lobeSpent, masked)} / {formatMaskedCurrency(lobeLimit, masked)} ({lobeLimit > 0 ? Math.round((lobeSpent / lobeLimit) * 100) : 0}%)
                     </text>
                   </g>
                 )}
@@ -652,18 +656,20 @@ function Tooltip({
       <div className="mt-2 space-y-1 text-xs">
         <div className="flex justify-between">
           <span className="text-[var(--ink-3)]">Budget</span>
-          <span className="font-medium text-[var(--ink-2)]">{formatCurrency(cell.limit)}</span>
+          <span className="font-medium text-[var(--ink-2)]">
+            <MaskedAmount value={cell.limit} tone="wil" />
+          </span>
         </div>
         <div className="flex justify-between">
           <span className="text-[var(--ink-3)]">Besteed</span>
           <span className={`font-medium ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
-            {formatCurrency(cell.spent)}
+            <MaskedAmount value={cell.spent} tone="wil" />
           </span>
         </div>
         <div className="flex justify-between">
           <span className="text-[var(--ink-3)]">Resterend</span>
           <span className={`font-medium ${remaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-            {formatCurrency(remaining)}
+            <MaskedAmount value={remaining} tone="wil" />
           </span>
         </div>
         {/* Mini bar */}

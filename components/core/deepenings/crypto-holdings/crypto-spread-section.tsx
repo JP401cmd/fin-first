@@ -21,7 +21,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plug, Wallet, Pencil, ChevronDown } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { CryptoSpreadEntry } from '@/lib/crypto-holdings-data'
 
 interface CryptoSpreadSectionProps {
@@ -251,6 +252,8 @@ interface SpreadEntryCardProps {
 }
 
 function SpreadEntryCard({ entry, onSourceClick }: SpreadEntryCardProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   return (
     <article className="border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
       {/* Header: symbol + naam links, totale units + waarde rechts */}
@@ -270,7 +273,7 @@ function SpreadEntryCard({ entry, onSourceClick }: SpreadEntryCardProps) {
             {formatUnits(entry.totalUnits)}
           </p>
           <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-            {formatCurrency(entry.totalValueEur)}
+            {fc(entry.totalValueEur)}
           </p>
         </div>
       </header>
@@ -300,7 +303,7 @@ function SpreadEntryCard({ entry, onSourceClick }: SpreadEntryCardProps) {
                 {s.sharePct.toFixed(0)}%
               </span>
               <span className="w-16 text-right font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-                {formatCurrency(s.valueEur)}
+                {fc(s.valueEur)}
               </span>
             </button>
           </li>
@@ -318,6 +321,8 @@ interface StackedBarProps {
 }
 
 function StackedBar({ entry, onSegmentClick }: StackedBarProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Render alleen segmenten met sharePct > 0 (defensief tegen edge-cases).
   // Voor één-bron-coins krijgt de bar één vlak, gevuld kleur — visueel
   // duidelijk dat er geen spreiding is, en de hover/click linkt nog steeds.
@@ -337,7 +342,7 @@ function StackedBar({ entry, onSegmentClick }: StackedBarProps) {
             key={`${s.kind}-${s.holdingId}-seg`}
             type="button"
             onClick={() => onSegmentClick(s.holdingId)}
-            title={`${s.label} — ${s.sharePct.toFixed(1)}% (${formatCurrency(s.valueEur)})`}
+            title={`${s.label} — ${s.sharePct.toFixed(1)}% (${fc(s.valueEur)})`}
             aria-label={`${s.label}: ${s.sharePct.toFixed(0)} procent`}
             className={`h-full ${SEGMENT_BG[s.kind]} ${
               isLast ? '' : 'border-r border-[var(--paper)]'

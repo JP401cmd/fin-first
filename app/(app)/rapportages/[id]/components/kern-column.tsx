@@ -1,15 +1,30 @@
+'use client'
+
+import { useCallback } from 'react'
 import type { ReportKernSection } from '@/lib/report-data'
-import { formatCurrency } from '@/lib/format'
-import { SectionKicker } from './section-kicker'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useResolvedModuleColor } from '@/lib/hooks/use-resolved-module-color'
+import { SectionLabel } from '@/components/editorial'
 import { KassabonTable } from './kassabon-table'
 import { ReportSparkline } from './report-sparkline'
 
-export function KernColumn({ kern }: { kern: ReportKernSection }) {
+export function KernColumn({
+  kern,
+  accentColor = '#6b4339',
+}: {
+  kern: ReportKernSection
+  /** Hex-fallback for the sparkline stroke. See `useResolvedModuleColor` notes. */
+  accentColor?: string
+}) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+  const resolvedAccent = useResolvedModuleColor('--module-active-700', accentColor)
   const cashflowValues = kern.monthlyOverview.map(m => m.savings)
 
   return (
     <div className="space-y-6">
-      <SectionKicker module="kern" title="De Kern" subtitle="Financieel Fundament" />
+      <SectionLabel num="i.">De Kern</SectionLabel>
 
       {/* Netto kasstroom sparkline */}
       {cashflowValues.length >= 2 && (
@@ -19,7 +34,7 @@ export function KernColumn({ kern }: { kern: ReportKernSection }) {
           </p>
           <ReportSparkline
             values={cashflowValues}
-            color="#6b4339"
+            color={resolvedAccent}
             height={32}
             showFill={true}
           />
@@ -33,7 +48,7 @@ export function KernColumn({ kern }: { kern: ReportKernSection }) {
           rows={kern.budgetBreakdown.map(b => ({
             label: b.name,
             value: b.spent,
-            sublabel: b.limit > 0 ? `/ ${formatCurrency(b.limit)}` : undefined,
+            sublabel: b.limit > 0 ? `/ ${fc(b.limit)}` : undefined,
             highlight: b.pctOfLimit > 100,
           }))}
           total={{ label: 'Totaal uitgaven', value: kern.totalExpenses }}
@@ -52,15 +67,15 @@ export function KernColumn({ kern }: { kern: ReportKernSection }) {
               <div key={d.id} className="flex items-baseline justify-between">
                 <span className="font-inter text-xs text-[var(--ink-2)] truncate">{d.name}</span>
                 <span className="shrink-0 font-dm-mono text-xs tabular-nums text-[var(--ink)]">
-                  {formatCurrency(d.currentBalance)}
+                  {fc(d.currentBalance)}
                 </span>
               </div>
             ))}
-            <div className="border-t border-dashed border-[var(--border-ed)] pt-1">
+            <div className="border-t border-dotted border-[var(--rule-soft)] pt-1">
               <div className="flex items-baseline justify-between font-medium">
                 <span className="font-inter text-xs text-[var(--ink)]">Totaal schulden</span>
                 <span className="font-dm-mono text-xs tabular-nums text-[var(--ink)]">
-                  {formatCurrency(kern.totalDebts)}
+                  {fc(kern.totalDebts)}
                 </span>
               </div>
             </div>
@@ -82,15 +97,15 @@ export function KernColumn({ kern }: { kern: ReportKernSection }) {
                   <span className="ml-1 font-inter text-[10px] text-[var(--ink-4)]">{a.assetType}</span>
                 </div>
                 <span className="shrink-0 font-dm-mono text-xs tabular-nums text-[var(--ink)]">
-                  {formatCurrency(a.currentValue)}
+                  {fc(a.currentValue)}
                 </span>
               </div>
             ))}
-            <div className="border-t border-dashed border-[var(--border-ed)] pt-1">
+            <div className="border-t border-dotted border-[var(--rule-soft)] pt-1">
               <div className="flex items-baseline justify-between font-medium">
                 <span className="font-inter text-xs text-[var(--ink)]">Totaal assets</span>
                 <span className="font-dm-mono text-xs tabular-nums text-[var(--ink)]">
-                  {formatCurrency(kern.totalAssets)}
+                  {fc(kern.totalAssets)}
                 </span>
               </div>
             </div>

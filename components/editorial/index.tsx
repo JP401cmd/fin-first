@@ -179,7 +179,8 @@ export function HLNeg({ children }: { children: ReactNode }) {
 
 export interface FigureProps {
   kicker: string
-  amount: string
+  /** Either a pre-formatted string ("€ 12.345") or a node (e.g. <MaskedAmount>) — the latter lets privacy-aware widgets swap in masked bullets without losing the cell's typography. */
+  amount: string | ReactNode
   sub?: string
   variant?: 'neutral' | 'positive' | 'negative' | 'winner'
   /** Maakt de cell een klikbare deeplink. Wordt gerenderd als Next.js `<Link>`. */

@@ -1,15 +1,16 @@
 'use client'
 
 import { useMemo } from 'react'
-import Link from 'next/link'
 import {
-  formatCurrency,
+  formatMaskedCurrency,
   calculateFreedomTime,
   formatFreedomTimeString,
 } from '@/lib/format'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { Kicker, HighlightMark, FiguresStrip } from '@/components/editorial'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import { ModuleTipStrip } from './module-tip-strip'
 
@@ -161,14 +162,14 @@ export function CoreHero({
           figures={[
             {
               kicker: 'Totale bezittingen',
-              amount: formatCurrency(totalAssets),
+              amount: <MaskedAmount value={totalAssets} tone="kern" monoWhenVisible={false} />,
               sub: `${assetCount} ${assetCount === 1 ? 'bezitting' : 'bezittingen'}`,
               variant: 'positive',
               href: '/core/assets',
             },
             {
               kicker: 'Totale schulden',
-              amount: formatCurrency(totalDebts),
+              amount: <MaskedAmount value={totalDebts} tone="kern" monoWhenVisible={false} />,
               sub: `${debtCount} ${debtCount === 1 ? 'schuld' : 'schulden'}`,
               variant: 'negative',
               href: '/core/debts',
@@ -192,11 +193,13 @@ function HeroAmount({ netWorth }: { netWorth: number }) {
   // Hook leeft hier zodat flash-class-updates alleen deze span re-renderen
   // en de omhullende button (LCP-element) stabiel blijft.
   const { flashClass } = useFlashChange(netWorth)
+  const { masked } = useMaskedAmounts()
   return (
     <span
       className={[
-        'font-mono text-[40px] font-bold leading-[1] tabular-nums tracking-tight text-[var(--ink)]',
+        'font-mono text-[40px] font-bold leading-[1] tabular-nums tracking-tight',
         'sm:text-[56px] md:text-[64px]',
+        masked ? 'text-[var(--module-active-500)]' : 'text-[var(--ink)]',
         flashClass,
       ]
         .filter(Boolean)
@@ -205,7 +208,7 @@ function HeroAmount({ netWorth }: { netWorth: number }) {
     >
       {/* Halve transparante streep in module-active-200 (Kern-200 op /core).
           Markeert het netto vermogen als hoofduitkomst-cijfer van de pagina. */}
-      <HighlightMark>{formatCurrency(netWorth)}</HighlightMark>
+      <HighlightMark>{formatMaskedCurrency(netWorth, masked)}</HighlightMark>
     </span>
   )
 }
@@ -262,7 +265,7 @@ function FireProgressBar({
           className="font-mono text-sm font-semibold tabular-nums sm:text-base"
           style={{ color: 'var(--module-active-700)' }}
         >
-          {formatCurrency(targetAmount)}
+          <MaskedAmount value={targetAmount} tone="kern" className="text-sm font-semibold sm:text-base" />
         </span>
       </div>
       <div
@@ -297,24 +300,21 @@ function AssetsDebtsBar({
   totalDebts: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
+  const { masked } = useMaskedAmounts()
   const sum = totalAssets + totalDebts
   const assetPct = sum > 0 ? (totalAssets / sum) * 100 : 0
 
   return (
     <div className="mt-5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)] sm:text-base">
-          {formatCurrency(totalAssets)}
-        </span>
-        <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)] sm:text-base">
-          {formatCurrency(totalDebts)}
-        </span>
+        <MaskedAmount value={totalAssets} tone="kern" className="text-sm font-semibold text-[var(--ink)] sm:text-base" />
+        <MaskedAmount value={totalDebts} tone="kern" className="text-sm font-semibold text-[var(--ink)] sm:text-base" />
       </div>
       <div
         ref={ref}
         className="mt-1.5 flex h-[5px] w-full overflow-hidden bg-[var(--subtle)]"
         role="img"
-        aria-label={`Bezittingen ${formatCurrency(totalAssets)} en schulden ${formatCurrency(totalDebts)}`}
+        aria-label={`Bezittingen ${formatMaskedCurrency(totalAssets, masked)} en schulden ${formatMaskedCurrency(totalDebts, masked)}`}
       >
         <div
           className="h-full bg-positive"
@@ -340,65 +340,3 @@ function AssetsDebtsBar({
   )
 }
 
-// ── Subcomponent: één kolom in de 3-koloms strip ─────────────
-
-function SummaryColumn({
-  kicker,
-  kickerClass,
-  value,
-  valueClass,
-  meta,
-  asPercentage = false,
-  href,
-}: {
-  kicker: string
-  kickerClass: string
-  value: number
-  valueClass: string
-  meta: string
-  asPercentage?: boolean
-  /** Optioneel: maakt de hele kolom klikbaar als deeplink. */
-  href?: string
-}) {
-  const formatted = asPercentage
-    ? `${(Math.round(value * 10) / 10).toString().replace('.', ',')}%`
-    : formatCurrency(value)
-
-  const content = (
-    <>
-      <dt
-        className={[
-          'text-[10px] font-semibold uppercase tracking-[0.1em]',
-          kickerClass,
-        ].join(' ')}
-      >
-        {kicker}
-      </dt>
-      <dd
-        className={[
-          'mt-2 font-mono text-2xl font-bold tabular-nums sm:text-3xl',
-          valueClass,
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        {formatted}
-      </dd>
-      <p className="mt-1 text-[11px] text-[var(--ink-4)]">{meta}</p>
-    </>
-  )
-
-  if (href) {
-    return (
-      <Link
-        href={href}
-        className="group -mx-2 -my-1 block px-2 py-1 transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-        aria-label={`${kicker} — bekijk overzicht`}
-      >
-        {content}
-      </Link>
-    )
-  }
-
-  return <div>{content}</div>
-}

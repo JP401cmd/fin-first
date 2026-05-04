@@ -41,7 +41,8 @@ import {
 } from '@/lib/debt-data'
 import type { AssetType } from '@/lib/asset-data'
 import type { RepaymentType as HvBRepaymentType } from '@/lib/hypotheek-vs-beleggen'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
 import { DebtPayoffStrategy } from './debt-payoff-strategy'
@@ -252,6 +253,8 @@ interface ActivePlannerProps {
 }
 
 function ActivePlanner({ mortgage, house, otherTrackedDebts }: ActivePlannerProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Berekeningsbasis: rente/aflossing-split om de equity-buildup-bar te
   // voeden met "maandelijkse aflossing = maandelijkse equity-groei".
   const split = useMemo(() => computeRenteAflossingsSplit(mortgage), [mortgage])
@@ -292,22 +295,22 @@ function ActivePlanner({ mortgage, house, otherTrackedDebts }: ActivePlannerProp
             <>
               <Stat
                 label="Marktwaarde"
-                value={formatCurrency(marketValue!)}
+                value={fc(marketValue!)}
               />
               <Stat
                 label="Schuld"
-                value={formatCurrency(balance)}
+                value={fc(balance)}
                 tone="negative"
               />
               <Stat
                 label="Eigen vermogen"
-                value={formatCurrency(Math.max(0, marketValue! - balance))}
+                value={fc(Math.max(0, marketValue! - balance))}
                 tone="primary"
               />
             </>
           ) : (
             <>
-              <Stat label="Schuld" value={formatCurrency(balance)} tone="negative" />
+              <Stat label="Schuld" value={fc(balance)} tone="negative" />
               <Stat label="Looptijd" value={formatYearSpan(months)} />
             </>
           )}

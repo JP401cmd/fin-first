@@ -22,7 +22,8 @@ import {
 } from '@/components/connections/add-exchange-modal'
 import { AddWalletModal } from '@/components/connections/add-wallet-modal'
 import { useToast } from '@/components/app/toast-provider'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   computeFreshness,
   type AssetConnectionSummary,
@@ -108,6 +109,7 @@ export function AssetEditConnectionSection({
 }: AssetEditConnectionSectionProps) {
   const router = useRouter()
   const { addToast } = useToast()
+  const { masked } = useMaskedAmounts()
 
   const [connection, setConnection] = useState<AssetConnectionSummary | null>(initialConnection)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -189,7 +191,7 @@ export function AssetEditConnectionSection({
         return
       }
       const lastSyncedAt = typeof json?.lastSyncedAt === 'string' ? json.lastSyncedAt : new Date().toISOString()
-      const totalEur = typeof json?.totalEur === 'number' ? formatCurrency(json.totalEur) : null
+      const totalEur = typeof json?.totalEur === 'number' ? formatMaskedCurrency(json.totalEur, masked) : null
       addToast({
         type: 'success',
         title: 'Bijgewerkt',
@@ -307,7 +309,7 @@ export function AssetEditConnectionSection({
           status={computeFreshness(connection.wallet.lastSyncedAt, connection.wallet.lastSyncError)}
           label={`${CHAIN_LABEL[connection.wallet.chain]}${connection.wallet.label ? ` · ${connection.wallet.label}` : ''}`}
           sublabel={maskAddress(connection.wallet.address)}
-          amount={connection.wallet.lastBalanceEur != null ? formatCurrency(connection.wallet.lastBalanceEur) : undefined}
+          amount={connection.wallet.lastBalanceEur != null ? formatMaskedCurrency(connection.wallet.lastBalanceEur, masked) : undefined}
           amountLabel={
             connection.wallet.lastBalanceNative != null
               ? `${connection.wallet.lastBalanceNative.toLocaleString('nl-NL', { maximumFractionDigits: 6 })} ${CHAIN_TICKER[connection.wallet.chain]}`

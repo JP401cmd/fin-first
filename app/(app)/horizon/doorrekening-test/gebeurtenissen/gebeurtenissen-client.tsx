@@ -1,8 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { ChevronDown, ChevronRight, Calendar, ArrowUpRight, ArrowDownRight, Clock, Zap, Info, Layers, Banknote, TrendingDown, TrendingUp, Snowflake as SnowflakeIcon } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware currency formatter hook used across this file's sub-views. */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import type { LifeEvent } from '@/lib/horizon-data'
 import { computeLifeEventNetImpact } from '@/lib/horizon-data'
 import { lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
@@ -437,6 +444,7 @@ function EventTimelineOverview({
   lifeEvents: LifeEvent[]
   currentAge: number | null
 }) {
+  const fc = useFc()
   // Sort events by target_age, null ages go to the end
   const sortedEvents = useMemo(() => {
     return [...lifeEvents]
@@ -476,18 +484,18 @@ function EventTimelineOverview({
     // One-time events
     if (event.one_time_cost !== 0 && event.monthly_cost_change === 0 && event.monthly_income_change === 0) {
       const sign = event.one_time_cost > 0 ? '-' : '+'
-      return `${sign}${formatCurrency(Math.abs(event.one_time_cost))}`
+      return `${sign}${fc(Math.abs(event.one_time_cost))}`
     }
     // Recurring events
     const monthly = getNetMonthly(event)
     if (monthly !== 0) {
       const sign = monthly > 0 ? '+' : ''
       const suffix = event.duration_months > 0 ? ` voor ${formatDuration(event.duration_months)}` : '/mnd'
-      return `${sign}${formatCurrency(monthly)}/mnd${event.duration_months > 0 ? ` × ${formatDuration(event.duration_months)}` : ''}`
+      return `${sign}${fc(monthly)}/mnd${event.duration_months > 0 ? ` × ${formatDuration(event.duration_months)}` : ''}`
     }
     // Fallback
     if (netImpact !== 0) {
-      return `${netImpact >= 0 ? '+' : ''}${formatCurrency(netImpact)}`
+      return `${netImpact >= 0 ? '+' : ''}${fc(netImpact)}`
     }
     return '—'
   }
@@ -695,6 +703,7 @@ export function GebeurtenissenClient({
   estimatedYearlyIncome: number
   yearlyMustExpenses: number
 }) {
+  const fc = useFc()
   const [eventsExpanded, setEventsExpanded] = useState(true)
   const [cashflowsExpanded, setCashflowsExpanded] = useState(true)
   const [distributionExpanded, setDistributionExpanded] = useState(true)
@@ -884,7 +893,7 @@ export function GebeurtenissenClient({
           <div>
             <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Netto impact (totaal)</p>
             <p className={`mt-0.5 font-mono text-lg font-bold tabular-nums ${totalNetImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {totalNetImpact >= 0 ? '+' : ''}{formatCurrency(totalNetImpact)}
+              {totalNetImpact >= 0 ? '+' : ''}{fc(totalNetImpact)}
             </p>
           </div>
           <div>
@@ -960,13 +969,13 @@ export function GebeurtenissenClient({
                             {formatAge(event.target_age)}
                           </td>
                           <td className={`px-3 py-1 text-right font-mono tabular-nums ${event.one_time_cost !== 0 ? (event.one_time_cost > 0 ? 'text-red-600' : 'text-emerald-600') : 'text-[var(--ink-4)]'}`}>
-                            {event.one_time_cost !== 0 ? formatCurrency(event.one_time_cost) : '—'}
+                            {event.one_time_cost !== 0 ? fc(event.one_time_cost) : '—'}
                           </td>
                           <td className={`px-3 py-1 text-right font-mono tabular-nums ${event.monthly_cost_change !== 0 ? 'text-red-600' : 'text-[var(--ink-4)]'}`}>
-                            {event.monthly_cost_change !== 0 ? formatCurrency(event.monthly_cost_change) : '—'}
+                            {event.monthly_cost_change !== 0 ? fc(event.monthly_cost_change) : '—'}
                           </td>
                           <td className={`px-3 py-1 text-right font-mono tabular-nums ${event.monthly_income_change > 0 ? 'text-emerald-600' : event.monthly_income_change < 0 ? 'text-red-600' : 'text-[var(--ink-4)]'}`}>
-                            {event.monthly_income_change !== 0 ? `${event.monthly_income_change > 0 ? '+' : ''}${formatCurrency(event.monthly_income_change)}` : '—'}
+                            {event.monthly_income_change !== 0 ? `${event.monthly_income_change > 0 ? '+' : ''}${fc(event.monthly_income_change)}` : '—'}
                           </td>
                           <td className="px-3 py-1 text-right text-[var(--ink-2)]">
                             {formatDuration(event.duration_months)}
@@ -975,7 +984,7 @@ export function GebeurtenissenClient({
                             {event.is_indexed ? '✓' : '—'}
                           </td>
                           <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${netImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {netImpact >= 0 ? '+' : ''}{formatCurrency(netImpact)}
+                            {netImpact >= 0 ? '+' : ''}{fc(netImpact)}
                           </td>
                         </tr>
                       ))}
@@ -984,7 +993,7 @@ export function GebeurtenissenClient({
                       <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
                         <td colSpan={8} className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal netto impact</td>
                         <td className={`px-3 py-1.5 text-right font-mono font-bold tabular-nums ${totalNetImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {totalNetImpact >= 0 ? '+' : ''}{formatCurrency(totalNetImpact)}
+                          {totalNetImpact >= 0 ? '+' : ''}{fc(totalNetImpact)}
                         </td>
                       </tr>
                     </tfoot>
@@ -1085,7 +1094,7 @@ export function GebeurtenissenClient({
                           <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${
                             cf.direction === 'income' ? 'text-emerald-600' : 'text-red-600'
                           }`}>
-                            {cf.direction === 'income' ? '+' : '-'}{formatCurrency(cf.amount)}
+                            {cf.direction === 'income' ? '+' : '-'}{fc(cf.amount)}
                           </td>
                           <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
                             {cf.fromAge}j
@@ -1164,7 +1173,7 @@ export function GebeurtenissenClient({
                         </span>
                       </div>
                       <span className="font-mono text-sm font-semibold tabular-nums text-red-600">
-                        -{formatCurrency(event.one_time_cost)}
+                        -{fc(event.one_time_cost)}
                       </span>
                     </div>
                   </div>
@@ -1193,16 +1202,16 @@ export function GebeurtenissenClient({
                               </span>
                             </td>
                             <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                              {formatCurrency(row.currentValue)}
+                              {fc(row.currentValue)}
                             </td>
                             <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                               {row.expectedReturn.toFixed(1)}%
                             </td>
                             <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${row.withdrawAmount > 0 ? 'text-red-600' : 'text-[var(--ink-4)]'}`}>
-                              {row.withdrawAmount > 0 ? `-${formatCurrency(row.withdrawAmount)}` : '—'}
+                              {row.withdrawAmount > 0 ? `-${fc(row.withdrawAmount)}` : '—'}
                             </td>
                             <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                              {formatCurrency(row.remainingValue)}
+                              {fc(row.remainingValue)}
                             </td>
                           </tr>
                         ))}
@@ -1267,7 +1276,7 @@ export function GebeurtenissenClient({
                         </span>
                       </div>
                       <span className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
-                        +{formatCurrency(amount)}
+                        +{fc(amount)}
                       </span>
                     </div>
                   </div>
@@ -1296,16 +1305,16 @@ export function GebeurtenissenClient({
                               </span>
                             </td>
                             <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                              {formatCurrency(row.currentValue)}
+                              {fc(row.currentValue)}
                             </td>
                             <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
                               {row.expectedReturn.toFixed(1)}%
                             </td>
                             <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${row.depositAmount > 0 ? 'text-emerald-600' : 'text-[var(--ink-4)]'}`}>
-                              {row.depositAmount > 0 ? `+${formatCurrency(row.depositAmount)}` : '—'}
+                              {row.depositAmount > 0 ? `+${fc(row.depositAmount)}` : '—'}
                             </td>
                             <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                              {formatCurrency(row.newValue)}
+                              {fc(row.newValue)}
                             </td>
                           </tr>
                         ))}
@@ -1346,7 +1355,7 @@ export function GebeurtenissenClient({
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Huidig netto vermogen</p>
               <p className="mt-1 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-                {formatCurrency(netWorth)}
+                {fc(netWorth)}
               </p>
             </div>
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3">
@@ -1354,7 +1363,7 @@ export function GebeurtenissenClient({
               <p className={`mt-1 font-mono text-base font-semibold tabular-nums ${
                 totalNetImpact >= 0 ? 'text-emerald-600' : 'text-red-600'
               }`}>
-                {formatCurrency(netWorth + totalNetImpact)}
+                {fc(netWorth + totalNetImpact)}
               </p>
             </div>
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3">
@@ -1362,13 +1371,13 @@ export function GebeurtenissenClient({
               <p className={`mt-1 font-mono text-base font-semibold tabular-nums ${
                 totalNetImpact >= 0 ? 'text-emerald-600' : 'text-red-600'
               }`}>
-                {totalNetImpact >= 0 ? '+' : ''}{formatCurrency(totalNetImpact)}
+                {totalNetImpact >= 0 ? '+' : ''}{fc(totalNetImpact)}
               </p>
             </div>
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Jaarlijkse spaarcapaciteit</p>
               <p className="mt-1 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-                {formatCurrency(annualSavings)}
+                {fc(annualSavings)}
               </p>
             </div>
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3">
@@ -1385,7 +1394,7 @@ export function GebeurtenissenClient({
             <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">Maandelijkse uitgaven (ref.)</p>
               <p className="mt-1 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-                {formatCurrency(monthlyExpenses)}
+                {fc(monthlyExpenses)}
               </p>
             </div>
           </div>
@@ -1430,16 +1439,16 @@ export function GebeurtenissenClient({
                               {formatAge(event.target_age)}
                             </td>
                             <td className={`px-3 py-1 text-right font-mono tabular-nums ${oneTime !== 0 ? (oneTime > 0 ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-4)]'}`}>
-                              {oneTime !== 0 ? `${oneTime > 0 ? '+' : ''}${formatCurrency(oneTime)}` : '—'}
+                              {oneTime !== 0 ? `${oneTime > 0 ? '+' : ''}${fc(oneTime)}` : '—'}
                             </td>
                             <td className={`px-3 py-1 text-right font-mono tabular-nums ${netMonthly !== 0 ? (netMonthly > 0 ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-4)]'}`}>
-                              {netMonthly !== 0 ? `${netMonthly > 0 ? '+' : ''}${formatCurrency(netMonthly)}/mnd` : '—'}
+                              {netMonthly !== 0 ? `${netMonthly > 0 ? '+' : ''}${fc(netMonthly)}/mnd` : '—'}
                             </td>
                             <td className="px-3 py-1 text-right text-[var(--ink-2)]">
                               {formatDuration(event.duration_months)}
                             </td>
                             <td className={`px-3 py-1 text-right font-mono font-semibold tabular-nums ${netImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {netImpact >= 0 ? '+' : ''}{formatCurrency(netImpact)}
+                              {netImpact >= 0 ? '+' : ''}{fc(netImpact)}
                             </td>
                           </tr>
                         )
@@ -1449,7 +1458,7 @@ export function GebeurtenissenClient({
                       <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]">
                         <td colSpan={5} className="px-3 py-1.5 font-bold text-[var(--ink)]">Totaal netto impact</td>
                         <td className={`px-3 py-1.5 text-right font-mono font-bold tabular-nums ${totalNetImpact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {totalNetImpact >= 0 ? '+' : ''}{formatCurrency(totalNetImpact)}
+                          {totalNetImpact >= 0 ? '+' : ''}{fc(totalNetImpact)}
                         </td>
                       </tr>
                     </tfoot>
@@ -1488,7 +1497,7 @@ export function GebeurtenissenClient({
                         <span className={`w-[90px] shrink-0 text-right font-mono text-xs font-semibold tabular-nums ${
                           netImpact >= 0 ? 'text-emerald-600' : 'text-red-600'
                         }`}>
-                          {netImpact >= 0 ? '+' : ''}{formatCurrency(netImpact)}
+                          {netImpact >= 0 ? '+' : ''}{fc(netImpact)}
                         </span>
                       </div>
                     )

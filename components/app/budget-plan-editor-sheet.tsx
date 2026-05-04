@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, AlertTriangle, Check, X, RotateCcw, Save, LayoutTemplate, ChevronRight, Info } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { formatCurrency } from '@/components/app/budget-shared'
+
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useToast } from '@/components/app/toast-provider'
 import {
   BUDGET_SLUGS,
@@ -24,6 +26,7 @@ import {
   type BudgetAmountLite,
   type DraftBudget,
 } from '@/lib/budget-plan-diff'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type EditorView = 'tree' | 'template-pick' | 'template-preview' | 'template-confirm'
 
@@ -520,7 +523,7 @@ export function BudgetPlanEditorSheet({
                 Te verdelen
               </p>
               <p className={`font-mono text-sm font-bold tabular-nums ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {teVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(teVerdelen))}
+                {teVerdelen >= 0 ? '' : '–'}{<MaskedAmount value={Math.abs(teVerdelen)} tone="wil" />}
               </p>
             </div>
             <div className="flex gap-2">
@@ -719,6 +722,7 @@ function Row({
   indent: boolean
   average?: { avg: number; months: number }
 }) {
+  const { masked } = useMaskedAmounts()
   const amountInputId = `amount-${row.id}`
 
   // 12-month average is hidden for rows without historical data: unsaved
@@ -758,7 +762,7 @@ function Row({
               className="font-mono tabular-nums text-[11px] text-[var(--ink-3)]"
               title={averageTitle}
             >
-              ⌀ {formatCurrency(roundedAvg)}
+              ⌀ {<MaskedAmount value={roundedAvg} tone="wil" />}
             </span>
             <span className="text-[var(--ink-4)]">·</span>
             {takenOver ? (
@@ -767,7 +771,7 @@ function Row({
               <button
                 type="button"
                 onClick={() => onTakeOver(row.id, roundedAvg)}
-                aria-label={`Neem gemiddelde van ${formatCurrency(roundedAvg)} over als budgetbedrag`}
+                aria-label={`Neem gemiddelde van ${formatMaskedCurrency(roundedAvg, masked)} over als budgetbedrag`}
                 // py-1 preserves ~23-24px hit area even though the text is
                 // 11px; no negative margins because we're in a flex row.
                 className="py-1 text-[11px] text-[var(--ink-2)] underline underline-offset-2 decoration-[var(--border-ed)] hover:text-[var(--ink)] hover:decoration-[var(--ink-2)] transition-colors duration-150"
@@ -787,7 +791,7 @@ function Row({
             <span
               id={amountInputId}
               className="block w-full py-1.5 pl-6 pr-2 text-right font-mono text-sm tabular-nums text-[var(--ink-3)]"
-              aria-label={`Totaal ${formatCurrency(amountValue)}`}
+              aria-label={`Totaal ${formatMaskedCurrency(amountValue, masked)}`}
             >
               {amountValue.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
@@ -835,7 +839,7 @@ function Row({
             className="font-mono tabular-nums text-[11px] text-[var(--ink-3)]"
             title={averageTitle}
           >
-            ⌀ {formatCurrency(roundedAvg)}
+            ⌀ {<MaskedAmount value={roundedAvg} tone="wil" />}
           </span>
           <span className="text-[var(--ink-4)]">·</span>
           {takenOver ? (
@@ -844,7 +848,7 @@ function Row({
             <button
               type="button"
               onClick={() => onTakeOver(row.id, roundedAvg)}
-              aria-label={`Neem gemiddelde van ${formatCurrency(roundedAvg)} over als budgetbedrag`}
+              aria-label={`Neem gemiddelde van ${formatMaskedCurrency(roundedAvg, masked)} over als budgetbedrag`}
               className="py-1 px-1 -my-1 -mx-1 text-[11px] text-[var(--ink-2)] underline underline-offset-2 decoration-[var(--border-ed)] hover:text-[var(--ink)] hover:decoration-[var(--ink-2)] transition-colors duration-150"
             >
               Overnemen
@@ -1000,7 +1004,7 @@ function TemplatePreview({
                       <div className="flex items-center justify-between px-3 py-2">
                         <span className="text-sm font-medium text-[var(--ink)]">{parent.name}</span>
                         <span className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
-                          {formatCurrency(kids.reduce((s, k) => s + (k.amount ?? 0), 0))}
+                          {<MaskedAmount value={kids.reduce((s, k) => s + (k.amount ?? 0), 0)} tone="wil" />}
                         </span>
                       </div>
                       {kids.map((child) => (

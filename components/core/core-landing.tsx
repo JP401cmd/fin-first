@@ -19,10 +19,11 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import type { QuickAddIntent } from '@/lib/quick-add/types'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { CoreHero } from './core-hero'
 import { SectionHeader } from './section-header'
 import { CategoryCard, type CategorySegment } from './category-card'
+import { AddCategoryCard } from './add-category-card'
 import {
   findDeepenings,
   countTrackedItems,
@@ -403,8 +404,6 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
             kicker="Bezittingen"
             allHref="/core/assets"
             allLabel="Alle"
-            onAddClick={() => setQuickAddIntent('asset')}
-            addAriaLabel="Nieuwe bezitting toevoegen"
           />
 
           {assetGroups.length > 0 ? (
@@ -436,6 +435,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
                     meta={`${group.count} item${group.count === 1 ? '' : 's'}`}
                     segments={group.segments}
                     categoryKpis={assetCategoryKpis.get(group.type)}
+                    sparklineValues={initialData.categorySparklines[`asset:${group.type}`]}
                     href={`/core/assets/${group.type}`}
                     staggerIndex={idx}
                     variant="asset"
@@ -453,6 +453,13 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
                   />
                 )
               })}
+              <AddCategoryCard
+                label="Bezitting toevoegen"
+                onClick={() => setQuickAddIntent('asset')}
+                variant="asset"
+                staggerIndex={assetGroups.length}
+                ariaLabel="Nieuwe bezitting toevoegen"
+              />
             </div>
           ) : (
             <EmptyAssetsState onClick={() => setQuickAddIntent('asset')} />
@@ -467,8 +474,6 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
             kicker="Schulden"
             allHref="/core/debts"
             allLabel="Alle"
-            onAddClick={() => setQuickAddIntent('debt')}
-            addAriaLabel="Nieuwe schuld toevoegen"
           />
 
           {debtGroups.length > 0 ? (
@@ -483,11 +488,19 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
                   meta={`${group.count} item${group.count === 1 ? '' : 's'}`}
                   segments={group.segments}
                   categoryKpis={debtCategoryKpis.get(group.type)}
+                  sparklineValues={initialData.categorySparklines[`debt:${group.type}`]}
                   href={`/core/debts/${group.type}`}
                   staggerIndex={idx}
                   variant="debt"
                 />
               ))}
+              <AddCategoryCard
+                label="Schuld toevoegen"
+                onClick={() => setQuickAddIntent('debt')}
+                variant="debt"
+                staggerIndex={debtGroups.length}
+                ariaLabel="Nieuwe schuld toevoegen"
+              />
             </div>
           ) : (
             <EmptyDebtsState onClick={() => setQuickAddIntent('debt')} />
@@ -668,10 +681,8 @@ function NetWorthKassabon({
 
       <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
         <span className="font-sans text-[var(--ink)]">Netto vermogen</span>
-        <span
-          className={`tabular-nums ${netWorth >= 0 ? 'text-[var(--ink)]' : 'text-negative'}`}
-        >
-          {formatCurrency(netWorth)}
+        <span className={netWorth >= 0 ? 'text-[var(--ink)]' : 'text-negative'}>
+          <MaskedAmount value={netWorth} tone="kern" />
         </span>
       </div>
 
@@ -704,23 +715,19 @@ function KassabonGroup({
               <span className="ml-1 text-[10px] text-[var(--ink-4)]">({item.pct}%)</span>
             )}
           </span>
-          <span
-            className={`tabular-nums ${item.tone === 'debt' ? 'text-negative' : 'text-[var(--ink)]'}`}
-          >
-            {item.tone === 'debt' ? '−' : ''}
-            {formatCurrency(item.amount)}
+          <span className={item.tone === 'debt' ? 'text-negative' : 'text-[var(--ink)]'}>
+            <MaskedAmount value={item.amount} tone="kern" signPrefix={item.tone === 'debt' ? '-' : ''} />
           </span>
         </div>
       ))}
       <div className="mt-1 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1 font-semibold">
         <span className="font-sans text-sm text-[var(--ink-2)]">Subtotaal</span>
-        <span
-          className={`tabular-nums ${
-            label === 'Schulden' ? 'text-negative' : 'text-[var(--ink)]'
-          }`}
-        >
-          {label === 'Schulden' && subtotal > 0 ? '−' : ''}
-          {formatCurrency(subtotal)}
+        <span className={label === 'Schulden' ? 'text-negative' : 'text-[var(--ink)]'}>
+          <MaskedAmount
+            value={subtotal}
+            tone="kern"
+            signPrefix={label === 'Schulden' && subtotal > 0 ? '-' : ''}
+          />
         </span>
       </div>
     </div>

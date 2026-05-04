@@ -14,9 +14,10 @@
  * year-details-modal.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { HybridYearRow } from '../calc/hybrid-projection'
 
 export interface HybridTimelineTableProps {
@@ -30,17 +31,18 @@ function phaseLabel(phase: 'opbouw' | 'afbouw'): string {
   return phase === 'opbouw' ? 'Opbouw' : 'Afbouw'
 }
 
-/** Optioneel bedrag renderen: leeg toon een gedimde em-dash bij 0. */
-function money(value: number): string {
-  return Math.abs(value) < 0.5 ? '—' : formatCurrency(Math.round(value))
-}
-
 export function HybridTimelineTable({
   rows,
   fireAge,
   aowAge,
   onRowClick,
 }: HybridTimelineTableProps) {
+  const { masked } = useMaskedAmounts()
+  const money = useCallback(
+    (value: number): string =>
+      Math.abs(value) < 0.5 ? '—' : formatMaskedCurrency(Math.round(value), masked),
+    [masked],
+  )
   const [expanded, setExpanded] = useState(false)
 
   const displayRows = useMemo(() => {

@@ -4,7 +4,8 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { ArrowUpDown, TrendingUp, ShoppingCart, PiggyBank, CreditCard } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -85,8 +86,8 @@ function CategoryRow({ config, spent, limit, dailyExp, hasEntered }: CategoryRow
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-mono tabular-nums text-xs text-[var(--ink)]">
-            {formatCurrency(spent)}
+          <span className="text-[var(--ink)]">
+            <MaskedAmount value={spent} tone="kern" className="text-xs" />
           </span>
           {freedomStr && (
             <span className="font-serif italic text-[10px] text-[var(--ink-4)]">
@@ -164,8 +165,12 @@ function ComparisonBar({ label, current, previous, color, hasEntered }: Comparis
         </div>
       </div>
       <div className="flex gap-1 text-[9px] text-[var(--ink-4)]">
-        <span className="flex-1 text-center font-mono tabular-nums">{formatCurrency(current)}</span>
-        <span className="flex-1 text-center font-mono tabular-nums">{formatCurrency(previous)}</span>
+        <span className="flex-1 text-center">
+          <MaskedAmount value={current} tone="kern" className="text-[9px]" />
+        </span>
+        <span className="flex-1 text-center">
+          <MaskedAmount value={previous} tone="kern" className="text-[9px]" />
+        </span>
       </div>
     </div>
   )
@@ -190,8 +195,13 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Cashflow Maand" href={href}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-positive' : 'text-negative'}`}>
-          {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+        <p className={`leading-none truncate ${isPositive ? 'text-positive' : 'text-negative'}`}>
+          <MaskedAmount
+            value={cashFlow}
+            signPrefix={isPositive ? '+' : ''}
+            tone="kern"
+            className="text-[15px] font-semibold"
+          />
         </p>
       </WidgetShell>
     )
@@ -210,8 +220,13 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
-        <p className={`font-mono text-lg font-semibold tabular-nums ${isPositive ? 'text-positive' : 'text-negative'}`}>
-          {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+        <p className={isPositive ? 'text-positive' : 'text-negative'}>
+          <MaskedAmount
+            value={cashFlow}
+            signPrefix={isPositive ? '+' : ''}
+            tone="kern"
+            className="text-lg font-semibold"
+          />
         </p>
         {freedomDays !== null && (
           <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
@@ -230,8 +245,13 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
       <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
-              {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+            <p className={isPositive ? 'text-[var(--ink)]' : 'text-negative'}>
+              <MaskedAmount
+                value={cashFlow}
+                signPrefix={isPositive ? '+' : ''}
+                tone="kern"
+                className="text-xl font-semibold"
+              />
             </p>
             {freedomStr && (
               <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
@@ -242,16 +262,25 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
           <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
             <div className="flex justify-between text-[11px] text-[var(--ink-3)]">
               <span>Inkomsten</span>
-              <span className="font-mono tabular-nums text-positive">+{formatCurrency(monthlyIncome)}</span>
+              <span className="text-positive">
+                <MaskedAmount value={monthlyIncome} signPrefix="+" tone="kern" />
+              </span>
             </div>
             <div className="flex justify-between text-[11px] text-[var(--ink-3)]">
               <span>Uitgaven</span>
-              <span className="font-mono tabular-nums text-negative">-{formatCurrency(monthlyExpenses)}</span>
+              <span className="text-negative">
+                <MaskedAmount value={monthlyExpenses} signPrefix="-" tone="kern" />
+              </span>
             </div>
             <div className="border-t border-dashed border-[var(--border-ed)] pt-1 flex justify-between text-[11px]">
               <span className="text-[var(--ink-3)]">Netto</span>
-              <span className={`font-mono tabular-nums font-medium ${isPositive ? 'text-positive' : 'text-negative'}`}>
-                {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+              <span className={isPositive ? 'text-positive' : 'text-negative'}>
+                <MaskedAmount
+                  value={cashFlow}
+                  signPrefix={isPositive ? '+' : ''}
+                  tone="kern"
+                  className="font-medium"
+                />
               </span>
             </div>
           </div>
@@ -274,8 +303,13 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Netto cashflow
             </p>
-            <p className={`font-mono tabular-nums text-2xl font-semibold ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
-              {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+            <p className={isPositive ? 'text-[var(--ink)]' : 'text-negative'}>
+              <MaskedAmount
+                value={cashFlow}
+                signPrefix={isPositive ? '+' : ''}
+                tone="kern"
+                className="text-2xl font-semibold"
+              />
             </p>
           </div>
           {freedomStr && (
@@ -306,12 +340,21 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
         {/* ── Income vs Expenses summary row ── */}
         <div className="mt-2 flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2.5 py-1.5">
           <div className="flex items-center gap-3 text-[11px]">
-            <span className="font-mono tabular-nums text-positive">+{formatCurrency(monthlyIncome)}</span>
+            <span className="text-positive">
+              <MaskedAmount value={monthlyIncome} signPrefix="+" tone="kern" />
+            </span>
             <span className="text-[var(--ink-4)]">ˆ’</span>
-            <span className="font-mono tabular-nums text-negative">{formatCurrency(monthlyExpenses)}</span>
+            <span className="text-negative">
+              <MaskedAmount value={monthlyExpenses} tone="kern" />
+            </span>
           </div>
-          <span className={`font-mono tabular-nums text-[11px] font-semibold ${isPositive ? 'text-positive' : 'text-negative'}`}>
-            = {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+          <span className={isPositive ? 'text-positive' : 'text-negative'}>
+            = <MaskedAmount
+              value={cashFlow}
+              signPrefix={isPositive ? '+' : ''}
+              tone="kern"
+              className="text-[11px] font-semibold"
+            />
           </span>
         </div>
 

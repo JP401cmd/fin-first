@@ -19,7 +19,8 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type {
   CryptoHoldingRow,
   CryptoHoldingPeriodReturn,
@@ -175,6 +176,8 @@ export function CryptoHeatmap({ holdings, perHoldingChange24h }: CryptoHeatmapPr
 // ── Tile label (alleen tonen als blok groot genoeg) ──────────────────────
 
 function TileLabel({ tile }: { tile: LaidOutTile }) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Heuristiek: alleen tekst als blok minimaal ~90×40 px in viewbox-ruimte.
   // Een SVG met preserveAspectRatio="none" rekt tekst lelijk uit; daarom
   // gebruiken we een vaste pixel-font die mee-rekt — bewuste keuze, past
@@ -232,7 +235,7 @@ function TileLabel({ tile }: { tile: LaidOutTile }) {
           fill={subColor}
           style={{ fontFamily: 'var(--font-mono, monospace)' }}
         >
-          {formatCurrency(tile.valueEur)}
+          {fc(tile.valueEur)}
         </text>
       )}
     </g>
@@ -242,6 +245,8 @@ function TileLabel({ tile }: { tile: LaidOutTile }) {
 // ── Tooltip ──────────────────────────────────────────────────────────────
 
 function HeatmapTooltip({ tile }: { tile: LaidOutTile | null }) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   if (!tile) return null
   // Positionering: absoluut binnen de relative-container, vanaf het
   // midden-boven van het blok. Klem aan de randen om uit-viewport te voorkomen.
@@ -266,7 +271,7 @@ function HeatmapTooltip({ tile }: { tile: LaidOutTile | null }) {
       <p className="font-serif text-[11px] italic text-[var(--ink-3)]">{tile.name}</p>
       <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-mono tabular-nums text-[var(--ink-2)]">
         <dt className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Waarde</dt>
-        <dd className="text-right">{formatCurrency(tile.valueEur)}</dd>
+        <dd className="text-right">{fc(tile.valueEur)}</dd>
         <dt className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Units</dt>
         <dd className="text-right">{formatUnits(tile.units)}</dd>
         {tile.changePct != null && (

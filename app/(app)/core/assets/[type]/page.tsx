@@ -42,6 +42,7 @@ import {
   loadConnectionsByAssetIds,
   type AssetConnectionSummary,
 } from '@/lib/connections-data'
+import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { AssetCategoryPage } from '@/components/core/asset-category-page'
 
 // ── Type guards ──────────────────────────────────────────────
@@ -256,6 +257,14 @@ export default async function AssetCategoryServerPage({
 
   const kpiRefs: KpiContextRefs | null = await kpiRefsPromise
 
+  // ── Per-asset sparklines voor de items-tab ───────────────────
+  // Eén batched query op `balance_snapshots` voor alle assets in deze
+  // categorie. Failure is non-fataal: lege map → kaarten tonen alleen
+  // de tweelagentint zonder breuklijn.
+  const assetSparklines = assets.length > 0
+    ? await loadEntitySparklines(supabase, 'asset', assets.map((a) => a.id))
+    : {}
+
   // ── Connections per asset (R2 + R5) ──────────────────────────
   // Voor crypto én investment laden we de actieve externe koppeling per
   // asset zodat de asset-card op de items-tab een plug-indicator kan tonen
@@ -297,6 +306,7 @@ export default async function AssetCategoryServerPage({
       initialCryptoVolatility={cryptoVolatility}
       initialCryptoFees={cryptoFees}
       initialInvestmentHoldings={investmentHoldings}
+      initialAssetSparklines={assetSparklines}
     />
   )
 }

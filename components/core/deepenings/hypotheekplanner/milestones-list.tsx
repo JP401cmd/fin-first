@@ -21,7 +21,8 @@
  */
 
 import { useMemo } from 'react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   amortizationSchedule,
   linearAmortization,
@@ -86,6 +87,8 @@ export function MilestonesList({
   remainingMonths,
   repaymentType,
 }: MilestonesListProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const schedule = useMemo<AmortizationRow[]>(() => {
     if (balance <= 0 || remainingMonths <= 0) return []
     if (repaymentType === 'aflossingsvrij') {
@@ -231,7 +234,7 @@ export function MilestonesList({
         <p className="text-[11px] leading-relaxed text-[var(--ink-4)]">
           LTV-percentages zijn berekend tegen de huidige marktwaarde van{' '}
           <span className="font-mono tabular-nums">
-            {formatCurrency(marketValue)}
+            {fc(marketValue)}
           </span>
           . Een waardestijging brengt deze mijlpalen dichterbij.
         </p>

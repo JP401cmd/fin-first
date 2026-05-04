@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { formatCurrency } from '@/components/app/budget-shared'
+
 import {
   computeLifeEventImpact,
   type FinancialInput,
@@ -9,6 +9,7 @@ import {
   type LifeEventImpact,
 } from '@/lib/horizon-data'
 import { Info, ChevronDown, ExternalLink, Download, Loader2, FileText } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Shared types ─────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ export function PensionParseSummaryCard({
       {result.aowBedrag != null && (
         <div className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 border border-horizon-100">
           <span className="text-xs font-medium text-[var(--ink-3)]">AOW (verwacht)</span>
-          <span className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">{formatCurrency(result.aowBedrag)}/mnd</span>
+          <span className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">{<MaskedAmount value={result.aowBedrag} tone="horizon" />}/mnd</span>
         </div>
       )}
 
@@ -95,7 +96,7 @@ export function PensionParseSummaryCard({
                     </p>
                   </div>
                   <span className="shrink-0 font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-                    {formatCurrency(regeling.brutoBedrag)}/mnd
+                    {<MaskedAmount value={regeling.brutoBedrag} tone="horizon" />}/mnd
                   </span>
                 </div>
                 {isSelected && hasMultiple && (
@@ -111,7 +112,7 @@ export function PensionParseSummaryCard({
       {result.nabestaandenpensioen != null && (
         <div className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 border border-horizon-100">
           <span className="text-xs font-medium text-[var(--ink-3)]">Nabestaandenpensioen</span>
-          <span className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">{formatCurrency(result.nabestaandenpensioen)}/mnd</span>
+          <span className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">{<MaskedAmount value={result.nabestaandenpensioen} tone="horizon" />}/mnd</span>
         </div>
       )}
 

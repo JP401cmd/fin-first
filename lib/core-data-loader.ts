@@ -161,6 +161,16 @@ export interface CorePageData {
    * de UI valt dan terug op een rente-fallback.
    */
   cashStatsByAssetId: Record<string, CashAssetStats>
+
+  /**
+   * Per-categorie sparkline-waarden over de afgelopen 6 maanden, opgebouwd
+   * uit `balance_snapshots`. Key is `asset:<asset_type>` of
+   * `debt:<debt_type>`; value is een array van 6 maandwaarden (oudste →
+   * nieuwste), gewogen met `net_worth_inclusion_pct`. Categorieën zonder
+   * historische snapshots staan niet in de map — de UI valt dan terug op
+   * geen sparkline (alleen tinted achtergrond).
+   */
+  categorySparklines: Record<string, number[]>
 }
 
 // ── Main loader ────────────────────────────────────────────────
@@ -204,6 +214,106 @@ export const loadCoreData = cache(async function loadCoreData(
       return (result.data ?? []) as SparkTx[]
     } catch {
       return []
+    }
+  })()
+
+  // ── Categorie-sparklines promise: balance_snapshots over de afgelopen
+  //    6 maanden, geaggregeerd per (entity_type, entity_subtype) per maand
+  //    en gewogen met inclusion_pct. Parallel gestart, pas vlak voor de
+  //    return geawait. Failure → leeg object, kaarten tonen geen sparkline.
+  const sixMonthsAgoForSparkline = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth() - 5, 1),
+  ).toISOString().split('T')[0]
+  type SnapRow = {
+    snapshot_date: string
+    entity_type: 'asset' | 'debt'
+    entity_subtype: string | null
+    balance: number | string
+    net_worth_inclusion_pct: number | string | null
+  }
+  const categorySparklinesPromise: Promise<Record<string, number[]>> = (async () => {
+    try {
+      const result = await supabase
+        .from('balance_snapshots')
+        .select('snapshot_date, entity_type, entity_subtype, balance, net_worth_inclusion_pct')
+        .gte('snapshot_date', sixMonthsAgoForSparkline)
+        .order('snapshot_date', { ascending: true })
+      const rows = (result.data ?? []) as SnapRow[]
+      if (rows.length === 0) return {}
+
+      // Bouw 6 maand-keys op (YYYY-MM, oudste → nieuwste).
+      const monthKeys: string[] = []
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() - i, 1))
+        monthKeys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
+      }
+      const monthIdx = new Map<string, number>(monthKeys.map((k, i) => [k, i]))
+
+      // Per (categoryKey, monthIdx) → som van gewogen balance van de laatste
+      // snapshot in die maand. We willen één waarde per maand per categorie:
+      // aggregeer per (categorie, maand) door per entity de meest recente
+      // snapshot in die maand te kiezen, en daarna over alle entities binnen
+      // de categorie te sommeren.
+      type EntityKey = string // `${type}:${subtype}:${entityId}` — niet beschikbaar zonder entity_id, dus we vereenvoudigen: per snapshot_date sommeren we alle balances binnen categorie + maand. Snapshots worden idealiter eens per maand gemaakt; bij meerdere per maand pakken we de laatste snapshot_date binnen die maand.
+
+      // Eerst: per (categorie, maand) → laatste snapshot_date.
+      const latestDateByCatMonth = new Map<string, string>()
+      for (const r of rows) {
+        const subtype = r.entity_subtype ?? 'other'
+        const month = r.snapshot_date.substring(0, 7)
+        if (!monthIdx.has(month)) continue
+        const catKey = `${r.entity_type}:${subtype}:${month}`
+        const cur = latestDateByCatMonth.get(catKey)
+        if (!cur || r.snapshot_date > cur) {
+          latestDateByCatMonth.set(catKey, r.snapshot_date)
+        }
+      }
+
+      // Tweede pas: som balances voor (categorie, maand) op de laatste datum.
+      const sumByCatMonth = new Map<string, number>()
+      for (const r of rows) {
+        const subtype = r.entity_subtype ?? 'other'
+        const month = r.snapshot_date.substring(0, 7)
+        if (!monthIdx.has(month)) continue
+        const catKey = `${r.entity_type}:${subtype}:${month}`
+        if (latestDateByCatMonth.get(catKey) !== r.snapshot_date) continue
+        const weight = (Number(r.net_worth_inclusion_pct ?? 100)) / 100
+        const val = Number(r.balance) * weight
+        const k = `${r.entity_type}:${subtype}|${month}`
+        sumByCatMonth.set(k, (sumByCatMonth.get(k) ?? 0) + val)
+      }
+
+      // Verzamel alle categorie-keys.
+      const catKeys = new Set<string>()
+      for (const k of sumByCatMonth.keys()) {
+        catKeys.add(k.split('|')[0])
+      }
+
+      const out: Record<string, number[]> = {}
+      for (const cat of catKeys) {
+        const series = new Array<number | null>(6).fill(null)
+        for (let i = 0; i < monthKeys.length; i++) {
+          const v = sumByCatMonth.get(`${cat}|${monthKeys[i]}`)
+          series[i] = v ?? null
+        }
+        // Forward-fill: als een maand ontbreekt, neem de vorige bekende waarde.
+        // Heeft de eerste maand geen waarde, vul met de eerste niet-null.
+        const firstReal = series.find((v) => v != null) ?? 0
+        let last = firstReal as number
+        const filled: number[] = []
+        for (const v of series) {
+          if (v != null) last = v
+          filled.push(last)
+        }
+        // Sla altijd op zodra we ten minste één snapshot hebben — een
+        // vlakke lijn (alle waarden gelijk) is OK: de UI rendert die als
+        // horizontale breuklijn op het midden van de kaart, wat correct
+        // de "geen variatie"-status communiceert.
+        if (filled.some((v) => v > 0)) out[cat] = filled
+      }
+      return out
+    } catch {
+      return {}
     }
   })()
 
@@ -928,5 +1038,6 @@ export const loadCoreData = cache(async function loadCoreData(
     holdingsPortfolio,
     rawHoldings: rawHoldingsForKpi,
     cashStatsByAssetId: await cashStatsPromise,
+    categorySparklines: await categorySparklinesPromise,
   }
 })

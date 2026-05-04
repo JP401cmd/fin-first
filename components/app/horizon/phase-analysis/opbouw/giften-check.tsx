@@ -9,6 +9,7 @@ import {
   NL_SCHENKING_VRIJSTELLING,
   type SchenkingAnalysis,
 } from '@/lib/phase-analysis'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 /** Minimum portfolio below which gifting analysis is not relevant. */
 const MIN_PORTFOLIO_FOR_GIFTING = 50_000
@@ -216,7 +217,7 @@ export const GiftenCheck = memo(function GiftenCheck(props: GiftenCheckProps) {
             Veilig schenkingsbedrag
           </p>
           <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-            {formatCurrency(scenario1Kind.veiligBedrag)}
+            {<MaskedAmount value={scenario1Kind.veiligBedrag} tone="horizon" />}
             <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
               per ontvanger per jaar
             </span>
@@ -264,7 +265,7 @@ export const GiftenCheck = memo(function GiftenCheck(props: GiftenCheckProps) {
                       {s.label}
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                      {formatCurrency(s.totaalGeschonken)}
+                      {<MaskedAmount value={s.totaalGeschonken} tone="horizon" />}
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
                       {s.fireImpactMaanden > 0
@@ -307,7 +308,7 @@ const ExemptionCard = memo(function ExemptionCard({
     <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
       <p className="text-[10px] leading-snug text-[var(--ink-4)]">{label}</p>
       <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-        {formatCurrency(amount)}
+        {<MaskedAmount value={amount} tone="horizon" />}
         <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
           belastingvrij
         </span>

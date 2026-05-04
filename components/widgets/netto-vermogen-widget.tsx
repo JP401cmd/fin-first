@@ -4,7 +4,9 @@ import { useMemo, memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
+import { formatMaskedCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Wallet, Users, UserCheck } from 'lucide-react'
@@ -19,6 +21,7 @@ interface Props {
 const SVG_W = 200
 
 export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, data, href }: Props) {
+  const { masked } = useMaskedAmounts()
   const { perspective, partnerName } = usePerspective()
   const isHouseholdView = perspective === 'household' && data.householdOverrides != null
   const isPartnerView = perspective === 'partner' && data.partnerOverrides != null
@@ -158,8 +161,8 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker={kickerLabel} href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {formatCurrency(netWorth)}
+        <p className="text-[var(--ink)] leading-none truncate">
+          <MaskedAmount value={netWorth} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -176,8 +179,8 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
               {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
             </div>
           )}
-          <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(netWorth)}
+          <p className="text-[var(--ink)]">
+            <MaskedAmount value={netWorth} tone="kern" className="text-lg font-semibold" />
           </p>
           {freedomStr && (
             <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
@@ -185,11 +188,16 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             </p>
           )}
           {momDelta && !isHouseholdView && !isPartnerView && (
-            <p className={`mt-1 font-mono text-[11px] tabular-nums font-medium ${
+            <p className={`mt-1 ${
               momDelta.delta >= 0 ? 'text-positive' : 'text-negative'
             }`}>
-              {momDelta.delta >= 0 ? '–²' : '–¼'}{' '}
-              {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}
+              <span className="font-mono">{momDelta.delta >= 0 ? '–²' : '–¼'}{' '}</span>
+              <MaskedAmount
+                value={momDelta.delta}
+                signPrefix={momDelta.delta >= 0 ? '+' : ''}
+                tone="kern"
+                className="text-[11px] font-medium"
+              />
             </p>
           )}
         </div>
@@ -209,8 +217,8 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                 {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
               </div>
             )}
-            <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-              {formatCurrency(netWorth)}
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={netWorth} tone="kern" className="text-xl font-bold" />
             </p>
             {freedomStr && (
               <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
@@ -218,10 +226,17 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
               </p>
             )}
             {momDelta && !isHouseholdView && !isPartnerView && (
-              <p className={`mt-1 font-mono text-[11px] tabular-nums font-semibold ${momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {momDelta.delta >= 0 ? '–²' : '–¼'}{' '}
-                {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}{' '}
-                ({momDelta.delta >= 0 ? '+' : ''}{momDelta.pct.toFixed(1)}%)
+              <p className={`mt-1 ${momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}`}>
+                <span className="font-mono">{momDelta.delta >= 0 ? '–²' : '–¼'}{' '}</span>
+                <MaskedAmount
+                  value={momDelta.delta}
+                  signPrefix={momDelta.delta >= 0 ? '+' : ''}
+                  tone="kern"
+                  className="text-[11px] font-semibold"
+                />{' '}
+                <span className="font-mono tabular-nums text-[11px]">
+                  ({momDelta.delta >= 0 ? '+' : ''}{momDelta.pct.toFixed(1)}%)
+                </span>
               </p>
             )}
           </div>
@@ -241,8 +256,8 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   <line x1={sparkline.currentX} y1={sparkline.pad.top} x2={sparkline.currentX} y2={sparkline.pad.top + sparkline.chartH} stroke="var(--border-md)" strokeWidth={1} strokeDasharray="2 2" strokeOpacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'stroke-opacity 80ms ease-out 455ms' : 'none' }} />
                   <path d={sparkline.forecastPath} fill="none" stroke="var(--hor-t)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 3" strokeOpacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'stroke-opacity 400ms ease-out 550ms' : 'none' }} />
                   <circle cx={sparkline.currentDotX} cy={sparkline.currentDotY} r={3} fill="var(--kern-t)" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 80ms ease-out 500ms' : 'none' }} />
-                  <text x={sparkline.pad.left + 1} y={Math.max(sparkline.startY - 4, sparkline.pad.top + 6)} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none' }}>{formatCurrency(sparkline.startValue)}</text>
-                  <text x={sparkline.forecastEndX - 1} y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)} fill="var(--hor-t)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" textAnchor="end" opacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none' }}>{formatCurrency(sparkline.forecastEndValue)}</text>
+                  <text x={sparkline.pad.left + 1} y={Math.max(sparkline.startY - 4, sparkline.pad.top + 6)} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none' }}>{formatMaskedCurrency(sparkline.startValue, masked)}</text>
+                  <text x={sparkline.forecastEndX - 1} y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)} fill="var(--hor-t)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" textAnchor="end" opacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none' }}>{formatMaskedCurrency(sparkline.forecastEndValue, masked)}</text>
                 </svg>
                 <div className="flex justify-between mt-0.5">
                   <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>12m geleden</span>
@@ -276,14 +291,17 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
           </div>
         )}
         <div className="flex items-baseline gap-2">
-          <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(netWorth)}
+          <p className="text-[var(--ink)]">
+            <MaskedAmount value={netWorth} tone="kern" className="text-2xl font-semibold" />
           </p>
           {momDelta && !isHouseholdView && !isPartnerView && (
-            <span className={`font-mono text-sm tabular-nums font-medium ${
-              momDelta.delta >= 0 ? 'text-positive' : 'text-negative'
-            }`}>
-              {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}
+            <span className={momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}>
+              <MaskedAmount
+                value={momDelta.delta}
+                signPrefix={momDelta.delta >= 0 ? '+' : ''}
+                tone="kern"
+                className="text-sm font-medium"
+              />
             </span>
           )}
         </div>
@@ -383,7 +401,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none',
                 }}
               >
-                {formatCurrency(sparkline.startValue)}
+                {formatMaskedCurrency(sparkline.startValue, masked)}
               </text>
 
               {/* Value label at current position (end of historical) */}
@@ -400,7 +418,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none',
                 }}
               >
-                {formatCurrency(sparkline.endValue)}
+                {formatMaskedCurrency(sparkline.endValue, masked)}
               </text>
 
               {/* Value label at end of forecast */}
@@ -416,7 +434,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none',
                 }}
               >
-                {formatCurrency(sparkline.forecastEndValue)}
+                {formatMaskedCurrency(sparkline.forecastEndValue, masked)}
               </text>
             </svg>
 
@@ -449,27 +467,29 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             </div>
             {/* Labels: Bezittingen left, Schulden right */}
             <div className="flex justify-between text-[11px]">
-              <span className="font-mono tabular-nums text-positive">
-                Bezittingen {formatCurrency(totalAssets)}
+              <span className="text-positive">
+                Bezittingen <MaskedAmount value={totalAssets} tone="kern" />
               </span>
-              <span className="font-mono tabular-nums text-negative">
-                Schulden {formatCurrency(totalDebts)}
+              <span className="text-negative">
+                Schulden <MaskedAmount value={totalDebts} tone="kern" />
               </span>
             </div>
             {/* MoM delta row — prominent */}
             {momDelta && (
               <div className="flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2 py-1">
                 <span className="text-[11px] text-[var(--ink-3)]">Î” deze maand</span>
-                <span
-                  className={`font-mono tabular-nums text-[11px] font-semibold ${
-                    momDelta.delta >= 0 ? 'text-positive' : 'text-negative'
-                  }`}
-                >
-                  {momDelta.delta >= 0 ? '+' : ''}
-                  {formatCurrency(momDelta.delta)}
+                <span className={momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}>
+                  <MaskedAmount
+                    value={momDelta.delta}
+                    signPrefix={momDelta.delta >= 0 ? '+' : ''}
+                    tone="kern"
+                    className="text-[11px] font-semibold"
+                  />
                   {' '}
-                  ({momDelta.delta >= 0 ? '+' : ''}
-                  {momDelta.pct.toFixed(1)}%)
+                  <span className="font-mono tabular-nums text-[11px] font-semibold">
+                    ({momDelta.delta >= 0 ? '+' : ''}
+                    {momDelta.pct.toFixed(1)}%)
+                  </span>
                 </span>
               </div>
             )}

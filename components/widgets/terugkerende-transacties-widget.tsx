@@ -1,7 +1,8 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { RefreshCcw, Home, ShoppingCart, Car, Zap, Heart, Smartphone, CreditCard, HelpCircle } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 
@@ -46,8 +47,8 @@ export const TerugkerendeTransactiesWidget = memo(function TerugkerendeTransacti
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Vaste Lasten" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {formatCurrency(totalRecurringAmount)}
+        <p className="text-[var(--ink)] leading-none truncate">
+          <MaskedAmount value={totalRecurringAmount} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -77,8 +78,8 @@ export const TerugkerendeTransactiesWidget = memo(function TerugkerendeTransacti
       <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
         <div className="flex items-center gap-2">
           <RefreshCcw className="h-4 w-4 text-kern-500 shrink-0" />
-          <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(totalRecurringAmount)} <span className="text-sm font-normal text-[var(--ink-3)]">per maand</span>
+          <p className="text-[var(--ink)]">
+            <MaskedAmount value={totalRecurringAmount} tone="kern" className="text-xl font-semibold" /> <span className="text-sm font-normal text-[var(--ink-3)]">per maand</span>
           </p>
         </div>
         {top5.length > 0 && (
@@ -86,7 +87,9 @@ export const TerugkerendeTransactiesWidget = memo(function TerugkerendeTransacti
             {top5.map((t) => (
               <li key={t.id} className="flex items-center justify-between text-xs text-[var(--ink-2)]">
                 <span className="truncate mr-2">{t.name}</span>
-                <span className="font-mono tabular-nums shrink-0">{formatCurrency(t.amount)}</span>
+                <span className="shrink-0">
+                  <MaskedAmount value={t.amount} tone="kern" />
+                </span>
               </li>
             ))}
           </ul>
@@ -110,13 +113,13 @@ export const TerugkerendeTransactiesWidget = memo(function TerugkerendeTransacti
   return (
     <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
       <div className="flex items-baseline gap-2">
-        <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(totalRecurringAmount)}
+        <p className="text-[var(--ink)]">
+          <MaskedAmount value={totalRecurringAmount} tone="kern" className="text-xl font-semibold" />
         </p>
         <span className="text-sm text-[var(--ink-3)]">per maand</span>
       </div>
       <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-        {formatCurrency(yearlyTotal)} per jaar
+        <MaskedAmount value={yearlyTotal} tone="kern" /> per jaar
         {incomePercent !== null && (
           <span> &middot; {incomePercent}% van inkomen</span>
         )}
@@ -131,7 +134,7 @@ export const TerugkerendeTransactiesWidget = memo(function TerugkerendeTransacti
                 <span className="truncate">{t.name}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="font-mono tabular-nums text-xs">{formatCurrency(t.amount)}</span>
+                <MaskedAmount value={t.amount} tone="kern" className="text-xs" />
                 {t.frequency && (
                   <span className="text-[10px] text-[var(--ink-4)]">/{t.frequency}</span>
                 )}

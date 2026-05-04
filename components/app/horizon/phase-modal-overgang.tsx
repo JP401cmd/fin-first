@@ -4,7 +4,6 @@ import { memo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
-import { formatCurrency } from '@/lib/format'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
 import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
 import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-events-in-phase'
@@ -19,6 +18,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -157,7 +157,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
         {/* 2. Fase-header — compact summary line */}
         <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
-            Overgang &middot; {formatCurrency(Math.round(startVermogen))} &rarr; {formatCurrency(Math.round(eindVermogen))} &middot; {durationYears} jaar
+            Overgang &middot; {<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} &middot; {durationYears} jaar
           </p>
         </div>
 
@@ -309,22 +309,22 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
                 )}
                 <AssumptionRow
                   label="Jaarlijkse onttrekking"
-                  value={formatCurrency(Math.round(yearlyWithdrawal > 0 ? yearlyWithdrawal : yearlyExpenses))}
+                  value={<MaskedAmount value={Math.round(yearlyWithdrawal > 0 ? yearlyWithdrawal : yearlyExpenses)} tone="horizon" />}
                 />
                 <AssumptionRow
                   label="Jaarlijkse uitgaven"
-                  value={formatCurrency(Math.round(yearlyExpenses))}
+                  value={<MaskedAmount value={Math.round(yearlyExpenses)} tone="horizon" />}
                 />
                 {transitionScenario === 'shortfall' && yearlyAowIncome > 0 && (
                   <>
                     <AssumptionRow
                       label="AOW-inkomen/jaar"
-                      value={formatCurrency(Math.round(yearlyAowIncome))}
+                      value={<MaskedAmount value={Math.round(yearlyAowIncome)} tone="horizon" />}
                     />
                     {yearlyExpenses > yearlyAowIncome && (
                       <AssumptionRow
                         label="Netto tekort/jaar"
-                        value={formatCurrency(Math.round(yearlyExpenses - yearlyAowIncome))}
+                        value={<MaskedAmount value={Math.round(yearlyExpenses - yearlyAowIncome)} tone="horizon" />}
                       />
                     )}
                   </>
@@ -398,28 +398,28 @@ function GapAnalysisKassabon({
 
       {/* Waterfall receipt rows */}
       <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-        <ReceiptRow label="Startvermogen (bij FIRE)" value={formatCurrency(Math.round(startVermogen))} />
+        <ReceiptRow label="Startvermogen (bij FIRE)" value={<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} />
         <ReceiptRow
           label="Rendement"
-          value={formatCurrency(Math.round(totalRendement))}
+          value={<MaskedAmount value={Math.round(totalRendement)} tone="horizon" />}
           positive={totalRendement > 0}
         />
         <ReceiptRow
           label="Onttrekking"
-          value={totalOnttrekking > 0 ? `\u2212${formatCurrency(Math.round(totalOnttrekking)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
+          value={totalOnttrekking > 0 ? <MaskedAmount value={Math.round(totalOnttrekking)} signPrefix="-" tone="horizon" /> : <MaskedAmount value={0} tone="horizon" />}
           negative={totalOnttrekking > 0}
         />
         <ReceiptRow
           label="Box 3 belasting"
-          value={totalBox3 > 0 ? `\u2212${formatCurrency(Math.round(totalBox3)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
+          value={totalBox3 > 0 ? <MaskedAmount value={Math.round(totalBox3)} signPrefix="-" tone="horizon" /> : <MaskedAmount value={0} tone="horizon" />}
           negative={totalBox3 > 0}
         />
         {Math.abs(totalEvents) > 0.5 && (
           <ReceiptRow
             label="Life events"
             value={totalEvents >= 0
-              ? formatCurrency(Math.round(totalEvents))
-              : `\u2212${formatCurrency(Math.round(Math.abs(totalEvents))).replace('\u20AC', '\u20AC ')}`}
+              ? <MaskedAmount value={Math.round(totalEvents)} tone="horizon" />
+              : <MaskedAmount value={Math.round(Math.abs(totalEvents))} signPrefix="-" tone="horizon" />}
             positive={totalEvents > 0}
             negative={totalEvents < 0}
           />
@@ -430,7 +430,7 @@ function GapAnalysisKassabon({
       <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
         <span className="font-sans text-sm text-[var(--ink)]">Vermogen bij AOW</span>
         <span className="font-mono tabular-nums text-[var(--ink)]">
-          {formatCurrency(Math.round(eindVermogen))}
+          {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />}
         </span>
       </div>
 
@@ -442,7 +442,7 @@ function GapAnalysisKassabon({
           </p>
         ) : (
           <p className="text-[11px] text-[var(--negative)]">
-            &#9888; Tekort van {formatCurrency(Math.round(totalExpenses - portfolioAtTransitionStart))} tijdens overgang
+            &#9888; Tekort van {<MaskedAmount value={Math.round(totalExpenses - portfolioAtTransitionStart)} tone="horizon" />} tijdens overgang
           </p>
         )}
       </div>
@@ -495,35 +495,35 @@ function ShortfallAnalysis({
 
       {/* Waterfall receipt rows */}
       <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-        <ReceiptRow label="Startvermogen" value={formatCurrency(Math.round(startVermogen))} />
+        <ReceiptRow label="Startvermogen" value={<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} />
         <ReceiptRow
           label="Rendement"
-          value={formatCurrency(Math.round(totalRendement))}
+          value={<MaskedAmount value={Math.round(totalRendement)} tone="horizon" />}
           positive={totalRendement > 0}
         />
         {totalIncome > 0 && (
           <ReceiptRow
             label="AOW/Pensioen inkomen"
-            value={formatCurrency(Math.round(totalIncome))}
+            value={<MaskedAmount value={Math.round(totalIncome)} tone="horizon" />}
             positive
           />
         )}
         <ReceiptRow
           label="Onttrekking"
-          value={totalOnttrekking > 0 ? `\u2212${formatCurrency(Math.round(totalOnttrekking)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
+          value={totalOnttrekking > 0 ? <MaskedAmount value={Math.round(totalOnttrekking)} signPrefix="-" tone="horizon" /> : <MaskedAmount value={0} tone="horizon" />}
           negative={totalOnttrekking > 0}
         />
         <ReceiptRow
           label="Box 3 belasting"
-          value={totalBox3 > 0 ? `\u2212${formatCurrency(Math.round(totalBox3)).replace('\u20AC', '\u20AC ')}` : formatCurrency(0)}
+          value={totalBox3 > 0 ? <MaskedAmount value={Math.round(totalBox3)} signPrefix="-" tone="horizon" /> : <MaskedAmount value={0} tone="horizon" />}
           negative={totalBox3 > 0}
         />
         {Math.abs(totalEvents) > 0.5 && (
           <ReceiptRow
             label="Life events"
             value={totalEvents >= 0
-              ? formatCurrency(Math.round(totalEvents))
-              : `\u2212${formatCurrency(Math.round(Math.abs(totalEvents))).replace('\u20AC', '\u20AC ')}`}
+              ? <MaskedAmount value={Math.round(totalEvents)} tone="horizon" />
+              : <MaskedAmount value={Math.round(Math.abs(totalEvents))} signPrefix="-" tone="horizon" />}
             positive={totalEvents > 0}
             negative={totalEvents < 0}
           />
@@ -534,7 +534,7 @@ function ShortfallAnalysis({
       <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
         <span className="font-sans text-sm text-[var(--ink)]">Vermogen na overgang</span>
         <span className="font-mono tabular-nums text-[var(--ink)]">
-          {formatCurrency(Math.round(eindVermogen))}
+          {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />}
         </span>
       </div>
 
@@ -552,7 +552,7 @@ function ShortfallAnalysis({
 
 // ── Assumption row helper ────────────────────────────────────────────────────
 
-function AssumptionRow({ label, value }: { label: string; value: string }) {
+function AssumptionRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between py-0.5">
       <span className="font-sans text-xs text-[var(--ink-3)]">{label}</span>

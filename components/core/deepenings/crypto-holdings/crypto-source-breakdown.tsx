@@ -9,7 +9,8 @@
 // de holdings-grid te filteren op bron. We tonen geen filter-state hier —
 // dat is verantwoordelijkheid van de host (decoupling).
 
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { CryptoHoldingRow } from '@/lib/crypto-holdings-data'
 
 interface CryptoSourceBreakdownProps {
@@ -30,6 +31,8 @@ export function CryptoSourceBreakdown({
   activeLabel,
   onSelect,
 }: CryptoSourceBreakdownProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const sources = aggregateSources(holdings)
   if (sources.length <= 1) return null
 
@@ -64,7 +67,7 @@ export function CryptoSourceBreakdown({
                   {s.label}
                 </p>
                 <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-                  {formatCurrency(s.value)}
+                  {fc(s.value)}
                   <span className="ml-2 text-[var(--ink-4)]">{pct.toFixed(0)}%</span>
                 </p>
               </div>

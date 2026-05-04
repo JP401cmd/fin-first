@@ -12,6 +12,7 @@ import {
   type Box3Result,
   type TaxYear,
 } from '@/lib/box3-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 export function Box3ScenarioModal({
   input,
@@ -86,7 +87,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
             className="text-sm font-semibold tabular-nums"
             style={{ color: 'var(--module-active-700)' }}
           >
-            {formatCurrency(shiftAmount)}
+            {<MaskedAmount value={shiftAmount} tone="kern" />}
           </span>
         </div>
         <input
@@ -100,8 +101,8 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
           style={{ accentColor: 'var(--module-active-500)' }}
         />
         <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-3)]">
-          <span>{formatCurrency(0)}</span>
-          <span>{formatCurrency(maxShift)}</span>
+          <span>{<MaskedAmount value={0} tone="kern" />}</span>
+          <span>{<MaskedAmount value={maxShift} tone="kern" />}</span>
         </div>
       </div>
 
@@ -113,7 +114,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
             className="mt-1.5 text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
             style={{ fontFamily: 'var(--font-playfair, serif)' }}
           >
-            {formatCurrency(result.tax)}
+            {<MaskedAmount value={result.tax} tone="kern" />}
           </p>
           <p
             className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -122,8 +123,8 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
             Box 3 belasting
           </p>
           <div className="mt-2 text-[11px] text-[var(--ink-3)] tabular-nums font-mono">
-            <p>Spaargeld: {formatCurrency(result.totaalSpaargeld)}</p>
-            <p>Beleggingen: {formatCurrency(result.totaalBeleggingen)}</p>
+            <p>Spaargeld: {<MaskedAmount value={result.totaalSpaargeld} tone="kern" />}</p>
+            <p>Beleggingen: {<MaskedAmount value={result.totaalBeleggingen} tone="kern" />}</p>
           </div>
         </div>
         <div className="p-3 sm:p-4">
@@ -140,7 +141,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
                     'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
                 }}
               >
-                {formatCurrency(shifted.tax)}
+                {<MaskedAmount value={shifted.tax} tone="kern" />}
               </span>
             ) : (
               formatCurrency(shifted.tax)
@@ -153,8 +154,8 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
             Box 3 belasting
           </p>
           <div className="mt-2 text-[11px] text-[var(--ink-3)] tabular-nums font-mono">
-            <p>Spaargeld: {formatCurrency(shifted.totaalSpaargeld)}</p>
-            <p>Beleggingen: {formatCurrency(shifted.totaalBeleggingen)}</p>
+            <p>Spaargeld: {<MaskedAmount value={shifted.totaalSpaargeld} tone="kern" />}</p>
+            <p>Beleggingen: {<MaskedAmount value={shifted.totaalBeleggingen} tone="kern" />}</p>
           </div>
         </div>
       </div>
@@ -183,7 +184,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
                 padding: '0 0.25rem',
               }}
             >
-              {formatCurrency(delta)}
+              {<MaskedAmount value={delta} tone="kern" />}
             </strong>
             {' '}— dat is{' '}
             <strong
@@ -220,20 +221,20 @@ function CompareTab({ input, result }: { input: Box3Input; result: Box3Result })
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-4">
           <p className="text-xs font-semibold text-kern-700">{result.year}</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(result.tax)}</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{<MaskedAmount value={result.tax} tone="kern" />}</p>
           <div className="mt-3 space-y-1 text-xs text-[var(--ink-3)]">
             <p>Forfait spaargeld: {(params1.forfaitSpaargeld * 100).toFixed(2)}%</p>
             <p>Forfait beleggingen: {(params1.forfaitBeleggingen * 100).toFixed(2)}%</p>
-            <p>Heffingsvrij: {formatCurrency(result.hasPartner ? params1.heffingsvrijPartner : params1.heffingsvrijSingle)}</p>
+            <p>Heffingsvrij: {<MaskedAmount value={result.hasPartner ? params1.heffingsvrijPartner : params1.heffingsvrijSingle} tone="kern" />}</p>
           </div>
         </div>
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
           <p className="text-xs font-semibold text-[var(--ink-2)]">{otherYear}</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(otherResult.tax)}</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{<MaskedAmount value={otherResult.tax} tone="kern" />}</p>
           <div className="mt-3 space-y-1 text-xs text-[var(--ink-3)]">
             <p>Forfait spaargeld: {(params2.forfaitSpaargeld * 100).toFixed(2)}%</p>
             <p>Forfait beleggingen: {(params2.forfaitBeleggingen * 100).toFixed(2)}%</p>
-            <p>Heffingsvrij: {formatCurrency(result.hasPartner ? params2.heffingsvrijPartner : params2.heffingsvrijSingle)}</p>
+            <p>Heffingsvrij: {<MaskedAmount value={result.hasPartner ? params2.heffingsvrijPartner : params2.heffingsvrijSingle} tone="kern" />}</p>
           </div>
         </div>
       </div>
@@ -241,7 +242,7 @@ function CompareTab({ input, result }: { input: Box3Input; result: Box3Result })
       {delta !== 0 && (
         <div className={`mt-4 rounded-lg p-3 text-center ${delta > 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
           <p className={`text-sm font-semibold ${delta > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-            {otherYear} is {formatCurrency(Math.abs(delta))} {delta > 0 ? 'goedkoper' : 'duurder'}
+            {otherYear} is {<MaskedAmount value={Math.abs(delta)} tone="kern" />} {delta > 0 ? 'goedkoper' : 'duurder'}
           </p>
         </div>
       )}

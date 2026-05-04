@@ -43,10 +43,17 @@
  *   year-details-phase-badge, year-details-deflation-context
  */
 
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useCallback } from 'react'
 import * as Lucide from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware EUR formatter hook used across this sheet. */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { ASSET_TYPE_ICONS, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import type { AssetType } from '@/lib/asset-data'
 import { DEBT_TYPE_ICONS, DEBT_TYPE_LABELS } from '@/lib/debt-data'
@@ -155,6 +162,7 @@ function PresentValueLine({
   align?: 'left' | 'right'
   className?: string
 }) {
+  const fc = useFc()
   if (age <= currentAge || inflation === 0) return null
   const pv = presentValue(nominal, age, currentAge, inflation)
   const sign = pv < 0 ? '−' : ''
@@ -166,7 +174,7 @@ function PresentValueLine({
     >
       <span aria-hidden="true">≈ </span>
       {sign}
-      {formatCurrency(Math.abs(pv))}
+      {fc(Math.abs(pv))}
       <span className="ml-1 text-[var(--ink-4)]">vandaag</span>
     </p>
   )
@@ -344,6 +352,7 @@ function AssetPhaseRow({
   currentAge: number
   inflation: number
 }) {
+  const fc = useFc()
   const iconName = iconForAssetMeta(meta)
   const typeLabel = typeLabelForAssetMeta(meta)
   return (
@@ -366,25 +375,25 @@ function AssetPhaseRow({
           {phase === 'opbouw' ? (
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
               <span>+ Bijdrage </span>
-              <span className="font-mono tabular-nums">{formatCurrency(contribution)}</span>
+              <span className="font-mono tabular-nums">{fc(contribution)}</span>
               <span className="mx-1.5">·</span>
               <span>+ Rendement </span>
-              <span className="font-mono tabular-nums">{formatCurrency(growth)}</span>
+              <span className="font-mono tabular-nums">{fc(growth)}</span>
             </p>
           ) : (
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
               <span>− Onttrekking </span>
-              <span className="font-mono tabular-nums">{formatCurrency(withdrawal)}</span>
+              <span className="font-mono tabular-nums">{fc(withdrawal)}</span>
               <span className="mx-1.5">·</span>
               <span>+ Rendement </span>
-              <span className="font-mono tabular-nums">{formatCurrency(growth)}</span>
+              <span className="font-mono tabular-nums">{fc(growth)}</span>
             </p>
           )}
         </div>
       </div>
       <div className="shrink-0 text-right">
         <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(endValue)}
+          {fc(endValue)}
         </p>
         <PresentValueLine
           nominal={endValue}
@@ -419,6 +428,7 @@ function DebtPhaseRow({
   currentAge: number
   inflation: number
 }) {
+  const fc = useFc()
   const iconName = iconForDebtMeta(meta)
   const typeLabel = typeLabelForDebtMeta(meta)
   return (
@@ -440,16 +450,16 @@ function DebtPhaseRow({
           </p>
           <p className="mt-1 text-[10px] text-[var(--ink-3)]">
             <span>− Aflossing </span>
-            <span className="font-mono tabular-nums">{formatCurrency(repayment)}</span>
+            <span className="font-mono tabular-nums">{fc(repayment)}</span>
             <span className="mx-1.5">·</span>
             <span>+ Rente </span>
-            <span className="font-mono tabular-nums">{formatCurrency(interest)}</span>
+            <span className="font-mono tabular-nums">{fc(interest)}</span>
           </p>
         </div>
       </div>
       <div className="shrink-0 text-right">
         <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(endBalance)}
+          {fc(endBalance)}
         </p>
         <PresentValueLine
           nominal={endBalance}
@@ -487,6 +497,7 @@ function CostsRow({
   currentAge: number
   inflation: number
 }) {
+  const fc = useFc()
   const sign = amount < 0 ? '−' : amount > 0 ? '+' : ''
   const toneClass =
     tone === 'expense'
@@ -505,7 +516,7 @@ function CostsRow({
       <div className="shrink-0 text-right">
         <p className={`font-mono text-sm font-semibold tabular-nums ${toneClass}`}>
           {sign}
-          {formatCurrency(Math.abs(amount))}
+          {fc(Math.abs(amount))}
         </p>
         <PresentValueLine
           nominal={amount}
@@ -559,6 +570,7 @@ export const YearDetailsSheet = memo(function YearDetailsSheet({
   cashflows = [],
   lifeEvents = [],
 }: YearDetailsSheetProps) {
+  const fc = useFc()
   // Leeftijd voor deflatie-context; valt terug op currentAge als row null is
   // zodat de "Huidige waarde"-regel altijd zinvol is.
   const age = row?.age ?? currentAge
@@ -687,7 +699,7 @@ export const YearDetailsSheet = memo(function YearDetailsSheet({
           </div>
           <div className="text-right">
             <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(netWorth)}
+              {fc(netWorth)}
             </p>
             <PresentValueLine
               nominal={netWorth}
@@ -708,10 +720,10 @@ export const YearDetailsSheet = memo(function YearDetailsSheet({
             <section data-testid="year-details-assets">
               <SectieKicker
                 label="Bezittingen"
-                total={formatCurrency(assetTotal)}
+                total={fc(assetTotal)}
                 totalPv={
                   showPv
-                    ? `≈ ${formatCurrency(presentValue(assetTotal, age, currentAge, inflationRate))} vandaag`
+                    ? `≈ ${fc(presentValue(assetTotal, age, currentAge, inflationRate))} vandaag`
                     : null
                 }
               />
@@ -744,11 +756,11 @@ export const YearDetailsSheet = memo(function YearDetailsSheet({
               <section data-testid="year-details-debts">
                 <SectieKicker
                   label="Schulden"
-                  total={formatCurrency(debtTotal)}
+                  total={fc(debtTotal)}
                   totalTone="negative"
                   totalPv={
                     showPv
-                      ? `≈ ${formatCurrency(presentValue(debtTotal, age, currentAge, inflationRate))} vandaag`
+                      ? `≈ ${fc(presentValue(debtTotal, age, currentAge, inflationRate))} vandaag`
                       : null
                   }
                 />
@@ -860,7 +872,7 @@ export const YearDetailsSheet = memo(function YearDetailsSheet({
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="font-mono text-sm font-semibold tabular-nums text-[var(--positive,#0f766e)]">
-                          +{formatCurrency(row.aowIncomeThisYear)}
+                          +{fc(row.aowIncomeThisYear)}
                         </p>
                         <PresentValueLine
                           nominal={row.aowIncomeThisYear}
@@ -898,7 +910,7 @@ export const YearDetailsSheet = memo(function YearDetailsSheet({
                           }`}
                         >
                           {evt.amount > 0 ? '+' : '−'}
-                          {formatCurrency(Math.abs(evt.amount))}
+                          {fc(Math.abs(evt.amount))}
                         </p>
                         <PresentValueLine
                           nominal={evt.amount}

@@ -4,6 +4,7 @@ import { memo, useState, useEffect } from 'react'
 import { ArrowDownRight, CheckCircle2, Shield, TrendingDown, AlertTriangle } from 'lucide-react'
 import { formatCurrency, formatCurrencyDecimals } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -221,9 +222,9 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
               </span>
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-4)]">
-              {formatCurrency(totalIncome)}/jaar is straks nog maar{' '}
+              {<MaskedAmount value={totalIncome} tone="horizon" />}/jaar is straks nog maar{' '}
               <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">
-                {formatCurrency(state.reeelLaatsteJaar)}
+                {<MaskedAmount value={state.reeelLaatsteJaar} tone="horizon" />}
               </span>{' '}
               waard in huidige euro&apos;s
             </p>
@@ -277,7 +278,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
                       )}
                     </td>
                     <td className="px-1 py-2 text-right font-mono tabular-nums text-[var(--ink-3)]">
-                      {formatCurrency(Math.round(row.nominaal))}
+                      {<MaskedAmount value={Math.round(row.nominaal)} tone="horizon" />}
                     </td>
                     <td
                       className={`px-1 py-2 text-right font-mono tabular-nums ${
@@ -288,7 +289,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
                             : 'text-[var(--ink)]'
                       }`}
                     >
-                      {formatCurrency(row.reeel)}
+                      {<MaskedAmount value={row.reeel} tone="horizon" />}
                     </td>
                     <td
                       className={`px-1 py-2 text-right font-mono tabular-nums ${

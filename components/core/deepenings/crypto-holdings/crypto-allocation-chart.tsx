@@ -17,7 +17,8 @@
 
 import { useMemo, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { CryptoHoldingRow } from '@/lib/crypto-holdings-data'
 import {
   CRYPTO_CATEGORY_COLORS,
@@ -63,6 +64,8 @@ function colorForChain(chain: string): string {
 }
 
 export function CryptoAllocationChart({ holdings, totalValue }: CryptoAllocationChartProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Chain-toggle alleen aanbieden als de data het rechtvaardigt — anders is
   // het een lege keuze en breekt het rasterritme van de strip eronder.
   const chainsAvailable = useMemo(() => {
@@ -164,7 +167,7 @@ export function CryptoAllocationChart({ holdings, totalValue }: CryptoAllocation
                 />
                 <span className="truncate text-[var(--ink-2)]">{s.label}</span>
                 <span className="font-mono tabular-nums text-[var(--ink-3)]">
-                  {formatCurrency(s.valueEur)}
+                  {fc(s.valueEur)}
                 </span>
                 <span className="font-mono tabular-nums text-[var(--ink-4)] w-12 text-right">
                   {s.pct.toFixed(0)}%
@@ -187,6 +190,8 @@ interface DonutProps {
 }
 
 function AllocationDonut({ slices, total, hoverKey }: DonutProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
   const size = 180
   const cx = size / 2
@@ -252,7 +257,7 @@ function AllocationDonut({ slices, total, hoverKey }: DonutProps) {
           fill="var(--ink)"
           style={{ fontFamily: 'var(--font-mono, monospace)' }}
         >
-          {formatCurrency(total)}
+          {fc(total)}
         </text>
         <text
           x={cx}

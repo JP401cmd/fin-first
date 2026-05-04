@@ -3,13 +3,14 @@
 import { useState, useMemo } from 'react'
 import { Sparkles } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { formatCurrency } from '@/lib/format'
+
 import {
   calculatePartnerSplit,
   optimizePartnerAllocation,
   type Box3Input,
   type Box3Result,
 } from '@/lib/box3-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 export function Box3PartnerModal({
   input,
@@ -70,7 +71,7 @@ export function Box3PartnerModal({
           {optimal.savingsVsEqual > 0 && (
             <div className="mb-5 rounded-lg bg-emerald-50 p-3 text-center">
               <p className="text-xs text-emerald-600">
-                Optimale verdeling bespaart {formatCurrency(optimal.savingsVsEqual)} ten opzichte van 50/50
+                Optimale verdeling bespaart {<MaskedAmount value={optimal.savingsVsEqual} tone="kern" />} ten opzichte van 50/50
               </p>
             </div>
           )}
@@ -101,20 +102,20 @@ export function Box3PartnerModal({
           <div className="mt-6 grid grid-cols-2 gap-3">
             <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
               <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Partner 1</p>
-              <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(manualSplit.partner1Tax)}</p>
+              <p className="mt-1 text-xl font-bold text-[var(--ink)]">{<MaskedAmount value={manualSplit.partner1Tax} tone="kern" />}</p>
               <div className="mt-2 space-y-0.5 text-xs text-[var(--ink-3)]">
-                <p>Spaargeld: {formatCurrency(p1S)}</p>
-                <p>Beleggingen: {formatCurrency(p1B)}</p>
-                <p>Schulden: {formatCurrency(p1Sch)}</p>
+                <p>Spaargeld: {<MaskedAmount value={p1S} tone="kern" />}</p>
+                <p>Beleggingen: {<MaskedAmount value={p1B} tone="kern" />}</p>
+                <p>Schulden: {<MaskedAmount value={p1Sch} tone="kern" />}</p>
               </div>
             </div>
             <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
               <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Partner 2</p>
-              <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(manualSplit.partner2Tax)}</p>
+              <p className="mt-1 text-xl font-bold text-[var(--ink)]">{<MaskedAmount value={manualSplit.partner2Tax} tone="kern" />}</p>
               <div className="mt-2 space-y-0.5 text-xs text-[var(--ink-3)]">
-                <p>Spaargeld: {formatCurrency(p2S)}</p>
-                <p>Beleggingen: {formatCurrency(p2B)}</p>
-                <p>Schulden: {formatCurrency(p2Sch)}</p>
+                <p>Spaargeld: {<MaskedAmount value={p2S} tone="kern" />}</p>
+                <p>Beleggingen: {<MaskedAmount value={p2B} tone="kern" />}</p>
+                <p>Schulden: {<MaskedAmount value={p2Sch} tone="kern" />}</p>
               </div>
             </div>
           </div>
@@ -122,10 +123,10 @@ export function Box3PartnerModal({
           {/* Total */}
           <div className="mt-4 rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-4 text-center">
             <p className="text-xs font-semibold text-kern-700/60 uppercase">Totaal met partner</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--ink)]">{formatCurrency(manualSplit.totalTax)}</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--ink)]">{<MaskedAmount value={manualSplit.totalTax} tone="kern" />}</p>
             {besparingVsSingle > 0 && (
               <p className="mt-1 text-sm text-emerald-600">
-                {formatCurrency(besparingVsSingle)} besparing t.o.v. alleen
+                {<MaskedAmount value={besparingVsSingle} tone="kern" />} besparing t.o.v. alleen
               </p>
             )}
           </div>
@@ -160,7 +161,7 @@ function SliderRow({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-xs font-medium text-[var(--ink-2)]">{label} ({formatCurrency(total)})</p>
+        <p className="text-xs font-medium text-[var(--ink-2)]">{label} ({<MaskedAmount value={total} tone="kern" />})</p>
         <p className="text-xs text-[var(--ink-3)]">{p1Pct}% / {100 - p1Pct}%</p>
       </div>
       <input
@@ -173,8 +174,8 @@ function SliderRow({
         className="w-full accent-kern-500"
       />
       <div className="mt-0.5 flex justify-between text-[10px] text-[var(--ink-3)]">
-        <span>P1: {formatCurrency(p1Val)}</span>
-        <span>P2: {formatCurrency(p2Val)}</span>
+        <span>P1: {<MaskedAmount value={p1Val} tone="kern" />}</span>
+        <span>P2: {<MaskedAmount value={p2Val} tone="kern" />}</span>
       </div>
     </div>
   )

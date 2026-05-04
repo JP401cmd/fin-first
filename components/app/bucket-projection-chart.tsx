@@ -4,9 +4,11 @@ import { useState, memo } from 'react'
 import type { BucketProjectionResult, BucketRow } from '@/lib/bucket-projection'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import { DEBT_LAYER_COLOR } from '@/lib/wealth-composition'
-import { formatCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
+import { formatMaskedCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { TrendingUp, TrendingDown, Info, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── View types ──────────────────────────────────────────────
 
@@ -41,6 +43,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
   const [showAlternative, setShowAlternative] = useState(false)
   const [chartView, setChartView] = useState<ChartView>('nom_reeel')
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 700 })
+  const { masked } = useMaskedAmounts()
 
   const { rows, alternativeRows, alternativeMethod, isGrowing, currentNetWorth, cashFlowSummary } = projection
 
@@ -229,10 +232,10 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
             {isGrowing ? <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" /> : nomEnd < currentNetWorth ? <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-red-600" /> : <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" />}
             <p className={`text-sm font-medium ${isGrowing ? 'text-kern-800' : nomEnd < currentNetWorth ? 'text-red-800' : 'text-[var(--ink-2)]'}`}>
               {isGrowing
-                ? `Nominaal groeit je vermogen met ${pctNom}% naar ${formatCurrency(nomEnd)} over ${totalYears} jaar. In euro's van vandaag: ${formatCurrency(realEnd)}.`
+                ? `Nominaal groeit je vermogen met ${pctNom}% naar ${formatMaskedCurrency(nomEnd, masked)} over ${totalYears} jaar. In euro's van vandaag: ${formatMaskedCurrency(realEnd, masked)}.`
                 : nomEnd < currentNetWorth
-                  ? `Let op: je vermogen daalt naar ${formatCurrency(nomEnd)} (nominaal) over ${totalYears} jaar.`
-                  : `Je vermogen blijft stabiel rond ${formatCurrency(currentNetWorth)}.`
+                  ? `Let op: je vermogen daalt naar ${formatMaskedCurrency(nomEnd, masked)} (nominaal) over ${totalYears} jaar.`
+                  : `Je vermogen blijft stabiel rond ${formatMaskedCurrency(currentNetWorth, masked)}.`
               }
             </p>
           </div>
@@ -248,10 +251,10 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
             {isGrowing ? <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" /> : endNetWorth < currentNetWorth ? <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-red-600" /> : <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" />}
             <p className={`text-sm font-medium ${isGrowing ? 'text-kern-800' : endNetWorth < currentNetWorth ? 'text-red-800' : 'text-[var(--ink-2)]'}`}>
               {isGrowing
-                ? `Je vermogen groeit met ${pctChange}% naar ${formatCurrency(endNetWorth)} over ${totalYears} jaar — per bucket berekend.`
+                ? `Je vermogen groeit met ${pctChange}% naar ${formatMaskedCurrency(endNetWorth, masked)} over ${totalYears} jaar — per bucket berekend.`
                 : endNetWorth < currentNetWorth
-                  ? `Let op: je vermogen daalt naar ${formatCurrency(endNetWorth)} over ${totalYears} jaar.`
-                  : `Je vermogen blijft stabiel rond ${formatCurrency(currentNetWorth)}.`
+                  ? `Let op: je vermogen daalt naar ${formatMaskedCurrency(endNetWorth, masked)} over ${totalYears} jaar.`
+                  : `Je vermogen blijft stabiel rond ${formatMaskedCurrency(currentNetWorth, masked)}.`
               }
             </p>
           </div>
@@ -267,7 +270,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
           <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r-lg)] border border-kern-200 bg-kern-50/60 p-3.5">
             <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
             <p className="text-sm font-medium text-kern-800">
-              Je jaarinkomen groeit van {formatCurrency(currentAnnual)} naar {formatCurrency(endAnnual)} (nominaal) over {totalYears} jaar. Reëel: {formatCurrency(realEndAnnual)}.
+              Je jaarinkomen groeit van {<MaskedAmount value={currentAnnual} tone="horizon" />} naar {<MaskedAmount value={endAnnual} tone="horizon" />} (nominaal) over {totalYears} jaar. Reëel: {<MaskedAmount value={realEndAnnual} tone="horizon" />}.
             </p>
           </div>
         )
@@ -281,7 +284,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
           <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r-lg)] border border-red-200 bg-red-50/60 p-3.5">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
             <p className="text-sm font-medium text-red-800">
-              Totale Box 3 belasting over {totalYears} jaar: {formatCurrency(totalNominal)} nominaal, {formatCurrency(totalReal)} reëel.
+              Totale Box 3 belasting over {totalYears} jaar: {<MaskedAmount value={totalNominal} tone="horizon" />} nominaal, {<MaskedAmount value={totalReal} tone="horizon" />} reëel.
             </p>
           </div>
         )
@@ -559,8 +562,8 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         const nom = r.netWorth
         const real = r.netWorth / r.inflationFactor
         return renderTooltipBox(hoveredMonth, yPos(nom), [
-          { label: `Maand ${r.month} — Nominaal`, value: formatCurrency(nom), bold: true },
-          { label: `Reëel (euro's van vandaag)`, value: formatCurrency(real) },
+          { label: `Maand ${r.month} — Nominaal`, value: formatMaskedCurrency(nom, masked), bold: true },
+          { label: `Reëel (euro's van vandaag)`, value: formatMaskedCurrency(real, masked) },
         ])
       }
       case 'opbouw': {
@@ -572,12 +575,12 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         ]
         for (const type of orderedTypes) {
           const v = r.assetBuckets[type] ?? 0
-          if (v > 0) lines.push({ label: ASSET_TYPE_LABELS[type], value: formatCurrency(v), color: ASSET_TYPE_COLORS[type] })
+          if (v > 0) lines.push({ label: ASSET_TYPE_LABELS[type], value: formatMaskedCurrency(v, masked), color: ASSET_TYPE_COLORS[type] })
         }
-        if (r.totalDebts > 0) lines.push({ label: 'Schulden', value: formatCurrency(-r.totalDebts), color: '#ef4444' })
-        lines.push({ label: 'Netto vermogen', value: formatCurrency(r.netWorth), bold: true, color: lineColor })
+        if (r.totalDebts > 0) lines.push({ label: 'Schulden', value: formatMaskedCurrency(-r.totalDebts, masked), color: '#ef4444' })
+        lines.push({ label: 'Netto vermogen', value: formatMaskedCurrency(r.netWorth, masked), bold: true, color: lineColor })
         if (showAlternative && sampledAlt[hoveredMonth]) {
-          lines.push({ label: `Alt. (${alternativeMethod})`, value: formatCurrency(sampledAlt[hoveredMonth].netWorth) })
+          lines.push({ label: `Alt. (${alternativeMethod})`, value: formatMaskedCurrency(sampledAlt[hoveredMonth].netWorth, masked) })
         }
         return renderTooltipBox(hoveredMonth, yPos(r.netWorth), lines)
       }
@@ -589,9 +592,9 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         const real = nom / r.inflationFactor
         const savings = cashFlowSummary.monthlySurplus * 12 * Math.pow(1 + cashFlowSummary.incomeGrowthRate, yearIdx)
         return renderTooltipBox(hoveredMonth, yPos(nom), [
-          { label: `Maand ${r.month} — Inkomen`, value: formatCurrency(nom), bold: true },
-          { label: 'Reëel inkomen', value: formatCurrency(real) },
-          { label: 'Jaarlijkse besparing', value: formatCurrency(savings) },
+          { label: `Maand ${r.month} — Inkomen`, value: formatMaskedCurrency(nom, masked), bold: true },
+          { label: 'Reëel inkomen', value: formatMaskedCurrency(real, masked) },
+          { label: 'Jaarlijkse besparing', value: formatMaskedCurrency(savings, masked) },
         ])
       }
       case 'box3': {
@@ -602,12 +605,12 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         const idx = sampled.findIndex(r => r.month >= monthTarget)
         const sIdx = idx >= 0 ? idx : sampled.length - 1
         const lines: TooltipLine[] = [
-          { label: `Jaar ${t.year} — Box 3`, value: formatCurrency(t.nominal), bold: true },
-          { label: 'Reëel', value: formatCurrency(t.real) },
+          { label: `Jaar ${t.year} — Box 3`, value: formatMaskedCurrency(t.nominal, masked), bold: true },
+          { label: 'Reëel', value: formatMaskedCurrency(t.real, masked) },
         ]
         if (showAlternative) {
           const alt = computeAnnualBox3Alt()[hoveredMonth]
-          if (alt) lines.push({ label: `Alt. (${alternativeMethod})`, value: formatCurrency(alt.nominal) })
+          if (alt) lines.push({ label: `Alt. (${alternativeMethod})`, value: formatMaskedCurrency(alt.nominal, masked) })
         }
         return renderTooltipBoxAtPos(xPos(sIdx), yPos(t.nominal), lines)
       }
@@ -760,11 +763,11 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
       case 'opbouw':
         return (
           <div className="mt-3 flex flex-wrap gap-2" data-testid="bucket-projection-badges">
-            <ProjectionBadge label="Over 1 jaar" value={formatCurrency(projection.year1.netWorth)} delta={projection.year1.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />
-            <ProjectionBadge label="Over 3 jaar" value={formatCurrency(projection.year3.netWorth)} delta={projection.year3.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />
-            <ProjectionBadge label="Over 5 jaar" value={formatCurrency(projection.year5.netWorth)} delta={projection.year5.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />
-            {projection.year10 && <ProjectionBadge label="Over 10 jaar" value={formatCurrency(projection.year10.netWorth)} delta={projection.year10.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />}
-            {projection.year20 && <ProjectionBadge label="Over 20 jaar" value={formatCurrency(projection.year20.netWorth)} delta={projection.year20.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />}
+            <ProjectionBadge label="Over 1 jaar" value={<MaskedAmount value={projection.year1.netWorth} tone="horizon" />} delta={projection.year1.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />
+            <ProjectionBadge label="Over 3 jaar" value={<MaskedAmount value={projection.year3.netWorth} tone="horizon" />} delta={projection.year3.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />
+            <ProjectionBadge label="Over 5 jaar" value={<MaskedAmount value={projection.year5.netWorth} tone="horizon" />} delta={projection.year5.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />
+            {projection.year10 && <ProjectionBadge label="Over 10 jaar" value={<MaskedAmount value={projection.year10.netWorth} tone="horizon" />} delta={projection.year10.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />}
+            {projection.year20 && <ProjectionBadge label="Over 20 jaar" value={<MaskedAmount value={projection.year20.netWorth} tone="horizon" />} delta={projection.year20.netWorth - currentNetWorth} dailyExpenses={dailyExpenses} />}
           </div>
         )
       case 'inkomen': {
@@ -786,8 +789,8 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
               return (
                 <div key={label} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1 text-xs">
                   <span className="text-[var(--ink-3)]">{label}:</span>
-                  <span className="font-mono font-medium tabular-nums text-[var(--ink)]">{formatCurrency(nom)}</span>
-                  <span className="font-mono text-[var(--ink-4)] tabular-nums">({formatCurrency(real)} reëel)</span>
+                  <span className="font-mono font-medium tabular-nums text-[var(--ink)]">{<MaskedAmount value={nom} tone="horizon" />}</span>
+                  <span className="font-mono text-[var(--ink-4)] tabular-nums">({<MaskedAmount value={real} tone="horizon" />} reëel)</span>
                 </div>
               )
             })}
@@ -805,7 +808,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
               return (
                 <div key={y} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1 text-xs">
                   <span className="text-[var(--ink-3)]">{y === 1 ? 'Jaar 1' : `${y} jaar`}:</span>
-                  <span className="font-mono font-medium tabular-nums text-red-600">{formatCurrency(cumulative)}</span>
+                  <span className="font-mono font-medium tabular-nums text-red-600">{<MaskedAmount value={cumulative} tone="horizon" />}</span>
                   <span className="font-mono text-[var(--ink-4)] tabular-nums">cumulatief</span>
                 </div>
               )
@@ -922,7 +925,7 @@ function ProjectionBadge({
   dailyExpenses,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
   delta: number
   dailyExpenses?: number
 }) {
@@ -934,7 +937,7 @@ function ProjectionBadge({
       <span className="text-[var(--ink-3)]">{label}:</span>
       <span className="font-mono font-medium tabular-nums text-[var(--ink)]">{value}</span>
       <span className={`font-mono font-medium tabular-nums ${isPositive ? 'text-emerald-600' : isNegative ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
-        ({isPositive ? '+' : ''}{formatCurrency(delta)})
+        ({isPositive ? '+' : ''}{<MaskedAmount value={delta} tone="horizon" />})
       </span>
       {dailyExpenses && dailyExpenses > 0 && Math.abs(delta) > 0 && (
         <span className="text-[var(--ink-4)]">

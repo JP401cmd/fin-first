@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { Shield, Telescope, ArrowRight } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 interface ModuleStripProps {
   /** Monthly net worth growth (income - expenses) */
@@ -22,8 +23,12 @@ export function ModuleStrip({
   growthDaysStr,
   simFireCountdown,
 }: ModuleStripProps) {
+  const { masked } = useMaskedAmounts()
   const growthSign = monthlyGrowth >= 0 ? '+' : ''
-  const growthLabel = `${growthSign}${formatCurrency(monthlyGrowth)}`
+  // The sign prefix is part of the visible display only; when masked the bullets carry no direction.
+  const growthLabel = masked
+    ? formatMaskedCurrency(monthlyGrowth, true)
+    : `${growthSign}${formatMaskedCurrency(monthlyGrowth, false)}`
   const growthSub = growthDaysStr ? ` (${growthDaysStr})` : ''
 
   const countdownLabel = simFireCountdown

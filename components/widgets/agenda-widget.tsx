@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData, UpcomingEvent } from './widget-renderer'
 import { Calendar, ArrowUpRight, ArrowDownRight, ArrowRight } from 'lucide-react'
 
@@ -82,8 +82,13 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
         </div>
         <p className="mt-1 text-xs text-[var(--ink-3)]">{relativeDate(next.date)}</p>
         {next.amount != null && (
-          <p className={`mt-0.5 font-mono text-xs tabular-nums ${DIR_COLORS[next.direction]}`}>
-            {next.direction === 'in' ? '+' : next.direction === 'out' ? '-' : ''}{formatCurrency(Math.abs(next.amount))}
+          <p className={`mt-0.5 ${DIR_COLORS[next.direction]}`}>
+            <MaskedAmount
+              value={Math.abs(next.amount)}
+              signPrefix={next.direction === 'in' ? '+' : next.direction === 'out' ? '-' : ''}
+              tone="kern"
+              className="text-xs"
+            />
           </p>
         )}
       </WidgetShell>
@@ -106,8 +111,13 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
               <span className="flex-1 min-w-0 text-sm text-[var(--ink)] truncate">{event.name}</span>
               <span className="shrink-0 text-[10px] text-[var(--ink-4)]">{relativeDate(event.date)}</span>
               {event.amount != null && (
-                <span className={`shrink-0 font-mono text-xs tabular-nums ${DIR_COLORS[event.direction]}`}>
-                  {event.direction === 'in' ? '+' : event.direction === 'out' ? '-' : ''}{formatCurrency(Math.abs(event.amount))}
+                <span className={`shrink-0 ${DIR_COLORS[event.direction]}`}>
+                  <MaskedAmount
+                    value={Math.abs(event.amount)}
+                    signPrefix={event.direction === 'in' ? '+' : event.direction === 'out' ? '-' : ''}
+                    tone="kern"
+                    className="text-xs"
+                  />
                 </span>
               )}
             </li>
@@ -164,8 +174,13 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
               <DirectionIcon direction={event.direction} />
               <p className="text-sm text-[var(--ink)] line-clamp-1 flex-1 min-w-0">{event.name}</p>
               {event.amount != null && (
-                <span className={`shrink-0 font-mono text-xs tabular-nums ${DIR_COLORS[event.direction]}`}>
-                  {event.direction === 'in' ? '+' : event.direction === 'out' ? '-' : ''}{formatCurrency(Math.abs(event.amount))}
+                <span className={`shrink-0 ${DIR_COLORS[event.direction]}`}>
+                  <MaskedAmount
+                    value={Math.abs(event.amount)}
+                    signPrefix={event.direction === 'in' ? '+' : event.direction === 'out' ? '-' : ''}
+                    tone="kern"
+                    className="text-xs"
+                  />
                 </span>
               )}
             </li>
@@ -198,14 +213,14 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Verwachte inkomsten</p>
-            <p className="font-mono text-sm font-semibold tabular-nums text-positive">
-              +{formatCurrency(totalIn)}
+            <p className="text-positive">
+              <MaskedAmount value={totalIn} signPrefix="+" tone="kern" className="text-sm font-semibold" />
             </p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Verwachte uitgaven</p>
-            <p className="font-mono text-sm font-semibold tabular-nums text-negative">
-              -{formatCurrency(totalOut)}
+            <p className="text-negative">
+              <MaskedAmount value={totalOut} signPrefix="-" tone="kern" className="text-sm font-semibold" />
             </p>
           </div>
         </div>

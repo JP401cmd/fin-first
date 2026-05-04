@@ -1,7 +1,8 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import type { DashboardData } from './widget-renderer'
 
@@ -46,8 +47,8 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Beleggingen" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {formatCurrency(totalInvestments)}
+        <p className="text-[var(--ink)] leading-none truncate">
+          <MaskedAmount value={totalInvestments} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -58,8 +59,8 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
     return (
       <WidgetShell module="kern" size={size} kicker="Beleggingen" href={href}>
         <div>
-          <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(totalInvestments)}
+          <p className="text-[var(--ink)]">
+            <MaskedAmount value={totalInvestments} tone="kern" className="text-lg font-semibold" />
           </p>
           <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
             {positionCount > 0
@@ -89,8 +90,8 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
       <WidgetShell module="kern" size={size} kicker="Beleggingen" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(totalInvestments)}
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={totalInvestments} tone="kern" className="text-xl font-semibold" />
             </p>
             {ftStr && (
               <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
@@ -123,8 +124,8 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
               </p>
             )}
             {investmentContributions > 0 && (
-              <p className="font-mono text-[11px] text-positive tabular-nums">
-                +{formatCurrency(investmentContributions)}/mnd
+              <p className="text-positive">
+                <MaskedAmount value={investmentContributions} signPrefix="+" tone="kern" className="text-[11px]" />/mnd
               </p>
             )}
           </div>
@@ -136,8 +137,8 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
   return (
     <WidgetShell module="kern" size={size} kicker="Beleggingen" href={href}>
       {/* Primary value */}
-      <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-        {formatCurrency(totalInvestments)}
+      <p className="text-[var(--ink)]">
+        <MaskedAmount value={totalInvestments} tone="kern" className="text-2xl font-semibold" />
       </p>
       {ftStr && (
         <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
@@ -151,8 +152,8 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
           : 'Geen beleggingsactiva'}
       </p>
       {investmentContributions > 0 && (
-        <p className="font-mono text-sm text-positive tabular-nums">
-          +{formatCurrency(investmentContributions)} / maand
+        <p className="text-positive">
+          <MaskedAmount value={investmentContributions} signPrefix="+" tone="kern" className="text-sm" /> / maand
         </p>
       )}
 
@@ -184,8 +185,8 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-mono tabular-nums text-[var(--ink)]">
-                        {formatCurrency(a.value)}
+                      <span className="text-[var(--ink)]">
+                        <MaskedAmount value={a.value} tone="kern" />
                       </span>
                       <span className="w-8 text-right text-[var(--ink-4)]">
                         {Math.round(pct)}%

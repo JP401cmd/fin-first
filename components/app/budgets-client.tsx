@@ -36,6 +36,9 @@ import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { Users } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 
 type Goal = BudgetGoal
@@ -77,15 +80,16 @@ function BudgetEditorialHeader({
   //    Toont of het BUDGET dat je hebt opgesteld klopt met je inkomen.
   //  - Werkelijk: verwacht inkomen − werkelijke outflow tot nu toe.
   //    Toont hoeveel je deze maand nog vrij hebt op basis van wat al weg is.
+  const { masked } = useMaskedAmounts()
   const planRuimte = teVerdelen
   const planPositive = planRuimte >= 0
   const planLabel = planPositive ? '€' : '−€'
-  const planBedrag = formatCurrency(Math.abs(planRuimte))
+  const planBedrag = formatMaskedCurrency(Math.abs(planRuimte), masked)
 
   const werkelijkRuimte = totalIncome - totalActualOutflow
   const werkelijkPositive = werkelijkRuimte >= 0
   const werkelijkLabel = werkelijkPositive ? '€' : '−€'
-  const werkelijkBedrag = formatCurrency(Math.abs(werkelijkRuimte))
+  const werkelijkBedrag = formatMaskedCurrency(Math.abs(werkelijkRuimte), masked)
 
   return (
     <header className="mb-6 space-y-3">
@@ -137,8 +141,8 @@ function BudgetEditorialHeader({
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
             {planPositive
-              ? `Te verdelen van € ${formatCurrency(totalIncome).replace('€', '').trim()} verwacht inkomen`
-              : `Over-toegewezen — ${formatCurrency(Math.abs(planRuimte))} meer dan verwacht inkomen`}
+              ? `Te verdelen van ${formatMaskedCurrency(totalIncome, masked)} verwacht inkomen`
+              : `Over-toegewezen — ${formatMaskedCurrency(Math.abs(planRuimte), masked)} meer dan verwacht inkomen`}
           </p>
         </div>
 
@@ -157,11 +161,11 @@ function BudgetEditorialHeader({
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
             {werkelijkPositive
-              ? `Nog te besteden — ${formatCurrency(totalActualOutflow)} al weg deze maand`
-              : `Boven inkomen — ${formatCurrency(Math.abs(werkelijkRuimte))} meer uitgegeven dan verwacht`}
+              ? `Nog te besteden — ${formatMaskedCurrency(totalActualOutflow, masked)} al weg deze maand`
+              : `Boven inkomen — ${formatMaskedCurrency(Math.abs(werkelijkRuimte), masked)} meer uitgegeven dan verwacht`}
             {totalIncomeActual > 0 &&
               totalIncome > 0 &&
-              ` · ontvangen: € ${formatCurrency(totalIncomeActual).replace('€', '').trim()}`}
+              ` · ontvangen: ${formatMaskedCurrency(totalIncomeActual, masked)}`}
           </p>
         </div>
       </div>
@@ -225,11 +229,11 @@ function BudgetKpiCell({
                 'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
             }}
           >
-            {formatCurrency(actual)} / {formatCurrency(target)}
+            {<MaskedAmount value={actual} tone="wil" />} / {<MaskedAmount value={target} tone="wil" />}
           </span>
         ) : (
           <>
-            {formatCurrency(actual)} / {formatCurrency(target)}
+            {<MaskedAmount value={actual} tone="wil" />} / {<MaskedAmount value={target} tone="wil" />}
           </>
         )}
       </p>
@@ -1887,7 +1891,7 @@ function DetailModalDonut({
               {pct}%
             </p>
             <p className="font-mono text-[10px] text-[var(--ink-4)] tabular-nums leading-normal">
-              van {formatCurrency(limit)}
+              van {<MaskedAmount value={limit} tone="wil" />}
             </p>
           </div>
         </div>
@@ -1898,7 +1902,7 @@ function DetailModalDonut({
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Besteed</p>
           <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-[var(--ink)]" data-testid="modal-spent">
-            {formatCurrency(spent)}
+            {<MaskedAmount value={spent} tone="wil" />}
           </p>
           {hasFreedomData && spent >= 100 && (
             <p className="font-serif text-xs italic text-[var(--ink-3)]" data-testid="modal-spent-freedom">
@@ -1913,7 +1917,7 @@ function DetailModalDonut({
           <p className={`mt-0.5 font-mono text-base font-bold tabular-nums ${
             remaining >= 0 ? 'text-positive' : (overPositive ? 'text-positive' : 'text-negative')
           }`} data-testid="modal-remaining">
-            {formatCurrency(Math.abs(remaining))}
+            {<MaskedAmount value={Math.abs(remaining)} tone="wil" />}
           </p>
           {hasFreedomData && Math.abs(remaining) >= 100 && (
             <p className="font-serif text-xs italic text-[var(--ink-3)]" data-testid="modal-remaining-freedom">
@@ -1976,6 +1980,7 @@ function BudgetDetailModal({
 }) {
   const { perspective } = usePerspective()
   const { openWithMessage } = useChatContext()
+  const { masked } = useMaskedAmounts()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -2320,7 +2325,7 @@ function BudgetDetailModal({
                 <div>
                   <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{budgetPartnerSplit.myName}</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(spent * budgetPartnerSplit.mySharePct / 100)}
+                    {<MaskedAmount value={spent * budgetPartnerSplit.mySharePct / 100} tone="wil" />}
                   </p>
                   <p className="text-xs italic text-[var(--ink-3)]">
                     ≈ {eurToFreedomTime(spent * budgetPartnerSplit.mySharePct / 100, dailyExpenseRate).formattedDagen}
@@ -2329,7 +2334,7 @@ function BudgetDetailModal({
                 <div>
                   <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{budgetPartnerSplit.partnerName}</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    {formatCurrency(spent * (100 - budgetPartnerSplit.mySharePct) / 100)}
+                    {<MaskedAmount value={spent * (100 - budgetPartnerSplit.mySharePct) / 100} tone="wil" />}
                   </p>
                   <p className="text-xs italic text-[var(--ink-3)]">
                     ≈ {eurToFreedomTime(spent * (100 - budgetPartnerSplit.mySharePct) / 100, dailyExpenseRate).formattedDagen}
@@ -2342,7 +2347,7 @@ function BudgetDetailModal({
           {carry > 0 && (
             <div className={`mt-2 flex items-center gap-1.5 rounded border px-2 py-1.5 ${colors.bg} ${colors.border}`}>
               <span className={`text-xs font-medium ${colors.text}`}>Doorgeschoven:</span>
-              <span className={`font-mono text-xs font-semibold ${colors.text}`}>+{formatCurrency(carry)}</span>
+              <span className={`font-mono text-xs font-semibold ${colors.text}`}>+{<MaskedAmount value={carry} tone="wil" />}</span>
             </div>
           )}
 
@@ -2389,7 +2394,7 @@ function BudgetDetailModal({
                   <div key={r.id} className="flex items-center justify-between text-xs">
                     <span className="text-[var(--ink-3)]">{r.period}</span>
                     <span className={`font-mono font-medium ${Number(r.carried_amount) > 0 ? colors.text : 'text-[var(--ink-4)]'}`}>
-                      {Number(r.carried_amount) > 0 ? '+' : ''}{formatCurrency(Number(r.carried_amount))}
+                      {Number(r.carried_amount) > 0 ? '+' : ''}{<MaskedAmount value={Number(r.carried_amount)} tone="wil" />}
                     </span>
                   </div>
                 ))}
@@ -2402,7 +2407,7 @@ function BudgetDetailModal({
             <div className={`mt-2 flex items-center gap-2 rounded border px-2 py-1.5 ${spent <= limit ? 'bg-emerald-50 border-emerald-200' : 'bg-kern-50 border-kern-200'}`}>
               {spent <= limit
                 ? <><CheckCircle2 className="h-4 w-4 text-emerald-600" /><span className="text-xs font-medium text-emerald-700">Gedekt</span></>
-                : <><AlertTriangle className="h-4 w-4 text-kern-600" /><span className="text-xs font-medium text-kern-700">Tekort: {formatCurrency(spent - limit)}</span></>
+                : <><AlertTriangle className="h-4 w-4 text-kern-600" /><span className="text-xs font-medium text-kern-700">Tekort: {<MaskedAmount value={spent - limit} tone="wil" />}</span></>
               }
             </div>
           )}
@@ -2418,7 +2423,7 @@ function BudgetDetailModal({
           {budget.goal_type === 'maandelijkse_reservering' && (
             <div className="mt-2 rounded border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
               <p className="text-[10px] text-[var(--ink-3)] uppercase tracking-[.08em]">Opgebouwd saldo</p>
-              <p className="font-mono text-base font-semibold text-[var(--ink)]">{formatCurrency(cumulativeCarry)}</p>
+              <p className="font-mono text-base font-semibold text-[var(--ink)]">{<MaskedAmount value={cumulativeCarry} tone="wil" />}</p>
               <p className="text-[10px] text-[var(--ink-3)] mt-0.5">Rollover staat automatisch aan</p>
             </div>
           )}
@@ -2445,11 +2450,11 @@ function BudgetDetailModal({
                 )}
               </div>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="font-mono text-base font-semibold">{formatCurrency(cumulativeCarry)}</span>
-                <span className="font-mono text-xs text-[var(--ink-3)]">van {formatCurrency(budget.goal_amount)}</span>
+                <span className="font-mono text-base font-semibold">{<MaskedAmount value={cumulativeCarry} tone="wil" />}</span>
+                <span className="font-mono text-xs text-[var(--ink-3)]">van {<MaskedAmount value={budget.goal_amount} tone="wil" />}</span>
               </div>
               {benodigdPerMaand !== null && (
-                <p className="text-xs text-[var(--ink-3)] mb-2">Benodigd: <span className="font-mono font-medium">{formatCurrency(benodigdPerMaand)}/mnd</span></p>
+                <p className="text-xs text-[var(--ink-3)] mb-2">Benodigd: <span className="font-mono font-medium">{<MaskedAmount value={benodigdPerMaand} tone="wil" />}/mnd</span></p>
               )}
               <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                 <div className="h-full rounded-full" style={{ width: `${spaarProgress}%`, backgroundColor: colors.barHex }} />
@@ -2473,16 +2478,16 @@ function BudgetDetailModal({
               <p className="text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)] mb-2">Periodieke Last</p>
               <div className="flex justify-between text-xs mb-2">
                 <span className="text-[var(--ink-3)]">Maandelijks reserveren</span>
-                <span className="font-mono font-semibold">{formatCurrency(maandelijksBedrag)}</span>
+                <span className="font-mono font-semibold">{<MaskedAmount value={maandelijksBedrag} tone="wil" />}</span>
               </div>
               <div className="flex justify-between text-xs mb-2">
                 <span className="text-[var(--ink-3)]">Opgebouwd saldo</span>
-                <span className="font-mono font-semibold">{formatCurrency(cumulativeCarry)}</span>
+                <span className="font-mono font-semibold">{<MaskedAmount value={cumulativeCarry} tone="wil" />}</span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                 <div className="h-full rounded-full" style={{ width: `${sinkProgress}%`, backgroundColor: colors.barHex }} />
               </div>
-              <p className="text-[10px] text-[var(--ink-3)] mt-1">Reset na uitgave · Doel: {formatCurrency(budget.goal_amount)}</p>
+              <p className="text-[10px] text-[var(--ink-3)] mt-1">Reset na uitgave · Doel: {<MaskedAmount value={budget.goal_amount} tone="wil" />}</p>
             </div>
           )
         })()}
@@ -2612,8 +2617,8 @@ function BudgetDetailModal({
               </div>
               <p className="font-medium text-sm text-[var(--ink)] mb-1">{linkedGoal.name}</p>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="font-mono text-base font-semibold text-[var(--ink)]">{formatCurrency(cumulativeCarry)}</span>
-                <span className="font-mono text-xs text-[var(--ink-3)]">van {formatCurrency(linkedGoal.target_value)}</span>
+                <span className="font-mono text-base font-semibold text-[var(--ink)]">{<MaskedAmount value={cumulativeCarry} tone="wil" />}</span>
+                <span className="font-mono text-xs text-[var(--ink-3)]">van {<MaskedAmount value={linkedGoal.target_value} tone="wil" />}</span>
               </div>
               {hasFreedomData && cumulativeCarry >= 100 && (
                 <p className="text-xs italic text-[var(--ink-3)] mb-2">
@@ -2630,7 +2635,7 @@ function BudgetDetailModal({
               <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-3)]">
                 <span>{Math.round(progress)}% bereikt</span>
                 <span>
-                  {goalRemaining > 0 && <><span className="font-mono">{formatCurrency(goalRemaining)}</span> resterend</>}
+                  {goalRemaining > 0 && <><span className="font-mono">{<MaskedAmount value={goalRemaining} tone="wil" />}</span> resterend</>}
                   {linkedGoal.target_date && (
                     <> · {new Date(linkedGoal.target_date).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}</>
                   )}
@@ -2676,7 +2681,7 @@ function BudgetDetailModal({
                           )}
                           <div className="text-right">
                             <span className="text-xs text-[var(--ink-3)]">
-                              {formatCurrency(childSpent)} / {formatCurrency(childLimit)}
+                              {<MaskedAmount value={childSpent} tone="wil" />} / {<MaskedAmount value={childLimit} tone="wil" />}
                             </span>
                             {hasFreedomData && childLimit - childSpent >= 100 && (
                               <p className="text-sm italic text-[var(--ink-3)]" data-testid="child-freedom-remaining">
@@ -2769,7 +2774,7 @@ function BudgetDetailModal({
                     </div>
                     <div className="ml-3 shrink-0 text-right">
                       <span className={`text-xs font-medium ${amountColor}`}>
-                        {formatCurrency(Math.abs(Number(tx.amount)))}
+                        {<MaskedAmount value={Math.abs(Number(tx.amount))} tone="wil" />}
                       </span>
                       {hasFreedomData && Math.abs(Number(tx.amount)) >= 100 && (
                         <p className="text-sm italic text-[var(--ink-3)]" data-testid="tx-freedom-time">
@@ -2814,7 +2819,7 @@ function BudgetDetailModal({
                     onClick={() => selectHistMonth(h.month)}
                     className="group relative flex flex-1 flex-col items-center focus-visible:outline-none"
                     style={{ height: '100%' }}
-                    title={`${h.label}: ${formatCurrency(h.spent)}${isCurrentMonth ? ' (lopende maand)' : ''}`}
+                    title={`${h.label}: ${formatMaskedCurrency(h.spent, masked)}${isCurrentMonth ? ' (lopende maand)' : ''}`}
                   >
                     {/* Limit indicator line */}
                     {h.limit > 0 && (
@@ -2841,7 +2846,7 @@ function BudgetDetailModal({
                     <p className={`mt-1 text-[9px] transition-colors ${isSelected ? 'font-semibold text-[var(--ink-2)]' : isCurrentMonth ? 'italic text-[var(--ink-3)]' : 'text-[var(--ink-3)]'}`}>{h.label}{isCurrentMonth ? '*' : ''}</p>
                     {/* Tooltip */}
                     <div className="pointer-events-none absolute -top-10 z-10 rounded bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-[var(--s2)] transition-opacity group-hover:opacity-100">
-                      {formatCurrency(h.spent)} / {formatCurrency(h.limit)}{isCurrentMonth ? ' ∗' : ''}
+                      {<MaskedAmount value={h.spent} tone="wil" />} / {<MaskedAmount value={h.limit} tone="wil" />}{isCurrentMonth ? ' ∗' : ''}
                     </div>
                   </button>
                 )
@@ -2860,13 +2865,13 @@ function BudgetDetailModal({
                       {new Date(selectedHistMonth).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
                     </p>
                     <div className="flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
-                      <span>{formatCurrency(hEntry.spent)} besteed</span>
-                      {hEntry.limit > 0 && <span>/ {formatCurrency(hEntry.limit)} limiet</span>}
+                      <span>{<MaskedAmount value={hEntry.spent} tone="wil" />} besteed</span>
+                      {hEntry.limit > 0 && <span>/ {<MaskedAmount value={hEntry.limit} tone="wil" />} limiet</span>}
                       {hEntry.limit > 0 && (
                         <span className={hEntry.spent > hEntry.limit
                           ? (isOverPositive(budgetType) ? 'font-semibold text-positive' : 'font-semibold text-negative')
                           : 'text-positive'}>
-                          {hEntry.spent > hEntry.limit ? '+' : '-'}{formatCurrency(Math.abs(hEntry.spent - hEntry.limit))}
+                          {hEntry.spent > hEntry.limit ? '+' : '-'}{<MaskedAmount value={Math.abs(hEntry.spent - hEntry.limit)} tone="wil" />}
                         </span>
                       )}
                     </div>
@@ -2896,7 +2901,7 @@ function BudgetDetailModal({
                             </p>
                           </div>
                           <span className={`ml-3 shrink-0 text-xs font-medium tabular-nums ${Number(tx.amount) < 0 ? 'text-negative' : 'text-positive'}`}>
-                            {formatCurrency(Math.abs(Number(tx.amount)))}
+                            {<MaskedAmount value={Math.abs(Number(tx.amount))} tone="wil" />}
                           </span>
                         </button>
                       ))}
@@ -2956,7 +2961,7 @@ function BudgetDetailModal({
                   <div>
                     <p className="text-xs text-[var(--ink-3)] font-medium">Verwachte uitgaven</p>
                     <p className="text-lg font-bold text-[var(--ink)] mt-0.5" data-testid="budget-forecast-amount">
-                      {formatCurrency(forecast.predicted)}
+                      {<MaskedAmount value={forecast.predicted} tone="wil" />}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -3034,7 +3039,7 @@ function BudgetDetailModal({
                       {forecast.alertMessage}
                     </p>
                     <p className="text-[10px] text-red-500 mt-0.5">
-                      Limiet: {formatCurrency(limit)} — Verwacht: {formatCurrency(forecast.predicted)}
+                      Limiet: {<MaskedAmount value={limit} tone="wil" />} — Verwacht: {<MaskedAmount value={forecast.predicted} tone="wil" />}
                     </p>
                   </div>
                 </div>
@@ -3066,7 +3071,7 @@ function BudgetDetailModal({
                     return (
                       <div key={i} className={`flex justify-between py-0.5 ${isZero ? 'opacity-40' : ''}`}>
                         <span className="font-sans text-sm text-[var(--ink-2)]">{label}{isZero ? ' (geen data)' : ` × ${i + 1}`}</span>
-                        <span className="tabular-nums text-[var(--ink)]">{isZero ? '—' : formatCurrency(val)}</span>
+                        <span className="text-[var(--ink)]">{isZero ? '—' : <MaskedAmount value={val} tone="wil" />}</span>
                       </div>
                     )
                   })}
@@ -3075,17 +3080,17 @@ function BudgetDetailModal({
                 <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
                   <div className="flex justify-between py-0.5">
                     <span className="font-sans text-sm text-[var(--ink-3)]">Gemiddelde (enkelvoudig)</span>
-                    <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(forecast.mean)}</span>
+                    <span className="tabular-nums text-[var(--ink-3)]">{<MaskedAmount value={forecast.mean} tone="wil" />}</span>
                   </div>
                   <div className="flex justify-between py-0.5">
                     <span className="font-sans text-sm text-[var(--ink-3)]">Standaardafwijking</span>
-                    <span className="tabular-nums text-[var(--ink-3)]">± {formatCurrency(forecast.stdDev)}</span>
+                    <span className="tabular-nums text-[var(--ink-3)]">± {<MaskedAmount value={forecast.stdDev} tone="wil" />}</span>
                   </div>
                 </div>
                 {/* Totaalregel */}
                 <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
                   <span className="text-[var(--ink)]">Verwacht volgende maand</span>
-                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(forecast.predicted)}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={forecast.predicted} tone="wil" />}</span>
                 </div>
                 {/* Freedom badge */}
                 {hasFreedomData && forecast.predicted >= 100 && (
@@ -3101,7 +3106,7 @@ function BudgetDetailModal({
                   <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2">
                     <div className="flex justify-between py-0.5 font-sans text-[11px]">
                       <span className="text-[var(--ink-3)]">Budgetlimiet</span>
-                      <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(limit)}</span>
+                      <span className="tabular-nums text-[var(--ink-3)]">{<MaskedAmount value={limit} tone="wil" />}</span>
                     </div>
                     <div className={`flex justify-between py-0.5 font-sans text-[11px] font-medium ${
                       forecast.exceedsLimit
@@ -3109,7 +3114,7 @@ function BudgetDetailModal({
                         : 'text-positive'
                     }`}>
                       <span>{forecast.exceedsLimit ? (isOverPositive(budgetType) ? 'Verwacht boven doel' : 'Verwachte overschrijding') : 'Verwachte ruimte'}</span>
-                      <span className="tabular-nums">{forecast.exceedsLimit ? '+' : ''}{formatCurrency(Math.abs(forecast.predicted - limit))}</span>
+                      <span className="tabular-nums">{forecast.exceedsLimit ? '+' : ''}{<MaskedAmount value={Math.abs(forecast.predicted - limit)} tone="wil" />}</span>
                     </div>
                   </div>
                 )}
@@ -3144,10 +3149,10 @@ function BudgetDetailModal({
                       {new Date(change.date).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-[var(--ink-2)]">{formatCurrency(change.amount)}</span>
+                      <span className="text-xs font-medium text-[var(--ink-2)]">{<MaskedAmount value={change.amount} tone="wil" />}</span>
                       {delta != null && delta !== 0 && (
                         <span className={`text-[10px] font-medium ${delta > 0 ? 'text-positive' : 'text-negative'}`}>
-                          {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                          {delta > 0 ? '+' : ''}{<MaskedAmount value={delta} tone="wil" />}
                         </span>
                       )}
                     </div>
@@ -3673,7 +3678,7 @@ function BudgetEditModal({
             <label htmlFor="budget-limit" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Bedrag</label>
             {isParent ? (
               <div className={`${inputCls} cursor-not-allowed bg-[var(--subtle)] text-[var(--ink-3)] font-mono tabular-nums`}>
-                {formatCurrency(childrenLimitSum ?? 0)}
+                {<MaskedAmount value={childrenLimitSum ?? 0} tone="wil" />}
                 <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">Som van sub-budgetten — pas de kinderen aan</p>
               </div>
             ) : (
@@ -3692,7 +3697,7 @@ function BudgetEditModal({
             {nibudAmount !== null && nibudAmount > 0 && (
               <p className="mt-1 flex items-center gap-1 text-xs text-[var(--ink-3)]">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--ink-4)]" />
-                NIBUD-richtlijn: <span className="font-mono font-medium text-[var(--ink-2)]">{formatCurrency(nibudAmount)}/mnd</span>
+                NIBUD-richtlijn: <span className="font-mono font-medium text-[var(--ink-2)]">{<MaskedAmount value={nibudAmount} tone="wil" />}/mnd</span>
               </p>
             )}
           </div>
@@ -3712,7 +3717,7 @@ function BudgetEditModal({
                 ))}
               </select>
               <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
-                Eerdere maanden behouden de oude limiet van <span className="font-mono tabular-nums">{formatCurrency(Number(budget.default_limit))}</span>.
+                Eerdere maanden behouden de oude limiet van <span className="font-mono tabular-nums">{<MaskedAmount value={Number(budget.default_limit)} tone="wil" />}</span>.
               </p>
             </div>
           )}

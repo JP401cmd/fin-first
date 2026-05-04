@@ -1,7 +1,7 @@
 'use client'
 
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { findAlternatives, FUND_ALTERNATIVES_DISCLAIMER, berekenJaarlijkseBesparing, type FindAlternativesResult } from '@/lib/fund-alternatives'
 import type { FeeAnalysis, HoldingFee } from '@/lib/fee-analysis'
 import { AlertTriangle, ArrowRight, Info, TrendingDown } from 'lucide-react'
@@ -70,10 +70,14 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
             </span>
           </div>
           <p className="text-sm text-[var(--ink-3)]">
-            Totale jaarlijkse fondskosten: <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{formatCurrency(totalAnnualFee)}</span>
+            Totale jaarlijkse fondskosten: <span className="text-[var(--ink)]">
+              <MaskedAmount value={totalAnnualFee} tone="kern" className="font-semibold" />
+            </span>
           </p>
           <p className="text-sm text-[var(--ink-3)]">
-            Portfoliowaarde: <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(totalPortfolioValue)}</span>
+            Portfoliowaarde: <span className="text-[var(--ink)]">
+              <MaskedAmount value={totalPortfolioValue} tone="kern" />
+            </span>
           </p>
           {fireImpactStr && feeImpactMonths > 0 && (
             <p className="text-sm text-[var(--ink-2)] italic mt-1">
@@ -112,8 +116,8 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
                       <FinTable.Td numeric color={SEVERITY_TEXT[holdingSeverity]}>
                         {(h.ter * 100).toFixed(2).replace('.', ',')}%
                       </FinTable.Td>
-                      <FinTable.Td numeric muted>{formatCurrency(h.value)}</FinTable.Td>
-                      <FinTable.Td numeric bold>{formatCurrency(h.annualFee)}</FinTable.Td>
+                      <FinTable.Td numeric muted><MaskedAmount value={h.value} tone="kern" /></FinTable.Td>
+                      <FinTable.Td numeric bold><MaskedAmount value={h.annualFee} tone="kern" /></FinTable.Td>
                       <FinTable.Td numeric muted>{(h.percentOfTotalFees * 100).toFixed(0)}%</FinTable.Td>
                     </FinTable.Row>
                   )
@@ -123,8 +127,8 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
                 <FinTable.Row total>
                   <FinTable.Td bold>Totaal</FinTable.Td>
                   <FinTable.Td numeric bold color={SEVERITY_TEXT[severity]}>{terPctStr}%</FinTable.Td>
-                  <FinTable.Td numeric muted>{formatCurrency(totalPortfolioValue)}</FinTable.Td>
-                  <FinTable.Td numeric bold>{formatCurrency(totalAnnualFee)}</FinTable.Td>
+                  <FinTable.Td numeric muted><MaskedAmount value={totalPortfolioValue} tone="kern" /></FinTable.Td>
+                  <FinTable.Td numeric bold><MaskedAmount value={totalAnnualFee} tone="kern" /></FinTable.Td>
                   <FinTable.Td numeric muted>100%</FinTable.Td>
                 </FinTable.Row>
               </FinTable.Footer>
@@ -197,7 +201,7 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
                               <div className="text-right flex-shrink-0">
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-positive">
                                   <TrendingDown className="h-3 w-3" />
-                                  {formatCurrency(saving)}/jaar
+                                  <MaskedAmount value={saving} tone="kern" className="text-xs" />/jaar
                                 </span>
                               </div>
                             )}
@@ -219,7 +223,7 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
               <Info className="h-4 w-4 text-[var(--ink-3)] mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-sm text-[var(--ink-2)]">
-                  Je totale fondskosten van <span className="font-mono tabular-nums font-semibold">{formatCurrency(totalAnnualFee)}</span> per jaar
+                  Je totale fondskosten van <MaskedAmount value={totalAnnualFee} tone="kern" className="font-semibold" /> per jaar
                   vertragen je financiële vrijheid met <span className="font-semibold">{fireImpactStr}</span>.
                 </p>
               </div>

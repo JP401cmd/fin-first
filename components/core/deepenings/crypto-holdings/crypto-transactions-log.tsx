@@ -17,7 +17,8 @@ import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Receipt } from 'lucide-react'
 import type { CryptoTransactionRow } from '@/lib/crypto-holdings-data'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 const TYPE_LABEL: Record<CryptoTransactionRow['type'], string> = {
   buy: 'Koop',
@@ -69,6 +70,8 @@ export function CryptoTransactionsLog({ transactions }: CryptoTransactionsLogPro
 
 function MonthSection({ group }: { group: MonthGroup }) {
   const router = useRouter()
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   return (
     <div>
       <h3 className="mb-2 font-serif text-[13px] italic text-[var(--ink-3)]">
@@ -87,7 +90,7 @@ function MonthSection({ group }: { group: MonthGroup }) {
           </thead>
           <tbody>
             {group.rows.map((tx) => {
-              const totalDisplay = tx.totalAmount != null ? formatCurrency(tx.totalAmount) : '—'
+              const totalDisplay = tx.totalAmount != null ? fc(tx.totalAmount) : '—'
               const tone =
                 tx.type === 'buy' || tx.type === 'deposit' || tx.type === 'reward'
                   ? 'positive'

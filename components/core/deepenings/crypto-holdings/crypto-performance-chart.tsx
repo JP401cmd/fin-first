@@ -27,7 +27,8 @@
 
 import { useMemo, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type {
   CryptoPortfolioPoint,
   CryptoPortfolioPeriodReturn,
@@ -81,6 +82,8 @@ export function CryptoPerformanceChart({
   benchmarkBtc,
   benchmarkEth,
 }: CryptoPerformanceChartProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Benchmark-keuze leeft hier in component-state — dit is een lokale view-
   // setting (geen URL-state) zodat de gebruiker tussen periodes kan switchen
   // zonder de overlay te verliezen. Default is "Geen": de portfolio-lijn
@@ -230,7 +233,7 @@ export function CryptoPerformanceChart({
               {deltaPct >= 0 ? '+' : ''}
               {deltaPct.toFixed(1)}%
               <span className="ml-1 text-[var(--ink-4)]">
-                ({deltaEur >= 0 ? '+' : ''}{formatCurrency(deltaEur)})
+                ({deltaEur >= 0 ? '+' : ''}{fc(deltaEur)})
               </span>
             </p>
           )

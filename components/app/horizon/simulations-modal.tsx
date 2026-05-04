@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
-import { formatCurrency } from '@/components/app/budget-shared'
+
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { Kicker } from '@/components/editorial'
@@ -10,6 +10,7 @@ import {
   runMonteCarlo, ageAtDate, NL_SWR,
   type FinancialInput, type MonteCarloResult,
 } from '@/lib/horizon-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type Props = {
   input: FinancialInput
@@ -269,15 +270,15 @@ export function SimulationsModal({
                 <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div>
                     <p className="text-xs text-[var(--ink-3)]">P10 (slechtst)</p>
-                    <p className="text-sm font-bold text-[var(--ink)]">{formatCurrency(mc.percentiles.p10[hoveredYear])}</p>
+                    <p className="text-sm font-bold text-[var(--ink)]">{<MaskedAmount value={mc.percentiles.p10[hoveredYear]} tone="horizon" />}</p>
                   </div>
                   <div>
                     <p className="text-xs text-[var(--ink-3)]">P50 (mediaan)</p>
-                    <p className="text-sm font-bold text-horizon-700">{formatCurrency(mc.percentiles.p50[hoveredYear])}</p>
+                    <p className="text-sm font-bold text-horizon-700">{<MaskedAmount value={mc.percentiles.p50[hoveredYear]} tone="horizon" />}</p>
                   </div>
                   <div>
                     <p className="text-xs text-[var(--ink-3)]">P90 (best)</p>
-                    <p className="text-sm font-bold text-[var(--ink)]">{formatCurrency(mc.percentiles.p90[hoveredYear])}</p>
+                    <p className="text-sm font-bold text-[var(--ink)]">{<MaskedAmount value={mc.percentiles.p90[hoveredYear]} tone="horizon" />}</p>
                   </div>
                   <div>
                     <p className="text-xs text-[var(--ink-3)]">FIRE kans</p>
@@ -522,7 +523,7 @@ function SimulationDetailModal({
                 </p>
               </div>
               <div className="rounded-lg bg-[var(--subtle)] p-4 text-sm text-[var(--ink-2)]">
-                <p>De FIRE-kans is het percentage simulaties waarin je doelvermogen van {formatCurrency(fireTarget)} wordt bereikt binnen {mc.years} jaar.</p>
+                <p>De FIRE-kans is het percentage simulaties waarin je doelvermogen van {<MaskedAmount value={fireTarget} tone="horizon" />} wordt bereikt binnen {mc.years} jaar.</p>
                 {isAuthoritativeTarget ? (
                   <p className="mt-2">Dit doelvermogen komt uit de simulatie-engine die rekening houdt met kasstromen, pensioen en Box 3-belastingen.</p>
                 ) : (
@@ -601,7 +602,7 @@ function SimulationDetailModal({
                       />
                     </div>
                     <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--ink-2)]">
-                      {formatCurrency(value)}
+                      {<MaskedAmount value={value} tone="horizon" />}
                     </span>
                   </div>
                 )

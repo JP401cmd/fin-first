@@ -82,7 +82,14 @@ import {
 } from 'react'
 import * as Lucide from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware EUR formatter hook used across this file's sub-views. */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { CHART_PAD } from '@/lib/chart-constants'
 import type {
   CompositionResult,
@@ -191,6 +198,7 @@ export const OpbouwCompositionChart = memo(function OpbouwCompositionChart({
   onViewChange,
   onYearClick,
 }: OpbouwCompositionChartProps) {
+  const fc = useFc()
   const { ref, hasEntered } = useInViewAnimation({ duration: 900 })
 
   // ── Netto-overlay toggle ─────────────────────────────────────────
@@ -384,7 +392,7 @@ export const OpbouwCompositionChart = memo(function OpbouwCompositionChart({
   const ariaLiveText = useMemo(() => {
     if (!tooltipBreakdown) return ''
     const { age, assetsTotal, debtsTotal, netWorth } = tooltipBreakdown
-    return `Leeftijd ${age}: bezit ${formatCurrency(assetsTotal)}, schulden ${formatCurrency(debtsTotal)}, netto ${formatCurrency(netWorth)}.`
+    return `Leeftijd ${age}: bezit ${fc(assetsTotal)}, schulden ${fc(debtsTotal)}, netto ${fc(netWorth)}.`
   }, [tooltipBreakdown])
 
   // ── SVG aria-label — statische samenvatting voor screenreaders die ──
@@ -685,8 +693,8 @@ export const OpbouwCompositionChart = memo(function OpbouwCompositionChart({
                   role="button"
                   aria-label={
                     onYearClick
-                      ? `Bekijk details voor leeftijd ${row.age}: netto ${formatCurrency(row.netWorth)}`
-                      : `Jaar op leeftijd ${row.age}: netto ${formatCurrency(row.netWorth)}`
+                      ? `Bekijk details voor leeftijd ${row.age}: netto ${fc(row.netWorth)}`
+                      : `Jaar op leeftijd ${row.age}: netto ${fc(row.netWorth)}`
                   }
                   onMouseMove={() => setHoveredAge(row.age)}
                   onFocus={() => setHoveredAge(row.age)}
@@ -1010,6 +1018,7 @@ function OpbouwCompositionTooltip({
   containerW: number
   xPixel: number
 }) {
+  const fc = useFc()
   // Positioneer links of rechts van de cursor afhankelijk van ruimte.
   const TOOLTIP_W = 220
   const OFFSET = 12
@@ -1045,7 +1054,7 @@ function OpbouwCompositionTooltip({
             />
             <span className="flex-1 truncate">{item.label}</span>
             <span className="font-mono tabular-nums">
-              {formatCurrency(item.value)}
+              {fc(item.value)}
             </span>
             <span className="w-9 text-right font-mono tabular-nums opacity-80">
               {Math.round(item.pct * 100)}%
@@ -1071,7 +1080,7 @@ function OpbouwCompositionTooltip({
                 />
                 <span className="flex-1 truncate">{item.label}</span>
                 <span className="font-mono tabular-nums">
-                  −{formatCurrency(item.value)}
+                  −{fc(item.value)}
                 </span>
                 <span className="w-9 text-right font-mono tabular-nums opacity-80">
                   {Math.round(item.pct * 100)}%
@@ -1082,7 +1091,7 @@ function OpbouwCompositionTooltip({
               <span className="h-2 w-2 shrink-0" aria-hidden="true" />
               <span className="flex-1 truncate">Totaal schulden</span>
               <span className="font-mono tabular-nums">
-                −{formatCurrency(breakdown.debtsTotal)}
+                −{fc(breakdown.debtsTotal)}
               </span>
               <span className="w-9" />
             </div>
@@ -1093,7 +1102,7 @@ function OpbouwCompositionTooltip({
         <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-white/30 pt-1.5 text-[10px] font-bold">
           <span>Netto</span>
           <span className="font-mono tabular-nums">
-            {formatCurrency(breakdown.netWorth)}
+            {fc(breakdown.netWorth)}
           </span>
         </div>
       </div>

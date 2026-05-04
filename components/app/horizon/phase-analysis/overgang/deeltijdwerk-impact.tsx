@@ -2,10 +2,12 @@
 
 import { memo, useState, useEffect } from 'react'
 import { Briefcase, AlertCircle } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { TransitionScenario } from '@/components/app/horizon/phase-modal-overgang'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -240,6 +242,7 @@ function computeScenarios(
 export const DeeltijdwerkImpact = memo(function DeeltijdwerkImpact(
   props: DeeltijdwerkImpactProps,
 ) {
+  const { masked } = useMaskedAmounts()
   const [state, setState] = useState<ComputedState | null>(null)
 
   // Lazy compute: defer past first paint
@@ -279,7 +282,7 @@ export const DeeltijdwerkImpact = memo(function DeeltijdwerkImpact(
             ? `Deeltijdwerk impact: ${state.scenarios
                 .map(
                   (s) =>
-                    `${s.label}: ${formatCurrency(s.maandInkomen)}/mnd → ${isGap ? `eindvermogen ${formatCurrency(s.eindVermogen ?? 0)}` : `eindvermogen ${formatCurrency(s.eindVermogen ?? 0)}`}${s.verschil !== 0 ? ` (${s.verschil > 0 ? '+' : ''}${formatCurrency(s.verschil)})` : ''}`,
+                    `${s.label}: ${formatMaskedCurrency(s.maandInkomen, masked)}/mnd → ${isGap ? `eindvermogen ${formatMaskedCurrency(s.eindVermogen ?? 0, masked)}` : `eindvermogen ${formatMaskedCurrency(s.eindVermogen ?? 0, masked)}`}${s.verschil !== 0 ? ` (${s.verschil > 0 ? '+' : ''}${formatMaskedCurrency(s.verschil, masked)})` : ''}`,
                 )
                 .join(', ')}`
             : 'Deeltijdwerk impact (laden...)'
@@ -327,11 +330,11 @@ export const DeeltijdwerkImpact = memo(function DeeltijdwerkImpact(
                     </td>
                     <td className="px-1 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
                       {s.maandInkomen > 0
-                        ? formatCurrency(s.maandInkomen)
+                        ? formatMaskedCurrency(s.maandInkomen, masked)
                         : '\u2013'}
                     </td>
                     <td className="px-1 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
-                      {formatCurrency(s.eindVermogen ?? 0)}
+                      {<MaskedAmount value={s.eindVermogen ?? 0} tone="horizon" />}
                     </td>
                     <td
                       className={`px-1 py-2 text-right font-mono tabular-nums ${
@@ -343,7 +346,7 @@ export const DeeltijdwerkImpact = memo(function DeeltijdwerkImpact(
                       }`}
                     >
                       {s.verschil !== 0
-                        ? `${s.verschil > 0 ? '+' : ''}${formatCurrency(s.verschil)}`
+                        ? `${s.verschil > 0 ? '+' : ''}${formatMaskedCurrency(s.verschil, masked)}`
                         : '\u2013'}
                     </td>
                   </tr>

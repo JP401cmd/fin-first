@@ -58,7 +58,7 @@ export function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium uppercase tracking-[0.06em] transition-colors border-t-3 ${
+              className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.06em] transition-colors border-t-3 ${
                 isNonKern ? 'animate-nav-reveal' : ''
               } ${
                 isActive
@@ -66,7 +66,7 @@ export function BottomNav() {
                   : 'text-[var(--ink-3)] border-transparent'
               }`}
             >
-              <Icon className="relative h-5 w-5" />
+              <Icon className="relative h-3.5 w-3.5" />
               <span className="relative">{tab.label}</span>
             </Link>
           )

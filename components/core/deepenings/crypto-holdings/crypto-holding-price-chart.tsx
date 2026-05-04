@@ -21,7 +21,8 @@
 
 import { useMemo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { CryptoHoldingPricePoint } from '@/lib/crypto-holdings-data'
 
 interface CryptoHoldingPriceChartProps {
@@ -47,6 +48,8 @@ export function CryptoHoldingPriceChart({
   symbol,
   daysBack = 90,
 }: CryptoHoldingPriceChartProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const stats = useMemo(() => {
     if (points.length < 2) return null
     let min = Infinity
@@ -110,7 +113,7 @@ export function CryptoHoldingPriceChart({
           <span>
             Gem. aankoopprijs ·{' '}
             <span className="font-mono tabular-nums text-[var(--ink-3)]">
-              {formatCurrency(avgPurchasePrice)}
+              {fc(avgPurchasePrice)}
             </span>
           </span>
         </p>

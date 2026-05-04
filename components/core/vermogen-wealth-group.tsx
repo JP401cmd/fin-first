@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import {
   type WealthGroup,
   WEALTH_GROUP_LABELS,
@@ -56,9 +56,7 @@ export function VermogenWealthGroup({
 
         {/* Right: total value + chevron */}
         <div className="flex items-center gap-1.5">
-          <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(totalValue)}
-          </span>
+          <MaskedAmount value={totalValue} tone="kern" className="text-sm font-semibold text-[var(--ink)]" />
           <ChevronDown
             className={`h-4 w-4 text-[var(--ink-4)] transition-transform duration-200 sm:hidden ${
               open ? 'rotate-180' : ''

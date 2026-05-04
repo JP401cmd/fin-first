@@ -10,6 +10,7 @@ import {
   Users, TrendingUp, Hourglass, Percent, Target, User,
   ArrowRight, Clock, PiggyBank, Wallet, Info, Settings2,
 } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // Types matching the API response
 interface PartnerFinancials {
@@ -196,7 +197,7 @@ export function HouseholdFireSection() {
               <div>
                 <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
                 <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="personal-fire-target">
-                  {formatCurrency(currentUserPartner.projection.fireTarget)}
+                  {<MaskedAmount value={currentUserPartner.projection.fireTarget} tone="horizon" />}
                 </p>
               </div>
               <div>
@@ -286,7 +287,7 @@ export function HouseholdFireSection() {
           <div>
             <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
             <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="combined-fire-target">
-              {formatCurrency(combined.projection.fireTarget)}
+              {<MaskedAmount value={combined.projection.fireTarget} tone="horizon" />}
             </p>
           </div>
 
@@ -324,27 +325,27 @@ export function HouseholdFireSection() {
         <FinancialCard
           icon={<PiggyBank className="h-4 w-4 text-horizon-600" />}
           label="Gecomb. vermogen"
-          value={formatCurrency(comparison.combinedNetWorth)}
+          value={<MaskedAmount value={comparison.combinedNetWorth} tone="horizon" />}
           testId="combined-net-worth"
         />
         <FinancialCard
           icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
           label="Gecomb. inkomen"
-          value={formatCurrency(comparison.combinedMonthlyIncome)}
+          value={<MaskedAmount value={comparison.combinedMonthlyIncome} tone="horizon" />}
           suffix="/mnd"
           testId="combined-income"
         />
         <FinancialCard
           icon={<Wallet className="h-4 w-4 text-red-500" />}
           label="Gecomb. uitgaven"
-          value={formatCurrency(comparison.combinedMonthlyExpenses)}
+          value={<MaskedAmount value={comparison.combinedMonthlyExpenses} tone="horizon" />}
           suffix="/mnd"
           testId="combined-expenses"
         />
         <FinancialCard
           icon={<Target className="h-4 w-4 text-wil-600" />}
           label="Gecomb. sparen"
-          value={formatCurrency(comparison.combinedMonthlySavings)}
+          value={<MaskedAmount value={comparison.combinedMonthlySavings} tone="horizon" />}
           suffix="/mnd"
           testId="combined-savings"
         />
@@ -610,7 +611,7 @@ function FinancialCard({
 }: {
   icon: React.ReactNode
   label: string
-  value: string
+  value: React.ReactNode
   suffix?: string
   testId: string
 }) {
@@ -680,7 +681,7 @@ function PartnerCard({
         <div>
           <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">FIRE-doel</p>
           <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
-            {formatCurrency(partner.projection.fireTarget)}
+            {<MaskedAmount value={partner.projection.fireTarget} tone="horizon" />}
           </p>
         </div>
         <div>
@@ -714,20 +715,20 @@ function PartnerCard({
       <div className="mt-3 space-y-1.5 text-xs text-[var(--ink-2)]">
         <div className="flex justify-between">
           <span>Netto vermogen</span>
-          <span className="font-mono tabular-nums font-medium">{formatCurrency(partner.financials.netWorth)}</span>
+          <span className="font-mono tabular-nums font-medium">{<MaskedAmount value={partner.financials.netWorth} tone="horizon" />}</span>
         </div>
         <div className="flex justify-between">
           <span>Inkomen/mnd</span>
-          <span className="font-mono tabular-nums font-medium">{formatCurrency(partner.financials.monthlyIncome)}</span>
+          <span className="font-mono tabular-nums font-medium">{<MaskedAmount value={partner.financials.monthlyIncome} tone="horizon" />}</span>
         </div>
         <div className="flex justify-between">
           <span>Uitgaven/mnd</span>
-          <span className="font-mono tabular-nums font-medium">{formatCurrency(partner.financials.monthlyExpenses)}</span>
+          <span className="font-mono tabular-nums font-medium">{<MaskedAmount value={partner.financials.monthlyExpenses} tone="horizon" />}</span>
         </div>
         {partner.financials.sharedAssetsValue > 0 && (
           <div className="flex justify-between text-horizon-600/70">
             <span>Gedeeld vermogen (aandeel)</span>
-            <span className="font-mono tabular-nums font-medium">{formatCurrency(partner.financials.sharedAssetsValue)}</span>
+            <span className="font-mono tabular-nums font-medium">{<MaskedAmount value={partner.financials.sharedAssetsValue} tone="horizon" />}</span>
           </div>
         )}
       </div>

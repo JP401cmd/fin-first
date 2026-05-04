@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface Props {
   size: WidgetSize
@@ -35,8 +35,8 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
   if (size === 'quarter') {
     return (
       <WidgetShell module="horizon" size={size} kicker="Box 3 Drag" href={href}>
-        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(annualDrag)}
+        <p className="text-[var(--ink)]">
+          <MaskedAmount value={annualDrag} tone="horizon" className="text-lg font-semibold" />
         </p>
         <span className="text-[10px] text-[var(--ink-3)]">/jaar</span>
         {freedomDaysLost != null && (
@@ -86,8 +86,8 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5">
-              <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-                {formatCurrency(annualDrag)}
+              <p className="text-[var(--ink)]">
+                <MaskedAmount value={annualDrag} tone="horizon" className="text-2xl font-semibold" />
               </p>
               <span className="text-xs text-[var(--ink-3)]">/jaar</span>
             </div>
@@ -110,8 +110,12 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
             {projections.map((p) => (
               <div key={p.year} className="flex items-center justify-between text-xs">
                 <span className="text-[var(--ink-3)] w-12">Jaar {p.year}</span>
-                <span className="font-mono tabular-nums text-[var(--ink-3)]">{formatCurrency(p.wealth)}</span>
-                <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(p.tax)}</span>
+                <span className="text-[var(--ink-3)]">
+                  <MaskedAmount value={p.wealth} tone="horizon" />
+                </span>
+                <span className="text-[var(--ink)]">
+                  <MaskedAmount value={p.tax} tone="horizon" />
+                </span>
                 {p.days != null && (
                   <span className="font-mono tabular-nums text-horizon-700 w-8 text-right">{p.days}d</span>
                 )}
@@ -124,7 +128,9 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
         <div className="mt-3 pt-2 border-t border-[var(--border-ed)] flex justify-between text-xs">
           <span className="text-[var(--ink-3)]">Totaal 5 jaar</span>
           <div className="flex items-center gap-3">
-            <span className="font-mono font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(totalTax5y)}</span>
+            <span className="text-[var(--ink)]">
+              <MaskedAmount value={totalTax5y} tone="horizon" className="font-semibold" />
+            </span>
             {totalDays5y > 0 && (
               <span className="font-mono font-semibold tabular-nums text-horizon-700">{totalDays5y}d</span>
             )}
@@ -135,11 +141,15 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
         <div className="mt-2 space-y-0.5">
           <div className="flex justify-between text-[11px]">
             <span className="text-[var(--ink-3)]">Fictief rendement (Box 3)</span>
-            <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(totalAssets * 0.0643)}</span>
+            <span className="text-[var(--ink-2)]">
+              <MaskedAmount value={totalAssets * 0.0643} tone="horizon" />
+            </span>
           </div>
           <div className="flex justify-between text-[11px]">
             <span className="text-[var(--ink-3)]">Werkelijk rendement (geschat)</span>
-            <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(totalAssets * annualGrowthRate)}</span>
+            <span className="text-[var(--ink-2)]">
+              <MaskedAmount value={totalAssets * annualGrowthRate} tone="horizon" />
+            </span>
           </div>
         </div>
 
@@ -162,8 +172,8 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
     <WidgetShell module="horizon" size={size} kicker="Box 3 Belastingdrag" href={href}>
       <div className="mt-0.5">
         <div className="flex items-baseline gap-1.5">
-          <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(annualDrag)}
+          <p className="text-[var(--ink)]">
+            <MaskedAmount value={annualDrag} tone="horizon" className="text-xl font-semibold" />
           </p>
           <span className="text-[10px] text-[var(--ink-3)]">/jaar</span>
         </div>

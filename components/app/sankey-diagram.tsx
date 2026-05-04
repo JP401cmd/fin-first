@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect, memo } from 'react'
-import { formatCurrency } from '@/components/app/budget-shared'
+import { formatMaskedCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 export interface SankeyNode {
   id: string
@@ -343,6 +345,7 @@ function NodeRect({
   svgWidth: number
   gradientId: string
 }) {
+  const { masked } = useMaskedAmounts()
   // Col 0 and 1: labels on right; col 2: labels on left
   const labelOnRight = node.column < 2
   const labelX = labelOnRight ? node.x + NODE_WIDTH + 6 : node.x - 6
@@ -411,7 +414,7 @@ function NodeRect({
             textAnchor={textAnchor}
             className="fill-zinc-400 text-[9px]"
           >
-            {node.secondaryLabel ?? formatCurrency(node.value)}
+            {node.secondaryLabel ?? formatMaskedCurrency(node.value, masked)}
           </text>
         </>
       )}
@@ -688,7 +691,7 @@ export const SankeyDiagram = memo(function SankeyDiagram({ nodes, links, height:
             {layoutNodes.find((n) => n.id === hoveredLink.target)?.label}
           </p>
           <p className="mt-0.5 text-sm font-bold text-[var(--ink)]">
-            {formatCurrency(hoveredLink.value)}
+            {<MaskedAmount value={hoveredLink.value} tone="ink" />}
           </p>
         </div>
       )}

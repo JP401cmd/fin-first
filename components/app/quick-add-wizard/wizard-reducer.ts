@@ -72,7 +72,18 @@ export type WizardState =
 // ── Actions ────────────────────────────────────────────────────────
 
 export type WizardAction =
-  | { type: 'OPEN'; initialIntent?: QuickAddIntent }
+  | {
+      type: 'OPEN'
+      initialIntent?: QuickAddIntent
+      /**
+       * Optionele type-prefill. Alleen toegepast wanneer hij past bij
+       * `initialIntent` (asset-type ↔ asset, debt-type ↔ debt). Skipt
+       * stap 2 zodat de wizard direct op het details-formulier opent —
+       * gebruikt door categorie-pagina's waar de categorie al vaststaat.
+       */
+      initialAssetType?: AssetType
+      initialDebtType?: DebtType
+    }
   | { type: 'SELECT_INTENT'; intent: QuickAddIntent }
   | { type: 'SELECT_TYPE_ASSET'; assetType: AssetType }
   | { type: 'SELECT_TYPE_DEBT'; debtType: DebtType }
@@ -120,6 +131,24 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       // we altijd vanaf een verse choice-state zodat resterende inline-state
       // van een vorige sessie wordt weggegooid.
       if (action.initialIntent) {
+        // Type-prefill skipt óók stap 2 — alleen wanneer het type past bij
+        // het intent. Mismatch (bv. assetType bij debt-intent) negeren we
+        // i.p.v. te crashen, zodat foute call-sites soft-failen op de
+        // type-grid en de gebruiker alsnog kan kiezen.
+        if (action.initialIntent === 'asset' && action.initialAssetType) {
+          return {
+            step: 'details',
+            intent: 'asset',
+            assetDraft: { asset_type: action.initialAssetType },
+          }
+        }
+        if (action.initialIntent === 'debt' && action.initialDebtType) {
+          return {
+            step: 'details',
+            intent: 'debt',
+            debtDraft: { debt_type: action.initialDebtType },
+          }
+        }
         return { step: 'type', intent: action.initialIntent }
       }
       return initialWizardState

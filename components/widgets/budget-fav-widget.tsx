@@ -2,7 +2,7 @@
 
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -46,8 +46,8 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker={budget.name} href={`/core/budgets?budget=${budget.id}`}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}`}>
-          {formatCurrency(budget.spent)} / {formatCurrency(budget.limit)}
+        <p className={`leading-none truncate ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}`}>
+          <MaskedAmount value={budget.spent} tone="kern" className="text-[15px] font-semibold" /> / <MaskedAmount value={budget.limit} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -75,8 +75,8 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
               <p className={`font-mono text-2xl font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}`}>
                 {Math.round(pct * 100)}%
               </p>
-              <p className="font-mono text-[10px] text-[var(--ink-4)] tabular-nums leading-normal">
-                van {formatCurrency(budget.limit)}
+              <p className="text-[var(--ink-4)] leading-normal">
+                van <MaskedAmount value={budget.limit} tone="kern" className="text-[10px]" />
               </p>
             </div>
           </div>
@@ -98,8 +98,8 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
 
             {/* Spent vs limit */}
             <div className="text-center">
-              <p className="font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatCurrency(budget.spent)} <span className="text-[var(--ink-4)]">van {formatCurrency(budget.limit)}</span>
+              <p className="text-[var(--ink)]">
+                <MaskedAmount value={budget.spent} tone="kern" className="text-sm" /> <span className="text-[var(--ink-4)]">van <MaskedAmount value={budget.limit} tone="kern" className="text-sm" /></span>
               </p>
             </div>
 
@@ -130,26 +130,31 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[10px] text-[var(--ink-3)] uppercase tracking-wide">Gem. per dag</p>
-                <p className="font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {formatCurrency(dailyAvg)}<span className="text-[var(--ink-4)]">/dag</span>
+                <p className="text-[var(--ink)]">
+                  <MaskedAmount value={dailyAvg} tone="kern" className="text-sm" /><span className="text-[var(--ink-4)]">/dag</span>
                 </p>
               </div>
               <div>
                 <p className="text-[10px] text-[var(--ink-3)] uppercase tracking-wide">Nog beschikbaar</p>
-                <p className={`font-mono text-sm tabular-nums ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}`}>
-                  {isOver ? '€ 0' : formatCurrency(remainingPerDay)}<span className="text-[var(--ink-4)]">/dag</span>
+                <p className={isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}>
+                  {isOver ? <span className="font-mono tabular-nums text-sm">€ 0</span> : <MaskedAmount value={remainingPerDay} tone="kern" className="text-sm" />}<span className="text-[var(--ink-4)]">/dag</span>
                 </p>
               </div>
             </div>
 
             {/* Remaining + days left */}
             <div className="flex items-baseline justify-between border-t border-[var(--border-ed)] pt-2">
-              <p className={`font-mono text-xs tabular-nums ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}`}>
-                {isOver
-                  ? (overPositive
-                    ? `${formatCurrency(budget.spent - budget.limit)} boven doel`
-                    : `${formatCurrency(budget.spent - budget.limit)} over budget`)
-                  : `${formatCurrency(remaining)} over`}
+              <p className={isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}>
+                {isOver ? (
+                  <>
+                    <MaskedAmount value={budget.spent - budget.limit} tone="kern" className="text-xs" />
+                    {overPositive ? ' boven doel' : ' over budget'}
+                  </>
+                ) : (
+                  <>
+                    <MaskedAmount value={remaining} tone="kern" className="text-xs" /> over
+                  </>
+                )}
               </p>
               <p className="text-[10px] text-[var(--ink-4)]">
                 nog {daysLeft} {daysLeft === 1 ? 'dag' : 'dagen'}
@@ -188,8 +193,8 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
 
           {/* Details */}
           <div className="flex-1 min-w-0 space-y-1">
-            <p className="font-mono text-sm tabular-nums text-[var(--ink)]">
-              {formatCurrency(budget.spent)} <span className="text-[var(--ink-4)]">van {formatCurrency(budget.limit)}</span>
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={budget.spent} tone="kern" className="text-sm" /> <span className="text-[var(--ink-4)]">van <MaskedAmount value={budget.limit} tone="kern" className="text-sm" /></span>
             </p>
 
             {/* Progress bar */}
@@ -215,12 +220,17 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
               )}
             </div>
 
-            <p className={`font-mono text-xs tabular-nums ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}`}>
-              {isOver
-                ? (overPositive
-                  ? `${formatCurrency(budget.spent - budget.limit)} boven doel`
-                  : `${formatCurrency(budget.spent - budget.limit)} over budget`)
-                : `${formatCurrency(remaining)} over · nog ${daysLeft}d`}
+            <p className={isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}>
+              {isOver ? (
+                <>
+                  <MaskedAmount value={budget.spent - budget.limit} tone="kern" className="text-xs" />
+                  {overPositive ? ' boven doel' : ' over budget'}
+                </>
+              ) : (
+                <>
+                  <MaskedAmount value={remaining} tone="kern" className="text-xs" /> over · nog {daysLeft}d
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -248,10 +258,10 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
             <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}`}>
               {Math.round(pct * 100)}%
             </p>
-            <p className="font-mono text-[9px] text-[var(--ink-3)] tabular-nums leading-normal mt-0.5 text-center">
-              {formatCurrency(budget.spent)}
+            <p className="text-[var(--ink-3)] leading-normal mt-0.5 text-center">
+              <MaskedAmount value={budget.spent} tone="kern" className="text-[9px]" />
               <br />
-              <span className="text-[var(--ink-4)]">/ {formatCurrency(budget.limit)}</span>
+              <span className="text-[var(--ink-4)]">/ <MaskedAmount value={budget.limit} tone="kern" className="text-[9px]" /></span>
             </p>
           </div>
         </div>

@@ -11,7 +11,7 @@
  *  4. `useMaskedAmounts` throws a helpful error when used without a provider,
  *     catching the most common integration bug at first render.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { act, render, renderHook, screen } from '@testing-library/react'
 import {
   PRIVACY_MASKED_STORAGE_KEY,
@@ -74,18 +74,16 @@ describe('useMaskedAmounts + PrivacyProvider', () => {
     expect(result.current.masked).toBe(true)
   })
 
-  it('throws a helpful error when used outside a PrivacyProvider', () => {
-    // Suppress React's automatic error boundary log — the throw IS the test.
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    function Offender() {
-      useMaskedAmounts()
-      return null
+  it('returns a safe fallback (masked=false) when used outside a PrivacyProvider', () => {
+    // Lets components render in unit tests / storybook / test routes without
+    // requiring every consumer to set up a provider tree.
+    function Probe() {
+      const { masked } = useMaskedAmounts()
+      return <span data-testid="state">{String(masked)}</span>
     }
 
-    expect(() => render(<Offender />)).toThrow(/PrivacyProvider/)
-
-    errSpy.mockRestore()
+    render(<Probe />)
+    expect(screen.getByTestId('state').textContent).toBe('false')
   })
 
   it('exposes a stable context shape with the required members', () => {

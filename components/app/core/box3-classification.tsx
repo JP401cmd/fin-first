@@ -1,10 +1,11 @@
 'use client'
 
 import { Info, PiggyBank, TrendingUp, Ban } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+
 import type { AssetClassification, DebtClassification } from '@/lib/box3-data'
 import { ASSET_TYPE_LABELS, ASSET_TYPE_COLORS } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS, DEBT_SUBTYPE_LABELS } from '@/lib/debt-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 function Tooltip({ text }: { text: string }) {
   return (
@@ -80,7 +81,7 @@ export function Box3Classification({
                   {group.items.length} assets
                 </span>
               </div>
-              <span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(group.total)}</span>
+              <span className="text-sm font-bold text-[var(--ink)]">{<MaskedAmount value={group.total} tone="kern" />}</span>
             </div>
             {group.items.length === 0 ? (
               <p className="text-xs text-[var(--ink-3)]">Geen assets in deze categorie</p>
@@ -100,7 +101,7 @@ export function Box3Classification({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-[var(--ink)]">
-                        {formatCurrency(Number(ac.asset.current_value))}
+                        {<MaskedAmount value={Number(ac.asset.current_value)} tone="kern" />}
                       </span>
                       {ac.exclusionReason && (
                         <Tooltip text={ac.exclusionReason} />
@@ -126,7 +127,7 @@ export function Box3Classification({
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-semibold text-red-700">In Box 3</span>
                   <span className="text-sm font-bold text-[var(--ink)]">
-                    {formatCurrency(box3Schulden.reduce((s, dc) => s + Number(dc.debt.current_balance), 0))}
+                    {<MaskedAmount value={box3Schulden.reduce((s, dc) => s + Number(dc.debt.current_balance), 0)} tone="kern" />}
                   </span>
                 </div>
                 <div className="space-y-1.5">
@@ -170,7 +171,7 @@ export function Box3Classification({
                         )}
                       </div>
                       <span className="text-sm font-medium text-red-600 shrink-0 ml-2">
-                        {formatCurrency(Number(dc.debt.current_balance))}
+                        {<MaskedAmount value={Number(dc.debt.current_balance)} tone="kern" />}
                       </span>
                     </div>
                     )
@@ -184,7 +185,7 @@ export function Box3Classification({
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-semibold text-[var(--ink-3)]">Niet in Box 3</span>
                   <span className="text-sm font-bold text-[var(--ink)]">
-                    {formatCurrency(uitgeslSchulden.reduce((s, dc) => s + Number(dc.debt.current_balance), 0))}
+                    {<MaskedAmount value={uitgeslSchulden.reduce((s, dc) => s + Number(dc.debt.current_balance), 0)} tone="kern" />}
                   </span>
                 </div>
                 <div className="space-y-1.5">
@@ -198,7 +199,7 @@ export function Box3Classification({
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-[var(--ink-2)]">
-                          {formatCurrency(Number(dc.debt.current_balance))}
+                          {<MaskedAmount value={Number(dc.debt.current_balance)} tone="kern" />}
                         </span>
                         {dc.exclusionReason && (
                           <Tooltip text={dc.exclusionReason} />

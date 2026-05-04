@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { X, Check, Clock, ArrowRight, Sparkles, Pencil, ArrowLeft } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
+import { BudgetIcon } from '@/components/app/budget-shared'
 import { PostponeForm } from '@/components/app/postpone-form'
 import type { Recommendation } from '@/lib/recommendation-data'
 import {
@@ -11,6 +11,7 @@ import {
   RECOMMENDATION_TYPE_ICONS,
   getRecommendationTypeColor,
 } from '@/lib/recommendation-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type RecommendationModalProps = {
   recommendation: Recommendation
@@ -146,11 +147,11 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
               {recommendation.current_value != null && recommendation.proposed_value != null && (
                 <div className="flex items-center justify-center gap-3 text-sm">
                   <span className="rounded-md bg-zinc-100 px-2.5 py-1 font-medium text-[var(--ink-2)]">
-                    {formatCurrency(recommendation.current_value)}/mnd
+                    {<MaskedAmount value={recommendation.current_value} tone="horizon" />}/mnd
                   </span>
                   <ArrowRight className="h-4 w-4 text-wil-500" />
                   <span className="rounded-md bg-wil-100 px-2.5 py-1 font-medium text-wil-700">
-                    {formatCurrency(recommendation.proposed_value)}/mnd
+                    {<MaskedAmount value={recommendation.proposed_value} tone="horizon" />}/mnd
                   </span>
                 </div>
               )}
@@ -158,7 +159,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
               {/* Euro impact */}
               {recommendation.euro_impact_yearly != null && recommendation.euro_impact_yearly > 0 && (
                 <p className="text-center text-xs text-[var(--ink-3)]">
-                  Besparing: {formatCurrency(recommendation.euro_impact_monthly || 0)}/mnd ({formatCurrency(recommendation.euro_impact_yearly)}/jaar)
+                  Besparing: {<MaskedAmount value={recommendation.euro_impact_monthly || 0} tone="horizon" />}/mnd ({<MaskedAmount value={recommendation.euro_impact_yearly} tone="horizon" />}/jaar)
                 </p>
               )}
 
@@ -335,7 +336,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                           <div className="text-xs font-semibold text-wil-600">{Math.round(draft.freedom_days_impact)} dagen</div>
                         )}
                         {draft.euro_impact_monthly != null && draft.euro_impact_monthly > 0 && (
-                          <div className="text-xs text-[var(--ink-3)]">{formatCurrency(draft.euro_impact_monthly)}/mnd</div>
+                          <div className="text-xs text-[var(--ink-3)]">{<MaskedAmount value={draft.euro_impact_monthly} tone="horizon" />}/mnd</div>
                         )}
                       </div>
                     </div>
@@ -392,9 +393,9 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                     <div className="text-sm font-medium text-zinc-800">Budget automatisch aanpassen</div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--ink-3)]">
                       <span>{recommendation.related_budget_slug}:</span>
-                      <span>{formatCurrency(recommendation.current_value!)}/mnd</span>
+                      <span>{<MaskedAmount value={recommendation.current_value!} tone="horizon" />}/mnd</span>
                       <ArrowRight className="h-3 w-3 text-wil-500" />
-                      <span className="font-medium text-wil-600">{formatCurrency(recommendation.proposed_value!)}/mnd</span>
+                      <span className="font-medium text-wil-600">{<MaskedAmount value={recommendation.proposed_value!} tone="horizon" />}/mnd</span>
                     </div>
                   </div>
                 </label>

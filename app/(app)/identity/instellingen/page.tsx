@@ -14,13 +14,19 @@ import type { FontTheme } from '@/components/app/module-color-provider'
 import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } from '@/lib/color-palette'
 import type { ModuleColorConfig, ModuleName, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import { ColorPickerCard } from '@/components/app/color-picker-card'
+import {
+  useCategoryTints,
+  useCategoryTintPercents,
+  DEFAULT_CATEGORY_TINTS,
+  DEFAULT_CATEGORY_TINT_PERCENTS,
+} from '@/lib/category-tints'
 import { Palette, RotateCcw, Type } from 'lucide-react'
 import { ExportDropdown } from '@/components/app/export-dropdown'
 import { type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
@@ -187,6 +193,8 @@ export default function InstellingenPage() {
   const { setConfig } = useModuleColors()
   const { setBudgetConfig } = useBudgetColors()
   const { setPhaseConfig } = usePhaseColors()
+  const [categoryTints, setCategoryTints] = useCategoryTints()
+  const [categoryTintPercents, setCategoryTintPercents] = useCategoryTintPercents()
   const [typeSaving, setTypeSaving] = useState(false)
   const [typeMessage, setTypeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [moduleColors, setModuleColors] = useState<ModuleColorConfig>(DEFAULT_MODULE_COLORS)
@@ -1448,7 +1456,7 @@ export default function InstellingenPage() {
               />
               {retirementCustomAmount && !isNaN(Number(retirementCustomAmount)) && Number(retirementCustomAmount) > 0 && (
                 <p className="mt-1.5 font-sans text-[11px] text-[var(--ink-3)]">
-                  ≈ {formatCurrency(Number(retirementCustomAmount) / 12)}/maand &middot; dagprijs {formatCurrency(Number(retirementCustomAmount) / 365)}
+                  ≈ <MaskedAmount value={Number(retirementCustomAmount) / 12} tone="ink" />/maand &middot; dagprijs <MaskedAmount value={Number(retirementCustomAmount) / 365} tone="ink" />
                 </p>
               )}
             </div>
@@ -1927,6 +1935,97 @@ export default function InstellingenPage() {
                 {phaseColorMessage.text}
               </span>
             )}
+          </div>
+        </div>
+
+        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
+
+        {/* Categorie-kaart tinten — twee zones rond de breuklijn op /core */}
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Categoriekaart-tinten</p>
+          <p className="mb-3 text-[11px] italic text-[var(--ink-3)]" style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}>
+            Kleuren van de twee zones rond de breuklijn op de Kern-categoriekaarten. Boven en onder de lijn krijgen elk een eigen tint; de breuklijn zelf blijft papierkleurig.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ColorPickerCard
+              label="Bezittingen — boven"
+              sublabel={`${categoryTintPercents.assetAbove}% over papier`}
+              value={categoryTints.assetAbove}
+              defaultValue={DEFAULT_CATEGORY_TINTS.assetAbove}
+              onChange={(hex) => setCategoryTints({ ...categoryTints, assetAbove: hex })}
+            />
+            <ColorPickerCard
+              label="Bezittingen — onder"
+              sublabel={`${categoryTintPercents.assetBelow}% over papier`}
+              value={categoryTints.assetBelow}
+              defaultValue={DEFAULT_CATEGORY_TINTS.assetBelow}
+              onChange={(hex) => setCategoryTints({ ...categoryTints, assetBelow: hex })}
+            />
+            <ColorPickerCard
+              label="Schulden — boven"
+              sublabel={`${categoryTintPercents.debtAbove}% over papier`}
+              value={categoryTints.debtAbove}
+              defaultValue={DEFAULT_CATEGORY_TINTS.debtAbove}
+              onChange={(hex) => setCategoryTints({ ...categoryTints, debtAbove: hex })}
+            />
+            <ColorPickerCard
+              label="Schulden — onder"
+              sublabel={`${categoryTintPercents.debtBelow}% over papier`}
+              value={categoryTints.debtBelow}
+              defaultValue={DEFAULT_CATEGORY_TINTS.debtBelow}
+              onChange={(hex) => setCategoryTints({ ...categoryTints, debtBelow: hex })}
+            />
+          </div>
+
+          {/* Transparantie-sliders per zone */}
+          <div className="mt-5">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Transparantie per zone</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {([
+                ['assetAbove', 'Bezittingen — boven'],
+                ['assetBelow', 'Bezittingen — onder'],
+                ['debtAbove', 'Schulden — boven'],
+                ['debtBelow', 'Schulden — onder'],
+              ] as const).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2">
+                  <span className="flex-1 text-xs text-[var(--ink-2)]">{label}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={20}
+                    step={0.5}
+                    value={categoryTintPercents[key]}
+                    onChange={(e) =>
+                      setCategoryTintPercents({
+                        ...categoryTintPercents,
+                        [key]: Number(e.target.value),
+                      })
+                    }
+                    className="h-1 flex-1 cursor-pointer accent-[var(--ink-2)]"
+                  />
+                  <span className="w-10 text-right font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                    {categoryTintPercents[key].toFixed(1)}%
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setCategoryTints(DEFAULT_CATEGORY_TINTS)
+                setCategoryTintPercents(DEFAULT_CATEGORY_TINT_PERCENTS)
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Standaard
+            </button>
+            <span className="text-[11px] italic text-[var(--ink-3)]" style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}>
+              Direct opgeslagen — verschijnen meteen op /core.
+            </span>
           </div>
         </div>
           </div>

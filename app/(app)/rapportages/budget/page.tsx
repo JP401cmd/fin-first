@@ -1,35 +1,54 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Printer, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency, formatTimestamp } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { ReportSparkline } from '@/app/(app)/rapportages/[id]/components/report-sparkline'
 import { KassabonTable } from '@/app/(app)/rapportages/[id]/components/kassabon-table'
+import {
+  FiguresStrip,
+  ScenarioCallout,
+  RekeningTag,
+  SectionLabel,
+  OrnamentColophon,
+} from '@/components/editorial'
+import { SectionDivider } from '@/components/app/section-divider'
 import type { BudgetReportData, BudgetReportCategory, BudgetReportVarianceItem, BudgetReportAggregate } from '@/lib/budget-report-data'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Masked-aware currency formatter hook. Each subcomponent calls `useFc()` to
+ * get a stable callback that returns either the masked placeholder or the
+ * formatted EUR string, based on the privacy toggle state.
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
+
 function TrendIcon({ direction, invert }: { direction: 'up' | 'down' | 'flat'; invert?: boolean }) {
   if (direction === 'flat') return <Minus className="h-3 w-3 text-[var(--ink-4)]" />
   const isGood = invert ? direction === 'down' : direction === 'up'
-  if (direction === 'up') return <TrendingUp className={`h-3 w-3 ${isGood ? 'text-kern-600' : 'text-red-600'}`} />
-  return <TrendingDown className={`h-3 w-3 ${isGood ? 'text-kern-600' : 'text-red-600'}`} />
+  if (direction === 'up') return <TrendingUp className={`h-3 w-3 ${isGood ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`} />
+  return <TrendingDown className={`h-3 w-3 ${isGood ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`} />
 }
 
 function HealthDot({ score }: { score: 'healthy' | 'warning' | 'over' }) {
-  const color = score === 'healthy' ? 'bg-emerald-500' : score === 'warning' ? 'bg-amber-500' : 'bg-red-500'
+  const color = score === 'healthy' ? 'bg-[var(--positive)]' : score === 'warning' ? 'bg-amber-500' : 'bg-[var(--negative)]'
   return <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
 }
 
 function PercentBar({ percent }: { percent: number }) {
   const clamped = Math.min(percent, 100)
   const barColor = percent > 100
-    ? 'bg-red-500'
+    ? 'bg-[var(--negative)]'
     : percent >= 80
       ? 'bg-amber-500'
-      : 'bg-kern-500'
+      : 'bg-[var(--module-active-500)]'
 
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
@@ -38,14 +57,21 @@ function PercentBar({ percent }: { percent: number }) {
   )
 }
 
-// ── Section: Scorecard (Lead Story) ──────────────────────────────────────────
+// ── Section: Scorecard secondary (sparkline + pillars + burn-rate) ───────────
 
+/**
+ * Secondary scorecard rendered under the editorial FiguresStrip.
+ *
+ * The headline numbers (Begroot, Besteed, Verschil, Vrijheid-impact) live in
+ * the FiguresStrip above this block; this card focuses on context that doesn't
+ * fit a 4-column strip — the 6-month spending trend, three category-health
+ * pillars (Op koers / Let op / Over budget), and the mid-month burn-rate
+ * projection. Together they answer "how is this month tracking?" beyond the
+ * headline-totals.
+ */
 function BudgetScorecard({ data }: { data: BudgetReportData }) {
+  const fc = useFc()
   const s = data.summary
-  const isUnder = s.totalVariance >= 0
-  const headlineText = isUnder
-    ? `${Math.round(s.variancePercent === 0 ? (s.totalSpent / s.totalBudgeted * 100) : (100 - s.variancePercent))}% van budget besteed`
-    : `${formatCurrency(Math.abs(s.totalVariance))} over budget`
 
   // Trend values: total expense spending per month
   const totalTrend = data.trendMonths.map((_, i) =>
@@ -56,23 +82,8 @@ function BudgetScorecard({ data }: { data: BudgetReportData }) {
 
   return (
     <div className="mb-8">
-      <p className="mb-1 font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-kern-600">
-        Budgetoverzicht
-      </p>
-      <h2 className="font-playfair text-2xl font-bold text-[var(--ink)] md:text-3xl" style={{ letterSpacing: '-0.02em' }}>
-        {headlineText}
-      </h2>
-      <p className="mt-1 font-source-serif text-[13px] text-[var(--ink-2)]">
-        {formatCurrency(s.totalSpent)} besteed van {formatCurrency(s.totalBudgeted)} begroot
-        {isUnder ? (
-          <span className="text-kern-600"> — {formatCurrency(s.totalVariance)} onder budget</span>
-        ) : (
-          <span className="text-red-600"> — {formatCurrency(Math.abs(s.totalVariance))} over budget</span>
-        )}
-      </p>
-
       {/* Sparkline */}
-      <div className="mt-4 mb-5">
+      <div className="mb-5">
         <ReportSparkline
           values={totalTrend}
           color="#c4a06b"
@@ -88,23 +99,23 @@ function BudgetScorecard({ data }: { data: BudgetReportData }) {
 
       {/* Stat pillars */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-[var(--r)] border border-kern-200 bg-kern-50 p-3 text-center">
-          <p className="font-dm-mono text-xl font-bold tabular-nums text-kern-700">{s.categoriesOnTrack}</p>
-          <p className="mt-0.5 font-inter text-[10px] font-medium text-kern-600">Op koers</p>
+        <div className="border border-[var(--module-active-300)] bg-[var(--module-active-50)]/40 p-3 text-center">
+          <p className="font-dm-mono text-xl font-bold tabular-nums text-[var(--positive)]">{s.categoriesOnTrack}</p>
+          <p className="mt-0.5 font-inter text-[10px] font-medium text-[var(--positive)]">Op koers</p>
         </div>
-        <div className="rounded-[var(--r)] border border-amber-200 bg-amber-50 p-3 text-center">
+        <div className="border border-amber-200 bg-amber-50 p-3 text-center">
           <p className="font-dm-mono text-xl font-bold tabular-nums text-amber-700">{s.categoriesNearLimit}</p>
           <p className="mt-0.5 font-inter text-[10px] font-medium text-amber-600">Let op</p>
         </div>
-        <div className="rounded-[var(--r)] border border-red-200 bg-red-50 p-3 text-center">
-          <p className="font-dm-mono text-xl font-bold tabular-nums text-red-700">{s.categoriesOverBudget}</p>
-          <p className="mt-0.5 font-inter text-[10px] font-medium text-red-600">Over budget</p>
+        <div className="border border-[var(--negative)]/30 bg-[var(--negative)]/10 p-3 text-center">
+          <p className="font-dm-mono text-xl font-bold tabular-nums text-[var(--negative)]">{s.categoriesOverBudget}</p>
+          <p className="mt-0.5 font-inter text-[10px] font-medium text-[var(--negative)]">Over budget</p>
         </div>
       </div>
 
       {/* Burn rate & projection */}
       {data.daysPassed > 0 && data.daysPassed < data.daysInMonth && (
-        <div className="mt-4 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-3">
+        <div className="mt-4 border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-3">
           <div className="flex items-center justify-between">
             <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Uitgavesnelheid
@@ -118,12 +129,12 @@ function BudgetScorecard({ data }: { data: BudgetReportData }) {
           </div>
           <p className="mt-1.5 font-source-serif text-[12px] italic text-[var(--ink-3)]">
             Bij dit tempo eindig je op{' '}
-            <span className={`font-dm-mono ${s.projectedMonthEnd > s.totalBudgeted ? 'text-red-600' : 'text-kern-600'}`}>
-              {formatCurrency(s.projectedMonthEnd)}
+            <span className={`font-dm-mono ${s.projectedMonthEnd > s.totalBudgeted ? 'text-[var(--negative)]' : 'text-[var(--positive)]'}`}>
+              {fc(s.projectedMonthEnd)}
             </span>
             {' '}— {s.projectedMonthEnd > s.totalBudgeted
-              ? `${formatCurrency(s.projectedMonthEnd - s.totalBudgeted)} over budget`
-              : `${formatCurrency(s.totalBudgeted - s.projectedMonthEnd)} onder budget`
+              ? `${fc(s.projectedMonthEnd - s.totalBudgeted)} over budget`
+              : `${fc(s.totalBudgeted - s.projectedMonthEnd)} onder budget`
             }
           </p>
         </div>
@@ -135,28 +146,29 @@ function BudgetScorecard({ data }: { data: BudgetReportData }) {
 // ── Section: Essentieel vs Discretionair ─────────────────────────────────────
 
 function AggregateColumn({ agg, dailyExpenseRate }: { agg: BudgetReportAggregate; dailyExpenseRate: number }) {
+  const fc = useFc()
   const isUnder = agg.variance >= 0
   return (
     <div>
       <div className="space-y-1.5">
         <div className="flex justify-between">
           <span className="font-inter text-[11px] text-[var(--ink-2)]">Begroot</span>
-          <span className="font-dm-mono text-[12px] tabular-nums text-[var(--ink)]">{formatCurrency(agg.budgeted)}</span>
+          <span className="font-dm-mono text-[12px] tabular-nums text-[var(--ink)]">{fc(agg.budgeted)}</span>
         </div>
         <div className="flex justify-between">
           <span className="font-inter text-[11px] text-[var(--ink-2)]">Besteed</span>
-          <span className="font-dm-mono text-[12px] tabular-nums text-[var(--ink)]">{formatCurrency(agg.spent)}</span>
+          <span className="font-dm-mono text-[12px] tabular-nums text-[var(--ink)]">{fc(agg.spent)}</span>
         </div>
         <div className="border-t border-dashed border-[var(--border-ed)] pt-1 flex justify-between">
           <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">Verschil</span>
-          <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${isUnder ? 'text-kern-600' : 'text-red-600'}`}>
-            {isUnder ? '+' : ''}{formatCurrency(agg.variance)}
+          <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${isUnder ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+            {isUnder ? '+' : ''}{fc(agg.variance)}
           </span>
         </div>
         {dailyExpenseRate > 0 && Math.abs(agg.freedomDaysImpact) >= 0.1 && (
           <div className="flex justify-between">
             <span className="font-inter text-[10px] text-[var(--ink-3)]">Vrijheidsdagen</span>
-            <span className={`font-dm-mono text-[10px] italic tabular-nums ${agg.freedomDaysImpact >= 0 ? 'text-kern-600' : 'text-red-600'}`}>
+            <span className={`font-dm-mono text-[10px] italic tabular-nums ${agg.freedomDaysImpact >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
               {agg.freedomDaysImpact >= 0 ? '+' : ''}{agg.freedomDaysImpact.toLocaleString('nl-NL', { maximumFractionDigits: 1 })}d
             </span>
           </div>
@@ -168,8 +180,11 @@ function AggregateColumn({ agg, dailyExpenseRate }: { agg: BudgetReportAggregate
 }
 
 function EssentialDiscretionary({ data }: { data: BudgetReportData }) {
+  // Lives inside the parent RekeningTag wrapper which provides its own paper/border
+  // chrome; this block contributes only the internal 2-column structure (header
+  // strip + body) without double-borders.
   return (
-    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+    <div className="overflow-hidden">
       <div className="grid grid-cols-1 md:grid-cols-2">
         <div className="border-b-2 border-[var(--ink)] bg-[var(--subtle)]/40 px-5 py-2.5">
           <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink)]">
@@ -199,12 +214,13 @@ function EssentialDiscretionary({ data }: { data: BudgetReportData }) {
 // ── Section: Budget vs Werkelijk table ───────────────────────────────────────
 
 function BudgetTableCategoryRow({ cat, isExpanded, onToggle }: { cat: BudgetReportCategory; isExpanded: boolean; onToggle: () => void }) {
+  const fc = useFc()
   const hasChildren = cat.children.length > 0
-  const varianceColor = cat.variance >= 0 ? 'text-kern-600' : 'text-red-600'
+  const varianceColor = cat.variance >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'
 
   return (
     <>
-      <tr className="border-b border-dashed border-[var(--border-ed)] hover:bg-[var(--subtle)]/30">
+      <tr className="border-b border-dotted border-[var(--rule-soft)] hover:bg-[var(--subtle)]/30">
         <td className="py-1.5 pr-2">
           <button
             type="button"
@@ -221,15 +237,15 @@ function BudgetTableCategoryRow({ cat, isExpanded, onToggle }: { cat: BudgetRepo
           </button>
         </td>
         <td className="py-1.5 px-2 text-right font-dm-mono text-[12px] tabular-nums text-[var(--ink-2)]">
-          {formatCurrency(cat.limit)}
+          {fc(cat.limit)}
         </td>
         <td className="py-1.5 px-2 text-right font-dm-mono text-[12px] tabular-nums text-[var(--ink)]">
-          {formatCurrency(cat.spent)}
+          {fc(cat.spent)}
         </td>
         <td className={`py-1.5 px-2 text-right font-dm-mono text-[12px] font-medium tabular-nums ${varianceColor}`}>
-          {cat.variance >= 0 ? '+' : ''}{formatCurrency(cat.variance)}
+          {cat.variance >= 0 ? '+' : ''}{fc(cat.variance)}
         </td>
-        <td className={`py-1.5 px-2 text-right font-dm-mono text-[11px] tabular-nums ${cat.percentUsed > 100 ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+        <td className={`py-1.5 px-2 text-right font-dm-mono text-[11px] tabular-nums ${cat.percentUsed > 100 ? 'text-[var(--negative)]' : 'text-[var(--ink-2)]'}`}>
           {cat.percentUsed}%
         </td>
         <td className="py-1.5 pl-2 w-20">
@@ -239,20 +255,20 @@ function BudgetTableCategoryRow({ cat, isExpanded, onToggle }: { cat: BudgetRepo
         </td>
       </tr>
       {hasChildren && isExpanded && cat.children.map(child => (
-        <tr key={child.id} className="border-b border-dotted border-[var(--border-ed)]/50">
+        <tr key={child.id} className="border-b border-dotted border-[var(--rule-soft)]/60">
           <td className="py-1 pr-2 pl-6">
             <span className="font-source-serif text-[11px] text-[var(--ink-3)]">{child.name}</span>
           </td>
           <td className="py-1 px-2 text-right font-dm-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-            {formatCurrency(child.limit)}
+            {fc(child.limit)}
           </td>
           <td className="py-1 px-2 text-right font-dm-mono text-[11px] tabular-nums text-[var(--ink-2)]">
-            {formatCurrency(child.spent)}
+            {fc(child.spent)}
           </td>
-          <td className={`py-1 px-2 text-right font-dm-mono text-[11px] tabular-nums ${child.limit - child.spent >= 0 ? 'text-kern-600' : 'text-red-600'}`}>
-            {child.limit - child.spent >= 0 ? '+' : ''}{formatCurrency(child.limit - child.spent)}
+          <td className={`py-1 px-2 text-right font-dm-mono text-[11px] tabular-nums ${child.limit - child.spent >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+            {child.limit - child.spent >= 0 ? '+' : ''}{fc(child.limit - child.spent)}
           </td>
-          <td className={`py-1 px-2 text-right font-dm-mono text-[10px] tabular-nums ${child.percentUsed > 100 ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
+          <td className={`py-1 px-2 text-right font-dm-mono text-[10px] tabular-nums ${child.percentUsed > 100 ? 'text-[var(--negative)]' : 'text-[var(--ink-3)]'}`}>
             {child.percentUsed}%
           </td>
           <td />
@@ -266,6 +282,12 @@ function BudgetTable({ categories }: { categories: BudgetReportCategory[] }) {
   // Default: all expanded
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(categories.filter(c => c.children.length > 0).map(c => c.id)))
 
+  // Sleep-affordance: show "sleep →" hint on mobile until the user has scrolled
+  // horizontally at least once. Hint hides on first non-zero scrollLeft so it
+  // doesn't repeatedly nag after the user has discovered the gesture.
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const [scrolled, setScrolled] = useState(false)
+
   function toggle(id: string) {
     setExpanded(prev => {
       const next = new Set(prev)
@@ -273,6 +295,12 @@ function BudgetTable({ categories }: { categories: BudgetReportCategory[] }) {
       else next.add(id)
       return next
     })
+  }
+
+  function handleScroll() {
+    if (scrolled) return
+    const el = scrollRef.current
+    if (el && el.scrollLeft > 4) setScrolled(true)
   }
 
   const expense = categories.filter(c => c.budgetType === 'expense')
@@ -285,7 +313,7 @@ function BudgetTable({ categories }: { categories: BudgetReportCategory[] }) {
       <>
         <tr>
           <td colSpan={6} className="pt-4 pb-1.5">
-            <span className="font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{label}</span>
+            <span className="text-[10px] uppercase tracking-[0.08em] font-mono text-[var(--ink-4)]">{label}</span>
           </td>
         </tr>
         {items.map(cat => (
@@ -296,16 +324,30 @@ function BudgetTable({ categories }: { categories: BudgetReportCategory[] }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div
+      ref={scrollRef}
+      onScroll={handleScroll}
+      data-scrolled={scrolled ? 'true' : 'false'}
+      className="relative overflow-x-auto"
+    >
+      {/* Sleep-affordance: only visible on <640px until user scrolls horizontally. */}
+      {!scrolled && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-2 top-2 z-[2] px-1.5 py-px font-mono text-[8.5px] uppercase tracking-[0.10em] text-[var(--module-active-500)] bg-[var(--paper)] border border-[var(--rule-soft)] sm:hidden"
+        >
+          sleep &rarr;
+        </span>
+      )}
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b-2 border-[var(--ink)]">
-            <th className="pb-1.5 text-left font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Categorie</th>
-            <th className="pb-1.5 px-2 text-right font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Budget</th>
-            <th className="pb-1.5 px-2 text-right font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Besteed</th>
-            <th className="pb-1.5 px-2 text-right font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Verschil</th>
-            <th className="pb-1.5 px-2 text-right font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">%</th>
-            <th className="pb-1.5 pl-2 text-right font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Trend</th>
+            <th className="pb-1.5 text-left text-[10px] uppercase tracking-[0.08em] font-mono text-[var(--ink-4)]">Categorie</th>
+            <th className="pb-1.5 px-2 text-right text-[10px] uppercase tracking-[0.08em] font-mono text-[var(--ink-4)]">Budget</th>
+            <th className="pb-1.5 px-2 text-right text-[10px] uppercase tracking-[0.08em] font-mono text-[var(--ink-4)]">Besteed</th>
+            <th className="pb-1.5 px-2 text-right text-[10px] uppercase tracking-[0.08em] font-mono text-[var(--ink-4)]">Verschil</th>
+            <th className="pb-1.5 px-2 text-right text-[10px] uppercase tracking-[0.08em] font-mono text-[var(--ink-4)]">%</th>
+            <th className="pb-1.5 pl-2 text-right text-[10px] uppercase tracking-[0.08em] font-mono text-[var(--ink-4)]">Trend</th>
           </tr>
         </thead>
         <tbody>
@@ -321,34 +363,55 @@ function BudgetTable({ categories }: { categories: BudgetReportCategory[] }) {
 // ── Section: Over/Under budget highlights ────────────────────────────────────
 
 function VarianceItemList({ items, variant, dailyRate }: { items: BudgetReportVarianceItem[]; variant: 'over' | 'under'; dailyRate: number }) {
+  const fc = useFc()
   const isOver = variant === 'over'
   const totalFreedom = items.reduce((s, i) => s + Math.abs(i.freedomDaysImpact), 0)
 
+  // Editorial comparison-row treatment: a tinted block (8% color-mix) with a 3px
+  // semantic left-border replaces the prior rounded box-card. Section header is
+  // a SectionLabel so the kicker-streep style stays consistent with the rest of
+  // the editorial layout.
+  const tone = isOver
+    ? {
+        bg: 'bg-[color-mix(in_oklch,var(--negative)_8%,transparent)]',
+        border: 'border-l-[3px] border-[var(--negative)]',
+        accent: 'text-[var(--negative)]',
+        ruleSoft: 'border-[var(--negative)]/30',
+      }
+    : {
+        bg: 'bg-[color-mix(in_oklch,var(--positive)_8%,transparent)]',
+        border: 'border-l-[3px] border-[var(--positive)]',
+        accent: 'text-[var(--positive)]',
+        ruleSoft: 'border-[var(--positive)]/30',
+      }
+
   return (
-    <div className={`rounded-[var(--r)] border p-4 ${isOver ? 'border-red-200 bg-red-50/50' : 'border-kern-200 bg-kern-50/50'}`}>
-      <p className={`mb-2 font-inter text-[9px] font-bold uppercase tracking-[0.1em] ${isOver ? 'text-red-700' : 'text-kern-700'}`}>
+    <div>
+      <SectionLabel>
         {isOver ? 'Over budget' : 'Onder budget'}
-      </p>
-      <div className="space-y-1.5">
-        {items.map(item => (
-          <div key={item.categoryName} className="flex justify-between gap-2">
-            <span className="truncate font-source-serif text-[12px] text-[var(--ink-2)]">{item.categoryName}</span>
-            <span className={`shrink-0 font-dm-mono text-[12px] tabular-nums ${isOver ? 'text-red-600' : 'text-kern-600'}`}>
-              {isOver ? '' : '+'}{formatCurrency(item.variance)}
-            </span>
-          </div>
-        ))}
-      </div>
-      {dailyRate > 0 && totalFreedom >= 0.1 && (
-        <div className={`mt-2 border-t border-dashed pt-1.5 ${isOver ? 'border-red-200' : 'border-kern-200'}`}>
-          <p className={`font-inter text-[10px] italic ${isOver ? 'text-red-600' : 'text-kern-600'}`}>
-            {isOver
-              ? `${totalFreedom.toLocaleString('nl-NL', { maximumFractionDigits: 1 })} vrijheidsdagen verloren`
-              : `${totalFreedom.toLocaleString('nl-NL', { maximumFractionDigits: 1 })} vrijheidsdagen gewonnen`
-            }
-          </p>
+      </SectionLabel>
+      <div className={`${tone.bg} ${tone.border} p-4`}>
+        <div className="space-y-1.5">
+          {items.map(item => (
+            <div key={item.categoryName} className="flex justify-between gap-2">
+              <span className="truncate font-source-serif text-[12px] text-[var(--ink-2)]">{item.categoryName}</span>
+              <span className={`shrink-0 font-dm-mono text-[12px] tabular-nums ${tone.accent}`}>
+                {isOver ? '' : '+'}{fc(item.variance)}
+              </span>
+            </div>
+          ))}
         </div>
-      )}
+        {dailyRate > 0 && totalFreedom >= 0.1 && (
+          <div className={`mt-2 border-t border-dashed pt-1.5 ${tone.ruleSoft}`}>
+            <p className={`font-inter text-[10px] italic ${tone.accent}`}>
+              {isOver
+                ? `${totalFreedom.toLocaleString('nl-NL', { maximumFractionDigits: 1 })} vrijheidsdagen verloren`
+                : `${totalFreedom.toLocaleString('nl-NL', { maximumFractionDigits: 1 })} vrijheidsdagen gewonnen`
+              }
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -367,6 +430,7 @@ function VarianceHighlights({ over, under, dailyRate }: { over: BudgetReportVari
 // ── Section: Trend grid ──────────────────────────────────────────────────────
 
 function TrendGrid({ categories }: { categories: BudgetReportCategory[] }) {
+  const fc = useFc()
   const expenseCategories = categories
     .filter(c => c.budgetType === 'expense' && c.trendValues.some(v => v > 0))
     .sort((a, b) => b.spent - a.spent)
@@ -382,7 +446,7 @@ function TrendGrid({ categories }: { categories: BudgetReportCategory[] }) {
               <span className="truncate font-inter text-[11px] font-medium text-[var(--ink)]">{cat.name}</span>
               <TrendIcon direction={cat.trendDirection} invert />
             </div>
-            <p className="font-dm-mono text-[10px] tabular-nums text-[var(--ink-3)]">{formatCurrency(cat.spent)}</p>
+            <p className="font-dm-mono text-[10px] tabular-nums text-[var(--ink-3)]">{fc(cat.spent)}</p>
           </div>
           <div className="w-20 shrink-0">
             <ReportSparkline values={cat.trendValues} color="#c4a06b" width={80} height={24} showFill={false} invertTrend />
@@ -396,6 +460,7 @@ function TrendGrid({ categories }: { categories: BudgetReportCategory[] }) {
 // ── Section: Month comparison ────────────────────────────────────────────────
 
 function MonthComparison({ data }: { data: BudgetReportData }) {
+  const fc = useFc()
   const c = data.comparison
   // Top changers (biggest absolute month-over-month change)
   const topChangers = data.categories
@@ -418,9 +483,9 @@ function MonthComparison({ data }: { data: BudgetReportData }) {
           <tbody>
             <tr className="border-b border-dashed border-[var(--border-ed)]">
               <td className="py-1.5 font-source-serif text-[12px] text-[var(--ink-2)]">Totaal uitgaven</td>
-              <td className="py-1.5 px-3 text-right font-dm-mono text-[12px] tabular-nums text-[var(--ink-2)]">{formatCurrency(c.previousMonth.totalSpent)}</td>
-              <td className="py-1.5 px-3 text-right font-dm-mono text-[12px] tabular-nums text-[var(--ink-2)]">{formatCurrency(c.threeMonthAverage.totalSpent)}</td>
-              <td className="py-1.5 px-3 text-right font-dm-mono text-[12px] font-medium tabular-nums text-[var(--ink)]">{formatCurrency(c.currentMonth.totalSpent)}</td>
+              <td className="py-1.5 px-3 text-right font-dm-mono text-[12px] tabular-nums text-[var(--ink-2)]">{fc(c.previousMonth.totalSpent)}</td>
+              <td className="py-1.5 px-3 text-right font-dm-mono text-[12px] tabular-nums text-[var(--ink-2)]">{fc(c.threeMonthAverage.totalSpent)}</td>
+              <td className="py-1.5 px-3 text-right font-dm-mono text-[12px] font-medium tabular-nums text-[var(--ink)]">{fc(c.currentMonth.totalSpent)}</td>
             </tr>
             {c.currentMonth.savingsRate != null && (
               <tr className="border-b border-dashed border-[var(--border-ed)]">
@@ -453,7 +518,7 @@ function MonthComparison({ data }: { data: BudgetReportData }) {
                     <TrendIcon direction={isUp ? 'up' : 'down'} invert />
                     <span className="font-source-serif text-[12px] text-[var(--ink-2)]">{cat.name}</span>
                   </div>
-                  <span className={`font-dm-mono text-[11px] tabular-nums ${isUp ? 'text-red-600' : 'text-kern-600'}`}>
+                  <span className={`font-dm-mono text-[11px] tabular-nums ${isUp ? 'text-[var(--negative)]' : 'text-[var(--positive)]'}`}>
                     {isUp ? '+' : ''}{cat.monthOverMonthChange}%
                   </span>
                 </div>
@@ -487,30 +552,30 @@ function UtilizationDistribution({ categories }: { categories: BudgetReportCateg
       </p>
       <div className="flex h-4 overflow-hidden rounded-full">
         {buckets.low > 0 && (
-          <div className="bg-kern-300" style={{ width: `${(buckets.low / total) * 100}%` }} title={`${buckets.low} onder 50%`} />
+          <div className="bg-[var(--module-active-300)]" style={{ width: `${(buckets.low / total) * 100}%` }} title={`${buckets.low} onder 50%`} />
         )}
         {buckets.medium > 0 && (
-          <div className="bg-kern-500" style={{ width: `${(buckets.medium / total) * 100}%` }} title={`${buckets.medium} tussen 50–80%`} />
+          <div className="bg-[var(--module-active-500)]" style={{ width: `${(buckets.medium / total) * 100}%` }} title={`${buckets.medium} tussen 50–80%`} />
         )}
         {buckets.high > 0 && (
           <div className="bg-amber-400" style={{ width: `${(buckets.high / total) * 100}%` }} title={`${buckets.high} tussen 80–100%`} />
         )}
         {buckets.over > 0 && (
-          <div className="bg-red-500" style={{ width: `${(buckets.over / total) * 100}%` }} title={`${buckets.over} boven 100%`} />
+          <div className="bg-[var(--negative)]" style={{ width: `${(buckets.over / total) * 100}%` }} title={`${buckets.over} boven 100%`} />
         )}
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
         <span className="flex items-center gap-1 font-inter text-[10px] text-[var(--ink-3)]">
-          <span className="inline-block h-2 w-2 rounded-full bg-kern-300" /> {buckets.low}× &lt;50%
+          <span className="inline-block h-2 w-2 rounded-full bg-[var(--module-active-300)]" /> {buckets.low}× &lt;50%
         </span>
         <span className="flex items-center gap-1 font-inter text-[10px] text-[var(--ink-3)]">
-          <span className="inline-block h-2 w-2 rounded-full bg-kern-500" /> {buckets.medium}× 50–80%
+          <span className="inline-block h-2 w-2 rounded-full bg-[var(--module-active-500)]" /> {buckets.medium}× 50–80%
         </span>
         <span className="flex items-center gap-1 font-inter text-[10px] text-[var(--ink-3)]">
           <span className="inline-block h-2 w-2 rounded-full bg-amber-400" /> {buckets.high}× 80–100%
         </span>
         <span className="flex items-center gap-1 font-inter text-[10px] text-[var(--ink-3)]">
-          <span className="inline-block h-2 w-2 rounded-full bg-red-500" /> {buckets.over}× &gt;100%
+          <span className="inline-block h-2 w-2 rounded-full bg-[var(--negative)]" /> {buckets.over}× &gt;100%
         </span>
       </div>
     </div>
@@ -520,6 +585,7 @@ function UtilizationDistribution({ categories }: { categories: BudgetReportCateg
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function BudgetReportPage() {
+  const fc = useFc()
   const router = useRouter()
   const searchParams = useSearchParams()
   const monthParam = searchParams.get('month')
@@ -555,7 +621,7 @@ export default function BudgetReportPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent" />
           <p className="font-inter text-sm text-[var(--ink-3)]">Budgetrapport wordt opgesteld...</p>
         </div>
       </div>
@@ -579,14 +645,6 @@ export default function BudgetReportPage() {
       </div>
     )
   }
-
-  const generatedDate = new Date(data.generatedAt).toLocaleDateString('nl-NL', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 
   const freedom = data.dailyExpenseRate > 0 && data.summary.freedomDaysVariance !== 0
     ? eurToFreedomTime(Math.abs(data.summary.totalVariance), data.dailyExpenseRate)
@@ -647,7 +705,48 @@ export default function BudgetReportPage() {
         </div>
       </div>
 
-      {/* ── Lead story: Budget Scorecard ── */}
+      {/* ── Methodologie-callout — uitleg vóór de cijfers ── */}
+      <ScenarioCallout title="Hoe dit rapport leest">
+        Variance = limit &minus; spent. Een negatieve variance betekent meer besteed dan begroot.
+        De vrijheid-impact onderaan is het variance-bedrag omgerekend naar tijd, met je
+        dagelijkse uitgaven-rate als deler.
+      </ScenarioCallout>
+
+      {/* ── Mini-hero figures-strip — 4 hoofdgetallen, vrijheid-impact als winnaar ── */}
+      <FiguresStrip
+        cols={4}
+        figures={[
+          {
+            kicker: 'Begroot',
+            amount: fc(data.summary.totalBudgeted),
+            sub: `${data.categories.length} ${data.categories.length === 1 ? 'categorie' : 'categorieën'}`,
+            variant: 'neutral',
+          },
+          {
+            kicker: 'Besteed',
+            amount: fc(data.summary.totalSpent),
+            sub: `${data.daysPassed}/${data.daysInMonth} dagen`,
+            variant: 'neutral',
+          },
+          {
+            kicker: 'Verschil',
+            amount: `${data.summary.totalVariance >= 0 ? '+' : ''}${fc(data.summary.totalVariance)}`,
+            sub: `${data.summary.variancePercent}%`,
+            variant: data.summary.totalVariance >= 0 ? 'positive' : 'negative',
+          },
+          {
+            kicker: 'Vrijheid-impact',
+            amount: freedom ? `${freedomGained ? '+' : '-'}${freedom.formatted}` : '—',
+            sub: data.summary.projectedMonthEnd != null
+              ? `vs. ${fc(data.summary.projectedMonthEnd)} eind maand`
+              : 'opgespaarde tijd',
+            // Hoofduitkomst — automatische highlight-marker via FiguresStrip-cell.
+            variant: 'winner',
+          },
+        ]}
+      />
+
+      {/* ── Secundaire scorecard: sparkline + categorie-pillars + burn-rate ── */}
       <BudgetScorecard data={data} />
 
       {/* ── Budget vs Werkelijk (direct na scorecard — bedragen zijn het belangrijkst) ── */}
@@ -681,23 +780,27 @@ export default function BudgetReportPage() {
         </span>
       </div>
 
-      {/* ── Kassabon + Essential/Discretionary ── */}
-      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-        <KassabonTable
-          title="Kassabon"
-          rows={[
-            { label: 'Inkomen', value: data.summary.totalIncomeActual, sublabel: `/ ${formatCurrency(data.summary.totalIncomeBudgeted)}` },
-            { label: 'Uitgaven', value: -data.categories.filter(c => c.budgetType === 'expense').reduce((s, c) => s + c.spent, 0), sublabel: `/ ${formatCurrency(data.categories.filter(c => c.budgetType === 'expense').reduce((s, c) => s + c.limit, 0))}` },
-            { label: 'Sparen', value: -data.summary.totalSavingsActual, sublabel: `/ ${formatCurrency(data.summary.totalSavingsBudgeted)}` },
-            { label: 'Schulden', value: -data.summary.totalDebtActual, sublabel: `/ ${formatCurrency(data.summary.totalDebtBudgeted)}` },
-          ]}
-          total={{
-            label: data.summary.savingsRate != null ? `Spaarquote: ${data.summary.savingsRate}%` : 'Netto',
-            value: data.summary.totalIncomeActual - data.categories.filter(c => c.budgetType === 'expense').reduce((s, c) => s + c.spent, 0) - data.summary.totalSavingsActual - data.summary.totalDebtActual,
-          }}
-          footer={`Gebaseerd op transacties in ${data.monthLabel.toLowerCase()}`}
-        />
-        <EssentialDiscretionary data={data} />
+      {/* ── Kassabon + Essential/Discretionary, omhuld door RekeningTag ── */}
+      <div className="mb-8">
+        <RekeningTag label="rekening">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <KassabonTable
+              title="Kassabon"
+              rows={[
+                { label: 'Inkomen', value: data.summary.totalIncomeActual, sublabel: `/ ${fc(data.summary.totalIncomeBudgeted)}` },
+                { label: 'Uitgaven', value: -data.categories.filter(c => c.budgetType === 'expense').reduce((s, c) => s + c.spent, 0), sublabel: `/ ${fc(data.categories.filter(c => c.budgetType === 'expense').reduce((s, c) => s + c.limit, 0))}` },
+                { label: 'Sparen', value: -data.summary.totalSavingsActual, sublabel: `/ ${fc(data.summary.totalSavingsBudgeted)}` },
+                { label: 'Schulden', value: -data.summary.totalDebtActual, sublabel: `/ ${fc(data.summary.totalDebtBudgeted)}` },
+              ]}
+              total={{
+                label: data.summary.savingsRate != null ? `Spaarquote: ${data.summary.savingsRate}%` : 'Netto',
+                value: data.summary.totalIncomeActual - data.categories.filter(c => c.budgetType === 'expense').reduce((s, c) => s + c.spent, 0) - data.summary.totalSavingsActual - data.summary.totalDebtActual,
+              }}
+              footer={`Gebaseerd op transacties in ${data.monthLabel.toLowerCase()}`}
+            />
+            <EssentialDiscretionary data={data} />
+          </div>
+        </RekeningTag>
       </div>
 
       {/* ── Budget benutting verdeling ── */}
@@ -736,16 +839,16 @@ export default function BudgetReportPage() {
           </p>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.ytd.totalBudgeted)}</p>
+              <p className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">{fc(data.ytd.totalBudgeted)}</p>
               <p className="mt-0.5 font-inter text-[10px] text-[var(--ink-3)]">Begroot</p>
             </div>
             <div>
-              <p className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.ytd.totalSpent)}</p>
+              <p className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">{fc(data.ytd.totalSpent)}</p>
               <p className="mt-0.5 font-inter text-[10px] text-[var(--ink-3)]">Besteed</p>
             </div>
             <div>
-              <p className={`font-dm-mono text-sm font-bold tabular-nums ${data.ytd.variance >= 0 ? 'text-kern-600' : 'text-red-600'}`}>
-                {data.ytd.variance >= 0 ? '+' : ''}{formatCurrency(data.ytd.variance)}
+              <p className={`font-dm-mono text-sm font-bold tabular-nums ${data.ytd.variance >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+                {data.ytd.variance >= 0 ? '+' : ''}{fc(data.ytd.variance)}
               </p>
               <p className="mt-0.5 font-inter text-[10px] text-[var(--ink-3)]">Verschil</p>
             </div>
@@ -761,7 +864,7 @@ export default function BudgetReportPage() {
               Rollovers
             </span>
             <span className="font-dm-mono text-[12px] tabular-nums text-[var(--ink-2)]">
-              Totaal: {formatCurrency(data.totalRolloverImpact)}
+              Totaal: {fc(data.totalRolloverImpact)}
             </span>
           </div>
           <div className="space-y-1">
@@ -770,7 +873,7 @@ export default function BudgetReportPage() {
                 <span className="truncate font-source-serif text-[12px] text-[var(--ink-2)]">{r.budgetName}</span>
                 <div className="flex items-center gap-2">
                   <span className="font-inter text-[10px] text-[var(--ink-4)]">{r.rolloverType}</span>
-                  <span className="font-dm-mono text-[12px] tabular-nums text-kern-600">+{formatCurrency(r.carriedAmount)}</span>
+                  <span className="font-dm-mono text-[12px] tabular-nums text-[var(--positive)]">+{fc(r.carriedAmount)}</span>
                 </div>
               </div>
             ))}
@@ -778,42 +881,49 @@ export default function BudgetReportPage() {
         </div>
       )}
 
-      {/* ── Vrijheidstijd Samenvatting ── */}
+      {/* ── Vrijheidstijd-eindconclusie ──
+           De FiguresStrip boven heeft het cijfer al met highlight-marker als
+           "winner" gemarkeerd; om dubbele highlight-markers binnen één pagina
+           te vermijden vervangen we hier het rounded-badge-frame door een
+           dubbele-lijn-finale (`border-b-4 border-double border-[var(--ink)]`)
+           rond het hoofdbedrag — de boekhoudkundige sluitstreep die in de
+           editorial blueprint hoort op de eindrij. */}
       {freedom && (
         <div className="mt-8 text-center">
           <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)] mb-3">
             Geld is opgeslagen tijd
           </p>
-          <div className={`inline-block rounded-[var(--r-lg)] border px-8 py-5 ${
-            freedomGained ? 'border-[var(--hor-m)] bg-[var(--hor-l)]' : 'border-red-200 bg-red-50'
-          }`}>
-            <p className={`font-playfair text-4xl font-bold ${freedomGained ? 'text-[var(--hor-t)]' : 'text-red-700'}`} style={{ letterSpacing: '-0.03em' }}>
-              {freedomGained ? '+' : '-'}{freedom.formatted}
-            </p>
-            <p className={`mt-1 font-inter text-[10px] font-bold uppercase tracking-[0.08em] ${freedomGained ? 'text-[var(--hor-t)]' : 'text-red-700'}`}>
-              {freedomGained ? 'vrijheid gewonnen' : 'vrijheid verloren'}
-            </p>
-          </div>
-          <p className="mt-3 font-source-serif text-[13px] italic text-[var(--ink-3)]">
+          <p
+            className={`inline-block font-playfair text-4xl font-bold pb-2 ${freedomGained ? 'text-[var(--module-active-700)]' : 'text-[var(--negative)]'}`}
+            style={{ letterSpacing: '-0.03em', borderBottom: '4px double var(--ink)' }}
+          >
+            {freedomGained ? '+' : '-'}{freedom.formatted}
+          </p>
+          <p className={`mt-2 font-inter text-[10px] font-bold uppercase tracking-[0.08em] ${freedomGained ? 'text-[var(--module-active-700)]' : 'text-[var(--negative)]'}`}>
+            {freedomGained ? 'vrijheid gewonnen' : 'vrijheid verloren'}
+          </p>
+          <p className="mx-auto mt-3 max-w-prose font-source-serif text-[13px] italic text-[var(--ink-3)]">
             Je budgetdiscipline in {data.monthLabel.toLowerCase()} vertegenwoordigt{' '}
             {freedom.formattedDagen} aan {freedomGained ? 'gewonnen' : 'verloren'} financiële vrijheid,
-            gebaseerd op je dagelijkse uitgaven van {formatCurrency(Math.round(data.dailyExpenseRate))}/dag.
+            gebaseerd op je dagelijkse uitgaven van {fc(Math.round(data.dailyExpenseRate))}/dag.
           </p>
         </div>
       )}
 
-      {/* ── Footer ── */}
-      <footer className="mt-10 border-t-2 border-[var(--ink)] pt-4 text-center">
+      {/* ── Editorial footer: dubbele-lijn-divider + tf.-monogram + ornament-colophon ── */}
+      <SectionDivider variant="double-rule" className="mt-10" />
+      <div className="text-center pt-2">
         <p className="font-playfair text-lg font-bold text-[var(--ink)]">
-          <span>t</span><span className="text-kern-600">f.</span>
+          <span>t</span><span style={{ color: 'var(--module-active-700)' }}>f.</span>
         </p>
         <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">
           &ldquo;Geld is opgeslagen tijd&rdquo;
         </p>
-        <p className="mt-2 font-inter text-[10px] text-[var(--ink-4)]">
-          Gegenereerd door TriFinity &middot; {generatedDate}
-        </p>
-      </footer>
+      </div>
+      <OrnamentColophon
+        module="Budget"
+        text={formatTimestamp(data.generatedAt)}
+      />
     </div>
   )
 }

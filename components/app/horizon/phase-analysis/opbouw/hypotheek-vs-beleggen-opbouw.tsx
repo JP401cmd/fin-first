@@ -11,6 +11,7 @@ import {
 } from '@/lib/hypotheek-vs-beleggen'
 import type { Debt } from '@/lib/debt-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -213,7 +214,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-[var(--subtle)]/50 px-2.5 py-1.5 text-xs text-[var(--ink-3)]">
             <span>
               <span className="text-[var(--ink-4)]">Hypotheek:</span>{' '}
-              <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{formatCurrency(mortgage.current_balance)}</span>
+              <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{<MaskedAmount value={mortgage.current_balance} tone="horizon" />}</span>
             </span>
             <span>
               <span className="text-[var(--ink-4)]">Rente:</span>{' '}
@@ -298,7 +299,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
                   {(expectedReturn * 100).toFixed(1)}% is beleggen voordeliger
                   dan extra aflossen. Het verschil na {HORIZON_JAREN} jaar is{' '}
                   <span className="font-mono tabular-nums text-[var(--positive)]">
-                    {formatCurrency(Math.abs(result.verschil))}
+                    {<MaskedAmount value={Math.abs(result.verschil)} tone="horizon" />}
                   </span>{' '}
                   netto.
                 </>
@@ -309,7 +310,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
                   {(expectedReturn * 100).toFixed(1)}% is extra aflossen
                   voordeliger. Het verschil na {HORIZON_JAREN} jaar is{' '}
                   <span className="font-mono tabular-nums text-[var(--color-horizon-600)]">
-                    {formatCurrency(Math.abs(result.verschil))}
+                    {<MaskedAmount value={Math.abs(result.verschil)} tone="horizon" />}
                   </span>{' '}
                   netto.
                 </>
@@ -368,7 +369,7 @@ const ScenarioCard = memo(function ScenarioCard({
         <div className="flex items-baseline justify-between">
           <span className="text-[11px] text-[var(--ink-3)]">Eindwaarde</span>
           <span className="font-mono text-xs tabular-nums text-[var(--ink)]">
-            {formatCurrency(endValue)}
+            {<MaskedAmount value={endValue} tone="horizon" />}
           </span>
         </div>
         <div className="flex items-baseline justify-between">
@@ -383,7 +384,7 @@ const ScenarioCard = memo(function ScenarioCard({
             }`}
           >
             {netBenefit >= 0 ? '+' : ''}
-            {formatCurrency(netBenefit)}
+            {<MaskedAmount value={netBenefit} tone="horizon" />}
           </span>
         </div>
       </div>

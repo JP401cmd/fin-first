@@ -5,7 +5,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopLifeEvent } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { Calendar, TrendingUp, Heart, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
 interface Props {
@@ -288,8 +288,8 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
             <span className="text-[11px] font-semibold uppercase tracking-wide text-positive">Vrijheid opbouwen</span>
           </div>
           {opTotalFull > 0 && (
-            <p className="font-mono text-sm font-semibold tabular-nums text-positive mb-2">
-              +{formatCurrency(opTotalFull)}
+            <p className="text-positive mb-2">
+              <MaskedAmount value={opTotalFull} signPrefix="+" tone="horizon" className="text-sm font-semibold" />
             </p>
           )}
           {opSliceFull.length > 0 ? (
@@ -331,8 +331,8 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
             <span className="text-[11px] font-semibold uppercase tracking-wide text-negative">Vrijheid investeren</span>
           </div>
           {invTotalFull > 0 && (
-            <p className="font-mono text-sm font-semibold tabular-nums text-negative mb-2">
-              ˆ’{formatCurrency(invTotalFull)}
+            <p className="text-negative mb-2">
+              <MaskedAmount value={invTotalFull} signPrefix="-" tone="horizon" className="text-sm font-semibold" />
             </p>
           )}
           {invSliceFull.length > 0 ? (
@@ -483,8 +483,13 @@ function TextFallback({
                       <span className="text-xs font-medium text-[var(--ink-2)] truncate">{evt.name}</span>
                     </div>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <p className={`mt-0.5 font-mono text-[11px] tabular-nums ${isPos ? 'text-positive' : 'text-negative'}`}>
-                        {isPos ? '+' : 'ˆ’'}{formatCurrency(evt.estimatedImpact)}
+                      <p className={`mt-0.5 ${isPos ? 'text-positive' : 'text-negative'}`}>
+                        <MaskedAmount
+                          value={evt.estimatedImpact}
+                          signPrefix={isPos ? '+' : '-'}
+                          tone="horizon"
+                          className="text-[11px]"
+                        />
                       </p>
                     )}
                   </div>
@@ -513,8 +518,13 @@ function TextFallback({
       {allEvents.length > 0 && cumulativeImpact !== 0 && (
         <div className="mt-3 pt-2 border-t border-[var(--border-ed)]">
           <p className="text-[11px] text-[var(--ink-3)]">Cumulatieve impact op FIRE</p>
-          <p className={`font-mono text-sm font-semibold tabular-nums ${cumulativeImpact > 0 ? 'text-positive' : 'text-negative'}`}>
-            {cumulativeImpact > 0 ? '+' : 'ˆ’'}{formatCurrency(Math.abs(cumulativeImpact))}
+          <p className={cumulativeImpact > 0 ? 'text-positive' : 'text-negative'}>
+            <MaskedAmount
+              value={Math.abs(cumulativeImpact)}
+              signPrefix={cumulativeImpact > 0 ? '+' : '-'}
+              tone="horizon"
+              className="text-sm font-semibold"
+            />
           </p>
         </div>
       )}

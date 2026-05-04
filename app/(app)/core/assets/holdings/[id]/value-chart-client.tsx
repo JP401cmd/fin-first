@@ -2,7 +2,18 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Loader2, TrendingUp, AlertTriangle } from 'lucide-react'
-import { formatCurrency } from '@/components/app/budget-shared'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/**
+ * Masked-aware currency formatter hook. Returns a stable callback that
+ * yields either the masked placeholder or a formatted EUR string based on
+ * the global privacy toggle.
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 
 type ValueHistoryPoint = {
   date: string
@@ -98,6 +109,7 @@ export default function HoldingValueChartClient({
 // ── SVG Value Chart ─────────────────────────────────────────────
 
 function ValueChart({ data }: { data: ValueHistoryResponse }) {
+  const fc = useFc()
   const { history } = data
 
   // Chart dimensions
@@ -190,7 +202,7 @@ function ValueChart({ data }: { data: ValueHistoryResponse }) {
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
           pnlAbs >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
         }`} data-testid="chart-pnl-badge">
-          {pnlAbs >= 0 ? '▲' : '▼'} {pnlAbs >= 0 ? '+' : ''}{formatCurrency(pnlAbs)}
+          {pnlAbs >= 0 ? '▲' : '▼'} {pnlAbs >= 0 ? '+' : ''}{fc(pnlAbs)}
           <span className="ml-0.5 font-normal">
             ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%)
           </span>
@@ -358,6 +370,7 @@ function HoverTooltip({
   chartWidth: number
   padding: { left: number; right: number }
 }) {
+  const fc = useFc()
   const tooltipW = 140
   const tooltipH = 72
   // Flip to left side if near right edge
@@ -382,13 +395,13 @@ function HoverTooltip({
         {point.event} · {formatDate(point.date)}
       </text>
       <text x={tx + 8} y={ty + 30} fontSize="10" fill="#fff" fontWeight="700">
-        {formatCurrency(point.value)}
+        {fc(point.value)}
       </text>
       <text x={tx + 8} y={ty + 44} fontSize="9" fill="#a1a1aa">
         {point.units.toFixed(3)} eenheden @ {formatShortCurrency(point.price)}
       </text>
       <text x={tx + 8} y={ty + 58} fontSize="9" fill={pnl >= 0 ? '#34d399' : '#f87171'}>
-        W/V: {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+        W/V: {pnl >= 0 ? '+' : ''}{fc(pnl)}
       </text>
     </g>
   )

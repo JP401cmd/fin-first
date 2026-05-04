@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type TransactionWithPnL = {
   id: string
@@ -306,14 +307,14 @@ export default function HoldingTransactionLog({
                     ) : (
                       <>
                         <p className={`text-sm font-semibold ${cfg.color}`}>
-                          {cfg.sign}{formatCurrency(tx.total_amount)}
+                          {cfg.sign}{<MaskedAmount value={tx.total_amount} tone="kern" />}
                         </p>
                         <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
                         {tx.type === 'sell' && tx.realized_pnl !== 0 && (
                           <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
                              data-testid="tx-realized-pnl"
                           >
-                            W/V: {tx.realized_pnl >= 0 ? '+' : ''}{formatCurrency(tx.realized_pnl)}
+                            W/V: {tx.realized_pnl >= 0 ? '+' : ''}{<MaskedAmount value={tx.realized_pnl} tone="kern" />}
                           </p>
                         )}
                       </>
@@ -335,24 +336,24 @@ export default function HoldingTransactionLog({
                   <div className="border-t border-[var(--border-ed)] px-3 py-3" data-testid="tx-detail">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       <MiniStat label="Eenheden na tx" value={tx.running_units.toString()} />
-                      <MiniStat label="Gem. kosten" value={formatCurrency(tx.running_avg_price)} />
-                      <MiniStat label="Kostenbasis" value={formatCurrency(tx.running_cost_basis)} />
+                      <MiniStat label="Gem. kosten" value={<MaskedAmount value={tx.running_avg_price} tone="kern" />} />
+                      <MiniStat label="Kostenbasis" value={<MaskedAmount value={tx.running_cost_basis} tone="kern" />} />
                       {tx.type === 'sell' && (
                         <MiniStat
                           label="Gerealiseerde W/V"
-                          value={`${tx.realized_pnl >= 0 ? '+' : ''}${formatCurrency(tx.realized_pnl)}`}
+                          value={<MaskedAmount value={tx.realized_pnl} signPrefix={tx.realized_pnl >= 0 ? '+' : ''} tone="kern" />}
                           colored={tx.realized_pnl}
                         />
                       )}
                       <MiniStat
                         label="Cumulatieve W/V"
-                        value={`${tx.cumulative_realized_pnl >= 0 ? '+' : ''}${formatCurrency(tx.cumulative_realized_pnl)}`}
+                        value={<MaskedAmount value={tx.cumulative_realized_pnl} signPrefix={tx.cumulative_realized_pnl >= 0 ? '+' : ''} tone="kern" />}
                         colored={tx.cumulative_realized_pnl}
                       />
                       {tx.cumulative_dividends > 0 && (
                         <MiniStat
                           label="Cum. dividenden"
-                          value={formatCurrency(tx.cumulative_dividends)}
+                          value={<MaskedAmount value={tx.cumulative_dividends} tone="kern" />}
                           colored={tx.cumulative_dividends}
                         />
                       )}
@@ -433,7 +434,7 @@ function SummaryCard({
     >
       <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-3)]">{label}</p>
       <p className={`mt-1 text-sm font-bold ${valueColor}`} data-testid={testId ? `${testId}-value` : undefined}>
-        {colored && value > 0 ? '+' : ''}{formatCurrency(value)}
+        {colored && value > 0 ? '+' : ''}{<MaskedAmount value={value} tone="kern" />}
       </p>
     </div>
   )
@@ -445,7 +446,7 @@ function MiniStat({
   colored,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
   colored?: number
 }) {
   const color = colored !== undefined
@@ -652,7 +653,7 @@ function InlineTransactionForm({
           <div>
             <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaal</label>
             <div className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-2.5 py-1.5 text-sm font-medium text-[var(--ink-2)]">
-              {formatCurrency(totalAmount)}
+              {<MaskedAmount value={totalAmount} tone="kern" />}
             </div>
           </div>
         </div>

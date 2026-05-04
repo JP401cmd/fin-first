@@ -15,6 +15,7 @@ import {
 } from '@/lib/phase-monte-carlo'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // -- Types --------------------------------------------------------------------
 
@@ -173,7 +174,7 @@ export const SORRAnalyse = memo(function SORRAnalyse({
             </span>
             . In die periode onttrek je circa{' '}
             <span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">
-              {formatCurrency(Math.round(yearlyWithdrawal * Math.min(10, yearsInPhase)))}
+              {<MaskedAmount value={Math.round(yearlyWithdrawal * Math.min(10, yearsInPhase))} tone="horizon" />}
             </span>{' '}
             aan levensonderhoud terwijl je portfolio nog kwetsbaar is.
           </p>
@@ -334,7 +335,7 @@ export const SORRAnalyse = memo(function SORRAnalyse({
             <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-2)]">
               Zet bij pensionering een cash buffer opzij van{' '}
               <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
-                {formatCurrency(state.recommendedBuffer.amount)}
+                {<MaskedAmount value={state.recommendedBuffer.amount} tone="horizon" />}
               </span>
               {state.recommendedBuffer.months > 0 && (
                 <>

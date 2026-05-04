@@ -7,13 +7,14 @@ import { WillDots } from '@/components/app/will-dots'
 import { RecommendationCard } from '@/components/app/recommendation-card'
 import { RecommendationModal } from '@/components/app/recommendation-modal'
 import { PostponeForm } from '@/components/app/postpone-form'
-import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
+import { BudgetIcon } from '@/components/app/budget-shared'
 import type { Recommendation } from '@/lib/recommendation-data'
 import {
   RECOMMENDATION_TYPE_LABELS,
   RECOMMENDATION_TYPE_ICONS,
   getRecommendationTypeColor,
 } from '@/lib/recommendation-data'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 const EXPECTED_COUNT = 3
 const POLL_INTERVAL_MS = 2000
@@ -187,7 +188,7 @@ function ArticleCard({
             {hasEuroImpact && (
               <div className="flex items-baseline gap-1">
                 <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rec.euro_impact_yearly!)}
+                  {<MaskedAmount value={rec.euro_impact_yearly!} tone="horizon" />}
                 </span>
                 <span className="font-serif text-[12px] italic text-[var(--ink-3)]">
                   /jaar
@@ -566,7 +567,7 @@ export function RecommendationGenerationModal({
                       Jaarlijks
                     </p>
                     <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-                      {formatCurrency(totalEuroYearly)}
+                      {<MaskedAmount value={totalEuroYearly} tone="horizon" />}
                     </p>
                   </div>
                 )}

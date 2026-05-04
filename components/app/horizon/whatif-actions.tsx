@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -11,6 +12,7 @@ import {
   Zap, ChevronDown, ChevronUp, MessageCircle, ArrowRight,
   TrendingUp, PiggyBank, Briefcase, BarChart3,
 } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +42,7 @@ export function WhatIfActions({
   whatIfAnnualSavings: number
   baselineAnnualSavings: number
 }) {
+  const { masked } = useMaskedAmounts()
   const [expanded, setExpanded] = useState(true)
   const [showSummary, setShowSummary] = useState(false)
   const { openWithMessage } = useChatContext()
@@ -73,8 +76,8 @@ export function WhatIfActions({
           id: 'salary-negotiation',
           icon: <Briefcase className="h-4 w-4" />,
           title: 'Salarisonderhandeling voeren',
-          description: `Je scenario gaat uit van ${formatCurrency(monthlyDelta)}/mnd meer inkomen. Plan een gesprek met je leidinggevende over een loonsverhoging.`,
-          impact: `+${formatCurrency(monthlyDelta)}/mnd`,
+          description: `Je scenario gaat uit van ${formatMaskedCurrency(monthlyDelta, masked)}/mnd meer inkomen. Plan een gesprek met je leidinggevende over een loonsverhoging.`,
+          impact: `+${formatMaskedCurrency(monthlyDelta, masked)}/mnd`,
           category: 'inkomen',
         })
       }
@@ -83,8 +86,8 @@ export function WhatIfActions({
           id: 'side-income',
           icon: <Zap className="h-4 w-4" />,
           title: 'Bijverdienste starten',
-          description: `Overweeg freelance werk, een online cursus geven of een side-project om ${formatCurrency(monthlyDelta)}/mnd extra te verdienen.`,
-          impact: `+${formatCurrency(monthlyDelta)}/mnd`,
+          description: `Overweeg freelance werk, een online cursus geven of een side-project om ${formatMaskedCurrency(monthlyDelta, masked)}/mnd extra te verdienen.`,
+          impact: `+${formatMaskedCurrency(monthlyDelta, masked)}/mnd`,
           category: 'inkomen',
         })
       }
@@ -109,7 +112,7 @@ export function WhatIfActions({
       result.push({
         id: 'reduce-expenses',
         icon: <PiggyBank className="h-4 w-4" />,
-        title: `Uitgaven verlagen met ${formatCurrency(monthlySaving)}/mnd`,
+        title: `Uitgaven verlagen met ${formatMaskedCurrency(monthlySaving, masked)}/mnd`,
         description: `Verhoog je spaarquote van ${Math.round(baseline.savingsRate)}% naar ${Math.round(overrides.savingsRate)}%. Bekijk je budgetten voor besparingsmogelijkheden bij abonnementen, boodschappen of vervoer.`,
         impact: `+${Math.round(deltas.savingsRate)}% spaarquote`,
         category: 'sparen',
@@ -121,9 +124,9 @@ export function WhatIfActions({
       result.push({
         id: 'increase-contribution',
         icon: <TrendingUp className="h-4 w-4" />,
-        title: `Maandelijkse inleg verhogen met ${formatCurrency(deltas.extraContribution)}`,
+        title: `Maandelijkse inleg verhogen met ${formatMaskedCurrency(deltas.extraContribution, masked)}`,
         description: 'Stel een automatische overboeking in naar je beleggingsrekening op de dag dat je salaris binnenkomt.',
-        impact: `+${formatCurrency(deltas.extraContribution)}/mnd`,
+        impact: `+${formatMaskedCurrency(deltas.extraContribution, masked)}/mnd`,
         category: 'beleggen',
       })
     }
@@ -153,14 +156,14 @@ export function WhatIfActions({
     }
 
     return result
-  }, [hasChanges, deltas, overrides, baseline])
+  }, [hasChanges, deltas, overrides, baseline, masked])
 
   // Build Will chat message with scenario context
   const buildWillMessage = () => {
     const parts: string[] = ['Ik heb een wat-als scenario gemaakt met de volgende aanpassingen:']
 
     if (deltas.income !== 0) {
-      parts.push(`- Maandinkomen: ${formatCurrency(baseline.monthlyIncome)} → ${formatCurrency(overrides.monthlyIncome)} (${deltas.income > 0 ? '+' : ''}${formatCurrency(deltas.income)}/mnd)`)
+      parts.push(`- Maandinkomen: ${formatMaskedCurrency(baseline.monthlyIncome, masked)} → ${formatMaskedCurrency(overrides.monthlyIncome, masked)} (${deltas.income > 0 ? '+' : ''}${formatMaskedCurrency(deltas.income, masked)}/mnd)`)
     }
     if (deltas.workDays !== 0) {
       parts.push(`- Werkdagen: ${baseline.workDaysPerWeek} → ${overrides.workDaysPerWeek} dagen/week`)
@@ -172,7 +175,7 @@ export function WhatIfActions({
       parts.push(`- Verwacht rendement: ${baseline.expectedReturn.toFixed(1)}% → ${overrides.expectedReturn.toFixed(1)}%`)
     }
     if (deltas.extraContribution !== 0) {
-      parts.push(`- Extra inleg: +${formatCurrency(deltas.extraContribution)}/mnd`)
+      parts.push(`- Extra inleg: +${formatMaskedCurrency(deltas.extraContribution, masked)}/mnd`)
     }
 
     if (fireAgeDelta !== null) {
@@ -235,7 +238,7 @@ export function WhatIfActions({
                 <p className={`mt-0.5 font-mono text-[11px] ${fireAgeDelta < 0 ? 'text-horizon-700' : 'text-kern-700'}`}>
                   FIRE {fireAgeDelta < 0 ? '' : '+'}{fireAgeDelta.toFixed(1)} jaar
                   {' · '}
-                  {formatCurrency(whatIfAnnualSavings - baselineAnnualSavings)}/jaar
+                  {<MaskedAmount value={whatIfAnnualSavings - baselineAnnualSavings} tone="horizon" />}/jaar
                 </p>
               )}
             </button>
@@ -352,7 +355,7 @@ function ScenarioSummaryKassabon({
           <div className="flex justify-between py-0.5">
             <span className="font-sans text-sm text-[var(--ink-2)]">Maandinkomen</span>
             <span className="tabular-nums text-[var(--ink)]">
-              {formatCurrency(baseline.monthlyIncome)} → {formatCurrency(overrides.monthlyIncome)}
+              {<MaskedAmount value={baseline.monthlyIncome} tone="horizon" />} → {<MaskedAmount value={overrides.monthlyIncome} tone="horizon" />}
             </span>
           </div>
         )}
@@ -392,7 +395,7 @@ function ScenarioSummaryKassabon({
           <div className="flex justify-between py-0.5">
             <span className="font-sans text-sm text-[var(--ink-2)]">Extra inleg</span>
             <span className="tabular-nums text-[var(--ink)]">
-              +{formatCurrency(overrides.extraContribution)}/mnd
+              +{<MaskedAmount value={overrides.extraContribution} tone="horizon" />}/mnd
             </span>
           </div>
         )}
@@ -402,11 +405,11 @@ function ScenarioSummaryKassabon({
       <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
         <div className="flex justify-between py-0.5">
           <span className="font-sans text-sm text-[var(--ink-2)]">Jaarlijks sparen (huidig)</span>
-          <span className="tabular-nums text-[var(--ink)]">{formatCurrency(baselineAnnualSavings)}</span>
+          <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={baselineAnnualSavings} tone="horizon" />}</span>
         </div>
         <div className="flex justify-between py-0.5">
           <span className="font-sans text-sm text-[var(--ink-2)]">Jaarlijks sparen (scenario)</span>
-          <span className="tabular-nums text-[var(--ink)]">{formatCurrency(whatIfAnnualSavings)}</span>
+          <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={whatIfAnnualSavings} tone="horizon" />}</span>
         </div>
       </div>
 

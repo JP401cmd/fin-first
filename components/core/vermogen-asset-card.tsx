@@ -1,7 +1,7 @@
 'use client'
 
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import {
   type Asset,
   type AssetType,
@@ -29,6 +29,7 @@ import { findDeepenings } from './category-deepening-registry'
 import { AssetAppChip } from './asset-app-chip'
 import { CardKpiStrip } from './card-kpi-strip'
 import { ConnectionIndicator } from './connection-indicator'
+import { CardTintOverlay } from './card-tint-overlay'
 import type { KpiPair } from '@/lib/asset-kpi'
 import type { AssetConnectionSummary } from '@/lib/connections-data'
 
@@ -74,6 +75,12 @@ interface VermogenAssetCardProps {
    * voor de hele lijst en geeft per kaart het asset-specifieke summary mee.
    */
   connection?: AssetConnectionSummary
+  /**
+   * 6 maandwaarden voor de achtergrond-sparkline ("breuklijn") die de
+   * tinted boven/onder zones scheidt. Bij `undefined` of <2 punten valt
+   * de overlay terug op een rechte horizontale scheiding op het midden.
+   */
+  sparklineValues?: number[]
   staggerIndex?: number
 }
 
@@ -84,6 +91,7 @@ export function VermogenAssetCard({
   kpiPair,
   onClick,
   connection,
+  sparklineValues,
   staggerIndex = 0,
 }: VermogenAssetCardProps) {
   const { flashClass } = useFlashChange(asset.current_value)
@@ -111,15 +119,17 @@ export function VermogenAssetCard({
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); onClick(asset) }}
-      className="card-editorial animate-fade-up w-full text-left"
+      className="card-editorial animate-fade-up relative w-full text-left"
       style={
         { '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties
       }
     >
-      {/* 3px top accent bar */}
-      <div className="h-[3px] w-full" style={{ backgroundColor: accentColor }} />
+      <CardTintOverlay variant="asset" sparklineValues={sparklineValues} />
 
-      <div className="flex items-center gap-3 p-3 sm:p-4">
+      {/* 3px top accent bar */}
+      <div className="relative z-10 h-[3px] w-full" style={{ backgroundColor: accentColor }} />
+
+      <div className="relative z-10 flex items-center gap-3 p-3 sm:p-4">
         {/* Left: icon + name + institution */}
         <div
           className="flex h-7 w-7 shrink-0 items-center justify-center bg-[var(--subtle)]"
@@ -153,9 +163,7 @@ export function VermogenAssetCard({
 
         {/* Right: value met halve transparante streep (highlight-marker) */}
         <div className="shrink-0 text-right">
-          <p
-            className={`font-mono text-sm font-bold tabular-nums text-[var(--ink)] ${flashClass}`}
-          >
+          <p className={`text-[var(--ink)] ${flashClass}`}>
             <span
               className="inline px-1"
               style={{
@@ -163,24 +171,26 @@ export function VermogenAssetCard({
                   'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
               }}
             >
-              {formatCurrency(asset.current_value)}
+              <MaskedAmount value={asset.current_value} tone="kern" className="text-sm font-bold" />
             </span>
           </p>
         </div>
       </div>
 
       {kpiPair && (kpiPair.primary || kpiPair.secondary) ? (
-        <CardKpiStrip pair={kpiPair} variant="item" />
+        <div className="relative z-10">
+          <CardKpiStrip pair={kpiPair} variant="item" />
+        </div>
       ) : (
         <>
           {/* Alignment-placeholder: matcht hoogte van <CardKpiStrip variant="item">
               zodat kaarten zonder KPI's op dezelfde y-as afsluiten in het grid. */}
           <div
-            className="mx-3 h-px bg-[var(--border-md)]/40 sm:mx-4"
+            className="relative z-10 mx-3 h-px bg-[var(--border-md)]/40 sm:mx-4"
             aria-hidden="true"
           />
           <div
-            className="flex items-center px-3 py-2 text-[11px] sm:px-4"
+            className="relative z-10 flex items-center px-3 py-2 text-[11px] sm:px-4"
             aria-hidden="true"
           >
             &nbsp;

@@ -1,7 +1,7 @@
 'use client'
 
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import {
   type Debt,
   type DebtType,
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { CardKpiStrip } from './card-kpi-strip'
 import { ConnectionIndicator } from './connection-indicator'
+import { CardTintOverlay } from './card-tint-overlay'
 import type { KpiPair } from '@/lib/asset-kpi'
 import type { AssetConnectionSummary } from '@/lib/connections-data'
 
@@ -63,6 +64,12 @@ interface VermogenDebtCardProps {
    * (geen actieve debt-koppelingen), maar het display-pad is in stelling.
    */
   connection?: AssetConnectionSummary
+  /**
+   * 6 maandwaarden voor de achtergrond-sparkline ("breuklijn") die de
+   * tinted boven/onder zones scheidt. Bij `undefined` of <2 punten valt
+   * de overlay terug op een rechte horizontale scheiding op het midden.
+   */
+  sparklineValues?: number[]
   onClick: (debtId: string) => void
   staggerIndex?: number
 }
@@ -83,6 +90,7 @@ export function VermogenDebtCard({
   debt,
   kpiPair,
   connection,
+  sparklineValues,
   onClick,
   staggerIndex = 0,
 }: VermogenDebtCardProps) {
@@ -103,18 +111,20 @@ export function VermogenDebtCard({
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); onClick(debt.id) }}
-      className="card-editorial animate-fade-up w-full text-left"
+      className="card-editorial animate-fade-up relative w-full text-left"
       style={
         { '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties
       }
     >
+      <CardTintOverlay variant="debt" sparklineValues={sparklineValues} />
+
       {/* 3px top accent bar — always red for debts */}
       <div
-        className="h-[3px] w-full"
+        className="relative z-10 h-[3px] w-full"
         style={{ backgroundColor: DEBT_ACCENT_COLOR }}
       />
 
-      <div className="flex items-center gap-3 p-3 sm:p-4">
+      <div className="relative z-10 flex items-center gap-3 p-3 sm:p-4">
         {/* Left: icon + name + subtitle */}
         <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-red-100">
           <Icon className="h-4 w-4 text-red-600" />
@@ -139,9 +149,7 @@ export function VermogenDebtCard({
 
         {/* Right: balance (negatief, met highlight-marker als hoofdcijfer) + monthly payment */}
         <div className="shrink-0 text-right">
-          <p
-            className={`font-mono text-sm font-bold tabular-nums text-negative ${flashClass}`}
-          >
+          <p className={`text-negative ${flashClass}`}>
             <span
               className="inline px-1"
               style={{
@@ -149,12 +157,17 @@ export function VermogenDebtCard({
                   'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
               }}
             >
-              {formatCurrency(-Math.abs(debt.current_balance))}
+              <MaskedAmount
+                value={Math.abs(debt.current_balance)}
+                signPrefix="-"
+                tone="kern"
+                className="text-sm font-bold"
+              />
             </span>
           </p>
           {debt.monthly_payment > 0 && (
-            <span className="font-mono text-[10px] font-medium tabular-nums text-[var(--ink-3)]">
-              {formatCurrency(debt.monthly_payment)}
+            <span className="text-[var(--ink-3)]">
+              <MaskedAmount value={debt.monthly_payment} tone="kern" className="text-[10px] font-medium" />
               <span className="text-[var(--ink-4)]">/mnd</span>
             </span>
           )}
@@ -162,17 +175,19 @@ export function VermogenDebtCard({
       </div>
 
       {kpiPair && (kpiPair.primary || kpiPair.secondary) ? (
-        <CardKpiStrip pair={kpiPair} variant="item" />
+        <div className="relative z-10">
+          <CardKpiStrip pair={kpiPair} variant="item" />
+        </div>
       ) : (
         <>
           {/* Alignment-placeholder: matcht hoogte van <CardKpiStrip variant="item">
               zodat kaarten zonder KPI's op dezelfde y-as afsluiten in het grid. */}
           <div
-            className="mx-3 h-px bg-[var(--border-md)]/40 sm:mx-4"
+            className="relative z-10 mx-3 h-px bg-[var(--border-md)]/40 sm:mx-4"
             aria-hidden="true"
           />
           <div
-            className="flex items-center px-3 py-2 text-[11px] sm:px-4"
+            className="relative z-10 flex items-center px-3 py-2 text-[11px] sm:px-4"
             aria-hidden="true"
           >
             &nbsp;

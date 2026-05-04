@@ -1,8 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware currency formatter hook used across this file. */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '@/lib/constants'
 
 // ── Types ────────────────────────────────────────────────────
@@ -72,6 +79,7 @@ export function PensionStrategyTables({
   hasPartner: boolean
   activeWithdrawalStrategy?: string
 }) {
+  const fc = useFc()
   const aowAge = NL_AOW_AGE
   const endAge = 100
   const totalYears = Math.max(0, endAge - aowAge)
@@ -247,11 +255,11 @@ export function PensionStrategyTables({
           </div>
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">Vermogen op {aowAge}j</p>
-            <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">{formatCurrency(portfolioAtAow)}</p>
+            <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">{fc(portfolioAtAow)}</p>
           </div>
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--ink-4)]">AOW-uitkering /jr</p>
-            <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-emerald-600">+{formatCurrency(aowYearly)}</p>
+            <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-emerald-600">+{fc(aowYearly)}</p>
           </div>
         </div>
         <p className="mt-2 text-[11px] text-[var(--ink-3)]">
@@ -289,6 +297,7 @@ function PensionSubTable({
   showVpwColumns?: boolean
   isActive?: boolean
 }) {
+  const fc = useFc()
   const [expanded, setExpanded] = useState(false)
   const displayRows = useMemo(() => (expanded ? rows : sampleRows(rows)), [rows, expanded])
   const hasTooMany = rows.length > 20
@@ -347,18 +356,18 @@ function PensionSubTable({
                     </>
                   )}
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(row.expenses)}
+                    {fc(row.expenses)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-red-600">
-                    -{formatCurrency(row.withdrawal)}
+                    -{fc(row.withdrawal)}
                   </td>
                   <td className="px-3 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                    {formatCurrency(row.startBalance)}
+                    {fc(row.startBalance)}
                   </td>
                   <td className={`px-3 py-1 text-right font-mono tabular-nums ${
                     row.endBalance <= 0 ? 'text-amber-600 font-semibold' : 'text-[var(--ink)]'
                   }`}>
-                    {row.endBalance <= 0 ? `${formatCurrency(0)} ⚠` : formatCurrency(row.endBalance)}
+                    {row.endBalance <= 0 ? `${fc(0)} ⚠` : fc(row.endBalance)}
                   </td>
                 </tr>
               ))}
@@ -369,16 +378,16 @@ function PensionSubTable({
                   Totaal ({rows.length}j)
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(rows.reduce((s, r) => s + r.expenses, 0))}
+                  {fc(rows.reduce((s, r) => s + r.expenses, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-red-600">
-                  -{formatCurrency(rows.reduce((s, r) => s + r.withdrawal, 0))}
+                  -{fc(rows.reduce((s, r) => s + r.withdrawal, 0))}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[0]?.startBalance ?? 0)}
+                  {fc(rows[0]?.startBalance ?? 0)}
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(rows[rows.length - 1]?.endBalance ?? 0)}
+                  {fc(rows[rows.length - 1]?.endBalance ?? 0)}
                 </td>
               </tr>
             </tfoot>

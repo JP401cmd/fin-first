@@ -65,7 +65,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { CHART_PAD } from '@/lib/chart-constants'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -216,6 +217,8 @@ export const DoorrekeningChart = memo(function DoorrekeningChart({
   legacyAmount,
   hybridRows,
 }: DoorrekeningChartProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200 })
 
   // ── Mode state (controlled of intern) ─────────────────────────────
@@ -605,7 +608,7 @@ export const DoorrekeningChart = memo(function DoorrekeningChart({
         return `Pensioen-strategie — kruising vastgezet op AOW (${aowAge.toFixed(1)}j).`
       case 'legacy': {
         const legacyLabel = legacyAmount != null && legacyAmount > 0
-          ? `${formatCurrency(legacyAmount)} × inflatie`
+          ? `${fc(legacyAmount)} × inflatie`
           : 'legacy-bedrag × inflatie'
         return `Legacy-strategie — eindvermogen \u2248 ${legacyLabel}.`
       }

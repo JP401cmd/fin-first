@@ -8,7 +8,7 @@ import {
   GOAL_TYPE_LABELS, GOAL_COLORS, GOAL_TYPE_META, GOAL_TYPE_ICONS,
   goalValueLabels, type Goal, type GoalType,
 } from '@/lib/goal-data'
-import { BudgetIcon, iconOptions } from '@/components/app/budget-shared'
+import { iconOptions } from '@/components/app/budget-shared'
 
 type Asset = { id: string; name: string; current_value: number }
 type Debt = { id: string; name: string; current_balance: number }

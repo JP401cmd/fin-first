@@ -19,7 +19,7 @@ export function ReceiptRow({
   subtle,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
   positive?: boolean
   negative?: boolean
   subtle?: boolean

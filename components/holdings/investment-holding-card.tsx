@@ -11,7 +11,7 @@
 
 import { Activity, TrendingUp, TrendingDown } from 'lucide-react'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { InvestmentHoldingRow } from '@/lib/investment-holdings-data'
 import { HoldingSourceBadge, type HoldingSourceForBadge } from './holding-source-badge'
 
@@ -118,10 +118,8 @@ export function InvestmentHoldingCard({
         </div>
 
         <div className="shrink-0 text-right">
-          <p
-            className={`font-mono text-sm font-bold tabular-nums text-[var(--ink)] ${flashClass}`}
-          >
-            {formatCurrency(holding.valueEur)}
+          <p className={`text-[var(--ink)] ${flashClass}`}>
+            <MaskedAmount value={holding.valueEur} tone="kern" className="text-sm font-bold" />
           </p>
           <div className="mt-0.5 flex items-center justify-end gap-1.5">
             <p className="font-mono text-[10px] tabular-nums text-[var(--ink-4)]">

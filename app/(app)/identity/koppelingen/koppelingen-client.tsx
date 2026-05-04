@@ -9,7 +9,8 @@ import { ConnectionCard } from '@/components/connections/connection-card'
 import { IsinResolverStatus } from '@/components/connections/isin-resolver-status'
 import { useToast } from '@/components/app/toast-provider'
 import { computeFreshness, type ConnectionsData, type ExchangeConnectionRow, type ExchangeId, type WalletAddressRow, type WalletChain } from '@/lib/connections-data'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 // Picker-source shape consumed by AddExchangeModal / AddWalletModal (R2 uses
 // these from the asset-edit page). Re-exported here to keep the existing import
@@ -68,6 +69,7 @@ function linkedAssetHref(linkedAssetType: string): string {
 export function KoppelingenClient({ initialData }: KoppelingenClientProps) {
   const router = useRouter()
   const { addToast } = useToast()
+  const { masked } = useMaskedAmounts()
 
   const [exchanges, setExchanges] = useState<ExchangeConnectionRow[]>(initialData.exchanges)
   const [wallets, setWallets] = useState<WalletAddressRow[]>(initialData.wallets)
@@ -90,7 +92,7 @@ export function KoppelingenClient({ initialData }: KoppelingenClientProps) {
         setExchanges((prev) => prev.map((r) => (r.id === id ? { ...r, lastSyncError: message } : r)))
       } else {
         const count = Number(json?.itemsSynced ?? 0)
-        const total = typeof json?.totalEur === 'number' ? formatCurrency(json.totalEur) : null
+        const total = typeof json?.totalEur === 'number' ? formatMaskedCurrency(json.totalEur, masked) : null
         addToast({
           type: 'success',
           title: 'Saldi opgehaald',
@@ -152,7 +154,7 @@ export function KoppelingenClient({ initialData }: KoppelingenClientProps) {
         addToast({ type: 'error', title: 'Sync-fout', message })
         setWallets((prev) => prev.map((r) => (r.id === id ? { ...r, lastSyncError: message } : r)))
       } else {
-        const total = typeof json?.totalEur === 'number' ? formatCurrency(json.totalEur) : null
+        const total = typeof json?.totalEur === 'number' ? formatMaskedCurrency(json.totalEur, masked) : null
         addToast({
           type: 'success',
           title: 'Saldo opgehaald',
@@ -306,7 +308,7 @@ export function KoppelingenClient({ initialData }: KoppelingenClientProps) {
                 status={computeFreshness(w.lastSyncedAt, w.lastSyncError)}
                 label={fullLabel}
                 sublabel={maskAddress(w.address)}
-                amount={w.lastBalanceEur != null ? formatCurrency(w.lastBalanceEur) : undefined}
+                amount={w.lastBalanceEur != null ? formatMaskedCurrency(w.lastBalanceEur, masked) : undefined}
                 amountLabel={
                   w.lastBalanceNative != null
                     ? `${w.lastBalanceNative.toLocaleString('nl-NL', { maximumFractionDigits: 6 })} ${CHAIN_TICKER[w.chain]}`

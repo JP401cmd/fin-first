@@ -11,7 +11,19 @@ import { Kicker } from '@/components/editorial'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/**
+ * Masked-aware EUR formatter hook used across this file's many sub-views.
+ * Each call site invokes `useFc()` so masking propagates through the
+ * privacy-toggle context. We keep `formatCurrency` available for any
+ * non-display sites (CSV, sorting, intermediate math).
+ */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { usePartnerPrivacy, filterPartnerItems, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
@@ -42,6 +54,7 @@ type Mortgage = { id: string; name: string; current_balance: number; linked_asse
 
 export default function AssetsPage({ initialAssetId, initialData }: { initialAssetId?: string; initialData?: AssetsPageData } = {}) {
   const router = useRouter()
+  const fc = useFc()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [assets, setAssets] = useState<Asset[]>(() => {
     if (!initialData) return []
@@ -419,7 +432,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale waarde</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalValue)}</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{fc(totalValue)}</p>
             {dailyExpenses > 0 && totalValue > 0 && (
               <p className="mt-0.5 text-xs text-kern-600/70" data-testid="total-value-freedom">
                 {formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid
@@ -428,14 +441,14 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           </div>
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Maandelijkse inleg</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalMonthlyContrib)}</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{fc(totalMonthlyContrib)}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Rendement (totaal)</p>
             {totalPurchase > 0 ? (
               <>
                 <p className={`mt-1 text-xl font-bold ${totalValue >= totalPurchase ? 'text-positive' : 'text-negative'}`}>
-                  {totalValue >= totalPurchase ? '+' : ''}{formatCurrency(totalValue - totalPurchase)}
+                  {totalValue >= totalPurchase ? '+' : ''}{fc(totalValue - totalPurchase)}
                 </p>
                 {dailyExpenses > 0 && Math.abs(totalValue - totalPurchase) > 0 && (
                   <p className={`mt-0.5 text-xs ${totalValue >= totalPurchase ? 'text-positive/70' : 'text-negative/70'}`} data-testid="return-freedom">
@@ -453,7 +466,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           </div>
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Waarde over {projectionYears} jaar</p>
-            <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrency(futureValue)}</p>
+            <p className="mt-1 text-xl font-bold text-emerald-600">{fc(futureValue)}</p>
             {dailyExpenses > 0 && futureValue > 0 && (
               <p className="mt-0.5 text-xs text-emerald-500/70" data-testid="future-value-freedom">
                 {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
@@ -482,7 +495,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
               Verdeling &amp; Projectie
             </Kicker>
             <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(totalValue)}
+              {fc(totalValue)}
             </p>
           </div>
         </button>
@@ -508,7 +521,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                         />
                         <span className="flex-1 text-xs text-[var(--ink-2)]">{ASSET_TYPE_LABELS[type]}</span>
                         <span className="text-xs font-medium text-[var(--ink)]">{pct.toFixed(0)}%</span>
-                        <span className="text-xs text-[var(--ink-3)]">{formatCurrency(data.total)}</span>
+                        <span className="text-xs text-[var(--ink-3)]">{fc(data.total)}</span>
                       </div>
                     )
                   })}
@@ -542,15 +555,15 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                 <div className="flex items-center gap-1">
                   <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
                   <span className="text-[var(--ink-3)]">Verwachte groei:</span>
-                  <span className="font-medium text-emerald-600" data-testid="projected-growth">+{formatCurrency(projectedGrowth)}</span>
+                  <span className="font-medium text-emerald-600" data-testid="projected-growth">+{fc(projectedGrowth)}</span>
                 </div>
               </div>
               {/* Contextual projection message */}
               {projection.length > 0 && (
                 <p className="mt-3 text-xs text-[var(--ink-3)] leading-relaxed" data-testid="projection-context-message">
                   {totalMonthlyContrib > 0
-                    ? `Met je huidige inleg van ${formatCurrency(totalMonthlyContrib)}/maand groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`
-                    : `Zonder extra inleg groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`}
+                    ? `Met je huidige inleg van ${fc(totalMonthlyContrib)}/maand groeit je portfolio naar ${fc(futureValue)} in ${projectionYears} jaar`
+                    : `Zonder extra inleg groeit je portfolio naar ${fc(futureValue)} in ${projectionYears} jaar`}
                   {dailyExpenses > 0 && futureValue > 0 && (
                     <span className="text-emerald-600 font-medium">
                       {' — '}dat is {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
@@ -595,7 +608,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                   </h3>
                 )}
                 <span className="text-xs tabular-nums text-[var(--ink-3)]">
-                  {formatCurrency(group.total)}
+                  {fc(group.total)}
                 </span>
               </div>
 
@@ -675,19 +688,19 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                         </p>
                         {asset.asset_type === 'deelneming' && asset.annual_dividend != null && asset.annual_dividend > 0 && (
                           <p className="text-[10px] text-teal-600/80">
-                            Dividend: {formatCurrency(asset.annual_dividend)} p.j.
+                            Dividend: {fc(asset.annual_dividend)} p.j.
                           </p>
                         )}
                         {asset.asset_type === 'levensverzekering' && Number(asset.monthly_contribution) > 0 && (
                           <p className="text-[10px] text-purple-600/80">
-                            Premie: {formatCurrency(Number(asset.monthly_contribution))} p/m
+                            Premie: {fc(Number(asset.monthly_contribution))} p/m
                           </p>
                         )}
                         {asset.asset_type === 'vordering' && (
                           <p className="text-[10px] text-sky-600/80">
                             {[
                               `Rente: ${Number(asset.expected_return)}% p.j.`,
-                              Number(asset.monthly_contribution) > 0 ? `Aflossing: ${formatCurrency(Number(asset.monthly_contribution))} p/m` : null,
+                              Number(asset.monthly_contribution) > 0 ? `Aflossing: ${fc(Number(asset.monthly_contribution))} p/m` : null,
                             ].filter(Boolean).join(' \u2022 ')}
                           </p>
                         )}
@@ -716,7 +729,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                         return null
                       })()}
                       <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold text-[var(--ink)]">{formatCurrency(value)}</p>
+                        <p className="text-sm font-semibold text-[var(--ink)]">{fc(value)}</p>
                         {dailyExpenses > 0 && value > 0 && (
                           <p className={`text-[10px] ${hasBudget ? 'text-emerald-500/70' : 'text-kern-500/70'}`} data-testid="asset-card-freedom">
                             {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'short', true)} vrijheid
@@ -871,6 +884,7 @@ export function AssetDetailModal({
   onRevalue: () => void
   onDelete: () => void
 }) {
+  const fc = useFc()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
   const [holdingsCount, setHoldingsCount] = useState(0)
@@ -986,7 +1000,7 @@ export function AssetDetailModal({
                   'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
               }}
             >
-              {formatCurrency(value)}
+              {fc(value)}
             </span>
           </p>
           {dailyExpenses > 0 && value > 0 && (
@@ -1000,7 +1014,7 @@ export function AssetDetailModal({
           )}
           {purchase > 0 && (
             <p className={`mt-2 text-sm font-medium tabular-nums ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% ({returnPct >= 0 ? '+' : ''}{formatCurrency(value - purchase)})
+              {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% ({returnPct >= 0 ? '+' : ''}{fc(value - purchase)})
               {dailyExpenses > 0 && Math.abs(value - purchase) > 0 && (
                 <span className={`ml-1 text-xs ${returnPct >= 0 ? 'text-positive/60' : 'text-negative/60'}`} data-testid="detail-return-freedom">
                   — {(() => {
@@ -1039,7 +1053,7 @@ export function AssetDetailModal({
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
               <p className="text-xs text-[var(--ink-3)]">{isEigenHuis ? 'Aankoopprijs' : asset.asset_type === 'vordering' ? 'Oorspronkelijke hoofdsom' : 'Aankoopwaarde'}</p>
-              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{purchase > 0 ? formatCurrency(purchase) : '-'}</p>
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{purchase > 0 ? fc(purchase) : '-'}</p>
             </div>
             <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
               <p className="text-xs text-[var(--ink-3)]">{asset.asset_type === 'vordering' ? 'Rentepercentage' : 'Verwacht rendement'}</p>
@@ -1049,7 +1063,7 @@ export function AssetDetailModal({
               <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
                 <p className="text-xs text-[var(--ink-3)]">{asset.asset_type === 'vordering' ? 'Maandelijkse aflossing' : asset.asset_type === 'levensverzekering' ? 'Maandelijkse premie' : 'Maandelijkse inleg'}</p>
                 <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
-                  {Number(asset.monthly_contribution) > 0 ? formatCurrency(Number(asset.monthly_contribution)) : '-'}
+                  {Number(asset.monthly_contribution) > 0 ? fc(Number(asset.monthly_contribution)) : '-'}
                 </p>
               </div>
             )}
@@ -1071,7 +1085,7 @@ export function AssetDetailModal({
                 <>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-[var(--ink-2)]">{mortgage.name}</span>
-                    <span className="text-sm font-medium text-[var(--ink)]">{formatCurrency(mortgage.balance)}</span>
+                    <span className="text-sm font-medium text-[var(--ink)]">{fc(mortgage.balance)}</span>
                   </div>
                   <div className="flex items-center justify-between border-t border-kern-200/60 pt-2">
                     <span className="text-xs font-medium text-[var(--ink-2)]">Overwaarde</span>
@@ -1079,7 +1093,7 @@ export function AssetDetailModal({
                       const overwaarde = value - mortgage.balance
                       return (
                         <span className={`text-sm font-bold ${overwaarde >= 0 ? 'text-positive' : 'text-negative'}`}>
-                          {formatCurrency(overwaarde)}
+                          {fc(overwaarde)}
                         </span>
                       )
                     })()}
@@ -1117,7 +1131,7 @@ export function AssetDetailModal({
                       className="flex w-full items-center justify-between rounded-[var(--r)] px-2 py-1.5 text-xs hover:bg-teal-50 transition-colors"
                     >
                       <span className="text-[var(--ink)]">{d.name}</span>
-                      <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(d.current_balance)}</span>
+                      <span className="font-mono tabular-nums text-[var(--ink-2)]">{fc(d.current_balance)}</span>
                     </button>
                   ))}
                 </div>
@@ -1130,7 +1144,7 @@ export function AssetDetailModal({
                     <div key={d.id} className="flex items-center justify-between">
                       <span className="text-xs text-[var(--ink-2)]">{d.name}</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono tabular-nums text-sm font-medium text-[var(--ink)]">{formatCurrency(d.current_balance)}</span>
+                        <span className="font-mono tabular-nums text-sm font-medium text-[var(--ink)]">{fc(d.current_balance)}</span>
                         <button
                           onClick={() => unlinkDebt(d.id)}
                           className="rounded p-0.5 text-[var(--ink-4)] hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -1153,7 +1167,7 @@ export function AssetDetailModal({
                 <div className="border-t border-teal-200/60 pt-2 mt-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-[var(--ink-2)]">Totaal DGA-leningen</span>
-                    <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{formatCurrency(totalDgaLeningen)}</span>
+                    <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{fc(totalDgaLeningen)}</span>
                   </div>
 
                   {totalDgaLeningen >= WET_EXCESSIEF_LENEN_DREMPEL && (
@@ -1164,7 +1178,7 @@ export function AssetDetailModal({
                           Wet excessief lenen: drempel overschreden
                         </p>
                         <p className="text-[10px] text-red-600 mt-0.5">
-                          Uw totale DGA-leningen ({formatCurrency(totalDgaLeningen)}) overschrijden de drempel van {formatCurrency(WET_EXCESSIEF_LENEN_DREMPEL)}. Het meerdere wordt belast als fictief regulier voordeel in Box 2.
+                          Uw totale DGA-leningen ({fc(totalDgaLeningen)}) overschrijden de drempel van {fc(WET_EXCESSIEF_LENEN_DREMPEL)}. Het meerdere wordt belast als fictief regulier voordeel in Box 2.
                         </p>
                         <a
                           href="https://www.belastingdienst.nl/wps/wcm/connect/nl/box-2/content/excessief-lenen"
@@ -1186,7 +1200,7 @@ export function AssetDetailModal({
                           Wet excessief lenen: nadert drempel
                         </p>
                         <p className="text-[10px] text-amber-600 mt-0.5">
-                          Uw totale DGA-leningen ({formatCurrency(totalDgaLeningen)}) naderen de drempel van {formatCurrency(WET_EXCESSIEF_LENEN_DREMPEL)}. Boven deze drempel wordt het meerdere belast als fictief regulier voordeel in Box 2.
+                          Uw totale DGA-leningen ({fc(totalDgaLeningen)}) naderen de drempel van {fc(WET_EXCESSIEF_LENEN_DREMPEL)}. Boven deze drempel wordt het meerdere belast als fictief regulier voordeel in Box 2.
                         </p>
                         <a
                           href="https://www.belastingdienst.nl/wps/wcm/connect/nl/box-2/content/excessief-lenen"
@@ -1209,8 +1223,8 @@ export function AssetDetailModal({
             const details: { label: string; value: string }[] = []
             if (asset.ticker_symbol) details.push({ label: 'Ticker / ISIN', value: asset.ticker_symbol })
             if (asset.address_postcode || asset.address_house_number) details.push({ label: 'Adres', value: `${asset.address_postcode ?? ''} ${asset.address_house_number ?? ''}`.trim() })
-            if (asset.woz_value) details.push({ label: 'WOZ-waarde', value: formatCurrency(Number(asset.woz_value)) })
-            if (asset.rental_income) details.push({ label: 'Huurinkomsten p/m', value: formatCurrency(Number(asset.rental_income)) })
+            if (asset.woz_value) details.push({ label: 'WOZ-waarde', value: fc(Number(asset.woz_value)) })
+            if (asset.rental_income) details.push({ label: 'Huurinkomsten p/m', value: fc(Number(asset.rental_income)) })
             if (asset.retirement_provider_type) details.push({ label: 'Pensioenuitvoerder', value: RETIREMENT_PROVIDER_LABELS[asset.retirement_provider_type] })
             if (asset.depreciation_rate != null && asset.depreciation_rate !== 0) details.push({ label: 'Afschrijving p/j', value: `${asset.depreciation_rate}%` })
             if (asset.lock_end_date) {
@@ -1246,7 +1260,7 @@ export function AssetDetailModal({
             // Deelneming-specific fields
             if (asset.kvk_number) details.push({ label: 'KvK-nummer', value: asset.kvk_number })
             if (asset.ownership_percentage != null) details.push({ label: 'Belang', value: `${asset.ownership_percentage}%` })
-            if (asset.annual_dividend != null && asset.annual_dividend > 0) details.push({ label: 'Jaarlijks dividend', value: formatCurrency(asset.annual_dividend) })
+            if (asset.annual_dividend != null && asset.annual_dividend > 0) details.push({ label: 'Jaarlijks dividend', value: fc(asset.annual_dividend) })
             if (details.length === 0) return null
             return (
               <div className="grid grid-cols-2 gap-3">
@@ -1269,7 +1283,7 @@ export function AssetDetailModal({
                 <p className="text-xs font-semibold text-teal-700/60 uppercase">Gekoppelde deelneming</p>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-[var(--ink)]">{linked.name}</span>
-                  <span className="text-sm text-[var(--ink-2)]">{formatCurrency(Number(linked.current_value))}</span>
+                  <span className="text-sm text-[var(--ink-2)]">{fc(Number(linked.current_value))}</span>
                 </div>
                 {linked.ownership_percentage != null && (
                   <p className="text-xs text-teal-600/80">{linked.ownership_percentage}% belang</p>
@@ -1394,6 +1408,7 @@ function TypedHoldingsSection({
     | import('@/lib/investment-holdings-data').InvestmentHoldingRow[]
   loaded: boolean
 }) {
+  const fc = useFc()
   const router = useRouter()
   const visible = holdings.slice(0, 12)
   const hasMore = holdings.length > visible.length
@@ -1457,7 +1472,7 @@ function TypedHoldingsSection({
           <span className="ml-1.5 text-[var(--ink-3)]">({holdings.length})</span>
         </p>
         <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-          {formatCurrency(totalEur)}
+          {fc(totalEur)}
         </p>
       </div>
 
@@ -1582,6 +1597,7 @@ function MiniSparkline({
 // ── Valuation trend section for detail modal ─────────────────
 
 function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
+  const fc = useFc()
   const { ref: chartRef, hasEntered: chartEntered } = useInViewAnimation({ duration: 600 })
   const [showAll, setShowAll] = useState(false)
   const INITIAL_SHOW = 10
@@ -1718,7 +1734,7 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
               const pct = first > 0 ? ((last - first) / first) * 100 : 0
               return (
                 <span className={`font-medium ${diff >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)} ({diff >= 0 ? '+' : ''}{pct.toFixed(1)}%)
+                  {diff >= 0 ? '+' : ''}{fc(diff)} ({diff >= 0 ? '+' : ''}{pct.toFixed(1)}%)
                 </span>
               )
             })()}
@@ -1727,7 +1743,7 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
       ) : sorted.length === 1 ? (
         <div className="mb-3 rounded-[var(--r)] bg-[var(--subtle)] p-3 text-center" data-testid="valuation-single-point">
           <p className="text-xs text-[var(--ink-3)]">
-            {formatCurrency(Number(sorted[0].value))} op{' '}
+            {fc(Number(sorted[0].value))} op{' '}
             {new Date(sorted[0].valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
           <p className="mt-1 text-[10px] text-[var(--ink-3)]">Voeg meer waarderingen toe voor een trendgrafiek.</p>
@@ -1746,10 +1762,10 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
               <span className="w-24 shrink-0 text-[var(--ink-3)]">
                 {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' })}
               </span>
-              <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
+              <span className="font-medium text-[var(--ink-2)]">{fc(Number(v.value))}</span>
               {diff !== null && (
                 <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                  {diff >= 0 ? '+' : ''}{fc(diff)}
                 </span>
               )}
               {v.notes && (
@@ -1805,6 +1821,7 @@ type AssetHolding = {
 }
 
 function HoldingsList({ assetId, assetName }: { assetId: string; assetName: string }) {
+  const fc = useFc()
   const [holdings, setHoldings] = useState<AssetHolding[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1970,7 +1987,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
           </span>
           {!loading && holdings.length > 0 && (
             <span className="text-xs text-[var(--ink-3)]">
-              — {formatCurrency(totalValue)}
+              — {fc(totalValue)}
             </span>
           )}
         </div>
@@ -2042,7 +2059,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                       <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
                         <span>{h.units} eenheden</span>
                         <span>·</span>
-                        <span>Gem. {formatCurrency(h.avg_purchase_price)}</span>
+                        <span>Gem. {fc(h.avg_purchase_price)}</span>
                         {h.purchase_date && (
                           <>
                             <span>·</span>
@@ -2053,7 +2070,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="text-right">
-                        <p className="text-xs font-medium text-[var(--ink)]">{formatCurrency(value)}</p>
+                        <p className="text-xs font-medium text-[var(--ink)]">{fc(value)}</p>
                         <p className={`text-[10px] ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
                           {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
                         </p>
@@ -2100,7 +2117,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
               <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-1.5 px-3">
                 <span className="text-[10px] font-medium text-[var(--ink-3)]">Totaal</span>
                 <div className="text-right">
-                  <span className="text-xs font-semibold text-[var(--ink)]">{formatCurrency(totalValue)}</span>
+                  <span className="text-xs font-semibold text-[var(--ink)]">{fc(totalValue)}</span>
                   {totalCost > 0 && (
                     <span className={`ml-1.5 text-[10px] ${totalValue >= totalCost ? 'text-positive' : 'text-negative'}`}>
                       ({totalValue >= totalCost ? '+' : ''}{((totalValue - totalCost) / totalCost * 100).toFixed(1)}%)
@@ -2254,6 +2271,7 @@ function AllocationPie({
   total: number
   dailyExpenses: number
 }) {
+  const fc = useFc()
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   const size = 120
   const cx = size / 2
@@ -2296,7 +2314,7 @@ function AllocationPie({
         )
       })}
       <text x={cx} y={dailyExpenses > 0 && total > 0 ? cy - 10 : cy - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#18181b">
-        {formatCurrency(total)}
+        {fc(total)}
       </text>
       {dailyExpenses > 0 && total > 0 ? (
         <>
@@ -2411,6 +2429,7 @@ export function AssetForm({
    */
   initialConnection?: import('@/lib/connections-data').AssetConnectionSummary | null
 }) {
+  const fc = useFc()
   const isEdit = !!asset
   const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
   const [holdingsCount, setHoldingsCount] = useState(0)
@@ -2814,7 +2833,7 @@ export function AssetForm({
             </p>
             {netWorthInclusionPct < 100 && Number(currentValue) > 0 && (
               <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
-                Effectieve waarde: {formatCurrency(Number(currentValue) * netWorthInclusionPct / 100)}
+                Effectieve waarde: {fc(Number(currentValue) * netWorthInclusionPct / 100)}
               </p>
             )}
           </div>
@@ -3260,7 +3279,7 @@ export function AssetForm({
                       {wozResult.map((w) => (
                         <div key={w.peildatum} className="flex items-center justify-between text-xs">
                           <span className="text-[var(--ink-2)]">{new Date(w.peildatum).toLocaleDateString('nl-NL', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                          <span className="font-medium text-[var(--ink)]">{formatCurrency(w.waarde)}</span>
+                          <span className="font-medium text-[var(--ink)]">{fc(w.waarde)}</span>
                         </div>
                       ))}
                     </div>
@@ -3443,6 +3462,7 @@ export function ValuationModal({
   onClose: () => void
   onSaved: () => void
 }) {
+  const fc = useFc()
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [value, setValue] = useState(String(currentValue))
   const [notes, setNotes] = useState('')
@@ -3535,7 +3555,7 @@ export function ValuationModal({
               className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
             <p className="mt-1 text-xs text-[var(--ink-3)]">
-              Huidige waarde: {formatCurrency(currentValue)}
+              Huidige waarde: {fc(currentValue)}
             </p>
           </div>
           <div>
@@ -3578,6 +3598,7 @@ function ValuationHistory({
   valuations: Valuation[] | undefined
   onLoad: () => void
 }) {
+  const fc = useFc()
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
@@ -3601,10 +3622,10 @@ function ValuationHistory({
               <span className="w-20 shrink-0 text-[var(--ink-3)]">
                 {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
               </span>
-              <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
+              <span className="font-medium text-[var(--ink-2)]">{fc(Number(v.value))}</span>
               {diff !== null && (
                 <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                  {diff >= 0 ? '+' : ''}{fc(diff)}
                 </span>
               )}
               {v.notes && (

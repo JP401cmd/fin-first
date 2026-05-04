@@ -4,7 +4,8 @@ import { memo, useMemo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
@@ -22,6 +23,7 @@ import type { Debt } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +76,7 @@ function IncomeSourceBar({
   pensioenTotal: number
   portfolioTotal: number
 }) {
+  const { masked } = useMaskedAmounts()
   const total = aowTotal + pensioenTotal + portfolioTotal
   if (total <= 0) return null
 
@@ -99,7 +102,7 @@ function IncomeSourceBar({
             key={s.label}
             className="h-full transition-all duration-300"
             style={{ width: `${s.pct}%`, backgroundColor: s.color }}
-            title={`${s.label}: ${formatCurrency(Math.round(s.value))}`}
+            title={`${s.label}: ${formatMaskedCurrency(Math.round(s.value), masked)}`}
           />
         ))}
       </div>
@@ -217,7 +220,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
         {/* 2. Fase-header */}
         <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
-            Onttrekken &middot; {formatCurrency(Math.round(startPortfolio))} &rarr; {formatCurrency(Math.round(endPortfolio))} &middot; {durationYears} jaar
+            Onttrekken &middot; {<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(endPortfolio)} tone="horizon" />} &middot; {durationYears} jaar
           </p>
         </div>
 
@@ -235,35 +238,35 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
 
           {/* Extended receipt rows — kasstroomanalyse */}
           <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-            <ReceiptRow label="Startvermogen" value={formatCurrency(Math.round(startPortfolio))} />
+            <ReceiptRow label="Startvermogen" value={<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} />
             <ReceiptRow
               label="Rendement (cumulatief)"
-              value={formatCurrency(Math.round(aggregates.totalGrowth))}
+              value={<MaskedAmount value={Math.round(aggregates.totalGrowth)} tone="horizon" />}
               positive={aggregates.totalGrowth > 0}
             />
             {aggregates.totalAow > 0 && (
               <ReceiptRow
                 label="AOW (cumulatief)"
-                value={formatCurrency(Math.round(aggregates.totalAow))}
+                value={<MaskedAmount value={Math.round(aggregates.totalAow)} tone="horizon" />}
                 positive
               />
             )}
             {aggregates.totalPensioen > 0 && (
               <ReceiptRow
                 label="Pensioen (cumulatief)"
-                value={formatCurrency(Math.round(aggregates.totalPensioen))}
+                value={<MaskedAmount value={Math.round(aggregates.totalPensioen)} tone="horizon" />}
                 positive
               />
             )}
             <ReceiptRow
               label="Levensonderhoud"
-              value={`\u2212 ${formatCurrency(Math.round(totalLevensonderhoud))}`}
+              value={<MaskedAmount value={Math.round(totalLevensonderhoud)} signPrefix="-" tone="horizon" />}
               negative
             />
             {aggregates.totalBox3 > 0 && (
               <ReceiptRow
                 label="Box 3 (cumulatief)"
-                value={`\u2212 ${formatCurrency(Math.round(aggregates.totalBox3))}`}
+                value={<MaskedAmount value={Math.round(aggregates.totalBox3)} signPrefix="-" tone="horizon" />}
                 negative
               />
             )}
@@ -271,8 +274,8 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
               <ReceiptRow
                 label="Eenmalige gebeurtenissen"
                 value={aggregates.totalOneTimeCashflows < 0
-                  ? `\u2212 ${formatCurrency(Math.round(Math.abs(aggregates.totalOneTimeCashflows)))}`
-                  : formatCurrency(Math.round(aggregates.totalOneTimeCashflows))
+                  ? <MaskedAmount value={Math.round(Math.abs(aggregates.totalOneTimeCashflows))} signPrefix="-" tone="horizon" />
+                  : <MaskedAmount value={Math.round(aggregates.totalOneTimeCashflows)} tone="horizon" />
                 }
                 positive={aggregates.totalOneTimeCashflows > 0}
                 negative={aggregates.totalOneTimeCashflows < 0}
@@ -284,7 +287,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
             <span className="font-sans text-sm text-[var(--ink)]">Eindvermogen</span>
             <span className="font-mono tabular-nums text-[var(--ink)]">
-              {formatCurrency(Math.round(endPortfolio))}
+              {<MaskedAmount value={Math.round(endPortfolio)} tone="horizon" />}
             </span>
           </div>
 
@@ -299,7 +302,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
                 {strategy === 'pensioen' ? 'Geschatte nalatenschap' : 'Doelvermogen'}
               </span>
               <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                {formatCurrency(Math.round(targetEndPortfolio))}
+                {<MaskedAmount value={Math.round(targetEndPortfolio)} tone="horizon" />}
               </span>
             </div>
           )}
@@ -433,18 +436,18 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
                 )}
                 <AssumptionRow
                   label="Jaarlijkse onttrekking"
-                  value={formatCurrency(Math.round(yearlyWithdrawal))}
+                  value={<MaskedAmount value={Math.round(yearlyWithdrawal)} tone="horizon" />}
                 />
                 {yearlyAowIncome > 0 && (
                   <AssumptionRow
                     label="AOW-inkomen/jaar"
-                    value={formatCurrency(Math.round(yearlyAowIncome))}
+                    value={<MaskedAmount value={Math.round(yearlyAowIncome)} tone="horizon" />}
                   />
                 )}
                 {aggregates.totalPensioen > 0 && durationYears > 0 && (
                   <AssumptionRow
                     label="Pensioen-inkomen/jaar"
-                    value={formatCurrency(Math.round(aggregates.totalPensioen / durationYears))}
+                    value={<MaskedAmount value={Math.round(aggregates.totalPensioen / durationYears)} tone="horizon" />}
                   />
                 )}
                 <AssumptionRow label="Strategie" value={strategyLabel} />
@@ -477,7 +480,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
 
 // ── Assumption row helper ────────────────────────────────────────────────────
 
-function AssumptionRow({ label, value }: { label: string; value: string }) {
+function AssumptionRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between py-0.5">
       <span className="font-sans text-xs text-[var(--ink-3)]">{label}</span>

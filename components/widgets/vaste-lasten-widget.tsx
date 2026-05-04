@@ -1,7 +1,8 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { RefreshCcw, Home, ShoppingCart, Car, Zap, Heart, Smartphone, CreditCard, HelpCircle } from 'lucide-react'
 import type { DashboardData, TopRecurringTransaction } from './widget-renderer'
 
@@ -54,7 +55,7 @@ function ItemRow({ t }: { t: TopRecurringTransaction }) {
         <span className="truncate">{t.name}</span>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <span className="font-mono tabular-nums text-xs">{formatCurrency(t.amount)}</span>
+        <MaskedAmount value={t.amount} tone="kern" className="text-xs" />
         {t.frequency && (
           <span className="text-[10px] text-[var(--ink-4)]">/{t.frequency}</span>
         )}
@@ -85,8 +86,8 @@ export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, h
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Vaste Lasten" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {formatCurrency(totalRecurringAmount)}
+        <p className="text-[var(--ink)] leading-none truncate">
+          <MaskedAmount value={totalRecurringAmount} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -116,8 +117,8 @@ export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, h
       <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(totalRecurringAmount)}
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={totalRecurringAmount} tone="kern" className="text-xl font-semibold" />
             </p>
             <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">per maand</p>
             {freedomStr && (
@@ -135,7 +136,9 @@ export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, h
                       {getCategoryIcon(t.category)}
                       <span className="truncate">{t.name}</span>
                     </div>
-                    <span className="font-mono tabular-nums shrink-0 ml-1">{formatCurrency(t.amount)}</span>
+                    <span className="shrink-0 ml-1">
+                      <MaskedAmount value={t.amount} tone="kern" />
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -158,13 +161,13 @@ export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, h
   return (
     <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
       <div className="flex items-baseline gap-2">
-        <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(totalRecurringAmount)}
+        <p className="text-[var(--ink)]">
+          <MaskedAmount value={totalRecurringAmount} tone="kern" className="text-xl font-semibold" />
         </p>
         <span className="text-sm text-[var(--ink-3)]">per maand</span>
       </div>
       <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-        {formatCurrency(yearlyTotal)} per jaar
+        <MaskedAmount value={yearlyTotal} tone="kern" /> per jaar
         {incomePercent !== null && (
           <span> &middot; {incomePercent}% van inkomen</span>
         )}

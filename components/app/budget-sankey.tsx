@@ -2,7 +2,8 @@
 
 import { useMemo, memo } from 'react'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
-import { formatCurrency } from '@/components/app/budget-shared'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 
 interface BudgetSankeyProps {
@@ -28,8 +29,9 @@ function colorForType(type: string, idx: number): string {
   return expenseColors[idx % expenseColors.length]
 }
 
-function label(spent: number, limit: number): string {
-  return `${formatCurrency(spent)} / ${formatCurrency(limit)}`
+function makeLabel(masked: boolean) {
+  return (spent: number, limit: number): string =>
+    `${formatMaskedCurrency(spent, masked)} / ${formatMaskedCurrency(limit, masked)}`
 }
 
 export const BudgetSankey = memo(function BudgetSankey({
@@ -41,6 +43,8 @@ export const BudgetSankey = memo(function BudgetSankey({
   getParentSpent,
   onNavigate,
 }: BudgetSankeyProps) {
+  const { masked } = useMaskedAmounts()
+  const label = makeLabel(masked)
   const incomeGroups = groups.filter((g) => g.budget_type === 'income')
   const expenseGroups = groups.filter((g) => g.budget_type === 'expense')
   const savingsGroups = groups.filter((g) => g.budget_type === 'savings')
@@ -160,7 +164,7 @@ export const BudgetSankey = memo(function BudgetSankey({
     }
 
     return { nodes, links }
-  }, [incomeGroups, expenseGroups, savingsGroups, debtGroups, getEffectiveLimit, getParentEffectiveLimit, getSpent, getParentSpent])
+  }, [incomeGroups, expenseGroups, savingsGroups, debtGroups, getEffectiveLimit, getParentEffectiveLimit, getSpent, getParentSpent, label])
 
   function handleNodeClick(nodeId: string) {
     const match = nodeId.match(/^(?:sub|grp|inc)-(.+)$/)

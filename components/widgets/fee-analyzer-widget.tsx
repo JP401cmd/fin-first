@@ -6,7 +6,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { TrendingDown, AlertTriangle, ArrowRight } from 'lucide-react'
 import { FeeDetailModal } from './fee-detail-modal'
 
@@ -92,8 +92,8 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
           </div>
           <div className="mt-1">
             <p className="text-xs text-[var(--ink-3)]">Jaarlijkse kosten</p>
-            <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)] mt-0.5">
-              {formatCurrency(totalAnnualFee)}
+            <p className="text-[var(--ink)] mt-0.5">
+              <MaskedAmount value={totalAnnualFee} tone="kern" className="text-sm font-semibold" />
             </p>
           </div>
           {terCoverage < 0.5 && (
@@ -129,8 +129,8 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             {/* Annual cost */}
             <div className="mb-2">
               <p className="text-xs text-[var(--ink-3)]">Jaarlijkse fondskosten</p>
-              <p className="font-mono tabular-nums text-lg font-semibold text-[var(--ink)] mt-0.5">
-                {formatCurrency(totalAnnualFee)}
+              <p className="text-[var(--ink)] mt-0.5">
+                <MaskedAmount value={totalAnnualFee} tone="kern" className="text-lg font-semibold" />
               </p>
             </div>
 
@@ -158,8 +158,8 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
                       }}
                     >
                       <span className="text-[var(--ink-2)] truncate max-w-[55%]">{h.name}</span>
-                      <span className={`font-mono tabular-nums ${SEVERITY_COLORS[holdingSeverity].text}`}>
-                        {(h.ter * 100).toFixed(2).replace('.', ',')}% · {formatCurrency(h.annualFee)}
+                      <span className={SEVERITY_COLORS[holdingSeverity].text}>
+                        <span className="font-mono tabular-nums">{(h.ter * 100).toFixed(2).replace('.', ',')}%</span> · <MaskedAmount value={h.annualFee} tone="kern" />
                       </span>
                     </div>
                   )
@@ -203,8 +203,8 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
           {/* Annual cost */}
           <div className="mb-2">
             <p className="text-xs text-[var(--ink-3)]">Jaarlijkse fondskosten</p>
-            <p className="font-mono tabular-nums text-lg font-semibold text-[var(--ink)] mt-0.5">
-              {formatCurrency(totalAnnualFee)}
+            <p className="text-[var(--ink)] mt-0.5">
+              <MaskedAmount value={totalAnnualFee} tone="kern" className="text-lg font-semibold" />
             </p>
           </div>
 
@@ -232,8 +232,8 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
                     }}
                   >
                     <span className="text-[var(--ink-2)] truncate max-w-[55%]">{h.name}</span>
-                    <span className={`font-mono tabular-nums ${SEVERITY_COLORS[holdingSeverity].text}`}>
-                      {(h.ter * 100).toFixed(2).replace('.', ',')}% · {formatCurrency(h.annualFee)}
+                    <span className={SEVERITY_COLORS[holdingSeverity].text}>
+                      <span className="font-mono tabular-nums">{(h.ter * 100).toFixed(2).replace('.', ',')}%</span> · <MaskedAmount value={h.annualFee} tone="kern" />
                     </span>
                   </div>
                 )

@@ -34,9 +34,13 @@ export function PrivacyToggle() {
       aria-pressed={masked}
       aria-label={actionLabel}
       title={actionLabel}
-      className="flex h-11 w-11 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+      className={`flex h-7 w-7 items-center justify-center transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-[var(--ink)] md:h-11 md:w-11 ${
+        masked
+          ? 'text-[var(--module-active-500)] hover:text-[var(--module-active-600)]'
+          : 'text-[var(--ink-3)] hover:text-[var(--ink)]'
+      }`}
     >
-      <Icon className="h-5 w-5" aria-hidden="true" />
+      <Icon className="h-3 w-3 md:h-5 md:w-5" aria-hidden="true" />
     </button>
   )
 }

@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { BarChart3 } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 
@@ -71,15 +72,15 @@ export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, d
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker="NIBUD Benchmark" href={href}>
-        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(monthlyExpenses)} <span className="text-xs font-normal text-[var(--ink-3)]">per maand</span>
+        <p className="text-[var(--ink)]">
+          <MaskedAmount value={monthlyExpenses} tone="kern" className="text-lg font-semibold" /> <span className="text-xs font-normal text-[var(--ink-3)]">per maand</span>
         </p>
         <ul className="mt-1.5 space-y-0.5">
           {comparison.map((c) => (
             <li key={c.key} className="flex items-center justify-between text-xs text-[var(--ink-2)]">
               <span>{c.label}</span>
               <div className="flex items-center gap-1.5">
-                <span className="font-mono tabular-nums">{formatCurrency(c.actual)}</span>
+                <MaskedAmount value={c.actual} tone="kern" />
                 <span className="text-[var(--ink-4)]">/</span>
                 <span className="font-mono tabular-nums text-[var(--ink-4)]">{formatCurrency(c.norm)}</span>
                 <span className="text-[11px]">{c.overNorm ? '\u26A0\uFE0F' : '\u2705'}</span>
@@ -97,8 +98,8 @@ export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, d
 
   return (
     <WidgetShell module="kern" size={size} kicker="NIBUD Benchmark" href={href}>
-      <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-        {formatCurrency(monthlyExpenses)}
+      <p className="text-[var(--ink)]">
+        <MaskedAmount value={monthlyExpenses} tone="kern" className="text-xl font-semibold" />
       </p>
       <p className="mt-0.5 text-xs text-[var(--ink-3)]">Jouw maanduitgaven</p>
 
@@ -149,8 +150,8 @@ export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, d
                     style={{ width: `${Math.min(userBarW, 100)}%` }}
                   />
                 </div>
-                <span className="w-16 shrink-0 text-right font-mono text-[10px] tabular-nums text-[var(--ink-2)]">
-                  {formatCurrency(c.actual)}
+                <span className="w-16 shrink-0 text-right text-[var(--ink-2)]">
+                  <MaskedAmount value={c.actual} tone="kern" className="text-[10px]" />
                 </span>
               </div>
               {/* NIBUD norm bar (grey) */}

@@ -2,7 +2,8 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { PiggyBank } from 'lucide-react'
 
@@ -135,7 +136,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
           </div>
 
           <p className="mt-2 text-xs text-[var(--ink-3)]">
-            {formatCurrency(Math.max(savings, 0))} gespaard per maand
+            <MaskedAmount value={Math.max(savings, 0)} tone="kern" /> gespaard per maand
           </p>
 
           {hasPrevData && (
@@ -228,7 +229,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
             />
           </div>
           <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">
-            {formatCurrency(Math.max(savings, 0))}/mnd
+            <MaskedAmount value={Math.max(savings, 0)} tone="kern" />/mnd
           </p>
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">

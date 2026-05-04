@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from './analysis-section'
 import { runPhaseStressTests, type StressTestResult } from '@/lib/phase-stress-test'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,7 +145,7 @@ export const StressTestSection = memo(function StressTestSection({
                       className={`px-1 py-2 text-right font-mono tabular-nums ${deltaColor}`}
                     >
                       {r.endPortfolioDelta >= 0 ? '+' : ''}
-                      {formatCurrency(r.endPortfolioDelta)}
+                      {<MaskedAmount value={r.endPortfolioDelta} tone="horizon" />}
                     </td>
                     <td
                       className={`px-1 py-2 text-right font-mono tabular-nums ${rateColor}`}

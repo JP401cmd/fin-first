@@ -6,7 +6,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { Home, TrendingUp, Scale, ArrowRight } from 'lucide-react'
 
 interface Props {
@@ -103,8 +103,8 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
               }}
             >
               <p className="text-xs text-[var(--ink-3)]">Restschuld</p>
-              <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)] mt-0.5">
-                {formatCurrency(restschuld)}
+              <p className="text-[var(--ink)] mt-0.5">
+                <MaskedAmount value={restschuld} tone="kern" className="text-sm font-semibold" />
               </p>
             </div>
             <div
@@ -203,8 +203,8 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
             }}
           >
             <p className="text-xs text-[var(--ink-3)]">Restschuld</p>
-            <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)] mt-0.5">
-              {formatCurrency(restschuld)}
+            <p className="text-[var(--ink)] mt-0.5">
+              <MaskedAmount value={restschuld} tone="kern" className="text-sm font-semibold" />
             </p>
           </div>
           <div
@@ -253,8 +253,8 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
                 <TrendingUp className="h-3 w-3 text-positive" />
                 Beleggen
               </span>
-              <span className="font-mono tabular-nums text-positive font-medium">
-                +{formatCurrency(beleggenWinst)}
+              <span className="text-positive">
+                <MaskedAmount value={beleggenWinst} signPrefix="+" tone="kern" className="font-medium" />
               </span>
             </div>
             <div className="flex items-baseline justify-between text-[11px]">
@@ -262,14 +262,19 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
                 <Home className="h-3 w-3 text-amber-500" />
                 Aflossen
               </span>
-              <span className="font-mono tabular-nums text-[var(--ink-2)] font-medium">
-                +{formatCurrency(aflossenBesparing)}
+              <span className="text-[var(--ink-2)]">
+                <MaskedAmount value={aflossenBesparing} signPrefix="+" tone="kern" className="font-medium" />
               </span>
             </div>
             <div className="border-t border-[var(--border-ed)] pt-1 flex items-baseline justify-between text-[11px]">
               <span className="text-[var(--ink-3)]">Verschil</span>
-              <span className={`font-mono tabular-nums font-semibold ${verschil >= 0 ? 'text-positive' : 'text-[var(--ink-2)]'}`}>
-                {verschil >= 0 ? '+' : ''}{formatCurrency(verschil)}
+              <span className={verschil >= 0 ? 'text-positive' : 'text-[var(--ink-2)]'}>
+                <MaskedAmount
+                  value={verschil}
+                  signPrefix={verschil >= 0 ? '+' : ''}
+                  tone="kern"
+                  className="font-semibold"
+                />
               </span>
             </div>
           </div>

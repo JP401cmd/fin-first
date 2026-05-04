@@ -22,7 +22,14 @@
 
 import { useState } from 'react'
 import { Info } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware currency formatter hook used across this file. */
+function useFcLocal() {
+  const { masked } = useMaskedAmounts()
+  return (v: number) => formatMaskedCurrency(v, masked)
+}
 import type { RentalCalculation } from './calc'
 
 // ── Types ────────────────────────────────────────────────────
@@ -37,6 +44,7 @@ interface Box3ComparisonProps {
 // ── Component ────────────────────────────────────────────────
 
 export function Box3Comparison({ calc }: Box3ComparisonProps) {
+  const fc = useFcLocal()
   // Default actieve methode = forfaitair (huidig stelsel). De gebruiker
   // kan switchen naar werkelijk om die kolom te markeren — beide blijven
   // zichtbaar.
@@ -103,7 +111,7 @@ export function Box3Comparison({ calc }: Box3ComparisonProps) {
             }`}
           >
             {verschil < 0 ? '−' : verschil > 0 ? '+' : ''}
-            {formatCurrency(Math.abs(verschil))}
+            {fc(Math.abs(verschil))}
           </span>{' '}
           {verschil < 0
             ? 'voordeliger'
@@ -206,6 +214,7 @@ function Box3Panel({
   netResult,
   isActive,
 }: Box3PanelProps) {
+  const fc = useFcLocal()
   const [showTooltip, setShowTooltip] = useState(false)
 
   return (
@@ -254,16 +263,16 @@ function Box3Panel({
           herhalen het label-pattern (kicker links, getal rechts) zodat de
           twee panelen visueel uitlijnen. */}
       <dl className="mt-3 space-y-2">
-        <Row label={basis} value={formatCurrency(basisAmount)} muted />
+        <Row label={basis} value={fc(basisAmount)} muted />
         <Row
           label="Box 3-belasting"
-          value={`−${formatCurrency(taxAmount)}`}
+          value={`−${fc(taxAmount)}`}
           muted
         />
         <div className="border-t border-dashed border-[var(--border-ed)] pt-2">
           <Row
             label="Netto cashflow"
-            value={formatCurrency(netResult)}
+            value={fc(netResult)}
             tone={netResult >= 0 ? 'primary' : 'negative'}
             bold
           />

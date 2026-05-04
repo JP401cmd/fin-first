@@ -10,9 +10,10 @@ import {
   DEBT_TYPE_COLORS,
   DEBT_TYPE_LABELS,
 } from '@/lib/debt-data'
-import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
+import { AddCategoryCard } from './add-category-card'
 import { VermogenDebtCard } from './vermogen-debt-card'
 import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
 import { computeDebtKpi } from '@/lib/debt-kpi'
@@ -81,6 +82,13 @@ interface DebtCategoryPageProps {
    * voorbereid voor toekomstige hypotheek/bank-koppelingen.
    */
   initialConnectionsByDebtId?: Record<string, AssetConnectionSummary>
+  /**
+   * Per-debt 6-maands sparkline-waarden voor de breuklijn op elke
+   * `<VermogenDebtCard>`. Server bouwt deze via `loadEntitySparklines()`.
+   * Debts zonder historie ontbreken — overlay valt dan terug op rechte
+   * scheidingslijn op het midden.
+   */
+  initialDebtSparklines?: Record<string, number[]>
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -107,6 +115,7 @@ export function DebtCategoryPage({
   initialDebts,
   initialKpiRefs,
   initialConnectionsByDebtId,
+  initialDebtSparklines,
 }: DebtCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -256,6 +265,7 @@ export function DebtCategoryPage({
               debts={debts}
               kpiByDebtId={kpiByDebtId}
               connectionsByDebtId={initialConnectionsByDebtId}
+              sparklinesByDebtId={initialDebtSparklines}
               onItemClick={openDebtDetail}
               onAddClick={() => setQuickAddOpen(true)}
             />
@@ -276,6 +286,7 @@ export function DebtCategoryPage({
         open={quickAddOpen}
         onClose={() => setQuickAddOpen(false)}
         initialIntent="debt"
+        initialDebtType={type}
         onSaved={() => {
           setQuickAddOpen(false)
           router.refresh()
@@ -350,7 +361,7 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
 
         {/* Hoofdbedrag (restschuld) met halve transparante streep */}
         <p
-          className="mt-2 font-mono text-[28px] font-bold tabular-nums leading-none tracking-tight text-[var(--ink)] sm:text-[36px]"
+          className="mt-2 leading-none tracking-tight text-[var(--ink)]"
           style={{
             fontFamily: 'var(--font-playfair, var(--font-mono, monospace))',
           }}
@@ -362,7 +373,12 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
                 'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
             }}
           >
-            {formatCurrency(total)}
+            <MaskedAmount
+              value={total}
+              tone="kern"
+              monoWhenVisible={false}
+              className="text-[28px] font-bold leading-none tracking-tight sm:text-[36px]"
+            />
           </span>
         </p>
 
@@ -403,6 +419,7 @@ interface DebtItemsTabProps {
   debts: Debt[]
   kpiByDebtId?: Map<string, KpiPair>
   connectionsByDebtId?: Record<string, AssetConnectionSummary>
+  sparklinesByDebtId?: Record<string, number[]>
   onItemClick: (debtId: string) => void
   onAddClick: () => void
 }
@@ -412,6 +429,7 @@ function DebtItemsTab({
   debts,
   kpiByDebtId,
   connectionsByDebtId,
+  sparklinesByDebtId,
   onItemClick,
   onAddClick,
 }: DebtItemsTabProps) {
@@ -420,30 +438,25 @@ function DebtItemsTab({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {debts.map((debt, idx) => (
-          <VermogenDebtCard
-            key={debt.id}
-            debt={debt}
-            kpiPair={kpiByDebtId?.get(debt.id)}
-            connection={connectionsByDebtId?.[debt.id]}
-            onClick={onItemClick}
-            staggerIndex={idx}
-          />
-        ))}
-      </div>
-
-      <div className="pt-2">
-        <button
-          type="button"
-          onClick={onAddClick}
-          className="inline-flex h-11 items-center gap-2 border border-kern-200 bg-kern-50 px-4 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100 hover:text-kern-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {addDebtCta(type)}
-        </button>
-      </div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {debts.map((debt, idx) => (
+        <VermogenDebtCard
+          key={debt.id}
+          debt={debt}
+          kpiPair={kpiByDebtId?.get(debt.id)}
+          connection={connectionsByDebtId?.[debt.id]}
+          sparklineValues={sparklinesByDebtId?.[debt.id]}
+          onClick={onItemClick}
+          staggerIndex={idx}
+        />
+      ))}
+      <AddCategoryCard
+        label={addDebtCta(type)}
+        onClick={onAddClick}
+        variant="debt"
+        shape="item"
+        staggerIndex={debts.length}
+      />
     </div>
   )
 }

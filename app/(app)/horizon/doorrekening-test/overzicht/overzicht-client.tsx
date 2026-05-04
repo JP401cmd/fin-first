@@ -1,9 +1,16 @@
 'use client'
 
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Settings, TrendingUp, ArrowDownRight, ArrowUpRight, ListOrdered, Shuffle, Target, ExternalLink, ChevronRight } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+
+/** Masked-aware EUR formatter hook used across this file's sub-views. */
+function useFc() {
+  const { masked } = useMaskedAmounts()
+  return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
 import type { FireParams } from '@/lib/fire-params'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { NL_SWR, BOX3_TARIEF, NL_FICTIEF_BELEGGINGEN } from '@/lib/horizon-data'
@@ -260,6 +267,7 @@ export function OverzichtClient({
   savingsRate6m: number
   estimatedYearlyIncome: number
 }) {
+  const fc = useFc()
   const dateOfBirth = typeof profile?.date_of_birth === 'string' ? profile.date_of_birth : null
   const currentAge = dateOfBirth
     ? Math.floor((Date.now() - new Date(dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
@@ -674,7 +682,7 @@ export function OverzichtClient({
           />
           <UitgangspuntRow
             label="Netto inkomen"
-            value={`${formatCurrency(monthlyIncome)} /mnd`}
+            value={`${fc(monthlyIncome)} /mnd`}
             href="/identity/profiel"
             sourceLabel="profiel"
           />
@@ -687,7 +695,7 @@ export function OverzichtClient({
           />
           <UitgangspuntRow
             label="Retirement-uitgaven"
-            value={`${formatCurrency(monthlyRetirement)} /mnd`}
+            value={`${fc(monthlyRetirement)} /mnd`}
             suffix={retirementSource}
             href="/identity/instellingen"
             sourceLabel="instellingen"
@@ -1039,7 +1047,7 @@ export function OverzichtClient({
                 Netto vermogen nu
               </p>
               <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-                {formatCurrency(netWorth)}
+                {fc(netWorth)}
               </p>
               <p className="mt-0.5 text-[9px] text-[var(--ink-4)]">
                 bruto · voor Box 3
@@ -1067,7 +1075,7 @@ export function OverzichtClient({
                 Benodigd nu
               </p>
               <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-[var(--ink-2)]">
-                {firstRequired != null ? formatCurrency(firstRequired) : 'n.v.t.'}
+                {firstRequired != null ? fc(firstRequired) : 'n.v.t.'}
               </p>
             </div>
             <div>
@@ -1075,7 +1083,7 @@ export function OverzichtClient({
                 Benodigd op kruispunt
               </p>
               <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-horizon-600">
-                {requiredAtFire != null ? formatCurrency(requiredAtFire) : '—'}
+                {requiredAtFire != null ? fc(requiredAtFire) : '—'}
               </p>
             </div>
             <div>
@@ -1085,10 +1093,10 @@ export function OverzichtClient({
               <p className={`mt-0.5 font-mono text-base font-semibold tabular-nums ${
                 lastHybridRow && lastHybridRow.netWorth >= 0 ? 'text-[var(--ink)]' : 'text-negative'
               }`}>
-                {lastHybridRow ? formatCurrency(lastHybridRow.netWorth) : '—'}
+                {lastHybridRow ? fc(lastHybridRow.netWorth) : '—'}
               </p>
               <p className="mt-0.5 text-[9px] text-[var(--ink-4)]">
-                op {displayEndAge}j · Box 3 −{formatCurrency(cumulativeBox3)}
+                op {displayEndAge}j · Box 3 −{fc(cumulativeBox3)}
               </p>
             </div>
           </div>
@@ -1192,25 +1200,25 @@ export function OverzichtClient({
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Bezittingen nu</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {firstHybridRow ? formatCurrency(firstHybridRow.assets) : '—'}
+                  {firstHybridRow ? fc(firstHybridRow.assets) : '—'}
                 </dd>
               </div>
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Schulden nu</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {firstHybridRow ? formatCurrency(firstHybridRow.debts) : '—'}
+                  {firstHybridRow ? fc(firstHybridRow.debts) : '—'}
                 </dd>
               </div>
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Spaarinleg eerste jaar</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {firstHybridRow ? formatCurrency(firstHybridRow.savingsInflowThisYear) : '—'}
+                  {firstHybridRow ? fc(firstHybridRow.savingsInflowThisYear) : '—'}
                 </dd>
               </div>
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Cumulatief Box 3</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {formatCurrency(cumulativeBox3)}
+                  {fc(cumulativeBox3)}
                 </dd>
               </div>
             </dl>
@@ -1238,19 +1246,19 @@ export function OverzichtClient({
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Jaarlijkse uitgaven</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {formatCurrency(yearlyRetirementExpenses)}
+                  {fc(yearlyRetirementExpenses)}
                 </dd>
               </div>
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Benodigd nu</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {firstRequired != null ? formatCurrency(firstRequired) : 'n.v.t.'}
+                  {firstRequired != null ? fc(firstRequired) : 'n.v.t.'}
                 </dd>
               </div>
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Benodigd op kruispunt</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {requiredAtFire != null ? formatCurrency(requiredAtFire) : '—'}
+                  {requiredAtFire != null ? fc(requiredAtFire) : '—'}
                 </dd>
               </div>
               <div>
@@ -1290,13 +1298,13 @@ export function OverzichtClient({
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Totaal inkomsten</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {formatCurrency(aggregatedEventInflow)}
+                  {fc(aggregatedEventInflow)}
                 </dd>
               </div>
               <div>
                 <dt className="text-[10px] uppercase tracking-wider text-[var(--ink-4)]">Totaal uitgaven</dt>
                 <dd className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">
-                  {formatCurrency(aggregatedEventOutflow)}
+                  {fc(aggregatedEventOutflow)}
                 </dd>
               </div>
             </dl>
@@ -1337,10 +1345,10 @@ export function OverzichtClient({
                   Δ Eindvermogen
                 </dt>
                 <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                  {endPortfolioDelta >= 0 ? '+' : ''}{formatCurrency(endPortfolioDelta)}
+                  {endPortfolioDelta >= 0 ? '+' : ''}{fc(endPortfolioDelta)}
                 </dd>
                 <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-                  agg {formatCurrency(aggEnd)} · sim {formatCurrency(simEnd)}
+                  agg {fc(aggEnd)} · sim {fc(simEnd)}
                 </p>
               </div>
               <div>
@@ -1349,11 +1357,11 @@ export function OverzichtClient({
                 </dt>
                 <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
                   {benodigdNuDelta != null
-                    ? `${benodigdNuDelta >= 0 ? '+' : ''}${formatCurrency(benodigdNuDelta)}`
+                    ? `${benodigdNuDelta >= 0 ? '+' : ''}${fc(benodigdNuDelta)}`
                     : '—'}
                 </dd>
                 <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-                  agg {benodigdNuAgg != null ? formatCurrency(benodigdNuAgg) : '—'} · sim {benodigdNuSim != null ? formatCurrency(benodigdNuSim) : '—'}
+                  agg {benodigdNuAgg != null ? fc(benodigdNuAgg) : '—'} · sim {benodigdNuSim != null ? fc(benodigdNuSim) : '—'}
                 </p>
               </div>
             </dl>
@@ -1388,10 +1396,10 @@ export function OverzichtClient({
                             {row.age}
                           </td>
                           <td className="px-2 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                            {formatCurrency(row.agg)}
+                            {fc(row.agg)}
                           </td>
                           <td className="px-2 py-1 text-right font-mono tabular-nums text-[var(--ink)]">
-                            {row.simEnd != null ? formatCurrency(row.simEnd) : '—'}
+                            {row.simEnd != null ? fc(row.simEnd) : '—'}
                           </td>
                           <td
                             className={`px-2 py-1 text-right font-mono tabular-nums ${
@@ -1399,7 +1407,7 @@ export function OverzichtClient({
                             }`}
                           >
                             {row.delta != null
-                              ? `${row.delta >= 0 ? '+' : ''}${formatCurrency(row.delta)}`
+                              ? `${row.delta >= 0 ? '+' : ''}${fc(row.delta)}`
                               : '—'}
                           </td>
                           <td
@@ -1422,7 +1430,7 @@ export function OverzichtClient({
             {/* Footer: aggregaat-divergentie-maten */}
             <p className="mt-3 text-[10px] text-[var(--ink-4)]">
               <span className="font-semibold text-[var(--ink-3)]">Max |Δ|:</span>{' '}
-              <span className="font-mono tabular-nums">{formatCurrency(diffStats.maxAbsDelta)}</span>
+              <span className="font-mono tabular-nums">{fc(diffStats.maxAbsDelta)}</span>
               <span className="mx-2">·</span>
               <span className="font-semibold text-[var(--ink-3)]">Gem. |Δ%|:</span>{' '}
               <span className="font-mono tabular-nums">{diffStats.avgAbsDeltaPct.toFixed(2)}%</span>

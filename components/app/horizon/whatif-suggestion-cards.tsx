@@ -2,9 +2,10 @@
 
 import { Calendar } from 'lucide-react'
 import { Plus, X, Sparkles } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+
 import { LIFE_EVENT_CATALOG } from '@/lib/horizon-data'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // SuggestedEvent mirrors the shape returned by the /api/whatif/suggest route (Task 6).
 // Defined here to keep the component self-contained until the API route is created.
@@ -79,15 +80,15 @@ export function WhatIfSuggestionCards({
               </p>
               <div className="mt-1 flex flex-wrap gap-2 font-mono tabular-nums text-xs text-[var(--ink-3)]">
                 {hasOnetime && (
-                  <span>-{formatCurrency(suggestion.one_time_cost)}</span>
+                  <span>-{<MaskedAmount value={suggestion.one_time_cost} tone="horizon" />}</span>
                 )}
                 {suggestion.monthly_cost_change > 0 && (
-                  <span>-{formatCurrency(suggestion.monthly_cost_change)}/mnd</span>
+                  <span>-{<MaskedAmount value={suggestion.monthly_cost_change} tone="horizon" />}/mnd</span>
                 )}
                 {suggestion.monthly_income_change !== 0 && (
                   <span className={suggestion.monthly_income_change > 0 ? 'text-positive' : ''}>
                     {suggestion.monthly_income_change > 0 ? '+' : '-'}
-                    {formatCurrency(Math.abs(suggestion.monthly_income_change))}/mnd
+                    {<MaskedAmount value={Math.abs(suggestion.monthly_income_change)} tone="horizon" />}/mnd
                   </span>
                 )}
                 {suggestion.duration_months > 0 && (

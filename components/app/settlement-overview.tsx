@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/components/app/budget-shared'
+
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   getOpenSettlements,
   settleEntry,
@@ -11,6 +13,7 @@ import {
   type SettlementEntry,
 } from '@/lib/settlement-data'
 import { CheckCircle2, Users, ArrowRight, Loader2 } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface HouseholdMember {
   userId: string
@@ -24,6 +27,7 @@ interface SettlementOverviewProps {
 }
 
 export function SettlementOverview({ householdId, currentUserId, members }: SettlementOverviewProps) {
+  const { masked } = useMaskedAmounts()
   const [entries, setEntries] = useState<SettlementEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [settling, setSettling] = useState<string | null>(null)
@@ -99,17 +103,17 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
           <span className={`ml-auto font-mono text-base font-bold ${
             netAmount > 0 ? 'text-emerald-700' : netAmount < 0 ? 'text-red-700' : 'text-[var(--ink)]'
           }`}>
-            {netAmount >= 0 ? '+' : ''}{formatCurrency(netAmount)}
+            {netAmount >= 0 ? '+' : ''}{<MaskedAmount value={netAmount} tone="wil" />}
           </span>
         </div>
         {netAmount > 0 && owedBy.length > 0 && (
           <p className="mt-1 text-xs text-emerald-600">
-            {owedBy.map(o => `${getMemberName(o.userId)} (${formatCurrency(o.amount)})`).join(', ')} {owedBy.length === 1 ? 'is je' : 'zijn je'} nog iets verschuldigd
+            {owedBy.map(o => `${getMemberName(o.userId)} (${formatMaskedCurrency(o.amount, masked)})`).join(', ')} {owedBy.length === 1 ? 'is je' : 'zijn je'} nog iets verschuldigd
           </p>
         )}
         {netAmount < 0 && owedTo.length > 0 && (
           <p className="mt-1 text-xs text-red-600">
-            Je bent nog {owedTo.map(o => `${formatCurrency(o.amount)} aan ${getMemberName(o.userId)}`).join(' en ')} verschuldigd
+            Je bent nog {owedTo.map(o => `${formatMaskedCurrency(o.amount, masked)} aan ${getMemberName(o.userId)}`).join(' en ')} verschuldigd
           </p>
         )}
       </div>
@@ -142,9 +146,9 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
                       <p className="text-sm font-medium text-[var(--ink)]">{getMemberName(otherId)}</p>
                       <p className={`text-xs ${netWithOther > 0 ? 'text-emerald-600' : netWithOther < 0 ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
                         {netWithOther > 0
-                          ? `Je krijgt ${formatCurrency(netWithOther)}`
+                          ? `Je krijgt ${formatMaskedCurrency(netWithOther, masked)}`
                           : netWithOther < 0
-                          ? `Je betaalt ${formatCurrency(Math.abs(netWithOther))}`
+                          ? `Je betaalt ${formatMaskedCurrency(Math.abs(netWithOther), masked)}`
                           : 'Gelijk'}
                       </p>
                     </div>
@@ -178,7 +182,7 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
                           </p>
                         </div>
                         <span className={`shrink-0 font-mono text-xs tabular-nums font-medium ${iOwe ? 'text-red-600' : 'text-emerald-600'}`}>
-                          {iOwe ? '-' : '+'}{formatCurrency(Number(entry.amount))}
+                          {iOwe ? '-' : '+'}{<MaskedAmount value={Number(entry.amount)} tone="wil" />}
                         </span>
                         <button
                           type="button"

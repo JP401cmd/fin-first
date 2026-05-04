@@ -22,7 +22,8 @@
 
 import { useMemo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { RentalCalculation } from './calc'
 
 // ── Types ────────────────────────────────────────────────────
@@ -46,6 +47,8 @@ interface CashflowChartProps {
 // ── Component ────────────────────────────────────────────────
 
 export function CashflowChart({ calc, vacancyLog }: CashflowChartProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Bouw 12 maanden op vanaf 11 maanden geleden tot deze maand.
   const series = useMemo(() => buildSeries(calc, vacancyLog), [calc, vacancyLog])
 
@@ -125,7 +128,7 @@ export function CashflowChart({ calc, vacancyLog }: CashflowChartProps) {
                   className="fill-[var(--ink-4)]"
                   style={{ fontSize: '9px', fontFamily: 'var(--font-mono)' }}
                 >
-                  {tick === 0 ? '0' : formatCurrency(tick).replace(/\s/g, '')}
+                  {tick === 0 ? '0' : fc(tick).replace(/\s/g, '')}
                 </text>
                 {/* Subtiele baseline op y=0 */}
                 {tick === 0 && (
@@ -190,7 +193,7 @@ export function CashflowChart({ calc, vacancyLog }: CashflowChartProps) {
                 }}
               >
                 <title>
-                  {s.label} — inkomsten {formatCurrency(s.income)}
+                  {s.label} — inkomsten {fc(s.income)}
                 </title>
               </circle>
             )

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { formatCurrency } from '@/components/app/budget-shared'
+
 import { useToast } from '@/components/app/toast-provider'
 import { quickAdd } from '@/app/actions/quick-add'
 import {
@@ -39,6 +39,7 @@ import { StepChoice } from './steps/step-choice'
 import { StepType } from './steps/step-type'
 import { StepDetails } from './steps/step-details'
 import { StepLinkDebt } from './steps/step-link-debt'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 /**
  * QuickAddWizard — 4-staps flow in een BottomSheet.
@@ -63,6 +64,15 @@ export interface QuickAddWizardProps {
   open: boolean
   onClose: () => void
   initialIntent?: QuickAddIntent
+  /**
+   * Optionele type-prefill — wordt alleen toegepast als hij past bij
+   * `initialIntent`. Skipt stap 2 (type-keuze) zodat de wizard direct het
+   * details-formulier toont. Gebruikt op categorie-pagina's, waar de
+   * gebruiker al gekozen heeft welke categorie hij toevoegt (bv. hypotheek
+   * op `/core/debts/mortgage`).
+   */
+  initialAssetType?: AssetType
+  initialDebtType?: DebtType
   onSaved?: (result: { assetId?: string; debtId?: string }) => void
 }
 
@@ -91,6 +101,8 @@ export function QuickAddWizard({
   open,
   onClose,
   initialIntent,
+  initialAssetType,
+  initialDebtType,
   onSaved,
 }: QuickAddWizardProps) {
   const [state, dispatch] = useReducer(wizardReducer, initialWizardState)
@@ -99,11 +111,23 @@ export function QuickAddWizard({
   const { addToast } = useToast()
   const router = useRouter()
 
+  // Type-prefill is alleen actief wanneer hij past bij intent — dezelfde
+  // soft-fail-regel als in de reducer. We berekenen 'm hier opnieuw zodat
+  // step-counters en back-knop-zichtbaarheid synchroon lopen met de state.
+  const hasTypePrefill =
+    (initialIntent === 'asset' && Boolean(initialAssetType)) ||
+    (initialIntent === 'debt' && Boolean(initialDebtType))
+
   // Open/reset — sync met de `open`-prop uit de parent. Bij heropening
-  // starten we schoon (OPEN action met optionele initialIntent).
+  // starten we schoon (OPEN action met optionele intent + type-prefill).
   useEffect(() => {
     if (open) {
-      dispatch({ type: 'OPEN', initialIntent })
+      dispatch({
+        type: 'OPEN',
+        initialIntent,
+        initialAssetType,
+        initialDebtType,
+      })
       setLinkDebtCtx(null)
       setIsSaving(false)
     } else {
@@ -111,9 +135,11 @@ export function QuickAddWizard({
       setLinkDebtCtx(null)
       setIsSaving(false)
     }
-  }, [open, initialIntent])
+  }, [open, initialIntent, initialAssetType, initialDebtType])
 
-  const totalSteps = initialIntent ? 3 : 4
+  // Stappen-totaal: choice + type + details + linkDebt = 4. Skip choice
+  // bij `initialIntent` (-1), skip ook type bij type-prefill (-1).
+  const totalSteps = hasTypePrefill ? 2 : initialIntent ? 3 : 4
 
   // ── Submit: asset-only of debt-only ────────────────────────────
 
@@ -382,6 +408,7 @@ export function QuickAddWizard({
           linkDebtCtx={linkDebtCtx}
           totalSteps={totalSteps}
           initialIntent={initialIntent}
+          hasTypePrefill={hasTypePrefill}
           isSaving={isSaving}
           onBack={handleBack}
           onSelectIntent={selectIntent}
@@ -417,6 +444,12 @@ interface WizardContentProps {
   linkDebtCtx: LinkDebtContext
   totalSteps: number
   initialIntent?: QuickAddIntent
+  /**
+   * `true` wanneer zowel intent als bijbehorend type vooraf zijn ingesteld.
+   * Verlaagt details-stap-nummering naar 1 en verbergt de back-knop op
+   * details — er is geen vorige stap om naar terug te keren.
+   */
+  hasTypePrefill: boolean
   isSaving: boolean
   onBack: () => void
   onSelectIntent: (intent: QuickAddIntent) => void
@@ -439,6 +472,7 @@ function WizardContent(props: WizardContentProps) {
     linkDebtCtx,
     totalSteps,
     initialIntent,
+    hasTypePrefill,
     isSaving,
     onBack,
     onSelectIntent,
@@ -455,6 +489,9 @@ function WizardContent(props: WizardContentProps) {
     onClose,
   } = props
 
+  // Stap "linkDebt" — details + 1. Verschuift mee met type-prefill.
+  const linkDebtStepNumber = hasTypePrefill ? 2 : initialIntent ? 3 : 4
+
   // Stap 4b — koppel-schuld form. Heeft voorrang boven reducer-state.
   if (linkDebtCtx?.phase === 'form') {
     const iconName = DEBT_TYPE_ICONS[linkDebtCtx.debtDraft.debt_type]
@@ -462,7 +499,7 @@ function WizardContent(props: WizardContentProps) {
     return (
       <>
         <StepHeader
-          step={initialIntent ? 3 : 4}
+          step={linkDebtStepNumber}
           total={totalSteps}
           title={DEBT_QUICK_ADD_LABELS[linkDebtCtx.debtDraft.debt_type]}
           kicker={`Voor ${linkDebtCtx.asset.name}`}
@@ -487,7 +524,7 @@ function WizardContent(props: WizardContentProps) {
     return (
       <>
         <StepHeader
-          step={initialIntent ? 3 : 4}
+          step={linkDebtStepNumber}
           total={totalSteps}
           title="Gekoppelde schuld"
           kicker="Extra"
@@ -535,7 +572,11 @@ function WizardContent(props: WizardContentProps) {
     }
 
     case 'details': {
-      const stepNumber = initialIntent ? 2 : 3
+      const stepNumber = hasTypePrefill ? 1 : initialIntent ? 2 : 3
+      // Type is voorgekookt → details is de eerste stap; geen back-knop
+      // (anders zou de gebruiker terug naar een type-stap die hij niet
+      // hoort te zien). Anders volgt de normale terug-flow.
+      const detailsBack = hasTypePrefill ? undefined : onBack
       if (state.intent === 'asset') {
         const iconName = ASSET_TYPE_ICONS[state.assetDraft.asset_type]
         const color = ASSET_TYPE_COLORS[state.assetDraft.asset_type]
@@ -547,7 +588,7 @@ function WizardContent(props: WizardContentProps) {
               total={totalSteps}
               title={label}
               kicker="Gegevens"
-              onBack={onBack}
+              onBack={detailsBack}
               icon={<TypeIcon name={iconName} className="h-4 w-4" strokeWidth={1.75} />}
               iconColor={color}
             />
@@ -571,7 +612,7 @@ function WizardContent(props: WizardContentProps) {
             total={totalSteps}
             title={label}
             kicker="Gegevens"
-            onBack={onBack}
+            onBack={detailsBack}
             icon={<TypeIcon name={iconName} className="h-4 w-4" strokeWidth={1.75} />}
             iconColor={color}
           />
@@ -700,7 +741,7 @@ function SuccessView({
         {kind === 'asset_with_debt' && typeof netAmount === 'number' && (
           <p className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
             Netto:{' '}
-            <span className="text-[var(--ink)]">{formatCurrency(netAmount)}</span>
+            <span className="text-[var(--ink)]">{<MaskedAmount value={netAmount} tone="kern" />}</span>
           </p>
         )}
       </div>

@@ -4,12 +4,13 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { Circle } from 'lucide-react'
 import { iconMap } from '@/components/app/budget-shared'
-import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { HighlightMark } from '@/components/editorial'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { CategoryCardAppStrip } from './category-card-app-strip'
 import { CardKpiStrip } from './card-kpi-strip'
 import type { KpiPair } from '@/lib/asset-kpi'
+import { CardTintOverlay } from './card-tint-overlay'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -72,6 +73,13 @@ export interface CategoryCardProps {
     totalCount: number
     tabHref: string
   }
+  /**
+   * Maandwaarden over de afgelopen 6 maanden (oudste → nieuwste). Wordt
+   * gerenderd als achtergrond-sparkline ("breuklijn") in de paper-kleur
+   * boven op de getinte bezittingen-/schulden-achtergrond. Lege of te korte
+   * series tonen alleen de getinte achtergrond zonder lijn.
+   */
+  sparklineValues?: number[]
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -123,10 +131,15 @@ export function CategoryCard({
   staggerIndex = 0,
   variant = 'asset',
   appStrip,
+  sparklineValues,
 }: CategoryCardProps) {
   const Icon = resolveIcon(iconName)
   const segmentBars = useMemo(() => buildSegmentWidths(segments), [segments])
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
+
+  // Tinted achtergrond + breuklijn worden afgehandeld door
+  // `<CardTintOverlay>`. Beide bezitting/schuld-cards en de categoriekaart
+  // delen dezelfde overlay-implementatie, geen lokale duplicatie nodig.
 
   // Module-active accent voor assets (= Kern-500 op /core), negative voor debts.
   // De variant bepaalt ook of de kicker-streep en het bedrag de module-tint
@@ -143,12 +156,18 @@ export function CategoryCard({
   return (
     <div
       ref={ref as unknown as React.RefObject<HTMLDivElement>}
-      className="card-editorial group flex flex-col animate-fade-up"
+      className="card-editorial group relative flex flex-col animate-fade-up"
       style={{ '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties}
     >
+      <CardTintOverlay
+        variant={variant}
+        sparklineValues={sparklineValues}
+        hasEntered={hasEntered}
+      />
+
       <Link
         href={href}
-        className="flex flex-1 flex-col text-left no-underline aspect-square sm:aspect-[5/4]"
+        className="relative z-10 flex flex-1 flex-col text-left no-underline aspect-square sm:aspect-[5/4]"
       >
         {/* Accent-streep — module-active voor assets, rood voor schulden. */}
         <div
@@ -185,8 +204,14 @@ export function CategoryCard({
           {/* Hoofdbedrag — DM Mono, tabular-nums, met halve transparante streep.
               `<HighlightMark>` gebruikt --module-active-200 als achtergrond, dus
               op /core wordt het Kern-200 (lichtbruin); cross-module fallback = Horizon-200. */}
-          <p className="font-mono text-[18px] font-bold tabular-nums leading-none text-[var(--ink)] sm:text-[22px]">
-            <HighlightMark>{formatCurrency(total)}</HighlightMark>
+          <p className="leading-none text-[var(--ink)]">
+            <HighlightMark>
+              <MaskedAmount
+                value={total}
+                tone="kern"
+                className="text-[18px] font-bold leading-none sm:text-[22px]"
+              />
+            </HighlightMark>
           </p>
 
           {/* Samengestelde KPI-strip — direct onder het totaalbedrag,
@@ -234,20 +259,22 @@ export function CategoryCard({
       </Link>
 
       {appStrip ? (
-        <CategoryCardAppStrip
-          appLabel={appStrip.appLabel}
-          moduleActive={appStrip.moduleActive}
-          trackedCount={appStrip.trackedCount}
-          totalCount={appStrip.totalCount}
-          tabHref={appStrip.tabHref}
-        />
+        <div className="relative z-10">
+          <CategoryCardAppStrip
+            appLabel={appStrip.appLabel}
+            moduleActive={appStrip.moduleActive}
+            trackedCount={appStrip.trackedCount}
+            totalCount={appStrip.totalCount}
+            tabHref={appStrip.tabHref}
+          />
+        </div>
       ) : (
         // Alignment-placeholder: kaarten zonder app krijgen dezelfde
         // border-top + footer-hoogte als <CategoryCardAppStrip> zodat
         // het grid op één y-as afsluit.
         <div
           aria-hidden="true"
-          className="border-t border-[var(--border-ed)] px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] leading-[1.4]"
+          className="relative z-10 border-t border-[var(--border-ed)] px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] leading-[1.4]"
         >
           &nbsp;
         </div>

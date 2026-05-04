@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { LIFE_EVENT_CATALOG, type LifeEvent, type CatalogField } from '@/lib/horizon-data'
 import type { SimResult } from '@/lib/fire-simulation'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -11,6 +12,7 @@ import {
   Calendar, Plus, ChevronDown, ChevronUp, Eye, EyeOff, Info, Clock,
   ArrowLeft, Check, Pencil,
 } from 'lucide-react'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +66,7 @@ export function WhatIfEventsPanel({
   /** Whether user has a household (enables household-only events) */
   isHousehold?: boolean
 }) {
+  const { masked } = useMaskedAmounts()
   const [expanded, setExpanded] = useState(true)
   const [showCatalog, setShowCatalog] = useState(false)
   const [selectedImpact, setSelectedImpact] = useState<EventImpact | null>(null)
@@ -259,8 +262,8 @@ export function WhatIfEventsPanel({
                         </p>
                         <p className="font-sans text-[10px] text-[var(--ink-4)]">
                           {ev.target_age ? `leeftijd ${ev.target_age}` : '—'}
-                          {Number(ev.one_time_cost) !== 0 && ` · ${formatCurrency(Number(ev.one_time_cost))}`}
-                          {Number(ev.monthly_cost_change) !== 0 && ` · ${formatCurrency(Number(ev.monthly_cost_change))}/mnd`}
+                          {Number(ev.one_time_cost) !== 0 && ` · ${formatMaskedCurrency(Number(ev.one_time_cost), masked)}`}
+                          {Number(ev.monthly_cost_change) !== 0 && ` · ${formatMaskedCurrency(Number(ev.monthly_cost_change), masked)}/mnd`}
                         </p>
                       </button>
 
@@ -355,7 +358,7 @@ export function WhatIfEventsPanel({
                     )}
                     {cat.defaultCost !== 0 && (
                       <span className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-                        {formatCurrency(cat.defaultCost)}
+                        {<MaskedAmount value={cat.defaultCost} tone="horizon" />}
                       </span>
                     )}
                   </div>
@@ -616,7 +619,7 @@ function EventFormSheet({
             <div className="flex justify-between">
               <span className="font-sans text-[11px] text-[var(--ink-2)]">Eenmalige kosten</span>
               <span className="font-mono text-[11px] tabular-nums text-[var(--ink)]">
-                {formatCurrency(form.oneTimeCost)}
+                {<MaskedAmount value={form.oneTimeCost} tone="horizon" />}
               </span>
             </div>
           )}
@@ -624,7 +627,7 @@ function EventFormSheet({
             <div className="flex justify-between">
               <span className="font-sans text-[11px] text-[var(--ink-2)]">Maandelijkse impact</span>
               <span className="font-mono text-[11px] tabular-nums text-[var(--ink)]">
-                {formatCurrency(form.monthlyCostChange)}/mnd
+                {<MaskedAmount value={form.monthlyCostChange} tone="horizon" />}/mnd
               </span>
             </div>
           )}
@@ -632,7 +635,7 @@ function EventFormSheet({
             <div className="flex justify-between">
               <span className="font-sans text-[11px] text-[var(--ink-2)]">Inkomenswijziging</span>
               <span className="font-mono text-[11px] tabular-nums text-[var(--ink)]">
-                {formatCurrency(form.monthlyIncomeChange)}/mnd
+                {<MaskedAmount value={form.monthlyIncomeChange} tone="horizon" />}/mnd
               </span>
             </div>
           )}
@@ -645,7 +648,7 @@ function EventFormSheet({
         <div className="flex justify-between">
           <span className="font-sans text-xs font-semibold text-[var(--ink)]">Totale impact</span>
           <span className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(totalImpact)}
+            {<MaskedAmount value={totalImpact} tone="horizon" />}
           </span>
         </div>
 
@@ -836,19 +839,19 @@ function EventImpactKassabon({ impact }: { impact: EventImpact }) {
         {Number(event.one_time_cost) !== 0 && (
           <div className="flex justify-between py-0.5">
             <span className="font-sans text-sm text-[var(--ink-2)]">Eenmalige kosten</span>
-            <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Number(event.one_time_cost))}</span>
+            <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Number(event.one_time_cost)} tone="horizon" />}</span>
           </div>
         )}
         {Number(event.monthly_cost_change) !== 0 && (
           <div className="flex justify-between py-0.5">
             <span className="font-sans text-sm text-[var(--ink-2)]">Maandelijkse kosten</span>
-            <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Number(event.monthly_cost_change))}/mnd</span>
+            <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Number(event.monthly_cost_change)} tone="horizon" />}/mnd</span>
           </div>
         )}
         {Number(event.monthly_income_change) !== 0 && (
           <div className="flex justify-between py-0.5">
             <span className="font-sans text-sm text-[var(--ink-2)]">Inkomenswijziging</span>
-            <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Number(event.monthly_income_change))}/mnd</span>
+            <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Number(event.monthly_income_change)} tone="horizon" />}/mnd</span>
           </div>
         )}
         {Number(event.duration_months) > 0 && (
@@ -863,7 +866,7 @@ function EventImpactKassabon({ impact }: { impact: EventImpact }) {
       {totalCost !== 0 && (
         <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
           <span className="text-[var(--ink)]">Totale kosten</span>
-          <span className="tabular-nums text-[var(--ink)]">{formatCurrency(totalCost)}</span>
+          <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={totalCost} tone="horizon" />}</span>
         </div>
       )}
 

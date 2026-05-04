@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Pencil } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import {
   DEBT_TYPE_LABELS,
   DEBT_SUBTYPE_LABELS,
@@ -28,6 +30,7 @@ interface DebtDetailSheetProps {
  */
 export function DebtDetailSheet({ debt, onClose }: DebtDetailSheetProps) {
   const router = useRouter()
+  const { masked } = useMaskedAmounts()
   return (
     <BottomSheet
       open={debt !== null}
@@ -41,8 +44,8 @@ export function DebtDetailSheet({ debt, onClose }: DebtDetailSheetProps) {
             <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Huidig saldo
             </p>
-            <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-negative">
-              {formatCurrency(Number(debt.current_balance))}
+            <p className="mt-1 text-negative">
+              <MaskedAmount value={Number(debt.current_balance)} tone="kern" className="text-3xl font-bold" />
             </p>
           </div>
 
@@ -79,13 +82,13 @@ export function DebtDetailSheet({ debt, onClose }: DebtDetailSheetProps) {
             {debt.monthly_payment != null && Number(debt.monthly_payment) > 0 && (
               <Meta
                 label="Maandlasten"
-                value={formatCurrency(Number(debt.monthly_payment))}
+                value={formatMaskedCurrency(Number(debt.monthly_payment), masked)}
               />
             )}
             {debt.original_amount != null && Number(debt.original_amount) > 0 && (
               <Meta
                 label="Oorspronkelijk"
-                value={formatCurrency(Number(debt.original_amount))}
+                value={formatMaskedCurrency(Number(debt.original_amount), masked)}
               />
             )}
             {debt.repayment_type && (

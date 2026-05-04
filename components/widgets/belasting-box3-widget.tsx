@@ -1,7 +1,7 @@
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { Receipt } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/constants'
@@ -34,8 +34,8 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Box 3 Belasting" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {formatCurrency(estimatedTax)}
+        <p className="text-[var(--ink)] leading-none truncate">
+          <MaskedAmount value={estimatedTax} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -47,8 +47,8 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
       <WidgetShell module="kern" size={size} kicker="Box 3 Belasting" href={href}>
         <div className="flex items-center gap-2">
           <Receipt className="h-3 w-3 text-kern-500 shrink-0" />
-          <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-            {formatCurrency(estimatedTax)}
+          <p className="text-[var(--ink)]">
+            <MaskedAmount value={estimatedTax} tone="kern" className="text-lg font-semibold" />
           </p>
         </div>
         <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
@@ -66,8 +66,8 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex items-center gap-2">
               <Receipt className="h-4 w-4 text-kern-500 shrink-0" />
-              <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-                {formatCurrency(estimatedTax)}
+              <p className="text-[var(--ink)]">
+                <MaskedAmount value={estimatedTax} tone="kern" className="text-xl font-semibold" />
               </p>
             </div>
             <p className="mt-1 text-[11px] text-[var(--ink-3)]">
@@ -92,23 +92,23 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
   }
 
   // ── Full-size: kassabon-stijl breakdown ───────────────────
-  const breakdownRows: { label: string; value: string; accent?: boolean; bold?: boolean; separator?: boolean }[] = [
-    { label: 'Totaal vermogen', value: formatCurrency(totalAssets) },
-    { label: 'Vrijstelling', value: `-${formatCurrency(VRIJSTELLING)}` },
+  const breakdownRows: { label: string; value: ReactNode; accent?: boolean; bold?: boolean; separator?: boolean }[] = [
+    { label: 'Totaal vermogen', value: <MaskedAmount value={totalAssets} tone="kern" /> },
+    { label: 'Vrijstelling', value: <MaskedAmount value={VRIJSTELLING} signPrefix="-" tone="kern" /> },
     { label: '', value: '', separator: true },
-    { label: 'Belastbaar vermogen', value: formatCurrency(belastbaarVermogen), bold: true },
-    { label: `Fictief rendement (${(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}%)`, value: formatCurrency(fictiefRendement) },
+    { label: 'Belastbaar vermogen', value: <MaskedAmount value={belastbaarVermogen} tone="kern" />, bold: true },
+    { label: `Fictief rendement (${(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}%)`, value: <MaskedAmount value={fictiefRendement} tone="kern" /> },
     { label: `Tarief (${(BOX3_TARIEF * 100).toFixed(0)}%)`, value: `× ${(BOX3_TARIEF * 100).toFixed(0)}%` },
     { label: '', value: '', separator: true },
-    { label: 'Netto belasting', value: formatCurrency(estimatedTax), bold: true, accent: true },
+    { label: 'Netto belasting', value: <MaskedAmount value={estimatedTax} tone="kern" />, bold: true, accent: true },
   ]
 
   return (
     <WidgetShell module="kern" size={size} kicker="Box 3 Belasting" href={href}>
       <div className="flex items-center gap-2">
         <Receipt className="h-4 w-4 text-kern-500 shrink-0" />
-        <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(estimatedTax)}
+        <p className="text-[var(--ink)]">
+          <MaskedAmount value={estimatedTax} tone="kern" className="text-2xl font-semibold" />
         </p>
       </div>
 

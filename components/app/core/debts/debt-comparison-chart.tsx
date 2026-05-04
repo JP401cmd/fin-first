@@ -2,8 +2,9 @@
 
 import { memo } from 'react'
 import { simulatePayoff, payoffSummary } from '@/lib/debt-data'
-import { formatCurrency } from '@/components/app/budget-shared'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 export const DebtPayoffTrajectoryChart = memo(function DebtPayoffTrajectoryChart({
@@ -260,6 +261,7 @@ export const StrategyComparisonMessage = memo(function StrategyComparisonMessage
   avalancheSummary: ReturnType<typeof payoffSummary>
   dailyExpenses: number
 }) {
+  const { masked } = useMaskedAmounts()
   if (snowballSummary.totalMonths === 0 && avalancheSummary.totalMonths === 0) return null
 
   const snowMonths = snowballSummary.totalMonths
@@ -285,19 +287,19 @@ export const StrategyComparisonMessage = memo(function StrategyComparisonMessage
     bgClass = 'border-[var(--border-ed)] bg-[var(--subtle)]'
     textClass = 'text-[var(--ink-2)]'
   } else if (avalancheFaster && avalancheCheaper) {
-    message = `Bij avalanche-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij en bespaar je ${formatCurrency(interestDiff)} aan rente.`
+    message = `Bij avalanche-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij en bespaar je ${formatMaskedCurrency(interestDiff, masked)} aan rente.`
     bgClass = 'border-red-200 bg-red-50'
     textClass = 'text-red-700'
   } else if (!avalancheFaster && !avalancheCheaper && !sameTime) {
-    message = `Bij sneeuwbal-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij en bespaar je ${formatCurrency(interestDiff)} aan rente.`
+    message = `Bij sneeuwbal-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij en bespaar je ${formatMaskedCurrency(interestDiff, masked)} aan rente.`
     bgClass = 'border-blue-200 bg-blue-50'
     textClass = 'text-blue-700'
   } else if (avalancheCheaper) {
-    message = `Bij avalanche-strategie bespaar je ${formatCurrency(interestDiff)} aan rente${!sameTime ? ` (${avalancheFaster ? `${monthDiff} maanden sneller` : `${monthDiff} maanden langer`})` : ''}.`
+    message = `Bij avalanche-strategie bespaar je ${formatMaskedCurrency(interestDiff, masked)} aan rente${!sameTime ? ` (${avalancheFaster ? `${monthDiff} maanden sneller` : `${monthDiff} maanden langer`})` : ''}.`
     bgClass = 'border-red-200 bg-red-50'
     textClass = 'text-red-700'
   } else {
-    message = `Bij sneeuwbal-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij${!sameInterest ? `, maar betaal je ${formatCurrency(interestDiff)} meer rente` : ''}.`
+    message = `Bij sneeuwbal-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij${!sameInterest ? `, maar betaal je ${formatMaskedCurrency(interestDiff, masked)} meer rente` : ''}.`
     bgClass = 'border-blue-200 bg-blue-50'
     textClass = 'text-blue-700'
   }

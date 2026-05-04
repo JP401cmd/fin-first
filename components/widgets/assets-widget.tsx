@@ -2,8 +2,9 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import type { DashboardData } from './widget-renderer'
 import { Landmark } from 'lucide-react'
@@ -53,8 +54,8 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
-        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(totalAssets)}
+        <p className="text-[var(--ink)]">
+          <MaskedAmount value={totalAssets} tone="kern" className="text-lg font-semibold" />
         </p>
         {ftStr && (
           <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
@@ -71,7 +72,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
                   width: `${(a.value / totalAssets) * 100}%`,
                   backgroundColor: getAssetColor(a.type),
                 }}
-                title={`${getAssetLabel(a.type)}: ${formatCurrency(a.value)}`}
+                title={`${getAssetLabel(a.type)}: ${formatMaskedCurrency(a.value, masked)}`}
               />
             ))}
           </div>
@@ -93,8 +94,8 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
       <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(totalAssets)}
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={totalAssets} tone="kern" className="text-xl font-semibold" />
             </p>
             {ftStr && (
               <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
@@ -105,8 +106,8 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
               Totaal actief vermogen
             </p>
             {monthlyContributions > 0 && (
-              <p className="font-mono text-xs text-positive tabular-nums">
-                +{formatCurrency(monthlyContributions)}/mnd
+              <p className="text-positive">
+                <MaskedAmount value={monthlyContributions} signPrefix="+" tone="kern" className="text-xs" />/mnd
               </p>
             )}
           </div>
@@ -121,7 +122,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
                       width: `${(a.value / totalAssets) * 100}%`,
                       backgroundColor: getAssetColor(a.type),
                     }}
-                    title={`${getAssetLabel(a.type)}: ${formatCurrency(a.value)}`}
+                    title={`${getAssetLabel(a.type)}: ${formatMaskedCurrency(a.value, masked)}`}
                   />
                 ))}
               </div>
@@ -148,8 +149,8 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
   return (
     <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
       {/* Primary value */}
-      <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-        {formatCurrency(totalAssets)}
+      <p className="text-[var(--ink)]">
+        <MaskedAmount value={totalAssets} tone="kern" className="text-2xl font-semibold" />
       </p>
       {ftStr && (
         <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
@@ -167,7 +168,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
                 width: `${(a.value / totalAssets) * 100}%`,
                 backgroundColor: getAssetColor(a.type),
               }}
-              title={`${getAssetLabel(a.type)}: ${formatCurrency(a.value)}`}
+              title={`${getAssetLabel(a.type)}: ${formatMaskedCurrency(a.value, masked)}`}
             />
           ))}
         </div>
@@ -177,8 +178,8 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
         Totaal actief vermogen
       </p>
       {monthlyContributions > 0 && (
-        <p className="font-mono text-sm text-positive tabular-nums">
-          +{formatCurrency(monthlyContributions)} / maand
+        <p className="text-positive">
+          <MaskedAmount value={monthlyContributions} signPrefix="+" tone="kern" className="text-sm" /> / maand
         </p>
       )}
 
@@ -198,11 +199,13 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
             {unrealizedGain != null && (
               <div className="mb-1 flex items-baseline justify-between text-[11px]">
                 <span className="text-[var(--ink-3)]">Ongerealiseerde winst</span>
-                <span
-                  className={`font-mono font-semibold tabular-nums ${unrealizedGain >= 0 ? 'text-positive' : 'text-negative'}`}
-                >
-                  {unrealizedGain >= 0 ? '+' : ''}
-                  {formatCurrency(unrealizedGain)}
+                <span className={unrealizedGain >= 0 ? 'text-positive' : 'text-negative'}>
+                  <MaskedAmount
+                    value={unrealizedGain}
+                    signPrefix={unrealizedGain >= 0 ? '+' : ''}
+                    tone="kern"
+                    className="font-semibold"
+                  />
                   {unrealizedPct != null && (
                     <span className="ml-1 font-normal text-[var(--ink-3)]">
                       ({unrealizedPct >= 0 ? '+' : ''}{unrealizedPct.toFixed(1)}%)
@@ -229,8 +232,8 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-mono tabular-nums text-[var(--ink)]">
-                        {formatCurrency(a.value)}
+                      <span className="text-[var(--ink)]">
+                        <MaskedAmount value={a.value} tone="kern" />
                       </span>
                       <span className="w-8 text-right text-[var(--ink-4)]">
                         {Math.round(pct)}%

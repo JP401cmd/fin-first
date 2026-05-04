@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { BOX3_PARAMS, BOX3_TOOLTIPS, type Box3Result, type TaxYear, type PartnerAllocation } from '@/lib/box3-data'
 import { BOX2_TOOLTIPS, DGA_LENING_DREMPEL, type Box2Result } from '@/lib/box2-data'
 import {
@@ -98,6 +99,12 @@ export default function BelastingPage() {
   const [showDetails, setShowDetails] = useState(false)
   const [showBox2Details, setShowBox2Details] = useState(false)
   const [showPartnerModal, setShowPartnerModal] = useState(false)
+  const { masked } = useMaskedAmounts()
+  // Bind formatCurrency-shape callback to the masked-aware formatter so the
+  // mass-replace below stays mechanical: every visible site is masked-aware,
+  // string-shaped sites (props, KpiCard, tooltips) get the placeholder when
+  // masked === true.
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
 
   const loadData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
@@ -288,7 +295,7 @@ export default function BelastingPage() {
                    'Jouw belasting'}
                 </p>
                 <span className="font-display text-[36px] sm:text-[44px] font-bold tracking-tight text-[var(--ink)] font-mono tabular-nums">
-                  {formatCurrency(activeResult.tax)}
+                  {fc(activeResult.tax)}
                 </span>
               </div>
               <div className="flex items-center gap-2 pb-1 sm:pb-2">
@@ -333,19 +340,19 @@ export default function BelastingPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-b border-[var(--ink)] mb-6">
             <KpiCard
               label="Box 3 vermogen"
-              value={formatCurrency(activeResult.totaalSpaargeld + activeResult.totaalBeleggingen)}
+              value={fc(activeResult.totaalSpaargeld + activeResult.totaalBeleggingen)}
               icon={<Wallet className="h-3 w-3" />}
               tooltip={BOX3_TOOLTIPS.box3}
             />
             <KpiCard
               label="Spaargeld"
-              value={formatCurrency(activeResult.totaalSpaargeld)}
+              value={fc(activeResult.totaalSpaargeld)}
               sub={`Forfait: ${formatPct(activeResult.params.forfaitSpaargeld)}`}
               icon={<PiggyBank className="h-3 w-3" />}
             />
             <KpiCard
               label="Beleggingen"
-              value={formatCurrency(activeResult.totaalBeleggingen)}
+              value={fc(activeResult.totaalBeleggingen)}
               sub={`Forfait: ${formatPct(activeResult.params.forfaitBeleggingen)}`}
               icon={<BarChart3 className="h-3 w-3" />}
             />
@@ -420,7 +427,7 @@ export default function BelastingPage() {
                   <div className="flex items-center gap-2 pt-1">
                     <Clock className="h-3.5 w-3.5 text-kern-500" />
                     <span className="text-xs text-[var(--ink-2)]">
-                      = {activeResult.freedomDays} vrijheidsdagen (bij {formatCurrency(activeResult.dailyExpenses)}/dag)
+                      = {activeResult.freedomDays} vrijheidsdagen (bij {fc(activeResult.dailyExpenses)}/dag)
                     </span>
                   </div>
                 </div>
@@ -523,11 +530,11 @@ export default function BelastingPage() {
                           <p className="text-xs text-[var(--ink-2)] leading-relaxed">
                             Als fiscaal partners mogen jullie Box 3 vermogen onderling verdelen. Elke partner heeft een eigen heffingsvrij vermogen van{' '}
                             <span className="font-mono font-semibold tabular-nums">
-                              {formatCurrency(activeResult?.params.heffingsvrijSingle ?? 0)}
+                              {fc(activeResult?.params.heffingsvrijSingle ?? 0)}
                             </span>{' '}
                             (samen{' '}
                             <span className="font-mono font-semibold tabular-nums">
-                              {formatCurrency(activeResult?.params.heffingsvrijPartner ?? 0)}
+                              {fc(activeResult?.params.heffingsvrijPartner ?? 0)}
                             </span>
                             ). Door slim te verdelen betaal je minder belasting.
                           </p>
@@ -545,7 +552,7 @@ export default function BelastingPage() {
                             <p className="text-xs text-kern-600 mt-1">
                               Door vermogen optimaal te verdelen bespaar je{' '}
                               <span className="font-mono font-semibold tabular-nums">
-                                {formatCurrency(data.optimalAllocation.savingsVsEqual)}
+                                {fc(data.optimalAllocation.savingsVsEqual)}
                               </span>{' '}
                               aan Box 3 belasting
                               {data.dailyExpenses > 0 && (
@@ -563,21 +570,21 @@ export default function BelastingPage() {
                           <div className="rounded-[var(--r)] bg-white/60 p-2.5">
                             <p className="text-[10px] font-semibold text-[var(--ink-3)] uppercase mb-1">Huidige (50/50)</p>
                             <p className="font-mono tabular-nums font-bold text-[var(--ink)]">
-                              {formatCurrency(data.optimalAllocation.totalTax + data.optimalAllocation.savingsVsEqual)}
+                              {fc(data.optimalAllocation.totalTax + data.optimalAllocation.savingsVsEqual)}
                             </p>
                             <div className="mt-1.5 space-y-0.5 text-[var(--ink-3)]">
-                              <p>{partner1Name}: {formatCurrency(data.combined?.totaalSpaargeld ? data.combined.totaalSpaargeld / 2 : 0)} spaar / {formatCurrency(data.combined?.totaalBeleggingen ? data.combined.totaalBeleggingen / 2 : 0)} beleg.</p>
-                              <p>{partner2Name}: {formatCurrency(data.combined?.totaalSpaargeld ? data.combined.totaalSpaargeld / 2 : 0)} spaar / {formatCurrency(data.combined?.totaalBeleggingen ? data.combined.totaalBeleggingen / 2 : 0)} beleg.</p>
+                              <p>{partner1Name}: {fc(data.combined?.totaalSpaargeld ? data.combined.totaalSpaargeld / 2 : 0)} spaar / {fc(data.combined?.totaalBeleggingen ? data.combined.totaalBeleggingen / 2 : 0)} beleg.</p>
+                              <p>{partner2Name}: {fc(data.combined?.totaalSpaargeld ? data.combined.totaalSpaargeld / 2 : 0)} spaar / {fc(data.combined?.totaalBeleggingen ? data.combined.totaalBeleggingen / 2 : 0)} beleg.</p>
                             </div>
                           </div>
                           <div className="rounded-[var(--r)] bg-emerald-50 border border-emerald-200 p-2.5">
                             <p className="text-[10px] font-semibold text-emerald-700 uppercase mb-1">Optimaal</p>
                             <p className="font-mono tabular-nums font-bold text-emerald-700">
-                              {formatCurrency(data.optimalAllocation.totalTax)}
+                              {fc(data.optimalAllocation.totalTax)}
                             </p>
                             <div className="mt-1.5 space-y-0.5 text-emerald-600">
-                              <p>{partner1Name}: {formatCurrency(data.optimalAllocation.partner1Spaargeld)} spaar / {formatCurrency(data.optimalAllocation.partner1Beleggingen)} beleg.</p>
-                              <p>{partner2Name}: {formatCurrency(data.optimalAllocation.partner2Spaargeld)} spaar / {formatCurrency(data.optimalAllocation.partner2Beleggingen)} beleg.</p>
+                              <p>{partner1Name}: {fc(data.optimalAllocation.partner1Spaargeld)} spaar / {fc(data.optimalAllocation.partner1Beleggingen)} beleg.</p>
+                              <p>{partner2Name}: {fc(data.optimalAllocation.partner2Spaargeld)} spaar / {fc(data.optimalAllocation.partner2Beleggingen)} beleg.</p>
                             </div>
                           </div>
                         </div>
@@ -596,13 +603,13 @@ export default function BelastingPage() {
                         <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
                           <p className="text-[10px] font-semibold text-[var(--ink-3)] uppercase mb-1">Heffingsvrij {partner1Name}</p>
                           <p className="font-mono tabular-nums text-sm font-bold text-[var(--ink)]">
-                            {formatCurrency(activeResult.params.heffingsvrijSingle)}
+                            {fc(activeResult.params.heffingsvrijSingle)}
                           </p>
                         </div>
                         <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
                           <p className="text-[10px] font-semibold text-[var(--ink-3)] uppercase mb-1">Heffingsvrij {partner2Name}</p>
                           <p className="font-mono tabular-nums text-sm font-bold text-[var(--ink)]">
-                            {formatCurrency(activeResult.params.heffingsvrijSingle)}
+                            {fc(activeResult.params.heffingsvrijSingle)}
                           </p>
                         </div>
                       </div>
@@ -684,7 +691,7 @@ export default function BelastingPage() {
                           {ac.category ?? (ac.exclusionReason ? `Uitgesloten (${ac.exclusionReason.includes('Box 2') ? 'Box 2' : 'Box 1'})` : 'Uitgesloten')}
                         </span>
                         <span className="font-mono tabular-nums text-[var(--ink)]">
-                          {formatCurrency(Number(ac.asset.current_value))}
+                          {fc(Number(ac.asset.current_value))}
                         </span>
                       </div>
                     </div>
@@ -717,7 +724,7 @@ export default function BelastingPage() {
                             {dc.inBox3 ? 'Box 3' : 'Uitgesloten'}
                           </span>
                           <span className="font-mono tabular-nums text-[var(--ink)]">
-                            {formatCurrency(Number(dc.debt.current_balance))}
+                            {fc(Number(dc.debt.current_balance))}
                           </span>
                         </div>
                       </div>
@@ -759,6 +766,8 @@ function Box2Section({
   setShowBox2Details: (v: boolean) => void
   year: TaxYear
 }) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   // Select active Box 2 result based on view mode
   const getActiveBox2 = (): Box2Result | null => {
     if (!box2Data) return null
@@ -804,11 +813,11 @@ function Box2Section({
                 {viewMode === 'combined' ? 'Gecombineerde belasting' : 'Jouw belasting'}
               </p>
               <span className="font-display text-[36px] sm:text-[44px] font-bold tracking-tight text-[var(--ink)] font-mono tabular-nums">
-                {formatCurrency(result.totalTaxInclDga)}
+                {fc(result.totalTaxInclDga)}
               </span>
               {result.dgaExcessTax > 0 && (
                 <p className="text-xs text-red-500 mt-1">
-                  incl. {formatCurrency(result.dgaExcessTax)} wet excessief lenen
+                  incl. {fc(result.dgaExcessTax)} wet excessief lenen
                 </p>
               )}
             </div>
@@ -827,19 +836,19 @@ function Box2Section({
       <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-b border-[var(--ink)] mb-6">
         <KpiCard
           label="Box 2 inkomen"
-          value={formatCurrency(result.totalIncome)}
+          value={fc(result.totalIncome)}
           icon={<Wallet className="h-3 w-3" />}
           tooltip={BOX2_TOOLTIPS.aanmerkelijkBelang}
         />
         <KpiCard
           label="Totaal dividend"
-          value={formatCurrency(result.totalDividend)}
+          value={fc(result.totalDividend)}
           icon={<PiggyBank className="h-3 w-3" />}
           tooltip={BOX2_TOOLTIPS.dividend}
         />
         <KpiCard
           label="Vervreemdingswinst"
-          value={formatCurrency(result.totalDisposalGain)}
+          value={fc(result.totalDisposalGain)}
           icon={<BarChart3 className="h-3 w-3" />}
           tooltip={BOX2_TOOLTIPS.vervreemdingswinst}
         />
@@ -901,7 +910,7 @@ function Box2Section({
               <div className="flex items-center gap-2 pt-1">
                 <Clock className="h-3.5 w-3.5 text-teal-500" />
                 <span className="text-xs text-[var(--ink-2)]">
-                  = {result.freedomDays} vrijheidsdagen (bij {formatCurrency(result.dailyExpenses)}/dag)
+                  = {result.freedomDays} vrijheidsdagen (bij {fc(result.dailyExpenses)}/dag)
                 </span>
               </div>
             </div>
@@ -934,22 +943,22 @@ function Box2Section({
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[var(--ink-2)]">Totaal DGA-leningen</span>
-                    <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{formatCurrency(result.dgaLeningenTotal)}</span>
+                    <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{fc(result.dgaLeningenTotal)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[var(--ink-3)]">Drempel</span>
-                    <span className="font-mono tabular-nums text-[var(--ink-3)]">{formatCurrency(DGA_LENING_DREMPEL)}</span>
+                    <span className="font-mono tabular-nums text-[var(--ink-3)]">{fc(DGA_LENING_DREMPEL)}</span>
                   </div>
                   {result.dgaLeningenExcess > 0 && (
                     <>
                       <div className="h-px bg-[var(--border-ed)]" />
                       <div className="flex items-center justify-between">
                         <span className="text-[var(--ink-2)] font-medium">Bovenmatig deel (fictief voordeel)</span>
-                        <span className="font-mono tabular-nums font-medium text-red-600">{formatCurrency(result.dgaLeningenExcess)}</span>
+                        <span className="font-mono tabular-nums font-medium text-red-600">{fc(result.dgaLeningenExcess)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[var(--ink-2)]">Extra Box 2 belasting</span>
-                        <span className="font-mono tabular-nums font-bold text-red-600">{formatCurrency(result.dgaExcessTax)}</span>
+                        <span className="font-mono tabular-nums font-bold text-red-600">{fc(result.dgaExcessTax)}</span>
                       </div>
                       {result.dailyExpenses > 0 && result.dgaExcessTax > 0 && (
                         <div className="flex items-center gap-2 pt-1">
@@ -988,16 +997,16 @@ function Box2Section({
                   <div className="flex items-center gap-3 shrink-0">
                     {pd.dividend > 0 && (
                       <span className="text-[10px] text-[var(--ink-3)]">
-                        div. {formatCurrency(pd.dividend)}
+                        div. {fc(pd.dividend)}
                       </span>
                     )}
                     {pd.disposalGain !== 0 && (
                       <span className="text-[10px] text-[var(--ink-3)]">
-                        verv. {formatCurrency(pd.disposalGain)}
+                        verv. {fc(pd.disposalGain)}
                       </span>
                     )}
                     <span className="font-mono tabular-nums text-[var(--ink)] font-medium">
-                      {formatCurrency(pd.totalIncome)}
+                      {fc(pd.totalIncome)}
                     </span>
                     {result.totalIncome > 0 && (
                       <span className="text-[10px] text-[var(--ink-3)] w-10 text-right">
@@ -1028,7 +1037,7 @@ function Box2Section({
                           </span>
                         )}
                         <span className="font-mono tabular-nums text-[var(--ink)]">
-                          {formatCurrency(d.currentValue!)}
+                          {fc(d.currentValue!)}
                         </span>
                       </div>
                     </div>
@@ -1056,6 +1065,8 @@ function CombinedTaxSummary({
   box2Result: Box2Result | null
   dailyExpenses: number
 }) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   const box2Tax = box2Result?.totalTaxInclDga ?? box2Result?.totalTax ?? 0
   const box2FreedomDays = box2Result?.freedomDays ?? 0
   const hasBox2 = box2Tax > 0
@@ -1087,7 +1098,7 @@ function CombinedTaxSummary({
           <div>
             <p className="text-[10px] font-semibold text-[var(--ink-3)] uppercase tracking-wider mb-1">Totale belastingdruk</p>
             <span className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[var(--ink)] font-mono tabular-nums">
-              {formatCurrency(totalTax)}
+              {fc(totalTax)}
             </span>
           </div>
           <div className="flex items-center gap-2 pb-0.5 sm:pb-1">
@@ -1142,7 +1153,7 @@ function CombinedTaxSummary({
               {hasBox2 ? (
                 <>
                   <span className="font-mono tabular-nums text-[var(--ink)] font-medium">
-                    {formatCurrency(box2Tax)}
+                    {fc(box2Tax)}
                   </span>
                   <span className="text-[10px] text-[var(--ink-3)]">{box2FreedomDays} dgn</span>
                 </>
@@ -1163,7 +1174,7 @@ function CombinedTaxSummary({
             </div>
             <div className="flex items-center gap-3">
               <span className="font-mono tabular-nums text-[var(--ink)] font-medium">
-                {formatCurrency(box3Tax)}
+                {fc(box3Tax)}
               </span>
               <span className="text-[10px] text-[var(--ink-3)]">{box3FreedomDays} dgn</span>
             </div>
@@ -1261,6 +1272,8 @@ function CalcRow({
   highlight?: boolean
   tooltip?: string
 }) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   return (
     <div className={`flex items-center justify-between text-xs ${muted ? 'opacity-60' : ''}`}>
       <span className={`text-[var(--ink-2)] ${bold ? 'font-semibold text-[var(--ink)]' : ''}`}>
@@ -1276,7 +1289,7 @@ function CalcRow({
             'text-[var(--ink)]'
           }`}
         >
-          {negative ? '− ' : ''}{formatCurrency(Math.abs(value))}
+          {negative ? '− ' : ''}{fc(Math.abs(value))}
         </span>
       )}
       {pct !== undefined && (
@@ -1301,6 +1314,8 @@ function ComparisonCard({
   icon: React.ReactNode
   highlight?: boolean
 }) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   return (
     <button
       onClick={onClick}
@@ -1317,7 +1332,7 @@ function ComparisonCard({
         <span className="text-xs font-semibold text-[var(--ink)]">{name}</span>
       </div>
       <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-        {formatCurrency(result.tax)}
+        {fc(result.tax)}
       </p>
       <div className="flex items-center gap-1.5 mt-1.5">
         <Clock className="h-3 w-3 text-kern-500" />
@@ -1326,11 +1341,11 @@ function ComparisonCard({
       <div className="mt-2 text-[10px] text-[var(--ink-3)] space-y-0.5">
         <div className="flex justify-between">
           <span>Spaargeld</span>
-          <span className="font-mono tabular-nums">{formatCurrency(result.totaalSpaargeld)}</span>
+          <span className="font-mono tabular-nums">{fc(result.totaalSpaargeld)}</span>
         </div>
         <div className="flex justify-between">
           <span>Beleggingen</span>
-          <span className="font-mono tabular-nums">{formatCurrency(result.totaalBeleggingen)}</span>
+          <span className="font-mono tabular-nums">{fc(result.totaalBeleggingen)}</span>
         </div>
       </div>
     </button>

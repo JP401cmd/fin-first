@@ -5,6 +5,7 @@ import { TrendingUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -240,7 +241,7 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
               {effectiveSavingsRate.toFixed(1)}%
             </span>
             <span className="text-[var(--ink-4)]">
-              ({formatCurrency(Math.round(annualSavings / 12))}/mnd)
+              ({<MaskedAmount value={Math.round(annualSavings / 12)} tone="horizon" />}/mnd)
             </span>
           </div>
         )}
@@ -306,7 +307,7 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
                       )}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                      {formatCurrency(s.monthlySavings)}
+                      {<MaskedAmount value={s.monthlySavings} tone="horizon" />}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
                       {s.fireAge != null ? `${s.fireAge} jr` : '90+'}
@@ -315,7 +316,7 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
                       {verschilText}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                      {formatCurrency(Math.round(s.eindVermogen))}
+                      {<MaskedAmount value={Math.round(s.eindVermogen)} tone="horizon" />}
                     </td>
                   </tr>
                 )

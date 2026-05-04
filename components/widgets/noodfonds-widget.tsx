@@ -1,7 +1,8 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { ShieldCheck, Lightbulb } from 'lucide-react'
 
@@ -87,9 +88,9 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
         </div>
 
         {/* Amount */}
-        <div className="mt-1.5 flex justify-between text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
-          <span>{formatCurrency(currentAmount)}</span>
-          <span>{formatCurrency(targetAmount)}</span>
+        <div className="mt-1.5 flex justify-between text-[11px] text-[var(--ink-3)]">
+          <MaskedAmount value={currentAmount} tone="kern" />
+          <MaskedAmount value={targetAmount} tone="kern" />
         </div>
 
         {/* Freedom time or complete state */}
@@ -162,20 +163,20 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
       </div>
 
       {/* Amounts */}
-      <div className="mt-1 flex justify-between text-xs text-[var(--ink-3)] font-mono tabular-nums">
-        <span>{formatCurrency(currentAmount)}</span>
-        <span>Doel: {formatCurrency(targetAmount)}</span>
+      <div className="mt-1 flex justify-between text-xs text-[var(--ink-3)]">
+        <MaskedAmount value={currentAmount} tone="kern" />
+        <span>Doel: <MaskedAmount value={targetAmount} tone="kern" /></span>
       </div>
 
       {/* Calculation explanation */}
       <div className="mt-3 rounded-lg bg-[var(--subtle)] px-3 py-2 text-[11px] text-[var(--ink-3)]">
         <p className="font-medium text-[var(--ink-2)]">Berekening</p>
         <p className="mt-0.5">
-          {targetMonths}&times; {formatCurrency(monthlyExpenses)} maanduitgaven = {formatCurrency(targetAmount)} doel
+          {targetMonths}&times; <MaskedAmount value={monthlyExpenses} tone="kern" /> maanduitgaven = <MaskedAmount value={targetAmount} tone="kern" /> doel
         </p>
         {!isComplete && remaining > 0 && (
           <p className="mt-0.5">
-            Nog {formatCurrency(remaining)} te gaan
+            Nog <MaskedAmount value={remaining} tone="kern" /> te gaan
           </p>
         )}
       </div>

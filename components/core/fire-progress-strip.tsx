@@ -1,7 +1,7 @@
 'use client'
 
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { ModuleTipStrip } from './module-tip-strip'
 
 interface FireProgressStripProps {
@@ -102,7 +102,7 @@ export function FireProgressStrip({
         <span className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
           <span className="font-semibold text-[var(--ink-2)]">{pctRounded}%</span>
           <span className="mx-1.5 text-[var(--ink-4)]">·</span>
-          <span>{formatCurrency(targetAmount)}</span>
+          <MaskedAmount value={targetAmount} tone="kern" />
         </span>
       </div>
       <FireProgressBar pct={pct} />

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   NL_AOW_AGE,
   NL_AOW_MONTHLY,
@@ -172,6 +173,8 @@ function CashflowCard({
   onEdit: () => void
   onRemove: () => void
 }) {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   const sign = cf.direction === 'income' ? '+' : '-'
   const color = cf.direction === 'income' ? 'text-green-700' : 'text-orange-600'
 
@@ -181,7 +184,7 @@ function CashflowCard({
         <div className="flex items-baseline gap-2">
           <span className="font-sans text-[12px] font-medium text-[var(--ink)] truncate">{cf.name}</span>
           <span className={`font-mono text-[12px] font-semibold tabular-nums shrink-0 ${color}`}>
-            {sign}{formatCurrency(cf.amount)}
+            {sign}{fc(cf.amount)}
             {cf.type === 'recurring' ? '/mnd' : ' eenmalig'}
           </span>
         </div>
@@ -533,6 +536,8 @@ function CashflowSection({
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function FireSimPage() {
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   const [currentAge, setCurrentAge] = useState(35)
   const [endAge, setEndAge] = useState(90)
   const [currentPortfolio, setCurrentPortfolio] = useState(100_000)
@@ -679,7 +684,7 @@ export default function FireSimPage() {
             />
             <KpiCard
               label="Benodigd bij FIRE"
-              value={formatCurrency(result.requiredFirePortfolio)}
+              value={fc(result.requiredFirePortfolio)}
               sub={`doel: €0 op leeftijd ${safeEndAge}`}
               highlight="neutral"
               onClick={() => setShowKassabon(true)}
@@ -694,10 +699,10 @@ export default function FireSimPage() {
             />
             <KpiCard
               label="Klassiek 25× model"
-              value={formatCurrency(result.classic25xTarget)}
+              value={fc(result.classic25xTarget)}
               sub={classicDiff < 0
-                ? `${formatCurrency(Math.abs(classicDiff))} minder nodig`
-                : `${formatCurrency(classicDiff)} meer nodig`}
+                ? `${fc(Math.abs(classicDiff))} minder nodig`
+                : `${fc(classicDiff)} meer nodig`}
               highlight={classicDiff < 0 ? 'green' : 'neutral'}
             />
           </div>
@@ -712,7 +717,7 @@ export default function FireSimPage() {
               <>
                 <span className="font-semibold">FIRE haalbaar op leeftijd {result.fireAgeFractional.toFixed(1)}.</span>{' '}
                 {result.fireAgeFractional - currentAge > 0
-                  ? `Na ${(result.fireAgeFractional - currentAge).toFixed(1)} jaar sparen bereik je ${formatCurrency(result.firePortfolioAtFire)} — `
+                  ? `Na ${(result.fireAgeFractional - currentAge).toFixed(1)} jaar sparen bereik je ${fc(result.firePortfolioAtFire)} — `
                   : 'Je huidige vermogen is al groot genoeg — '}
                 genoeg om tot leeftijd {safeEndAge} te leven.
                 {cashflows.length > 0 && ` Inclusief ${cashflows.length} kasstroom${cashflows.length !== 1 ? 'en' : ''}.`}
@@ -720,8 +725,8 @@ export default function FireSimPage() {
             ) : (
               <>
                 <span className="font-semibold">FIRE niet haalbaar voor leeftijd {safeEndAge}.</span>{' '}
-                Je bouwt {formatCurrency(result.firePortfolioAtFire)} op, maar hebt{' '}
-                {formatCurrency(result.requiredFirePortfolio)} nodig op leeftijd {safeEndAge - 1}.{' '}
+                Je bouwt {fc(result.firePortfolioAtFire)} op, maar hebt{' '}
+                {fc(result.requiredFirePortfolio)} nodig op leeftijd {safeEndAge - 1}.{' '}
                 Verhoog je inleg, verlaag je uitgaven of vergroot je eindleeftijd.
               </>
             )}
@@ -759,7 +764,7 @@ export default function FireSimPage() {
                 onChange={setYearlyExpenses} step={1_000} />
               <NumberInput label="Maandelijkse inleg" value={monthlySavings}
                 onChange={setMonthlySavings} step={100}
-                suffix={`= ${formatCurrency(annualSavings)}/jr`} />
+                suffix={`= ${fc(annualSavings)}/jr`} />
             </div>
           </div>
 
@@ -840,7 +845,7 @@ export default function FireSimPage() {
           {result.fireAgeFractional !== null && (
             <p className="mb-3 font-sans text-[11px] text-[var(--ink-3)]">
               FIRE op leeftijd <strong>{result.fireAgeFractional.toFixed(1)}</strong> — portfolio van{' '}
-              <strong>{formatCurrency(result.firePortfolioAtFire)}</strong> daalt naar{' '}
+              <strong>{fc(result.firePortfolioAtFire)}</strong> daalt naar{' '}
               <strong>€0</strong> op leeftijd {safeEndAge}.
             </p>
           )}
@@ -867,7 +872,7 @@ export default function FireSimPage() {
                     elements.push(
                       <tr key={`fire-sep-${row.age}`} className="bg-kern-50/40">
                         <td colSpan={7} className="py-1.5 pl-2 font-sans text-[10px] text-[var(--kern-t,#58362d)]">
-                          ↓ FIRE op leeftijd {result.fireAgeFractional?.toFixed(1)} — {formatCurrency(result.firePortfolioAtFire)}
+                          ↓ FIRE op leeftijd {result.fireAgeFractional?.toFixed(1)} — {fc(result.firePortfolioAtFire)}
                         </td>
                       </tr>
                     )
@@ -885,27 +890,27 @@ export default function FireSimPage() {
                           {row.phase === 'accumulation' ? 'Opbouw' : 'Pensioen'}
                         </span>
                       </td>
-                      <td className="py-1 text-right tabular-nums text-[var(--ink-3)]">{formatCurrency(row.startPortfolio)}</td>
-                      <td className="py-1 text-right tabular-nums text-green-700">+{formatCurrency(row.growth)}</td>
+                      <td className="py-1 text-right tabular-nums text-[var(--ink-3)]">{fc(row.startPortfolio)}</td>
+                      <td className="py-1 text-right tabular-nums text-green-700">+{fc(row.growth)}</td>
                       <td className="py-1 text-right tabular-nums">
                         {row.phase === 'accumulation'
-                          ? <span className="text-green-700">+{formatCurrency(row.savings)}</span>
+                          ? <span className="text-green-700">+{fc(row.savings)}</span>
                           : row.withdrawal > 0
-                          ? <span className="text-orange-600">-{formatCurrency(row.withdrawal)}</span>
+                          ? <span className="text-orange-600">-{fc(row.withdrawal)}</span>
                           : <span className="text-[var(--ink-4)]">—</span>}
                       </td>
                       <td className="py-1 text-right tabular-nums">
                         {row.cashflowNet > 0
-                          ? <span className="text-green-700">+{formatCurrency(row.cashflowNet)}</span>
+                          ? <span className="text-green-700">+{fc(row.cashflowNet)}</span>
                           : row.cashflowNet < 0
-                          ? <span className="text-orange-600">{formatCurrency(row.cashflowNet)}</span>
+                          ? <span className="text-orange-600">{fc(row.cashflowNet)}</span>
                           : <span className="text-[var(--ink-4)]">—</span>}
                       </td>
                       <td className={`py-1 text-right tabular-nums font-medium ${
                         row.phase !== 'accumulation' && row.endPortfolio <= 1000 && row.age >= safeEndAge - 2
                           ? 'text-orange-600' : 'text-[var(--ink)]'
                       }`}>
-                        {formatCurrency(row.endPortfolio)}
+                        {fc(row.endPortfolio)}
                       </td>
                     </tr>
                   )
@@ -951,7 +956,7 @@ export default function FireSimPage() {
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Jaarlijkse uitgaven</span>
-                <span className="tabular-nums text-[var(--ink)]">{formatCurrency(yearlyExpenses)}</span>
+                <span className="tabular-nums text-[var(--ink)]">{fc(yearlyExpenses)}</span>
               </div>
               {result.fireAgeFractional !== null && (
                 <div className="flex justify-between py-0.5">
@@ -978,17 +983,17 @@ export default function FireSimPage() {
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Klassiek 25× model</span>
-                <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(result.classic25xTarget)}</span>
+                <span className="tabular-nums text-[var(--ink-3)]">{fc(result.classic25xTarget)}</span>
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Eindleeftijdmodel</span>
-                <span className="tabular-nums font-semibold text-[var(--ink)]">{formatCurrency(result.requiredFirePortfolio)}</span>
+                <span className="tabular-nums font-semibold text-[var(--ink)]">{fc(result.requiredFirePortfolio)}</span>
               </div>
             </div>
 
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
               <span className="text-[var(--ink)]">Benodigd bij FIRE</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.requiredFirePortfolio)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{fc(result.requiredFirePortfolio)}</span>
             </div>
 
             <div className="mt-2 flex justify-between py-0.5">
@@ -996,7 +1001,7 @@ export default function FireSimPage() {
                 {classicDiff < 0 ? 'Voordeel vs. klassiek' : 'Extra vs. klassiek'}
               </span>
               <span className={`tabular-nums font-semibold ${classicDiff < 0 ? 'text-green-700' : 'text-orange-600'}`}>
-                {classicDiff < 0 ? '-' : '+'}{formatCurrency(Math.abs(classicDiff))}
+                {classicDiff < 0 ? '-' : '+'}{fc(Math.abs(classicDiff))}
               </span>
             </div>
 

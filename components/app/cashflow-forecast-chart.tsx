@@ -4,6 +4,7 @@ import { useState, memo } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { AlertTriangle } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 export type ForecastPoint = {
   month: string
@@ -334,7 +335,7 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forec
                     fontSize="10"
                     fontWeight="600"
                   >
-                    {formatCurrency(point.projectedBalance)}
+                    {<MaskedAmount value={point.projectedBalance} tone="horizon" />}
                   </text>
                 </g>
               )}
@@ -369,7 +370,7 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forec
       <div className="mt-3 grid grid-cols-3 gap-2 text-center" data-testid="cashflow-forecast-summary">
         <div className="rounded-lg bg-[var(--subtle)] p-2">
           <p className="text-[10px] text-[var(--ink-3)]">Huidig saldo</p>
-          <p className="text-sm font-bold text-[var(--ink)]">{formatCurrency(currentBalance)}</p>
+          <p className="text-sm font-bold text-[var(--ink)]">{<MaskedAmount value={currentBalance} tone="horizon" />}</p>
         </div>
         <div className="rounded-lg bg-[var(--subtle)] p-2">
           <p className="text-[10px] text-[var(--ink-3)]">Over 3 maanden</p>

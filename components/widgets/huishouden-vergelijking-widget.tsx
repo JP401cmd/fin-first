@@ -4,7 +4,8 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { Users, User } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -52,8 +53,8 @@ export const HuishoudenVergelijkingWidget = memo(function HuishoudenVergelijking
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Huishouden Vergelijking" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {formatCurrency(ho.netWorth)}
+        <p className="text-[var(--ink)] leading-none truncate">
+          <MaskedAmount value={ho.netWorth} tone="kern" className="text-[15px] font-semibold" />
         </p>
       </WidgetShell>
     )
@@ -66,8 +67,8 @@ export const HuishoudenVergelijkingWidget = memo(function HuishoudenVergelijking
 
     return (
       <WidgetShell module="kern" size={size} kicker="Huishouden" href={href}>
-        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(ho.netWorth)}
+        <p className="text-[var(--ink)]">
+          <MaskedAmount value={ho.netWorth} tone="kern" className="text-lg font-semibold" />
         </p>
         <div className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
           <div className="h-full bg-kern-400" style={{ width: `${myPct}%` }} />
@@ -99,8 +100,8 @@ export const HuishoudenVergelijkingWidget = memo(function HuishoudenVergelijking
               </div>
               <span className="text-[11px] font-medium text-[var(--ink-2)]">Jij</span>
             </div>
-            <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(myNetWorth)}
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={myNetWorth} tone="kern" className="text-base font-semibold" />
             </p>
             <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
               ≈ {myFreedomStr}
@@ -115,8 +116,8 @@ export const HuishoudenVergelijkingWidget = memo(function HuishoudenVergelijking
               </div>
               <span className="text-[11px] font-medium text-[var(--ink-2)]">{partnerName ?? 'Partner'}</span>
             </div>
-            <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-              {formatCurrency(partnerNetWorth)}
+            <p className="text-[var(--ink)]">
+              <MaskedAmount value={partnerNetWorth} tone="kern" className="text-base font-semibold" />
             </p>
             <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
               ≈ {partnerFreedomStr}
@@ -145,8 +146,8 @@ export const HuishoudenVergelijkingWidget = memo(function HuishoudenVergelijking
                 <span className="text-[11px] text-[var(--ink-3)]">Gecombineerd</span>
               </div>
               <div className="text-right">
-                <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(ho.netWorth)}
+                <span className="text-[var(--ink)]">
+                  <MaskedAmount value={ho.netWorth} tone="kern" className="text-sm font-semibold" />
                 </span>
                 <span className="ml-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
                   ≈ {combinedFreedomStr}
