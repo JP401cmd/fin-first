@@ -241,6 +241,16 @@ export interface PersonaValuation {
   value: number
 }
 
+export interface PersonaBalanceSnapshot {
+  monthsAgo: number
+  entity_type: 'asset' | 'debt'
+  // Resolves to entity_id via name lookup. Match against bank_account name
+  // (cash assets), persona.assets[].name, or persona.debts[].name depending
+  // on entity_type. Names that don't resolve are skipped silently.
+  entityName: string
+  balance: number
+}
+
 export interface PersonaHolding {
   assetName: string // parent asset name for FK
   ticker: string | null
@@ -286,6 +296,14 @@ export interface PersonaData {
   recommendations: PersonaRecommendation[]
   net_worth_snapshots: PersonaNetWorthSnapshot[]
   valuations?: PersonaValuation[]
+  /**
+   * Per-entity maandsnapshots over de afgelopen maanden, gevoed naar de
+   * `balance_snapshots`-tabel. Vereist voor de categorie-sparkline op
+   * `/core` en de detail-sparkline per asset/debt-card. Naam wordt aan
+   * entity_id gekoppeld via de naam van de bankrekening (cash), het asset
+   * of de schuld.
+   */
+  balance_snapshots?: PersonaBalanceSnapshot[]
   holdings?: PersonaHolding[]
   target_allocations?: PersonaTargetAllocation[]
   appSettings?: Record<string, unknown>
@@ -516,6 +534,61 @@ function generateIrregularTransactions(
     })
   }
   return result
+}
+
+/**
+ * Bouw 6-maandse balans-snapshots per entiteit (asset of debt) op basis van
+ * een huidige waarde + maandelijkse delta. Wordt geseed naar de
+ * `balance_snapshots`-tabel om de categorie-sparkline op `/core` en de
+ * detail-sparkline op asset/debt-cards van data te voorzien.
+ *
+ * - `monthlyDelta` positief = groei (asset) of toename schuld; negatief =
+ *   afname (asset depreciation, schuld aflossing).
+ * - `jitterPct` voegt deterministische ruis toe (alleen historische
+ *   maanden, m=0 blijft exact `currentValue`). Per-entiteit-naam-gebaseerde
+ *   pseudo-random zorgt dat het seedresultaat reproduceerbaar is.
+ */
+function generateBalanceSnapshots(
+  entries: {
+    name: string
+    entity_type: 'asset' | 'debt'
+    currentValue: number
+    monthlyDelta?: number
+    jitterPct?: number
+  }[],
+): PersonaBalanceSnapshot[] {
+  const out: PersonaBalanceSnapshot[] = []
+  for (const e of entries) {
+    const delta = e.monthlyDelta ?? 0
+    // Deterministische seed per entiteit-naam (mulberry32 op string-hash).
+    let seed = 0
+    for (let i = 0; i < e.name.length; i++) seed = (seed * 31 + e.name.charCodeAt(i)) >>> 0
+    const rng = () => {
+      seed = (seed + 0x6D2B79F5) >>> 0
+      let t = seed
+      t = Math.imul(t ^ (t >>> 15), t | 1)
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+    for (let m = 5; m >= 0; m--) {
+      let value = e.currentValue - m * delta
+      if (e.jitterPct && m > 0) {
+        const jitter = 1 + (rng() * 2 - 1) * e.jitterPct
+        value = Math.round(value * jitter)
+      } else {
+        value = Math.round(value)
+      }
+      // Schulden mogen niet negatief gaan; assets niet onder 0.
+      if (value < 0) value = 0
+      out.push({
+        monthsAgo: m,
+        entity_type: e.entity_type,
+        entityName: e.name,
+        balance: value,
+      })
+    }
+  }
+  return out
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1087,10 +1160,10 @@ const lisaData: PersonaData = {
     description: 'Projectmanager, getrouwd, 2 kinderen. Na jaren discipline net de magische €100K grens doorbroken — 3 jaar en 4 maanden vrijheid opgebouwd.',
     color: 'amber',
     avatarColor: '#D4A843',
-    netWorth: 112000,
+    netWorth: 130000,
     income: 5200,
     expenses: 4000,
-    backgroundStory: 'Lisa werkt als projectmanager bij de gemeente en is getrouwd met een leraar. Na tien jaar spaardiscipline hebben zij en haar man net de €100K grens doorbroken — het magische omslagpunt waar compound interest merkbaar wordt. Met twee kinderen balanceert ze kinderopvang en schoolkosten met €400/mnd Meesman-beleggingen. Elke maand koopt ze 3,5 dag vrijheid voor het hele gezin.',
+    backgroundStory: 'Lisa werkt als projectmanager bij de gemeente en is getrouwd met een leraar. Na tien jaar spaardiscipline hebben zij en haar man net de €100K grens doorbroken — het magische omslagpunt waar compound interest merkbaar wordt. Met twee kinderen balanceert ze kinderopvang en schoolkosten met €400/mnd Meesman-beleggingen. Naast de Meesman-beleggingen heeft het gezin een kleine, brede dwarsdoorsnede van bezittingen (parkeerplaats verhuurd, BTC-spaarpot, sieraden, klein belang in familie BV, oude spaarpolis) en wat resterende kleine schulden (afbetaling, kortlopende leningen, lening van ouders).',
     challenges: ['Balanceren van gezinskosten met beleggingsgroei — kinderopvang kost €350/mnd', 'Studiefonds voor kinderen opbouwen (€8K van €40K doel)', 'Hypotheek optioneel versneld aflossen vs. meer beleggen'],
     currentSituation: 'Solide momentum — netto vermogen €100.000, investeert €400/mnd. Het compounding effect begint zichtbaar te worden.',
     firstGoal: 'Netto vermogen naar €250.000 en studiefonds starten',
@@ -1124,13 +1197,38 @@ const lisaData: PersonaData = {
     { name: 'Eigen betaalrekening', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 850, is_active: true, sort_order: 2 },
   ],
   assets: [
+    // Bestaande kern-assets
     { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 42000, purchase_value: 33600, purchase_date: '2020-03-01', expected_return: 7, monthly_contribution: 400, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT', has_holdings_tracking: true },
     { name: 'NT World Custom ESG Kinderbelegging', asset_type: 'investment', current_value: 8000, purchase_value: 7140, purchase_date: '2023-12-01', expected_return: 7, monthly_contribution: 0, institution: 'Northern Trust', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'NL0011225305', has_holdings_tracking: true },
     { name: 'Woning Utrecht', asset_type: 'eigen_huis', current_value: 385000, purchase_value: 285000, purchase_date: '2015-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 385000, address_postcode: '3581 KP', address_house_number: '24' },
     { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
+    // Volledige typen-dekking — kleine/realistische bedragen voor visuele
+    // testdekking van alle categoriekaarten op /core (asset_type-as).
+    { name: 'Spaardeposito Rabo 3-jaar', asset_type: 'savings', current_value: 4000, purchase_value: 4000, purchase_date: '2024-01-15', expected_return: 2.5, monthly_contribution: 0, institution: 'Rabobank', subtype: 'deposito', risk_profile: 'laag', is_liquid: false, lock_end_date: '2027-01-15' },
+    { name: 'Pensioenfonds ABP Lisa', asset_type: 'retirement', current_value: 8000, purchase_value: 0, purchase_date: '2010-01-01', expected_return: 5.5, monthly_contribution: 0, institution: 'ABP', subtype: 'uitkeringsregeling', risk_profile: 'laag', tax_benefit: true, retirement_provider_type: 'bedrijfspensioenfonds' },
+    { name: 'Parkeerplaats Utrecht (verhuurd)', asset_type: 'real_estate', current_value: 12000, purchase_value: 9500, purchase_date: '2021-04-01', expected_return: 3, monthly_contribution: 0, institution: '', subtype: 'beleggingspand', rental_income: 95 },
+    { name: 'Bitcoin spaarpot', asset_type: 'crypto', current_value: 1200, purchase_value: 800, purchase_date: '2023-06-01', expected_return: 0, monthly_contribution: 0, institution: 'Bitvavo', subtype: 'bitcoin', risk_profile: 'hoog' },
+    { name: 'Trouwringen + sieraden', asset_type: 'physical', current_value: 2500, purchase_value: 2200, purchase_date: '2008-08-15', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'sieraden' },
+    { name: 'Belang familie BV (5%)', asset_type: 'deelneming', current_value: 2000, purchase_value: 1500, purchase_date: '2018-03-01', expected_return: 0, monthly_contribution: 0, institution: 'Familie De Groot Holding BV', subtype: 'familie_bv' },
+    { name: 'Spaarpolis Aegon (oud)', asset_type: 'levensverzekering', current_value: 4500, purchase_value: 3200, purchase_date: '2005-09-01', expected_return: 1.5, monthly_contribution: 0, institution: 'Aegon', subtype: 'kapitaalverzekering' },
+    { name: 'Lening aan zus', asset_type: 'vordering', current_value: 1500, purchase_value: 2500, purchase_date: '2024-03-01', expected_return: 2, monthly_contribution: 0, institution: '', subtype: 'familielening' },
+    { name: 'Boot (gedeeld met zwager)', asset_type: 'other', current_value: 800, purchase_value: 1500, purchase_date: '2019-05-01', expected_return: 0, monthly_contribution: 0, institution: '' },
   ],
   debts: [
+    // Bestaande hoofdschuld
     { name: 'Hypotheek woning Utrecht', debt_type: 'mortgage', original_amount: 385000, current_balance: 350000, interest_rate: 2.9, minimum_payment: 1100, monthly_payment: 1100, start_date: '2015-06-01', creditor: 'Rabobank', subtype: 'annuiteit', is_tax_deductible: true, nhg: false, linked_asset_name: 'Woning Utrecht', repayment_type: 'annuiteit' },
+    // Volledige typen-dekking — symbolische restschulden, voor visuele
+    // testdekking van alle categoriekaarten op /core (debt_type-as).
+    { name: 'Persoonlijke lening keukenrenovatie', debt_type: 'personal_loan', original_amount: 8000, current_balance: 2800, interest_rate: 6.5, minimum_payment: 165, monthly_payment: 165, start_date: '2022-09-01', creditor: 'Santander', subtype: 'aflopend', repayment_type: 'annuiteit' },
+    { name: 'DUO studielening (oud)', debt_type: 'student_loan', original_amount: 18500, current_balance: 4500, interest_rate: 0.46, minimum_payment: 95, monthly_payment: 95, start_date: '2006-09-01', creditor: 'DUO', subtype: 'oud_stelsel' },
+    { name: 'Restant autolening Toyota', debt_type: 'car_loan', original_amount: 15000, current_balance: 2000, interest_rate: 4.5, minimum_payment: 220, monthly_payment: 220, start_date: '2022-03-01', creditor: 'Toyota Financial Services', repayment_type: 'annuiteit', linked_asset_name: 'Auto Toyota Corolla' },
+    { name: 'Visa creditcard saldo', debt_type: 'credit_card', original_amount: 0, current_balance: 250, interest_rate: 14.0, minimum_payment: 25, monthly_payment: 25, start_date: '2024-11-01', creditor: 'ICS Visa', subtype: 'regulier', credit_limit: 2500 },
+    { name: 'ICS doorlopend krediet', debt_type: 'revolving_credit', original_amount: 5000, current_balance: 800, interest_rate: 8.9, minimum_payment: 50, monthly_payment: 50, start_date: '2020-05-01', creditor: 'ICS', subtype: 'doorlopend_krediet', credit_limit: 5000 },
+    { name: 'Afbetaling tandartsbehandeling', debt_type: 'payment_plan', original_amount: 1200, current_balance: 320, interest_rate: 0, minimum_payment: 80, monthly_payment: 80, start_date: '2025-08-01', creditor: 'Tandartspraktijk Utrecht' },
+    { name: 'Belastingaanslag IB 2024', debt_type: 'belastingschuld', original_amount: 1850, current_balance: 1200, interest_rate: 4.0, minimum_payment: 150, monthly_payment: 150, start_date: '2025-09-01', creditor: 'Belastingdienst', subtype: 'inkomstenbelasting' },
+    { name: 'Lening van ouders', debt_type: 'familielening', original_amount: 10000, current_balance: 6000, interest_rate: 0, minimum_payment: 100, monthly_payment: 100, start_date: '2020-06-01', creditor: 'Ouders De Groot', subtype: 'ouders' },
+    { name: 'Rekening-courant familie BV', debt_type: 'dga_schuld', original_amount: 800, current_balance: 200, interest_rate: 5.0, minimum_payment: 50, monthly_payment: 50, start_date: '2024-01-01', creditor: 'Familie De Groot Holding BV' },
+    { name: 'Achterstallige factuur klusbedrijf', debt_type: 'other', original_amount: 450, current_balance: 200, interest_rate: 0, minimum_payment: 100, monthly_payment: 100, start_date: '2025-10-15', creditor: 'Klusbedrijf Van Dam' },
   ],
   budgets: makeBudgets({
     [S.INKOMEN]: 5200, [S.SALARIS_UITKERING]: 4200,
@@ -1212,22 +1310,24 @@ const lisaData: PersonaData = {
   net_worth_snapshots: [
     // Assets +€2.700/mnd (sparen + beleggen + rendement + woningwaarde)
     // Hypotheek -€300/mnd principal (annuiteit 2.9%)
-    // Netto vermogen +€3.000/mnd
-    { monthsAgo: 14, total_assets: 417800, total_debts: 354000, net_worth: 63800 },
-    { monthsAgo: 13, total_assets: 420450, total_debts: 353700, net_worth: 66750 },
-    { monthsAgo: 12, total_assets: 423100, total_debts: 353400, net_worth: 69700 },
-    { monthsAgo: 11, total_assets: 425750, total_debts: 353100, net_worth: 72650 },
-    { monthsAgo: 10, total_assets: 428400, total_debts: 352800, net_worth: 75600 },
-    { monthsAgo: 9, total_assets: 431100, total_debts: 352500, net_worth: 78600 },
-    { monthsAgo: 8, total_assets: 433800, total_debts: 352200, net_worth: 81600 },
-    { monthsAgo: 7, total_assets: 436900, total_debts: 351900, net_worth: 85000 },
-    { monthsAgo: 6, total_assets: 440200, total_debts: 351600, net_worth: 88600 },
-    { monthsAgo: 5, total_assets: 443500, total_debts: 351300, net_worth: 92200 },
-    { monthsAgo: 4, total_assets: 446700, total_debts: 351000, net_worth: 95700 },
-    { monthsAgo: 3, total_assets: 449800, total_debts: 350700, net_worth: 99100 },
-    { monthsAgo: 2, total_assets: 456500, total_debts: 350400, net_worth: 106100 },
-    { monthsAgo: 1, total_assets: 459100, total_debts: 350200, net_worth: 108900 },
-    { monthsAgo: 0, total_assets: 462050, total_debts: 350000, net_worth: 112050 },
+    // Plus brede 'lange staart' van extra bezittingen/schulden (~+€18K NW
+    // tov het oorspronkelijke verhaal) — uniform doorgetrokken zodat de
+    // historische curve stabiel blijft.
+    { monthsAgo: 14, total_assets: 454250, total_debts: 372270, net_worth: 81980 },
+    { monthsAgo: 13, total_assets: 456900, total_debts: 371970, net_worth: 84930 },
+    { monthsAgo: 12, total_assets: 459550, total_debts: 371670, net_worth: 87880 },
+    { monthsAgo: 11, total_assets: 462200, total_debts: 371370, net_worth: 90830 },
+    { monthsAgo: 10, total_assets: 464850, total_debts: 371070, net_worth: 93780 },
+    { monthsAgo: 9, total_assets: 467550, total_debts: 370770, net_worth: 96780 },
+    { monthsAgo: 8, total_assets: 470250, total_debts: 370470, net_worth: 99780 },
+    { monthsAgo: 7, total_assets: 473350, total_debts: 370170, net_worth: 103180 },
+    { monthsAgo: 6, total_assets: 476650, total_debts: 369870, net_worth: 106780 },
+    { monthsAgo: 5, total_assets: 479950, total_debts: 369570, net_worth: 110380 },
+    { monthsAgo: 4, total_assets: 483150, total_debts: 369270, net_worth: 113880 },
+    { monthsAgo: 3, total_assets: 486250, total_debts: 368970, net_worth: 117280 },
+    { monthsAgo: 2, total_assets: 492950, total_debts: 368670, net_worth: 124280 },
+    { monthsAgo: 1, total_assets: 495550, total_debts: 368470, net_worth: 127080 },
+    { monthsAgo: 0, total_assets: 498500, total_debts: 368270, net_worth: 130230 },
   ],
   valuations: [
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 14, value: 31500 },
@@ -1298,6 +1398,44 @@ const lisaData: PersonaData = {
         { type: 'buy', units: 40, price_per_unit: 36.00, total_amount: 1440, monthsAgo: 2, notes: null },
       ],
     },
+  ],
+  balance_snapshots: [
+    // ── Cash assets (afgeleid van bank_accounts via gelijke naam) ──
+    ...generateBalanceSnapshots([
+      { name: 'Gezamenlijke rekening Rabo', entity_type: 'asset', currentValue: 3200, monthlyDelta: 50, jitterPct: 0.18 },
+      { name: 'Spaarrekening gezin', entity_type: 'asset', currentValue: 15000, monthlyDelta: 200, jitterPct: 0.02 },
+      { name: 'Eigen betaalrekening', entity_type: 'asset', currentValue: 850, jitterPct: 0.25 },
+    ]),
+    // ── Reguliere assets ──
+    ...generateBalanceSnapshots([
+      { name: 'Meesman Wereldwijd Totaal', entity_type: 'asset', currentValue: 42000, monthlyDelta: 500, jitterPct: 0.015 },
+      { name: 'NT World Custom ESG Kinderbelegging', entity_type: 'asset', currentValue: 8000, monthlyDelta: 250, jitterPct: 0.02 },
+      { name: 'Woning Utrecht', entity_type: 'asset', currentValue: 385000, monthlyDelta: 600 },
+      { name: 'Auto Toyota Corolla', entity_type: 'asset', currentValue: 8000, monthlyDelta: -85 },
+      { name: 'Spaardeposito Rabo 3-jaar', entity_type: 'asset', currentValue: 4000, monthlyDelta: 8 },
+      { name: 'Pensioenfonds ABP Lisa', entity_type: 'asset', currentValue: 8000, monthlyDelta: 60 },
+      { name: 'Parkeerplaats Utrecht (verhuurd)', entity_type: 'asset', currentValue: 12000, monthlyDelta: 30 },
+      { name: 'Bitcoin spaarpot', entity_type: 'asset', currentValue: 1200, jitterPct: 0.18 },
+      { name: 'Trouwringen + sieraden', entity_type: 'asset', currentValue: 2500 },
+      { name: 'Belang familie BV (5%)', entity_type: 'asset', currentValue: 2000 },
+      { name: 'Spaarpolis Aegon (oud)', entity_type: 'asset', currentValue: 4500, monthlyDelta: 6 },
+      { name: 'Lening aan zus', entity_type: 'asset', currentValue: 1500, monthlyDelta: -100 },
+      { name: 'Boot (gedeeld met zwager)', entity_type: 'asset', currentValue: 800, monthlyDelta: -10 },
+    ]),
+    // ── Schulden ──
+    ...generateBalanceSnapshots([
+      { name: 'Hypotheek woning Utrecht', entity_type: 'debt', currentValue: 350000, monthlyDelta: -300 },
+      { name: 'Persoonlijke lening keukenrenovatie', entity_type: 'debt', currentValue: 2800, monthlyDelta: -160 },
+      { name: 'DUO studielening (oud)', entity_type: 'debt', currentValue: 4500, monthlyDelta: -90 },
+      { name: 'Restant autolening Toyota', entity_type: 'debt', currentValue: 2000, monthlyDelta: -210 },
+      { name: 'Visa creditcard saldo', entity_type: 'debt', currentValue: 250, jitterPct: 0.30 },
+      { name: 'ICS doorlopend krediet', entity_type: 'debt', currentValue: 800, monthlyDelta: -50 },
+      { name: 'Afbetaling tandartsbehandeling', entity_type: 'debt', currentValue: 320, monthlyDelta: -80 },
+      { name: 'Belastingaanslag IB 2024', entity_type: 'debt', currentValue: 1200, monthlyDelta: -150 },
+      { name: 'Lening van ouders', entity_type: 'debt', currentValue: 6000, monthlyDelta: -100 },
+      { name: 'Rekening-courant familie BV', entity_type: 'debt', currentValue: 200, monthlyDelta: -50 },
+      { name: 'Achterstallige factuur klusbedrijf', entity_type: 'debt', currentValue: 200 },
+    ]),
   ],
   appSettings: {
     'whatif_scenarios:PLACEHOLDER': {

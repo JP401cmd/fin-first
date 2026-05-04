@@ -121,11 +121,12 @@ export async function deleteAllUserData(
     deleteTable(supabase, 'recurring_transactions', userId),
     deleteTable(supabase, 'valuations', userId),
     deleteTable(supabase, 'net_worth_snapshots', userId),
+    deleteTable(supabase, 'balance_snapshots', userId),
     deleteTable(supabase, 'life_events', userId),
     deleteTable(supabase, 'goals', userId),
     deleteTable(supabase, 'news_editions', userId),
   ])
-  const batch1bTables = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'life_events', 'goals', 'news_editions']
+  const batch1bTables = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'balance_snapshots', 'life_events', 'goals', 'news_editions']
   for (let i = 0; i < batch1bTables.length; i++) {
     summary[batch1bTables[i]] = batch1bResults[i]
   }
@@ -430,6 +431,7 @@ export async function seedPersonaData(
   // ── Phase 2: Dependent inserts (parallel where possible) ────
 
   // Debts need asset IDs for linking
+  const debtNameToId: Record<string, string> = {}
   async function insertDebts() {
     if (persona.debts.length === 0) {
       summary.debts = 0
@@ -460,9 +462,15 @@ export async function seedPersonaData(
     const { data: insertedDebts, error: debtErr } = await supabase
       .from('debts')
       .insert(debtRows)
-      .select('id')
+      .select('id, name')
     if (debtErr) throw new Error(`Schulden insert mislukt: ${debtErr.message}`)
     summary.debts = insertedDebts?.length ?? 0
+
+    if (insertedDebts) {
+      for (let i = 0; i < insertedDebts.length; i++) {
+        debtNameToId[insertedDebts[i].name] = insertedDebts[i].id
+      }
+    }
 
     // Link mortgages to assets via linked_asset_id
     if (insertedDebts) {
@@ -784,6 +792,66 @@ export async function seedPersonaData(
     + (summary.investment_transactions ?? 0)
     + (summary.crypto_transactions ?? 0)
     + (summary.target_allocations ?? 0))
+
+  // ── Phase 4b: Balance snapshots (per-entiteit, voedt sparkline) ──
+  // Vereist alle entity-IDs (cash, regular assets, debts) — wordt daarom
+  // pas gedraaid nadat assets+debts compleet zijn ingeladen. Onbekende
+  // namen worden stilzwijgend overgeslagen zodat oude persona's zonder
+  // deze data niet breken.
+  if (persona.balance_snapshots && persona.balance_snapshots.length > 0) {
+    const cashAssetNameToId: Record<string, string> = {}
+    for (let i = 0; i < persona.bank_accounts.length; i++) {
+      const id = cashAssetIds[i]
+      if (id) cashAssetNameToId[persona.bank_accounts[i].name] = id
+    }
+    const assetNameToSubtype: Record<string, string> = {}
+    for (const a of persona.assets) assetNameToSubtype[a.name] = a.asset_type
+    for (const ba of persona.bank_accounts) assetNameToSubtype[ba.name] = 'cash'
+    const debtNameToSubtype: Record<string, string> = {}
+    for (const d of persona.debts) debtNameToSubtype[d.name] = d.debt_type
+
+    const balanceRows = persona.balance_snapshots
+      .map((s) => {
+        let entityId: string | undefined
+        let entitySubtype: string | undefined
+        if (s.entity_type === 'asset') {
+          entityId = assetNameToId[s.entityName] ?? cashAssetNameToId[s.entityName]
+          entitySubtype = assetNameToSubtype[s.entityName]
+        } else {
+          entityId = debtNameToId[s.entityName]
+          entitySubtype = debtNameToSubtype[s.entityName]
+        }
+        if (!entityId) return null
+        return {
+          user_id: userId,
+          snapshot_date: monthsAgoDate(s.monthsAgo),
+          entity_type: s.entity_type,
+          entity_id: entityId,
+          entity_name: s.entityName,
+          entity_subtype: entitySubtype ?? null,
+          balance: s.balance,
+          net_worth_inclusion_pct: 100,
+        }
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+
+    if (balanceRows.length > 0) {
+      // Insert in batches om eventuele payload-limits te respecteren.
+      let bsCount = 0
+      for (let i = 0; i < balanceRows.length; i += 100) {
+        const batch = balanceRows.slice(i, i + 100)
+        const { error: bsErr } = await supabase
+          .from('balance_snapshots')
+          .upsert(batch, { onConflict: 'user_id,snapshot_date,entity_type,entity_id' })
+        if (bsErr) throw new Error(`Balance snapshots insert mislukt (batch ${Math.floor(i / 100)}): ${bsErr.message}`)
+        bsCount += batch.length
+      }
+      summary.balance_snapshots = bsCount
+    } else {
+      summary.balance_snapshots = 0
+    }
+    onProgress('Balans-snapshots toevoegen...', 'phase4b', 'insert', summary.balance_snapshots)
+  }
 
   // ── Phase 5: App settings (scenarios, preferences) ──────────
 
