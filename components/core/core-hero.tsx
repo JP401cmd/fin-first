@@ -64,7 +64,9 @@ export function CoreHero({
   onShowNetWorthReceipt,
   onShowFireReceipt,
 }: CoreHeroProps) {
-  const { flashClass } = useFlashChange(netWorth)
+  // useFlashChange leeft binnen HeroAmount zelf — flashClass-updates triggeren
+  // dan alleen een re-render van die span en niet van de omhullende button
+  // (LCP-element). Houdt INP stabiel bij netWorth-mutaties.
 
   // Vrijheidstijd: hoeveel jaren/maanden kan dit netto vermogen je dragen?
   // Basis = jaarlijkse must-uitgaven; bij 0 valt de regel weg.
@@ -115,10 +117,10 @@ export function CoreHero({
               onClick={onShowNetWorthReceipt}
               className="text-left transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
-              <HeroAmount netWorth={netWorth} flashClass={flashClass} />
+              <HeroAmount netWorth={netWorth} />
             </button>
           ) : (
-            <HeroAmount netWorth={netWorth} flashClass={flashClass} />
+            <HeroAmount netWorth={netWorth} />
           )}
           <span className="font-serif text-base italic text-[var(--ink-3)] sm:text-lg">
             netto vermogen
@@ -186,13 +188,10 @@ export function CoreHero({
 
 // ── Subcomponent: hoofdbedrag ────────────────────────────────
 
-function HeroAmount({
-  netWorth,
-  flashClass,
-}: {
-  netWorth: number
-  flashClass: string
-}) {
+function HeroAmount({ netWorth }: { netWorth: number }) {
+  // Hook leeft hier zodat flash-class-updates alleen deze span re-renderen
+  // en de omhullende button (LCP-element) stabiel blijft.
+  const { flashClass } = useFlashChange(netWorth)
   return (
     <span
       className={[

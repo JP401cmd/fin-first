@@ -11,8 +11,16 @@ import { WillLanding } from '@/components/will/will-landing'
 export default async function WillPage() {
   const supabase = await createClient()
 
-  // Load dashboard data first (cached via React cache())
-  const dashboardResult = await loadDashboardData(supabase)
+  // Parallelle loaders: dashboard (21 queries) en will (3-6 queries) draaien
+  // tegelijk i.p.v. sequentieel. We geven `loadWillData` geen shared-data
+  // meer mee — dat triggert 3 extra queries (assets, debts, profile) die
+  // parallel met dashboard draaien, dus geen extra latency. Postgres kan
+  // dat makkelijk aan en de wall-clock-tijd voor de page is nu max(dashboard,
+  // will) i.p.v. dashboard + will. Verwachte winst: 100-200ms p75.
+  const [dashboardResult, willData] = await Promise.all([
+    loadDashboardData(supabase),
+    loadWillData(supabase),
+  ])
 
   const {
     dashboardData,
@@ -20,19 +28,8 @@ export default async function WillPage() {
     allWidgetPrefs,
     userName,
     aiEnabled,
-    userId,
-    sharedAssets,
-    sharedDebts,
     categoryAppLinks,
   } = dashboardResult
-
-  // Load Will data with shared data from dashboard (avoids ~5 duplicate queries)
-  const willData = await loadWillData(supabase, {
-    userId,
-    assets: sharedAssets,
-    debts: sharedDebts,
-    fullName: userName,
-  })
 
   // Build temporal context for DAIshboard briefing
   const temporal = buildTemporalContext()

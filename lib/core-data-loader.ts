@@ -187,6 +187,26 @@ export const loadCoreData = cache(async function loadCoreData(
   //    KPI valt op de UI-laag terug op rente.
   const cashStatsPromise = loadCombinedCashStats(supabase).catch(() => ({} as Record<string, CashAssetStats>))
 
+  // ── Sparkline-transacties promise: parallel met alle batches. Voorheen
+  //    ran deze query als blocking await ná batch 2 (waterfall ~200-400ms).
+  //    Hij hangt qua DATA niet af van batch 2 — alleen de parent/child
+  //    budget-aggregatie wel. Door 'em vroeg te starten en pas bij gebruik
+  //    te awaiten besparen we de waterfall. Failure → lege array,
+  //    sparklines vervallen non-fataal (zelfde gedrag als de oude try/catch).
+  type SparkTx = { budget_id: string | null; amount: number | string; date: string }
+  const sparkTxPromise: Promise<SparkTx[]> = (async () => {
+    try {
+      const result = await supabase
+        .from('transactions')
+        .select('budget_id, amount, date')
+        .gte('date', twelveMonthsAgo)
+        .lt('date', monthEnd)
+      return (result.data ?? []) as SparkTx[]
+    } catch {
+      return []
+    }
+  })()
+
   // ── Batch 1: Primary data fetches ──
   const [
     txResult, assetsResult, debtsResult, income12Result,
@@ -679,86 +699,100 @@ export const loadCoreData = cache(async function loadCoreData(
   const fireTargetFromHorizon = await fireTargetPromise
 
   // ── Load 12-month budget spending sparklines per parent category ──
+  // Aggregeert in één pass over de transacties ipv O(parents × months × txs).
+  // De query is al vroeg gestart (sparkTxPromise) zodat hij parallel met de
+  // batches draait i.p.v. als waterfall daarná.
   let budgetSparklines: CorePageData['budgetSparklines'] = []
   let budgetSpendingHistory: CorePageData['budgetSpendingHistory'] = []
 
   try {
-    if (budgetResult.data && budgetResult.data.length > 0) {
+    const sparkTxData = await sparkTxPromise
+
+    if (budgetResult.data && budgetResult.data.length > 0 && sparkTxData.length > 0) {
       const allBudgets = budgetResult.data as Budget[]
       const parentBudgets = allBudgets.filter(b => !b.parent_id)
       const childBudgets = allBudgets.filter(b => b.parent_id)
 
       // Build 12-month date ranges
-      const sparkMonths: { month: string; start: string; end: string; label: string }[] = []
+      const sparkMonths: { month: string; start: string; monthKey: string; label: string }[] = []
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const start = new Date(Date.UTC(d.getFullYear(), d.getMonth(), 1)).toISOString().split('T')[0]
-        const end = new Date(Date.UTC(d.getFullYear(), d.getMonth() + 1, 1)).toISOString().split('T')[0]
         const label = d.toLocaleDateString('nl-NL', { month: 'short' })
-        sparkMonths.push({ month: start, start, end, label })
+        sparkMonths.push({ month: start, start, monthKey: start.substring(0, 7), label })
       }
 
-      // Fetch all transactions for the 12-month range
-      const { data: sparkTxData } = await supabase
-        .from('transactions')
-        .select('budget_id, amount, date')
-        .gte('date', sparkMonths[0].start)
-        .lt('date', sparkMonths[sparkMonths.length - 1].end)
-
-      if (sparkTxData && sparkTxData.length > 0) {
-        const sparklines: CorePageData['budgetSparklines'] = []
-
-        for (const parent of parentBudgets) {
-          const childIds = childBudgets.filter(c => c.parent_id === parent.id).map(c => c.id)
-          const budgetIds = childIds.length > 0 ? childIds : [parent.id]
-
-          const monthlyData: SparklineDataPoint[] = sparkMonths.map(m => {
-            const monthTx = sparkTxData.filter(t =>
-              t.date >= m.start && t.date < m.end && budgetIds.includes(t.budget_id),
-            )
-            const monthSpent = monthTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-            return { month: m.month, label: m.label, spent: monthSpent }
-          })
-
-          // Only include categories that have at least some spending data
-          const hasAnySpending = monthlyData.some(d => d.spent > 0)
-          if (hasAnySpending) {
-            sparklines.push({
-              id: parent.id,
-              name: parent.name,
-              icon: parent.icon,
-              budgetType: parent.budget_type ?? 'expense',
-              data: monthlyData,
-            })
+      // Eén pass: bouw twee maps op uit alle transacties.
+      //  - sumByBudgetMonth: budgetId → monthKey → som van |amount|
+      //  - totalExpenseByMonth: monthKey → som van |amount| voor uitgaven
+      // Hierdoor is de daaropvolgende per-parent loop O(parents × months)
+      // i.p.v. O(parents × months × txs) — dat scheelt op een typisch user
+      // met 50K transacties enkele honderden ms aan CPU.
+      const sumByBudgetMonth = new Map<string, Map<string, number>>()
+      const totalExpenseByMonth = new Map<string, number>()
+      for (const t of sparkTxData) {
+        const mKey = t.date.substring(0, 7)
+        const amt = Math.abs(Number(t.amount))
+        if (t.budget_id) {
+          let bMap = sumByBudgetMonth.get(t.budget_id)
+          if (!bMap) {
+            bMap = new Map()
+            sumByBudgetMonth.set(t.budget_id, bMap)
           }
+          bMap.set(mKey, (bMap.get(mKey) ?? 0) + amt)
         }
+        if (Number(t.amount) < 0) {
+          totalExpenseByMonth.set(mKey, (totalExpenseByMonth.get(mKey) ?? 0) + amt)
+        }
+      }
 
-        budgetSparklines = sparklines
+      const sparklines: CorePageData['budgetSparklines'] = []
+      for (const parent of parentBudgets) {
+        const childIds = childBudgets.filter(c => c.parent_id === parent.id).map(c => c.id)
+        const budgetIds = childIds.length > 0 ? childIds : [parent.id]
 
-        // Compute total budget spending per month for hero sparkline
-        const monthlyTotals = sparkMonths.map(m => {
-          const monthSpent = sparkTxData
-            .filter(t => t.date >= m.start && t.date < m.end && Number(t.amount) < 0)
-            .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-          return { label: m.label, spent: monthSpent, isProjection: false }
+        const monthlyData: SparklineDataPoint[] = sparkMonths.map(m => {
+          let spent = 0
+          for (const bid of budgetIds) {
+            const bMap = sumByBudgetMonth.get(bid)
+            if (bMap) spent += bMap.get(m.monthKey) ?? 0
+          }
+          return { month: m.month, label: m.label, spent }
         })
-        // Project next 6 months based on average of historical months with data
-        const monthsWithData = monthlyTotals.filter(m => m.spent > 0)
-        const avgSpent = monthsWithData.length > 0
-          ? monthsWithData.reduce((s, m) => s + m.spent, 0) / monthsWithData.length
-          : 0
-        if (avgSpent > 0) {
-          for (let i = 1; i <= 6; i++) {
-            const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
-            monthlyTotals.push({
-              label: d.toLocaleDateString('nl-NL', { month: 'short' }),
-              spent: avgSpent,
-              isProjection: true,
-            })
-          }
+
+        if (monthlyData.some(d => d.spent > 0)) {
+          sparklines.push({
+            id: parent.id,
+            name: parent.name,
+            icon: parent.icon,
+            budgetType: parent.budget_type ?? 'expense',
+            data: monthlyData,
+          })
         }
-        budgetSpendingHistory = monthlyTotals
       }
+      budgetSparklines = sparklines
+
+      // Total per maand voor hero-sparkline + projectie van komende 6 maanden
+      const monthlyTotals = sparkMonths.map(m => ({
+        label: m.label,
+        spent: totalExpenseByMonth.get(m.monthKey) ?? 0,
+        isProjection: false,
+      }))
+      const monthsWithData = monthlyTotals.filter(m => m.spent > 0)
+      const avgSpent = monthsWithData.length > 0
+        ? monthsWithData.reduce((s, m) => s + m.spent, 0) / monthsWithData.length
+        : 0
+      if (avgSpent > 0) {
+        for (let i = 1; i <= 6; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+          monthlyTotals.push({
+            label: d.toLocaleDateString('nl-NL', { month: 'short' }),
+            spent: avgSpent,
+            isProjection: true,
+          })
+        }
+      }
+      budgetSpendingHistory = monthlyTotals
     }
   } catch {
     // Budget sparklines are non-critical
