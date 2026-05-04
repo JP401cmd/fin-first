@@ -3,10 +3,15 @@ import { Playfair_Display, Source_Serif_4, DM_Mono, Inter, Andada_Pro } from "ne
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
+// LCP-font: hero h1 op /core, /will, /horizon en alle category-pages.
+// preload: true zodat de browser hem direct prioriteert. Alleen Playfair
+// krijgt deze voorkeur — andere fonts dingen anders mee om bandbreedte.
 const playfair = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
   weight: ["400", "600", "700"],
+  display: "swap",
+  preload: true,
 });
 
 const sourceSerif = Source_Serif_4({
@@ -14,18 +19,24 @@ const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
   weight: ["400", "600"],
   style: ["normal", "italic"],
+  display: "swap",
+  preload: false,
 });
 
 const dmMono = DM_Mono({
   variable: "--font-dm-mono",
   subsets: ["latin"],
   weight: ["400", "500"],
+  display: "swap",
+  preload: false,
 });
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
+  display: "swap",
+  preload: false,
 });
 
 const andadaPro = Andada_Pro({
@@ -33,6 +44,8 @@ const andadaPro = Andada_Pro({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],
+  display: "swap",
+  preload: false,
 });
 
 export const viewport: Viewport = {
@@ -70,7 +83,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="nl">
+    <html lang="nl" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
       </head>

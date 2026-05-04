@@ -38,15 +38,15 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
   const r = size === 'full' ? 52 : size === 'half' ? 32 : 44
   const sw = size === 'full' ? 9 : size === 'half' ? 6 : 7
   const circ = 2 * Math.PI * r
-  const trackColor = `color-mix(in srgb, var(--color-${cssType}-300) 35%, transparent)`
-  const fillColor = isOver ? (overPositive ? '#10b981' : '#ef4444') : `var(--color-${cssType}-500)`
+  const trackColor = 'var(--subtle)'
+  const fillColor = isOver ? (overPositive ? 'var(--positive)' : 'var(--negative)') : `var(--color-${cssType}-500)`
   const barSeg = computeBarSegments(budget.spent, budget.limit, 80, { barHex: `var(--color-${cssType}-400)`, barHexWarn: `var(--color-${cssType}-600)` }, overPositive)
 
   // ── Mini: compact spent / limit ──
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker={budget.name} href={`/core/budgets?budget=${budget.id}`}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}`}>
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}`}>
           {formatCurrency(budget.spent)} / {formatCurrency(budget.limit)}
         </p>
       </WidgetShell>
@@ -72,7 +72,7 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className={`font-mono text-2xl font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}`}>
+              <p className={`font-mono text-2xl font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}`}>
                 {Math.round(pct * 100)}%
               </p>
               <p className="font-mono text-[10px] text-[var(--ink-4)] tabular-nums leading-normal">
@@ -88,9 +88,9 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                 isOver
                   ? (overPositive
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-                    : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400')
-                  : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                    ? 'bg-[color-mix(in_oklab,var(--positive)_10%,transparent)] text-[var(--positive)]'
+                    : 'bg-[color-mix(in_oklab,var(--negative)_10%,transparent)] text-[var(--negative)]')
+                  : 'bg-[color-mix(in_oklab,var(--positive)_10%,transparent)] text-[var(--positive)]'
               }`}>
                 {isOver ? (overPositive ? 'Doel bereikt' : 'Over budget') : 'Op schema'}
               </div>
@@ -136,7 +136,7 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
               </div>
               <div>
                 <p className="text-[10px] text-[var(--ink-3)] uppercase tracking-wide">Nog beschikbaar</p>
-                <p className={`font-mono text-sm tabular-nums ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-emerald-600'}`}>
+                <p className={`font-mono text-sm tabular-nums ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}`}>
                   {isOver ? '€ 0' : formatCurrency(remainingPerDay)}<span className="text-[var(--ink-4)]">/dag</span>
                 </p>
               </div>
@@ -144,7 +144,7 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
 
             {/* Remaining + days left */}
             <div className="flex items-baseline justify-between border-t border-[var(--border-ed)] pt-2">
-              <p className={`font-mono text-xs tabular-nums ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-emerald-600'}`}>
+              <p className={`font-mono text-xs tabular-nums ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}`}>
                 {isOver
                   ? (overPositive
                     ? `${formatCurrency(budget.spent - budget.limit)} boven doel`
@@ -180,7 +180,7 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}`}>
+              <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}`}>
                 {Math.round(pct * 100)}%
               </p>
             </div>
@@ -215,7 +215,7 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
               )}
             </div>
 
-            <p className={`font-mono text-xs tabular-nums ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-emerald-600'}`}>
+            <p className={`font-mono text-xs tabular-nums ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-positive'}`}>
               {isOver
                 ? (overPositive
                   ? `${formatCurrency(budget.spent - budget.limit)} boven doel`
@@ -245,7 +245,7 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({ size, budget }: {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}`}>
+            <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}`}>
               {Math.round(pct * 100)}%
             </p>
             <p className="font-mono text-[9px] text-[var(--ink-3)] tabular-nums leading-normal mt-0.5 text-center">

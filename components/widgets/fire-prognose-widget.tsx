@@ -46,7 +46,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
             <>
               <div className="flex items-center gap-1.5">
                 <Compass className="h-4 w-4 text-horizon-600" />
-                <p className="font-mono text-lg font-semibold text-horizon-600">Bereikt! 🎉</p>
+                <p className="font-mono text-lg font-semibold text-horizon-600">Bereikt! ðŸŽ‰</p>
               </div>
             </>
           ) : isNotFeasible ? (
@@ -92,7 +92,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
                 <Compass className="h-3.5 w-3.5 text-horizon-600" />
               </div>
               {isReached ? (
-                <p className="font-mono text-lg font-semibold text-horizon-600">Bereikt! 🎉</p>
+                <p className="font-mono text-lg font-semibold text-horizon-600">Bereikt! ðŸŽ‰</p>
               ) : isNotFeasible ? (
                 <p className="font-mono text-lg font-semibold text-[var(--ink-3)]">—</p>
               ) : (
@@ -140,7 +140,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
         </div>
         <div className="min-w-0">
           {isReached ? (
-            <p className="font-mono text-xl font-semibold text-horizon-600">Bereikt! 🎉</p>
+            <p className="font-mono text-xl font-semibold text-horizon-600">Bereikt! ðŸŽ‰</p>
           ) : isNotFeasible ? (
             <>
               <p className="font-mono text-xl font-semibold text-[var(--ink)]">—</p>
@@ -209,8 +209,8 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
             >
               <defs>
                 <linearGradient id="fire-mini-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--horizon-500, #c4a06b)" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="var(--horizon-500, #c4a06b)" stopOpacity="0.02" />
+                  <stop offset="0%" stopColor="var(--color-horizon-500)" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="var(--color-horizon-500)" stopOpacity="0.02" />
                 </linearGradient>
               </defs>
               {/* Area fill */}
@@ -219,7 +219,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
               <path
                 d={pathD}
                 fill="none"
-                stroke="var(--horizon-500, #c4a06b)"
+                stroke="var(--color-horizon-500)"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -230,7 +230,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
                   cx={fireX}
                   cy={fireY}
                   r="3"
-                  fill="var(--horizon-600, #a07840)"
+                  fill="var(--color-horizon-600)"
                 />
               )}
             </svg>

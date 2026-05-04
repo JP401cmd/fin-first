@@ -21,9 +21,9 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
   }
 
   const scenarios = [
-    { label: 'Pessimistisch', proj: fireRange.pessimistic, dotColor: 'bg-red-400' },
+    { label: 'Pessimistisch', proj: fireRange.pessimistic, dotColor: 'bg-negative' },
     { label: 'Verwacht', proj: fireRange.expected, dotColor: 'bg-horizon-500' },
-    { label: 'Optimistisch', proj: fireRange.optimistic, dotColor: 'bg-emerald-500' },
+    { label: 'Optimistisch', proj: fireRange.optimistic, dotColor: 'bg-positive' },
   ]
 
   const expAge = fireRange.expected.fireAge
@@ -134,9 +134,9 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
           )}
           {/* Return scenario labels in compact grid */}
           <div className="mt-1.5 grid grid-cols-3 gap-1 text-center text-[10px]">
-            <span className="text-red-500 font-mono">5%</span>
+            <span className="text-negative font-mono">5%</span>
             <span className="text-horizon-600 font-mono font-semibold">7%</span>
-            <span className="text-emerald-600 font-mono">9%</span>
+            <span className="text-positive font-mono">9%</span>
           </div>
           <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)] text-center">
             rendement per scenario
@@ -160,9 +160,9 @@ function ScenarioAxis({ pesAge, expAge, optAge }: { pesAge: number; expAge: numb
   const toX = (age: number) => pad + ((age - minAge) / range) * innerW
 
   const markers = [
-    { age: optAge, color: '#10b981', label: `${optAge}` },  // emerald-500
-    { age: expAge, color: '#8b5cf6', label: `${expAge}` },  // purple-500 (horizon)
-    { age: pesAge, color: '#f87171', label: `${pesAge}` },  // red-400
+    { age: optAge, color: 'var(--positive)', label: `${optAge}` },  // emerald-500
+    { age: expAge, color: 'var(--color-horizon-500)', label: `${expAge}` },  // purple-500 (horizon)
+    { age: pesAge, color: 'var(--negative)', label: `${pesAge}` },  // red-400
   ]
 
   return (

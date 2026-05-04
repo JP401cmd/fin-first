@@ -205,18 +205,22 @@ describe('PhaseBar buildSegments — segment properties', () => {
 
 // ── Tests: persona validation ──────────────────────────────────
 
-describe('PhaseBar buildSegments — all 6 personas', () => {
+describe('PhaseBar buildSegments — all 10 personas', () => {
   const personaConfigs: Record<PersonaKey, {
     totalAssets: number
     totalDebts: number
     description: string
   }> = {
-    roos: { totalAssets: 0, totalDebts: 15000, description: 'schuld, FIRE onbereikbaar' },
-    daan: { totalAssets: 2850, totalDebts: 13900, description: 'starter, perpetual' },
-    lisa: { totalAssets: 100000, totalDebts: 0, description: '100K milestone, legacy' },
-    willem: { totalAssets: 1457000, totalDebts: 0, description: 'near-FI, deplete' },
-    rashid: { totalAssets: 250000, totalDebts: 0, description: 'no-budget, deplete' },
-    marijke: { totalAssets: 850000, totalDebts: 0, description: 'retired, pensioen' },
+    roos: { totalAssets: 0, totalDebts: 18500, description: 'schuld, FIRE onbereikbaar' },
+    daan: { totalAssets: 9700, totalDebts: 13900, description: 'starter, perpetual' },
+    lisa: { totalAssets: 462050, totalDebts: 350000, description: '100K milestone, legacy' },
+    willem: { totalAssets: 1619700, totalDebts: 0, description: 'near-FI, deplete' },
+    rashid: { totalAssets: 904000, totalDebts: 654000, description: 'no-budget, deplete' },
+    marijke: { totalAssets: 820200, totalDebts: 0, description: 'retired, pensioen' },
+    ronald: { totalAssets: 820200, totalDebts: 0, description: 'pensioenplanner, ALL_MODULES' },
+    bas: { totalAssets: 462050, totalDebts: 350000, description: 'vermogensverdeler, ALL_MODULES' },
+    leo: { totalAssets: 12215, totalDebts: 18500, description: 'budgetteerder, recovery' },
+    jochen: { totalAssets: 1619700, totalDebts: 0, description: 'FIRE-strijder, ALL_MODULES' },
   }
 
   for (const key of PERSONA_KEYS) {

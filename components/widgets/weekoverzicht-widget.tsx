@@ -21,7 +21,7 @@ function DeltaIndicator({ current, previous, compact = false }: { current: numbe
 
   const isUp = deltaPct > 0
   const Icon = isUp ? TrendingUp : TrendingDown
-  const color = isUp ? 'text-red-500' : 'text-emerald-500'
+  const color = isUp ? 'text-negative' : 'text-positive'
 
   return (
     <span className={`inline-flex items-center gap-0.5 ${color}`}>
@@ -54,7 +54,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Weekoverzicht" href={href}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${overBudget ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
           {formatCurrency(weekExpenses)}
         </p>
       </WidgetShell>
@@ -65,14 +65,14 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Weekoverzicht" href={href}>
-        <p className={`font-mono text-lg font-semibold tabular-nums ${overBudget ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+        <p className={`font-mono text-lg font-semibold tabular-nums ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
           {formatCurrency(weekExpenses)}
         </p>
         {weekBudget > 0 && (
           <>
             <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--subtle)] overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${overBudget ? 'bg-red-500' : budgetPct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                className={`h-full rounded-full transition-all ${overBudget ? 'bg-negative' : budgetPct > 80 ? 'bg-[var(--ink-3)]' : 'bg-positive'}`}
                 style={{ width: `${Math.min(budgetPct, 100)}%` }}
               />
             </div>
@@ -97,7 +97,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
       <WidgetShell module="kern" size={size} kicker="Weekoverzicht" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className={`font-mono text-xl font-semibold tabular-nums ${overBudget ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+            <p className={`font-mono text-xl font-semibold tabular-nums ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
               {formatCurrency(weekExpenses)}
             </p>
             <DeltaIndicator current={weekExpenses} previous={prevWeekExpenses} compact />
@@ -147,7 +147,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <p className={`font-mono text-lg font-semibold tabular-nums ${overBudget ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+              <p className={`font-mono text-lg font-semibold tabular-nums ${overBudget ? 'text-negative' : 'text-[var(--ink)]'}`}>
                 {formatCurrency(weekExpenses)}
               </p>
               <DeltaIndicator current={weekExpenses} previous={prevWeekExpenses} />
@@ -226,8 +226,8 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
         <div className="flex items-center justify-between">
           <p className="text-xs text-[var(--ink-3)]">vs. vorige week totaal</p>
           <div className="flex items-center gap-1">
-            {weekDelta > 0 ? <TrendingUp className="h-3 w-3 text-red-500" /> : weekDelta < 0 ? <TrendingDown className="h-3 w-3 text-emerald-500" /> : <Minus className="h-3 w-3 text-[var(--ink-4)]" />}
-            <p className={`font-mono text-sm tabular-nums ${weekDelta > 0 ? 'text-red-600' : weekDelta < 0 ? 'text-emerald-600' : 'text-[var(--ink-3)]'}`}>
+            {weekDelta > 0 ? <TrendingUp className="h-3 w-3 text-negative" /> : weekDelta < 0 ? <TrendingDown className="h-3 w-3 text-positive" /> : <Minus className="h-3 w-3 text-[var(--ink-4)]" />}
+            <p className={`font-mono text-sm tabular-nums ${weekDelta > 0 ? 'text-negative' : weekDelta < 0 ? 'text-positive' : 'text-[var(--ink-3)]'}`}>
               {weekDelta > 0 ? '+' : ''}{weekDeltaPct}%
             </p>
             <span className="font-mono text-[10px] tabular-nums text-[var(--ink-4)] ml-0.5">

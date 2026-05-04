@@ -28,7 +28,7 @@ export async function GET() {
 
   try {
     // Test 1: Verify that the holdings table is queryable
-    const { error: tableCheck } = await supabase.from('holdings').select('id').limit(0)
+    const { error: tableCheck } = await supabase.from('investment_holdings').select('id').limit(0)
 
     results.push({
       test: 'Holdings table exists',
@@ -45,7 +45,7 @@ export async function GET() {
 
       // Create first holding
       const { data: h1, error: e1 } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .insert({
           user_id: user.id,
           asset_id: null,
@@ -82,7 +82,7 @@ export async function GET() {
 
         // Check for existing duplicates using the same logic as the API
         const { data: dupes } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .select('id, name, ticker, asset_id')
           .eq('user_id', user.id)
           .eq('is_active', true)
@@ -97,7 +97,7 @@ export async function GET() {
         // Test 4: Case-insensitive detection
         const tickerLower = testTicker.toLowerCase()
         const { data: dupesLower } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .select('id, name, ticker')
           .eq('user_id', user.id)
           .eq('is_active', true)
@@ -111,7 +111,7 @@ export async function GET() {
 
         // Test 5: force_duplicate flag creates second holding
         const { data: h2, error: e2 } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .insert({
             user_id: user.id,
             asset_id: null,
@@ -132,7 +132,7 @@ export async function GET() {
 
         // Verify two holdings now exist with same ticker
         const { data: allDupes } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .select('id, name, ticker')
           .eq('user_id', user.id)
           .eq('is_active', true)
@@ -146,13 +146,13 @@ export async function GET() {
 
         // Clean up
         await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .delete()
           .eq('user_id', user.id)
           .ilike('ticker', testTicker)
 
         const { data: afterClean } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .select('id')
           .eq('user_id', user.id)
           .ilike('ticker', testTicker)

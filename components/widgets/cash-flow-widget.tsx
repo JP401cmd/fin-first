@@ -132,7 +132,7 @@ function ComparisonBar({ label, current, previous, color, hasEntered }: Comparis
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{label}</span>
         {previous > 0 && (
-          <span className={`text-[10px] font-mono tabular-nums ${delta > 0 ? 'text-red-500' : delta < 0 ? 'text-emerald-600' : 'text-[var(--ink-4)]'}`}>
+          <span className={`text-[10px] font-mono tabular-nums ${delta > 0 ? 'text-negative' : delta < 0 ? 'text-positive' : 'text-[var(--ink-4)]'}`}>
             {delta > 0 ? '+' : ''}{Math.round(delta)}%
           </span>
         )}
@@ -190,7 +190,7 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Cashflow Maand" href={href}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-positive' : 'text-negative'}`}>
           {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
         </p>
       </WidgetShell>
@@ -210,7 +210,7 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
-        <p className={`font-mono text-lg font-semibold tabular-nums ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+        <p className={`font-mono text-lg font-semibold tabular-nums ${isPositive ? 'text-positive' : 'text-negative'}`}>
           {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
         </p>
         {freedomDays !== null && (
@@ -230,7 +230,7 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
       <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
+            <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
               {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
             </p>
             {freedomStr && (
@@ -242,15 +242,15 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
           <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
             <div className="flex justify-between text-[11px] text-[var(--ink-3)]">
               <span>Inkomsten</span>
-              <span className="font-mono tabular-nums text-emerald-700">+{formatCurrency(monthlyIncome)}</span>
+              <span className="font-mono tabular-nums text-positive">+{formatCurrency(monthlyIncome)}</span>
             </div>
             <div className="flex justify-between text-[11px] text-[var(--ink-3)]">
               <span>Uitgaven</span>
-              <span className="font-mono tabular-nums text-red-600">-{formatCurrency(monthlyExpenses)}</span>
+              <span className="font-mono tabular-nums text-negative">-{formatCurrency(monthlyExpenses)}</span>
             </div>
             <div className="border-t border-dashed border-[var(--border-ed)] pt-1 flex justify-between text-[11px]">
               <span className="text-[var(--ink-3)]">Netto</span>
-              <span className={`font-mono tabular-nums font-medium ${isPositive ? 'text-emerald-700' : 'text-red-600'}`}>
+              <span className={`font-mono tabular-nums font-medium ${isPositive ? 'text-positive' : 'text-negative'}`}>
                 {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
               </span>
             </div>
@@ -274,7 +274,7 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Netto cashflow
             </p>
-            <p className={`font-mono tabular-nums text-2xl font-semibold ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
+            <p className={`font-mono tabular-nums text-2xl font-semibold ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
               {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
             </p>
           </div>
@@ -306,11 +306,11 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
         {/* ── Income vs Expenses summary row ── */}
         <div className="mt-2 flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2.5 py-1.5">
           <div className="flex items-center gap-3 text-[11px]">
-            <span className="font-mono tabular-nums text-emerald-700">+{formatCurrency(monthlyIncome)}</span>
-            <span className="text-[var(--ink-4)]">−</span>
-            <span className="font-mono tabular-nums text-red-600">{formatCurrency(monthlyExpenses)}</span>
+            <span className="font-mono tabular-nums text-positive">+{formatCurrency(monthlyIncome)}</span>
+            <span className="text-[var(--ink-4)]">ˆ’</span>
+            <span className="font-mono tabular-nums text-negative">{formatCurrency(monthlyExpenses)}</span>
           </div>
-          <span className={`font-mono tabular-nums text-[11px] font-semibold ${isPositive ? 'text-emerald-700' : 'text-red-600'}`}>
+          <span className={`font-mono tabular-nums text-[11px] font-semibold ${isPositive ? 'text-positive' : 'text-negative'}`}>
             = {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
           </span>
         </div>

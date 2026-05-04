@@ -214,6 +214,12 @@
   --negative: oklch(0.50 0.09 25);
   --neutral-change: oklch(0.67 0.005 88);
 
+  /* ── Score-tier tokens (gezondheidsscore, performance, ...) ── */
+  --score-good: oklch(0.50 0.13 162);
+  --score-ok:   oklch(0.55 0.10 200);
+  --score-warn: oklch(0.65 0.13 70);
+  --score-bad:  oklch(0.55 0.18 25);
+
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
@@ -396,6 +402,12 @@
   --color-positive: var(--positive);
   --color-negative: var(--negative);
   --color-neutral-change: var(--neutral-change);
+
+  /* ── Score-tier tokens (text-score-good, bg-score-bad, etc.) ── */
+  --color-score-good: var(--score-good);
+  --color-score-ok:   var(--score-ok);
+  --color-score-warn: var(--score-warn);
+  --color-score-bad:  var(--score-bad);
 }
 
 /* Landing page animations */

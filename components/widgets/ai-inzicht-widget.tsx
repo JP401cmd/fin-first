@@ -15,9 +15,9 @@ interface Props {
 }
 
 const MODULE_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
-  kern:    { bg: 'bg-amber-50 dark:bg-amber-950/30', text: 'text-amber-700 dark:text-amber-400', dot: 'bg-amber-500' },
-  wil:     { bg: 'bg-teal-50 dark:bg-teal-950/30', text: 'text-teal-700 dark:text-teal-400', dot: 'bg-teal-500' },
-  horizon: { bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-700 dark:text-purple-400', dot: 'bg-purple-500' },
+  kern:    { bg: 'bg-[var(--subtle)]', text: 'text-kern-600',    dot: 'bg-kern-500' },
+  wil:     { bg: 'bg-[var(--subtle)]', text: 'text-wil-600',     dot: 'bg-wil-500' },
+  horizon: { bg: 'bg-[var(--subtle)]', text: 'text-horizon-600', dot: 'bg-horizon-500' },
 }
 
 const MODULE_HREFS: Record<string, string> = {
@@ -47,7 +47,7 @@ export const AiInzichtWidget = memo(function AiInzichtWidget({ size, data, href 
   }
 
   const latest = aiInsights[0]
-  const colors = MODULE_COLORS[latest.module] ?? { bg: 'bg-gray-50', text: 'text-gray-600', dot: 'bg-gray-400' }
+  const colors = MODULE_COLORS[latest.module] ?? { bg: 'bg-[var(--subtle)]', text: 'text-[var(--ink-3)]', dot: 'bg-[var(--border-md)]' }
 
   // ── Mini: 'Nieuw' badge or latest insight module ──
   if (size === 'mini') {
@@ -133,7 +133,7 @@ export const AiInzichtWidget = memo(function AiInzichtWidget({ size, data, href 
             </p>
           </div>
           <div className="flex items-center justify-between">
-            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${colors.text} bg-white/60 dark:bg-black/20`}>
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${colors.text} bg-[var(--paper)]`}>
               {latest.module}
             </span>
             <span className="text-[10px] text-[var(--ink-4)]">

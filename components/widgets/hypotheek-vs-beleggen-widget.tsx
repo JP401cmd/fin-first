@@ -40,9 +40,9 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
       : 'Vrijwel gelijkwaardig'
 
   const adviesColor = aanbeveling === 'beleggen'
-    ? 'text-emerald-600'
+    ? 'text-positive'
     : aanbeveling === 'aflossen'
-      ? 'text-amber-600'
+      ? 'text-[var(--ink-2)]'
       : 'text-[var(--ink-3)]'
 
   const AdviesIcon = aanbeveling === 'beleggen' ? TrendingUp : aanbeveling === 'aflossen' ? Home : Scale
@@ -250,10 +250,10 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
           <div className="px-2 py-1.5 space-y-1">
             <div className="flex items-baseline justify-between text-[11px]">
               <span className="text-[var(--ink-2)] flex items-center gap-1">
-                <TrendingUp className="h-3 w-3 text-emerald-500" />
+                <TrendingUp className="h-3 w-3 text-positive" />
                 Beleggen
               </span>
-              <span className="font-mono tabular-nums text-emerald-600 font-medium">
+              <span className="font-mono tabular-nums text-positive font-medium">
                 +{formatCurrency(beleggenWinst)}
               </span>
             </div>
@@ -262,13 +262,13 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
                 <Home className="h-3 w-3 text-amber-500" />
                 Aflossen
               </span>
-              <span className="font-mono tabular-nums text-amber-600 font-medium">
+              <span className="font-mono tabular-nums text-[var(--ink-2)] font-medium">
                 +{formatCurrency(aflossenBesparing)}
               </span>
             </div>
             <div className="border-t border-[var(--border-ed)] pt-1 flex items-baseline justify-between text-[11px]">
               <span className="text-[var(--ink-3)]">Verschil</span>
-              <span className={`font-mono tabular-nums font-semibold ${verschil >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+              <span className={`font-mono tabular-nums font-semibold ${verschil >= 0 ? 'text-positive' : 'text-[var(--ink-2)]'}`}>
                 {verschil >= 0 ? '+' : ''}{formatCurrency(verschil)}
               </span>
             </div>

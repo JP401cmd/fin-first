@@ -33,7 +33,7 @@ function ReturnRing({
   const clampedPct = Math.min(100, Math.max(-100, Math.abs(pct)))
   const dashOffset = circumference - (clampedPct / 100) * circumference
   const isPositive = pct >= 0
-  const ringColor = isPositive ? '#059669' : '#dc2626'
+  const ringColor = isPositive ? 'var(--positive)' : 'var(--negative)'
 
   return (
     <svg width={diameter} height={diameter} viewBox={`0 0 ${diameter} ${diameter}`} className="shrink-0">
@@ -116,7 +116,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
             </div>
             <span
               className={`font-mono text-xs tabular-nums ${
-                isPositive ? 'text-emerald-600' : 'text-red-600'
+                isPositive ? 'text-positive' : 'text-negative'
               }`}
             >
               {changeSign}{holding.dailyChangePct.toFixed(2)}%
@@ -135,18 +135,18 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
             <KpiCell
               label="Rendement"
               value={`${returnPositive ? '+' : ''}${formatCurrency(returnAmount)}`}
-              color={returnPositive ? 'text-emerald-600' : 'text-red-600'}
+              color={returnPositive ? 'text-positive' : 'text-negative'}
             />
             <KpiCell
               label="Dagverandering"
               value={`${changeSign}${formatCurrency(dailyChangeAmount)}`}
-              color={isPositive ? 'text-emerald-600' : 'text-red-600'}
+              color={isPositive ? 'text-positive' : 'text-negative'}
             />
             <KpiCell label="Eenheden" value={holding.units.toLocaleString('nl-NL', { maximumFractionDigits: 4 })} />
             <KpiCell
               label="Totaal rendement"
               value={`${returnPositive ? '+' : ''}${holding.returnPct.toFixed(1)}%`}
-              color={returnPositive ? 'text-emerald-600' : 'text-red-600'}
+              color={returnPositive ? 'text-positive' : 'text-negative'}
             />
           </div>
         </div>
@@ -186,14 +186,14 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
             <div className="flex items-center gap-2">
               <span
                 className={`font-mono text-[11px] tabular-nums leading-none ${
-                  returnPositive ? 'text-emerald-600' : 'text-red-600'
+                  returnPositive ? 'text-positive' : 'text-negative'
                 }`}
               >
                 {returnPositive ? '+' : ''}{formatCurrency(returnAmount)}
               </span>
               <span
                 className={`font-mono text-[11px] tabular-nums leading-none ${
-                  isPositive ? 'text-emerald-600' : 'text-red-600'
+                  isPositive ? 'text-positive' : 'text-negative'
                 }`}
               >
                 dag {changeSign}{holding.dailyChangePct.toFixed(1)}%
@@ -245,7 +245,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({ size, holding }
         </p>
         <span
           className={`font-mono text-xs tabular-nums leading-none whitespace-nowrap ${
-            isPositive ? 'text-emerald-600' : 'text-red-600'
+            isPositive ? 'text-positive' : 'text-negative'
           }`}
         >
           {changeSign}{holding.dailyChangePct.toFixed(1)}%

@@ -19,24 +19,24 @@ interface Props {
 // ── Color helpers ────────────────────────────────────────────
 
 function scoreColor(score: number): string {
-  if (score >= 80) return '#059669'   // emerald-600
-  if (score >= 60) return '#0d9488'   // teal-600
-  if (score >= 40) return '#d97706'   // amber-600
-  return '#dc2626'                     // red-600
+  if (score >= 80) return 'var(--score-good)'
+  if (score >= 60) return 'var(--score-ok)'
+  if (score >= 40) return 'var(--score-warn)'
+  return 'var(--score-bad)'
 }
 
 function scoreColorClass(score: number): string {
-  if (score >= 80) return 'text-emerald-600'
-  if (score >= 60) return 'text-teal-600'
-  if (score >= 40) return 'text-amber-600'
-  return 'text-red-600'
+  if (score >= 80) return 'text-score-good'
+  if (score >= 60) return 'text-score-ok'
+  if (score >= 40) return 'text-score-warn'
+  return 'text-score-bad'
 }
 
 function barColorClass(score: number): string {
-  if (score >= 80) return 'bg-emerald-500'
-  if (score >= 60) return 'bg-teal-500'
-  if (score >= 40) return 'bg-amber-500'
-  return 'bg-red-500'
+  if (score >= 80) return 'bg-score-good'
+  if (score >= 60) return 'bg-score-ok'
+  if (score >= 40) return 'bg-score-warn'
+  return 'bg-score-bad'
 }
 
 // ── Full-circle gauge SVG ────────────────────────────────────
@@ -176,9 +176,9 @@ function RadarChart({ pillars, sz }: { pillars: HealthPillar[]; sz: number }) {
       {/* Data polygon */}
       <path
         d={dataPath}
-        fill="var(--horizon-500)"
+        fill="var(--color-horizon-500)"
         fillOpacity={0.15}
-        stroke="var(--horizon-500)"
+        stroke="var(--color-horizon-500)"
         strokeWidth={1.5}
       />
 
@@ -189,7 +189,7 @@ function RadarChart({ pillars, sz }: { pillars: HealthPillar[]; sz: number }) {
           cx={pt.x}
           cy={pt.y}
           r={2.5}
-          fill="var(--horizon-500)"
+          fill="var(--color-horizon-500)"
         />
       ))}
 
@@ -237,14 +237,14 @@ function PillarRow({ pillar }: { pillar: HealthPillar }) {
 function TrendBadge({ trend }: { trend: number }) {
   if (trend > 0) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-600">
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-positive">
         <TrendingUp className="h-3 w-3" /> +{trend}
       </span>
     )
   }
   if (trend < 0) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-red-600">
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-negative">
         <TrendingDown className="h-3 w-3" /> {trend}
       </span>
     )

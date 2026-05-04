@@ -42,9 +42,9 @@ function getOverallSeverity(drifts: DriftResult[], threshold = 5): DriftSeverity
 }
 
 const SEVERITY_COLORS: Record<DriftSeverity, { dot: string; bar: string; text: string }> = {
-  green: { dot: 'bg-emerald-500', bar: 'bg-emerald-500', text: 'text-emerald-600' },
-  orange: { dot: 'bg-amber-500', bar: 'bg-amber-500', text: 'text-amber-600' },
-  red: { dot: 'bg-red-500', bar: 'bg-red-500', text: 'text-red-600' },
+  green: { dot: 'bg-positive', bar: 'bg-positive', text: 'text-positive' },
+  orange: { dot: 'bg-[var(--ink-3)]', bar: 'bg-[var(--ink-3)]', text: 'text-[var(--ink-2)]' },
+  red: { dot: 'bg-negative', bar: 'bg-negative', text: 'text-negative' },
 }
 
 export const RebalancingWidget = memo(function RebalancingWidget({ size, href }: Props) {
@@ -133,7 +133,7 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
       <WidgetShell module="kern" size="mini" kicker="Rebalancing" href={href}>
         <div className="flex items-center gap-2">
           <span className={`inline-block h-3 w-3 rounded-full ${SEVERITY_COLORS[overallSeverity].dot}`} />
-          <span className={`text-[12px] font-medium truncate ${isBalanced ? 'text-emerald-600' : SEVERITY_COLORS[overallSeverity].text}`}>
+          <span className={`text-[12px] font-medium truncate ${isBalanced ? 'text-positive' : SEVERITY_COLORS[overallSeverity].text}`}>
             {isBalanced ? 'In balans ✓' : biggestDrift ? `${biggestDrift.label} ${biggestDrift.drift_pct > 0 ? '+' : ''}${biggestDrift.drift_pct.toFixed(1)}%` : 'Drift'}
           </span>
         </div>
@@ -148,7 +148,7 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
       <WidgetShell module="kern" size={size} kicker="Rebalancing" href={href}>
         <div className="flex items-center gap-2 mb-1.5">
           <span className={`inline-block h-2.5 w-2.5 rounded-full ${SEVERITY_COLORS[overallSeverity].dot}`} />
-          <span className={`text-sm font-medium ${isBalanced ? 'text-emerald-600' : SEVERITY_COLORS[overallSeverity].text}`}>
+          <span className={`text-sm font-medium ${isBalanced ? 'text-positive' : SEVERITY_COLORS[overallSeverity].text}`}>
             {isBalanced ? 'Portfolio in balans ✓' : 'Portfolio drift'}
           </span>
         </div>
@@ -166,7 +166,7 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
           </div>
         )}
         {unclassifiedCount > 0 && (
-          <p className="text-[11px] text-amber-600 mt-1.5 flex items-center gap-1">
+          <p className="text-[11px] text-[var(--ink-2)] mt-1.5 flex items-center gap-1">
             <AlertTriangle className="h-3 w-3" />
             {unclassifiedCount} niet geclassificeerd
           </p>
@@ -187,7 +187,7 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
           {/* Status header */}
           <div className="flex items-center gap-2 mb-2">
             <span className={`inline-block h-2.5 w-2.5 rounded-full ${SEVERITY_COLORS[overallSeverity].dot}`} />
-            <span className={`text-sm font-medium ${isBalanced ? 'text-emerald-600' : SEVERITY_COLORS[overallSeverity].text}`}>
+            <span className={`text-sm font-medium ${isBalanced ? 'text-positive' : SEVERITY_COLORS[overallSeverity].text}`}>
               {isBalanced ? 'Portfolio in balans ✓' : 'Portfolio drift gedetecteerd'}
             </span>
           </div>
@@ -230,7 +230,7 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
 
           {/* Unclassified warning */}
           {unclassifiedCount > 0 && (
-            <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+            <p className="text-[11px] text-[var(--ink-2)] mt-2 flex items-center gap-1">
               <AlertTriangle className="h-3 w-3 flex-shrink-0" />
               <span>{unclassifiedCount} holding{unclassifiedCount > 1 ? 's' : ''} niet geclassificeerd</span>
             </p>
@@ -251,7 +251,7 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
         {/* Status header */}
         <div className="flex items-center gap-2 mb-2">
           <span className={`inline-block h-2.5 w-2.5 rounded-full ${SEVERITY_COLORS[overallSeverity].dot}`} />
-          <span className={`text-sm font-medium ${isBalanced ? 'text-emerald-600' : SEVERITY_COLORS[overallSeverity].text}`}>
+          <span className={`text-sm font-medium ${isBalanced ? 'text-positive' : SEVERITY_COLORS[overallSeverity].text}`}>
             {isBalanced ? 'Portfolio in balans ✓' : 'Portfolio drift gedetecteerd'}
           </span>
         </div>
@@ -333,7 +333,7 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, href }:
 
         {/* Unclassified warning */}
         {unclassifiedCount > 0 && (
-          <p className="text-[11px] text-amber-600 mb-1.5 flex items-center gap-1">
+          <p className="text-[11px] text-[var(--ink-2)] mb-1.5 flex items-center gap-1">
             <AlertTriangle className="h-3 w-3 flex-shrink-0" />
             <span>{unclassifiedCount} holding{unclassifiedCount > 1 ? 's' : ''} niet geclassificeerd</span>
           </p>

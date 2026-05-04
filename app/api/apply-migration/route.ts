@@ -705,7 +705,7 @@ export async function GET() {
   const holdingsColumns = ['asset_class', 'sector', 'geography', 'previous_close', 'daily_change_percent', 'is_favorite', 'currency']
   const holdingsColumnStatus: Record<string, boolean> = {}
   for (const col of holdingsColumns) {
-    const { error } = await supabase.from('holdings').select(col).limit(0)
+    const { error } = await supabase.from('investment_holdings').select(col).limit(0)
     holdingsColumnStatus[col] = !error || !error.message.includes('does not exist')
   }
 

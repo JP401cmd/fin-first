@@ -107,7 +107,12 @@ export function DoelenStrook({
 
   return (
     <FeatureGate featureId="doelen_systeem" fallback="hidden">
-      <section id="doelen" className="space-y-4">
+      <section
+        id="doelen"
+        className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)]"
+      >
+        <div aria-hidden className="h-[3px] w-full bg-wil-500" />
+        <div className="space-y-4 p-5">
         {/* Section header — kicker · label · count + "Nieuw doel" CTA */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
@@ -211,6 +216,7 @@ export function DoelenStrook({
             }}
           />
         )}
+        </div>
       </section>
     </FeatureGate>
   )

@@ -21,7 +21,7 @@ export async function GET() {
 
   // ── Test 1: Holdings table exists in Supabase ──
   try {
-    const { error } = await supabase.from('holdings').select('id').limit(0)
+    const { error } = await supabase.from('investment_holdings').select('id').limit(0)
     const exists = !error || !error.message.includes('Could not find')
     results.push({
       name: 'Holdings table exists in Supabase',
@@ -39,7 +39,7 @@ export async function GET() {
     const apiPath = join(process.cwd(), 'app', 'api', 'holdings', 'route.ts')
     const apiCode = readFileSync(apiPath, 'utf-8')
 
-    const queriesSupabase = apiCode.includes("supabase.from('holdings')") || apiCode.includes('supabase.from("holdings")')
+    const queriesSupabase = apiCode.includes("supabase.from('investment_holdings')") || apiCode.includes('supabase.from("investment_holdings")')
     const hasUserFilter = apiCode.includes("eq('user_id', user.id)")
     const hasActiveFilter = apiCode.includes("eq('is_active', true)")
     const computesTotalValue = apiCode.includes('total_value') && apiCode.includes('current_price')
@@ -49,7 +49,7 @@ export async function GET() {
       name: 'API queries real Supabase holdings table',
       pass: queriesSupabase,
       detail: queriesSupabase
-        ? 'GET /api/holdings contains supabase.from("holdings") query'
+        ? 'GET /api/holdings contains supabase.from("investment_holdings") query'
         : 'Missing Supabase query in API handler',
     })
 
@@ -205,7 +205,7 @@ export async function GET() {
     const createdIds: string[] = []
     try {
       const { data: created, error: createErr } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .insert({
           user_id: user.id,
           name: 'TEST_DONUT_VERIFY',
@@ -228,12 +228,12 @@ export async function GET() {
 
       // Cleanup
       for (const id of createdIds) {
-        await supabase.from('holdings').delete().eq('id', id)
+        await supabase.from('investment_holdings').delete().eq('id', id)
       }
     } catch (e) {
       results.push({ name: 'Live CRUD test', pass: false, detail: `Exception: ${e}` })
       for (const id of createdIds) {
-        try { await supabase.from('holdings').delete().eq('id', id) } catch { /* cleanup */ }
+        try { await supabase.from('investment_holdings').delete().eq('id', id) } catch { /* cleanup */ }
       }
     }
   } else {

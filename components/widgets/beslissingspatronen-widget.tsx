@@ -95,7 +95,7 @@ export const BeslissingspatronenWidget = memo(function BeslissingspatronenWidget
                   +{Math.round(pattern.days)}d
                 </span>
               </div>
-              <div className="h-2 w-full rounded-full bg-wil-50">
+              <div className="h-2 w-full rounded-full bg-[var(--subtle)]">
                 <div
                   className="h-2 rounded-full bg-wil-400 transition-all duration-500"
                   style={{ width: `${Math.max(pct, 4)}%` }}

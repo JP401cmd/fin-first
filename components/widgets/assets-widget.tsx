@@ -4,32 +4,17 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import type { DashboardData } from './widget-renderer'
 import { Landmark } from 'lucide-react'
 
-const ASSET_COLORS: Record<string, string> = {
-  savings:     '#3b82f6',
-  investment:  '#10b981',
-  retirement:  '#8b5cf6',
-  eigen_huis:  '#d97706',
-  real_estate: '#f59e0b',
-  crypto:      '#f97316',
-  vehicle:     '#6366f1',
-  physical:    '#ec4899',
-  other:       '#71717a',
-}
-
-const ASSET_LABELS: Record<string, string> = {
-  savings:     'Spaargeld',
-  investment:  'Beleggingen',
-  retirement:  'Pensioen',
-  eigen_huis:  'Eigen woning',
-  real_estate: 'Vastgoed',
-  crypto:      'Crypto',
-  vehicle:     'Voertuig',
-  physical:    'Fysiek',
-  other:       'Overig',
-}
+// Onderscheid tussen klasses gebeurt via labels naast kleur-dots — kleur-as is
+// luminantie binnen kern-bruin (zie lib/asset-data.ts). 'overig' is geen
+// AssetType maar een aggregate-bucket die altijd de fallback-tint krijgt.
+const getAssetColor = (type: string): string =>
+  ASSET_TYPE_COLORS[type as AssetType] ?? ASSET_TYPE_COLORS.other
+const getAssetLabel = (type: string): string =>
+  ASSET_TYPE_LABELS[type as AssetType] ?? (type === 'overig' ? 'Overig' : type)
 
 interface Props {
   size: WidgetSize
@@ -84,9 +69,9 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
                 key={a.type}
                 style={{
                   width: `${(a.value / totalAssets) * 100}%`,
-                  backgroundColor: ASSET_COLORS[a.type] ?? '#71717a',
+                  backgroundColor: getAssetColor(a.type),
                 }}
-                title={`${ASSET_LABELS[a.type] ?? a.type}: ${formatCurrency(a.value)}`}
+                title={`${getAssetLabel(a.type)}: ${formatCurrency(a.value)}`}
               />
             ))}
           </div>
@@ -120,7 +105,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
               Totaal actief vermogen
             </p>
             {monthlyContributions > 0 && (
-              <p className="font-mono text-xs text-emerald-700 tabular-nums">
+              <p className="font-mono text-xs text-positive tabular-nums">
                 +{formatCurrency(monthlyContributions)}/mnd
               </p>
             )}
@@ -134,9 +119,9 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
                     key={a.type}
                     style={{
                       width: `${(a.value / totalAssets) * 100}%`,
-                      backgroundColor: ASSET_COLORS[a.type] ?? '#71717a',
+                      backgroundColor: getAssetColor(a.type),
                     }}
-                    title={`${ASSET_LABELS[a.type] ?? a.type}: ${formatCurrency(a.value)}`}
+                    title={`${getAssetLabel(a.type)}: ${formatCurrency(a.value)}`}
                   />
                 ))}
               </div>
@@ -147,8 +132,8 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
               return (
                 <div key={a.type} className="flex items-center justify-between text-[11px]">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: ASSET_COLORS[a.type] ?? '#71717a' }} />
-                    <span className="text-[var(--ink-2)] truncate">{ASSET_LABELS[a.type] ?? a.type}</span>
+                    <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: getAssetColor(a.type) }} />
+                    <span className="text-[var(--ink-2)] truncate">{getAssetLabel(a.type)}</span>
                   </div>
                   <span className="font-mono tabular-nums text-[var(--ink-3)] shrink-0 ml-1">{Math.round(pct)}%</span>
                 </div>
@@ -180,9 +165,9 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
               key={a.type}
               style={{
                 width: `${(a.value / totalAssets) * 100}%`,
-                backgroundColor: ASSET_COLORS[a.type] ?? '#71717a',
+                backgroundColor: getAssetColor(a.type),
               }}
-              title={`${ASSET_LABELS[a.type] ?? a.type}: ${formatCurrency(a.value)}`}
+              title={`${getAssetLabel(a.type)}: ${formatCurrency(a.value)}`}
             />
           ))}
         </div>
@@ -192,7 +177,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
         Totaal actief vermogen
       </p>
       {monthlyContributions > 0 && (
-        <p className="font-mono text-sm text-emerald-700 tabular-nums">
+        <p className="font-mono text-sm text-positive tabular-nums">
           +{formatCurrency(monthlyContributions)} / maand
         </p>
       )}
@@ -214,7 +199,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
               <div className="mb-1 flex items-baseline justify-between text-[11px]">
                 <span className="text-[var(--ink-3)]">Ongerealiseerde winst</span>
                 <span
-                  className={`font-mono font-semibold tabular-nums ${unrealizedGain >= 0 ? 'text-emerald-700' : 'text-red-600'}`}
+                  className={`font-mono font-semibold tabular-nums ${unrealizedGain >= 0 ? 'text-positive' : 'text-negative'}`}
                 >
                   {unrealizedGain >= 0 ? '+' : ''}
                   {formatCurrency(unrealizedGain)}
@@ -230,7 +215,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
             {/* Per-type rows — max 3 + overig */}
             {displayRows.map(a => {
               const pct = totalAssets > 0 ? (a.value / totalAssets) * 100 : 0
-              const color = ASSET_COLORS[a.type] ?? '#71717a'
+              const color = getAssetColor(a.type)
               return (
                 <div key={a.type}>
                   <div className="flex items-center justify-between text-[11px] mb-0.5">
@@ -240,7 +225,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
                         style={{ backgroundColor: color }}
                       />
                       <span className="text-[var(--ink-2)] truncate">
-                        {ASSET_LABELS[a.type] ?? (a.type === 'overig' ? 'Overig' : a.type)}
+                        {getAssetLabel(a.type)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

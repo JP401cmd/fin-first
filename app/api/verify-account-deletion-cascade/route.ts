@@ -217,7 +217,7 @@ export async function GET() {
     // ── Test 13: Database-level ON DELETE CASCADE on holdings ──
     {
       const { error } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .select('user_id', { count: 'exact', head: true })
         .eq('user_id', testUserId)
       results.push({

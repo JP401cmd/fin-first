@@ -24,9 +24,9 @@ function getTerSeverity(ter: number): TerSeverity {
 }
 
 const SEVERITY_TEXT: Record<TerSeverity, string> = {
-  green: 'text-emerald-600',
-  orange: 'text-amber-600',
-  red: 'text-red-600',
+  green: 'text-positive',
+  orange: 'text-[var(--ink-2)]',
+  red: 'text-negative',
 }
 
 export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: Props) {
@@ -64,7 +64,7 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
         {/* ── Summary header ── */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className={`inline-block h-3 w-3 rounded-full ${severity === 'green' ? 'bg-emerald-500' : severity === 'orange' ? 'bg-amber-500' : 'bg-red-500'}`} />
+            <span className={`inline-block h-3 w-3 rounded-full ${severity === 'green' ? 'bg-positive' : severity === 'orange' ? 'bg-[var(--ink-3)]' : 'bg-negative'}`} />
             <span className={`text-lg font-semibold ${SEVERITY_TEXT[severity]}`}>
               {terPctStr}% gewogen TER
             </span>
@@ -134,14 +134,14 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
 
         {/* ── Holdings without TER ── */}
         {holdingsNoTer.length > 0 && (
-          <div className="rounded-lg border border-amber-200 dark:border-amber-800/30 bg-amber-50/50 dark:bg-amber-950/10 p-4">
+          <div className="rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] p-4">
             <div className="flex items-start gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 text-[var(--ink-2)] mt-0.5 flex-shrink-0" />
+              <h3 className="text-sm font-medium text-[var(--ink)]">
                 {holdingsNoTer.length} holding{holdingsNoTer.length > 1 ? 's' : ''} zonder TER
               </h3>
             </div>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
+            <p className="text-xs text-[var(--ink-2)] mb-3">
               Vul de TER in voor een nauwkeuriger kostenbeeld. Individuele aandelen hebben geen TER.
             </p>
             <div className="space-y-1.5">
@@ -153,7 +153,7 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
                   </span>
                   <a
                     href="/core/assets"
-                    className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[var(--ink-2)] hover:underline"
                   >
                     Vul TER in <ArrowRight className="h-3 w-3" />
                   </a>
@@ -183,7 +183,7 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
                           ? berekenJaarlijkseBesparing(result.fund.ter, alt.ter, holding.value)
                           : 0
                         return (
-                          <div key={alt.isin} className="flex items-start justify-between gap-3 pl-3 border-l-2 border-emerald-300">
+                          <div key={alt.isin} className="flex items-start justify-between gap-3 pl-3 border-l-2 border-positive">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-[var(--ink-2)] truncate">{alt.name}</p>
                               <p className="text-xs text-[var(--ink-4)]">
@@ -195,7 +195,7 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
                             </div>
                             {saving > 0 && (
                               <div className="text-right flex-shrink-0">
-                                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-positive">
                                   <TrendingDown className="h-3 w-3" />
                                   {formatCurrency(saving)}/jaar
                                 </span>

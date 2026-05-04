@@ -765,20 +765,16 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
   return (
     <div className="mt-8 space-y-6">
       {expenseGroup && (
-        <div className="flex justify-center">
-          <div className="w-full max-w-2xl">
-            <TypeDonut
-              key={expenseGroup.type}
-              budgetType={expenseGroup.type}
-              segments={expenseGroup.segments}
-              onNavigate={onNavigate}
-              hiddenBudgets={hiddenBudgets}
-              onToggleHidden={toggleHidden}
-              isCollapsed={collapsedTypes.has(expenseGroup.type)}
-              onToggleCollapse={() => toggleCollapsedType(expenseGroup.type)}
-            />
-          </div>
-        </div>
+        <TypeDonut
+          key={expenseGroup.type}
+          budgetType={expenseGroup.type}
+          segments={expenseGroup.segments}
+          onNavigate={onNavigate}
+          hiddenBudgets={hiddenBudgets}
+          onToggleHidden={toggleHidden}
+          isCollapsed={collapsedTypes.has(expenseGroup.type)}
+          onToggleCollapse={() => toggleCollapsedType(expenseGroup.type)}
+        />
       )}
 
       {restGroups.length > 0 && (

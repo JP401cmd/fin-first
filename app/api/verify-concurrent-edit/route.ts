@@ -61,14 +61,14 @@ export async function GET() {
     // Test 5: If we have auth, do an actual concurrent edit simulation
     if (user) {
       // Check if holdings table exists
-      const { error: tableCheck } = await supabase.from('holdings').select('id').limit(0)
+      const { error: tableCheck } = await supabase.from('investment_holdings').select('id').limit(0)
       const hasHoldingsTable = !tableCheck || !tableCheck.message.includes('Could not find')
 
       if (hasHoldingsTable) {
         // Create a test holding
         const testName = `CONFLICT_TEST_${Date.now()}`
         const { data: testHolding, error: createErr } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .insert({
             user_id: user.id,
             name: testName,
@@ -97,7 +97,7 @@ export async function GET() {
 
           // Simulate "Tab 1" saves first — updates units to 15
           const { error: tab1Err } = await supabase
-            .from('holdings')
+            .from('investment_holdings')
             .update({ units: 15, updated_at: new Date().toISOString() })
             .eq('id', testHolding.id)
             .eq('user_id', user.id)
@@ -117,7 +117,7 @@ export async function GET() {
 
             // Verify updated_at has changed
             const { data: afterTab1 } = await supabase
-              .from('holdings')
+              .from('investment_holdings')
               .select('updated_at, units')
               .eq('id', testHolding.id)
               .single()
@@ -161,7 +161,7 @@ export async function GET() {
 
             // Test: force overwrite without expected_updated_at works
             const { data: forceResult, error: forceErr } = await supabase
-              .from('holdings')
+              .from('investment_holdings')
               .update({ units: 20, updated_at: new Date().toISOString() })
               .eq('id', testHolding.id)
               .eq('user_id', user.id)
@@ -176,7 +176,7 @@ export async function GET() {
 
             // Test: verify no data corruption — row is consistent
             const { data: finalRow } = await supabase
-              .from('holdings')
+              .from('investment_holdings')
               .select('*')
               .eq('id', testHolding.id)
               .single()
@@ -196,7 +196,7 @@ export async function GET() {
 
           // Cleanup: delete the test holding
           await supabase
-            .from('holdings')
+            .from('investment_holdings')
             .delete()
             .eq('id', testHolding.id)
             .eq('user_id', user.id)

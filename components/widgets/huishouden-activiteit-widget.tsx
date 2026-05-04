@@ -124,7 +124,7 @@ export const HuishoudenActiviteitWidget = memo(function HuishoudenActiviteitWidg
               </div>
             </div>
             <span className={`font-mono tabular-nums text-sm shrink-0 ${
-              item.amount < 0 ? 'text-[var(--ink)]' : 'text-emerald-600'
+              item.amount < 0 ? 'text-[var(--ink)]' : 'text-positive'
             }`}>
               {formatCurrency(item.amount)}
             </span>

@@ -2,31 +2,15 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import type { DashboardData } from './widget-renderer'
 
-const ASSET_COLORS: Record<string, string> = {
-  savings:     '#3b82f6',
-  investment:  '#10b981',
-  retirement:  '#8b5cf6',
-  eigen_huis:  '#d97706',
-  real_estate: '#f59e0b',
-  crypto:      '#f97316',
-  vehicle:     '#6366f1',
-  physical:    '#ec4899',
-  other:       '#71717a',
-}
-
-const ASSET_LABELS: Record<string, string> = {
-  savings:     'Spaargeld',
-  investment:  'Beleggingen',
-  retirement:  'Pensioen',
-  eigen_huis:  'Eigen woning',
-  real_estate: 'Vastgoed',
-  crypto:      'Crypto',
-  vehicle:     'Voertuig',
-  physical:    'Fysiek',
-  other:       'Overig',
-}
+// investment/retirement/crypto delen kern-500 in het editorial palette — onderscheid
+// gaat via tekst-labels naast kleur-dots (zie lib/asset-data.ts comment).
+const getAssetColor = (type: string): string =>
+  ASSET_TYPE_COLORS[type as AssetType] ?? ASSET_TYPE_COLORS.other
+const getAssetLabel = (type: string): string =>
+  ASSET_TYPE_LABELS[type as AssetType] ?? (type === 'overig' ? 'Overig' : type)
 
 const INVESTMENT_TYPES = new Set(['investment', 'retirement', 'crypto'])
 
@@ -122,12 +106,12 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
           <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
             {top2.map(a => {
               const pct = totalInvestments > 0 ? (a.value / totalInvestments) * 100 : 0
-              const color = ASSET_COLORS[a.type] ?? '#71717a'
+              const color = getAssetColor(a.type)
               return (
                 <div key={a.type} className="flex items-center justify-between text-[11px]">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                    <span className="text-[var(--ink-2)] truncate">{ASSET_LABELS[a.type] ?? a.type}</span>
+                    <span className="text-[var(--ink-2)] truncate">{getAssetLabel(a.type)}</span>
                   </div>
                   <span className="font-mono tabular-nums text-[var(--ink-3)] shrink-0 ml-1">{Math.round(pct)}%</span>
                 </div>
@@ -139,7 +123,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
               </p>
             )}
             {investmentContributions > 0 && (
-              <p className="font-mono text-[11px] text-emerald-700 tabular-nums">
+              <p className="font-mono text-[11px] text-positive tabular-nums">
                 +{formatCurrency(investmentContributions)}/mnd
               </p>
             )}
@@ -167,7 +151,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
           : 'Geen beleggingsactiva'}
       </p>
       {investmentContributions > 0 && (
-        <p className="font-mono text-sm text-emerald-700 tabular-nums">
+        <p className="font-mono text-sm text-positive tabular-nums">
           +{formatCurrency(investmentContributions)} / maand
         </p>
       )}
@@ -186,7 +170,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
           <div className="mt-3 space-y-1 border-t border-dashed border-[var(--border-ed)] pt-3">
             {displayRows.map(a => {
               const pct = totalInvestments > 0 ? (a.value / totalInvestments) * 100 : 0
-              const color = ASSET_COLORS[a.type] ?? '#71717a'
+              const color = getAssetColor(a.type)
               return (
                 <div key={a.type}>
                   <div className="flex items-center justify-between text-[11px] mb-0.5">
@@ -196,7 +180,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
                         style={{ backgroundColor: color }}
                       />
                       <span className="text-[var(--ink-2)] truncate">
-                        {ASSET_LABELS[a.type] ?? (a.type === 'overig' ? 'Overig' : a.type)}
+                        {getAssetLabel(a.type)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

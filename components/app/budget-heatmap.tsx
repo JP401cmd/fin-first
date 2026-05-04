@@ -447,7 +447,7 @@ function HeatmapTooltip({
 
       {/* Spent / limit */}
       <div className="mb-1.5 font-mono text-xs tabular-nums">
-        <span className={isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}>
+        <span className={isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink)]'}>
           {formatCurrency(rect.spent)}
         </span>
         <span className="text-[var(--ink-3)]"> / {formatCurrency(rect.limit)}</span>
@@ -455,7 +455,7 @@ function HeatmapTooltip({
 
       {/* Percentage bar */}
       <div className="mb-1.5">
-        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
           <div
             className="absolute inset-y-0 left-0 rounded-full transition-all"
             style={{
@@ -465,7 +465,7 @@ function HeatmapTooltip({
           />
         </div>
         <div className="mt-0.5 flex items-center justify-between">
-          <span className={`text-[10px] font-medium ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
+          <span className={`text-[10px] font-medium ${isOver ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}`}>
             {pct}%
           </span>
           {trend && (

@@ -13,9 +13,9 @@ interface Props {
 
 /** Color based on months covered: red <3m, orange 3-5m, green >=6m */
 function progressColor(months: number): { text: string; bar: string; bg: string } {
-  if (months >= 6) return { text: 'text-emerald-600', bar: 'bg-emerald-500', bg: 'bg-emerald-50' }
-  if (months >= 3) return { text: 'text-amber-600', bar: 'bg-amber-500', bg: 'bg-amber-50' }
-  return { text: 'text-red-600', bar: 'bg-red-500', bg: 'bg-red-50' }
+  if (months >= 6) return { text: 'text-positive', bar: 'bg-positive', bg: 'bg-positive/10' }
+  if (months >= 3) return { text: 'text-[var(--ink-2)]', bar: 'bg-[var(--ink-3)]', bg: 'bg-[var(--subtle)]' }
+  return { text: 'text-negative', bar: 'bg-negative', bg: 'bg-negative/10' }
 }
 
 export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href }: Props) {
@@ -58,7 +58,7 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
           />
         </div>
         {isComplete && (
-          <p className="mt-1 text-[10px] font-medium text-emerald-600">Compleet</p>
+          <p className="mt-1 text-[10px] font-medium text-positive">Compleet</p>
         )}
       </WidgetShell>
     )
@@ -73,7 +73,7 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
           <div className={`flex-shrink-0 rounded-md p-1.5 ${colors.bg}`}>
             <ShieldCheck className={`h-4 w-4 ${colors.text}`} strokeWidth={1.5} />
           </div>
-          <p className={`font-mono text-xl font-semibold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-[var(--ink)]'}`}>
+          <p className={`font-mono text-xl font-semibold tabular-nums ${isComplete ? 'text-positive' : 'text-[var(--ink)]'}`}>
             {monthsCovered.toFixed(1)}<span className="text-sm text-[var(--ink-3)]"> / {targetMonths} mnd</span>
           </p>
         </div>
@@ -94,7 +94,7 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
 
         {/* Freedom time or complete state */}
         {isComplete ? (
-          <p className="mt-1.5 font-serif italic text-[11px] text-emerald-600">
+          <p className="mt-1.5 font-serif italic text-[11px] text-positive">
             Noodfonds bereikt — {targetMonths} maanden ademruimte
           </p>
         ) : freedomStr ? (
@@ -125,11 +125,11 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
           <ShieldCheck className={`h-5 w-5 ${colors.text}`} strokeWidth={1.5} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-[var(--ink)]'}`}>
+          <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-positive' : 'text-[var(--ink)]'}`}>
             {monthsCovered.toFixed(1)}<span className="text-base text-[var(--ink-3)]"> / {targetMonths} maanden gedekt</span>
           </p>
           {isComplete && (
-            <p className="mt-0.5 text-sm font-medium text-emerald-600">
+            <p className="mt-0.5 text-sm font-medium text-positive">
               Noodfonds bereikt!
             </p>
           )}

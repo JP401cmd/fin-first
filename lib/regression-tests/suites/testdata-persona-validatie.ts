@@ -150,17 +150,84 @@ const tests: TestCase[] = [
     },
   },
 
+  // ── Landing-page persona's (spread van basis-persona's) ─────────────
+
+  {
+    id: 'tp-ronald-complete-data',
+    name: 'Ronald (pensioenplanner): complete persona data',
+    category: CAT,
+    description: 'Ronald is approaching retirement, all modules active',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      const ronald = p('ronald')
+      assertEqual(ronald.meta.name, 'Ronald Hoekstra', 'name')
+      assertEqual(ronald.meta.sovereignty, 'mastery', 'sovereignty = mastery')
+      assertGreaterThan(ronald.meta.netWorth, 500000, 'substantial net worth')
+      assertEqual(ronald.profile.full_name, 'Ronald Hoekstra', 'profile name overridden')
+      assertEqual(ronald.profile.date_of_birth, '1962-03-15', 'DOB overridden')
+    },
+  },
+
+  {
+    id: 'tp-bas-complete-data',
+    name: 'Bas (vermogensverdeler): complete persona data',
+    category: CAT,
+    description: 'Bas hit 100K with diversified portfolio',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      const bas = p('bas')
+      assertEqual(bas.meta.name, 'Bas Mulder', 'name')
+      assertGreaterThanOrEqual(bas.meta.netWorth, 100000, 'net worth >= 100K')
+      assertEqual(bas.profile.full_name, 'Bas Mulder', 'profile name overridden')
+      assertEqual(bas.profile.date_of_birth, '1981-09-22', 'DOB overridden')
+    },
+  },
+
+  {
+    id: 'tp-leo-complete-data',
+    name: 'Leo (budgetteerder): complete persona data',
+    category: CAT,
+    description: 'Leo has negative net worth, needs grip on spending',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      const leo = p('leo')
+      assertEqual(leo.meta.name, 'Leo Pietersen', 'name')
+      assertEqual(leo.meta.sovereignty, 'recovery', 'sovereignty = recovery')
+      assertLessThan(leo.meta.netWorth, 0, 'negative net worth')
+      assertEqual(leo.profile.full_name, 'Leo Pietersen', 'profile name overridden')
+    },
+  },
+
+  {
+    id: 'tp-jochen-complete-data',
+    name: 'Jochen (FIRE-strijder): complete persona data',
+    category: CAT,
+    description: 'Jochen is near FIRE with large portfolio',
+    priority: 'high',
+    estimatedDurationMs: 200,
+    fn() {
+      const jochen = p('jochen')
+      assertEqual(jochen.meta.name, 'Jochen Brouwer', 'name')
+      assertEqual(jochen.meta.sovereignty, 'mastery', 'sovereignty = mastery')
+      assertGreaterThan(jochen.meta.netWorth, 1000000, 'substantial net worth >1M')
+      assertEqual(jochen.profile.full_name, 'Jochen Brouwer', 'profile name overridden')
+    },
+  },
+
   // ── Step 2: Alle persona velden aanwezig ────────────────────────────
 
   {
     id: 'tp-all-personas-have-profile',
-    name: 'Alle 6 personas: profiel compleet',
+    name: 'Alle 10 personas: profiel compleet',
     category: CAT,
     description: 'Every persona has required profile fields',
     priority: 'critical',
     estimatedDurationMs: 300,
     fn() {
-      assertEqual(PERSONA_KEYS.length, 6, '6 personas')
+      assertEqual(PERSONA_KEYS.length, 10, '10 personas')
       for (const key of PERSONA_KEYS) {
         const persona = PERSONAS[key]
         assertNotNull(persona.profile.full_name, `${key}: full_name`)
@@ -486,10 +553,10 @@ const tests: TestCase[] = [
       // Verify the order is logically correct:
       // Children must be deleted BEFORE parents
       const deleteOrder = [
-        // batch 0: deepest holding children
-        'holding_transactions', 'holding_alerts', 'target_allocations',
+        // batch 0: deepest holding children (post-split holdings tables)
+        'investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations',
         // batch 0b: holdings (before assets in batch 3)
-        'holdings',
+        'investment_holdings', 'crypto_holdings',
         // batch 1a: deepest leaf tables
         'goal_contributions', 'category_corrections',
         // batch 1b: leaf tables
@@ -502,14 +569,18 @@ const tests: TestCase[] = [
         'recommendations', 'debts', 'assets', 'bank_accounts', 'budgets',
       ]
 
-      // holding_transactions before holdings
-      const htIdx = deleteOrder.indexOf('holding_transactions')
-      const hIdx = deleteOrder.indexOf('holdings')
-      assertLessThan(htIdx, hIdx, 'holding_transactions deleted before holdings')
+      // investment_transactions/crypto_transactions before *_holdings
+      const itIdx = deleteOrder.indexOf('investment_transactions')
+      const ihIdx = deleteOrder.indexOf('investment_holdings')
+      assertLessThan(itIdx, ihIdx, 'investment_transactions deleted before investment_holdings')
+      const ctIdx = deleteOrder.indexOf('crypto_transactions')
+      const chIdx = deleteOrder.indexOf('crypto_holdings')
+      assertLessThan(ctIdx, chIdx, 'crypto_transactions deleted before crypto_holdings')
 
-      // holdings before assets
+      // *_holdings before assets
       const aIdx = deleteOrder.indexOf('assets')
-      assertLessThan(hIdx, aIdx, 'holdings deleted before assets')
+      assertLessThan(ihIdx, aIdx, 'investment_holdings deleted before assets')
+      assertLessThan(chIdx, aIdx, 'crypto_holdings deleted before assets')
 
       // actions before recommendations
       const actIdx = deleteOrder.indexOf('actions')
@@ -626,14 +697,16 @@ const tests: TestCase[] = [
         'profiles', 'assets', 'bank_accounts', 'debts',
         'budgets', 'goals', 'life_events', 'net_worth_snapshots',
         'transactions', 'recommendations', 'actions',
-        'valuations', 'holdings', 'holding_transactions',
+        'valuations',
+        'investment_holdings', 'crypto_holdings',
+        'investment_transactions', 'crypto_transactions',
       ]
 
       // Tables that deleteAllUserData removes from:
       const deleteTables = [
-        'holding_transactions', 'holding_alerts', 'target_allocations',
+        'investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations',
         'user_feature_visits', 'next_step_completions',
-        'holdings',
+        'investment_holdings', 'crypto_holdings',
         'goal_contributions', 'category_corrections',
         'recommendation_feedback', 'budget_rollovers', 'recurring_transactions',
         'valuations', 'net_worth_snapshots', 'life_events', 'goals',
@@ -996,7 +1069,7 @@ export function register() {
   registerCategory({
     id: CAT,
     label: 'Data — Testdata',
-    description: 'Persona seed validatie: 6 personas, financiële consistentie, metadata constraints, idempotentie, gezondheids score',
+    description: 'Persona seed validatie: 10 personas, financiële consistentie, metadata constraints, idempotentie, gezondheids score',
     icon: 'Users',
     testCount: 0,
   })

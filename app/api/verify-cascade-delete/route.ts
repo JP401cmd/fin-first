@@ -32,7 +32,7 @@ export async function GET() {
   try {
     // ── Test 1: Holdings table exists ──────────────────────────
     const { error: tableError } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id')
       .limit(0)
 
@@ -201,7 +201,7 @@ export async function GET() {
     }))
 
     const { data: insertedHoldings, error: holdingsError } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .insert(holdingsToInsert)
       .select()
 
@@ -231,7 +231,7 @@ export async function GET() {
 
     // ── Test 5: Verify all 3 holdings exist before deletion ──
     const { data: holdingsBefore, error: beforeError } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id, name, asset_id')
       .eq('asset_id', asset.id)
       .like('name', `${TEST_PREFIX}%`)
@@ -271,7 +271,7 @@ export async function GET() {
     // Query by the specific holding IDs we created
     const holdingIds = insertedHoldings.map(h => h.id)
     const { data: holdingsAfter, error: afterError } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id, name, asset_id')
       .in('id', holdingIds)
 
@@ -292,7 +292,7 @@ export async function GET() {
 
     // ── Test 8: No orphans with test prefix ──────────────────
     const { data: orphanCheck, error: orphanError } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id, name, asset_id')
       .like('name', `${TEST_PREFIX}%`)
 
@@ -314,7 +314,7 @@ export async function GET() {
     })
   } finally {
     for (const holdingId of cleanupIds.holdings) {
-      await supabase.from('holdings').delete().eq('id', holdingId)
+      await supabase.from('investment_holdings').delete().eq('id', holdingId)
     }
     for (const assetId of cleanupIds.assets) {
       await supabase.from('assets').delete().eq('id', assetId)

@@ -57,7 +57,7 @@ function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: nu
             Bijna!
           </span>
         )}
-        <span className={`shrink-0 font-mono text-sm tabular-nums ${overdue ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+        <span className={`shrink-0 font-mono text-sm tabular-nums ${overdue ? 'text-negative' : 'text-[var(--ink)]'}`}>
           {pct}%
         </span>
       </div>
@@ -65,7 +65,7 @@ function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: nu
       {/* Voortgangsbalk */}
       <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
         <div
-          className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
+          className={`h-full rounded-full ${overdue ? 'bg-negative' : colors.bar}`}
           style={{
             width: hasEntered ? `${pct}%` : '0%',
             transition: hasEntered
@@ -77,7 +77,7 @@ function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: nu
 
       {/* Deadline */}
       {eta && (
-        <p className={`mt-0.5 font-mono text-[10px] tabular-nums ${overdue ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
+        <p className={`mt-0.5 font-mono text-[10px] tabular-nums ${overdue ? 'text-negative' : 'text-[var(--ink-4)]'}`}>
           {overdue ? 'Verlopen — ' : ''}{eta}
         </p>
       )}
@@ -141,7 +141,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
     const overdue = isOverdue(goal)
     const eta = etaLabel(goal)
     const colors = getGoalColorClasses(goal.color)
-    const pctColor = overdue ? 'text-red-600' : pct >= 90 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-[var(--ink)]'
+    const pctColor = overdue ? 'text-negative' : pct >= 90 ? 'text-positive' : pct >= 50 ? 'text-[var(--ink-2)]' : 'text-[var(--ink)]'
 
     return (
       <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
@@ -152,7 +152,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
           </p>
           <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
             <div
-              className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
+              className={`h-full rounded-full ${overdue ? 'bg-negative' : colors.bar}`}
               style={{
                 width: hasEntered ? `${pct}%` : '0%',
                 transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
@@ -160,7 +160,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
             />
           </div>
           {eta && (
-            <p className={`mt-0.5 font-mono text-[10px] tabular-nums ${overdue ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
+            <p className={`mt-0.5 font-mono text-[10px] tabular-nums ${overdue ? 'text-negative' : 'text-[var(--ink-4)]'}`}>
               {overdue ? 'Verlopen — ' : ''}{eta}
             </p>
           )}
@@ -200,13 +200,13 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
                     <div key={goal.id}>
                       <div className="flex items-center gap-1.5">
                         <span className="flex-1 min-w-0 text-[11px] text-[var(--ink)] truncate">{goal.name}</span>
-                        <span className={`shrink-0 font-mono text-[10px] tabular-nums ${overdue ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
+                        <span className={`shrink-0 font-mono text-[10px] tabular-nums ${overdue ? 'text-negative' : 'text-[var(--ink-3)]'}`}>
                           {pct}%
                         </span>
                       </div>
                       <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
                         <div
-                          className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
+                          className={`h-full rounded-full ${overdue ? 'bg-negative' : colors.bar}`}
                           style={{
                             width: hasEntered ? `${pct}%` : '0%',
                             transition: hasEntered ? `width ${500 + i * 80}ms cubic-bezier(.22,1,.36,1) ${i * 80}ms` : 'none',

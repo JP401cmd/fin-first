@@ -103,8 +103,8 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
             className="overflow-visible"
             aria-hidden="true"
           >
-            <path d={fillD} fill="var(--horizon-100, #e0f2fe)" opacity={0.5} />
-            <path d={pathD} fill="none" stroke="var(--horizon-500, #0ea5e9)" strokeWidth={2} />
+            <path d={fillD} fill="var(--color-horizon-100)" opacity={0.5} />
+            <path d={pathD} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2} />
           </svg>
         </div>
 
@@ -188,8 +188,8 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
           className="overflow-visible"
           aria-hidden="true"
         >
-          <path d={fillD} fill="var(--horizon-100, #e0f2fe)" opacity={0.5} />
-          <path d={pathD} fill="none" stroke="var(--horizon-500, #0ea5e9)" strokeWidth={2} />
+          <path d={fillD} fill="var(--color-horizon-100)" opacity={0.5} />
+          <path d={pathD} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2} />
           {/* Milestone dots and labels on the curve */}
           {milestones.map(({ year, label }) => {
             const cx = (year / maxYears) * svgWidth
@@ -201,14 +201,14 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
             const labelY = isLast ? Math.min(cy + 12, svgHeight) : Math.max(cy - 6, 8)
             return (
               <g key={year}>
-                <circle cx={cx} cy={cy} r={2.5} fill="var(--horizon-500, #0ea5e9)" />
+                <circle cx={cx} cy={cy} r={2.5} fill="var(--color-horizon-500)" />
                 <text
                   x={isFirst ? cx + 4 : isLast ? cx : cx}
                   y={labelY}
                   fontSize={8}
                   fontFamily="var(--font-mono, ui-monospace, monospace)"
                   fontWeight={isFirst || isLast ? 600 : 400}
-                  fill={isFirst ? 'var(--ink)' : isLast ? 'var(--horizon-700, #0369a1)' : 'var(--ink-3)'}
+                  fill={isFirst ? 'var(--ink)' : isLast ? 'var(--color-horizon-700)' : 'var(--ink-3)'}
                   textAnchor={isFirst ? 'start' : isLast ? 'end' : 'middle'}
                 >
                   {label}

@@ -25,11 +25,11 @@ export async function GET() {
   const supabase = await createClient()
 
   // Check if holdings table exists
-  const { error: tableCheck } = await supabase.from('holdings').select('id').limit(0)
+  const { error: tableCheck } = await supabase.from('investment_holdings').select('id').limit(0)
   const hasHoldingsTable = !tableCheck || !tableCheck.message?.includes('Could not find')
 
   // Check if holding_transactions table exists
-  const { error: txTableCheck } = await supabase.from('holding_transactions').select('id').limit(0)
+  const { error: txTableCheck } = await supabase.from('investment_transactions').select('id').limit(0)
   const hasTransactionsTable = !txTableCheck || !txTableCheck.message?.includes('Could not find')
 
   // Test 1: Backend sell logic uses Math.max(0, ...) — code analysis
@@ -111,7 +111,7 @@ export async function GET() {
       // Create a test holding with 10 units
       const testName = `SOLDOUT_TEST_${Date.now()}`
       const { data: testHolding, error: createErr } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .insert({
           user_id: user.id,
           name: testName,
@@ -126,7 +126,7 @@ export async function GET() {
       if (testHolding && !createErr) {
         // Simulate sell-all: update units to 0 (same as what the sell transaction handler does)
         const { data: updatedHolding, error: sellErr } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .update({
             units: Math.max(0, 10 - 10), // Sell all 10 units
             updated_at: new Date().toISOString(),
@@ -154,7 +154,7 @@ export async function GET() {
         })
 
         // Clean up test holding
-        await supabase.from('holdings').delete().eq('id', testHolding.id)
+        await supabase.from('investment_holdings').delete().eq('id', testHolding.id)
       } else {
         results.push({
           test: 'Integration: sell all units results in 0 units',

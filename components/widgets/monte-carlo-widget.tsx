@@ -39,8 +39,8 @@ export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, hre
     }
 
     const successColor =
-      successRate >= 85 ? 'text-emerald-600' :
-      successRate >= 65 ? 'text-amber-600' : 'text-red-600'
+      successRate >= 85 ? 'text-positive' :
+      successRate >= 65 ? 'text-[var(--ink-2)]' : 'text-negative'
 
     return (
       <WidgetShell module="horizon" size={size} kicker="Monte Carlo" href={href}>
@@ -71,12 +71,12 @@ export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, hre
     }
 
     const successColor =
-      successRate >= 85 ? 'text-emerald-600' :
-      successRate >= 65 ? 'text-amber-600' : 'text-red-600'
+      successRate >= 85 ? 'text-positive' :
+      successRate >= 65 ? 'text-[var(--ink-2)]' : 'text-negative'
 
     const bgColor =
-      successRate >= 85 ? 'bg-emerald-50' :
-      successRate >= 65 ? 'bg-amber-50' : 'bg-red-50'
+      successRate >= 85 ? 'bg-positive/10' :
+      successRate >= 65 ? 'bg-[var(--subtle)]' : 'bg-negative/10'
 
     return (
       <WidgetShell module="horizon" size={size} kicker="Monte Carlo" href={href}>
@@ -119,12 +119,12 @@ export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, hre
   }
 
   const successColor =
-    successRate >= 85 ? 'text-emerald-600' :
-    successRate >= 65 ? 'text-amber-600' : 'text-red-600'
+    successRate >= 85 ? 'text-positive' :
+    successRate >= 65 ? 'text-[var(--ink-2)]' : 'text-negative'
 
   const bgColor =
-    successRate >= 85 ? 'bg-emerald-50' :
-    successRate >= 65 ? 'bg-amber-50' : 'bg-red-50'
+    successRate >= 85 ? 'bg-positive/10' :
+    successRate >= 65 ? 'bg-[var(--subtle)]' : 'bg-negative/10'
 
   const successes = namedPaths?.filter(p => p.success).length ?? 0
   const total = namedPaths?.length ?? 0
@@ -150,11 +150,11 @@ export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, hre
       <div className="mt-2">
         <svg width="100%" height="60" viewBox="0 0 200 60" preserveAspectRatio="none" aria-label="Monte Carlo fan chart">
           {/* P10-P90 band */}
-          <path d="M0,50 C40,48 80,40 120,30 160,20 200,15 200,15 L200,55 C160,52 120,50 80,50 40,52 0,55 0,55 Z" fill="var(--horizon-500, #c4a06b)" fillOpacity="0.12" />
+          <path d="M0,50 C40,48 80,40 120,30 160,20 200,15 200,15 L200,55 C160,52 120,50 80,50 40,52 0,55 0,55 Z" fill="var(--color-horizon-500)" fillOpacity="0.12" />
           {/* P25-P75 band */}
-          <path d="M0,48 C40,44 80,36 120,28 160,22 200,18 200,18 L200,50 C160,48 120,46 80,46 40,48 0,52 0,52 Z" fill="var(--horizon-500, #c4a06b)" fillOpacity="0.15" />
+          <path d="M0,48 C40,44 80,36 120,28 160,22 200,18 200,18 L200,50 C160,48 120,46 80,46 40,48 0,52 0,52 Z" fill="var(--color-horizon-500)" fillOpacity="0.15" />
           {/* P50 median line */}
-          <path d="M0,48 C40,44 80,38 120,30 160,24 200,20" fill="none" stroke="var(--horizon-600, #a07840)" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M0,48 C40,44 80,38 120,30 160,24 200,20" fill="none" stroke="var(--color-horizon-600)" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
         <div className="flex justify-between text-[10px] text-[var(--ink-4)] font-mono tabular-nums -mt-0.5">
           <span>P10</span>
@@ -171,8 +171,8 @@ export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, hre
               key={p.label}
               className={`inline-flex items-center gap-0.5 rounded-[var(--r-sm)] border px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide
                 ${p.success
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border-red-200 bg-red-50 text-red-700'
+                  ? 'border-positive/40 bg-positive/10 text-positive'
+                  : 'border-negative/40 bg-negative/10 text-negative'
                 }`}
             >
               {p.success ? '\u2713' : '\u2717'} {p.label}

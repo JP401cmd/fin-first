@@ -26,9 +26,9 @@ function getTerSeverity(weightedTER: number): TerSeverity {
 }
 
 const SEVERITY_COLORS: Record<TerSeverity, { dot: string; text: string }> = {
-  green:  { dot: 'bg-emerald-500', text: 'text-emerald-600' },
-  orange: { dot: 'bg-amber-500',   text: 'text-amber-600' },
-  red:    { dot: 'bg-red-500',     text: 'text-red-600' },
+  green:  { dot: 'bg-positive',         text: 'text-positive' },
+  orange: { dot: 'bg-[var(--ink-3)]',   text: 'text-[var(--ink-2)]' },
+  red:    { dot: 'bg-negative',         text: 'text-negative' },
 }
 
 export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, href }: Props) {
@@ -97,7 +97,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             </p>
           </div>
           {terCoverage < 0.5 && (
-            <p className="text-[11px] text-amber-600 mt-1.5 flex items-center gap-1">
+            <p className="text-[11px] text-[var(--ink-2)] mt-1.5 flex items-center gap-1">
               <AlertTriangle className="h-3 w-3 flex-shrink-0" />
               <span>TER ontbreekt bij {holdingsWithoutTER} holdings</span>
             </p>
@@ -169,8 +169,8 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
 
             {/* CTA if <50% holdings have TER */}
             {terCoverage < 0.5 && (
-              <div className="mt-3 p-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30">
-                <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+              <div className="mt-3 p-2 rounded-md bg-[var(--subtle)] border border-[var(--border-md)]">
+                <p className="text-[11px] text-[var(--ink-2)] flex items-start gap-1.5">
                   <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
                   <span>
                     Vul de TER in bij je holdings voor een nauwkeuriger beeld.
@@ -243,8 +243,8 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
 
           {/* TER coverage warning */}
           {terCoverage < 0.5 && (
-            <div className="mb-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30">
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+            <div className="mb-2 p-2 rounded-md bg-[var(--subtle)] border border-[var(--border-md)]">
+              <p className="text-[11px] text-[var(--ink-2)] flex items-start gap-1.5">
                 <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
                 <span>
                   Vul de TER in bij je holdings voor een nauwkeuriger beeld.

@@ -29,7 +29,7 @@ export async function GET() {
   try {
     // ── Test 1: Holdings table exists ──────────────────────────
     const { error: tableError } = await supabase
-      .from('holdings')
+      .from('investment_holdings')
       .select('id')
       .limit(0)
 
@@ -115,7 +115,7 @@ export async function GET() {
 
       // Verify the holdings table columns exist
       const { data: sampleCols } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .select('id, user_id, name, ticker, units, avg_purchase_price, current_price, is_active, created_at')
         .limit(0)
 
@@ -142,7 +142,7 @@ export async function GET() {
     for (const h of testHoldings) {
       if (tableExists) {
         const { data, error } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .insert({ ...h, user_id: user.id })
           .select()
           .single()
@@ -183,7 +183,7 @@ export async function GET() {
     // ── Test 3: Verify all 3 appear in holdings query ──────────
     const { data: allHoldings, error: fetchError } = tableExists
       ? await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
@@ -252,7 +252,7 @@ export async function GET() {
 
     if (tableExists) {
       const { error: deleteError } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .delete()
         .eq('id', deleteId)
         .eq('user_id', user.id)
@@ -286,7 +286,7 @@ export async function GET() {
     // ── Test 6: Verify only 2 remain ───────────────────────────
     const { data: remainingHoldings } = tableExists
       ? await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
@@ -340,7 +340,7 @@ export async function GET() {
     // ── Cleanup: delete remaining test holdings ────────────────
     for (const id of testIds) {
       try {
-        await supabase.from('holdings').delete().eq('id', id)
+        await supabase.from('investment_holdings').delete().eq('id', id)
       } catch {
         try {
           await supabase.from('assets').delete().eq('id', id)

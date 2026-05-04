@@ -236,7 +236,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
   // ── Mini ─────────────────────────────────────────────────
   if (size === 'mini') {
     const trendColor = momDelta != null
-      ? (isUp ? 'text-emerald-600' : 'text-red-600')
+      ? (isUp ? 'text-positive' : 'text-negative')
       : 'text-[var(--ink)]'
     const trendArrow = momDelta != null ? (isUp ? '↑ ' : '↓ ') : ''
 
@@ -265,7 +265,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
 
           {/* Trend indicator */}
           {momDelta != null && (
-            <p className={`text-[11px] font-medium ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
+            <p className={`text-[11px] font-medium ${isUp ? 'text-positive' : 'text-negative'}`}>
               {isUp ? '↑' : '↓'} {Math.abs(momDelta).toFixed(0)}% vs vorige maand
             </p>
           )}
@@ -300,7 +300,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
               {formatCurrency(current.value)}
             </span>
             {momDelta != null && (
-              <span className={`text-[11px] font-medium ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
+              <span className={`text-[11px] font-medium ${isUp ? 'text-positive' : 'text-negative'}`}>
                 {isUp ? '↑' : '↓'} {Math.abs(momDelta).toFixed(0)}%
               </span>
             )}
@@ -340,7 +340,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
             {formatCurrency(current.value)}
           </span>
           {momDelta != null && (
-            <span className={`text-xs font-medium ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
+            <span className={`text-xs font-medium ${isUp ? 'text-positive' : 'text-negative'}`}>
               {isUp ? '↑' : '↓'} {Math.abs(momDelta).toFixed(0)}% vs vorige maand
             </span>
           )}
@@ -381,7 +381,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
           </div>
           {freedomStr && (
             <p className="font-serif italic text-[11px] text-[var(--ink-3)] text-right">
-              ≈ {freedomStr}/maand
+              ‰ˆ {freedomStr}/maand
             </p>
           )}
         </div>

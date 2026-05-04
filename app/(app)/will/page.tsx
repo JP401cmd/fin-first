@@ -4,8 +4,9 @@ import { loadWillData } from '@/lib/will-data-loader'
 import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { WillLanding } from '@/components/will/will-landing'
 
-// Defense-in-depth: ensure this page is never statically cached by Next.js
-export const dynamic = 'force-dynamic'
+// Geen `force-dynamic` nodig: createClient() leest de auth-cookie via
+// next/headers, wat deze page automatisch dynamic maakt. Andere routes
+// (/core, /horizon, /dashboard) doen dit ook zonder expliciete flag.
 
 export default async function WillPage() {
   const supabase = await createClient()

@@ -11,9 +11,9 @@ interface Props {
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
-  1: 'bg-red-500',
-  2: 'bg-amber-500',
-  3: 'bg-emerald-500',
+  1: 'bg-negative',
+  2: 'bg-[var(--ink-3)]',
+  3: 'bg-positive',
 }
 
 function RecommendationRow({ rec, index }: { rec: TopRecommendation; index: number }) {

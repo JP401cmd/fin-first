@@ -22,12 +22,12 @@ interface LocalNewsCache {
 const NEWS_LOCAL_CACHE_KEY = 'trifinity_news_cache'
 
 const CATEGORY_DOT: Record<string, string> = {
-  fiscaal:      'bg-kern-400',
-  rente:        'bg-blue-400',
-  woningmarkt:  'bg-purple-400',
-  beleggingen:  'bg-wil-400',
-  pensioen:     'bg-horizon-400',
-  macro:        'bg-zinc-400',
+  fiscaal:      'bg-kern-500',
+  rente:        'bg-[var(--ink-3)]',
+  woningmarkt:  'bg-wil-500',
+  beleggingen:  'bg-horizon-500',
+  pensioen:     'bg-horizon-600',
+  macro:        'bg-[var(--ink-2)]',
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -101,7 +101,7 @@ export const BerichtenWidget = memo(function BerichtenWidget({ size, href }: Pro
   // ── Quarter: edition + 1 headline + category dot ──
   if (size === 'quarter') {
     const item = news[0]
-    const dot = CATEGORY_DOT[item.category] ?? 'bg-zinc-400'
+    const dot = CATEGORY_DOT[item.category] ?? 'bg-[var(--border-md)]'
 
     return (
       <WidgetShell module="cross" size={size} kicker="Berichten" href={href}>
@@ -140,7 +140,7 @@ export const BerichtenWidget = memo(function BerichtenWidget({ size, href }: Pro
         </div>
         <ul className="space-y-1.5">
           {shown.map(item => {
-            const dot = CATEGORY_DOT[item.category] ?? 'bg-zinc-400'
+            const dot = CATEGORY_DOT[item.category] ?? 'bg-[var(--border-md)]'
             const label = CATEGORY_LABEL[item.category] ?? item.category
             return (
               <li key={item.id} className="flex items-center gap-2">
@@ -182,7 +182,7 @@ export const BerichtenWidget = memo(function BerichtenWidget({ size, href }: Pro
 
       <div className="space-y-3">
         {shown.map(item => {
-          const dot = CATEGORY_DOT[item.category] ?? 'bg-zinc-400'
+          const dot = CATEGORY_DOT[item.category] ?? 'bg-[var(--border-md)]'
           const label = CATEGORY_LABEL[item.category] ?? item.category
           return (
             <div key={item.id}>

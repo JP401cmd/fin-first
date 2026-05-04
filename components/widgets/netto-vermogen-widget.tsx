@@ -181,14 +181,14 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
           </p>
           {freedomStr && (
             <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-              ≈ {freedomStr} vrijheid
+              ‰ˆ {freedomStr} vrijheid
             </p>
           )}
           {momDelta && !isHouseholdView && !isPartnerView && (
             <p className={`mt-1 font-mono text-[11px] tabular-nums font-medium ${
-              momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
+              momDelta.delta >= 0 ? 'text-positive' : 'text-negative'
             }`}>
-              {momDelta.delta >= 0 ? '▲' : '▼'}{' '}
+              {momDelta.delta >= 0 ? '–²' : '–¼'}{' '}
               {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}
             </p>
           )}
@@ -214,12 +214,12 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             </p>
             {freedomStr && (
               <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-                ≈ {freedomStr} vrijheid
+                ‰ˆ {freedomStr} vrijheid
               </p>
             )}
             {momDelta && !isHouseholdView && !isPartnerView && (
-              <p className={`mt-1 font-mono text-[11px] tabular-nums font-semibold ${momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {momDelta.delta >= 0 ? '▲' : '▼'}{' '}
+              <p className={`mt-1 font-mono text-[11px] tabular-nums font-semibold ${momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}`}>
+                {momDelta.delta >= 0 ? '–²' : '–¼'}{' '}
                 {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}{' '}
                 ({momDelta.delta >= 0 ? '+' : ''}{momDelta.pct.toFixed(1)}%)
               </p>
@@ -254,8 +254,8 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             {assetDebtBar && (
               <div className="mt-1">
                 <div className="flex h-1 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                  <div className="h-full rounded-l-full bg-emerald-500/80" style={{ width: `${assetDebtBar.assetPct}%` }} />
-                  <div className="h-full rounded-r-full bg-red-500/70" style={{ width: `${assetDebtBar.debtPct}%` }} />
+                  <div className="h-full rounded-l-full bg-positive/80" style={{ width: `${assetDebtBar.assetPct}%` }} />
+                  <div className="h-full rounded-r-full bg-negative/70" style={{ width: `${assetDebtBar.debtPct}%` }} />
                 </div>
               </div>
             )}
@@ -281,7 +281,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
           </p>
           {momDelta && !isHouseholdView && !isPartnerView && (
             <span className={`font-mono text-sm tabular-nums font-medium ${
-              momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
+              momDelta.delta >= 0 ? 'text-positive' : 'text-negative'
             }`}>
               {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}
             </span>
@@ -289,7 +289,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
         </div>
         {freedomStr && (
           <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
-            ≈ {freedomStr} vrijheid
+            ‰ˆ {freedomStr} vrijheid
           </p>
         )}
 
@@ -439,30 +439,30 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             {/* Stacked bar: assets (green) vs debts (red) */}
             <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
-                className="h-full rounded-l-full bg-emerald-500/80 transition-all duration-500"
+                className="h-full rounded-l-full bg-positive/80 transition-all duration-500"
                 style={{ width: `${assetDebtBar.assetPct}%` }}
               />
               <div
-                className="h-full rounded-r-full bg-red-500/70 transition-all duration-500"
+                className="h-full rounded-r-full bg-negative/70 transition-all duration-500"
                 style={{ width: `${assetDebtBar.debtPct}%` }}
               />
             </div>
             {/* Labels: Bezittingen left, Schulden right */}
             <div className="flex justify-between text-[11px]">
-              <span className="font-mono tabular-nums text-emerald-600">
+              <span className="font-mono tabular-nums text-positive">
                 Bezittingen {formatCurrency(totalAssets)}
               </span>
-              <span className="font-mono tabular-nums text-red-500">
+              <span className="font-mono tabular-nums text-negative">
                 Schulden {formatCurrency(totalDebts)}
               </span>
             </div>
             {/* MoM delta row — prominent */}
             {momDelta && (
               <div className="flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2 py-1">
-                <span className="text-[11px] text-[var(--ink-3)]">Δ deze maand</span>
+                <span className="text-[11px] text-[var(--ink-3)]">Î” deze maand</span>
                 <span
                   className={`font-mono tabular-nums text-[11px] font-semibold ${
-                    momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
+                    momDelta.delta >= 0 ? 'text-positive' : 'text-negative'
                   }`}
                 >
                   {momDelta.delta >= 0 ? '+' : ''}

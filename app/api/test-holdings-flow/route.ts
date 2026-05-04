@@ -28,7 +28,7 @@ export async function GET() {
 
   try {
     // --- Check if holdings table exists ---
-    const { error: tableCheck } = await supabase.from('holdings').select('id').limit(0)
+    const { error: tableCheck } = await supabase.from('investment_holdings').select('id').limit(0)
     const hasHoldingsTable = !tableCheck || !tableCheck.message.includes('Could not find')
 
     // --- Step 1: Create holding with 10 units at current price 100 ---
@@ -43,7 +43,7 @@ export async function GET() {
         .single()
 
       const { data: holding, error } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .insert({
           user_id: user.id,
           asset_id: investmentAsset?.id || null,
@@ -99,7 +99,7 @@ export async function GET() {
     // --- Step 2: Verify portfolio total shows 1000 ---
     if (hasHoldingsTable) {
       const { data: holdings } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
@@ -138,7 +138,7 @@ export async function GET() {
     // --- Step 3: Update current price to 110 ---
     if (hasHoldingsTable) {
       const { data: updated, error } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .update({
           current_price: 110,
           last_price_update: new Date().toISOString(),
@@ -191,7 +191,7 @@ export async function GET() {
     // --- Step 4: Verify portfolio total updates to 1100 ---
     if (hasHoldingsTable) {
       const { data: holdings } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
@@ -264,7 +264,7 @@ export async function GET() {
     // --- Cleanup ---
     if (holdingId) {
       if (source === 'holdings_table') {
-        await supabase.from('holdings').delete().eq('id', holdingId).eq('user_id', user.id)
+        await supabase.from('investment_holdings').delete().eq('id', holdingId).eq('user_id', user.id)
       } else {
         await supabase.from('assets').delete().eq('id', holdingId).eq('user_id', user.id)
       }

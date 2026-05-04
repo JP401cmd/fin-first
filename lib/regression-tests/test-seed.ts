@@ -169,13 +169,13 @@ export async function seedTestData(
 
   // ── 4. Holdings (stocks/ETFs) ───────────────────────────────────────────
   const { data: existingHoldings } = await supabase
-    .from('holdings')
+    .from('investment_holdings')
     .select('id')
     .eq('user_id', userId)
     .like('name', `%${SEED_TAG}%`)
 
   if (!existingHoldings || existingHoldings.length === 0) {
-    await supabase.from('holdings').insert([
+    await supabase.from('investment_holdings').insert([
       {
         user_id: userId,
         asset_id: investmentAssetId,
@@ -516,7 +516,7 @@ export async function cleanupTestData(
 
   // Holdings (depend on assets)
   await supabase
-    .from('holdings')
+    .from('investment_holdings')
     .delete()
     .eq('user_id', userId)
     .like('name', `%${SEED_TAG}%`)

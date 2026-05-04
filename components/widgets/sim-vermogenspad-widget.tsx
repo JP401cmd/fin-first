@@ -82,7 +82,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               <path
                 d={qPath}
                 fill="none"
-                stroke="var(--horizon-500, #c4a06b)"
+                stroke="var(--color-horizon-500)"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -101,7 +101,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
                 cx={qFireX}
                 cy={qFireY}
                 r="2.5"
-                fill="var(--horizon-600, #a07840)"
+                fill="var(--color-horizon-600)"
                 style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 400ms' }}
               />
             )}
@@ -170,7 +170,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               const peakVal = peakRow?.endPortfolio ?? 1
               const drawdown = peakVal > 0 ? ((peakVal - endVal) / peakVal) * 100 : 0
               const riskLabel = drawdown < 20 ? 'Laag risico' : drawdown < 50 ? 'Matig' : 'Hoog'
-              const riskColor = drawdown < 20 ? 'bg-emerald-50 text-emerald-700' : drawdown < 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+              const riskColor = drawdown < 20 ? 'bg-positive/10 text-positive' : drawdown < 50 ? 'bg-[var(--subtle)] text-[var(--ink-2)]' : 'bg-negative/10 text-negative'
               return (
                 <span className={`mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full w-fit ${riskColor}`}>
                   {riskLabel}
@@ -189,7 +189,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
                 <path
                   d={buildPath(accumulationRows)}
                   fill="none"
-                  stroke="var(--horizon-500, #c4a06b)"
+                  stroke="var(--color-horizon-500)"
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -217,7 +217,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
                   cx={fireX}
                   cy={toY(accumulationRows.at(-1)?.endPortfolio ?? 0)}
                   r="3"
-                  fill="var(--horizon-600, #a07840)"
+                  fill="var(--color-horizon-600)"
                   style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 650ms' }}
                 />
               )}
@@ -283,7 +283,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
             <path
               d={buildPath(accumulationRows)}
               fill="none"
-              stroke="var(--horizon-500, #c4a06b)"
+              stroke="var(--color-horizon-500)"
               strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -322,7 +322,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
                 y1={pad}
                 x2={fireX}
                 y2={H - pad}
-                stroke="var(--horizon-600, #a07840)"
+                stroke="var(--color-horizon-600)"
                 strokeWidth="1"
                 strokeDasharray="2 2"
                 style={{ opacity: hasEntered ? 0.8 : 0, transition: 'opacity 300ms ease 600ms' }}
@@ -331,7 +331,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
                 cx={fireX}
                 cy={toY(accumulationRows.at(-1)?.endPortfolio ?? 0)}
                 r="3"
-                fill="var(--horizon-600, #a07840)"
+                fill="var(--color-horizon-600)"
                 style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 650ms' }}
               />
             </>
@@ -343,7 +343,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               x={Math.min(toX(peakRow.age) + 4, W - 40)}
               y={Math.max(toY(peakRow.endPortfolio) - 4, 10)}
               fontSize="5"
-              fill="var(--horizon-600, #a07840)"
+              fill="var(--color-horizon-600)"
               fontFamily="monospace"
               fontWeight="600"
               style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 700ms' }}
@@ -392,7 +392,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               const peakVal = peakRow?.endPortfolio ?? 1
               const drawdown = peakVal > 0 ? ((peakVal - endVal) / peakVal) * 100 : 0
               const riskLabel = drawdown < 20 ? 'Laag risico' : drawdown < 50 ? 'Matig risico' : 'Hoog risico'
-              const riskColor = drawdown < 20 ? 'bg-emerald-50 text-emerald-700' : drawdown < 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+              const riskColor = drawdown < 20 ? 'bg-positive/10 text-positive' : drawdown < 50 ? 'bg-[var(--subtle)] text-[var(--ink-2)]' : 'bg-negative/10 text-negative'
               return (
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${riskColor}`}>
                   {riskLabel}

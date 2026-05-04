@@ -90,7 +90,7 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
               </p>
             </div>
             {pctDelta !== null && (
-              <span className={`text-[11px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <span className={`text-[11px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
                 {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}% deze mnd
               </span>
             )}
@@ -211,7 +211,7 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
                 {effectivePct.toFixed(1)}%
               </span>
               {pctDelta !== null && (
-                <span className={`text-[10px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <span className={`text-[10px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}%
                 </span>
               )}
@@ -246,7 +246,7 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
                 <span className={`font-mono tabular-nums ${reached ? 'text-horizon-600 font-medium' : 'text-[var(--ink-3)]'}`}>
                   {m}% vrijheid
                 </span>
-                <span className={`font-mono tabular-nums ${reached ? 'text-emerald-600' : 'text-[var(--ink-3)]'}`}>
+                <span className={`font-mono tabular-nums ${reached ? 'text-positive' : 'text-[var(--ink-3)]'}`}>
                   {reached ? 'Bereikt' : `~${est}`}
                 </span>
               </div>

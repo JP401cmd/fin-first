@@ -83,7 +83,7 @@ function progressPct(spent: number, limit: number): number {
 //
 // Structuur per rij (3 lagen):
 //   1. [Icon]  TYPE LABEL
-//   2. [══════════════════ bar ══════════════════]
+//   2. [•••••••••••••••••• bar ••••••••••••••••••]
 //   3.  €spent besteed  ·  65%  ·  budget €limit
 
 interface BudgetRowProps {
@@ -120,13 +120,13 @@ function BudgetRow({ config, limit, spent, hasEntered, trend }: BudgetRowProps) 
           {trend && trend !== 'flat' && (
             <span className={`text-[10px] font-semibold ${
               config.key === 'expense' || config.key === 'debt'
-                ? (trend === 'up' ? 'text-red-500' : 'text-emerald-600')
-                : (trend === 'up' ? 'text-emerald-600' : 'text-red-500')
+                ? (trend === 'up' ? 'text-negative' : 'text-positive')
+                : (trend === 'up' ? 'text-positive' : 'text-negative')
             }`}>
               {trend === 'up' ? '↑' : '↓'}
             </span>
           )}
-          <span className={`font-mono tabular-nums text-[10px] ${overBudget ? (overPositive ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
+          <span className={`font-mono tabular-nums text-[10px] ${overBudget ? (overPositive ? 'text-positive font-semibold' : 'text-negative font-semibold') : 'text-[var(--ink-3)]'}`}>
             {hasData ? `${formatCurrency(spent)} / ${formatCurrency(limit)}` : '—'}
           </span>
         </div>
@@ -173,7 +173,7 @@ function BudgetRow({ config, limit, spent, hasEntered, trend }: BudgetRowProps) 
       {/* Laag 3: percentage indicator */}
       {hasData && (
         <div className="flex justify-end">
-          <span className={`text-[9px] font-bold ${overBudget ? (overPositive ? 'text-emerald-500' : 'text-red-400') : 'text-[var(--ink-4)]'}`}>
+          <span className={`text-[9px] font-bold ${overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-4)]'}`}>
             {pctLabel}
           </span>
         </div>
@@ -229,7 +229,7 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
     return (
       <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
         <div className="flex flex-col items-center gap-2 py-2 text-center">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-50">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--subtle)]">
             <Sparkles className="text-amber-500" size={16} />
           </div>
           <p className="text-sm font-medium text-[var(--ink)]">
@@ -240,7 +240,7 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
           </p>
           <a
             href="/core/budgets"
-            className="mt-1 inline-flex items-center gap-1 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+            className="mt-1 inline-flex items-center gap-1 rounded-lg bg-[var(--subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
           >
             Bekijk budgetten
           </a>
@@ -281,8 +281,8 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
                   backgroundColor: !hasData
                     ? 'var(--border-ed)'
                     : (onTrack || overPos)
-                      ? 'var(--color-emerald-500, #10b981)'
-                      : 'var(--color-red-500, #ef4444)',
+                      ? 'var(--positive)'
+                      : 'var(--negative)',
                   opacity: hasEntered ? 1 : 0.3,
                   transition: 'opacity 400ms ease',
                 }}
@@ -324,7 +324,7 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
                 const overBudget = hasData && typeData.spent > typeData.limit
                 const overPos = isOverPositive(config.key as 'income' | 'expense' | 'savings' | 'debt')
                 const isAboveThreshold = pct >= 80
-                const fillColor = overBudget ? (overPos ? 'var(--color-emerald-500, #10b981)' : 'var(--color-red-500, #ef4444)') : isAboveThreshold ? barWarnVar : barFillVar
+                const fillColor = overBudget ? (overPos ? 'var(--positive)' : 'var(--negative)') : isAboveThreshold ? barWarnVar : barFillVar
 
                 return (
                   <div key={config.key}>
@@ -335,7 +335,7 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
                       <span className={`text-[9px] font-bold uppercase tracking-[0.08em] ${hasData ? labelText : 'text-[var(--ink-3)]'}`}>
                         {label}
                       </span>
-                      <span className={`ml-auto font-mono tabular-nums text-[10px] ${overBudget ? (overPos ? 'text-emerald-600' : 'text-red-500') : 'text-[var(--ink-3)]'}`}>
+                      <span className={`ml-auto font-mono tabular-nums text-[10px] ${overBudget ? (overPos ? 'text-positive' : 'text-negative') : 'text-[var(--ink-3)]'}`}>
                         {hasData ? `${Math.round(pct)}%` : '—'}
                       </span>
                     </div>
@@ -398,7 +398,7 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
       {isFullSize && (
         <>
           <div className="mt-3 border-t border-dashed border-[var(--border-ed)]" />
-          <div className={`mt-3 rounded-[var(--r-md)] px-3 py-2.5 ${isNettoPositief ? 'bg-emerald-50/60' : 'bg-red-50/60'}`}>
+          <div className={`mt-3 rounded-[var(--r-md)] px-3 py-2.5 ${isNettoPositief ? 'bg-positive/15' : 'bg-negative/15'}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
@@ -409,7 +409,7 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
                 </p>
               </div>
               <div className="text-right">
-                <p className={`font-mono tabular-nums text-2xl font-semibold ${isNettoPositief ? 'text-emerald-700' : 'text-red-600'}`}>
+                <p className={`font-mono tabular-nums text-2xl font-semibold ${isNettoPositief ? 'text-positive' : 'text-negative'}`}>
                   {isNettoPositief ? '+' : ''}{formatCurrency(nettoBalans)}
                 </p>
                 {freedomStr && (

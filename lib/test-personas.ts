@@ -594,12 +594,12 @@ const roosData: PersonaData = {
     description: 'Na een scheiding en jarenlang onbewust consumeren zit Roos diep in de schulden. Uitgaven overstijgen haar inkomen.',
     color: 'red',
     avatarColor: '#EF4444',
-    netWorth: -15000,
+    netWorth: -6000,
     income: 2800,
     expenses: 3200,
     backgroundStory: 'Na haar scheiding in 2024 raakte Roos het financieel overzicht volledig kwijt. Jarenlang emotioneel kopen — bezorgmaaltijden als troost, kleding als afleiding — en nu drie schulden die samen bijna twee jaar van haar levenstijd vertegenwoordigen. Als logistiek medewerker verdient ze €2.800, maar geeft ze €3.200 uit. Elke maand verliest ze 4 dagen vrijheid.',
     challenges: ['Uitgaven overstijgen inkomen met €400/mnd — elke maand 4 vrijheidsdagen verlies', 'Creditcard schuld van €4.800 op 14% rente vreet aan haar toekomst', 'Geen noodfonds — één tegenslag betekent meer schulden'],
-    currentSituation: 'Diep in de rode cijfers — netto vermogen -€15.000 met drie actieve schulden. Haar financiële klok loopt achteruit.',
+    currentSituation: 'Diep in de rode cijfers — netto vermogen -€6.000 met drie actieve schulden. Haar financiële klok loopt achteruit.',
     firstGoal: 'Noodfonds aanleggen en uit de schulden komen',
     sovereignty: 'recovery',
     modules: ['budgetteren'],
@@ -719,23 +719,23 @@ const roosData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
-    // Consistente neerwaartse spiraal: ~€300/mnd netto verslechtering
-    // (overspending €400 - effectieve schuldaflossing €187 + asset depreciatie €100)
-    { monthsAgo: 14, total_assets: 4900, total_debts: 15900, net_worth: -11000 },
-    { monthsAgo: 13, total_assets: 4800, total_debts: 16100, net_worth: -11300 },
-    { monthsAgo: 12, total_assets: 4700, total_debts: 16400, net_worth: -11700 },
-    { monthsAgo: 11, total_assets: 4600, total_debts: 16700, net_worth: -12100 },
-    { monthsAgo: 10, total_assets: 4500, total_debts: 17000, net_worth: -12500 },
-    { monthsAgo: 9, total_assets: 4400, total_debts: 17300, net_worth: -12900 },
-    { monthsAgo: 8, total_assets: 4300, total_debts: 17500, net_worth: -13200 },
-    { monthsAgo: 7, total_assets: 4200, total_debts: 17800, net_worth: -13600 },
-    { monthsAgo: 6, total_assets: 4100, total_debts: 18000, net_worth: -13900 },
-    { monthsAgo: 5, total_assets: 4000, total_debts: 18200, net_worth: -14200 },
-    { monthsAgo: 4, total_assets: 3900, total_debts: 18400, net_worth: -14500 },
-    { monthsAgo: 3, total_assets: 3800, total_debts: 18600, net_worth: -14800 },
-    { monthsAgo: 2, total_assets: 3700, total_debts: 18700, net_worth: -15000 },
-    { monthsAgo: 1, total_assets: 3600, total_debts: 18600, net_worth: -15000 },
-    { monthsAgo: 0, total_assets: 3500, total_debts: 18500, net_worth: -15000 },
+    // Snapshot rekent met sum(assets+banks)-debts. Huidige sum: 12000 (assets) + 215 (banks) - 18500 (debts) = -6285.
+    // Trend: ~€500/mnd verslechtering door overspending €400/mnd + asset depreciatie + boetes.
+    { monthsAgo: 14, total_assets: 12500, total_debts: 11700, net_worth: 800 },
+    { monthsAgo: 13, total_assets: 12450, total_debts: 12200, net_worth: 250 },
+    { monthsAgo: 12, total_assets: 12400, total_debts: 12700, net_worth: -300 },
+    { monthsAgo: 11, total_assets: 12380, total_debts: 13280, net_worth: -900 },
+    { monthsAgo: 10, total_assets: 12360, total_debts: 13800, net_worth: -1440 },
+    { monthsAgo: 9, total_assets: 12340, total_debts: 14380, net_worth: -2040 },
+    { monthsAgo: 8, total_assets: 12320, total_debts: 14900, net_worth: -2580 },
+    { monthsAgo: 7, total_assets: 12300, total_debts: 15500, net_worth: -3200 },
+    { monthsAgo: 6, total_assets: 12280, total_debts: 16080, net_worth: -3800 },
+    { monthsAgo: 5, total_assets: 12260, total_debts: 16660, net_worth: -4400 },
+    { monthsAgo: 4, total_assets: 12240, total_debts: 17240, net_worth: -5000 },
+    { monthsAgo: 3, total_assets: 12230, total_debts: 17730, net_worth: -5500 },
+    { monthsAgo: 2, total_assets: 12220, total_debts: 18020, net_worth: -5800 },
+    { monthsAgo: 1, total_assets: 12215, total_debts: 18215, net_worth: -6000 },
+    { monthsAgo: 0, total_assets: 12215, total_debts: 18500, net_worth: -6285 },
   ],
 }
 
@@ -832,7 +832,7 @@ const daanData: PersonaData = {
     description: 'Software developer, 2 jaar aan het werk. Geniet van het leven in Amsterdam, spaart minimaal. Bouwt elke maand 3 vrijheidsdagen op.',
     color: 'teal',
     avatarColor: '#14B8A6',
-    netWorth: -8700,
+    netWorth: -4200,
     income: 3400,
     expenses: 3060,
     backgroundStory: 'Daan werkt twee jaar als developer bij een startup in Amsterdam. Hij woont in een eigen studio en geniet volop van het stadsleven — uit eten, festivals, weekendjes weg. Hij kent het FIRE-concept via Reddit maar vindt het nu nog te vroeg om agressief te sparen. Met slechts €340/mnd aan sparen en aflossingen gaat 90% van zijn inkomen naar uitgaven. Zijn enige schuld — een DUO-lening — lost hij minimaal af.',
@@ -1087,7 +1087,7 @@ const lisaData: PersonaData = {
     description: 'Projectmanager, getrouwd, 2 kinderen. Na jaren discipline net de magische €100K grens doorbroken — 3 jaar en 4 maanden vrijheid opgebouwd.',
     color: 'amber',
     avatarColor: '#D4A843',
-    netWorth: 100000,
+    netWorth: 112000,
     income: 5200,
     expenses: 4000,
     backgroundStory: 'Lisa werkt als projectmanager bij de gemeente en is getrouwd met een leraar. Na tien jaar spaardiscipline hebben zij en haar man net de €100K grens doorbroken — het magische omslagpunt waar compound interest merkbaar wordt. Met twee kinderen balanceert ze kinderopvang en schoolkosten met €400/mnd Meesman-beleggingen. Elke maand koopt ze 3,5 dag vrijheid voor het hele gezin.',
@@ -1225,9 +1225,9 @@ const lisaData: PersonaData = {
     { monthsAgo: 5, total_assets: 443500, total_debts: 351300, net_worth: 92200 },
     { monthsAgo: 4, total_assets: 446700, total_debts: 351000, net_worth: 95700 },
     { monthsAgo: 3, total_assets: 449800, total_debts: 350700, net_worth: 99100 },
-    { monthsAgo: 2, total_assets: 452500, total_debts: 350400, net_worth: 102100 },
-    { monthsAgo: 1, total_assets: 455100, total_debts: 350200, net_worth: 104900 },
-    { monthsAgo: 0, total_assets: 458000, total_debts: 350000, net_worth: 108000 },
+    { monthsAgo: 2, total_assets: 456500, total_debts: 350400, net_worth: 106100 },
+    { monthsAgo: 1, total_assets: 459100, total_debts: 350200, net_worth: 108900 },
+    { monthsAgo: 0, total_assets: 462050, total_debts: 350000, net_worth: 112050 },
   ],
   valuations: [
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 14, value: 31500 },
@@ -1387,10 +1387,10 @@ const willemData: PersonaData = {
   meta: {
     name: 'Willem Jansen',
     subtitle: 'Bijna binnen',
-    description: 'Senior consultant, hypotheek afbetaald, kinderen het huis uit. Netto vermogen €1,46M — zijn investeerbaar vermogen nadert het infinity-punt.',
+    description: 'Senior consultant, hypotheek afbetaald, kinderen het huis uit. Netto vermogen €1,62M — zijn investeerbaar vermogen nadert het infinity-punt.',
     color: 'purple',
     avatarColor: '#8B5CB8',
-    netWorth: 1457000,
+    netWorth: 1620000,
     income: 6500,
     expenses: 3000,
     backgroundStory: 'Willem werkt al 30 jaar als senior consultant en heeft in 2024 zijn hypotheek volledig afgelost. Zijn kinderen staan op eigen benen. Met een beleggingsportefeuille van €420.000, ABP-pensioen van €285.000 en een afbetaalde woning van €650.000 is zijn totale vermogen €1,46M. Maar het gaat hem om de vraag: dekt zijn investeerbaar vermogen (€705K) zijn jaarlijkse uitgaven van €36K? Bij de Nederlandse SWR is hij op ~78%. Nog even doorzetten richting 2028.',
@@ -1513,9 +1513,9 @@ const willemData: PersonaData = {
     { monthsAgo: 5, total_assets: 1568000, total_debts: 0, net_worth: 1568000 },
     { monthsAgo: 4, total_assets: 1578000, total_debts: 0, net_worth: 1578000 },
     { monthsAgo: 3, total_assets: 1590000, total_debts: 0, net_worth: 1590000 },
-    { monthsAgo: 2, total_assets: 1598000, total_debts: 0, net_worth: 1598000 },
-    { monthsAgo: 1, total_assets: 1603000, total_debts: 0, net_worth: 1603000 },
-    { monthsAgo: 0, total_assets: 1607000, total_debts: 0, net_worth: 1607000 },
+    { monthsAgo: 2, total_assets: 1605000, total_debts: 0, net_worth: 1605000 },
+    { monthsAgo: 1, total_assets: 1612000, total_debts: 0, net_worth: 1612000 },
+    { monthsAgo: 0, total_assets: 1619700, total_debts: 0, net_worth: 1619700 },
   ],
   valuations: [
     // DEGIRO totaal: VWRL (~420K) + IEAG (~80K) + TDIV (~45K) + EMIM (~25K) = ~570K
@@ -1687,7 +1687,7 @@ const rashidData: PersonaData = {
     currentSituation: 'Financieel stabiel met positieve cashflow, maar geen gedetailleerd inzicht in uitgavenpatronen. Gebruikt de app puur voor vermogensoverzicht en maandelijkse check-ins.',
     firstGoal: '€500K netto vermogen',
     sovereignty: 'momentum',
-    modules: ['vermogensregistratie', 'aandelenregistratie', 'nieuws'],
+    modules: ['vermogensregistratie', 'aandelenregistratie', 'toekomstplannen', 'inzicht_acties', 'nieuws'],
   },
   profile: {
     full_name: 'Rashid Dimohammed',
@@ -1706,7 +1706,7 @@ const rashidData: PersonaData = {
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'fire_prognose', 'vrijheidsscenarios', 'acties', 'doelen',
     ]),
-    active_modules: ['vermogensregistratie', 'aandelenregistratie', 'nieuws'],
+    active_modules: ['vermogensregistratie', 'aandelenregistratie', 'toekomstplannen', 'inzicht_acties', 'nieuws'],
   },
   bank_accounts: [
     { name: 'Betaalrekening ING', iban: 'NL91INGB0006543210', bank_name: 'ING', account_type: 'checking', balance: 40000, is_active: true, sort_order: 0 },
@@ -1926,10 +1926,10 @@ const marijkeData: PersonaData = {
   meta: {
     name: 'Marijke Vermeer',
     subtitle: 'De Gepensioneerde',
-    description: 'Al 3 jaar met pensioen, geniet van het leven met \u20ac850K netto vermogen. AOW + ABP pensioen + dividend vormen een comfortabel passief inkomen van \u20ac3.400/maand.',
+    description: 'Al 3 jaar met pensioen, geniet van het leven met \u20ac820K netto vermogen. AOW + ABP pensioen + dividend vormen een comfortabel passief inkomen van \u20ac3.400/maand.',
     color: 'emerald',
     avatarColor: '#6B8E6B',
-    netWorth: 850000,
+    netWorth: 820000,
     income: 3400,
     expenses: 2800,
     backgroundStory: 'Marijke was 35 jaar verpleegkundig specialist bij Isala Zwolle. Samen met haar man Henk (70) heeft ze een hypotheekvrij huis in Zwolle-Zuid. Sinds haar pensioen op 65 geniet ze van bridgen, wandelen met vriendinnen en de kleinkinderen. Hun stacaravan in Drenthe is hun zomerse uitvalsbasis. Financieel zijn ze comfortabel: AOW, ABP-pensioen en een degelijke beleggingsportefeuille met focus op dividend en obligaties. Marijke wil een deel nalaten aan de kinderen \u2014 de rest is voor genieten.',
@@ -2075,7 +2075,7 @@ const marijkeData: PersonaData = {
     { monthsAgo: 3, total_assets: 842000, total_debts: 0, net_worth: 842000 },
     { monthsAgo: 2, total_assets: 845000, total_debts: 0, net_worth: 845000 },
     { monthsAgo: 1, total_assets: 848000, total_debts: 0, net_worth: 848000 },
-    { monthsAgo: 0, total_assets: 850000, total_debts: 0, net_worth: 850000 },
+    { monthsAgo: 0, total_assets: 820200, total_debts: 0, net_worth: 820200 },
   ],
   valuations: [
     // Beleggingsportefeuille: stabiele groei door dividend herbelegging (\u20ac295K \u2192 \u20ac320K)
@@ -2162,6 +2162,14 @@ const marijkeData: PersonaData = {
 // ══════════════════════════════════════════════════════════════
 // Landing page testpersona's — gebaseerd op bestaande seeds
 // Elk vertegenwoordigt een gebruikersgroep van de landing page
+//
+// LET OP: deze personas erven via spread (...marijkeData / ...lisaData / ...) en
+// overriden alleen meta + profile (+ budgets bij Ronald). Inherited transactions,
+// life_events, assets, debts en net_worth_snapshots dragen de DOB en levensfase
+// van de basispersoon — voor Ronald (DOB 1962 vs Marijke 1955) en Jochen (DOB
+// 1974 vs Willem 1968) leveren de inherited life_events.target_date dus
+// inconsistente leeftijden op. Bewuste keuze: snelle vulling van landingspagina-
+// scenario's; vervang met eigen data zodra een persona meer detail nodig heeft.
 // ══════════════════════════════════════════════════════════════
 
 const ronaldData: PersonaData = {
@@ -2172,7 +2180,7 @@ const ronaldData: PersonaData = {
     description: 'Bijna met pensioen op 64. Wil het pensioengat in kaart brengen en weten of AOW + werkgeverspensioen + eigen vermogen samen genoeg zijn. Gebruikersgroep: pensioenplanner.',
     color: 'emerald',
     avatarColor: '#4A7A5B',
-    netWorth: 850000,
+    netWorth: 820000,
     income: 5200,
     expenses: 3950,
     backgroundStory: 'Ronald was 30 jaar technisch manager bij Tata Steel in IJmuiden. Samen met zijn vrouw Anja (62) heeft hij een hypotheekvrij huis in Beverwijk. Over een jaar gaat hij met pensioen. Hij wil precies weten of het ABP-pensioen, de AOW en zijn beleggingsportefeuille samen genoeg zijn om hun levensstijl voort te zetten. Zijn grootste vraag: hoeveel mag hij onttrekken zonder dat het geld opraakt?',
@@ -2206,6 +2214,14 @@ const ronaldData: PersonaData = {
     [S.SPAREN_SCHULDEN]: 300, [S.SPAREN_NOODBUFFER]: 300, [S.INVESTEREN_FIRE]: 0,
     [S.SCHULDEN_AFLOSSINGEN_PARENT]: 0, [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
   }),
+  // Eigen life_events met dates afgestemd op Ronald's DOB 1962-03-15.
+  // Marijke's events kloppen niet voor Ronald (5 jaar leeftijdsverschil).
+  life_events: [
+    { name: 'Pensioen', event_type: 'early_retirement', target_age: 65, target_date: '2027-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: -5200, duration_months: 0, icon: 'Sunset', is_active: true, sort_order: 0, metadata: { gewensteMaandinkomen: 3950, pensioenUitkering: 2400 } },
+    { name: 'ABP-pensioen', event_type: 'custom', target_age: 65, target_date: '2027-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 2400, duration_months: 0, icon: 'Building2', is_active: true, sort_order: 1, metadata: { reden: 'Werkgeverspensioen na 30 jaar Tata Steel' } },
+    { name: 'AOW', event_type: 'aow', target_age: 67, target_date: '2029-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 940, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
+    { name: 'Campertrip Noorwegen', event_type: 'custom', target_age: 65, target_date: '2027-08-01', one_time_cost: -8500, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Mountain', is_active: true, sort_order: 3, metadata: { reden: 'Eerste reis na pensioen' } },
+  ],
 }
 
 const basData: PersonaData = {
@@ -2242,7 +2258,7 @@ const leoData: PersonaData = {
     description: 'Grafisch vormgever die na een impulsieve periode grip wil krijgen op zijn uitgaven. Geeft meer uit dan er binnenkomt en wil patronen herkennen. Gebruikersgroep: budgetteerder.',
     color: 'red',
     avatarColor: '#9B4D4D',
-    netWorth: -15000,
+    netWorth: -6000,
     income: 2800,
     expenses: 3200,
     backgroundStory: 'Leo is freelance grafisch vormgever in Rotterdam. Na een jaar van grote uitgaven — nieuwe MacBook Pro, designmeubels, festivals — zit hij met een creditcardschuld en een privélease die hij liever kwijt was. Zijn inkomsten zijn goed maar onregelmatig, en hij heeft geen idee waar het geld naartoe gaat. Zijn bankrekening is een zwart gat. Leo wil geen streng budget, maar wél inzicht: hoeveel gaat er naar abonnementen? Hoeveel naar uit eten? En hoeveel kost die impulsiviteit hem aan vrijheidstijd?',
@@ -2250,13 +2266,13 @@ const leoData: PersonaData = {
     currentSituation: 'Elke maand dieper in het rood. Weet dat het anders moet maar mist de tools om patronen te herkennen.',
     firstGoal: 'Creditcardschuld aflossen en 1 maand buffer opbouwen',
     sovereignty: 'recovery',
-    modules: ['budgetteren', 'vermogensregistratie', 'aandelenregistratie', 'inzicht_acties'],
+    modules: ['budgetteren', 'vermogensregistratie', 'inzicht_acties'],
   },
   profile: {
     ...roosData.profile,
     full_name: 'Leo Pietersen',
     date_of_birth: '1991-01-08',
-    active_modules: ['budgetteren', 'vermogensregistratie', 'aandelenregistratie', 'inzicht_acties'],
+    active_modules: ['budgetteren', 'vermogensregistratie', 'inzicht_acties'],
   },
 }
 
@@ -2276,14 +2292,22 @@ const jochenData: PersonaData = {
     currentSituation: 'Op 92% van FIRE-doel. €705K belegbaar vermogen, target €900K. 53% spaarquote. Nog ~3 jaar als rendementen meezitten.',
     firstGoal: 'Financieel onafhankelijk op 55',
     sovereignty: 'mastery',
-    modules: ['budgetteren'],
+    modules: ALL_MODULES,
   },
   profile: {
     ...willemData.profile,
     full_name: 'Jochen Brouwer',
     date_of_birth: '1974-07-03',
-    active_modules: ['budgetteren'],
+    active_modules: ALL_MODULES,
   },
+  // Eigen life_events met dates afgestemd op Jochen's DOB 1974-07-03.
+  // Willem's events kloppen niet voor Jochen (6 jaar leeftijdsverschil).
+  life_events: [
+    { name: 'Hypotheek afgelost', event_type: 'custom', target_age: 50, target_date: '2024-07-01', one_time_cost: 0, monthly_cost_change: -1400, monthly_income_change: 0, duration_months: 0, icon: 'PartyPopper', is_active: false, sort_order: 0 },
+    { name: 'FIRE — financieel onafhankelijk', event_type: 'early_retirement', target_age: 55, target_date: '2029-07-03', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: -6500, duration_months: 0, icon: 'Sunset', is_active: true, sort_order: 1, metadata: { gewensteMaandinkomen: 3000, pensioenUitkering: 0 } },
+    { name: 'AOW', event_type: 'aow', target_age: 68, target_date: '2042-07-03', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 940, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
+    { name: 'Kinderen klaar met studie', event_type: 'custom', target_age: 56, target_date: '2030-09-01', one_time_cost: 0, monthly_cost_change: -800, monthly_income_change: 0, duration_months: 0, icon: 'GraduationCap', is_active: true, sort_order: 3, metadata: { reden: 'Studiekosten ouders vallen weg' } },
+  ],
 }
 
 // Export

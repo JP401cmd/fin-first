@@ -24,7 +24,7 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
   if (size === 'mini') {
     return (
       <WidgetShell module="horizon" size="mini" kicker="Box 3 Drag" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-red-600 leading-none truncate">
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
           {pctOfAssets.toFixed(2)}%
         </p>
       </WidgetShell>
@@ -145,7 +145,7 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
 
         {/* Optimalisatie hint */}
         {annualGrowthRate < 0.0643 && totalAssets > 50000 && (
-          <p className="mt-1.5 text-[11px] text-amber-600 font-medium">
+          <p className="mt-1.5 text-[11px] text-[var(--ink-2)] font-medium">
             💡 Werkelijk rendement lager dan fictief — overweeg asset-mix optimalisatie
           </p>
         )}

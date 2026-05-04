@@ -1,6 +1,7 @@
 'use client'
 
 import { Component, type ReactNode } from 'react'
+import { Info } from 'lucide-react'
 import { WIDGET_CATALOG, type WidgetSize, type WidgetModule } from '@/lib/widget-catalog'
 import { WidgetRenderer } from '@/components/widgets/widget-renderer'
 import { MOCK_DASHBOARD_DATA } from '@/lib/mock-dashboard-data'
@@ -58,11 +59,28 @@ export default function WidgetsTestPage() {
     <div className="-mx-4 sm:-mx-6 px-4 sm:px-6" style={{ maxWidth: 'calc(100vw - 2rem)' }}>
       <div className="mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h2 className="text-xl font-semibold text-[var(--ink)]">Widget Test</h2>
           <p className="mt-1 text-sm text-[var(--ink-3)]">
             {totalWidgets} widgets &middot; {SIZES.length} formaten &middot; alle modules
           </p>
+        </div>
+
+        {/* Mock-data banner */}
+        <div className="mb-8 flex items-start gap-2.5 border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-3.5 py-2.5">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--ink-3)]">
+              Mock data
+            </p>
+            <p className="mt-0.5 text-sm text-[var(--ink-2)]">
+              Alle widgets op deze pagina tonen test-data uit{' '}
+              <code className="rounded-sm bg-[var(--paper)] px-1 py-0.5 font-mono text-[11px] text-[var(--ink)]">
+                lib/mock-dashboard-data.ts
+              </code>
+              {' '}— niet je echte cijfers.
+            </p>
+          </div>
         </div>
 
         {/* Module groups */}
@@ -130,8 +148,13 @@ function WidgetTestRow({ def }: WidgetTestRowProps) {
     <div>
       {/* Widget meta */}
       <div className="mb-3">
-        <h4 className="text-sm font-semibold text-[var(--ink)]">{def.name}</h4>
-        <p className="text-xs text-[var(--ink-3)]">{def.description}</p>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-[var(--ink)]">{def.name}</h4>
+          <span className="rounded-sm border border-dashed border-[var(--border-md)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Mock
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-[var(--ink-3)]">{def.description}</p>
         <p className="mt-0.5 font-mono text-xs text-[var(--ink-4)]">
           id: {def.id} &middot; minLevel: {def.minLevel} &middot; default: {def.defaultSize}
         </p>

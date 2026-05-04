@@ -318,8 +318,8 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
             return (
               <div key={idx} className="flex items-center gap-1.5">
                 {met ? (
-                  <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                    <Check className="h-2 w-2 text-emerald-600" />
+                  <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-positive/20">
+                    <Check className="h-2 w-2 text-positive" />
                   </div>
                 ) : (
                   <Circle className="h-3.5 w-3.5 shrink-0 text-[var(--ink-4)]" />
@@ -327,7 +327,7 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
                 <span
                   className={`text-[11px] leading-snug ${
                     met
-                      ? 'text-emerald-700 line-through decoration-emerald-400'
+                      ? 'text-positive line-through decoration-[var(--positive)]'
                       : 'text-[var(--ink-2)]'
                   }`}
                 >

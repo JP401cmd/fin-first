@@ -64,8 +64,8 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
   const expectedReturn = (data.grossReturn || 0.07) * 100
 
   // Color based on positive/negative return
-  const returnColor = sinceInceptionReturn >= 0 ? 'text-emerald-600' : 'text-red-600'
-  const sparklineStroke = sinceInceptionReturn >= 0 ? '#059669' : '#dc2626'
+  const returnColor = sinceInceptionReturn >= 0 ? 'text-positive' : 'text-negative'
+  const sparklineStroke = sinceInceptionReturn >= 0 ? 'var(--positive)' : 'var(--negative)'
 
   // Empty state: no investment assets at all
   if (investmentAssets.length === 0) {
@@ -152,7 +152,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
               const pct = asset.purchaseValue > 0
                 ? ((gain) / asset.purchaseValue) * 100
                 : 0
-              const rowColor = gain >= 0 ? 'text-emerald-600' : 'text-red-600'
+              const rowColor = gain >= 0 ? 'text-positive' : 'text-negative'
               const label = ASSET_LABELS[asset.type] || asset.type
 
               return (

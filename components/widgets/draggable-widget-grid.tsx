@@ -22,7 +22,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, ChevronDown, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass } from 'lucide-react'
+import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, ChevronDown, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass, Trash2 } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { CategoryAppNavBar } from './category-app-nav-bar'
 import {
@@ -111,7 +111,7 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
               onClick={() => onHide?.(pref.id)}
               aria-label={`Verberg ${pref.id} widget`}
               title="Verbergen"
-              className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-all hover:text-red-500 hover:border-red-200 hover:bg-red-50 active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
+              className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-all hover:text-negative hover:border-negative/40 hover:bg-negative/10 active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -241,6 +241,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const [showAddPicker, setShowAddPicker] = useState(false)
   const [showAutoWizard, setShowAutoWizard] = useState(false)
   const [selectedPreset, setSelectedPreset] = useState<WidgetPreset | null>(null)
+  // Bulk-actie wacht op bevestiging — `null` = geen dialoog open.
+  const [bulkAction, setBulkAction] = useState<{ type: 'fill'; size: WidgetSize } | { type: 'clear' } | null>(null)
   // Dashboard state from shared context (type + collapsed)
   const { dashboardType, setDashboardType, isCollapsed, setIsCollapsed: setCollapsedCtx } = useDashboardType()
 
@@ -432,6 +434,46 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     setShowAddPicker(false)
     router.refresh()
   }, [performSave, router, features, data])
+
+  // Bulk: vul dashboard met alle toegankelijke widgets op de gekozen grootte.
+  // Vervangt de huidige indeling (na bevestiging via dialoog). Behoudt
+  // dynamische favorieten (budget_fav:*, holding_fav:*) en hergroottet ze
+  // mee zodat de gehele dashboard-lay-out consistent is.
+  const handleFillAll = useCallback(async (size: WidgetSize) => {
+    const fillable = WIDGET_CATALOG.filter(w => {
+      if (!isWidgetAccessible(w.id, features)) return false
+      if (BUDGET_WIDGETS.has(w.id) && !data.budgetingActive) return false
+      return true
+    })
+    const newPrefs: WidgetPref[] = fillable.map((w, i) => ({
+      id: w.id,
+      enabled: true,
+      size: w.sizes.includes(size) ? size : w.defaultSize,
+      order: i,
+    }))
+    for (const w of activeWidgets) {
+      if (w.id.startsWith('budget_fav:') || w.id.startsWith('holding_fav:')) {
+        newPrefs.push({ ...w, size, order: newPrefs.length })
+      }
+    }
+    setActiveWidgets(newPrefs)
+    setBulkAction(null)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    pendingWidgets.current = null
+    await performSave(newPrefs)
+    router.refresh()
+  }, [features, data.budgetingActive, activeWidgets, performSave, router])
+
+  // Bulk: verberg alle widgets — dashboard wordt leeg, gebruiker kan opnieuw
+  // beginnen via "Widget toevoegen", "Automatisch samenstellen" of presets.
+  const handleClearAll = useCallback(async () => {
+    setActiveWidgets([])
+    setBulkAction(null)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    pendingWidgets.current = null
+    await performSave([])
+    router.refresh()
+  }, [performSave, router])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string)
@@ -762,7 +804,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       )}
       {saveError && (
         <div
-          className="mb-3 rounded-[var(--r-sm)] border border-dashed border-red-200 bg-red-50/50 px-3 py-2 text-xs text-red-700"
+          className="mb-3 rounded-[var(--r-sm)] border border-dashed border-negative/40 bg-negative/12 px-3 py-2 text-xs text-negative"
           data-testid="save-error"
         >
           {saveError}
@@ -817,7 +859,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
 
       {/* Add widget picker + AI dashboard — only in edit mode */}
       {isEditMode && (
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <WidgetAddPicker
             activeWidgets={activeWidgets}
             features={features}
@@ -837,6 +879,47 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
           >
             <Wand2 className="h-3.5 w-3.5" />
             Automatisch samenstellen
+          </button>
+
+          {/* Visuele scheider — alleen op desktop, mobile wrapt naar nieuwe rij */}
+          <div className="hidden sm:block h-6 w-px bg-[var(--border-ed)]" aria-hidden="true" />
+
+          {/* Bulk-vullen: alle accessible widgets aan op gekozen grootte.
+              Group-styling spiegelt de per-widget S/M/L resize-knoppen voor
+              herkenbaarheid; "Vul alles"-prefix maakt de bulk-bedoeling helder. */}
+          <div
+            className="flex items-stretch rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden"
+            data-testid="fill-all-group"
+          >
+            <span className="flex items-center px-2.5 text-[10px] font-mono uppercase tracking-[0.08em] text-[var(--ink-3)] border-r border-[var(--border-ed)]">
+              Vul alles
+            </span>
+            {(['quarter', 'half', 'full'] as WidgetSize[]).map(size => (
+              <button
+                key={size}
+                type="button"
+                onClick={() => setBulkAction({ type: 'fill', size })}
+                aria-label={`Vul dashboard met alle widgets op grootte ${sizeLabel(size)}`}
+                title={`Alle widgets aan op ${sizeLabel(size)}`}
+                className="px-3 text-[11px] font-semibold text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors min-h-[44px] sm:min-h-0 sm:py-1.5"
+                data-testid={`fill-all-${size}-btn`}
+              >
+                {size === 'quarter' ? 'S' : size === 'half' ? 'M' : 'L'}
+              </button>
+            ))}
+          </div>
+
+          {/* Volledig leegmaken — destructief tint, disabled bij leeg dashboard */}
+          <button
+            type="button"
+            onClick={() => setBulkAction({ type: 'clear' })}
+            disabled={activeWidgets.length === 0}
+            aria-label="Maak dashboard volledig leeg"
+            className="flex items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--border-ed)] px-3 py-2 text-xs text-[var(--ink-3)] hover:text-negative hover:border-negative/40 hover:bg-negative/5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--ink-3)] disabled:hover:border-[var(--border-ed)] disabled:hover:bg-transparent transition-colors"
+            data-testid="clear-all-btn"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Leegmaken
           </button>
         </div>
       )}
@@ -880,6 +963,53 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                   className="rounded-[var(--r-sm)] bg-[var(--ink)] text-[var(--paper)] px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity"
                 >
                   Toepassen
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Bulk-actie bevestigingsdialoog — vul alles op X / volledig leegmaken */}
+      {bulkAction && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setBulkAction(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-sm rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)] p-5">
+              <h3 className="text-sm font-semibold text-[var(--ink)]">
+                {bulkAction.type === 'clear'
+                  ? 'Dashboard leegmaken?'
+                  : `Alle widgets aan op ${sizeLabel(bulkAction.size)}?`}
+              </h3>
+              <p className="mt-2 text-xs text-[var(--ink-3)] leading-relaxed">
+                {bulkAction.type === 'clear' ? (
+                  <>Alle widgets worden verborgen. Je dashboard wordt leeg en je kunt opnieuw beginnen via <span className="font-semibold text-[var(--ink-2)]">Widget toevoegen</span>, <span className="font-semibold text-[var(--ink-2)]">Automatisch samenstellen</span> of een preset.</>
+                ) : (
+                  <>Alle beschikbare widgets worden zichtbaar gemaakt op grootte <span className="font-semibold text-[var(--ink-2)]">{sizeLabel(bulkAction.size)}</span>. Je huidige indeling gaat verloren.</>
+                )}
+              </p>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkAction(null)}
+                  className="rounded-[var(--r-sm)] px-3 py-1.5 text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+                >
+                  Annuleren
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (bulkAction.type === 'clear') handleClearAll()
+                    else handleFillAll(bulkAction.size)
+                  }}
+                  className={`rounded-[var(--r-sm)] px-3 py-1.5 text-xs font-medium transition-opacity ${
+                    bulkAction.type === 'clear'
+                      ? 'bg-negative text-white hover:opacity-90'
+                      : 'bg-[var(--ink)] text-[var(--paper)] hover:opacity-90'
+                  }`}
+                  data-testid="bulk-action-confirm"
+                >
+                  {bulkAction.type === 'clear' ? 'Leegmaken' : 'Toepassen'}
                 </button>
               </div>
             </div>

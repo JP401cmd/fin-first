@@ -16,7 +16,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Schulden" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-red-600 leading-none truncate">
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-negative leading-none truncate">
           {formatCurrency(totalDebts)}
         </p>
       </WidgetShell>
@@ -37,7 +37,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
     return (
       <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
         <div>
-          <p className={`font-mono text-lg font-semibold tabular-nums ${totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+          <p className={`font-mono text-lg font-semibold tabular-nums ${totalDebts > 0 ? 'text-negative' : 'text-positive'}`}>
             {totalDebts > 0 ? `-${formatCurrency(totalDebts)}` : `${formatCurrency(0)}`}
           </p>
           {totalDebts > 0 && freedomStr ? (
@@ -45,14 +45,14 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
               {freedomStr} terug te winnen
             </p>
           ) : totalDebts === 0 ? (
-            <p className="mt-0.5 text-[11px] font-medium text-emerald-600">
+            <p className="mt-0.5 text-[11px] font-medium text-positive">
               Schuldenvrij!
             </p>
           ) : null}
           {totalDebts > 0 && (
             <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
-                className="h-full rounded-full bg-red-500/70"
+                className="h-full rounded-full bg-negative/70"
                 style={{ width: `${schuldRatio}%` }}
               />
             </div>
@@ -70,7 +70,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
       <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className={`font-mono text-xl font-semibold tabular-nums ${totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+            <p className={`font-mono text-xl font-semibold tabular-nums ${totalDebts > 0 ? 'text-negative' : 'text-positive'}`}>
               {totalDebts > 0 ? '-' : ''}{formatCurrency(totalDebts)}
             </p>
             {totalDebts > 0 && freedomStr ? (
@@ -78,7 +78,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
                 {freedomStr} terug te winnen
               </p>
             ) : totalDebts === 0 ? (
-              <p className="mt-0.5 text-[11px] font-medium text-emerald-600">
+              <p className="mt-0.5 text-[11px] font-medium text-positive">
                 Schuldenvrij!
               </p>
             ) : null}
@@ -90,11 +90,11 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
                 <div>
                   <div className="flex justify-between text-[11px] mb-0.5">
                     <span className="text-[var(--ink-3)]">Schuldratio</span>
-                    <span className="font-mono tabular-nums text-red-600">{schuldRatio.toFixed(0)}%</span>
+                    <span className="font-mono tabular-nums text-negative">{schuldRatio.toFixed(0)}%</span>
                   </div>
                   <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                     <div
-                      className="h-full rounded-full bg-red-500/70 transition-all duration-500"
+                      className="h-full rounded-full bg-negative/70 transition-all duration-500"
                       style={{ width: `${schuldRatio}%` }}
                     />
                   </div>
@@ -121,7 +121,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
   // ── Full-size: enriched breakdown with freedom framing ────
   return (
     <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
-      <p className={`font-mono text-2xl font-semibold tabular-nums ${totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+      <p className={`font-mono text-2xl font-semibold tabular-nums ${totalDebts > 0 ? 'text-negative' : 'text-positive'}`}>
         {totalDebts > 0 ? '-' : ''}{formatCurrency(totalDebts)}
       </p>
       {freedomStr && (
@@ -136,11 +136,11 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
           <div>
             <div className="flex justify-between text-[11px] mb-0.5">
               <span className="text-[var(--ink-3)]">Schuldratio</span>
-              <span className="font-mono tabular-nums text-red-600">{schuldRatio.toFixed(0)}%</span>
+              <span className="font-mono tabular-nums text-negative">{schuldRatio.toFixed(0)}%</span>
             </div>
             <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
-                className="h-full rounded-full bg-red-500/70 transition-all duration-500"
+                className="h-full rounded-full bg-negative/70 transition-all duration-500"
                 style={{ width: `${schuldRatio}%` }}
               />
             </div>
@@ -167,7 +167,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
           {/* Net worth impact */}
           <div className="flex justify-between text-[11px]">
             <span className="text-[var(--ink-3)]">Na aflossing</span>
-            <span className="font-mono tabular-nums font-medium text-emerald-600">
+            <span className="font-mono tabular-nums font-medium text-positive">
               +{formatCurrency(totalDebts)} netto vermogen
             </span>
           </div>
@@ -179,9 +179,9 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
       ) : (
         <div className="mt-3 space-y-2">
           <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-            <div className="h-full w-full rounded-full bg-emerald-500/60" />
+            <div className="h-full w-full rounded-full bg-positive/60" />
           </div>
-          <p className="text-xs font-medium text-emerald-600">
+          <p className="text-xs font-medium text-positive">
             Schuldenvrij — 100% inzet voor vrijheid
           </p>
         </div>

@@ -12,8 +12,8 @@ interface Props {
 }
 
 function TrendArrow({ value }: { value: number }) {
-  if (value > 0) return <TrendingUp className="h-3 w-3 text-emerald-500 shrink-0" />
-  if (value < 0) return <TrendingDown className="h-3 w-3 text-red-500 shrink-0" />
+  if (value > 0) return <TrendingUp className="h-3 w-3 text-positive shrink-0" />
+  if (value < 0) return <TrendingDown className="h-3 w-3 text-negative shrink-0" />
   return <Minus className="h-3 w-3 text-[var(--ink-4)] shrink-0" />
 }
 
@@ -53,7 +53,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Maandoverzicht" href={href}>
-        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${deltaPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
           {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
         </p>
       </WidgetShell>
@@ -64,10 +64,10 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Maandoverzicht" href={href}>
-        <p className={`font-mono text-lg font-semibold tabular-nums ${deltaPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+        <p className={`font-mono text-lg font-semibold tabular-nums ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
           {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
         </p>
-        <p className={`mt-0.5 font-serif italic text-[11px] ${freedomDaysWon >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+        <p className={`mt-0.5 font-serif italic text-[11px] ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
           {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon} vrijheidsdagen
         </p>
       </WidgetShell>
@@ -85,7 +85,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vermogen</p>
               <TrendArrow value={netWorthDelta} />
             </div>
-            <p className={`font-mono text-base font-semibold tabular-nums ${deltaPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`font-mono text-base font-semibold tabular-nums ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
               {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
             </p>
           </div>
@@ -96,7 +96,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vrijheidsdagen</p>
               <TrendArrow value={freedomDaysWon} />
             </div>
-            <p className={`font-mono text-base font-semibold tabular-nums ${freedomDaysWon >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`font-mono text-base font-semibold tabular-nums ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
               {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon}d
             </p>
           </div>
@@ -167,9 +167,9 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
           <div>
             <div className="flex items-center justify-between">
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vermogen</p>
-              <MiniSparkline data={histValues.slice(-6)} color={deltaPositive ? '#10b981' : '#ef4444'} />
+              <MiniSparkline data={histValues.slice(-6)} color={deltaPositive ? 'var(--positive)' : 'var(--negative)'} />
             </div>
-            <p className={`font-mono text-lg font-semibold tabular-nums ${deltaPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`font-mono text-lg font-semibold tabular-nums ${deltaPositive ? 'text-positive' : 'text-negative'}`}>
               {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
             </p>
           </div>
@@ -179,7 +179,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vrijheidsdagen</p>
               <TrendArrow value={freedomDaysWon} />
             </div>
-            <p className={`font-mono text-lg font-semibold tabular-nums ${freedomDaysWon >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`font-mono text-lg font-semibold tabular-nums ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
               {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon}d
             </p>
           </div>
@@ -213,14 +213,14 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Beste budget</p>
-              <p className="text-sm font-medium text-emerald-600">{bestBudget.label}</p>
+              <p className="text-sm font-medium text-positive">{bestBudget.label}</p>
               <p className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
                 {formatCurrency(bestBudget.spent)} / {formatCurrency(bestBudget.limit)}
               </p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Aandachtspunt</p>
-              <p className="text-sm font-medium text-amber-600">{worstBudget.label}</p>
+              <p className="text-sm font-medium text-[var(--ink-2)]">{worstBudget.label}</p>
               <p className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
                 {formatCurrency(worstBudget.spent)} / {formatCurrency(worstBudget.limit)}
               </p>
@@ -234,7 +234,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
         {/* 3-month average comparison */}
         <div className="flex items-center justify-between">
           <p className="text-xs text-[var(--ink-3)]">3-maandsgemiddelde</p>
-          <p className={`font-mono text-sm font-semibold tabular-nums ${avg3MonthDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`font-mono text-sm font-semibold tabular-nums ${avg3MonthDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
             {avg3MonthDelta >= 0 ? '+' : ''}{formatCurrency(avg3MonthDelta)}/mnd
           </p>
         </div>
@@ -242,7 +242,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
         {/* vs vorige maand */}
         <div className="flex items-center justify-between">
           <p className="text-xs text-[var(--ink-3)]">vs. vorige maand</p>
-          <p className={`font-mono text-sm tabular-nums ${prevMonthComparison >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`font-mono text-sm tabular-nums ${prevMonthComparison >= 0 ? 'text-positive' : 'text-negative'}`}>
             {prevMonthComparison >= 0 ? '+' : ''}{prevMonthComparison.toFixed(1)}%
           </p>
         </div>

@@ -30,11 +30,11 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     return (
       <WidgetShell module="kern" size="mini" kicker="Spaarquote" href={href}>
         <>
-          <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-positive' : 'text-negative'}`}>
             {rate.toFixed(1)}%
           </p>
           <div className="mt-0.5 h-[2px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-            <div className={`h-full rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`} style={{ width: `${Math.min(Math.abs(rate), 100)}%` }} />
+            <div className={`h-full rounded-full ${isPositive ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(Math.abs(rate), 100)}%` }} />
           </div>
         </>
       </WidgetShell>
@@ -45,12 +45,12 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
-        <p className={`font-mono text-lg font-semibold tabular-nums ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+        <p className={`font-mono text-lg font-semibold tabular-nums ${isPositive ? 'text-positive' : 'text-negative'}`}>
           {rate.toFixed(1)}%
         </p>
         <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
           <div
-            className={`h-full rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`}
+            className={`h-full rounded-full ${isPositive ? 'bg-positive' : 'bg-negative'}`}
             style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
           />
         </div>
@@ -123,13 +123,13 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
       <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
         {/* Percentage + bar + bedrag (stacked vertically for 2-col full) */}
         <div>
-          <p className={`font-mono text-2xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
+          <p className={`font-mono text-2xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
             {rate.toFixed(1)}%
           </p>
 
           <div className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
             <div
-              className={`h-full rounded-full transition-all ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`}
+              className={`h-full rounded-full transition-all ${isPositive ? 'bg-positive' : 'bg-negative'}`}
               style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
             />
           </div>
@@ -139,7 +139,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
           </p>
 
           {hasPrevData && (
-            <p className={`mt-1 text-xs font-mono tabular-nums ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`mt-1 text-xs font-mono tabular-nums ${delta >= 0 ? 'text-positive' : 'text-negative'}`}>
               {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}% t.o.v. vorige maand
             </p>
           )}
@@ -167,7 +167,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
               <polyline
                 points={points}
                 fill="none"
-                stroke={isPositive ? '#10b981' : '#ef4444'}
+                stroke={isPositive ? 'var(--positive)' : 'var(--negative)'}
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -180,7 +180,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
                   <circle
                     key={i}
                     cx={x} cy={y} r={2.5}
-                    fill={v >= 0 ? '#10b981' : '#ef4444'}
+                    fill={v >= 0 ? 'var(--positive)' : 'var(--negative)'}
                   />
                 )
               })}
@@ -204,7 +204,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
           const lastYear = estimatedRates.slice(-12, -6).reduce((a, b) => a + b, 0) / 6
           const yoyDelta = thisYear - lastYear
           return (
-            <p className={`mt-0.5 text-[11px] font-mono tabular-nums ${yoyDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+            <p className={`mt-0.5 text-[11px] font-mono tabular-nums ${yoyDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
               {yoyDelta >= 0 ? '↑' : '↓'} {Math.abs(yoyDelta).toFixed(1)}% t.o.v. vorig halfjaar
             </p>
           )
@@ -218,12 +218,12 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
       <div className="flex gap-3 h-full">
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
+          <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
             {rate.toFixed(1)}%
           </p>
           <div className="mt-1.5 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
             <div
-              className={`h-full rounded-full transition-all ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`}
+              className={`h-full rounded-full transition-all ${isPositive ? 'bg-positive' : 'bg-negative'}`}
               style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
             />
           </div>
@@ -233,7 +233,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
           {hasPrevData && (
-            <p className={`text-[11px] font-mono tabular-nums ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`text-[11px] font-mono tabular-nums ${delta >= 0 ? 'text-positive' : 'text-negative'}`}>
               {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}% t.o.v. vorige mnd
             </p>
           )}

@@ -13,14 +13,14 @@ interface Props {
 }
 
 const DIR_COLORS: Record<string, string> = {
-  in: 'text-emerald-600',
-  out: 'text-red-600',
+  in: 'text-positive',
+  out: 'text-negative',
   neutral: 'text-[var(--ink-3)]',
 }
 
 function DirectionIcon({ direction }: { direction: string }) {
-  if (direction === 'in') return <ArrowUpRight className="h-3 w-3 text-emerald-500 shrink-0" />
-  if (direction === 'out') return <ArrowDownRight className="h-3 w-3 text-red-500 shrink-0" />
+  if (direction === 'in') return <ArrowUpRight className="h-3 w-3 text-positive shrink-0" />
+  if (direction === 'out') return <ArrowDownRight className="h-3 w-3 text-negative shrink-0" />
   return <ArrowRight className="h-3 w-3 text-[var(--ink-4)] shrink-0" />
 }
 
@@ -182,8 +182,8 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
             <div className="flex gap-1">
               {weeklyCashflow.map(wk => (
                 <div key={wk.week} className="flex-1 text-center">
-                  <div className={`h-6 rounded-sm flex items-center justify-center ${wk.net >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                    <span className={`font-mono text-[10px] tabular-nums ${wk.net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <div className={`h-6 rounded-sm flex items-center justify-center ${wk.net >= 0 ? 'bg-positive/10' : 'bg-negative/10'}`}>
+                    <span className={`font-mono text-[10px] tabular-nums ${wk.net >= 0 ? 'text-positive' : 'text-negative'}`}>
                       {wk.net >= 0 ? '+' : ''}{Math.round(wk.net / 100) * 100 >= 1000 ? `${(wk.net / 1000).toFixed(1)}k` : Math.round(wk.net)}
                     </span>
                   </div>
@@ -198,13 +198,13 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Verwachte inkomsten</p>
-            <p className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
+            <p className="font-mono text-sm font-semibold tabular-nums text-positive">
               +{formatCurrency(totalIn)}
             </p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Verwachte uitgaven</p>
-            <p className="font-mono text-sm font-semibold tabular-nums text-red-600">
+            <p className="font-mono text-sm font-semibold tabular-nums text-negative">
               -{formatCurrency(totalOut)}
             </p>
           </div>

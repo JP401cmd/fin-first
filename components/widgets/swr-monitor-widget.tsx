@@ -16,10 +16,10 @@ const CLASSIC_SWR = 0.04
 const NL_SWR_DEFAULT = 0.02883
 
 function swrStatus(swr: number): { color: string; label: string; bg: string } {
-  if (swr >= 0.04) return { color: 'text-emerald-600', label: 'Veilig', bg: 'bg-emerald-100' }
-  if (swr >= 0.03) return { color: 'text-emerald-600', label: 'Goed', bg: 'bg-emerald-50' }
-  if (swr >= 0.02) return { color: 'text-amber-600', label: 'Matig', bg: 'bg-amber-50' }
-  return { color: 'text-red-600', label: 'Krap', bg: 'bg-red-50' }
+  if (swr >= 0.04) return { color: 'text-positive', label: 'Veilig', bg: 'bg-positive/20' }
+  if (swr >= 0.03) return { color: 'text-positive', label: 'Goed', bg: 'bg-positive/10' }
+  if (swr >= 0.02) return { color: 'text-[var(--ink-2)]', label: 'Matig', bg: 'bg-[var(--subtle)]' }
+  return { color: 'text-negative', label: 'Krap', bg: 'bg-negative/10' }
 }
 
 function formatPct(value: number, decimals = 2): string {
@@ -92,7 +92,7 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
         {/* Gauge bar */}
         <div className="relative h-2.5 w-full rounded-full bg-[var(--subtle)] overflow-visible mb-3">
           <div
-            className={`h-full rounded-full ${effectiveSwr >= 0.03 ? 'bg-emerald-400' : effectiveSwr >= 0.02 ? 'bg-amber-400' : 'bg-red-400'}`}
+            className={`h-full rounded-full ${effectiveSwr >= 0.03 ? 'bg-positive' : effectiveSwr >= 0.02 ? 'bg-[var(--ink-3)]' : 'bg-negative'}`}
             style={{ width: `${swrPct}%` }}
           />
           {/* Trinity Study marker */}
@@ -171,7 +171,7 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
         {/* Gauge bar with markers */}
         <div className="relative h-3 w-full rounded-full bg-[var(--subtle)] overflow-visible">
           <div
-            className={`h-full rounded-full ${effectiveSwr >= 0.03 ? 'bg-emerald-400' : effectiveSwr >= 0.02 ? 'bg-amber-400' : 'bg-red-400'}`}
+            className={`h-full rounded-full ${effectiveSwr >= 0.03 ? 'bg-positive' : effectiveSwr >= 0.02 ? 'bg-[var(--ink-3)]' : 'bg-negative'}`}
             style={{ width: `${swrPct}%` }}
           />
           <div className="absolute top-0 h-3 w-px bg-[var(--ink-3)]" style={{ left: `${classicPct}%` }} />
@@ -198,7 +198,7 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--ink-2)]">Pessimistisch ({formatPct(grossReturn - 0.01, 0)})</span>
-              <span className={`font-mono text-xs tabular-nums ${swrPessimistic < 0.02 ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+              <span className={`font-mono text-xs tabular-nums ${swrPessimistic < 0.02 ? 'text-negative' : 'text-[var(--ink)]'}`}>
                 {formatPct(swrPessimistic)} → {(1 / swrPessimistic).toFixed(1)}×
               </span>
             </div>
@@ -210,7 +210,7 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--ink-2)]">Optimistisch ({formatPct(grossReturn + 0.01, 0)})</span>
-              <span className="font-mono text-xs tabular-nums text-emerald-600">
+              <span className="font-mono text-xs tabular-nums text-positive">
                 {formatPct(swrOptimistic)} → {(1 / swrOptimistic).toFixed(1)}×
               </span>
             </div>
@@ -223,12 +223,12 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
         <div className="flex items-center justify-between">
           <p className="text-xs text-[var(--ink-3)]">Huidige onttrekking</p>
           <div className="flex items-center gap-1.5">
-            <span className={`font-mono text-sm tabular-nums ${withdrawalSafe ? 'text-emerald-600' : 'text-red-600'}`}>
+            <span className={`font-mono text-sm tabular-nums ${withdrawalSafe ? 'text-positive' : 'text-negative'}`}>
               {netWorth > 0 ? formatPct(actualWithdrawal) : '—'}
             </span>
             {netWorth > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${withdrawalSafe ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                {withdrawalSafe ? '✓ OK' : '⚠ Te hoog'}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${withdrawalSafe ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative'}`}>
+                {withdrawalSafe ? '✓ OK' : '⚠  Te hoog'}
               </span>
             )}
           </div>

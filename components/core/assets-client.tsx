@@ -72,13 +72,13 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [modalStep, setModalStep] = useState<'detail' | 'edit' | 'revalue'>('detail')
   const [projectionYears, setProjectionYears] = useState(10)
-  const [insightOpen, setInsightOpen] = useState(() => {
-    if (typeof window !== 'undefined') {
+  const [insightOpen, setInsightOpen] = useState(false)
+  useEffect(() => {
+    try {
       const stored = localStorage.getItem('collapsible_assets-insight')
-      if (stored !== null) return stored === 'true'
-    }
-    return false
-  })
+      if (stored !== null) setInsightOpen(stored === 'true')
+    } catch { /* */ }
+  }, [])
   const toggleInsight = () => {
     const next = !insightOpen
     setInsightOpen(next)

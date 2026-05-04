@@ -15,10 +15,9 @@ interface Props {
 }
 
 // ── Colors matching SimChart ──────────────────────────────────────────────────
-const COLOR_OPBOUW = 'var(--hor-t, #8a6e42)'
-const COLOR_AFBOUW = 'var(--kern-t, #58362d)'
-const COLOR_POS = '#10b981'
-const COLOR_NEG = '#ef4444'
+const COLOR_OPBOUW = 'var(--color-horizon-700)'
+const COLOR_POS = 'var(--positive)'
+const COLOR_NEG = 'var(--negative)'
 
 /** Linearly interpolate portfolio value at a fractional age. */
 function interpAt(
@@ -211,8 +210,8 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
           {/* Opbouwen column */}
           <div>
             <div className="flex items-center gap-1 mb-1.5">
-              <ArrowUpRight className="h-3 w-3 text-emerald-500" />
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Opbouwen</span>
+              <ArrowUpRight className="h-3 w-3 text-positive" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-positive">Opbouwen</span>
             </div>
             {opSlice.length > 0 ? (
               <div className="space-y-1">
@@ -220,15 +219,15 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                   <div key={evt.id} className="flex items-baseline justify-between gap-1 min-h-[44px] sm:min-h-0">
                     <span className="text-[11px] text-[var(--ink-2)] truncate">{evt.name}</span>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-emerald-600">
+                      <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-positive">
                         +{fmtCompact(evt.estimatedImpact)}
                       </span>
                     )}
                   </div>
                 ))}
                 {opTotal > 0 && (
-                  <div className="pt-1 border-t border-emerald-200/40">
-                    <span className="font-mono text-[11px] sm:text-xs tabular-nums font-semibold text-emerald-600">
+                  <div className="pt-1 border-t border-positive/40">
+                    <span className="font-mono text-[11px] sm:text-xs tabular-nums font-semibold text-positive">
                       +{fmtCompact(opTotal)}
                     </span>
                   </div>
@@ -241,8 +240,8 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
           {/* Investeren column */}
           <div>
             <div className="flex items-center gap-1 mb-1.5">
-              <ArrowDownRight className="h-3 w-3 text-red-500" />
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-red-500">Investeren</span>
+              <ArrowDownRight className="h-3 w-3 text-negative" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-negative">Investeren</span>
             </div>
             {invSlice.length > 0 ? (
               <div className="space-y-1">
@@ -250,16 +249,16 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                   <div key={evt.id} className="flex items-baseline justify-between gap-1 min-h-[44px] sm:min-h-0">
                     <span className="text-[11px] text-[var(--ink-2)] truncate">{evt.name}</span>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-red-500">
-                        −{fmtCompact(evt.estimatedImpact)}
+                      <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-negative">
+                        ˆ’{fmtCompact(evt.estimatedImpact)}
                       </span>
                     )}
                   </div>
                 ))}
                 {invTotal > 0 && (
-                  <div className="pt-1 border-t border-red-200/40">
-                    <span className="font-mono text-[11px] sm:text-xs tabular-nums font-semibold text-red-500">
-                      −{fmtCompact(invTotal)}
+                  <div className="pt-1 border-t border-negative/40">
+                    <span className="font-mono text-[11px] sm:text-xs tabular-nums font-semibold text-negative">
+                      ˆ’{fmtCompact(invTotal)}
                     </span>
                   </div>
                 )}
@@ -285,11 +284,11 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
         {/* Opbouwen column */}
         <div>
           <div className="flex items-center gap-1.5 mb-2">
-            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Vrijheid opbouwen</span>
+            <ArrowUpRight className="h-3.5 w-3.5 text-positive" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-positive">Vrijheid opbouwen</span>
           </div>
           {opTotalFull > 0 && (
-            <p className="font-mono text-sm font-semibold tabular-nums text-emerald-600 mb-2">
+            <p className="font-mono text-sm font-semibold tabular-nums text-positive mb-2">
               +{formatCurrency(opTotalFull)}
             </p>
           )}
@@ -297,7 +296,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
             <div className="space-y-1.5">
               {opSliceFull.map(evt => (
                 <div key={evt.id} className="flex items-start gap-1.5 min-h-[44px] md:min-h-0">
-                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-positive shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-1">
                       <span className="text-[11px] sm:text-xs text-[var(--ink-2)] font-medium truncate">{evt.name}</span>
@@ -306,7 +305,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                       )}
                     </div>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <p className="font-mono text-[11px] sm:text-xs tabular-nums text-emerald-600">
+                      <p className="font-mono text-[11px] sm:text-xs tabular-nums text-positive">
                         +{fmtCompact(evt.estimatedImpact)}
                       </p>
                     )}
@@ -318,9 +317,9 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center rounded-md border border-dashed border-emerald-300/40 bg-emerald-50/15 py-3 px-2 text-center">
-              <TrendingUp className="h-4 w-4 text-emerald-500/40 mb-1" />
-              <p className="text-[10px] text-emerald-600/60">Geen opbouw-events</p>
+            <div className="flex flex-col items-center rounded-md border border-dashed border-positive/40 bg-positive/10 py-3 px-2 text-center">
+              <TrendingUp className="h-4 w-4 text-positive/40 mb-1" />
+              <p className="text-[10px] text-positive/60">Geen opbouw-events</p>
               <p className="text-[8px] text-[var(--ink-4)] mt-0.5">erfenis, AOW, pensioen</p>
             </div>
           )}
@@ -328,19 +327,19 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
         {/* Investeren column */}
         <div>
           <div className="flex items-center gap-1.5 mb-2">
-            <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-red-500">Vrijheid investeren</span>
+            <ArrowDownRight className="h-3.5 w-3.5 text-negative" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-negative">Vrijheid investeren</span>
           </div>
           {invTotalFull > 0 && (
-            <p className="font-mono text-sm font-semibold tabular-nums text-red-500 mb-2">
-              −{formatCurrency(invTotalFull)}
+            <p className="font-mono text-sm font-semibold tabular-nums text-negative mb-2">
+              ˆ’{formatCurrency(invTotalFull)}
             </p>
           )}
           {invSliceFull.length > 0 ? (
             <div className="space-y-1.5">
               {invSliceFull.map(evt => (
                 <div key={evt.id} className="flex items-start gap-1.5 min-h-[44px] md:min-h-0">
-                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-negative shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-1">
                       <span className="text-[11px] sm:text-xs text-[var(--ink-2)] font-medium truncate">{evt.name}</span>
@@ -349,8 +348,8 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                       )}
                     </div>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <p className="font-mono text-[11px] sm:text-xs tabular-nums text-red-500">
-                        −{fmtCompact(evt.estimatedImpact)}
+                      <p className="font-mono text-[11px] sm:text-xs tabular-nums text-negative">
+                        ˆ’{fmtCompact(evt.estimatedImpact)}
                       </p>
                     )}
                   </div>
@@ -361,9 +360,9 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center rounded-md border border-dashed border-red-300/40 bg-red-50/15 py-3 px-2 text-center">
-              <Heart className="h-4 w-4 text-red-400/40 mb-1" />
-              <p className="text-[10px] text-red-500/60">Geen investeringen</p>
+            <div className="flex flex-col items-center rounded-md border border-dashed border-negative/40 bg-negative/10 py-3 px-2 text-center">
+              <Heart className="h-4 w-4 text-negative/40 mb-1" />
+              <p className="text-[10px] text-negative/60">Geen investeringen</p>
               <p className="text-[8px] text-[var(--ink-4)] mt-0.5">kinderen, verbouwing, reis</p>
             </div>
           )}
@@ -423,7 +422,7 @@ function TextFallback({
                       <span className="text-[11px] font-medium text-[var(--ink-2)] truncate">{evt.name}</span>
                     </div>
                   </div>
-                  <span className={`shrink-0 text-[11px] font-semibold ${evt.impactType === 'positive' ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <span className={`shrink-0 text-[11px] font-semibold ${evt.impactType === 'positive' ? 'text-positive' : 'text-negative'}`}>
                     {evt.impactType === 'positive' ? '↑' : '↓'}
                   </span>
                 </div>
@@ -432,14 +431,14 @@ function TextFallback({
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="flex flex-col items-center rounded-md border border-dashed border-emerald-300/40 bg-emerald-50/15 py-3 px-2 text-center">
-              <TrendingUp className="h-4 w-4 text-emerald-500/40 mb-1" />
-              <p className="text-[10px] text-emerald-600/60 leading-tight">Geen opbouw-events</p>
+            <div className="flex flex-col items-center rounded-md border border-dashed border-positive/40 bg-positive/10 py-3 px-2 text-center">
+              <TrendingUp className="h-4 w-4 text-positive/40 mb-1" />
+              <p className="text-[10px] text-positive/60 leading-tight">Geen opbouw-events</p>
               <p className="text-[8px] text-[var(--ink-4)] mt-0.5">erfenis, AOW, pensioen</p>
             </div>
-            <div className="flex flex-col items-center rounded-md border border-dashed border-red-300/40 bg-red-50/15 py-3 px-2 text-center">
-              <Heart className="h-4 w-4 text-red-400/40 mb-1" />
-              <p className="text-[10px] text-red-500/60 leading-tight">Geen investeringen</p>
+            <div className="flex flex-col items-center rounded-md border border-dashed border-negative/40 bg-negative/10 py-3 px-2 text-center">
+              <Heart className="h-4 w-4 text-negative/40 mb-1" />
+              <p className="text-[10px] text-negative/60 leading-tight">Geen investeringen</p>
               <p className="text-[8px] text-[var(--ink-4)] mt-0.5">kinderen, verbouwing, reis</p>
             </div>
           </div>
@@ -475,7 +474,7 @@ function TextFallback({
               const isPos = evt.impactType === 'positive'
               return (
                 <div key={evt.id} className="relative flex items-start gap-2">
-                  <div className={`absolute -left-4 top-1 h-2.5 w-2.5 rounded-full border-2 ${isPos ? 'border-emerald-500 bg-emerald-100' : 'border-red-400 bg-red-100'}`} />
+                  <div className={`absolute -left-4 top-1 h-2.5 w-2.5 rounded-full border-2 ${isPos ? 'border-positive bg-positive/20' : 'border-negative bg-negative/20'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       {evt.year && (
@@ -484,12 +483,12 @@ function TextFallback({
                       <span className="text-xs font-medium text-[var(--ink-2)] truncate">{evt.name}</span>
                     </div>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
-                      <p className={`mt-0.5 font-mono text-[11px] tabular-nums ${isPos ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {isPos ? '+' : '−'}{formatCurrency(evt.estimatedImpact)}
+                      <p className={`mt-0.5 font-mono text-[11px] tabular-nums ${isPos ? 'text-positive' : 'text-negative'}`}>
+                        {isPos ? '+' : 'ˆ’'}{formatCurrency(evt.estimatedImpact)}
                       </p>
                     )}
                   </div>
-                  <span className={`shrink-0 text-xs font-semibold ${isPos ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <span className={`shrink-0 text-xs font-semibold ${isPos ? 'text-positive' : 'text-negative'}`}>
                     {isPos ? '↑' : '↓'}
                   </span>
                 </div>
@@ -499,14 +498,14 @@ function TextFallback({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="flex flex-col items-center rounded-lg border border-dashed border-emerald-300/40 bg-emerald-50/15 py-4 px-3 text-center">
-            <TrendingUp className="h-5 w-5 text-emerald-500/40 mb-1.5" />
-            <p className="text-xs text-emerald-600/60">Geen opbouw-events gepland</p>
+          <div className="flex flex-col items-center rounded-lg border border-dashed border-positive/40 bg-positive/10 py-4 px-3 text-center">
+            <TrendingUp className="h-5 w-5 text-positive/40 mb-1.5" />
+            <p className="text-xs text-positive/60">Geen opbouw-events gepland</p>
             <p className="text-[10px] text-[var(--ink-4)] mt-1">erfenis, AOW, pensioenuitkering, verkoop woning</p>
           </div>
-          <div className="flex flex-col items-center rounded-lg border border-dashed border-red-300/40 bg-red-50/15 py-4 px-3 text-center">
-            <Heart className="h-5 w-5 text-red-400/40 mb-1.5" />
-            <p className="text-xs text-red-500/60">Geen investeringen gepland</p>
+          <div className="flex flex-col items-center rounded-lg border border-dashed border-negative/40 bg-negative/10 py-4 px-3 text-center">
+            <Heart className="h-5 w-5 text-negative/40 mb-1.5" />
+            <p className="text-xs text-negative/60">Geen investeringen gepland</p>
             <p className="text-[10px] text-[var(--ink-4)] mt-1">kinderen, verbouwing, wereldreis, studie</p>
           </div>
         </div>
@@ -514,8 +513,8 @@ function TextFallback({
       {allEvents.length > 0 && cumulativeImpact !== 0 && (
         <div className="mt-3 pt-2 border-t border-[var(--border-ed)]">
           <p className="text-[11px] text-[var(--ink-3)]">Cumulatieve impact op FIRE</p>
-          <p className={`font-mono text-sm font-semibold tabular-nums ${cumulativeImpact > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-            {cumulativeImpact > 0 ? '+' : '−'}{formatCurrency(Math.abs(cumulativeImpact))}
+          <p className={`font-mono text-sm font-semibold tabular-nums ${cumulativeImpact > 0 ? 'text-positive' : 'text-negative'}`}>
+            {cumulativeImpact > 0 ? '+' : 'ˆ’'}{formatCurrency(Math.abs(cumulativeImpact))}
           </p>
         </div>
       )}

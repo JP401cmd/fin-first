@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { deleteAllUserData } from '@/lib/seed-persona'
+import { clearBriefingState } from '@/app/api/briefing/compose/route'
 
 export async function POST() {
   const supabase = await createClient()
@@ -10,8 +11,11 @@ export async function POST() {
   }
 
   try {
-    // Delete all user financial data
+    // Delete all user financial data (also wipes news_editions + per-user app_settings rows)
     await deleteAllUserData(supabase, user.id)
+
+    // Drop in-memory briefing composition so the user doesn't see stale cards for ~5 min
+    clearBriefingState(user.id)
 
     // Reset profile — core fields first (always exist)
     // last_known_phase is set to null so phase is recomputed on next load

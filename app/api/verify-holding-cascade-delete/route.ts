@@ -62,7 +62,7 @@ export async function GET() {
       name: 'DELETE /api/holdings endpoint deletes from holdings table',
       pass: hasDelete,
       detail: hasDelete
-        ? 'DELETE handler issues supabase.from("holdings").delete()'
+        ? 'DELETE handler issues supabase.from("investment_holdings").delete()'
         : 'DELETE handler does not delete from holdings table',
     })
   } catch (err) {
@@ -75,7 +75,7 @@ export async function GET() {
 
   // Test 3: holding_transactions table exists
   try {
-    const { error } = await supabase.from('holding_transactions').select('id').limit(0)
+    const { error } = await supabase.from('investment_transactions').select('id').limit(0)
     const exists = !error || !error.message.includes('Could not find')
     results.push({
       name: 'holding_transactions table exists',
@@ -94,7 +94,7 @@ export async function GET() {
 
   // Test 4: holdings table exists
   try {
-    const { error } = await supabase.from('holdings').select('id').limit(0)
+    const { error } = await supabase.from('investment_holdings').select('id').limit(0)
     const exists = !error || !error.message.includes('Could not find')
     results.push({
       name: 'holdings table exists',
@@ -244,7 +244,7 @@ export async function GET() {
       }
 
       const { data: holding, error } = await supabase
-        .from('holdings')
+        .from('investment_holdings')
         .insert(insertData)
         .select()
         .single()
@@ -275,7 +275,7 @@ export async function GET() {
         ]
 
         const { data: transactions, error } = await supabase
-          .from('holding_transactions')
+          .from('investment_transactions')
           .insert(txData)
           .select()
 
@@ -306,7 +306,7 @@ export async function GET() {
     if (testHoldingId) {
       try {
         const { data: txBefore, error } = await supabase
-          .from('holding_transactions')
+          .from('investment_transactions')
           .select('id, type')
           .eq('holding_id', testHoldingId)
           .eq('user_id', user.id)
@@ -337,7 +337,7 @@ export async function GET() {
     if (testHoldingId) {
       try {
         const { error } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .delete()
           .eq('id', testHoldingId)
           .eq('user_id', user.id)
@@ -367,7 +367,7 @@ export async function GET() {
     if (testHoldingId) {
       try {
         const { data: txAfter, error } = await supabase
-          .from('holding_transactions')
+          .from('investment_transactions')
           .select('id')
           .eq('holding_id', testHoldingId)
 
@@ -399,7 +399,7 @@ export async function GET() {
     if (testHoldingId) {
       try {
         const { data: holdingAfter, error } = await supabase
-          .from('holdings')
+          .from('investment_holdings')
           .select('id')
           .eq('id', testHoldingId)
 
@@ -431,7 +431,7 @@ export async function GET() {
     if (transactionIds.length > 0) {
       try {
         const { data: orphanedTx, error } = await supabase
-          .from('holding_transactions')
+          .from('investment_transactions')
           .select('id')
           .in('id', transactionIds)
 

@@ -38,7 +38,7 @@ function ActionRow({ action, index, hasEntered }: { action: TopAction; index: nu
         {index + 1}
       </span>
       <span className={`shrink-0 font-mono text-[10px] tabular-nums font-bold ${priorityDotClass(action.priority_score).replace('bg-', 'text-')}`}>
-        ★{action.priority_score ?? 0}
+        ˜…{action.priority_score ?? 0}
       </span>
       <span className="flex-1 min-w-0 text-sm text-[var(--ink)] truncate">
         {action.title}
@@ -170,10 +170,10 @@ export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Pro
             <p className="label-editorial text-[var(--ink-3)] mt-3 mb-1.5">RECENT AFGEROND</p>
             {recentCompletedActions.slice(0, 2).map((a) => (
               <div key={a.id} className="flex items-center gap-2 py-1 text-[var(--ink-3)]">
-                <span className="h-2 w-2 rounded-full shrink-0 bg-emerald-400" />
+                <span className="h-2 w-2 rounded-full shrink-0 bg-positive" />
                 <span className="flex-1 min-w-0 text-xs truncate line-through decoration-[var(--ink-4)]">{a.title}</span>
                 {a.freedomDaysImpact != null && a.freedomDaysImpact > 0 && (
-                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-emerald-600">+{Math.round(a.freedomDaysImpact)}d</span>
+                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-positive">+{Math.round(a.freedomDaysImpact)}d</span>
                 )}
               </div>
             ))}

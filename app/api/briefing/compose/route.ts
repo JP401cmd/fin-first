@@ -80,6 +80,11 @@ const compositionErrors = new Map<string, string>()    // userId → error messa
 const COMPOSITION_TIMEOUT_MS = 120_000                 // 2 min — auto-cleanup
 const RESULT_TTL_MS = 5 * 60 * 1000                   // 5 min — completed results cleanup
 
+export function clearBriefingState(userId: string) {
+  activeCompositions.delete(userId)
+  compositionErrors.delete(userId)
+}
+
 function cleanupStaleCompositions() {
   const now = Date.now()
   for (const [userId, state] of activeCompositions) {

@@ -56,13 +56,13 @@ export const MeldingenWidget = memo(function MeldingenWidget({ size, data, href 
   // ── Quarter: teller met urgentie-kleur badge, rode dot bij kritiek ──
   if (size === 'quarter') {
     const badgeColor = critical > 0
-      ? 'bg-red-100 text-red-700'
-      : 'bg-amber-100 text-amber-700'
+      ? 'bg-[color-mix(in_oklab,var(--negative)_10%,transparent)] text-[var(--negative)]'
+      : 'bg-[var(--subtle)] text-[var(--ink-2)]'
     return (
       <WidgetShell module="cross" size={size} kicker="Meldingen" href={href}>
         <div className="flex items-center gap-2">
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm font-semibold ${badgeColor}`}>
-            {critical > 0 && <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+            {critical > 0 && <span className="h-2 w-2 rounded-full bg-[var(--negative)] animate-pulse" />}
             {count} melding{count !== 1 ? 'en' : ''}
           </span>
         </div>
@@ -81,9 +81,9 @@ export const MeldingenWidget = memo(function MeldingenWidget({ size, data, href 
               <span className="shrink-0 text-xs">{TYPE_ICONS[n.type] ?? '\u2139\ufe0f'}</span>
               <span className="flex-1 line-clamp-1">{n.message}</span>
               <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                n.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                n.severity === 'warning' ? 'bg-amber-100 text-amber-700' :
-                'bg-blue-50 text-blue-600'
+                n.severity === 'critical' ? 'bg-[color-mix(in_oklab,var(--negative)_10%,transparent)] text-[var(--negative)]' :
+                n.severity === 'warning' ? 'bg-[var(--subtle)] text-[var(--ink-2)]' :
+                'bg-[var(--subtle)] text-[var(--ink-3)]'
               }`}>
                 {TYPE_LABELS[n.type] ?? n.type}
               </span>
@@ -120,15 +120,15 @@ export const MeldingenWidget = memo(function MeldingenWidget({ size, data, href 
                 <li key={n.id} className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2 min-w-0 flex-1">
                     <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                      n.severity === 'critical' ? 'bg-red-500' :
-                      n.severity === 'warning' ? 'bg-amber-500' : 'bg-blue-400'
+                      n.severity === 'critical' ? 'bg-[var(--negative)]' :
+                      n.severity === 'warning' ? 'bg-[var(--ink-3)]' : 'bg-[var(--ink-4)]'
                     }`} />
                     <span className="text-sm text-[var(--ink-2)] line-clamp-2">{n.message}</span>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="text-[10px] text-[var(--ink-4)]">{formatTimestamp(n.createdAt)}</span>
                     {n.actionHref && (
-                      <span className="text-[10px] font-medium text-blue-600">
+                      <span className="text-[10px] font-medium text-[var(--ink)]">
                         Bekijk
                       </span>
                     )}

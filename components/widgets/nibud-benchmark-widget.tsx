@@ -107,7 +107,7 @@ export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, d
         <span className="text-[11px] text-[var(--ink-3)]">Gemiddeld</span>
         <span
           className={`font-mono text-sm font-semibold tabular-nums ${
-            avgPct <= 100 ? 'text-emerald-600' : avgPct <= 130 ? 'text-amber-600' : 'text-red-600'
+            avgPct <= 100 ? 'text-positive' : avgPct <= 130 ? 'text-[var(--ink-2)]' : 'text-negative'
           }`}
         >
           {avgPct}% van NIBUD norm
@@ -129,8 +129,8 @@ export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, d
                 <span
                   className={`font-mono text-[11px] font-medium tabular-nums ${
                     c.overNorm
-                      ? pctOfNorm > 130 ? 'text-red-600' : 'text-amber-600'
-                      : 'text-emerald-600'
+                      ? pctOfNorm > 130 ? 'text-negative' : 'text-[var(--ink-2)]'
+                      : 'text-positive'
                   }`}
                 >
                   {pctOfNorm}%
@@ -139,12 +139,12 @@ export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, d
               {/* User bar (colored) */}
               <div className="flex items-center gap-2">
                 <span className="w-7 shrink-0 text-[9px] text-[var(--ink-3)]">Jij</span>
-                <div className="relative h-[6px] flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div className="relative h-[6px] flex-1 overflow-hidden rounded-full bg-[var(--subtle)]">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       c.overNorm
-                        ? pctOfNorm > 130 ? 'bg-red-400' : 'bg-amber-400'
-                        : 'bg-emerald-400'
+                        ? pctOfNorm > 130 ? 'bg-negative' : 'bg-[var(--ink-3)]'
+                        : 'bg-positive'
                     }`}
                     style={{ width: `${Math.min(userBarW, 100)}%` }}
                   />
@@ -156,9 +156,9 @@ export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, d
               {/* NIBUD norm bar (grey) */}
               <div className="mt-[2px] flex items-center gap-2">
                 <span className="w-7 shrink-0 text-[9px] text-[var(--ink-4)]">Norm</span>
-                <div className="relative h-[6px] flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div className="relative h-[6px] flex-1 overflow-hidden rounded-full bg-[var(--subtle)]">
                   <div
-                    className="h-full rounded-full bg-zinc-300 dark:bg-zinc-600"
+                    className="h-full rounded-full bg-[var(--border-md)]"
                     style={{ width: `${Math.min(normBarW, 100)}%` }}
                   />
                 </div>
@@ -175,12 +175,12 @@ export const NibudBenchmarkWidget = memo(function NibudBenchmarkWidget({ size, d
       <div className="mt-3 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
         {overCount > 0 && (
           <span>
-            <span className="font-medium text-amber-600">{overCount}</span> boven norm
+            <span className="font-medium text-[var(--ink-2)]">{overCount}</span> boven norm
           </span>
         )}
         {comparison.length - overCount > 0 && (
           <span>
-            <span className="font-medium text-emerald-600">{comparison.length - overCount}</span> op koers
+            <span className="font-medium text-positive">{comparison.length - overCount}</span> op koers
           </span>
         )}
       </div>

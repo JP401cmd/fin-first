@@ -21,7 +21,7 @@ function StepCard({ step }: { step: NextStep }) {
       </div>
       <p className="mt-0.5 text-xs text-[var(--ink-3)] line-clamp-1">{step.description}</p>
       {step.impact != null && step.impact > 0 && (
-        <p className="mt-1 font-serif italic text-[11px] text-emerald-600">
+        <p className="mt-1 font-serif italic text-[11px] text-positive">
           +{step.impact} vrijheidsdagen
         </p>
       )}
@@ -38,7 +38,7 @@ export const VolgendeStapWidget = memo(function VolgendeStapWidget({ size, data,
     return (
       <WidgetShell module="wil" size={size} kicker="Volgende Stap" href={href}>
         <div className="flex flex-col items-center justify-center gap-2 py-4">
-          <CheckCircle2 className="h-5 w-5 text-emerald-500" strokeWidth={1.5} />
+          <CheckCircle2 className="h-5 w-5 text-positive" strokeWidth={1.5} />
           <p className="font-serif italic text-[13px] text-[var(--ink-3)] text-center leading-relaxed">
             Alles op orde — geen openstaande stappen
           </p>

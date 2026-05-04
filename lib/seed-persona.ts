@@ -77,28 +77,32 @@ export async function deleteAllUserData(
 ): Promise<Record<string, number>> {
   const summary: Record<string, number> = {}
 
-  // Batch 0: tables with no FK to other user tables + holding children (FK to holdings)
-  // holding_transactions, holding_alerts must be deleted before holdings
-  // holding_prices has no user_id but CASCADE from holdings handles it
+  // Batch 0: tables with no FK to other user tables + holding children (FK to *_holdings)
+  // investment_transactions, crypto_transactions, holding_alerts must be deleted before *_holdings
   // target_allocations has user_id only (no FK to holdings)
   const batch0Results = await Promise.all([
-    deleteTable(supabase, 'holding_transactions', userId),
+    deleteTable(supabase, 'investment_transactions', userId),
+    deleteTable(supabase, 'crypto_transactions', userId),
     deleteTable(supabase, 'holding_alerts', userId),
     deleteTable(supabase, 'target_allocations', userId),
     deleteTable(supabase, 'user_feature_visits', userId),
     deleteTable(supabase, 'next_step_completions', userId),
   ])
-  const batch0Tables = ['holding_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions']
+  const batch0Tables = ['investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions']
   for (let i = 0; i < batch0Tables.length; i++) {
     summary[batch0Tables[i]] = batch0Results[i]
   }
 
-  // Batch 0b: holdings (FK to assets, must be deleted before assets)
-  const holdingsResult = await deleteTable(supabase, 'holdings', userId)
-  summary.holdings = holdingsResult
+  // Batch 0b: investment_holdings + crypto_holdings (FK to assets, must be deleted before assets)
+  const [investmentHoldingsResult, cryptoHoldingsResult] = await Promise.all([
+    deleteTable(supabase, 'investment_holdings', userId),
+    deleteTable(supabase, 'crypto_holdings', userId),
+  ])
+  summary.investment_holdings = investmentHoldingsResult
+  summary.crypto_holdings = cryptoHoldingsResult
 
   onProgress?.('Gebruikersdata verwijderen...', 'batch0', 'delete',
-    batch0Results.reduce((a, b) => a + b, 0) + holdingsResult)
+    batch0Results.reduce((a, b) => a + b, 0) + investmentHoldingsResult + cryptoHoldingsResult)
 
   // Batch 1a: deepest leaf tables (FK to goals, budgets)
   const batch1aResults = await Promise.all([
@@ -119,8 +123,9 @@ export async function deleteAllUserData(
     deleteTable(supabase, 'net_worth_snapshots', userId),
     deleteTable(supabase, 'life_events', userId),
     deleteTable(supabase, 'goals', userId),
+    deleteTable(supabase, 'news_editions', userId),
   ])
-  const batch1bTables = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'life_events', 'goals']
+  const batch1bTables = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'life_events', 'goals', 'news_editions']
   for (let i = 0; i < batch1bTables.length; i++) {
     summary[batch1bTables[i]] = batch1bResults[i]
   }
@@ -160,8 +165,22 @@ export async function deleteAllUserData(
   for (let i = 0; i < batch3Tables.length; i++) {
     summary[batch3Tables[i]] = batch3Results[i]
   }
+
   onProgress?.('Hoofdtabellen verwijderen...', 'batch3', 'delete',
     syncLogResult + connAccountsResult + connectionsResult + batch3Results.reduce((a, b) => a + b, 0))
+
+  // Batch 4: per-user app_settings rows (news cache, briefing prefs, notifications history,
+  // sovereignty level, monthly check-ins, partner notif prefs, household privacy, reminders…).
+  // These are scattered across many keys, all containing the user id. A single LIKE wipes them.
+  const { count: settingsCount, error: settingsErr } = await supabase
+    .from('app_settings')
+    .delete({ count: 'exact' })
+    .like('key', `%${userId}%`)
+  if (settingsErr) {
+    console.warn(`[seed] Delete from app_settings failed: ${settingsErr.message}`)
+  }
+  summary.app_settings = settingsCount ?? 0
+  onProgress?.('App-instellingen wissen...', 'batch4', 'delete', settingsCount ?? 0)
 
   return summary
 }
@@ -235,21 +254,7 @@ export async function seedPersonaData(
   const { error: profileError } = await supabase
     .from('profiles')
     .upsert(profileData)
-  if (profileError) {
-    // If the error is about a missing column (e.g. rebalance_threshold or marginaal_tarief not yet migrated),
-    // retry without the newer optional columns
-    const msg = profileError.message ?? ''
-    if (msg.includes('rebalance_threshold') || msg.includes('marginaal_tarief')) {
-      console.warn(`[seed-persona] Profile upsert failed with optional column, retrying without: ${msg}`)
-      const fallbackProfile = { ...profileData }
-      delete fallbackProfile.rebalance_threshold
-      delete fallbackProfile.marginaal_tarief
-      const { error: fallbackErr } = await supabase.from('profiles').upsert(fallbackProfile)
-      if (fallbackErr) throw new Error(`Profiel update mislukt (fallback): ${fallbackErr.message}`)
-    } else {
-      throw new Error(`Profiel update mislukt: ${profileError.message}`)
-    }
-  }
+  if (profileError) throw new Error(`Profiel update mislukt: ${profileError.message}`)
   summary.profiles = 1
 
   // ── Phase 1a: Cash assets first (bank_accounts need their IDs) ──
@@ -657,74 +662,84 @@ export async function seedPersonaData(
   }
 
   // Holdings + Holding Transactions
+  // Routes per asset_type: 'crypto' → crypto_holdings + crypto_transactions,
+  // anders → investment_holdings + investment_transactions.
+  // (Migration 20260502000003 splitste de oude `holdings`/`holding_transactions` tabellen.)
   if (persona.holdings && persona.holdings.length > 0) {
-    let holdingCount = 0
-    let holdingTxCount = 0
+    const assetNameToType: Record<string, string> = {}
+    for (const a of persona.assets) {
+      assetNameToType[a.name] = a.asset_type
+    }
+
+    let investmentHoldingCount = 0
+    let cryptoHoldingCount = 0
+    let investmentTxCount = 0
+    let cryptoTxCount = 0
 
     for (const h of persona.holdings) {
       const assetId = assetNameToId[h.assetName]
       if (!assetId) continue
-
-      const holdingRow: Record<string, unknown> = {
-        user_id: userId,
-        asset_id: assetId,
-        ticker: h.ticker,
-        isin: h.isin,
-        name: h.name,
-        units: h.units,
-        avg_purchase_price: h.avg_purchase_price,
-        current_price: h.current_price,
-        purchase_date: monthsAgoDate(h.purchase_date_monthsAgo),
-        is_active: true,
-      }
-      if (h.asset_class) holdingRow.asset_class = h.asset_class
-      if (h.sector !== undefined) holdingRow.sector = h.sector
-      if (h.geography) holdingRow.geography = h.geography
-      if (h.is_favorite != null) holdingRow.is_favorite = h.is_favorite
-      if (h.currency) holdingRow.currency = h.currency
-      if (h.ter != null) holdingRow.ter = h.ter
-      if (h.ter_source) holdingRow.ter_source = h.ter_source
+      const assetType = assetNameToType[h.assetName] ?? 'investment'
+      const isCrypto = assetType === 'crypto'
 
       let holdingData: { id: string } | null = null
-      const { data: d1, error: holdingErr } = await supabase
-        .from('holdings')
-        .insert(holdingRow)
-        .select('id')
-        .single()
 
-      if (holdingErr) {
-        // If the error indicates missing columns (from migration 20260316100001),
-        // retry without the newer optional columns.
-        const msg = holdingErr.message ?? ''
-        if (msg.includes('column') || msg.includes('asset_class') || msg.includes('sector') || msg.includes('geography') || msg.includes('previous_close') || msg.includes('daily_change_percent') || msg.includes('currency') || msg.includes('ter')) {
-          console.warn(`[seed-persona] Holdings insert failed, retrying without optional columns (asset_class, sector, geography, previous_close, daily_change_percent, currency, ter, ter_source): ${msg}`)
-          const fallbackRow = { ...holdingRow }
-          delete fallbackRow.asset_class
-          delete fallbackRow.sector
-          delete fallbackRow.geography
-          delete fallbackRow.previous_close
-          delete fallbackRow.daily_change_percent
-          delete fallbackRow.currency
-          delete fallbackRow.ter
-          delete fallbackRow.ter_source
-          const { data: d2, error: fallbackErr } = await supabase
-            .from('holdings')
-            .insert(fallbackRow)
-            .select('id')
-            .single()
-          if (fallbackErr) throw new Error(`Holding "${h.name}" insert mislukt (fallback): ${fallbackErr.message}`)
-          holdingData = d2
-        } else {
-          throw new Error(`Holding "${h.name}" insert mislukt: ${holdingErr.message}`)
+      if (isCrypto) {
+        const cryptoRow: Record<string, unknown> = {
+          user_id: userId,
+          asset_id: assetId,
+          symbol: h.ticker ?? h.name,
+          name: h.name,
+          units: h.units,
+          avg_purchase_price: h.avg_purchase_price,
+          current_price: h.current_price,
+          is_active: true,
         }
+        if (h.is_favorite != null) cryptoRow.is_favorite = h.is_favorite
+
+        const { data, error } = await supabase
+          .from('crypto_holdings')
+          .insert(cryptoRow)
+          .select('id')
+          .single()
+        if (error) throw new Error(`Crypto holding "${h.name}" insert mislukt: ${error.message}`)
+        holdingData = data
+        cryptoHoldingCount++
       } else {
-        holdingData = d1
+        const investmentRow: Record<string, unknown> = {
+          user_id: userId,
+          asset_id: assetId,
+          ticker: h.ticker ?? h.name,
+          isin: h.isin,
+          name: h.name,
+          units: h.units,
+          avg_purchase_price: h.avg_purchase_price,
+          current_price: h.current_price,
+          purchase_date: monthsAgoDate(h.purchase_date_monthsAgo),
+          is_active: true,
+        }
+        if (h.asset_class) investmentRow.asset_class = h.asset_class
+        if (h.sector !== undefined) investmentRow.sector = h.sector
+        if (h.geography) investmentRow.geography = h.geography
+        if (h.is_favorite != null) investmentRow.is_favorite = h.is_favorite
+        if (h.currency) investmentRow.currency = h.currency
+        if (h.ter != null) investmentRow.ter = h.ter
+        if (h.ter_source) investmentRow.ter_source = h.ter_source
+
+        const { data, error } = await supabase
+          .from('investment_holdings')
+          .insert(investmentRow)
+          .select('id')
+          .single()
+        if (error) throw new Error(`Investment holding "${h.name}" insert mislukt: ${error.message}`)
+        holdingData = data
+        investmentHoldingCount++
       }
+
       if (!holdingData) throw new Error(`Holding "${h.name}" insert returned no data`)
-      holdingCount++
 
       if (h.transactions.length > 0) {
-        const htRows = h.transactions.map((ht) => ({
+        const txRows = h.transactions.map((ht) => ({
           holding_id: holdingData.id,
           user_id: userId,
           type: ht.type,
@@ -734,41 +749,41 @@ export async function seedPersonaData(
           date: monthsAgoDate(ht.monthsAgo),
           notes: ht.notes,
         }))
-        const { error: htErr } = await supabase.from('holding_transactions').insert(htRows)
-        if (htErr) throw new Error(`Holding transacties insert mislukt: ${htErr.message}`)
-        holdingTxCount += htRows.length
+        const targetTable = isCrypto ? 'crypto_transactions' : 'investment_transactions'
+        const { error: htErr } = await supabase.from(targetTable).insert(txRows)
+        if (htErr) throw new Error(`Holding transacties insert mislukt (${targetTable}): ${htErr.message}`)
+        if (isCrypto) cryptoTxCount += txRows.length
+        else investmentTxCount += txRows.length
       }
     }
-    summary.holdings = holdingCount
-    summary.holding_transactions = holdingTxCount
+    summary.investment_holdings = investmentHoldingCount
+    summary.crypto_holdings = cryptoHoldingCount
+    summary.investment_transactions = investmentTxCount
+    summary.crypto_transactions = cryptoTxCount
   }
 
   // Target Allocations (for rebalancing)
   if (persona.target_allocations && persona.target_allocations.length > 0) {
-    try {
-      const taRows = persona.target_allocations.map((ta) => ({
-        user_id: userId,
-        view_mode: ta.view_mode,
-        category: ta.category,
-        target_pct: ta.target_pct,
-      }))
-      // Upsert to avoid failure if target_allocations already exist for this user
-      const { error: taErr } = await supabase
-        .from('target_allocations')
-        .upsert(taRows, { onConflict: 'user_id,view_mode,category' })
-      if (taErr) {
-        console.warn(`[seed-persona] Target allocations insert failed (table may not exist): ${taErr.message}`)
-      } else {
-        summary.target_allocations = taRows.length
-      }
-    } catch {
-      // Table may not exist yet — non-fatal
-      console.warn('[seed-persona] target_allocations table not available, skipping')
-    }
+    const taRows = persona.target_allocations.map((ta) => ({
+      user_id: userId,
+      view_mode: ta.view_mode,
+      category: ta.category,
+      target_pct: ta.target_pct,
+    }))
+    const { error: taErr } = await supabase
+      .from('target_allocations')
+      .upsert(taRows, { onConflict: 'user_id,view_mode,category' })
+    if (taErr) throw new Error(`Target allocations upsert mislukt: ${taErr.message}`)
+    summary.target_allocations = taRows.length
   }
 
   onProgress('Waarderingen & holdings toevoegen...', 'phase4', 'insert',
-    (summary.valuations ?? 0) + (summary.holdings ?? 0) + (summary.holding_transactions ?? 0) + (summary.target_allocations ?? 0))
+    (summary.valuations ?? 0)
+    + (summary.investment_holdings ?? 0)
+    + (summary.crypto_holdings ?? 0)
+    + (summary.investment_transactions ?? 0)
+    + (summary.crypto_transactions ?? 0)
+    + (summary.target_allocations ?? 0))
 
   // ── Phase 5: App settings (scenarios, preferences) ──────────
 
