@@ -1,8 +1,21 @@
 'use client'
 
+/**
+ * Fase 2.1 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.2 (sheet)
+ *
+ * OpzegModal is een single-form "even snel iets doen" — past in §5.2 als
+ * sheet via <ShellOverlay kind="sheet">. Op desktop rendert dit een
+ * centered BottomSheet (md:max-w-lg); op mobile een gewone bottom-sheet
+ * met peek/full detents.
+ *
+ * ShellOverlay werkt onafhankelijk van de feature-flag — bij flag UIT zien
+ * gebruikers dezelfde behaviour, alleen via één centrale wrapper.
+ */
+
 import { useState, useMemo, useEffect } from 'react'
 import { Bot, X, BookmarkCheck } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
@@ -146,9 +159,11 @@ ${nameVal}`
   if (!subscription) return null
 
   return (
-    <BottomSheet
+    <ShellOverlay
       open={open}
       onClose={onClose}
+      kind="sheet"
+      size="md"
       title={`Opzegbrief — ${subscription.name}`}
     >
       <div className="space-y-5">
@@ -233,6 +248,6 @@ ${nameVal}`
           </button>
         </div>
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }

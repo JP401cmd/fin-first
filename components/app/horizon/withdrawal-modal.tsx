@@ -1,5 +1,11 @@
 'use client'
 
+/**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ */
+
 import { useEffect, useState } from 'react'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
@@ -11,8 +17,8 @@ import {
   type GuardrailsConfig, type BucketConfig,
 } from '@/lib/horizon-data'
 import { DEFAULT_RETURN } from '@/lib/constants'
-import { X, ChevronDown, ChevronUp, Info } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { Kicker, ScenarioCallout } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -116,7 +122,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
   if (!open || !result) return null
 
   return (
-    <BottomSheet open={true} onClose={onClose} title="Opnamestrategie">
+    <ShellOverlay open={true} onClose={onClose} kind="pane" title="Opnamestrategie">
         <div className="space-y-6 px-6 py-6">
           {/* Strategy tabs */}
           <section>
@@ -424,7 +430,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
             )}
           </section>
         </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }
 

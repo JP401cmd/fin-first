@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { useModuleColors, useBudgetColors, usePhaseColors, useFontTheme, usePaletteTheme, PALETTE_THEMES, type PaletteTheme } from '@/components/app/module-color-provider'
 import type { FontTheme } from '@/components/app/module-color-provider'
 import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } from '@/lib/color-palette'
@@ -744,6 +745,7 @@ export default function InstellingenPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
+      <NavStackMeta title="Instellingen" bottomBar={{ kind: 'tabs' }} />
       {/* Editorial header — blueprint Type 8 (Settings) */}
       <header className="mb-5 sm:mb-8 space-y-2">
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">

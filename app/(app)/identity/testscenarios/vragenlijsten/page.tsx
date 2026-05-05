@@ -1,9 +1,15 @@
 'use client'
 
+/**
+ * Fase 3 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §2.1 (shell-agnostische content)
+ * Eigen back-knop verwijderd; shell levert deze via TopBar (mobile) of pane-header (desktop).
+ */
+
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { ArrowRight, CheckCircle2, Clock } from 'lucide-react'
-import { SectionDivider } from '@/components/app/section-divider'
+import Link from 'next/link'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 interface QuestionnaireItem {
   id: string
@@ -28,6 +34,7 @@ export default function VragenlijstenPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <NavStackMeta title="Vragenlijsten" bottomBar={{ kind: 'tabs' }} />
       <header className="mb-10 border-b border-[var(--border-ed)] pb-6 space-y-2">
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
           <span
@@ -78,17 +85,6 @@ export default function VragenlijstenPage() {
           ))}
         </div>
       )}
-
-      <SectionDivider variant="asterisk" />
-
-      <div className="text-center">
-        <Link
-          href="/identity/testscenarios"
-          className="text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]"
-        >
-          &larr; Terug naar testscenario&rsquo;s
-        </Link>
-      </div>
     </div>
   )
 }

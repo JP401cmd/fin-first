@@ -1,13 +1,14 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Briefcase, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
+import { Briefcase, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 import HoldingTransactionLogClient from './transaction-log-client'
 import HoldingValueChartClient from './value-chart-client'
 import { HoldingFavoriteButton } from './holding-favorite-button'
 import { calculateHoldingBox3 } from '@/lib/box3-holdings'
 import HoldingAlertsClient from './alerts-client'
 import { resolveHolding } from '@/lib/holdings-table-resolver'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -91,15 +92,7 @@ export default async function HoldingDetailPage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8" data-testid="holding-detail-page">
-      <Link
-        href="/core/assets/holdings"
-        className="mb-6 inline-flex items-center gap-2 text-sm text-[var(--ink-3)] hover:text-zinc-800 transition-colors"
-        data-testid="back-to-holdings-link"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Terug naar holdings
-      </Link>
-
+      <NavStackMeta title={name} />
       {/* Holding header with KPIs */}
       <section className="rounded-[var(--r-lg)] border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-start gap-4">

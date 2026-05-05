@@ -33,7 +33,6 @@ const activeBorder: Record<string, string> = {
 }
 
 export function BottomNav() {
-  const pathname = usePathname()
   const { activeModules } = useModuleAccess()
 
   // Derive which tabs to show from active modules.
@@ -45,33 +44,57 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 z-40 border-t-2 border-[var(--border-md)] bg-[var(--paper)]/90 backdrop-blur-md safe-bottom transition-[right] duration-300 md:hidden" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
-      <div className="flex items-center justify-around" style={{ height: 'var(--bottom-nav-height)' }}>
-        {visibleTabs.map((tab) => {
-          // tab may be undefined if tabConfig lookup fails (defensive guard)
-          if (!tab) return null
-          const isActive = pathname.startsWith(tab.href)
-          const Icon = tab.icon
-          // Non-kern tabs are added dynamically when the user activates a
-          // module, so they receive the reveal animation.
-          const isNonKern = tab.href !== '/core'
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.06em] transition-colors border-t-3 ${
-                isNonKern ? 'animate-nav-reveal' : ''
-              } ${
-                isActive
-                  ? `${activeColors[tab.color]} ${activeBorder[tab.color]} ${activeBg[tab.color]} rounded-b-sm`
-                  : 'text-[var(--ink-3)] border-transparent'
-              }`}
-            >
-              <Icon className="relative h-3.5 w-3.5" />
-              <span className="relative">{tab.label}</span>
-            </Link>
-          )
-        })}
-      </div>
+      <BottomNavTabs />
     </nav>
+  )
+}
+
+/**
+ * Content-only versie van de BottomNav. Rendert ALLEEN de tab-rij zonder
+ * `fixed bottom-0`-positionering of safe-area-padding — bedoeld om
+ * geëmbed te worden in een ander shell-element (bv. de tray-of-three van
+ * MobileStackShell, plan §4.4). De wrapping `<nav>` met fixed-styling blijft
+ * de verantwoordelijkheid van de aanroeper.
+ *
+ * Geëxporteerd zodat `MobileBottomBar` (kind='tabs') deze kan gebruiken zonder
+ * dubbele bottom-nav in de DOM.
+ */
+export function BottomNavTabs() {
+  const pathname = usePathname()
+  const { activeModules } = useModuleAccess()
+
+  const activeNavModules = getActiveNavModules(activeModules)
+  const visibleTabs = activeNavModules.map(m => tabConfig[m])
+
+  if (visibleTabs.length <= 1) return null
+
+  return (
+    <div className="flex items-center justify-around w-full" style={{ height: 'var(--bottom-nav-height)' }}>
+      {visibleTabs.map((tab) => {
+        // tab may be undefined if tabConfig lookup fails (defensive guard)
+        if (!tab) return null
+        const isActive = pathname.startsWith(tab.href)
+        const Icon = tab.icon
+        // Non-kern tabs are added dynamically when the user activates a
+        // module, so they receive the reveal animation.
+        const isNonKern = tab.href !== '/core'
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.06em] transition-colors border-t-3 ${
+              isNonKern ? 'animate-nav-reveal' : ''
+            } ${
+              isActive
+                ? `${activeColors[tab.color]} ${activeBorder[tab.color]} ${activeBg[tab.color]} rounded-b-sm`
+                : 'text-[var(--ink-3)] border-transparent'
+            }`}
+          >
+            <Icon className="relative h-3.5 w-3.5" />
+            <span className="relative">{tab.label}</span>
+          </Link>
+        )
+      })}
+    </div>
   )
 }

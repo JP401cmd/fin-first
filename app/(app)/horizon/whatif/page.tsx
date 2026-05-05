@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 /**
  * Masked-aware currency formatter hook. Returns a stable callback that
@@ -566,6 +567,7 @@ export default function WhatIfPage() {
 
   return (
     <div className={dimensionClass}>
+      <NavStackMeta title="Wat-Als" />
       <div className="whatif-world mx-auto max-w-6xl py-4 sm:py-8">
 
         {/* ── Header ────────────────────────────────────────── */}

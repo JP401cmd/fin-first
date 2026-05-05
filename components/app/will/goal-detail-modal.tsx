@@ -1,8 +1,25 @@
 'use client'
 
+/**
+ * Fase 2.1 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane)
+ *
+ * GoalDetailModal toont de volledige doelen-context (lijst, form, progress-
+ * timeline, CRUD-acties) — past in §5.1 als pane: gebruiker "gaat ergens
+ * naartoe". Op desktop (>=lg) glijdt deze van rechts in als SlideInPane;
+ * op mobile valt ShellOverlay terug op een full-height BottomSheet (tot
+ * Fase 0.5 stack-push via NavStackProvider).
+ *
+ * GoalForm + GoalProgressTimeline blijven als child-componenten BINNEN deze
+ * pane gerendered — geen aparte migratie. Sub-modal pattern blijft intact.
+ *
+ * ShellOverlay werkt onafhankelijk van de feature-flag — bij flag UIT zien
+ * gebruikers dezelfde behaviour, alleen via één centrale wrapper.
+ */
+
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, Check, ChevronDown, ChevronUp, Trash2, BarChart3, Users } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import {
   type Goal, type GoalType, GOAL_TYPE_LABELS, GOAL_TYPE_META,
@@ -161,7 +178,7 @@ export function GoalDetailModal({
 
   return (
     <>
-      <BottomSheet open={open} onClose={handleClose} title="Alle doelen" size="lg">
+      <ShellOverlay open={open} onClose={handleClose} kind="pane" title="Alle doelen">
         {/* Sub-header */}
         <div className="flex items-center justify-between px-5 pb-3 pt-1">
           <p className="text-sm text-[var(--ink-3)]">
@@ -297,7 +314,7 @@ export function GoalDetailModal({
             </>
           )}
         </div>
-      </BottomSheet>
+      </ShellOverlay>
 
       {/* GoalForm sub-modal */}
       {showForm && (

@@ -1,9 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import {
   type Asset,
   type AssetType,
@@ -637,17 +636,8 @@ function CategoryHero({ type, total, count }: CategoryHeroProps) {
       <div className="h-1" style={{ background: 'var(--module-active-500)' }} />
 
       <div className="px-4 py-5 sm:px-6 sm:py-7">
-        {/* Back-link in mono UPPERCASE (Type 2 blueprint: back-navigation) */}
-        <Link
-          href="/core"
-          className="inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-        >
-          <ArrowLeft className="h-3 w-3" aria-hidden="true" />
-          <span>Terug naar Kern</span>
-        </Link>
-
         {/* Kicker met 28×1px streep — editorial signature-element */}
-        <div className="mt-4 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
           <span
             aria-hidden
             className="inline-block h-px w-7 shrink-0"

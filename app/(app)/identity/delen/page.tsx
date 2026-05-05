@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import { FreedomCardGenerator } from '@/components/app/freedom-card'
 import { ChevronRight } from 'lucide-react'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 export default function DelenPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
+      <NavStackMeta title="Delen" bottomBar={{ kind: 'tabs' }} />
       {/* Editorial header — blueprint Type 8 (Settings) */}
       <header className="mb-5 sm:mb-8 space-y-2">
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">

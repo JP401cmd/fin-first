@@ -16,6 +16,7 @@ import {
   type CategoryHistoryData,
 } from '@/lib/load-category-history'
 import { DebtCategoryPage } from '@/components/core/debt-category-page'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // ── Type guards ──────────────────────────────────────────────
 
@@ -106,14 +107,17 @@ export default async function DebtCategoryServerPage({
   ])
 
   return (
-    <DebtCategoryPage
-      type={type}
-      initialDebts={debts}
-      initialKpiRefs={kpiRefs ?? undefined}
-      initialConnectionsByDebtId={connectionsByDebtId}
-      initialDebtSparklines={debtSparklines}
-      initialHistoryData={historyData ?? undefined}
-    />
+    <>
+      <NavStackMeta title={DEBT_TYPE_LABELS[type] ?? 'Schulden'} bottomBar={{ kind: 'tabs' }} />
+      <DebtCategoryPage
+        type={type}
+        initialDebts={debts}
+        initialKpiRefs={kpiRefs ?? undefined}
+        initialConnectionsByDebtId={connectionsByDebtId}
+        initialDebtSparklines={debtSparklines}
+        initialHistoryData={historyData ?? undefined}
+      />
+    </>
   )
 }
 

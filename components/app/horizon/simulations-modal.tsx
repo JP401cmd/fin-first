@@ -1,10 +1,19 @@
 'use client'
 
+/**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane) + §5.2 (sheet)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ *
+ * SimulationsModal = pane (Monte Carlo simulatie-flow met instellingen + chart).
+ * SimulationDetailModal (sub-overlay) = sheet (drill-down per metric).
+ */
+
 import { useEffect, useState, useMemo } from 'react'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { Kicker } from '@/components/editorial'
 import {
   runMonteCarlo, ageAtDate, NL_SWR,
@@ -93,14 +102,14 @@ export function SimulationsModal({
 
   if (computing || !mc) {
     return (
-      <BottomSheet open={true} onClose={onClose} title="Monte Carlo Simulaties">
+      <ShellOverlay open={true} onClose={onClose} kind="pane" title="Monte Carlo Simulaties">
           <div className="flex flex-col items-center justify-center p-12 py-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-horizon-500 border-t-transparent" />
             <p className="mt-4 text-sm text-[var(--ink-3)]">
               Monte Carlo simulaties berekenen ({simCount.toLocaleString('nl-NL')} paden)...
             </p>
           </div>
-      </BottomSheet>
+      </ShellOverlay>
     )
   }
 
@@ -111,7 +120,7 @@ export function SimulationsModal({
       : (input.monthlyExpenses * 12) / NL_SWR)
 
   return (
-    <BottomSheet open={true} onClose={onClose} title="Monte Carlo Simulaties">
+    <ShellOverlay open={true} onClose={onClose} kind="pane" title="Monte Carlo Simulaties">
         <div className="space-y-6 px-6 py-6">
           {/* Settings */}
           <button
@@ -318,7 +327,7 @@ export function SimulationsModal({
             </div>
           )}
         </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }
 
@@ -505,7 +514,7 @@ function SimulationDetailModal({
   const sampleYears = [5, 10, 15, 20, 25, 30, 35, 40].filter((y) => y <= mc.years)
 
   return (
-    <BottomSheet open={true} onClose={onClose}>
+    <ShellOverlay open={true} onClose={onClose} kind="sheet" size="lg">
         <div className="flex items-center justify-between border-b border-horizon-200 bg-horizon-50 px-6 py-4">
           <h2 className="text-lg font-semibold text-[var(--ink)]">{titles[metric]}</h2>
           <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
@@ -610,6 +619,6 @@ function SimulationDetailModal({
             </div>
           </div>
         </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }

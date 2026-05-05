@@ -1,8 +1,14 @@
 'use client'
 
+/**
+ * Fase 3 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §2.1 (shell-agnostische content)
+ * Eigen back-knop verwijderd; shell levert deze via TopBar (mobile) of pane-header (desktop).
+ */
+
 import { useEffect, useState, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Printer } from 'lucide-react'
 import { formatMaskedCurrency, formatTimestamp } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
@@ -11,6 +17,7 @@ import {
   SectionLabel,
   OrnamentColophon,
 } from '@/components/editorial'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 /**
  * Masked-aware currency formatter hook. Returns a stable callback that
@@ -131,7 +138,6 @@ function KengetalRow({ label, value, variant, tooltip }: {
 
 export default function BalansPage() {
   const fc = useFc()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const date = searchParams.get('date') || new Date().toISOString().split('T')[0]
 
@@ -203,16 +209,13 @@ export default function BalansPage() {
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8">
-      {/* ── Toolbar ── */}
-      <div data-print-hide className="mb-6 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => router.push('/rapportages')}
-          className="flex items-center gap-2 font-inter text-sm text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Terug naar rapportages
-        </button>
+      <NavStackMeta title="Balans-rapportage" bottomBar={{ kind: 'tabs' }} />
+      {/* ── Toolbar ──
+           Back-knop is verwijderd in Fase 3 van de new-navigation-shell migratie:
+           shell levert deze nu via TopBar (mobile) of pane-header (desktop).
+           Print-actie blijft hier — het is een page-eigen content-actie, geen
+           navigatie-chrome. */}
+      <div data-print-hide className="mb-6 flex items-center justify-end">
         <button
           type="button"
           onClick={() => window.print()}

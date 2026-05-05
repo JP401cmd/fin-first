@@ -1,11 +1,20 @@
 'use client'
 
+/**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane) + §5.2 (sheet)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ *
+ * ScenariosModal = pane (full scenario-beheer met lijst + acties).
+ * ScenarioDetailModal (sub-overlay) = sheet (inspection van één scenario).
+ */
+
 import { useEffect, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { X, ArrowDown, ArrowUp, TrendingDown } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { Kicker } from '@/components/editorial'
 import {
   MARKET_WEATHER, type MarketWeather, type FinancialInput,
@@ -38,7 +47,9 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
   const [healthScore, setHealthScore] = useState<HealthScore | null>(null)
   const [weather, setWeather] = useState<MarketWeather>('normal')
   const [selectedScenario, setSelectedScenario] = useState<ScenarioPath | null>(null)
-  const { ref: resilienceRef, hasEntered: resilienceEntered } = useInViewAnimation({ duration: 600 })
+  // forModal=true: ScenariosModal rendert via createPortal — IntersectionObserver
+  // ziet de wrapper anders niet en de animatie zou nooit triggeren in mobile-portal.
+  const { ref: resilienceRef, hasEntered: resilienceEntered } = useInViewAnimation({ duration: 600, forModal: true })
 
   useEffect(() => {
     if (!open) return
@@ -75,7 +86,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
   const baseReturn = weather === 'normal' ? (grossReturn ?? 0) : MARKET_WEATHER[weather].return
 
   return (
-    <BottomSheet open={true} onClose={onClose} title="Toekomstpaden">
+    <ShellOverlay open={true} onClose={onClose} kind="pane" title="Toekomstpaden">
         <div className="space-y-6 px-6 py-6">
           {/* Diverging paths chart */}
           <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
@@ -197,7 +208,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
             <DebtStrategyComparison debts={debts} />
           )}
         </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }
 
@@ -232,7 +243,10 @@ function ScenarioDetailModal({
   fireTarget: number
   onClose: () => void
 }) {
-  const { ref: yearBarsRef, hasEntered: yearBarsEntered } = useInViewAnimation({ threshold: 0.1, duration: 500 })
+  // ScenarioDetailModal rendert via createPortal (BottomSheet); IntersectionObserver
+  // kan de wrapper niet zien wanneer pane/sheet via portal naar document.body wordt
+  // gemount. useModalAnimation triggert wel correct na mount.
+  const { hasEntered: yearBarsEntered } = useModalAnimation({ delay: 100, duration: 500 })
   const colorMap: Record<string, { border: string; text: string; bg: string }> = {
     pessimist: { border: 'border-red-200', text: 'text-red-600', bg: 'bg-red-50' },
     current: { border: 'border-horizon-200', text: 'text-horizon-600', bg: 'bg-horizon-50' },
@@ -243,7 +257,7 @@ function ScenarioDetailModal({
   const yearlyPoints = scenario.months.filter((m, i) => m.month % 60 === 0 || i === scenario.months.length - 1).slice(0, 9)
 
   return (
-    <BottomSheet open={true} onClose={onClose}>
+    <ShellOverlay open={true} onClose={onClose} kind="sheet" size="lg">
         <div className={`flex items-center justify-between border-b ${c.border} ${c.bg} px-6 py-4`}>
           <div>
             <h2 className="text-lg font-semibold text-[var(--ink)]">{scenario.label}</h2>
@@ -268,7 +282,7 @@ function ScenarioDetailModal({
           </p>
         </div>
 
-        <div ref={yearBarsRef} className="border-t border-[var(--border-ed)] px-6 py-4">
+        <div className="border-t border-[var(--border-ed)] px-6 py-4">
           <p className="mb-3 text-xs font-semibold text-[var(--ink-3)] uppercase">Projectie per 5 jaar</p>
           <div className="space-y-2">
             {yearlyPoints.map((pt, i) => {
@@ -317,7 +331,7 @@ function ScenarioDetailModal({
             </div>
           </div>
         </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }
 

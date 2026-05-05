@@ -42,6 +42,7 @@ import { GuideProgressBar } from "@/components/app/guide-progress-bar";
 import GuideFaq from "@/components/app/guide-faq";
 import GuideProTips from "@/components/app/guide-pro-tips";
 import ReisStapSection from "@/components/app/reis-stap-section";
+import { NavStackMeta } from "@/components/app/shell/nav-stack-meta";
 import GuideTopicCard from "@/components/app/guide-topic-card";
 import GuideNaslagwerk from "@/components/app/guide-naslagwerk";
 import GuideHorizonUitleg from "@/components/app/guide-horizon-uitleg";
@@ -130,6 +131,7 @@ export default function GidsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <NavStackMeta title="Gids" bottomBar={{ kind: 'tabs' }} />
       {/* ── 1. Editorial hero — blueprint Type 7 (Wizard) met drie module-strips ── */}
       <section className="card-editorial overflow-hidden mb-6 sm:mb-8">
         {/* Drie module-strips: Kern bruin, Wil paars, Horizon zandgoud — gids touch alle drie */}

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Target, PiggyBank, TrendingUp, Wallet, Sparkles, ArrowRight, ChevronDown, Check } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { SectionDivider } from '@/components/app/section-divider'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // ── Scenario data ────────────────────────────────────────────────────────────
 
@@ -271,6 +272,7 @@ export default function TestScenariosPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <NavStackMeta title="Testscenario's" bottomBar={{ kind: 'tabs' }} />
       {/* ── Editorial masthead — blueprint Type 2 ── */}
       <header className="mb-10 border-b border-[var(--border-ed)] pb-6 space-y-2">
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">

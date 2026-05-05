@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ArrowLeft, Upload, FileText, Check, AlertTriangle, X,
+  Upload, FileText, Check, AlertTriangle, X,
   ChevronRight, Loader2, WifiOff, RefreshCw, ArrowLeftRight, Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -13,6 +13,7 @@ import { parseCSV, getCSVHeaders, getCSVPreview } from '@/lib/parsers/csv'
 import { parseOFX } from '@/lib/parsers/ofx'
 import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { categorizeTransaction, isOwnAccountTransfer, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
@@ -1307,17 +1308,7 @@ export default function ImportPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Back */}
-      <div className="mb-3 sm:mb-6">
-        <Link
-          href="/core/cash"
-          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
-        >
-          <ArrowLeft className="h-3 w-3" aria-hidden />
-          Terug naar Cash
-        </Link>
-      </div>
-
+      <NavStackMeta title="Transacties importeren" />
       <header className="mb-5 sm:mb-8 space-y-2">
         <Kicker>Cash · Importeren</Kicker>
         <EditorialHeadline level="h1" emphasis="importeren" size="lg">

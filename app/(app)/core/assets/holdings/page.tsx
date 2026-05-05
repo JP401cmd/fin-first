@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { loadHoldingsData, type HoldingsPageData } from '@/lib/holdings-data-loader'
 import HoldingsPage from '@/components/core/holdings-client'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 function HoldingsLoading() {
   return (
@@ -26,6 +27,7 @@ export default async function HoldingsServerPage() {
 
   return (
     <Suspense fallback={<HoldingsLoading />}>
+      <NavStackMeta title="Holdings" bottomBar={{ kind: 'tabs' }} />
       <HoldingsPage initialData={holdingsData ?? undefined} />
     </Suspense>
   )

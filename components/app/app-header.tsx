@@ -12,6 +12,7 @@ import { useNotifications } from '@/components/app/notifications/notification-pr
 import { PrivacyToggle } from '@/components/app/privacy-toggle'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
+import { ShellFlagToggle } from '@/components/app/shell/shell-flag-toggle'
 
 // Static config for each nav module — label, path, and color token
 const navConfig: Record<string, { label: string; href: string; color: string }> = {
@@ -242,6 +243,14 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                   <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   Sync-rapport
                 </button>
+
+                {/* Beta-toggle naar de nieuwe shell. Plaatsing onder de sync-
+                    opties zodat hij in mobile + desktop dropdown vlak naast
+                    "Sync-rapport" / "Sync nu" zit. Klik wisselt + reload. */}
+                <ShellFlagToggle
+                  variant="dropdown-row"
+                  onAfterToggle={() => setMenuOpen(false)}
+                />
                 {/* News-only users: subtle upgrade link to discover the full app */}
                 {activeModules.length === 1 && activeModules[0] === 'nieuws' && (
                   <>

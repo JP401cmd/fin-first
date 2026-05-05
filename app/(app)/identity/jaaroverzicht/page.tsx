@@ -22,6 +22,7 @@ import { formatCurrency, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import Link from 'next/link'
 import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // ── Types ──────────────────────────────────────────────────────
 interface MonthData {
@@ -347,6 +348,7 @@ export default function JaaroverzichtPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white">
+      <NavStackMeta title="Jaaroverzicht" />
       {/* Header */}
       <div className="mx-auto max-w-2xl px-4 pt-6 pb-4">
         <div className="flex items-center justify-between">

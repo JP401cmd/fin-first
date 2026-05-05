@@ -1,8 +1,14 @@
 'use client'
 
+/**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ */
+
 import { memo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
 import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
@@ -170,12 +176,11 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
     : null
 
   return (
-    <BottomSheet
+    <ShellOverlay
       open={open}
       onClose={onClose}
+      kind="pane"
       title={`Opbouwfase \u00b7 ${Math.round(currentAge)} \u2192 ${Math.round(fireAge)} jaar`}
-      size="xl"
-      initialMobileHeight="60vh"
     >
       {/* Accent line */}
       <div className="h-[2px] bg-[var(--color-horizon-600)]" />
@@ -417,7 +422,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           </div>
         )}
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 })
 

@@ -3,6 +3,7 @@
 import { use } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CashAccountView } from '@/components/app/cash-account-view'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 export default function CashAccountDetailPage({
   params,
@@ -14,11 +15,14 @@ export default function CashAccountDetailPage({
   const month = searchParams.get('month') ?? undefined
 
   return (
-    <CashAccountView
-      accountId={accountId}
-      backHref="/core/assets"
-      backLabel="Vermogen"
-      initialMonth={month}
-    />
+    <>
+      <NavStackMeta title="Cash-rekening" />
+      <CashAccountView
+        accountId={accountId}
+        backHref="/core/assets"
+        backLabel="Vermogen"
+        initialMonth={month}
+      />
+    </>
   )
 }

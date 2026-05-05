@@ -9,11 +9,11 @@ import { BOX2_TOOLTIPS, DGA_LENING_DREMPEL, type Box2Result } from '@/lib/box2-d
 import {
   Calculator, Users, User, ArrowLeftRight, Info,
   TrendingDown, Wallet, PiggyBank, BarChart3,
-  Clock, ChevronDown, ChevronUp, Lightbulb, ArrowLeft,
+  Clock, ChevronDown, ChevronUp, Lightbulb,
   Sparkles, SlidersHorizontal, Shield, Building2, AlertTriangle,
 } from 'lucide-react'
 import { Box3PartnerModal } from '@/components/app/core/box3-partner-modal'
-import Link from 'next/link'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -191,15 +191,7 @@ export default function BelastingPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Back link */}
-      <Link
-        href="/core"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        De Kern
-      </Link>
-
+      <NavStackMeta title="Belasting" />
       {/* === Combined Tax Summary === */}
       {activeResult && (
         <CombinedTaxSummary

@@ -23,6 +23,7 @@ import {
   type BrokerParseResult,
 } from '@/lib/parsers/broker-csv'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -445,15 +446,7 @@ export default function HoldingsImportPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:py-10">
-      {/* Back link */}
-      <Link
-        href="/core/assets/holdings"
-        className="mb-6 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
-      >
-        <ArrowLeft className="h-3 w-3" aria-hidden />
-        Terug naar holdings
-      </Link>
-
+      <NavStackMeta title="Holdings importeren" />
       {/* Page header — editorial blueprint */}
       <header className="mb-8 space-y-2">
         <Kicker>Holdings · Importeren</Kicker>

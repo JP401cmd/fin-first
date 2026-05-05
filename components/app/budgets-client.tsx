@@ -1,5 +1,27 @@
 'use client'
 
+/**
+ * Fase 1.1 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 + §6.1 + §6.4
+ * Budget-detail wordt pane (desktop) / stack-push (mobile) via <ShellOverlay kind="pane">.
+ *
+ * Pane-state heeft één bron-of-truth: `useSearchParams` op deze pagina.
+ *  - Open detail: `?budget=<id>` (push via router.replace)
+ *  - Edit-mode binnen pane: `?budget=<id>&edit=true` (compositie, plan §6.4)
+ *  - Sluiten: query-params verwijderen → `/core/budgets`
+ *
+ * ShellOverlay zelf kijkt niet naar de feature-flag `new_navigation_shell`;
+ * dat is verantwoordelijkheid van ResponsiveShell. Op deze pagina is de
+ * pane dus altijd actief: een visuele upgrade die geen functionaliteit-
+ * verlies veroorzaakt en de migratie geleidelijk maakt. Mobile (<lg)
+ * krijgt voorlopig nog een full-height BottomSheet als pane-fallback;
+ * Fase 0.5 vervangt dat door echte stack-push via NavStackProvider.
+ *
+ * Volgt nog (out of scope hier):
+ *  - §6.1 Transactie-detail als pane-binnen-pane (met onBack).
+ *  - §6.4 `/core/budgets/new` als sheet via `?new=true`.
+ */
+
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
@@ -29,7 +51,8 @@ import { GoalForm } from '@/components/app/goal-form'
 import { BudgetPlanEditorSheet } from '@/components/app/budget-plan-editor-sheet'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { TransactionForm } from '@/components/app/transaction-form'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
@@ -622,8 +645,16 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const [budgets, setBudgets] = useState<BudgetWithChildren[]>(initialData?.budgets ?? [])
   const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
-  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null)
-  const [modalStep, setModalStep] = useState<'detail' | 'edit'>('detail')
+
+  // Pane-state komt rechtstreeks uit `searchParams` (één bron-of-truth, plan §2.7).
+  // Geen lokale `selectedBudgetId` meer; openen/sluiten gebeurt via router.replace
+  // hieronder. Edit-mode is een composite query-param `?budget=<id>&edit=true`
+  // (plan §6.4). Bestaat de id niet (meer) in `budgets`, dan resolved
+  // `selectedBudget` simpelweg naar null en rendert de pane niet — geen aparte
+  // "valid id"-bewaking nodig.
+  const selectedBudgetId = searchParams.get(OVERLAY_QUERY_KEYS.budget)
+  const modalStep: 'detail' | 'edit' =
+    searchParams.get(OVERLAY_QUERY_KEYS.edit) === 'true' ? 'edit' : 'detail'
   const [viewMode, setViewMode] = useState<'tree' | 'donut' | 'heatmap'>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('budgets-view-mode')
@@ -1079,40 +1110,46 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       })
   }, [selectedBudgetId])
 
-  // Open modal from URL search params (e.g. ?budget=id&edit=true)
+  // Embedded usage (legacy `initialBudgetId` prop) — schrijf de id naar de URL
+  // zodat de URL ook in dat geval de bron-of-truth is. Geen lokale state nodig.
+  // Eenmalige redirect bij mount of als `initialBudgetId` wijzigt; `searchParams`
+  // staat bewust niet in deps (de URL-wijziging zou anders zelf een re-run
+  // veroorzaken die de bedoelde state direct zou overschrijven).
+  const hasInitialRedirected = useRef(false)
   useEffect(() => {
-    if (loading || budgets.length === 0) return
-    const budgetParam = searchParams.get('budget')
-    if (budgetParam) {
-      const exists = budgets.some(b => b.id === budgetParam || b.children.some(c => c.id === budgetParam))
-      if (exists) {
-        setSelectedBudgetId(budgetParam)
-        setModalStep(searchParams.get('edit') === 'true' ? 'edit' : 'detail')
-      }
-      // Clean up URL params without triggering navigation
-      router.replace('/core/budgets', { scroll: false })
-    }
-  }, [loading, budgets, searchParams, router])
+    if (!initialBudgetId) return
+    if (hasInitialRedirected.current) return
+    hasInitialRedirected.current = true
+    router.replace(`/core/budgets?${OVERLAY_QUERY_KEYS.budget}=${initialBudgetId}`, { scroll: false })
+  }, [initialBudgetId, router])
 
-  // Open modal from initialBudgetId prop (embedded in core page modal)
-  useEffect(() => {
-    if (!initialBudgetId || loading || budgets.length === 0) return
-    const exists = budgets.some(b => b.id === initialBudgetId || b.children.some(c => c.id === initialBudgetId))
-    if (exists) {
-      setSelectedBudgetId(initialBudgetId)
-      setModalStep('detail')
-    }
-  }, [initialBudgetId, loading, budgets])
+  // Pane open/sluit/stap-toggle — alle drie schrijven naar de URL en triggeren
+  // zo een re-render van deze component (selectedBudgetId/modalStep komen uit
+  // searchParams). `router.replace` ipv `push` om history-vervuiling te voorkomen
+  // (plan §8.2): de gebruiker moet één browser-back-klik = één pane-stap zien.
+  const openBudgetModal = useCallback((id: string) => {
+    router.replace(`/core/budgets?${OVERLAY_QUERY_KEYS.budget}=${id}`, { scroll: false })
+  }, [router])
 
-  function openBudgetModal(id: string) {
-    setSelectedBudgetId(id)
-    setModalStep('detail')
-  }
+  const closeBudgetModal = useCallback(() => {
+    router.replace('/core/budgets', { scroll: false })
+  }, [router])
 
-  function closeBudgetModal() {
-    setSelectedBudgetId(null)
-    setModalStep('detail')
-  }
+  // Edit-toggle binnen pane (plan §6.4): pane blijft open, alleen `?edit=true`
+  // wordt toegevoegd of verwijderd. De pane-content rendert detail vs edit
+  // op basis van `modalStep`.
+  const goToEditStep = useCallback(() => {
+    if (!selectedBudgetId) return
+    router.replace(
+      `/core/budgets?${OVERLAY_QUERY_KEYS.budget}=${selectedBudgetId}&${OVERLAY_QUERY_KEYS.edit}=true`,
+      { scroll: false },
+    )
+  }, [router, selectedBudgetId])
+
+  const goToDetailStep = useCallback(() => {
+    if (!selectedBudgetId) return
+    router.replace(`/core/budgets?${OVERLAY_QUERY_KEYS.budget}=${selectedBudgetId}`, { scroll: false })
+  }, [router, selectedBudgetId])
 
   // Find the selected budget (parent or child)
   const selectedBudget = selectedBudgetId
@@ -1122,6 +1159,17 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const selectedParent = selectedBudgetId
     ? budgets.find((b) => b.id === selectedBudgetId || b.children.some((c) => c.id === selectedBudgetId)) ?? null
     : null
+
+  // URL-cleanup bij ongeldige budget-id (verwijderd budget, cross-user deeplink,
+  // of stale query). Voorkomt dat `?budget=<id>` in de URL blijft hangen na
+  // refresh op zo'n state — pane rendert dan toch niet, dus URL moet matchen.
+  // `loading` is false zodra de eerste data-load klaar is; we wachten daarop
+  // om een vroege false-negative tijdens initial-render te vermijden.
+  useEffect(() => {
+    if (selectedBudgetId && !selectedBudget && !loading) {
+      router.replace('/core/budgets', { scroll: false })
+    }
+  }, [selectedBudgetId, selectedBudget, loading, router])
   // Siblings for ordering: parents of same type, or children of same parent
   const selectedSiblings: Budget[] = selectedBudget
     ? selectedBudget.parent_id
@@ -1788,7 +1836,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           goals={goals.filter(g => g.budget_id === selectedBudget?.id)}
           rolloverHistory={budgetRolloverHistory}
           onClose={closeBudgetModal}
-          onEdit={() => setModalStep('edit')}
+          onEdit={goToEditStep}
           onSelectChild={(id) => openBudgetModal(id)}
           onDelete={async () => {
             closeBudgetModal()
@@ -1817,9 +1865,9 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               ? selectedParent!.children.reduce((sum, c) => sum + Number(c.default_limit), 0)
               : undefined
           }
-          onClose={() => setModalStep('detail')}
+          onClose={goToDetailStep}
           onSaved={() => {
-            setModalStep('detail')
+            goToDetailStep()
             loadBudgets()
             loadSpending()
           }}
@@ -2284,7 +2332,12 @@ function BudgetDetailModal({
 
   return (
     <>
-    <BottomSheet open={true} onClose={onClose} title={budget.name} size="lg">
+    {/* Pane (lg+) / full-height sheet (<lg) — plan §5.1.
+        Geen `onBack` op deze view: dit is de root van de pane-flow. De `onBack`-
+        prop wordt straks in een vervolgtaak (§6.1) gebruikt voor transactie-
+        detail-binnen-pane. Voor edit-toggle gaan we naar `?…&edit=true` en
+        rendert de parent een tweede ShellOverlay (BudgetEditModal). */}
+    <ShellOverlay open={true} onClose={onClose} kind="pane" title={budget.name}>
         {/* Header accent */}
         <div className={`flex items-center gap-3 bg-gradient-to-r ${colors.headerGradient} px-6 py-4`}>
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colors.bgDark}`}>
@@ -3045,9 +3098,15 @@ function BudgetDetailModal({
                 </div>
               )}
             </div>
-            <BottomSheet
+            {/* Forecast-overlay: inspectie-overlay binnen de budget-detail-pane.
+                Conform plan §5.2 (sheet voor "vergelijking/inspectie naast onder-
+                liggende content") — gerouteerd via ShellOverlay zodat de
+                driewegregel consistent blijft (geen bare BottomSheet binnen pane). */}
+            <ShellOverlay
               open={showForecastModal}
               onClose={() => setShowForecastModal(false)}
+              kind="sheet"
+              size="md"
               title="Verwachte uitgaven"
             >
               <div className="p-4 sm:p-6">
@@ -3130,7 +3189,7 @@ function BudgetDetailModal({
                 <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Gebaseerd op {forecast.monthsUsed} maanden transactiedata</p>
               </KassabonShell>
               </div>
-            </BottomSheet>
+            </ShellOverlay>
             </>
           )
         })()}
@@ -3271,7 +3330,7 @@ function BudgetDetailModal({
             Archiveren
           </button>
         </div>
-    </BottomSheet>
+    </ShellOverlay>
     {txToEdit && (
       <TransactionForm
         transaction={txToEdit}
@@ -3550,7 +3609,11 @@ function BudgetEditModal({
 
   return (
     <>
-    <BottomSheet open={true} onClose={handleClose} title="Budget bewerken" size="lg">
+    {/* Edit-mode binnen pane (plan §6.4): zelfde pane-shell als detail-view,
+        andere content. URL-state: `?budget=<id>&edit=true`. `handleClose`
+        opent eventueel eerst een unsaved-changes-bevestiging; bij confirm
+        wordt `onClose` aangeroepen die teruggaat naar `?budget=<id>` (detail). */}
+    <ShellOverlay open={true} onClose={handleClose} kind="pane" title="Budget bewerken">
         <div className="flex justify-end px-6 pt-3">
           <button type="button" onClick={() => setIsFavorite(!isFavorite)}
             className={`rounded-lg p-1.5 transition-colors ${
@@ -4127,7 +4190,7 @@ function BudgetEditModal({
             {saving ? 'Opslaan...' : 'Opslaan'}
           </button>
         </div>
-    </BottomSheet>
+    </ShellOverlay>
 
     {showCreateGoal && (
       <GoalForm

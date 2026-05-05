@@ -1,8 +1,14 @@
 'use client'
 
+/**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ */
+
 import { memo, useMemo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -200,7 +206,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   const totalLevensonderhoud = aggregates.totalWithdrawal + aggregates.totalAow + aggregates.totalPensioen
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={title} size="xl" initialMobileHeight="60vh">
+    <ShellOverlay open={open} onClose={onClose} kind="pane" title={title}>
       {/* Accent line at top — kern-500 */}
       <div className="h-[2px] w-full bg-[var(--color-kern-500,#8b6914)]" />
 
@@ -474,7 +480,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           )
         })()}
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 })
 

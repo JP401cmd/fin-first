@@ -1,7 +1,21 @@
 'use client'
 
+/**
+ * Fase 1.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane) + §5.2 (sheet)
+ * DebtDetailModal → pane; DebtForm + ValuationModal → sheet (via ShellOverlay).
+ *
+ * ValuationModal is een light single-veld + notitie-flow — past in §5.2 als
+ * sheet. ShellOverlay kind="sheet" rendert intern een BottomSheet, dus
+ * zelfde visuele behaviour als voorheen — alle overlay-mechanica gaat nu
+ * door één centrale wrapper.
+ *
+ * Werkt onafhankelijk van de feature-flag — bij flag UIT zien gebruikers
+ * dezelfde behaviour, alleen via één centrale wrapper.
+ */
+
 import { useState } from 'react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 
@@ -83,7 +97,7 @@ export function ValuationModal({
   const label = entityType === 'asset' ? 'Herwaarderen' : 'Saldo bijwerken'
 
   return (
-    <BottomSheet open={true} onClose={onClose} title={label} size="md">
+    <ShellOverlay open={true} onClose={onClose} kind="sheet" size="md" title={label}>
       <div className="p-6">
         <p className="mb-4 text-sm text-[var(--ink-3)]">{entityName}</p>
 
@@ -139,6 +153,6 @@ export function ValuationModal({
           </button>
         </div>
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }

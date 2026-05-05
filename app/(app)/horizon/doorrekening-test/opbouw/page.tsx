@@ -5,6 +5,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import { loadCoreData } from '@/lib/core-data-loader'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { OpbouwClient } from './opbouw-client'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 export default async function OpbouwPage() {
   const supabase = await createClient()
@@ -63,19 +64,22 @@ export default async function OpbouwPage() {
   const estimatedYearlyIncome = coreData?.rawFinancials.extrapolatedIncome ?? 0
 
   return (
-    <OpbouwClient
-      assets={assets ?? []}
-      debts={debts ?? []}
-      profile={profile}
-      fireParams={fireParams}
-      cashflows={cashflows}
-      lifeEvents={(lifeEvents ?? []) as LifeEvent[]}
-      savingsRate6m={savingsRate6m}
-      estimatedYearlyIncome={estimatedYearlyIncome}
-      netWorth={netWorth}
-      yearlyMustExpenses={yearlyMustExpenses}
-      userAowAge={userAowAge}
-      weightedGrossReturn={weightedGrossReturn}
-    />
+    <>
+      <NavStackMeta title="Doorrekening — Opbouw" />
+      <OpbouwClient
+        assets={assets ?? []}
+        debts={debts ?? []}
+        profile={profile}
+        fireParams={fireParams}
+        cashflows={cashflows}
+        lifeEvents={(lifeEvents ?? []) as LifeEvent[]}
+        savingsRate6m={savingsRate6m}
+        estimatedYearlyIncome={estimatedYearlyIncome}
+        netWorth={netWorth}
+        yearlyMustExpenses={yearlyMustExpenses}
+        userAowAge={userAowAge}
+        weightedGrossReturn={weightedGrossReturn}
+      />
+    </>
   )
 }

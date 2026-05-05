@@ -1,6 +1,10 @@
 'use client'
 
 /**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.2 (sheet)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ *
  * YearDetailsSheet — jaar-detail drilldown voor een enkele kolom van de
  * opbouw-/afbouw-samenstelling chart op `/horizon/doorrekening-test/overzicht`.
  *
@@ -34,8 +38,9 @@
  *  - Geen verticale borders — alleen horizontale `border-b`.
  *
  * ── Toegankelijkheid ────────────────────────────────────────────────────
- * `BottomSheet` levert het dialog-shell + focus-trap + ESC + backdrop-close.
- * Bedragen met +/− zijn zowel kleur als teken — nooit alleen kleur.
+ * `ShellOverlay` (kind="sheet") levert het dialog-shell + focus-trap + ESC
+ * + backdrop-close via de onderliggende BottomSheet. Bedragen met +/−
+ * zijn zowel kleur als teken — nooit alleen kleur.
  *
  * ── Data-testids ────────────────────────────────────────────────────────
  *   year-details-sheet, year-details-assets, year-details-debts,
@@ -45,7 +50,7 @@
 
 import { memo, useMemo, useCallback } from 'react'
 import * as Lucide from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -669,11 +674,12 @@ export const YearDetailsSheet = memo(function YearDetailsSheet({
   const phase = row?.phase ?? 'opbouw'
 
   return (
-    <BottomSheet
+    <ShellOverlay
       open={open}
       onClose={onClose}
+      kind="sheet"
+      size="md"
       title={`Jaar ${calendarYear} — ${age}j`}
-      size="lg"
     >
       <div data-testid="year-details-sheet" className="px-5 pb-6 pt-3">
         {/* ── Fase-badge + deflatie-context ─────────────────────── */}
@@ -927,6 +933,6 @@ export const YearDetailsSheet = memo(function YearDetailsSheet({
           </div>
         )}
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 })

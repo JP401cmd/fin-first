@@ -1,13 +1,8 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { AppHeader } from '@/components/app/app-header'
-import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanel } from '@/components/app/chat/chat-panel'
-import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
-import { BottomNav } from '@/components/app/bottom-nav'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { ToastProvider } from '@/components/app/toast-provider'
@@ -15,10 +10,10 @@ import { GlobalSyncProvider } from '@/components/sync/global-sync-provider'
 import { PrivacyProvider } from '@/lib/hooks/use-privacy'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
-import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { PerspectiveProvider } from '@/components/app/perspective-provider'
 import { NotificationProvider } from '@/components/app/notifications/notification-provider'
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
+import { ResponsiveShell } from '@/components/app/shell/responsive-shell'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 import { ALL_MODULES } from '@/lib/module-registry'
@@ -174,17 +169,22 @@ export default async function AppLayout({
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
                   <DashboardTypeProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
+                      {/* Skip-link — eerste tab-stop voor keyboard- en
+                          screen-reader-gebruikers (WCAG 2.1 Bypass Blocks).
+                          sr-only verbergt visueel; focus:not-sr-only maakt
+                          zichtbaar wanneer geactiveerd. Target = #main-content,
+                          gezet door beide shell-takken (LegacyShell main +
+                          NewShell wrapper-div). */}
+                      <a
+                        href="#main-content"
+                        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-[var(--paper)] focus:px-4 focus:py-2 focus:border-2 focus:border-[var(--ink)] focus:text-sm focus:font-medium focus:text-[var(--ink)] focus:no-underline"
+                      >
+                        Naar hoofdinhoud
+                      </a>
                       <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} activeModules={activeModules}>
-                        <ChatLayoutWrapper>
-                          <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
-                          <Suspense fallback={null}>
-                            <WelcomeBanner />
-                          </Suspense>
-                          <DailyExpenseProvider>
-                            <main className="pb-20 md:pb-0">{children}</main>
-                          </DailyExpenseProvider>
-                        </ChatLayoutWrapper>
-                        <BottomNav />
+                        <ResponsiveShell email={user.email ?? ''} role={profile?.role ?? 'user'}>
+                          {children}
+                        </ResponsiveShell>
                       </FeatureAccessProvider>
                       <ChatPanel />
                     </div>

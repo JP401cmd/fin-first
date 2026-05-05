@@ -5,6 +5,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import { loadCoreData } from '@/lib/core-data-loader'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { GebeurtenissenClient } from './gebeurtenissen-client'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 export default async function GebeurtenissenPage() {
   const supabase = await createClient()
@@ -75,20 +76,23 @@ export default async function GebeurtenissenPage() {
     monthlyIncome * (1 - savingsRate / 100)
 
   return (
-    <GebeurtenissenClient
-      lifeEvents={(lifeEvents ?? []) as LifeEvent[]}
-      assets={assets ?? []}
-      profile={profile}
-      fireParams={fireParams}
-      netWorth={netWorth}
-      annualSavings={annualSavings}
-      monthlyExpenses={monthlyExpenses}
-      cashflows={cashflows}
-      userAowAge={userAowAge}
-      weightedGrossReturn={weightedGrossReturn}
-      savingsRate6m={savingsRate6m}
-      estimatedYearlyIncome={estimatedYearlyIncome}
-      yearlyMustExpenses={yearlyMustExpenses}
-    />
+    <>
+      <NavStackMeta title="Doorrekening — Gebeurtenissen" />
+      <GebeurtenissenClient
+        lifeEvents={(lifeEvents ?? []) as LifeEvent[]}
+        assets={assets ?? []}
+        profile={profile}
+        fireParams={fireParams}
+        netWorth={netWorth}
+        annualSavings={annualSavings}
+        monthlyExpenses={monthlyExpenses}
+        cashflows={cashflows}
+        userAowAge={userAowAge}
+        weightedGrossReturn={weightedGrossReturn}
+        savingsRate6m={savingsRate6m}
+        estimatedYearlyIncome={estimatedYearlyIncome}
+        yearlyMustExpenses={yearlyMustExpenses}
+      />
+    </>
   )
 }

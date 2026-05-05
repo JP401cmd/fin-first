@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 type LinkedAccount = {
   id: string
@@ -60,6 +61,7 @@ export default function ConnectSuccessPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 py-5 sm:px-6 sm:py-12 text-center">
+      <NavStackMeta title="Bank gekoppeld" />
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
         <CheckCircle2 className="h-8 w-8 text-green-600" />
       </div>

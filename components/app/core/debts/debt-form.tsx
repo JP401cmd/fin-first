@@ -1,8 +1,23 @@
 'use client'
 
+/**
+ * Fase 1.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane) + §5.2 (sheet)
+ * DebtDetailModal → pane; DebtForm + ValuationModal → sheet (via ShellOverlay).
+ *
+ * DebtForm is een single-form bewerk/aanmaak-flow — past in §5.2 als sheet:
+ * "even snel" iets doen, terugkeer-context op de debt-pagina blijft zichtbaar.
+ * ShellOverlay kind="sheet" rendert intern een BottomSheet, dus zelfde
+ * visuele behaviour als voorheen — alle overlay-mechanica gaat nu door één
+ * centrale wrapper.
+ *
+ * Werkt onafhankelijk van de feature-flag — bij flag UIT zien gebruikers
+ * dezelfde behaviour, alleen via één centrale wrapper.
+ */
+
 import { useState, useMemo } from 'react'
 import { AlertTriangle, Building2 } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { formatCurrency } from '@/components/app/budget-shared'
@@ -306,7 +321,7 @@ export function DebtForm({
   }
 
   return (
-    <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Schuld bewerken' : 'Nieuwe schuld'} size="lg">
+    <ShellOverlay open={true} onClose={onClose} kind="sheet" size="lg" title={isEdit ? 'Schuld bewerken' : 'Nieuwe schuld'}>
       <div className="p-6">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -933,6 +948,6 @@ export function DebtForm({
           </button>
         </div>
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }

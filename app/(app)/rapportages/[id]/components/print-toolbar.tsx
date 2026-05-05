@@ -1,21 +1,17 @@
 'use client'
 
-import { ArrowLeft, Printer } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+/**
+ * Fase 3 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §2.1 (shell-agnostische content)
+ * Eigen back-knop verwijderd; shell levert deze via TopBar (mobile) of pane-header (desktop).
+ * Print-actie blijft — page-eigen content-actie, geen navigatie-chrome.
+ */
+
+import { Printer } from 'lucide-react'
 
 export function PrintToolbar() {
-  const router = useRouter()
-
   return (
-    <div data-print-hide className="mb-6 flex items-center justify-between">
-      <button
-        type="button"
-        onClick={() => router.push('/rapportages')}
-        className="flex items-center gap-2 font-inter text-sm text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Terug naar rapportages
-      </button>
+    <div data-print-hide className="mb-6 flex items-center justify-end">
       <button
         type="button"
         onClick={() => window.print()}

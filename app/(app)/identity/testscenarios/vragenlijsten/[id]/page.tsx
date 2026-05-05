@@ -1,9 +1,15 @@
 'use client'
 
+/**
+ * Fase 3 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §2.1 (shell-agnostische content)
+ * Eigen back-knop verwijderd; shell levert deze via TopBar (mobile) of pane-header (desktop).
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 interface Question {
   id: string
@@ -148,13 +154,6 @@ export default function QuestionnaireFillPage() {
         <p className="mt-2 font-serif text-sm text-[var(--ink-3)]">
           Je antwoorden zijn opgeslagen. Je kunt de vragenlijst later opnieuw invullen.
         </p>
-        <Link
-          href="/identity/testscenarios"
-          className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Terug naar testscenario&rsquo;s
-        </Link>
       </div>
     )
   }
@@ -166,6 +165,7 @@ export default function QuestionnaireFillPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
+      <NavStackMeta title="Vragenlijst" />
       {/* Progress bar */}
       <div className="mb-8">
         <div className="flex items-center justify-between text-xs text-[var(--ink-3)]">

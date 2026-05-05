@@ -28,6 +28,7 @@ import { DebtForm } from '@/components/app/core/debts/debt-form'
 import { ValuationModal } from '@/components/app/core/debts/debt-valuation-modal'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -235,6 +236,7 @@ export default function DebtsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <NavStackMeta title="Schulden" bottomBar={{ kind: 'tabs' }} />
       {/* Editorial header — blueprint Type 2 (List) */}
       <header className="mb-5 space-y-2">
         {/* Kicker met streep — debts in negative-rood voor semantische scheiding */}

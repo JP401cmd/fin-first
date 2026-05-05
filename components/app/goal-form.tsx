@@ -1,8 +1,15 @@
 'use client'
 
+/**
+ * Fase 2.4 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.2 (sheet-driewegregel)
+ * GoalForm wordt nu gerenderd via <ShellOverlay kind="sheet">. Conform
+ * CLAUDE.md verbod op directe BottomSheet-imports buiten ShellOverlay.
+ */
+
 import { useState, useEffect } from 'react'
 import { Save, Users } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import {
   GOAL_TYPE_LABELS, GOAL_COLORS, GOAL_TYPE_META, GOAL_TYPE_ICONS,
@@ -164,7 +171,7 @@ export function GoalForm({
   }
 
   return (
-    <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Doel bewerken' : 'Nieuw doel'} size="lg">
+    <ShellOverlay open={true} onClose={onClose} kind="sheet" size="lg" title={isEdit ? 'Doel bewerken' : 'Nieuw doel'}>
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -441,6 +448,6 @@ export function GoalForm({
             </button>
           </div>
         </form>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }

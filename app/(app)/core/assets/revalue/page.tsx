@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, RefreshCw, Loader2, AlertCircle, Lock, Check } from 'lucide-react'
+import { RefreshCw, Loader2, AlertCircle, Lock, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import {
   type Asset,
   type AssetType,
@@ -267,15 +267,9 @@ export default function RevaluePage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
+      <NavStackMeta title="Herwaarderen" />
       {/* Header — editorial blueprint */}
       <header className="mb-6 space-y-2">
-        <Link
-          href="/core/assets"
-          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
-        >
-          <ArrowLeft className="h-3 w-3" aria-hidden />
-          Terug naar bezittingen
-        </Link>
         <Kicker>Bezittingen · Herwaarderen</Kicker>
         <EditorialHeadline level="h1" emphasis="herwaarderen" size="lg">
           Assets herwaarderen

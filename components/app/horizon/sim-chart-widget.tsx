@@ -1,8 +1,17 @@
 'use client'
 
+/**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.2 (sheet)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ *
+ * SimChartModal is een full-screen sheet (size="full") — chart-zoom is
+ * inspectie ("even iets snel doen — terug naar overzicht"); past bij §5.2.
+ */
+
 import { useState, useCallback, memo } from 'react'
 import { AlertTriangle, TrendingUp, TableProperties, ChevronDown, ChevronUp } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { SimChart } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
@@ -37,7 +46,8 @@ function fmt(n: number): string {
 }
 
 // ── SimChartModal ─────────────────────────────────────────────────────────────
-// Alleen de BottomSheet — geen card-wrapper. Gebruik dit in de merged hero.
+// Alleen de overlay (ShellOverlay kind="sheet" size="full") — geen card-wrapper.
+// Gebruik dit in de merged hero.
 
 export interface SimChartModalProps {
   open: boolean
@@ -79,7 +89,7 @@ export const SimChartModal = memo(function SimChartModal({
   const retirementRows = rows.filter(r => r.phase === 'retirement')
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Simulatie Prognose">
+    <ShellOverlay open={open} onClose={onClose} kind="sheet" size="full" title="Simulatie Prognose">
       <div className="p-4 sm:p-6 space-y-6">
 
         {/* 1. Kassabon — onderbouwing berekening */}
@@ -420,7 +430,7 @@ export const SimChartModal = memo(function SimChartModal({
         </div>
 
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 })
 

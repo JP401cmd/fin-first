@@ -1,8 +1,22 @@
 'use client'
 
+/**
+ * Fase 1.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane) + §5.2 (sheet)
+ * DebtDetailModal → pane; DebtForm + ValuationModal → sheet (via ShellOverlay).
+ *
+ * Deze modal is volledige debt-context (saldo, type, splits, herwaarder-knop,
+ * acties) — past in §5.1 als pane: gebruiker "gaat ergens naartoe".
+ * Op desktop (≥lg) glijdt deze van rechts in als SlideInPane; op mobile valt
+ * ShellOverlay terug op een full-height BottomSheet (tot Fase 0.5 stack-push).
+ *
+ * Werkt onafhankelijk van de feature-flag — bij flag UIT zien gebruikers
+ * dezelfde behaviour, alleen via één centrale wrapper.
+ */
+
 import { useState, useEffect } from 'react'
 import { Edit3, RefreshCw, Trash2, AlertTriangle, Users, Scale } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import {
@@ -103,7 +117,7 @@ export function DebtDetailModal({
 
   return (
     <>
-    <BottomSheet open={true} onClose={onClose} title={debt.name} size="xl">
+    <ShellOverlay open={true} onClose={onClose} kind="pane" title={debt.name}>
         {/* Subheader with icon and type info */}
         <div className="flex items-center gap-3 border-b border-[var(--border-ed)] px-6 py-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-kern-50">
@@ -418,23 +432,58 @@ export function DebtDetailModal({
             <Edit3 className="h-3.5 w-3.5" />
             Bewerken
           </button>
-          {confirmDelete ? (
-            <button
-              onClick={onDelete}
-              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
-            >
-              Bevestigen
-            </button>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
+          {/* Delete-trigger — opent een confirm-overlay (plan §5.3, driewegregel
+              kind="confirm"). Vorige inline-toggle werd vervangen omdat een
+              onomkeerbare actie hoort in een echte confirm-modal met focus-trap
+              en duidelijke destructive-framing. */}
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+            aria-label="Schuld verwijderen"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
-    </BottomSheet>
+    </ShellOverlay>
+
+      {/* Delete-confirm-overlay — kind="confirm" volgens plan §5.3.
+          Smal centered modal met focus-trap; primaire CTA destructive. */}
+      <ShellOverlay
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        kind="confirm"
+        title="Schuld verwijderen?"
+        destructive
+      >
+        <div className="space-y-4 p-5">
+          <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
+            <strong className="text-[var(--ink)]">{debt.name}</strong> en alle bijbehorende
+            waardehistorie en koppelingen worden definitief verwijderd. Deze actie kan
+            niet ongedaan worden gemaakt.
+          </p>
+          <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              className="border border-[var(--border-md)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink)] hover:bg-[var(--subtle)]"
+              style={{ minHeight: 44 }}
+            >
+              Annuleren
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmDelete(false)
+                onDelete()
+              }}
+              className="border border-red-600 bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700"
+              style={{ minHeight: 44 }}
+            >
+              Definitief verwijderen
+            </button>
+          </div>
+        </div>
+      </ShellOverlay>
 
       {/* Hypotheek vs Beleggen comparison modal */}
       {showHvB && debt.debt_type === 'mortgage' && (() => {

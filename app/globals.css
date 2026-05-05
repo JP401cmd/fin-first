@@ -1021,3 +1021,54 @@ body {
 .fin-table-zebra > tr:nth-child(even) {
   background-color: color-mix(in srgb, var(--subtle) 30%, transparent);
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Mobile-stack tray-of-three transitie-animaties
+   Plan: docs/navigatie-redesign-plan.md §4.1 + §4.2
+   Voorheen inline `<style jsx>` in components/app/shell/mobile-stack-shell.tsx;
+   verhuisd naar globals.css (Fase 4 cosmetic cleanup) zodat:
+    - keyframes deduplicaten over meerdere instances
+    - high-contrast / dark-mode media-queries makkelijker te koppelen zijn
+    - DevTools een vaste source-locatie tonen
+   Duur 240ms moet matchen met TRANSITION_DURATION_MS in nav-stack-provider.tsx.
+   Easing = iOS-spring-curve (zelfde als SlideInPane voor consistentie).
+   ───────────────────────────────────────────────────────────────── */
+.tray-outgoing-push,
+.tray-incoming-push,
+.tray-outgoing-pop,
+.tray-incoming-pop {
+  will-change: transform, opacity;
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  animation-fill-mode: both;
+}
+.tray-outgoing-push { animation-name: tray-outgoing-push-kf; }
+.tray-incoming-push { animation-name: tray-incoming-push-kf; }
+.tray-outgoing-pop  { animation-name: tray-outgoing-pop-kf; }
+.tray-incoming-pop  { animation-name: tray-incoming-pop-kf; }
+
+@keyframes tray-outgoing-push-kf {
+  from { transform: translateX(0);     opacity: 1;   }
+  to   { transform: translateX(-30%);  opacity: 0.5; }
+}
+@keyframes tray-incoming-push-kf {
+  from { transform: translateX(100%);  opacity: 0.7; }
+  to   { transform: translateX(0);     opacity: 1;   }
+}
+@keyframes tray-outgoing-pop-kf {
+  from { transform: translateX(0);     opacity: 1;   }
+  to   { transform: translateX(100%);  opacity: 0.7; }
+}
+@keyframes tray-incoming-pop-kf {
+  from { transform: translateX(-30%);  opacity: 0.5; }
+  to   { transform: translateX(0);     opacity: 1;   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tray-outgoing-push,
+  .tray-incoming-push,
+  .tray-outgoing-pop,
+  .tray-incoming-pop {
+    animation: none;
+  }
+}

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import {
-  ArrowLeft,
   CalendarCheck,
   Loader2,
   User,
@@ -110,31 +110,23 @@ export default function CheckinHistoriePage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
+      <NavStackMeta title="Check-in historie" />
       {/* Header — editorial blueprint met kicker-streep */}
-      <div className="mb-6 flex items-center gap-3">
-        <Link
-          href="/core/checkin"
-          className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
-          aria-label="Terug naar check-in"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
-            <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
-            <span>Geldcheck-in · Archief</span>
-          </div>
-          <h1
-            className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
-            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-          >
-            <em
-              className="font-normal italic"
-              style={{ color: 'var(--module-active-700)' }}
-            >Historie</em>
-            {' '}van je check-ins
-          </h1>
+      <div className="mb-6">
+        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
+          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
+          <span>Geldcheck-in · Archief</span>
         </div>
+        <h1
+          className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
+          <em
+            className="font-normal italic"
+            style={{ color: 'var(--module-active-700)' }}
+          >Historie</em>
+          {' '}van je check-ins
+        </h1>
       </div>
 
       {hasHousehold && (

@@ -1,5 +1,11 @@
 'use client'
 
+/**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ */
+
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -26,7 +32,7 @@ import {
   computeRetirementExpenses,
   type RetirementExpenseMethod,
 } from '@/lib/budget-utils'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { ArrowLeft, Shield, TrendingUp, Landmark, Settings, Info, Check, CircleDot, Loader2, AlertTriangle, Banknote, Heart, Infinity as InfinityIcon } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -831,7 +837,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
 
   if (loading) {
     return (
-      <BottomSheet open={open} onClose={onClose} title="Strategieën" size="full">
+      <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
         <div className="px-5 py-4">
           <div className="space-y-4">
             <div className="h-8 w-48 animate-pulse rounded-[var(--r)] bg-[var(--subtle)]" />
@@ -848,17 +854,17 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
             Gegevens laden...
           </p>
         </div>
-      </BottomSheet>
+      </ShellOverlay>
     )
   }
 
   if (error || !input) {
     return (
-      <BottomSheet open={open} onClose={onClose} title="Strategieën" size="full">
+      <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
         <div className="px-5 py-4">
           <p className="font-sans text-sm text-[var(--ink-2)]">{error ?? 'Geen data beschikbaar.'}</p>
         </div>
-      </BottomSheet>
+      </ShellOverlay>
     )
   }
 
@@ -867,7 +873,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
   const fireAge = selectedSim?.fireAge ?? null
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Strategieën" size="full">
+    <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
       <div className="px-5 py-4">
 
         {/* ── Subtitle + active badges ────────────────────────────── */}
@@ -1470,7 +1476,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
           Dit is een simulatie — geen financieel advies. Werkelijke resultaten kunnen afwijken.
         </p>
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }
 

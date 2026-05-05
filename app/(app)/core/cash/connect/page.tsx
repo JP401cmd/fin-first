@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { ChevronLeft, Building2, ExternalLink, Shield, Clock, AlertTriangle } from 'lucide-react'
+import { Building2, ExternalLink, Shield, Clock, AlertTriangle } from 'lucide-react'
 import { BankSelector } from '@/components/app/bank-connect/bank-selector'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 type Provider = {
   id: string
@@ -69,15 +69,7 @@ export default function ConnectBankPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Back link */}
-      <Link
-        href="/core/cash"
-        className="mb-6 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
-      >
-        <ChevronLeft className="h-3 w-3" />
-        Terug naar Kas
-      </Link>
-
+      <NavStackMeta title="Bank koppelen" />
       {/* Editorial header — blueprint Type 7 (Wizard) */}
       <header className="mb-8 space-y-2">
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">

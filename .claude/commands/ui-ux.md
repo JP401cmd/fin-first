@@ -118,6 +118,9 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Actieve tab heeft `border-b-3` onderstreep + subtiele achtergrond `bg-[module-50]/40`?
 - [ ] Tab-tekst matcht module-kleur bij active state?
 - [ ] Alle navigatie-elementen minimaal 44px touch target?
+- [ ] Geen ingebakken back-knop in pagina-content — shell levert die via mobile TopBar of desktop pane-header. Zie patroon-kaart *Mobile TopBar* en page-type 11.
+- [ ] Sidebar-active-state via `--module-active-*` (zelfde tokens als kicker-streep): linker accent 3px in `-500` + bg-tint `-50/40`. Niet hardcoden naar `kern`/`wil`/`horizon`-hex.
+- [ ] Modal-keuze altijd via `<ShellOverlay kind="...">` driewegregel — geen directe `BottomSheet`-imports buiten de wrapper.
 
 ### Happy Flow & Voorwaartse Beweging
 - [ ] Bij elke succesvolle actie beantwoordt de UI drie vragen: (1) Is het gelukt? (2) Wat nu? (3) Wat als fout? — NOOIT een kale "OK"/"Sluiten".
@@ -171,6 +174,7 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] `WidgetEmpty` uitbreiden met optionele `action`-prop — verplicht voor lijstcomponenten op entiteitpagina's (budgets, assets, debts, goals).
 - [ ] Illustratie alleen als die iets léért. Bij twijfel: kicker + serif-zin in `italic` + CTA — past bij krant-esthetiek.
 - [ ] Eerste-gebruik empty state IS het onboarding-moment. Niet bovenop modal-tour stapelen.
+- [ ] Empty-state-CTA mag direct een `<ShellOverlay kind="sheet">` openen via query-state of `router.push()` (bv. "Voeg eerste budget toe" → `?new=true` triggert sheet) — géén aparte modal-CTA-component bouwen die buiten de driewegregel valt.
 
 ### Notifications & feedback-hiërarchie
 - [ ] Gebruik het bestaande `ToastProvider` (`components/app/toast-provider.tsx`) — bouw geen parallel toast-systeem. Ondersteunt success/info/warning/error, auto-dismiss, `role="alert"` + `aria-live`.
@@ -305,11 +309,54 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Niet toepassen op**: dashboards, lijsten, forms, settings, dynamische rapportages (kan vii. worden — onhandig).
 - **Implementatie**: section-label is een grid-row met label-links + cijfer-rechts: `<div className="flex items-center justify-between border-b border-[var(--rule-soft)] mb-6 pb-2"><span className="text-[10px] uppercase tracking-[0.22em] text-[var(--module-active-500)]">{label}</span><span className="font-serif italic text-sm text-[var(--module-active-700)]">{romanNumeral}.</span></div>`. Op `<380px`: cijfer `text-xs`. Op `<320px`: verbergen.
 
+### Sidebar (variant A — desktop shell)
+- **Toepassen op**: persistente verticale navigatie op `≥lg` (1024px+). Productie-implementatie in `components/app/shell/sidebar.tsx`.
+- **Niet toepassen op**: mobile (<lg) — daar levert `MobileStackShell` de chrome; sidebar rendert `null` via `hidden lg:flex`.
+- **Implementatie**: `position: fixed; left: 0; top: var(--header-height); width: 264px` expanded, `64px` collapsed (icon-rail). Toggle-state in `localStorage` per device via `lib/hooks/use-sidebar-collapsed.ts` — sluit aan bij plan §9 Q7.
+- **Inhoud-volgorde** (top-naar-bottom): branding-rij (`tf.` + ⌘K-skeleton) → kicker `DRIE MODULES` met streep → modules-lijst (Kern · Wil · Horizon, gating-aware via `getActiveNavModules()`) → kicker `overige` (lowercase italic) → secundaire bestemmingen (Berichten, Nieuws, Rapportages, Tools) → spacer → profiel-pill in footer.
+- **Active-state**: linker accent 3px in `--module-active-500` + bg-tint `bg-[var(--module-active-50)]/40` op de actieve module-rij. Inline tag-strip onder active module met **alleen categorieën** (Kern: `Bezittingen · Schulden`; Horizon: `Wat-Als · Doorrekening`). Géén apps in tag-strip — apps zijn in-page `?tab=`-segmented.
+- **Module-uit (gedimd)**: zie patroon-kaart *Module-fallback in shell*.
+- **Portal-mount**: Sidebar wordt via `createPortal(document.body)` gerenderd vanuit `ResponsiveShell` om `ChatLayoutWrapper`'s `contain: layout` te ontwijken. Anders zou `position: fixed` relatief aan de wrapper komen te staan.
+
+### Mobile TopBar (binnen tray-of-three)
+- **Toepassen op**: bovenrand van mobile-stack-shell (<lg). Productie-implementatie in `components/app/shell/top-bar.tsx`.
+- **Niet toepassen op**: desktop — daar levert de Sidebar oriëntatie.
+- **Implementatie**: hoogte 48px (zonder meta-strook) of 72-80px (met module-meta-strook op tab-roots). Safe-area-padding boven via `env(safe-area-inset-top)`.
+- **Lay-out**: ←-knop links (44×44 touch, alleen bij stack-diepte > 1) → titel midden → max 2 actions rechts.
+- **Titel-typografie**: Inter 14px medium met `tabular-nums` indien numeriek. **Niet Playfair** — voelde te zwaar in Fase 0.0-validatie. Module-meta-strook (saldo of subtitel) eronder gebruikt italic Source Serif 13px.
+- **Animatie**: TopBar zit *binnen* de animation-layer van de tray, niet sticky t.o.v. viewport. Schuift mee bij stack-push/pop. Bij scroll van content blijft hij aan de top van zijn tray.
+- **A11y**: `aria-live="polite"` op de titel zodat screen-readers de nieuwe pagina aankondigen na transitie. ←-knop heeft `aria-label="Terug"` + native button.
+
+### Slide-in pane (desktop)
+- **Toepassen op**: doorklik vanuit een lijst naar een entiteit-detail die naast de lijst zichtbaar moet blijven (transactie binnen budget, holding-edit binnen overzicht). Productie-implementatie in `components/app/shell/slide-in-pane.tsx`.
+- **Niet toepassen op**: modules-overzichten, categorie-pagina's (vervangen content-area volledig), of mobile (<lg, daar wordt het stack-push).
+- **Implementatie**: `transform: translateX(100%) → 0` over 240ms `cubic-bezier(0.32, 0.72, 0, 1)`. Breedte `lg:w-[480px] xl:w-[560px]`. Geen dim-overlay — wel rand-schaduw `shadow-[-12px_0_32px_rgba(0,0,0,0.08)]`.
+- **Sluiten**: ✕ rechtsboven (44×44), `Esc`-toets, klik op overlay-rand, of browser-back. URL-bron is altijd query-state uit `OVERLAY_QUERY_KEYS` — pane leest `useSearchParams()` en opent automatisch.
+- **A11y**: focus-trap actief (hergebruik `useFocusTrap` uit `bottom-sheet.tsx:7`), initial-focus op veilig element (annuleer-knop of eerste leesbare regio — nooit destructive), return-focus naar trigger. Sub-overlays binnen pane (sheet of confirm) krijgen *eigen* focus-trap die de pane-trap pauzeert.
+- **Reduced motion**: `prefers-reduced-motion: reduce` → instant-show, geen translate.
+
+### ShellOverlay (driewegregel)
+- **Toepassen op**: alle modal-achtige UI buiten de pure shell-chrome. Eén canonical wrapper in `components/app/shell/shell-overlay.tsx`. Geen directe `BottomSheet`-imports buiten deze wrapper (uitzondering: sandbox).
+- **Drie kinds met regel**:
+  - `kind="pane"` — *"ergens naartoe gaan"*. Eigen oriëntatie nodig, meerdere data-secties. Rendert `SlideInPane` op desktop, stack-push op mobile. Voorbeelden: budget-detail, scenario-modals, fase-analyses.
+  - `kind="sheet"` — *"even iets snel doen"*. Single-form, terugkeer-context. Rendert via `BottomSheet` (responsive `md:max-w-*`). Voorbeelden: opzeggen, herwaardering, jaar-inspectie.
+  - `kind="confirm"` — *"onomkeerbare bevestiging"*. Smal centered modal `max-w-sm` met focus-trap, type-to-confirm bij destructive. Voorbeelden: delete-asset, account-verwijdering.
+- **Beslis-flowchart**: heeft de gebruiker eigen oriëntatie nodig (multi-section, eigen back-stack)? → pane. Anders: snelle actie met retour naar dezelfde context? → sheet. Bevestiging van iets onomkeerbaars? → confirm.
+- **A11y**: alle drie kinds verplicht focus-trap, return-focus, `inert` op achtergrond. Hergebruik `useFocusTrap` patroon uit `bottom-sheet.tsx:232-276`.
+- **Verbod**: parallel modal-systemen bouwen ("ConfirmDialog", "DetailDrawer", etc.). Eén wrapper, drie kinds — uitbreiden via prop, niet via nieuwe component.
+
+### Module-fallback in shell
+- **Toepassen op**: sidebar-entry's en bottom-nav-tabs voor modules die uit staan (zie `isModuleActive()` en `getActiveNavModules()` in `lib/module-registry.ts`).
+- **Niet stilzwijgend verbergen** — gebruiker moet zien dat de module bestaat maar uit staat (CLAUDE.md fallback-regel).
+- **Sidebar-entry (desktop)**: `text-[var(--ink-4)]` + geen accent-streep + `cursor-help`. Hover toont tooltip `"Activeer in Instellingen"` met icon → bij klik `router.push('/identity/instellingen#modules')`. Geen module-tag-strip eronder.
+- **Bottom-nav-tab (mobile)**: gedimd icon + label op `text-[var(--ink-4)]`, `opacity-60`. Klik opent `/identity/instellingen#modules` in plaats van de module-route.
+- **Categorie-app-tabs binnen module**: bestaande tip-strip (`tipStripCopy` uit `category-deepening-registry.ts`) + teaser blijven zoals nu — die zitten één laag dieper.
+
 ## Page-type-blueprints
 
 > Elke pagina valt in één van tien archetypes. Bij review/ontwerp eerst type bepalen, dan de blueprint volgen. Pagina's mogen blokken weglaten, maar nooit volgorde of hiërarchie veranderen. Cross-cutting standaarden (back-nav, action-bar, confirmation, loading, saving, success) gelden voor alle types.
 
-Cross-cutting voor alle types: `<AppHeader>` (chrome boven) en `<BottomNav>` (chrome onder, mobile) blijven onveranderd; pagina-content leeft daartussen in een `<main>` met juiste safe-area-padding.
+Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell` (zie Type 11). Pagina-content leeft *binnen* die chrome zonder zelf back-knop, breadcrumb, of module-tab-rij te renderen. Module-layouts (`app/(app)/{module}/layout.tsx`) leveren alleen de kleur-context (`--module-active-*` CSS-vars) en optionele transitie-context (DreamTransition op `/horizon/**`).
 
 ### Type 1: Module-landing
 - **Routes**: `/dashboard`, `/core`, `/will`, `/horizon`, `/identity`, `/rapportages`, `/berichten`, `/nieuws`.
@@ -329,7 +376,7 @@ Cross-cutting voor alle types: `<AppHeader>` (chrome boven) en `<BottomNav>` (ch
 - **Routes**: `/core/assets/[type]`, `/core/debts/[type]`, `/core/budgets`, `/core/cash`, `/core/assets/holdings`, `/identity/koppelingen`, `/rapportages/budget`, `/rapportages/balans`.
 - **Doel**: overzicht van entiteiten binnen één categorie.
 - **Top-down structuur**:
-  1. Back-link / breadcrumb: `← Terug naar {parent}` in mono UPPERCASE 9px, `text-[var(--ink-3)] hover:text-[var(--ink)]`.
+  1. ~~Back-link~~ — shell levert via TopBar (mobile) of pane-header (desktop). Pagina rendert geen eigen "← Terug naar {parent}"-link.
   2. Mini-hero: kicker-met-streepje → categorie-naam (Playfair, optionele italic-em) → mini-`<FiguresStrip cols={2}>` met `[totaal-met-highlight, count]` of `[totaal, KPI]`.
   3. Optionele `<EditorialDeck>` (alleen als context vereist is).
   4. Toolbar (sticky bij scroll op desktop): search-input (alleen >25 items), filter-chips, sort-control rechts, primaire CTA "Toevoegen" rechts (button-stijl met module-active accent).
@@ -344,7 +391,7 @@ Cross-cutting voor alle types: `<AppHeader>` (chrome boven) en `<BottomNav>` (ch
 - **Routes**: `/core/budgets/[id]`, `/core/assets/cash/[accountId]`, `/core/assets/holdings/[id]`, `/core/assets/crypto/[holdingId]`, `/core/assets/investment/[holdingId]`, `/rapportages/[id]`.
 - **Doel**: alles wat één entiteit toont — eigendomsinfo, KPI's, transacties, gekoppelde items.
 - **Top-down structuur**:
-  1. Back-link.
+  1. ~~Back-link~~ — shell levert. Detail-pagina's openen vanaf desktop bij voorkeur als `<ShellOverlay kind="pane">`; vanaf mobile als stack-push. URL-state in `OVERLAY_QUERY_KEYS`.
   2. Editorial header: kicker-met-streepje (categorie/type) → entiteit-naam (Playfair, italic-em op subtype) → hoofdwaarde-bedrag (DM Mono, ~32-40px) MET highlight-marker → sub-meta italic Source Serif (provider, looptijd, "Bijgewerkt om HH:mm").
   3. Action-bar (sticky onderaan op mobile, inline op desktop): primair "Bewerken" / "Herwaarderen" → secundair "Verwijderen" achter type-to-confirm.
   4. `<FiguresStrip cols={4}>` met afgeleide KPI's. Maximaal één extra highlight-marker.
@@ -358,9 +405,11 @@ Cross-cutting voor alle types: `<AppHeader>` (chrome boven) en `<BottomNav>` (ch
 ### Type 4: Bewerk-/create-pagina (form-flow)
 - **Routes**: `/core/budgets/new`, `/core/budgets/[id]/edit`, `/core/assets/revalue`, `/core/cash/import`, `/core/assets/holdings/import`, en alle CRUD-sheets/modals.
 - **Doel**: gegevens aanmaken of wijzigen in een gestructureerd formulier.
-- **Variant-keuze**:
-  - Mobile: full-page (geen modal).
-  - Desktop: bottom-sheet/centered-modal voor entiteiten ≤10 velden, full-page voor >10 velden.
+- **Variant-keuze** (altijd via `<ShellOverlay kind="...">`, nooit directe `BottomSheet`):
+  - Lichte form (≤5 velden): `kind="sheet"` op zowel desktop als mobile — responsive uit één component.
+  - Multi-section form / wizard: `kind="pane"` op desktop (slide-in, eigen back-stack), stack-push op mobile.
+  - Type-to-confirm destructive: `kind="confirm"`.
+  - Full-page wizard (>10 velden, multi-step): aparte route met `<NavStackMeta bottomBar={{kind: 'action-bar'}} />`, geen ShellOverlay.
 - **Top-down structuur**:
   1. Editorial header: kicker-met-streepje "BEWERKEN" / "TOEVOEGEN" / "IMPORTEREN" → entiteit-naam (Playfair).
   2. Optionele `<ScenarioCallout>` met context/uitleg.
@@ -371,12 +420,12 @@ Cross-cutting voor alle types: `<AppHeader>` (chrome boven) en `<BottomNav>` (ch
 - **Autosave-variant** (alleen voor settings-achtige edit-flows): status-label rechtsbovenin "Saving…" / "Opgeslagen — zojuist", debounce 500ms.
 
 ### Type 5: Modal / sheet (CRUD / detail / lookup)
-- **Bestanden**: `bottom-sheet.tsx` als basis, plus alle `*-modal.tsx` en `*-sheet.tsx` in `components/app/` en `components/app/{module}/`.
+- **Wrapper**: `<ShellOverlay kind="pane|sheet|confirm">` is canonical (zie patroon-kaart *ShellOverlay (driewegregel)*). Render-mechanisme voor `kind="sheet"` is `bottom-sheet.tsx`; pagina-componenten importeren **niet** direct.
 - **Doel**: ingrijpen op één entiteit zonder pagina-context te verliezen, of detail-zoom.
-- **Variant-keuze**:
-  - Bottom-sheet (mobile-first, default).
-  - Centered-modal (desktop-only, alleen bij >800px viewport voor smal-form).
-  - Full-screen-modal (alleen voor multi-step-flows binnen een modal — zie Type 7).
+- **Variant-keuze (driewegregel)**:
+  - `kind="sheet"` (default) — single-form, "even iets snel doen". Mobile = peek/mid/full detents; desktop = `md:max-w-lg` centered-bottom.
+  - `kind="pane"` — multi-section detail of wizard binnen modal (multi-step). Slide-in op desktop, stack-push op mobile.
+  - `kind="confirm"` — onomkeerbare bevestiging. Smal centered modal `max-w-sm` met focus-trap + type-to-confirm.
 - **Top-down structuur**:
   1. Drag-handle (alleen bottom-sheet, 4×40px gecentreerd).
   2. Modal header: kicker-met-streepje (klein, 9px mono) → titel (Playfair, 18-22px) → sluit-knop ✕ rechtsboven (44×44 touch-target).
@@ -444,9 +493,38 @@ Cross-cutting voor alle types: `<AppHeader>` (chrome boven) en `<BottomNav>` (ch
   6. Footer-notes-grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7 border-t-4 border-double border-[var(--ink)] pt-6 mt-8`): per blok kicker (mono UPPERCASE) + 1 paragraaf body (Source Serif).
   7. Ornament-colophon: `Trifinity ✦ {Module} ✦ {Tool} v{x}`.
 
+### Type 11: Module-shell (cross-cutting chrome-blueprint)
+- **Bestanden**: `components/app/shell/responsive-shell.tsx` als root, daarbinnen `desktop-sidebar-shell.tsx` (≥lg) of `mobile-stack-shell.tsx` (<lg). Activeert achter feature-flag `new_navigation_shell`.
+- **Doel**: chrome leveren rond alle pagina-content — sidebar (desktop), TopBar + StackContainer + BottomBar (mobile), slide-in pane, focus-trap, swipe-back, skeleton-fallbacks.
+- **Top-down structuur (desktop, ≥lg)**:
+  1. `ResponsiveShell` rendert `Sidebar` via portal naar `document.body` (omzeilt `ChatLayoutWrapper`'s `contain: layout`).
+  2. `<main className="hidden lg:block lg:pl-[264px]">` reserveert ruimte naast de fixed sidebar.
+  3. Pagina-content rendert binnen `<main>` zonder eigen back-knop, breadcrumb, of module-tab-rij.
+  4. Optionele `SlideInPane` (zie patroon-kaart) rendert rechts via dezelfde portal.
+- **Top-down structuur (mobile, <lg)**:
+  1. `MobileStackShell` wikkelt content in tray-of-three (`TopBar` + content + `MobileBottomBar`).
+  2. Tray schuift als één geheel bij push/pop (240ms View Transition met fallback).
+  3. `NavStackProvider` houdt per-tab-stacks (`kern`, `wil`, `horizon`, `identity`, `other`) in `sessionStorage`, max-diepte 5.
+  4. Pagina declareert `<NavStackMeta title="..." bottomBar={...} />` synchroon vóór data-fetch zodat tray instant rendert; content via Suspense-skeleton.
+- **BottomBar-kinds** (Q9 in plan, per-pagina vastgesteld):
+  - `'tabs'` — module-tabs, gating-aware. Default voor tab-roots.
+  - `'action-bar'` — primair + secundair CTA (form-flows, bv. nieuw-budget, edit-debt).
+  - `'context-actions'` — 2-3 detail-knoppen (Bewerken/Verwijderen/Delen op detail-pagina's).
+  - `'hidden'` — full-screen wizards (CSV-import, bank-koppeling, check-in).
+- **Bottom-nav-state buiten hoofd-modules** (Identity-stack, Beheer, globaal): laatst-actieve hoofd-module **gedimd-actief** (icon + label op `text-[var(--ink-3)]`, accent-streep op `--module-active-200/40`). Niet vol-actief, niet neutraal — behoudt oriëntatie zonder misleiden.
+- **DreamTransitionContext** (`/horizon/**`): module-layout overrideert generieke stack-transitie met golden-veil-animatie. Buiten Horizon valt MobileStackShell terug op standaard slide.
+- **Beheer-routes** (`/beheer/**`): behouden eigen `max-w-4xl` layout, geen ResponsiveShell-interferentie. Plan §8.6.
+- **A11y**:
+  - Skip-link "Naar hoofdinhoud" als eerste tab-stop, `sr-only focus:not-sr-only`.
+  - Sidebar volledig keyboard-bereikbaar: tab-order = branding → modules → overige → profiel-pill. Collapse-toggle bereikbaar als eigen `<button>`.
+  - Mobile: `aria-live="polite"` op TopBar-titel + outgoing tray-tree krijgt `aria-hidden="true"` tijdens 240ms transitie.
+  - Swipe-back-gesture beperkt tot edge-zone (`clientX < 24px` op touchstart) om conflict met horizontale scroll-content (charts/tables) te voorkomen.
+  - `prefers-reduced-motion: reduce` → instant-swap, geen translate of fade.
+- **Niet doen**: pagina rendert eigen back-knop / breadcrumb (shell levert dat), parallel sidebar/drawer-systemen bouwen, `BottomSheet` direct importeren buiten `<ShellOverlay>` (zie driewegregel-patroon-kaart).
+
 ### Cross-cutting standaarden voor alle page-types
 
-- [ ] **Back-navigation**: elke non-landing-pagina toont een terug-affordance (mobile: native back-knop in `<AppHeader>` + breadcrumb-link bovenin content; desktop: breadcrumb "← Terug naar {parent}"). Max 3 niveaus.
+- [ ] **Back-navigation**: shell levert de terug-affordance — TopBar `←` op mobile (binnen tray-of-three), pane-header of browser-back op desktop. Pagina-content rendert **geen** eigen "← Terug naar X"-link; max 3 niveaus stack-diepte (per `NavStackProvider` configuratie).
 - [ ] **Action-bar**: primaire actie altijd voorwaarts geframed ("Bewerken", "Opslaan en doorgaan", "Voeg toe"), nooit destructief.
 - [ ] **Confirmation**: type-to-confirm met preview → expliciete bevestiging → success-scherm met undo-window (5s toast). Géén één-tap-destructive ooit.
 - [ ] **Loading**: skeleton voor pagina-load (matcht final layout, geen layout-shift); spinner voor enkele actie. Pagina-skeleton volgt page-type-blueprint.

@@ -17,6 +17,7 @@ import {
 } from '@/components/editorial'
 import { SectionDivider } from '@/components/app/section-divider'
 import { formatTimestamp } from '@/lib/format'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 type PeriodType = 'month' | 'quarter' | 'year'
 
@@ -204,6 +205,7 @@ export default function RapportagesPage() {
 
   return (
     <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
+      <NavStackMeta title="Rapportages" bottomBar={{ kind: 'tabs' }} />
       {/* Editorial header — Type 1 Module-landing */}
       <header className="mb-6 space-y-3">
         <Kicker>Rapportages</Kicker>

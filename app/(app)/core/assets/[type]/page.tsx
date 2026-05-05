@@ -48,6 +48,7 @@ import {
   type CategoryHistoryData,
 } from '@/lib/load-category-history'
 import { AssetCategoryPage } from '@/components/core/asset-category-page'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // ── Type guards ──────────────────────────────────────────────
 
@@ -303,31 +304,34 @@ export default async function AssetCategoryServerPage({
   }
 
   return (
-    <AssetCategoryPage
-      type={type}
-      initialAssets={assets}
-      initialBudgetsData={budgetsData ?? undefined}
-      initialHoldingsData={holdingsData ?? undefined}
-      initialCoreData={coreData ?? undefined}
-      bankAccountByAssetId={bankAccountByAssetId}
-      initialKpiRefs={kpiRefs ?? undefined}
-      initialConnectionsByAssetId={connectionsByAssetId}
-      initialCryptoHoldings={cryptoHoldings}
-      initialCryptoTransactions={cryptoTransactions}
-      initialCryptoHistory={cryptoHistory}
-      cryptoHistoryDaysBack={cryptoHistoryDaysBack}
-      initialCryptoPeriodReturns={cryptoPeriodReturns}
-      initialCryptoRealizedPnL={cryptoRealizedPnL}
-      initialCryptoRealizedPnLFifo={cryptoRealizedPnLFifo}
-      initialCryptoSparklines={cryptoSparklines}
-      initialCryptoBenchmarkBtc={cryptoBenchmarkBtc}
-      initialCryptoBenchmarkEth={cryptoBenchmarkEth}
-      initialCryptoVolatility={cryptoVolatility}
-      initialCryptoFees={cryptoFees}
-      initialInvestmentHoldings={investmentHoldings}
-      initialAssetSparklines={assetSparklines}
-      historyData={historyData}
-    />
+    <>
+      <NavStackMeta title={ASSET_TYPE_LABELS[type] ?? 'Bezittingen'} bottomBar={{ kind: 'tabs' }} />
+      <AssetCategoryPage
+        type={type}
+        initialAssets={assets}
+        initialBudgetsData={budgetsData ?? undefined}
+        initialHoldingsData={holdingsData ?? undefined}
+        initialCoreData={coreData ?? undefined}
+        bankAccountByAssetId={bankAccountByAssetId}
+        initialKpiRefs={kpiRefs ?? undefined}
+        initialConnectionsByAssetId={connectionsByAssetId}
+        initialCryptoHoldings={cryptoHoldings}
+        initialCryptoTransactions={cryptoTransactions}
+        initialCryptoHistory={cryptoHistory}
+        cryptoHistoryDaysBack={cryptoHistoryDaysBack}
+        initialCryptoPeriodReturns={cryptoPeriodReturns}
+        initialCryptoRealizedPnL={cryptoRealizedPnL}
+        initialCryptoRealizedPnLFifo={cryptoRealizedPnLFifo}
+        initialCryptoSparklines={cryptoSparklines}
+        initialCryptoBenchmarkBtc={cryptoBenchmarkBtc}
+        initialCryptoBenchmarkEth={cryptoBenchmarkEth}
+        initialCryptoVolatility={cryptoVolatility}
+        initialCryptoFees={cryptoFees}
+        initialInvestmentHoldings={investmentHoldings}
+        initialAssetSparklines={assetSparklines}
+        historyData={historyData}
+      />
+    </>
   )
 }
 

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import type { ModuleNavConfig, DomainColor } from '@/lib/navigation'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag'
 
 const colorStyles: Record<DomainColor, { active: string; hover: string; border: string }> = {
   amber: {
@@ -36,12 +37,20 @@ export function ModuleNav({ config }: { config: ModuleNavConfig }) {
   const styles = colorStyles[config.color]
   const { features } = useFeatureAccess()
 
+  // Feature-flag-aware sticky-top: bij oude shell zit de AppHeader bovenop,
+  // dus ModuleNav plakt eronder via `var(--header-height)`. Bij nieuwe shell
+  // is er geen AppHeader op desktop én geen pagina-bovenrand boven de tray-
+  // content op mobile; ModuleNav plakt dan direct aan de top van zijn
+  // scroll-container (de viewport op desktop, de tray-main op mobile).
+  const [newShell] = useFeatureFlag('new_navigation_shell')
+  const stickyTop = newShell ? 'top-0' : 'top-[var(--header-height)]'
+
   const visibleItems = config.items.filter(
     item => !item.featureId || isFeatureAccessible(features, item.featureId)
   )
 
   return (
-    <div className={`sticky top-[var(--header-height)] z-40 border-b border-[var(--border-ed)] bg-[var(--paper)] ${styles.border}`}>
+    <div className={`sticky ${stickyTop} z-40 border-b border-[var(--border-ed)] bg-[var(--paper)] ${styles.border}`}>
       <div className="mx-auto max-w-6xl px-6">
         <div className="relative">
           <nav

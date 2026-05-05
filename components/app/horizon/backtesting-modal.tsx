@@ -1,7 +1,17 @@
 'use client'
 
+/**
+ * Fase 2.2 — onderdeel van new-navigation-shell migratie.
+ * Plan: docs/navigatie-redesign-plan.md §5.1 (pane) + §5.2 (sheet)
+ * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
+ *
+ * BacktestingModal = pane (eigen flow: upload + replay + scenarios).
+ * PeriodKassabon (sub-overlay) = sheet (inspection van één historische
+ * periode — gebruiker keert terug naar de pane-lijst).
+ */
+
 import { useState, useMemo } from 'react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
@@ -41,7 +51,7 @@ export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }
 
   return (
     <>
-      <BottomSheet open={true} onClose={onClose} title={perspectiveLabel ? `Historische robuustheid — ${perspectiveLabel}` : 'Historische robuustheid'}>
+      <ShellOverlay open={true} onClose={onClose} kind="pane" title={perspectiveLabel ? `Historische robuustheid — ${perspectiveLabel}` : 'Historische robuustheid'}>
         <div className="space-y-6 px-6 py-6">
 
           {/* Kicker */}
@@ -180,9 +190,9 @@ export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }
           </section>
 
         </div>
-      </BottomSheet>
+      </ShellOverlay>
 
-      {/* Named period kassabon sub-modal */}
+      {/* Named period kassabon sub-overlay — sheet (inspection, terugkeer naar pane-lijst) */}
       {selectedPeriod && (
         <PeriodKassabon
           path={selectedPeriod}
@@ -359,7 +369,7 @@ function PeriodKassabon({ path, onClose }: { path: BacktestPath; onClose: () => 
   const milestones = [0, 5, 10, 15, 20, 25, 30].filter(y => y < path.values.length)
 
   return (
-    <BottomSheet open={true} onClose={onClose} title={path.label ?? `Startjaar ${path.startYear}`}>
+    <ShellOverlay open={true} onClose={onClose} kind="sheet" size="lg" title={path.label ?? `Startjaar ${path.startYear}`}>
       <div className="px-6 py-6">
         <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           {/* Header */}
@@ -429,6 +439,6 @@ function PeriodKassabon({ path, onClose }: { path: BacktestPath; onClose: () => 
           </p>
         </div>
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }

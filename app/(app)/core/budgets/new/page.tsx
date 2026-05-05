@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetForm } from '@/components/app/budget-form'
 import type { Budget } from '@/lib/budget-data'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 export default function NewBudgetPage() {
   const [parentBudgets, setParentBudgets] = useState<Budget[]>([])
@@ -28,6 +29,7 @@ export default function NewBudgetPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
+        <NavStackMeta title="Nieuw budget" />
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -35,5 +37,10 @@ export default function NewBudgetPage() {
     )
   }
 
-  return <BudgetForm parentBudgets={parentBudgets} />
+  return (
+    <>
+      <NavStackMeta title="Nieuw budget" />
+      <BudgetForm parentBudgets={parentBudgets} />
+    </>
+  )
 }

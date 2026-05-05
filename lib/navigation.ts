@@ -45,3 +45,29 @@ export const identityNav: ModuleNavConfig = {
     { label: 'Delen', href: '/identity/delen' },
   ],
 }
+
+/**
+ * Canonical query-state keys voor overlays/panes en in-page-state.
+ * Pane luistert op: budget | debt | asset | strategie.
+ * In-page (geen overlay): tab.
+ * Compositie / transient: edit | via | month.
+ *
+ * Reden om te centraliseren: voorkomt typos en magic strings verspreid door
+ * de codebase (huidige call-sites: holdings-client.tsx:83, budgets-client,
+ * debts-client, horizon strategie-modal).
+ */
+export const OVERLAY_QUERY_KEYS = {
+  budget:    'budget',
+  debt:      'debt',
+  asset:     'asset',
+  strategie: 'strategie',
+  tab:       'tab',
+  edit:      'edit',
+  via:       'via',
+  month:     'month',
+} as const
+
+export type OverlayQueryKey = keyof typeof OVERLAY_QUERY_KEYS
+
+/** Welke keys daadwerkelijk een pane-overlay openen. `tab` is in-page; `edit/via/month` zijn modifier/transient. */
+export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'strategie'] as const satisfies readonly OverlayQueryKey[]

@@ -24,6 +24,7 @@ import { HorizonColumn } from './components/horizon-column'
 import { PullQuoteSection } from './components/pull-quote'
 import { MonthlyTable } from './components/monthly-table'
 import { HistoricalComparison } from './components/historical-comparison'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 export default function ReportViewerPage() {
   const searchParams = useSearchParams()
@@ -117,6 +118,7 @@ export default function ReportViewerPage() {
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8">
+      <NavStackMeta title="Rapport" />
       <PrintToolbar />
 
       <ReportMasthead data={data} />

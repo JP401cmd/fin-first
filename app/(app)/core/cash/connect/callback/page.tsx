@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 /**
  * This page handles the return from bank authorization.
@@ -25,6 +26,7 @@ export default function ConnectCallbackPage() {
 
   return (
     <div className="flex flex-col items-center justify-center py-20">
+      <NavStackMeta title="Verbinden..." topBar={{ kind: 'hidden' }} />
       <div className="h-10 w-10 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
       <p className="mt-4 text-sm font-medium text-[var(--ink-2)]">Verbinding verwerken...</p>
       <p className="mt-1 text-xs text-[var(--ink-3)]">Even geduld, je wordt automatisch doorgestuurd.</p>
