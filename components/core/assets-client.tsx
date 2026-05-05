@@ -10,6 +10,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { Kicker } from '@/components/editorial'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -798,6 +799,8 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           entityId={selectedAsset.id}
           entityType="asset"
           entityName={selectedAsset.name}
+          entitySubtype={selectedAsset.asset_type}
+          netWorthInclusionPct={selectedAsset.net_worth_inclusion_pct ?? 100}
           currentValue={Number(selectedAsset.current_value)}
           onClose={() => setModalStep('detail')}
           onSaved={() => {
@@ -2686,14 +2689,24 @@ export function AssetForm({
       const newValue = Number(currentValue) || 0
       const oldValue = Number(asset.current_value)
       if (newValue !== oldValue && newValue > 0) {
+        const today = new Date().toISOString().split('T')[0]
         await supabase.from('valuations').upsert({
           user_id: user.id,
           entity_type: 'asset',
           entity_id: asset.id,
-          valuation_date: new Date().toISOString().split('T')[0],
+          valuation_date: today,
           value: newValue,
           notes: `Waarde bijgewerkt van ${oldValue} naar ${newValue}`,
         }, { onConflict: 'entity_id,valuation_date' })
+        // Mirror naar balance_snapshots zodat de categorie-sparkline meebeweegt.
+        await upsertSingleBalanceSnapshot(supabase, user.id, today, {
+          type: 'asset',
+          id: asset.id,
+          name,
+          subtype: assetType,
+          balance: newValue,
+          netWorthInclusionPct: netWorthInclusionPct,
+        })
       }
     } else {
       const { data: inserted, error: insertErr } = await supabase.from('assets').insert(row).select('id').single()
@@ -3451,6 +3464,8 @@ export function ValuationModal({
   entityId,
   entityType,
   entityName,
+  entitySubtype,
+  netWorthInclusionPct,
   currentValue,
   onClose,
   onSaved,
@@ -3458,6 +3473,8 @@ export function ValuationModal({
   entityId: string
   entityType: 'asset' | 'debt'
   entityName: string
+  entitySubtype: string
+  netWorthInclusionPct?: number | null
   currentValue: number
   onClose: () => void
   onSaved: () => void
@@ -3511,6 +3528,16 @@ export function ValuationModal({
     const table = entityType === 'asset' ? 'assets' : 'debts'
     const column = entityType === 'asset' ? 'current_value' : 'current_balance'
     await supabase.from(table).update({ [column]: Number(value) }).eq('id', entityId)
+
+    // Mirror naar balance_snapshots op de gekozen valuation_date.
+    await upsertSingleBalanceSnapshot(supabase, user.id, date, {
+      type: entityType,
+      id: entityId,
+      name: entityName,
+      subtype: entitySubtype,
+      balance: Number(value),
+      netWorthInclusionPct,
+    })
 
     setSaving(false)
     onSaved()

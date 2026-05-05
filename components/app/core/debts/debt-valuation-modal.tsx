@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
+import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -10,6 +11,8 @@ export function ValuationModal({
   entityId,
   entityType,
   entityName,
+  entitySubtype,
+  netWorthInclusionPct,
   currentValue,
   onClose,
   onSaved,
@@ -17,6 +20,8 @@ export function ValuationModal({
   entityId: string
   entityType: 'asset' | 'debt'
   entityName: string
+  entitySubtype: string
+  netWorthInclusionPct?: number | null
   currentValue: number
   onClose: () => void
   onSaved: () => void
@@ -60,6 +65,16 @@ export function ValuationModal({
     }
 
     await supabase.from(table).update(updatePayload).eq('id', entityId)
+
+    // Mirror naar balance_snapshots zodat de categorie-sparkline meebeweegt.
+    await upsertSingleBalanceSnapshot(supabase, user.id, date, {
+      type: entityType,
+      id: entityId,
+      name: entityName,
+      subtype: entitySubtype,
+      balance: newValue,
+      netWorthInclusionPct,
+    })
 
     setSaving(false)
     onSaved()

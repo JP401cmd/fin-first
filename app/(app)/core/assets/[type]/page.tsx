@@ -43,6 +43,10 @@ import {
   type AssetConnectionSummary,
 } from '@/lib/connections-data'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
+import {
+  loadCategoryHistory,
+  type CategoryHistoryData,
+} from '@/lib/load-category-history'
 import { AssetCategoryPage } from '@/components/core/asset-category-page'
 
 // ── Type guards ──────────────────────────────────────────────
@@ -117,6 +121,18 @@ export default async function AssetCategoryServerPage({
   // catchen fouten zodat een falende KPI-load niet de hele categorie-pagina
   // 500't; bij failure rendert de strip simpelweg geen extra KPI's.
   const kpiRefsPromise = loadKpiContextRefs(supabase).catch(() => null)
+
+  // ── Cumulatieve categorie-historie ───────────────────────────
+  // Voor niet-cash categorieën laden we 12 maanden snapshot-historie zodat
+  // `<CategoryHistoryChart>` direct kan renderen zonder client-roundtrip.
+  // Cash heeft eigen overzicht-componenten (CashOverview + CoreKengetallen)
+  // bovenaan de items-tab, dus we besparen daar de query.
+  const historyPromise: Promise<CategoryHistoryData | undefined> =
+    type === 'cash'
+      ? Promise.resolve(undefined)
+      : loadCategoryHistory(supabase, { entityType: 'asset', subtype: type }).catch(
+          () => undefined,
+        )
 
   // ── Verdieping-data prefetch ─────────────────────────────────
   // Voor `cash` en `investment` laden we óók de bijbehorende module-data
@@ -255,7 +271,10 @@ export default async function AssetCategoryServerPage({
     }
   }
 
-  const kpiRefs: KpiContextRefs | null = await kpiRefsPromise
+  const [kpiRefs, historyData] = await Promise.all([
+    kpiRefsPromise,
+    historyPromise,
+  ])
 
   // ── Per-asset sparklines voor de items-tab ───────────────────
   // Eén batched query op `balance_snapshots` voor alle assets in deze
@@ -307,6 +326,7 @@ export default async function AssetCategoryServerPage({
       initialCryptoFees={cryptoFees}
       initialInvestmentHoldings={investmentHoldings}
       initialAssetSparklines={assetSparklines}
+      historyData={historyData}
     />
   )
 }

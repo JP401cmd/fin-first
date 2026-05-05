@@ -218,11 +218,14 @@ export const loadCoreData = cache(async function loadCoreData(
   })()
 
   // ── Categorie-sparklines promise: balance_snapshots over de afgelopen
-  //    6 maanden, geaggregeerd per (entity_type, entity_subtype) per maand
-  //    en gewogen met inclusion_pct. Parallel gestart, pas vlak voor de
-  //    return geawait. Failure → leeg object, kaarten tonen geen sparkline.
-  const sixMonthsAgoForSparkline = new Date(
-    Date.UTC(now.getFullYear(), now.getMonth() - 5, 1),
+  //    12 maanden, geaggregeerd per (entity_type, entity_subtype) per maand
+  //    en gewogen met inclusion_pct. Bij categorieën waarvan de eerste
+  //    snapshot recenter is dan 12 maanden geleden, knippen we het venster
+  //    af op die eerste meting — geen valse historie tonen via leading
+  //    forward-fill. Parallel gestart, pas vlak voor de return geawait.
+  //    Failure → leeg object, kaarten tonen geen sparkline.
+  const twelveMonthsAgoForSparkline = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth() - 11, 1),
   ).toISOString().split('T')[0]
   type SnapRow = {
     snapshot_date: string
@@ -236,14 +239,14 @@ export const loadCoreData = cache(async function loadCoreData(
       const result = await supabase
         .from('balance_snapshots')
         .select('snapshot_date, entity_type, entity_subtype, balance, net_worth_inclusion_pct')
-        .gte('snapshot_date', sixMonthsAgoForSparkline)
+        .gte('snapshot_date', twelveMonthsAgoForSparkline)
         .order('snapshot_date', { ascending: true })
       const rows = (result.data ?? []) as SnapRow[]
       if (rows.length === 0) return {}
 
-      // Bouw 6 maand-keys op (YYYY-MM, oudste → nieuwste).
+      // Bouw tot 12 maand-keys op (YYYY-MM, oudste → nieuwste).
       const monthKeys: string[] = []
-      for (let i = 5; i >= 0; i--) {
+      for (let i = 11; i >= 0; i--) {
         const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() - i, 1))
         monthKeys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
       }
@@ -291,17 +294,20 @@ export const loadCoreData = cache(async function loadCoreData(
 
       const out: Record<string, number[]> = {}
       for (const cat of catKeys) {
-        const series = new Array<number | null>(6).fill(null)
+        const series = new Array<number | null>(monthKeys.length).fill(null)
         for (let i = 0; i < monthKeys.length; i++) {
           const v = sumByCatMonth.get(`${cat}|${monthKeys[i]}`)
           series[i] = v ?? null
         }
-        // Forward-fill: als een maand ontbreekt, neem de vorige bekende waarde.
-        // Heeft de eerste maand geen waarde, vul met de eerste niet-null.
-        const firstReal = series.find((v) => v != null) ?? 0
-        let last = firstReal as number
+        // Knip leading nulls af zodat we niet visueel een lange vlakke
+        // periode tonen voor een categorie die pas later begon te meten.
+        // Forward-fill alleen tussen de eerste en laatste echte waarde.
+        const firstRealIdx = series.findIndex((v) => v != null)
+        if (firstRealIdx === -1) continue
+        const trimmed = series.slice(firstRealIdx)
+        let last = trimmed[0] as number
         const filled: number[] = []
-        for (const v of series) {
+        for (const v of trimmed) {
           if (v != null) last = v
           filled.push(last)
         }

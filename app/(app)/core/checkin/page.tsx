@@ -41,6 +41,7 @@ function useFc() {
   return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
 }
 import { createClient } from '@/lib/supabase/client'
+import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import {
   type Asset,
@@ -1058,6 +1059,20 @@ function StepBezittingen({
         )
       )
 
+      // Mirror naar balance_snapshots zodat de categorie-sparkline meebeweegt.
+      await Promise.all(
+        changes.map(({ asset, newValue }) =>
+          upsertSingleBalanceSnapshot(supabase, user.id, date, {
+            type: 'asset',
+            id: asset.id,
+            name: asset.name,
+            subtype: asset.asset_type,
+            balance: newValue,
+            netWorthInclusionPct: asset.net_worth_inclusion_pct ?? 100,
+          })
+        )
+      )
+
       setSaved(true)
     } catch {
       // silent — user can retry
@@ -1263,6 +1278,20 @@ function StepSchulden({
           if (newValue <= 0) updateData.is_active = false
           return supabase.from('debts').update(updateData).eq('id', debt.id)
         })
+      )
+
+      // Mirror naar balance_snapshots zodat de categorie-sparkline meebeweegt.
+      await Promise.all(
+        changes.map(({ debt, newValue }) =>
+          upsertSingleBalanceSnapshot(supabase, user.id, date, {
+            type: 'debt',
+            id: debt.id,
+            name: debt.name,
+            subtype: debt.debt_type,
+            balance: newValue,
+            netWorthInclusionPct: debt.net_worth_inclusion_pct ?? 100,
+          })
+        )
       )
 
       // Remove deactivated debts from local state

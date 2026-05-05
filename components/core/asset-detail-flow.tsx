@@ -300,6 +300,8 @@ export function AssetDetailFlow({
         entityId={currentAsset.id}
         entityType="asset"
         entityName={currentAsset.name}
+        entitySubtype={currentAsset.asset_type}
+        netWorthInclusionPct={currentAsset.net_worth_inclusion_pct ?? 100}
         currentValue={Number(currentAsset.current_value)}
         onClose={() => setModalStep('detail')}
         onSaved={() => {

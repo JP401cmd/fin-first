@@ -7,9 +7,11 @@ interface CardTintOverlayProps {
   /** Bezitting → groen-paar; schuld → amber-paar. */
   variant: 'asset' | 'debt'
   /**
-   * 6 maandwaarden (oudste → nieuwste). Optioneel: bij `undefined` of <2
-   * punten rendert de overlay alleen tinted zones zonder breuklijn (rechte
-   * scheiding op het midden).
+   * Tot 12 maandwaarden (oudste → nieuwste). Variabele lengte: bij
+   * categorieën/entities die korter dan 12 maanden geleden begonnen te
+   * meten knipt de loader het venster af op de eerste meting. Bij
+   * `undefined` of <2 punten rendert de overlay alleen tinted zones zonder
+   * breuklijn (rechte scheiding op het midden).
    */
   sparklineValues?: number[]
   /**
@@ -27,7 +29,7 @@ interface CardTintOverlayProps {
  *
  * - Sky-vlak gebruikt `tintAbove` (subtiel papier-tint, "wand").
  * - Bergmassa gebruikt `tintBelow`; toppen reflecteren `sparklineValues`
- *   (6-maand-historie) zodat elke categorie een uniek silhouet krijgt.
+ *   (tot 12-maand-historie) zodat elke categorie een uniek silhouet krijgt.
  * - Schaduw projecteert diagonaal rechtsboven (licht van linksonder),
  *   geblurd via SVG `<filter>`. Diagonale richting is essentieel voor
  *   het 3D-effect.

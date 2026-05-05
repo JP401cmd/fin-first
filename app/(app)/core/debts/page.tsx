@@ -439,6 +439,8 @@ export default function DebtsPage() {
           entityId={selectedDebt.id}
           entityType="debt"
           entityName={selectedDebt.name}
+          entitySubtype={selectedDebt.debt_type}
+          netWorthInclusionPct={selectedDebt.net_worth_inclusion_pct ?? 100}
           currentValue={Number(selectedDebt.current_balance)}
           onClose={() => setModalStep('detail')}
           onSaved={() => {

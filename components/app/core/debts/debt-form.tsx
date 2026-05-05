@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { AlertTriangle, Building2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
+import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
   type Debt,
@@ -277,14 +278,24 @@ export function DebtForm({
         const valuationNotes = newBalance <= 0
           ? `Schuld afgelost! Saldo bijgewerkt van ${oldBalance} naar ${newBalance}`
           : `Saldo bijgewerkt van ${oldBalance} naar ${newBalance}`
+        const today = new Date().toISOString().split('T')[0]
         await supabase.from('valuations').upsert({
           user_id: user.id,
           entity_type: 'debt',
           entity_id: debt.id,
-          valuation_date: new Date().toISOString().split('T')[0],
+          valuation_date: today,
           value: newBalance,
           notes: valuationNotes,
         }, { onConflict: 'entity_id,valuation_date' })
+        // Mirror naar balance_snapshots zodat de categorie-sparkline meebeweegt.
+        await upsertSingleBalanceSnapshot(supabase, user.id, today, {
+          type: 'debt',
+          id: debt.id,
+          name,
+          subtype: debtType,
+          balance: newBalance,
+          netWorthInclusionPct,
+        })
       }
     } else {
       await supabase.from('debts').insert(row)

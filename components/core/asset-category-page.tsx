@@ -25,6 +25,7 @@ import type {
   CryptoFeesSummary,
 } from '@/lib/crypto-holdings-data'
 import type { InvestmentHoldingRow } from '@/lib/investment-holdings-data'
+import type { CategoryHistoryData } from '@/lib/load-category-history'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
@@ -35,6 +36,7 @@ import { CashOverview } from '@/components/app/cash-overview'
 import { AddCategoryCard } from './add-category-card'
 import { VermogenAssetCard } from './vermogen-asset-card'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
+import { CategoryHistoryChart } from './category-history-chart'
 import { ModuleTipStrip } from './module-tip-strip'
 import { CoreKengetallen } from './core-kengetallen'
 import { AssetDetailFlow } from './asset-detail-flow'
@@ -218,6 +220,13 @@ interface AssetCategoryPageProps {
    * map — de overlay valt dan terug op een rechte scheidingslijn.
    */
   initialAssetSparklines?: Record<string, number[]>
+  /**
+   * 12-maands cumulatieve historie voor `<CategoryHistoryChart>`. Server-side
+   * geladen voor niet-cash categorieën; cash heeft eigen overzicht-secties
+   * (`CashOverview` + `CoreKengetallen`) onder de items-tab. `undefined` of
+   * een lege reeks → chart wordt niet gerenderd.
+   */
+  historyData?: CategoryHistoryData
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -269,6 +278,7 @@ export function AssetCategoryPage({
   initialCryptoFees,
   initialInvestmentHoldings,
   initialAssetSparklines,
+  historyData,
 }: AssetCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -486,6 +496,16 @@ export function AssetCategoryPage({
                 onItemClick={openAssetDetail}
                 onAddClick={() => setQuickAddOpen(true)}
               />
+
+              {type !== 'cash' && historyData && (
+                <section className="mt-8">
+                  <CategoryHistoryChart
+                    variant="asset"
+                    subtype={type}
+                    initialData={historyData}
+                  />
+                </section>
+              )}
 
               {type === 'cash' && (
                 <div className="mt-8 -mx-4 sm:-mx-6">

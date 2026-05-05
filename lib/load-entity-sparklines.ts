@@ -3,12 +3,12 @@
  * kaarten. Spiegelt de aggregatie-logica van `categorySparklines` in
  * `core-data-loader.ts`, maar groepeert op `entity_id` i.p.v. categorie.
  *
- * Output: `Record<entity_id, number[6]>` — 6 maandwaarden (oudste →
- * nieuwste), gewogen met `net_worth_inclusion_pct`. Bij ontbrekende
- * maanden vullen we forward (laatst bekende waarde). Categorieën zonder
- * variatie of zonder snapshots vallen in de UI terug op een rechte
- * scheidingslijn — hier in de loader retourneren we ze met de gevonden
- * waarden zodat de UI kan kiezen.
+ * Output: `Record<entity_id, number[]>` — tot 12 maandwaarden (oudste →
+ * nieuwste), gewogen met `net_worth_inclusion_pct`. Bij entiteiten waarvan
+ * de eerste meting recenter is dan 12 maanden geleden, knippen we het
+ * venster af op die eerste meting — geen valse historie via leading
+ * forward-fill. Tussenliggende ontbrekende maanden vullen we forward met
+ * de laatst bekende waarde. Entities zonder enige snapshot vallen uit.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -28,8 +28,8 @@ export async function loadEntitySparklines(
 ): Promise<Record<string, number[]>> {
   if (entityIds.length === 0) return {}
   const now = new Date()
-  const sixMonthsAgo = new Date(
-    Date.UTC(now.getFullYear(), now.getMonth() - 5, 1),
+  const twelveMonthsAgo = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth() - 11, 1),
   )
     .toISOString()
     .split('T')[0]
@@ -40,13 +40,13 @@ export async function loadEntitySparklines(
       .select('snapshot_date, entity_id, balance, net_worth_inclusion_pct')
       .eq('entity_type', entityType)
       .in('entity_id', entityIds)
-      .gte('snapshot_date', sixMonthsAgo)
+      .gte('snapshot_date', twelveMonthsAgo)
       .order('snapshot_date', { ascending: true })
     const rows = (result.data ?? []) as SnapRow[]
     if (rows.length === 0) return {}
 
     const monthKeys: string[] = []
-    for (let i = 5; i >= 0; i--) {
+    for (let i = 11; i >= 0; i--) {
       const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() - i, 1))
       monthKeys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
     }
@@ -78,11 +78,12 @@ export async function loadEntitySparklines(
     const out: Record<string, number[]> = {}
     for (const id of entityIds) {
       const series = monthKeys.map((m) => valByEntityMonth.get(`${id}|${m}`) ?? null)
-      const firstReal = series.find((v) => v != null) ?? null
-      if (firstReal == null) continue
-      let last = firstReal
+      const firstRealIdx = series.findIndex((v) => v != null)
+      if (firstRealIdx === -1) continue
+      const trimmed = series.slice(firstRealIdx)
+      let last = trimmed[0] as number
       const filled: number[] = []
-      for (const v of series) {
+      for (const v of trimmed) {
         if (v != null) last = v
         filled.push(last)
       }

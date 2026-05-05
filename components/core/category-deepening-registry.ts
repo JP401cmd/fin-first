@@ -147,13 +147,14 @@ export const CATEGORY_DEEPENINGS: DeepeningEntry[] = [
     moduleId: 'aandelenregistratie',
     tipStripCopy:
       'Activeer aandelen- en cryptoregistratie voor het volledige coin-overzicht per exchange of wallet.',
-    // Crypto-asset wordt door de Holdings-app gevolgd zodra hij gekoppeld is
-    // aan een exchange-connectie of wallet, óf zodra er handmatig holdings
-    // onder hangen. Op asset-niveau hebben we (nog) geen vlag — de telling
-    // op de items-tab wordt gevoed door de typed-loader, niet door deze
-    // helper. Hier `undefined` laten = "geen item-toggle van toepassing".
-    isItemTracked: undefined,
-    toggleEndpoint: undefined,
+    // Symmetrisch met de investment-entry: crypto-assets dragen dezelfde
+    // `has_holdings_tracking`-vlag (zie `assets-client.tsx` waar de vlag voor
+    // crypto netjes wordt weggeschreven). Daarmee telt `countTrackedItems`
+    // de Kern-landing-strip correct als 1/N zodra een crypto-asset is
+    // geactiveerd voor Holdings.
+    isItemTracked: (item) =>
+      'has_holdings_tracking' in item && item.has_holdings_tracking === true,
+    toggleEndpoint: '/api/assets/toggle-holdings',
   },
   // ── Aflosstrategie — zes debt-types ─────────────────────────
   // Eén DebtType per entry. De `isItemTracked`/`toggleEndpoint`/`moduleId`/

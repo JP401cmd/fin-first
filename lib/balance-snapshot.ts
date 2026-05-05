@@ -81,3 +81,49 @@ export async function captureBalanceSnapshots(
 
   return { count: rows.length }
 }
+
+/**
+ * Upsert a single balance snapshot row for one entity (asset or debt) on a
+ * specific date. Mirrors valuations writes into balance_snapshots so that the
+ * sparkline overlay on category cards (`<CardTintOverlay>`) reflects every
+ * individual herwaardering, not just bulk-revalue and the daily snapshot cron.
+ *
+ * Use the valuation_date (not today) so historical corrections land on the
+ * correct month in the sparkline.
+ *
+ * Faalt stil — net als de bulk variant — om het hoofdpad nooit te breken.
+ */
+export async function upsertSingleBalanceSnapshot(
+  supabase: SupabaseClient,
+  userId: string,
+  date: string,
+  entity: {
+    type: 'asset' | 'debt'
+    id: string
+    name: string
+    subtype: string
+    balance: number
+    netWorthInclusionPct?: number | null
+  },
+): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase
+    .from('balance_snapshots')
+    .upsert(
+      {
+        user_id: userId,
+        snapshot_date: date,
+        entity_type: entity.type,
+        entity_id: entity.id,
+        entity_name: entity.name,
+        entity_subtype: entity.subtype,
+        balance: Number(entity.balance),
+        net_worth_inclusion_pct: entity.netWorthInclusionPct ?? 100,
+      },
+      { onConflict: 'user_id,snapshot_date,entity_type,entity_id' },
+    )
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
+}

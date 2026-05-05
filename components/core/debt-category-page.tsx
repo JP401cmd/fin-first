@@ -21,6 +21,8 @@ import type { KpiPair } from '@/lib/asset-kpi'
 import type { AssetConnectionSummary } from '@/lib/connections-data'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
+import { CategoryHistoryChart } from './category-history-chart'
+import type { CategoryHistoryData } from '@/lib/load-category-history'
 import { DebtDetailSheet } from './debt-detail-sheet'
 import {
   findDeepenings,
@@ -89,6 +91,12 @@ interface DebtCategoryPageProps {
    * scheidingslijn op het midden.
    */
   initialDebtSparklines?: Record<string, number[]>
+  /**
+   * Cumulatieve 12-maands historie voor de `<CategoryHistoryChart>` boven
+   * de tabs. Optioneel: bij load-failure of <2 maanden data toont de chart
+   * zijn eigen empty-state — pagina blijft functioneel.
+   */
+  initialHistoryData?: CategoryHistoryData
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -116,6 +124,7 @@ export function DebtCategoryPage({
   initialKpiRefs,
   initialConnectionsByDebtId,
   initialDebtSparklines,
+  initialHistoryData,
 }: DebtCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -260,15 +269,27 @@ export function DebtCategoryPage({
           className="py-6"
         >
           {isItemsTab ? (
-            <DebtItemsTab
-              type={type}
-              debts={debts}
-              kpiByDebtId={kpiByDebtId}
-              connectionsByDebtId={initialConnectionsByDebtId}
-              sparklinesByDebtId={initialDebtSparklines}
-              onItemClick={openDebtDetail}
-              onAddClick={() => setQuickAddOpen(true)}
-            />
+            <>
+              <DebtItemsTab
+                type={type}
+                debts={debts}
+                kpiByDebtId={kpiByDebtId}
+                connectionsByDebtId={initialConnectionsByDebtId}
+                sparklinesByDebtId={initialDebtSparklines}
+                onItemClick={openDebtDetail}
+                onAddClick={() => setQuickAddOpen(true)}
+              />
+
+              {initialHistoryData && (
+                <section className="mt-8">
+                  <CategoryHistoryChart
+                    variant="debt"
+                    subtype={type}
+                    initialData={initialHistoryData}
+                  />
+                </section>
+              )}
+            </>
           ) : ActiveDeepeningComponent ? (
             // Symmetrisch met `asset-category-page.tsx`: elke verdiepings-
             // tab krijgt zijn eigen `moduleActive` op basis van de

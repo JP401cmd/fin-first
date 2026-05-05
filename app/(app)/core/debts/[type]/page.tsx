@@ -11,6 +11,10 @@ import {
   type AssetConnectionSummary,
 } from '@/lib/connections-data'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
+import {
+  loadCategoryHistory,
+  type CategoryHistoryData,
+} from '@/lib/load-category-history'
 import { DebtCategoryPage } from '@/components/core/debt-category-page'
 
 // ── Type guards ──────────────────────────────────────────────
@@ -77,28 +81,29 @@ export default async function DebtCategoryServerPage({
   // kaarten gewoon geen LTV — geen 500.
   const kpiRefs = await loadKpiContextRefs(supabase).catch(() => null)
 
-  // Batched-load van actieve API-koppelingen per debt — voorlopig leeg in
-  // productie (geen actieve hypotheek/bank-connectoren), maar het pad is in
-  // stelling zodat het symbool zichtbaar wordt zodra de eerste debt-API komt.
-  // Falen we hier, dan vervalt het symbool stilzwijgend; de pagina blijft
-  // functioneel.
-  let connectionsByDebtId: Record<string, AssetConnectionSummary> | undefined
-  if (debts.length > 0) {
-    try {
-      connectionsByDebtId = await loadConnectionsByDebtIds(
-        supabase,
-        debts.map((d) => d.id),
-      )
-    } catch {
-      connectionsByDebtId = undefined
-    }
-  }
+  // Batched parallel-load: connections + per-debt sparklines + cumulatieve
+  // category-historie. Connections en sparklines hangen aan de debt-IDs;
+  // category-history queryt op subtype en draait dus ook bij een lege
+  // categorie (toont eventuele inactieve items met historie). Alle drie
+  // falen onafhankelijk en non-fataal.
+  const connectionsPromise: Promise<Record<string, AssetConnectionSummary> | undefined> =
+    debts.length > 0
+      ? loadConnectionsByDebtIds(supabase, debts.map((d) => d.id)).catch(() => undefined)
+      : Promise.resolve(undefined)
+  const sparklinesPromise: Promise<Record<string, number[]>> =
+    debts.length > 0
+      ? loadEntitySparklines(supabase, 'debt', debts.map((d) => d.id)).catch(() => ({}))
+      : Promise.resolve({})
+  const historyPromise: Promise<CategoryHistoryData | null> = loadCategoryHistory(
+    supabase,
+    { entityType: 'debt', subtype: type },
+  ).catch(() => null)
 
-  // Per-debt sparklines voor de items-grid. Faalt non-fataal: lege map →
-  // kaarten tonen alleen de tweelagentint zonder breuklijn.
-  const debtSparklines = debts.length > 0
-    ? await loadEntitySparklines(supabase, 'debt', debts.map((d) => d.id))
-    : {}
+  const [connectionsByDebtId, debtSparklines, historyData] = await Promise.all([
+    connectionsPromise,
+    sparklinesPromise,
+    historyPromise,
+  ])
 
   return (
     <DebtCategoryPage
@@ -107,6 +112,7 @@ export default async function DebtCategoryServerPage({
       initialKpiRefs={kpiRefs ?? undefined}
       initialConnectionsByDebtId={connectionsByDebtId}
       initialDebtSparklines={debtSparklines}
+      initialHistoryData={historyData ?? undefined}
     />
   )
 }

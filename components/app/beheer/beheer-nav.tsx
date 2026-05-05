@@ -28,6 +28,7 @@ const tabs = [
   { label: 'Vragenlijsten', href: '/beheer/vragenlijsten', activeClass: 'border-wil-500 text-wil-700' },
   { label: 'Module Guide', href: '/beheer/module-guide' },
   { label: 'Blueprints', href: '/beheer/blueprints', activeClass: 'border-[var(--color-horizon-500)] text-[var(--color-horizon-700)]' },
+  { label: 'Sidebar-prototype', href: '/beheer/sidebar-prototype', activeClass: 'border-[var(--color-horizon-500)] text-[var(--color-horizon-700)]' },
 ] as const
 
 export function BeheerNav() {
