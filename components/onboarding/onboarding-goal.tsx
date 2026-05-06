@@ -3,107 +3,40 @@
 import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
-import { type IntentId } from '@/lib/module-registry'
+import {
+  GOAL_CATALOG_ENTRIES,
+  GOAL_DEFAULT_SPEECH,
+  GOAL_SPEECH_TEXT,
+} from '@/lib/goals/catalog'
+import type { GoalSlug } from '@/lib/goals/types'
 
-// ── Types ────────────────────────────────────────────────────
+// ── Props ──────────────────────────────────────────────────────
 
-export interface OnboardingIntentProps {
-  selectedIntent: IntentId | null
-  onSelect: (intent: IntentId) => void
+export interface OnboardingGoalProps {
+  selectedGoal: GoalSlug | null
+  onSelect: (goal: GoalSlug) => void
   onNext: () => void
   onBack: () => void
+  /** Klikbare opt-out voor de news-only flow (zet activeModules=['nieuws']) */
+  onNewsOnly: () => void
 }
 
-// ── Intent definitions ──────────────────────────────────────
+// ── Speech-bubble helper ───────────────────────────────────────
 
-interface IntentDef {
-  id: IntentId
-  name: string
-  tagline: string
-  description: string
-  emoji: string
-  /** Whether this is the primary/prominent card */
-  primary?: boolean
+function getSpeechText(goal: GoalSlug | null): string {
+  return goal ? GOAL_SPEECH_TEXT[goal] : GOAL_DEFAULT_SPEECH
 }
 
-const INTENTS: IntentDef[] = [
-  {
-    id: 'coaching',
-    name: 'Coaching',
-    tagline: 'Slimmer omgaan met geld',
-    description: 'Ik wil slimmer omgaan met mijn geld \u2014 met persoonlijke tips',
-    emoji: '\uD83E\uDDE0',
-    primary: true,
-  },
-  {
-    id: 'grip_uitgaven',
-    name: 'Grip op uitgaven',
-    tagline: 'Budgetteren en besparen',
-    description: 'Ik wil weten waar mijn geld naartoe gaat en bewuster uitgeven',
-    emoji: '\uD83C\uDFAF',
-  },
-  {
-    id: 'overzicht_geld',
-    name: 'Overzicht over mijn geld',
-    tagline: 'Vermogen bijhouden',
-    description: 'Ik wil al mijn bezittingen en schulden op \u00e9\u00e9n plek zien',
-    emoji: '\uD83D\uDCCA',
-  },
-  {
-    id: 'toekomst',
-    name: 'Toekomst plannen',
-    tagline: 'Pensioen en FIRE',
-    description: 'Ik wil weten wanneer ik financieel vrij ben en scenario\u2019s doorrekenen',
-    emoji: '\uD83D\uDD2D',
-  },
-  {
-    id: 'nieuws',
-    name: 'Nieuws',
-    tagline: 'Financieel nieuws',
-    description: 'Ik wil op de hoogte blijven van financieel nieuws en marktinzichten',
-    emoji: '\uD83D\uDCF0',
-  },
-  {
-    id: 'alles',
-    name: 'Alles',
-    tagline: 'Maximale inzichten',
-    description: 'Ik wil alles \u2014 budgetteren, vermogen, toekomst en meer',
-    emoji: '\uD83D\uDD25',
-  },
-]
+// ── Main Component ─────────────────────────────────────────────
 
-// ── Speech bubble helper ─────────────────────────────────────
-
-function getSpeechText(intent: IntentId | null): string {
-  if (!intent) {
-    return 'Wat wil je bereiken met TriFinity? Ik begeleid je naar de juiste plek in de app.'
-  }
-  const map: Record<IntentId, string> = {
-    coaching:
-      'Goede keuze! Ik breng je naar de plek waar je direct persoonlijke tips krijgt.',
-    grip_uitgaven:
-      'Slim! Ik breng je direct naar je budgetten en cashflow.',
-    overzicht_geld:
-      'Overzicht is de basis! Ik breng je naar je vermogensoverzicht.',
-    toekomst:
-      'Toekomstgericht! Ik breng je naar je vrijheidsprojectie.',
-    alles:
-      'Volledig aan de slag! Ik breng je naar het complete overzicht.',
-    nieuws:
-      'Je blijft op de hoogte! Ik breng je naar gepersonaliseerd financieel nieuws.',
-  }
-  return map[intent]
-}
-
-// ── Main Component ───────────────────────────────────────────
-
-export function OnboardingIntent({
-  selectedIntent,
+export function OnboardingGoal({
+  selectedGoal,
   onSelect,
   onNext,
   onBack,
-}: OnboardingIntentProps) {
-  const canProceed = selectedIntent !== null
+  onNewsOnly,
+}: OnboardingGoalProps) {
+  const canProceed = selectedGoal !== null
 
   return (
     <div className="pb-20 sm:pb-0">
@@ -123,14 +56,14 @@ export function OnboardingIntent({
         <StepProgress currentPhase="modules" />
       </div>
 
-      <p className="label-editorial mb-2 text-[var(--ink-4)]">Intentie</p>
+      <p className="label-editorial mb-2 text-[var(--ink-4)]">Jouw doel</p>
 
       {/* Will's speech bubble */}
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0">
           <WillDots size={48} />
         </div>
-        <SpeechBubble>{getSpeechText(selectedIntent)}</SpeechBubble>
+        <SpeechBubble>{getSpeechText(selectedGoal)}</SpeechBubble>
       </div>
 
       {/* Section heading */}
@@ -138,17 +71,17 @@ export function OnboardingIntent({
         Wat wil je bereiken?
       </h2>
 
-      {/* Intent cards grid — coaching spans full width, others in 2-col grid */}
+      {/* Goal cards grid — primary goal spans full width, others in 2-col grid */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {INTENTS.map((intent) => {
-          const isSelected = selectedIntent === intent.id
-          const isPrimary = intent.primary
+        {GOAL_CATALOG_ENTRIES.map((goal) => {
+          const isSelected = selectedGoal === goal.slug
+          const isPrimary = goal.primary
 
           return (
             <button
-              key={intent.id}
+              key={goal.slug}
               type="button"
-              onClick={() => onSelect(intent.id)}
+              onClick={() => onSelect(goal.slug)}
               className={`group w-full cursor-pointer rounded-xl border-2 text-left transition-all duration-150 active:scale-[0.99] outline-none focus-visible:ring-2 focus-visible:ring-wil-400 focus-visible:ring-offset-2 ${
                 isPrimary
                   ? 'sm:col-span-2 lg:col-span-3 p-5'
@@ -179,7 +112,7 @@ export function OnboardingIntent({
                   }`}
                   aria-hidden="true"
                 >
-                  {intent.emoji}
+                  {goal.emoji}
                 </div>
 
                 {/* Text content */}
@@ -190,7 +123,7 @@ export function OnboardingIntent({
                         isPrimary ? 'text-base' : 'text-sm'
                       } ${isSelected ? 'text-wil-900' : 'text-[var(--ink)]'}`}
                     >
-                      {intent.name}
+                      {goal.label}
                     </h3>
                     {isPrimary && (
                       <span className="inline-flex items-center rounded-full bg-wil-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-wil-700">
@@ -203,12 +136,12 @@ export function OnboardingIntent({
                       isPrimary ? 'text-sm' : 'text-xs'
                     } ${isSelected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`}
                   >
-                    {intent.tagline}
+                    {goal.tagline}
                   </p>
                   <p className={`mt-1 text-[var(--ink-4)] leading-snug ${
                     isPrimary ? 'text-sm' : 'text-xs'
                   }`}>
-                    {intent.description}
+                    {goal.description}
                   </p>
                 </div>
 
@@ -230,6 +163,17 @@ export function OnboardingIntent({
             </button>
           )
         })}
+      </div>
+
+      {/* Subtle news-only opt-out */}
+      <div className="mt-5 flex justify-center">
+        <button
+          type="button"
+          onClick={onNewsOnly}
+          className="text-xs text-[var(--ink-4)] underline-offset-2 transition-colors hover:text-[var(--ink-2)] hover:underline"
+        >
+          Ik wil alleen financieel nieuws lezen
+        </button>
       </div>
 
       {/* Sticky navigation */}

@@ -6,22 +6,25 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { WillDots } from '@/components/app/will-dots'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
-import type { BankAccountEntry } from '@/components/onboarding/mini-bank-form'
-import type { AssetEntry } from '@/components/onboarding/mini-asset-form'
-import type { DebtEntry } from '@/components/onboarding/mini-debt-form'
-import type { PreferencesData } from '@/components/onboarding/onboarding-preferences'
 import type { HorizonData } from '@/components/onboarding/onboarding-horizon'
+import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 
 import { OnboardingIntro } from '@/components/onboarding/onboarding-intro'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingBudgets } from '@/components/onboarding/onboarding-budgets'
-import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
-import { INITIAL_PREFERENCES } from '@/components/onboarding/onboarding-preferences'
-import { OnboardingIntent } from '@/components/onboarding/onboarding-intent'
+import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
+import { OnboardingGoal } from '@/components/onboarding/onboarding-goal'
 import { OnboardingHorizon, INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
-import { type PersonaId, type IntentId, type ModuleId, INTENT_MODULE_PRESETS, getHomePath, getFirstWinPath } from '@/lib/module-registry'
+import { type PersonaId, type IntentId, type ModuleId, getHomePath } from '@/lib/module-registry'
+import type { GoalSlug } from '@/lib/goals/types'
+import {
+  GOAL_MODULE_PRESETS,
+  INTENT_TO_GOAL_FALLBACK,
+  getGoalFirstWinPath,
+  isGoalSlug,
+} from '@/lib/goals/catalog'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -40,7 +43,7 @@ const SAVING_MESSAGES = [
 type Step =
   | 'intro'
   | 'identity'
-  | 'intent'
+  | 'goal'
   | 'bezittingen'
   | 'budgets'
   | 'horizon'
@@ -58,7 +61,7 @@ type Direction = 'forward' | 'back'
 const CANONICAL_STEP_ORDER: readonly Step[] = [
   'intro',
   'identity',
-  'intent',
+  'goal',
   'bezittingen',
   'budgets',
   'horizon',
@@ -94,10 +97,11 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
   // Map legacy step names to their current equivalents so old localStorage
   // drafts resolve correctly even when this function is called directly.
   const LEGACY_STEP_MAP: Record<string, string> = {
-    modules: 'intent',
-    persona: 'intent',
+    modules: 'goal',
+    persona: 'goal',
+    intent: 'goal', // Legacy: intent-stap is hernoemd naar goal (mei 2026)
     extras: 'bezittingen',
-    preferences: 'horizon',
+    preferences: 'horizon', // Legacy: preferences-stap is verwijderd; horizon is nu de laatste content-stap
   }
   // eslint-disable-next-line no-param-reassign
   if (LEGACY_STEP_MAP[lastStep]) lastStep = LEGACY_STEP_MAP[lastStep]
@@ -155,18 +159,24 @@ export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
 
 /**
  * Compute the dynamic step order based on which modules the user selected.
- * Steps are only included when the corresponding module is active.
- * Special case: if only 'nieuws' is selected, show a single nieuws_only step.
+ *
+ * - `bezittingen` toont *altijd* (behalve in news-only-flow): registreren van
+ *   bezittingen en schulden is fundament-werk dat losstaat van module-keuze.
+ *   Een gebruiker activeert in deze stap óók optioneel `budgetteren` (via de
+ *   cash-asset-prompt) — de step-order reageert daarna op de nieuwe
+ *   activeModules en `budgets` schuift erachter.
+ * - `budgets` / `horizon` blijven module-gated.
+ * - News-only: enkel de vrije-tekst-stap.
  */
 function computeStepOrder(selectedModules: ModuleId[]): Step[] {
-  const steps: Step[] = ['intro', 'identity', 'intent']
+  const steps: Step[] = ['intro', 'identity', 'goal']
   const has = (m: ModuleId) => selectedModules.includes(m)
   const isNewsOnly = selectedModules.length === 1 && has('nieuws')
 
   if (isNewsOnly) {
     steps.push('nieuws_only')
   } else {
-    if (has('vermogensregistratie') || has('inzicht_acties')) steps.push('bezittingen')
+    steps.push('bezittingen')
     if (has('budgetteren')) steps.push('budgets')
     if (has('toekomstplannen')) steps.push('horizon')
   }
@@ -181,7 +191,7 @@ function computeStepOrder(selectedModules: ModuleId[]): Step[] {
  */
 function getSubStep(step: Step, stepOrder: Step[]): { current: number; total: number } | undefined {
   const installenSteps = stepOrder.filter(
-    (s) => !['intro', 'identity', 'intent', 'saving', 'success'].includes(s)
+    (s) => !['intro', 'identity', 'goal', 'saving', 'success'].includes(s)
   )
   const idx = installenSteps.indexOf(step)
   if (idx === -1) return undefined
@@ -192,23 +202,25 @@ interface State {
   step: Step
   direction: Direction
   identity: IdentityData
-  intent: IntentId | null
+  /** Sinds mei 2026: outcome-georiënteerde keuze die de oude `intent` vervangt. */
+  goal: GoalSlug | null
   activeModules: ModuleId[]
   horizon: HorizonData
   newsDescription: string
   extraction: ExtractionResult | null
   budgetAmounts: Record<string, number>
-  bankAccounts: BankAccountEntry[]
-  assets: AssetEntry[]
-  debts: DebtEntry[]
-  preferences: PreferencesData
+  quickAssets: AssetQuickInput[]
+  quickDebts: DebtQuickInput[]
 }
 
 /** Data portion of state that gets persisted to localStorage (excludes step/direction) */
 interface PersistedData {
   identity: IdentityData
-  intent: IntentId | null
-  /** @deprecated Use intent — kept for migration from old localStorage drafts */
+  /** Selected goal slug — primary keuze sinds mei 2026 */
+  goal: GoalSlug | null
+  /** @deprecated Use goal — kept for migration from old localStorage drafts */
+  intent?: IntentId | null
+  /** @deprecated Use goal — kept for migration from old localStorage drafts */
   persona?: PersonaId | null
   activeModules: ModuleId[]
   /** @deprecated Use activeModules — kept for migration from old localStorage drafts */
@@ -217,10 +229,8 @@ interface PersistedData {
   newsDescription?: string
   extraction?: ExtractionResult | null
   budgetAmounts: Record<string, number>
-  bankAccounts: BankAccountEntry[]
-  assets: AssetEntry[]
-  debts: DebtEntry[]
-  preferences: PreferencesData
+  quickAssets: AssetQuickInput[]
+  quickDebts: DebtQuickInput[]
   /** Last step the user was on (to restore position) */
   lastStep?: Step
 }
@@ -228,22 +238,28 @@ interface PersistedData {
 type Action =
   | { type: 'SET_STEP'; step: Step }
   | { type: 'SET_IDENTITY'; data: IdentityData }
-  | { type: 'SET_INTENT'; intent: IntentId }
+  | { type: 'SET_GOAL'; goal: GoalSlug }
+  /** Opt-out vanaf de goal-stap: zet activeModules op ['nieuws'] en clear goal. */
+  | { type: 'SET_NEWS_ONLY' }
   | { type: 'TOGGLE_MODULE'; moduleId: ModuleId; enabled: boolean }
+  /**
+   * Activeer een module zónder goal te resetten. Gebruikt door contextuele
+   * opt-ins zoals de budgetteren-prompt op de bezittingen-stap: de gebruiker
+   * blijft binnen z'n gekozen doel, voegt alleen één module toe.
+   */
+  | { type: 'ENABLE_MODULE'; moduleId: ModuleId }
   | { type: 'SET_HORIZON'; data: HorizonData }
   | { type: 'SET_NEWS_DESCRIPTION'; value: string }
   | { type: 'SET_EXTRACTION'; data: ExtractionResult | null }
   | { type: 'SET_BUDGET_AMOUNTS'; amounts: Record<string, number> }
-  | { type: 'SET_BANK_ACCOUNTS'; items: BankAccountEntry[] }
-  | { type: 'SET_ASSETS'; items: AssetEntry[] }
-  | { type: 'SET_DEBTS'; items: DebtEntry[] }
-  | { type: 'SET_PREFERENCES'; data: PreferencesData }
+  | { type: 'SET_QUICK_ASSETS'; items: AssetQuickInput[] }
+  | { type: 'SET_QUICK_DEBTS'; items: DebtQuickInput[] }
   | { type: 'RESTORE_STATE'; data: PersistedData }
 
 export const _initialState: State = {
   step: 'intro',
   direction: 'forward',
-  intent: null,
+  goal: null,
   activeModules: [],
   identity: {
     full_name: '',
@@ -257,10 +273,28 @@ export const _initialState: State = {
   newsDescription: '',
   extraction: null,
   budgetAmounts: {},
-  bankAccounts: [],
-  assets: [],
-  debts: [],
-  preferences: INITIAL_PREFERENCES,
+  quickAssets: [],
+  quickDebts: [],
+}
+
+/** Map a legacy persisted intent (or persona) onto the new GoalSlug. */
+function migrateIntentToGoal(
+  intent: IntentId | null | undefined,
+  persona: PersonaId | null | undefined,
+): GoalSlug | null {
+  if (intent && intent in INTENT_TO_GOAL_FALLBACK) {
+    return INTENT_TO_GOAL_FALLBACK[intent]
+  }
+  if (persona) {
+    const personaToGoal: Record<PersonaId, GoalSlug | null> = {
+      budgetteerder: 'grip-uitgaven',
+      vermogensverdeler: 'vermogen-overzicht',
+      pensioenplanner: 'eerder-stoppen',
+      fire_fighter: 'eerder-stoppen',
+    }
+    return personaToGoal[persona] ?? null
+  }
+  return null
 }
 
 export function _reducer(state: State, action: Action): State {
@@ -272,16 +306,23 @@ export function _reducer(state: State, action: Action): State {
       const direction: Direction = newIdx >= oldIdx ? 'forward' : 'back'
       return { ...state, step: action.step, direction }
     }
-    case 'SET_INTENT': {
-      const modules = [...INTENT_MODULE_PRESETS[action.intent]]
-      return { ...state, intent: action.intent, activeModules: modules }
+    case 'SET_GOAL': {
+      const modules = [...GOAL_MODULE_PRESETS[action.goal]]
+      return { ...state, goal: action.goal, activeModules: modules }
+    }
+    case 'SET_NEWS_ONLY': {
+      return { ...state, goal: null, activeModules: ['nieuws'] }
     }
     case 'TOGGLE_MODULE': {
-      // Always allow toggling — clear intent to null since it no longer matches a preset
+      // Always allow toggling — clear goal to null since it no longer matches a preset
       const updated = action.enabled
         ? [...state.activeModules, action.moduleId]
         : state.activeModules.filter((m) => m !== action.moduleId)
-      return { ...state, intent: null, activeModules: updated }
+      return { ...state, goal: null, activeModules: updated }
+    }
+    case 'ENABLE_MODULE': {
+      if (state.activeModules.includes(action.moduleId)) return state
+      return { ...state, activeModules: [...state.activeModules, action.moduleId] }
     }
     case 'SET_IDENTITY':
       return { ...state, identity: action.data }
@@ -293,14 +334,10 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, extraction: action.data }
     case 'SET_BUDGET_AMOUNTS':
       return { ...state, budgetAmounts: action.amounts }
-    case 'SET_BANK_ACCOUNTS':
-      return { ...state, bankAccounts: action.items }
-    case 'SET_ASSETS':
-      return { ...state, assets: action.items }
-    case 'SET_DEBTS':
-      return { ...state, debts: action.items }
-    case 'SET_PREFERENCES':
-      return { ...state, preferences: action.data }
+    case 'SET_QUICK_ASSETS':
+      return { ...state, quickAssets: action.items }
+    case 'SET_QUICK_DEBTS':
+      return { ...state, quickDebts: action.items }
     case 'RESTORE_STATE': {
       const restoredModules = action.data.activeModules ?? action.data.selectedModules ?? []
       // Recompute the active step order for the restored module selection so
@@ -319,21 +356,21 @@ export function _reducer(state: State, action: Action): State {
           `[onboarding] lastStep ${action.data.lastStep ?? '(none)'} not in active order, falling back to ${restoredStep}`
         )
       }
+      const restoredGoal: GoalSlug | null =
+        action.data.goal ?? migrateIntentToGoal(action.data.intent, action.data.persona)
       return {
         ...state,
         step: restoredStep,
         direction: 'forward',
         identity: action.data.identity,
-        intent: action.data.intent ?? (action.data.persona as IntentId | null) ?? null,
+        goal: restoredGoal,
         activeModules: restoredModules,
         horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
         newsDescription: action.data.newsDescription ?? '',
         extraction: action.data.extraction ?? null,
         budgetAmounts: action.data.budgetAmounts,
-        bankAccounts: action.data.bankAccounts,
-        assets: action.data.assets,
-        debts: action.data.debts,
-        preferences: action.data.preferences,
+        quickAssets: action.data.quickAssets,
+        quickDebts: action.data.quickDebts,
       }
     }
     default:
@@ -360,16 +397,14 @@ function saveToLocalStorage(state: State) {
   try {
     const data: PersistedData = {
       identity: state.identity,
-      intent: state.intent,
+      goal: state.goal,
       activeModules: state.activeModules,
       horizon: state.horizon,
       newsDescription: state.newsDescription,
       extraction: state.extraction,
       budgetAmounts: state.budgetAmounts,
-      bankAccounts: state.bankAccounts,
-      assets: state.assets,
-      debts: state.debts,
-      preferences: state.preferences,
+      quickAssets: state.quickAssets,
+      quickDebts: state.quickDebts,
       lastStep: state.step,
     }
     localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data))
@@ -416,9 +451,15 @@ function loadFromLocalStorage(): PersistedData | null {
       identity = parsed.identity as IdentityData
     }
 
+    // Migratie: een draft van vóór de QuickAddWizard-flow heeft `bankAccounts`,
+    // `assets`, `debts` met de oude shape. Die items zijn niet 1:1 te mappen
+    // op de nieuwe 3-velden-input zonder data te verzinnen — dus we droppen
+    // ze. De gebruiker voegt opnieuw toe via de wizard. Acceptabel voor
+    // onboarding (transient draft, geen permanente data).
     const data: PersistedData = {
       identity,
-      intent: parsed.intent ?? parsed.persona ?? null,
+      goal: isGoalSlug(parsed.goal) ? parsed.goal : null,
+      intent: parsed.intent ?? null,
       persona: parsed.persona ?? null,
       activeModules: Array.isArray(parsed.activeModules) ? parsed.activeModules : (Array.isArray(parsed.selectedModules) ? parsed.selectedModules : []),
       selectedModules: Array.isArray(parsed.selectedModules) ? parsed.selectedModules : [],
@@ -426,16 +467,15 @@ function loadFromLocalStorage(): PersistedData | null {
       newsDescription: parsed.newsDescription,
       extraction: parsed.extraction ?? null,
       budgetAmounts: parsed.budgetAmounts && typeof parsed.budgetAmounts === 'object' ? parsed.budgetAmounts : {},
-      bankAccounts: Array.isArray(parsed.bankAccounts) ? parsed.bankAccounts : [],
-      assets: Array.isArray(parsed.assets) ? parsed.assets : [],
-      debts: Array.isArray(parsed.debts) ? parsed.debts : [],
-      preferences: parsed.preferences ?? INITIAL_PREFERENCES,
+      quickAssets: Array.isArray(parsed.quickAssets) ? parsed.quickAssets : [],
+      quickDebts: Array.isArray(parsed.quickDebts) ? parsed.quickDebts : [],
       lastStep: parsed.lastStep,
     }
 
     // Map old step names to new ones
-    if (data.lastStep === ('persona' as string)) data.lastStep = 'intent'
-    if (data.lastStep === ('modules' as string)) data.lastStep = 'intent'
+    if (data.lastStep === ('persona' as string)) data.lastStep = 'goal'
+    if (data.lastStep === ('modules' as string)) data.lastStep = 'goal'
+    if (data.lastStep === ('intent' as string)) data.lastStep = 'goal'
     if (data.lastStep === ('extras' as string)) data.lastStep = 'bezittingen'
 
     return data
@@ -565,7 +605,7 @@ export default function OnboardingPage() {
     dispatch({ type: 'SET_STEP', step: 'saving' })
 
     try {
-      const { identity, budgetAmounts, bankAccounts, assets, debts } = state
+      const { identity, budgetAmounts, quickAssets, quickDebts } = state
 
       // Stable idempotency key: reuse across retries so the server can
       // detect duplicate submissions.  Only generate once per session.
@@ -584,7 +624,6 @@ export default function OnboardingPage() {
           estimated_monthly_expenses: identity.estimated_monthly_expenses ? Number(identity.estimated_monthly_expenses) : undefined,
         },
         budgetAmounts,
-        widgetPrefs: { widgets: [] },
         idempotencyKey,
         activeModules: state.activeModules.length > 0 ? state.activeModules : undefined,
       }
@@ -602,9 +641,9 @@ export default function OnboardingPage() {
         }
       }
 
-      // Add chosen intent for analytics / personalization
-      if (state.intent) {
-        body.intent = state.intent
+      // Add chosen goal — primary signal voor de doel-stappen-flow
+      if (state.goal) {
+        body.selectedGoalSlug = state.goal
       }
 
       // Add news description if present
@@ -621,60 +660,14 @@ export default function OnboardingPage() {
       const budgetteringMode = state.activeModules.includes('budgetteren') ? 'manual' : 'none'
       body.budgetteringMode = budgetteringMode
 
-      // Only send non-empty optional arrays
-      const validBanks = bankAccounts.filter((a) => a.name && a.bank_name && a.balance)
-      if (validBanks.length > 0) {
-        body.bankAccounts = validBanks.map((a) => ({
-          ...a,
-          balance: Number(a.balance),
-          has_budget_tracking: a.has_budget_tracking,
-        }))
+      // QuickAddInput-shape: 3 velden per item. De server roept
+      // buildAssetDraft / buildDebtDraft aan om volledige rijen te bouwen —
+      // dezelfde logica als de Server Action op /core.
+      if (quickAssets.length > 0) {
+        body.quickAssets = quickAssets
       }
-
-      const validAssets = assets.filter((a) => a.name && a.current_value)
-      if (validAssets.length > 0) {
-        body.assets = validAssets.map((a) => ({
-          name: a.name,
-          asset_type: a.asset_type,
-          current_value: Number(a.current_value),
-          purchase_value: Number(a.purchase_value) || Number(a.current_value),
-          expected_return: Number(a.expected_return) || 0,
-          monthly_contribution: Number(a.monthly_contribution) || 0,
-          institution: a.institution || undefined,
-          subtype: a.subtype || undefined,
-          risk_profile: a.risk_profile || undefined,
-          tax_benefit: a.tax_benefit || undefined,
-          is_liquid: a.is_liquid,
-          lock_end_date: a.lock_end_date || undefined,
-          ticker_symbol: a.ticker_symbol || undefined,
-          rental_income: a.rental_income ? Number(a.rental_income) : undefined,
-          woz_value: a.woz_value ? Number(a.woz_value) : undefined,
-          retirement_provider_type: a.retirement_provider_type || undefined,
-          depreciation_rate: a.depreciation_rate ? Number(a.depreciation_rate) : undefined,
-          address_postcode: a.address_postcode || undefined,
-          address_house_number: a.address_house_number || undefined,
-        }))
-      }
-
-      const validDebts = debts.filter((d) => d.name && d.current_balance)
-      if (validDebts.length > 0) {
-        body.debts = validDebts.map((d) => ({
-          name: d.name,
-          debt_type: d.debt_type,
-          original_amount: Number(d.original_amount) || Number(d.current_balance),
-          current_balance: Number(d.current_balance),
-          interest_rate: Number(d.interest_rate) || 0,
-          minimum_payment: Number(d.minimum_payment) || Number(d.monthly_payment) || 0,
-          monthly_payment: Number(d.monthly_payment) || 0,
-          creditor: d.creditor || undefined,
-          subtype: d.subtype || undefined,
-          repayment_type: d.repayment_type || undefined,
-          is_tax_deductible: d.is_tax_deductible || undefined,
-          fixed_rate_end_date: d.fixed_rate_end_date || undefined,
-          nhg: d.nhg || undefined,
-          credit_limit: d.credit_limit ? Number(d.credit_limit) : undefined,
-          draagkrachtmeting_date: d.draagkrachtmeting_date || undefined,
-        }))
+      if (quickDebts.length > 0) {
+        body.quickDebts = quickDebts
       }
 
       // Timeout after 30 seconds (allows time for batched DB operations including retry cleanup)
@@ -705,8 +698,9 @@ export default function OnboardingPage() {
         throw new Error(`${data.error || 'Opslaan mislukt'}${detail}`)
       }
 
-      // Pre-generate AI recommendations for coaching/alles intents so /will isn't empty
-      if (state.intent === 'coaching' || state.intent === 'alles') {
+      // Pre-generate AI recommendations for goals waar /will het primaire
+      // landingspad is — anders is de pagina leeg bij eerste bezoek.
+      if (state.goal === 'bewust-leven' || state.goal === 'noodfonds') {
         try {
           const res = await fetch('/api/ai/recommendations/initial', { method: 'POST' })
           if (!res.ok) {
@@ -885,26 +879,31 @@ export default function OnboardingPage() {
             />
           )}
 
-          {state.step === 'intent' && (
-            <OnboardingIntent
-              selectedIntent={state.intent}
-              onSelect={(intent) => dispatch({ type: 'SET_INTENT', intent })}
+          {state.step === 'goal' && (
+            <OnboardingGoal
+              selectedGoal={state.goal}
+              onSelect={(goal) => dispatch({ type: 'SET_GOAL', goal })}
               onNext={goToNext}
               onBack={goToBack}
+              onNewsOnly={() => {
+                // Skip naar nieuws-only flow: zet modules op ['nieuws'] +
+                // spring naar 'nieuws_only'-stap.
+                dispatch({ type: 'SET_NEWS_ONLY' })
+                dispatch({ type: 'SET_STEP', step: 'nieuws_only' })
+              }}
             />
           )}
 
           {state.step === 'bezittingen' && (
-            <OnboardingExtras
-              bankAccounts={state.bankAccounts}
-              assets={state.assets}
-              debts={state.debts}
-              onBankChange={(items) => dispatch({ type: 'SET_BANK_ACCOUNTS', items })}
-              onAssetChange={(items) => dispatch({ type: 'SET_ASSETS', items })}
-              onDebtChange={(items) => dispatch({ type: 'SET_DEBTS', items })}
+            <OnboardingBezittingen
+              quickAssets={state.quickAssets}
+              quickDebts={state.quickDebts}
+              onAssetsChange={(items) => dispatch({ type: 'SET_QUICK_ASSETS', items })}
+              onDebtsChange={(items) => dispatch({ type: 'SET_QUICK_DEBTS', items })}
               onNext={goToNext}
               onBack={goToBack}
               activeModules={state.activeModules}
+              onActivateBudgetteren={() => dispatch({ type: 'ENABLE_MODULE', moduleId: 'budgetteren' })}
               subStep={currentSubStep}
             />
           )}
@@ -979,13 +978,13 @@ export default function OnboardingPage() {
             <OnboardingSuccess
               onDashboard={() => {
                 clearLocalStorage()
-                const destination = state.intent
-                  ? getFirstWinPath(state.intent)
+                const destination = state.goal
+                  ? getGoalFirstWinPath(state.goal)
                   : getHomePath(state.activeModules)
                 router.push(destination + '?welcome=1')
               }}
               activeModules={state.activeModules}
-              intent={state.intent ?? undefined}
+              goal={state.goal ?? undefined}
             />
           )}
         </StepTransition>

@@ -218,12 +218,12 @@ export const loadCoreData = cache(async function loadCoreData(
   })()
 
   // ── Categorie-sparklines promise: balance_snapshots over de afgelopen
-  //    12 maanden, geaggregeerd per (entity_type, entity_subtype) per maand
-  //    en gewogen met inclusion_pct. Bij categorieën waarvan de eerste
-  //    snapshot recenter is dan 12 maanden geleden, knippen we het venster
-  //    af op die eerste meting — geen valse historie tonen via leading
-  //    forward-fill. Parallel gestart, pas vlak voor de return geawait.
-  //    Failure → leeg object, kaarten tonen geen sparkline.
+  //    12 maanden, per-entiteit backward+forward gefilled en daarna
+  //    gesommeerd per (entity_type, entity_subtype). Spiegelt de logica
+  //    van `loadCategoryHistory` (de chart op /core/[…]/[type]) zodat het
+  //    silhouette op de Kern-kaart en de chart op de categoriepagina niet
+  //    uit de pas kunnen lopen wanneer een entiteit halverwege het venster
+  //    is toegevoegd. Parallel gestart; failure → leeg object.
   const twelveMonthsAgoForSparkline = new Date(
     Date.UTC(now.getFullYear(), now.getMonth() - 11, 1),
   ).toISOString().split('T')[0]
@@ -231,6 +231,7 @@ export const loadCoreData = cache(async function loadCoreData(
     snapshot_date: string
     entity_type: 'asset' | 'debt'
     entity_subtype: string | null
+    entity_id: string
     balance: number | string
     net_worth_inclusion_pct: number | string | null
   }
@@ -238,7 +239,7 @@ export const loadCoreData = cache(async function loadCoreData(
     try {
       const result = await supabase
         .from('balance_snapshots')
-        .select('snapshot_date, entity_type, entity_subtype, balance, net_worth_inclusion_pct')
+        .select('snapshot_date, entity_type, entity_subtype, entity_id, balance, net_worth_inclusion_pct')
         .gte('snapshot_date', twelveMonthsAgoForSparkline)
         .order('snapshot_date', { ascending: true })
       const rows = (result.data ?? []) as SnapRow[]
@@ -252,69 +253,66 @@ export const loadCoreData = cache(async function loadCoreData(
       }
       const monthIdx = new Map<string, number>(monthKeys.map((k, i) => [k, i]))
 
-      // Per (categoryKey, monthIdx) → som van gewogen balance van de laatste
-      // snapshot in die maand. We willen één waarde per maand per categorie:
-      // aggregeer per (categorie, maand) door per entity de meest recente
-      // snapshot in die maand te kiezen, en daarna over alle entities binnen
-      // de categorie te sommeren.
-      type EntityKey = string // `${type}:${subtype}:${entityId}` — niet beschikbaar zonder entity_id, dus we vereenvoudigen: per snapshot_date sommeren we alle balances binnen categorie + maand. Snapshots worden idealiter eens per maand gemaakt; bij meerdere per maand pakken we de laatste snapshot_date binnen die maand.
-
-      // Eerst: per (categorie, maand) → laatste snapshot_date.
-      const latestDateByCatMonth = new Map<string, string>()
+      // Stap 1 — per (entity_id, maand): pak de meest recente snapshot.
+      // Bewust niet over meerdere snapshots in dezelfde maand sommeren —
+      // anders zou een mid-month correctie de waarde verdubbelen.
+      const latestDateByEntityMonth = new Map<string, string>()
+      const catByEntity = new Map<string, string>() // entity_id → `${type}:${subtype}`
       for (const r of rows) {
-        const subtype = r.entity_subtype ?? 'other'
         const month = r.snapshot_date.substring(0, 7)
         if (!monthIdx.has(month)) continue
-        const catKey = `${r.entity_type}:${subtype}:${month}`
-        const cur = latestDateByCatMonth.get(catKey)
+        const k = `${r.entity_id}|${month}`
+        const cur = latestDateByEntityMonth.get(k)
         if (!cur || r.snapshot_date > cur) {
-          latestDateByCatMonth.set(catKey, r.snapshot_date)
+          latestDateByEntityMonth.set(k, r.snapshot_date)
+        }
+        if (!catByEntity.has(r.entity_id)) {
+          const subtype = r.entity_subtype ?? 'other'
+          catByEntity.set(r.entity_id, `${r.entity_type}:${subtype}`)
         }
       }
 
-      // Tweede pas: som balances voor (categorie, maand) op de laatste datum.
-      const sumByCatMonth = new Map<string, number>()
+      // Stap 2 — per (entity_id, maand): gewogen waarde van die laatste snapshot.
+      const valByEntityMonth = new Map<string, number>()
       for (const r of rows) {
-        const subtype = r.entity_subtype ?? 'other'
         const month = r.snapshot_date.substring(0, 7)
         if (!monthIdx.has(month)) continue
-        const catKey = `${r.entity_type}:${subtype}:${month}`
-        if (latestDateByCatMonth.get(catKey) !== r.snapshot_date) continue
-        const weight = (Number(r.net_worth_inclusion_pct ?? 100)) / 100
-        const val = Number(r.balance) * weight
-        const k = `${r.entity_type}:${subtype}|${month}`
-        sumByCatMonth.set(k, (sumByCatMonth.get(k) ?? 0) + val)
+        const k = `${r.entity_id}|${month}`
+        if (latestDateByEntityMonth.get(k) !== r.snapshot_date) continue
+        const weight = Number(r.net_worth_inclusion_pct ?? 100) / 100
+        valByEntityMonth.set(k, Number(r.balance) * weight)
       }
 
-      // Verzamel alle categorie-keys.
-      const catKeys = new Set<string>()
-      for (const k of sumByCatMonth.keys()) {
-        catKeys.add(k.split('|')[0])
+      // Stap 3 — per categorie: per-entiteit backward+forward fill, daarna
+      // sommeren over alle entiteiten in die categorie. `last = firstReal`
+      // initialiseren zodat maanden vóór de eerste snapshot dezelfde waarde
+      // krijgen — anders schiet het sparkline-silhouet omhoog wanneer een
+      // nieuwe entiteit halverwege het venster wordt toegevoegd, terwijl de
+      // chart op /core/[…]/[type] netjes vlak blijft.
+      const sumByCatMonth = new Map<string, number>()
+      for (const [entityId, cat] of catByEntity) {
+        const series = monthKeys.map((m) => valByEntityMonth.get(`${entityId}|${m}`))
+        const firstReal = series.find((v) => v !== undefined)
+        if (firstReal === undefined) continue
+        let last = firstReal
+        for (let i = 0; i < monthKeys.length; i++) {
+          const v = series[i]
+          if (v !== undefined) last = v
+          const k = `${cat}|${monthKeys[i]}`
+          sumByCatMonth.set(k, (sumByCatMonth.get(k) ?? 0) + last)
+        }
       }
+
+      // Stap 4 — bouw de output-reeks per categorie. Met backward-fill bevat
+      // élke maand een waarde zodra de categorie ergens een snapshot heeft;
+      // we kunnen daarom direct het hele 12-maands venster terugleveren
+      // (geen leading-null trimming nodig — data is per definitie compleet).
+      const catKeys = new Set<string>()
+      for (const k of sumByCatMonth.keys()) catKeys.add(k.split('|')[0])
 
       const out: Record<string, number[]> = {}
       for (const cat of catKeys) {
-        const series = new Array<number | null>(monthKeys.length).fill(null)
-        for (let i = 0; i < monthKeys.length; i++) {
-          const v = sumByCatMonth.get(`${cat}|${monthKeys[i]}`)
-          series[i] = v ?? null
-        }
-        // Knip leading nulls af zodat we niet visueel een lange vlakke
-        // periode tonen voor een categorie die pas later begon te meten.
-        // Forward-fill alleen tussen de eerste en laatste echte waarde.
-        const firstRealIdx = series.findIndex((v) => v != null)
-        if (firstRealIdx === -1) continue
-        const trimmed = series.slice(firstRealIdx)
-        let last = trimmed[0] as number
-        const filled: number[] = []
-        for (const v of trimmed) {
-          if (v != null) last = v
-          filled.push(last)
-        }
-        // Sla altijd op zodra we ten minste één snapshot hebben — een
-        // vlakke lijn (alle waarden gelijk) is OK: de UI rendert die als
-        // horizontale breuklijn op het midden van de kaart, wat correct
-        // de "geen variatie"-status communiceert.
+        const filled = monthKeys.map((m) => sumByCatMonth.get(`${cat}|${m}`) ?? 0)
         if (filled.some((v) => v > 0)) out[cat] = filled
       }
       return out
@@ -415,7 +413,10 @@ export const loadCoreData = cache(async function loadCoreData(
   const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
   const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
   const budgetingActive = profileResult.data?.budgeting_active !== false
-  const activeModules: string[] = (profileResult.data?.active_modules as string[] | null) ?? [...ALL_MODULES]
+  // Module-toggle is verwijderd uit Trifinity; alle modules zijn altijd actief
+  // op data-niveau. App-zichtbaarheid in de sidebar wordt afgeleid van
+  // tracking-flags op assets/debts (zie app/(app)/layout.tsx).
+  const activeModules: string[] = [...ALL_MODULES]
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
   // ── Last 12 months income — extrapolate if less than 12 months of data ──

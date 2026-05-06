@@ -110,10 +110,10 @@ export default function TestOnboardingDoubleSubmit() {
             <div>
               <h3 className="font-medium text-zinc-700">Layer 2: Disabled Buttons</h3>
               <p>
-                The <code>saving</code> state is passed to <code>OnboardingExtras</code>,
-                which sets <code>disabled=&#123;saving&#125;</code> on both the &quot;Sla over&quot;
-                and &quot;Opslaan &amp; verder&quot; buttons. Disabled buttons prevent further clicks at the
-                HTML level and show visual feedback (opacity-50, cursor-not-allowed).
+                The <code>saving</code> state is passed to <code>OnboardingBezittingen</code>,
+                which sets <code>disabled=&#123;saving&#125;</code> op de &quot;Volgende&quot;-knop.
+                Disabled buttons prevent further clicks at the HTML level and show visual
+                feedback (opacity-50, cursor-not-allowed).
               </p>
             </div>
             <div>

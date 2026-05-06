@@ -43,10 +43,22 @@ export async function GET() {
     ? true
     : !!(intentData as Record<string, unknown> | null)?.onboarding_intent
 
+  // Primary goal slug — added voor de goal-guide-card op /will. Aparte fetch
+  // omdat de kolom nog kan ontbreken op staging-DBs zonder migration.
+  const { data: goalData, error: goalError } = await supabase
+    .from('profiles')
+    .select('primary_goal_slug')
+    .eq('id', user.id)
+    .single()
+  const primaryGoalSlug = isColumnMissing(goalError)
+    ? null
+    : ((goalData as Record<string, unknown> | null)?.primary_goal_slug as string | null) ?? null
+
   if (!error) {
     return NextResponse.json({
       state: data?.module_guide_state ?? {},
       hasOnboardingIntent: hasIntent,
+      primaryGoalSlug,
     })
   }
 
@@ -59,13 +71,14 @@ export async function GET() {
       .single()
 
     if (fbError) {
-      return NextResponse.json({ state: {}, hasOnboardingIntent: hasIntent })
+      return NextResponse.json({ state: {}, hasOnboardingIntent: hasIntent, primaryGoalSlug })
     }
 
     const prefs = (fbData?.feature_preferences ?? {}) as Record<string, unknown>
     return NextResponse.json({
       state: (prefs[FALLBACK_KEY] as ModuleGuideState) ?? {},
       hasOnboardingIntent: hasIntent,
+      primaryGoalSlug,
     })
   }
 

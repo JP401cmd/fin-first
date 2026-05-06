@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { BriefingCardSpec, ModuleGuideCardSpec, CardModule } from '@/lib/briefing/types'
+import type { BriefingCardSpec, ModuleGuideCardSpec, GoalGuideCardSpec, CardModule } from '@/lib/briefing/types'
 import { CARD_SPAN } from '@/lib/briefing/types'
 import { MetricCard } from './cards/metric-card'
 import { ActionCard } from './cards/action-card'
@@ -21,12 +21,16 @@ import { LifeEventCard } from './cards/life-event-card'
 import { NextStepBriefingCard } from './cards/next-step-card'
 import { DiscoverCard } from './cards/discover-card'
 import { ModuleGuideCard } from './cards/module-guide-card'
+import { GoalGuideCard } from './cards/goal-guide-card'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { CardFeedbackProvider, type CardFeedbackFn } from './card-feedback-context'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useModuleGuideState } from '@/lib/hooks/use-module-guide-state'
+import { useGoalGuideState } from '@/lib/hooks/use-goal-guide-state'
 import { MODULE_GUIDE_DISPLAY_ORDER, getModuleGuideSteps } from '@/lib/briefing/module-guide-steps'
+import { getGoalGuideSteps } from '@/lib/briefing/goal-guide-steps'
+import { GOAL_CATALOG } from '@/lib/goals/catalog'
 import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 
 interface BriefingCardGridProps {
@@ -62,6 +66,7 @@ function renderCard(card: BriefingCardSpec, data: DashboardData) {
     case 'nextStep': return <NextStepBriefingCard spec={card} />
     case 'discover': return <DiscoverCard spec={card} />
     case 'moduleGuide': return <ModuleGuideCard spec={card} />
+    case 'goalGuide': return <GoalGuideCard spec={card} />
   }
 }
 
@@ -79,13 +84,34 @@ const MODULE_CARD_MODULE: Record<ModuleId, CardModule> = {
 export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: BriefingCardGridProps) {
   const { activeModules } = useModuleAccess()
   const { isCardVisible, hasOnboardingIntent } = useModuleGuideState()
+  const { primaryGoalSlug, isCardVisible: isGoalCardVisible } = useGoalGuideState()
   const guideSteps = getModuleGuideSteps()
+  const goalSteps = getGoalGuideSteps()
 
   // Fallback step for inzicht_acties when AI pre-generation didn't produce recommendations
   const hasRecommendations = data.recommendations > 0
 
-  // Build module-guide cards: only for users who went through intent-based onboarding
+  // Build a single goal-guide card if the user heeft een primair doel gekozen
+  const goalGuideCard = useMemo<GoalGuideCardSpec | null>(() => {
+    if (!primaryGoalSlug) return null
+    if (!isGoalCardVisible(primaryGoalSlug)) return null
+    const entry = GOAL_CATALOG[primaryGoalSlug]
+    if (!entry) return null
+    const steps = goalSteps[primaryGoalSlug] ?? []
+    if (steps.length === 0) return null
+    return {
+      type: 'goalGuide',
+      goalSlug: primaryGoalSlug,
+      module: 'wil',
+      title: `Stappen voor: ${entry.label}`,
+      steps,
+    }
+  }, [primaryGoalSlug, isGoalCardVisible, goalSteps])
+
+  // Build module-guide cards: only for legacy users (intent-based onboarding zonder primary goal)
   const guideCards = useMemo<ModuleGuideCardSpec[]>(() => {
+    // Users met een primair doel zien dat doel-stappenplan in plaats van per-module-cards
+    if (primaryGoalSlug) return []
     // Users without onboarding_intent (existing users) don't see guide cards
     if (!hasOnboardingIntent) return []
 
@@ -123,25 +149,38 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
           steps,
         }
       })
-  }, [activeModules, isCardVisible, guideSteps, hasRecommendations, hasOnboardingIntent])
+  }, [activeModules, isCardVisible, guideSteps, hasRecommendations, hasOnboardingIntent, primaryGoalSlug])
+
+  // Goal-guide-card heeft voorrang boven module-guide-cards: één card,
+  // outcome-georiënteerd. Module-guide-cards blijven bestaan voor legacy
+  // gebruikers zonder primary_goal_slug.
+  const allGuideCards: (GoalGuideCardSpec | ModuleGuideCardSpec)[] = goalGuideCard
+    ? [goalGuideCard]
+    : guideCards
 
   // Split into guide cards (client) and AI cards (server-composed)
-  const hasGuides = guideCards.length > 0
+  const hasGuides = allGuideCards.length > 0
   const hasAiCards = cards.length > 0
 
   // Render a single card item with optional feedback wrapper
   const renderCardItem = (card: BriefingCardSpec, index: number) => {
-    const module = 'module' in card ? card.module : undefined
+    const cardModule = 'module' in card ? card.module : undefined
     const rendered = renderCard(card, data)
     const wrapped = onFeedback
       ? <CardFeedbackProvider index={index} cardType={card.type} handler={onFeedback}>{rendered}</CardFeedbackProvider>
       : rendered
+    const reactKey =
+      card.type === 'moduleGuide'
+        ? `guide-${card.moduleId}`
+        : card.type === 'goalGuide'
+          ? `goalguide-${card.goalSlug}`
+          : `${card.type}-${index}`
     return (
       <div
-        key={card.type === 'moduleGuide' ? `guide-${card.moduleId}` : `${card.type}-${index}`}
+        key={reactKey}
         className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}
         style={{ '--stagger': `${index * 80}ms` } as React.CSSProperties}
-        onClick={onCardEngage ? () => onCardEngage(card.type, module) : undefined}
+        onClick={onCardEngage ? () => onCardEngage(card.type, cardModule) : undefined}
       >
         {wrapped}
       </div>
@@ -150,10 +189,10 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Module-guide cards (client-generated, onboarding users only) */}
+      {/* Goal-guide of module-guide cards (client-generated) */}
       {hasGuides && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 grid-flow-dense">
-          {guideCards.map((card, i) => renderCardItem(card, i))}
+          {allGuideCards.map((card, i) => renderCardItem(card, i))}
         </div>
       )}
 
@@ -183,8 +222,8 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
       {(hasAiCards || !hasGuides) && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 grid-flow-dense">
           {hasGuides
-            ? cards.map((card, i) => renderCardItem(card, i + guideCards.length))
-            : [...guideCards, ...cards].map((card, i) => renderCardItem(card, i))
+            ? cards.map((card, i) => renderCardItem(card, i + allGuideCards.length))
+            : [...allGuideCards, ...cards].map((card, i) => renderCardItem(card, i))
           }
         </div>
       )}

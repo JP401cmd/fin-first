@@ -1,15 +1,17 @@
 import { WillDots } from '@/components/app/will-dots'
 import { Shield, Zap, Telescope, Newspaper, ListChecks, type LucideIcon } from 'lucide-react'
-import { type ModuleId, type IntentId, getActiveNavModules, getFirstWinPath } from '@/lib/module-registry'
+import { type ModuleId, getActiveNavModules } from '@/lib/module-registry'
+import type { GoalSlug } from '@/lib/goals/types'
+import { getGoalFirstWinPath } from '@/lib/goals/catalog'
 
 export function OnboardingSuccess({
   onDashboard,
   activeModules,
-  intent,
+  goal,
 }: {
   onDashboard: () => void
   activeModules?: ModuleId[]
-  intent?: IntentId
+  goal?: GoalSlug
 }) {
   const navModules = getActiveNavModules(activeModules ?? [])
   const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
@@ -19,19 +21,21 @@ export function OnboardingSuccess({
     ? []
     : MODULE_CARDS.filter((c) => navModules.includes(c.navModule))
 
-  // Dynamic CTA label based on intent → first-win page
-  const firstWinPath = intent ? getFirstWinPath(intent) : undefined
+  // Dynamic CTA label based on goal → first-win page
+  const firstWinPath = goal ? getGoalFirstWinPath(goal) : undefined
   const ctaLabel = isNewsOnly
     ? 'Naar de Trifinity Post'
     : firstWinPath === '/horizon'
       ? 'Bekijk De Horizon'
       : firstWinPath === '/core/budgets'
         ? 'Bekijk je budgetten'
-        : firstWinPath === '/core'
-          ? 'Bekijk De Kern'
-          : navModules.includes('wil')
-            ? 'Bekijk De Wil'
-            : 'Bekijk De Kern'
+        : firstWinPath === '/core/debts'
+          ? 'Bekijk je schulden'
+          : firstWinPath === '/core'
+            ? 'Bekijk De Kern'
+            : navModules.includes('wil')
+              ? 'Bekijk De Wil'
+              : 'Bekijk De Kern'
 
   return (
     <div className="flex flex-col items-center py-8 text-center sm:py-12">

@@ -184,7 +184,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ai_enabled column may not exist yet (migration pending) — default to true
   const profileAiEnabled = (profileResult.data as Record<string, unknown> | null)?.ai_enabled !== false
 
-  const activeModules: string[] = ((profileResult.data as Record<string, unknown> | null)?.active_modules as string[] | null) ?? [...ALL_MODULES]
+  // Module-toggle is verwijderd uit Trifinity; alle modules zijn altijd actief
+  // op data-niveau. App-zichtbaarheid in de sidebar wordt afgeleid van
+  // tracking-flags op assets/debts (zie app/(app)/layout.tsx).
+  const activeModules: string[] = [...ALL_MODULES]
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
   // Core calculations

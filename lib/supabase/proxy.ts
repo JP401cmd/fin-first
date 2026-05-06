@@ -386,7 +386,6 @@ export async function updateSession(request: NextRequest) {
     '/test-snapshot-comparison',
     '/api/verify-snapshot-comparison',
     '/test-onboarding-error-handling',
-    '/test-widget-cap',
     '/test-sanitize',
     '/api/test-sanitize',
     '/test-berichten-footer',

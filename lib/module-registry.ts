@@ -114,9 +114,14 @@ export const ALL_MODULES: ModuleId[] = MODULE_CATALOG.map((m) => m.id)
 // ── Intent Presets ───────────────────────────────────────────────────────────
 // Default module sets per onboarding intent.
 
+// Budgetteren is bewust afwezig uit `coaching` en `grip_uitgaven`: de gebruiker
+// activeert die module via de cash-asset-prompt in onboarding ("wil je deze
+// rekening gebruiken voor budgetteren?"). Zo wordt budgettering een bewuste
+// opt-in op het juiste moment — niet een onuitlegbare default die op het
+// dashboard verschijnt.
 export const INTENT_MODULE_PRESETS: Record<IntentId, ModuleId[]> = {
-  coaching: ['budgetteren', 'inzicht_acties'],
-  grip_uitgaven: ['budgetteren'],
+  coaching: ['inzicht_acties'],
+  grip_uitgaven: [],
   overzicht_geld: ['vermogensregistratie'],
   toekomst: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
   alles: [...ALL_MODULES],

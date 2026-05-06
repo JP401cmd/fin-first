@@ -558,31 +558,31 @@ const intentTests: TestCase[] = [
   // ── 16. localStorage healing: 'modules' → 'intent' ────────────────────
   {
     id: 'intent-localstorage-healing-modules',
-    name: '_resolveRestoredStep healt "modules" naar "intent"',
+    name: '_resolveRestoredStep healt "modules" naar "goal"',
     category: CAT,
-    description: 'Oude localStorage drafts met lastStep="modules" worden correct geheald naar "intent"',
+    description: 'Oude localStorage drafts met lastStep="modules" worden correct geheald naar "goal" (mei 2026: intent → goal)',
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+      const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
       const result = _resolveRestoredStep('modules', [...activeOrder])
-      assertEqual(result.step, 'intent', 'modules wordt geheald naar intent')
-      assertEqual(result.healed, false, 'Geen healing nodig na mapping (intent zit in active order)')
+      assertEqual(result.step, 'goal', 'modules wordt geheald naar goal')
+      assertEqual(result.healed, false, 'Geen healing nodig na mapping (goal zit in active order)')
     },
   },
 
   // ── 17. localStorage healing: 'persona' → 'intent' ────────────────────
   {
     id: 'intent-localstorage-healing-persona',
-    name: '_resolveRestoredStep healt "persona" naar "intent"',
+    name: '_resolveRestoredStep healt "persona" naar "goal"',
     category: CAT,
-    description: 'Oude localStorage drafts met lastStep="persona" worden correct geheald naar "intent"',
+    description: 'Oude localStorage drafts met lastStep="persona" worden correct geheald naar "goal" (mei 2026: intent → goal)',
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+      const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
       const result = _resolveRestoredStep('persona', [...activeOrder])
-      assertEqual(result.step, 'intent', 'persona wordt geheald naar intent')
+      assertEqual(result.step, 'goal', 'persona wordt geheald naar goal')
       assertEqual(result.healed, false, 'Geen healing nodig na mapping')
     },
   },
@@ -596,7 +596,7 @@ const intentTests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+      const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
       const result = _resolveRestoredStep('extras', [...activeOrder])
       assertEqual(result.step, 'bezittingen', 'extras wordt geheald naar bezittingen')
       assertEqual(result.healed, false, 'Geen healing nodig na mapping')

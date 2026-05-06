@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
@@ -15,7 +15,6 @@ import {
   DEBT_TYPE_COLORS,
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
-import { OwnershipBadge } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 
@@ -29,10 +28,35 @@ import { ValuationModal } from '@/components/app/core/debts/debt-valuation-modal
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { VermogenDebtCard } from '@/components/core/vermogen-debt-card'
+import { AddCategoryCard } from '@/components/core/add-category-card'
+import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip } from '@/components/editorial'
+import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
+import { buildKpiContext } from '@/lib/kpi-context'
+import { computeDebtKpi } from '@/lib/debt-kpi'
+import type { KpiPair } from '@/lib/asset-kpi'
 
 // ── Types ───────────────────────────────────────────────────
 
 type ModalStep = 'detail' | 'edit' | 'revalue'
+
+const DEBT_ITEM_NOUN: Record<DebtType, string> = {
+  mortgage: 'hypotheek',
+  personal_loan: 'lening',
+  student_loan: 'studielening',
+  car_loan: 'autolening',
+  credit_card: 'creditcard',
+  revolving_credit: 'krediet',
+  payment_plan: 'regeling',
+  belastingschuld: 'belastingschuld',
+  familielening: 'familielening',
+  dga_schuld: 'DGA-schuld',
+  other: 'schuld',
+}
+
+function addDebtCta(type: DebtType): string {
+  return `Voeg ${DEBT_ITEM_NOUN[type]} toe`
+}
 
 // ── Component ───────────────────────────────────────────────
 
@@ -58,9 +82,13 @@ export default function DebtsPage() {
   const initialDebtId = searchParams.get('debt') ?? undefined
 
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [quickAddInitialType, setQuickAddInitialType] = useState<DebtType | null>(null)
   const [debts, setDebts] = useState<Debt[]>([])
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [userAssets, setUserAssets] = useState<Asset[]>([])
+  // Per-debt sparkline-historie (12 maanden) voor de breuklijn-overlay op
+  // VermogenDebtCard. Zelfde shape als asset-categorie-pagina.
+  const [debtSparklines, setDebtSparklines] = useState<Record<string, number[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null)
@@ -138,7 +166,14 @@ export default function DebtsPage() {
 
   const loadUserAssets = useCallback(async () => {
     const supabase = createClient()
-    const { data } = await supabase.from('assets').select('id, name, asset_type').order('name')
+    // KPI-context heeft `current_value` + `linked_asset_id` nodig voor LTV
+    // op hypotheken. Zonder die velden kan `buildKpiContext` geen
+    // linkedAssetValueByDebtId opbouwen en blijft de LTV-KPI leeg.
+    const { data } = await supabase
+      .from('assets')
+      .select('id, name, asset_type, current_value, linked_asset_id, is_active')
+      .eq('is_active', true)
+      .order('name')
     if (data) setUserAssets(data as Asset[])
   }, [])
 
@@ -147,6 +182,25 @@ export default function DebtsPage() {
     loadDebts(signal)
     loadUserAssets()
   }, [loadDebts, loadUserAssets, perspectiveSignal])
+
+  // ── Per-debt sparklines voor de cards-grid ──────────────────
+  // Eén batched query op `balance_snapshots` zodra debts geladen zijn.
+  // Failure is non-fataal: lege map → kaarten zonder breuklijn-overlay.
+  useEffect(() => {
+    const activeDebtIds = debts
+      .filter((d) => d.is_active && Number(d.current_balance) > 0)
+      .map((d) => d.id)
+    if (activeDebtIds.length === 0) {
+      setDebtSparklines({})
+      return
+    }
+    const supabase = createClient()
+    let cancelled = false
+    loadEntitySparklines(supabase, 'debt', activeDebtIds)
+      .then((sparklines) => { if (!cancelled) setDebtSparklines(sparklines) })
+      .catch(() => { if (!cancelled) setDebtSparklines({}) })
+    return () => { cancelled = true }
+  }, [debts])
 
   // ── Detail-modal openen vanuit deep-link ───────────────────
 
@@ -192,6 +246,12 @@ export default function DebtsPage() {
 
   const activeDebts = debts.filter((d) => d.is_active && Number(d.current_balance) > 0)
   const totalBalance = activeDebts.reduce((s, d) => s + Number(d.current_balance), 0)
+  const totalMonthlyPayment = activeDebts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
+  // Gewogen gemiddelde rente — met current_balance als weegfactor, zodat
+  // grote hypotheken zwaarder meetellen dan een kleine creditcard.
+  const weightedAvgInterest = totalBalance > 0
+    ? activeDebts.reduce((s, d) => s + Number(d.interest_rate ?? 0) * Number(d.current_balance), 0) / totalBalance
+    : 0
 
   // Group by type — analoog aan `assets-client.tsx` (regel 250-261)
   const byType = (Object.keys(DEBT_TYPE_LABELS) as DebtType[]).reduce(
@@ -205,6 +265,35 @@ export default function DebtsPage() {
     },
     {} as Record<DebtType, { debts: Debt[]; total: number }>,
   )
+
+  // ── KPI's per schuld (zelfde patroon als debt-category-page) ──
+  // userAssets levert linked_asset_id + current_value voor mortgage LTV.
+  // computeDebtKpi heeft alleen DebtKpiContext nodig.
+  const kpiByDebtId = useMemo(() => {
+    const ctx = buildKpiContext({
+      assets: userAssets.map((a) => ({
+        id: a.id,
+        asset_type: a.asset_type,
+        current_value: Number(a.current_value ?? 0),
+        linked_asset_id: a.linked_asset_id ?? null,
+      })),
+      debts: activeDebts.map((d) => ({
+        id: d.id,
+        debt_type: d.debt_type,
+        current_balance: Number(d.current_balance),
+        linked_asset_id: d.linked_asset_id ?? null,
+      })),
+      holdings: [],
+    }).debt
+    const map = new Map<string, KpiPair>()
+    for (const debt of activeDebts) {
+      const pair = computeDebtKpi(debt, ctx)
+      if (pair.primary || pair.secondary) {
+        map.set(debt.id, pair)
+      }
+    }
+    return map
+  }, [activeDebts, userAssets])
 
   // ── Rendering ──────────────────────────────────────────────
 
@@ -237,81 +326,77 @@ export default function DebtsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Schulden" bottomBar={{ kind: 'tabs' }} />
-      {/* Editorial header — blueprint Type 2 (List) */}
-      <header className="mb-5 space-y-2">
-        {/* Kicker met streep — debts in negative-rood voor semantische scheiding */}
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--negative)]">
-          <span
-            aria-hidden
-            className="inline-block h-px w-7 shrink-0"
-            style={{ background: 'var(--negative)' }}
-          />
-          Schulden · {activeDebts.length} item{activeDebts.length !== 1 ? 's' : ''}
-        </div>
-        {/* Headline met italic-em "vrijheid" */}
-        <h1
-          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
-          style={{ fontFamily: 'var(--font-playfair, serif)' }}
-        >
-          Vrijheid die je{' '}
-          <em
-            className="font-normal italic"
-            style={{ color: 'var(--module-active-700)' }}
-          >
-            terugkoopt
-          </em>
-        </h1>
+
+      {/* ═══ Editorial header (Type 2 — List) ═══════════════════════
+          Hergebruikt editorial-primitives: Kicker, EditorialHeadline,
+          EditorialDeck, FiguresStrip. Geen hand-rolled markup. */}
+
+      {/* 3px module-accent-bar */}
+      <div className="h-[3px] w-full mb-5" style={{ background: 'var(--module-active-500)' }} aria-hidden="true" />
+
+      <header className="mb-5 space-y-3">
+        <Kicker size="large">Schulden · vrijheid die je terugkoopt</Kicker>
+
+        <EditorialHeadline emphasis="terugkoopt" size="lg">
+          Vrijheid die je terugkoopt
+        </EditorialHeadline>
+
+        <EditorialDeck>
+          Elke schuld is een claim op je toekomst. Door af te lossen koop je vrijheid terug — euro voor euro,
+          maand na maand.
+        </EditorialDeck>
+
+        {perspective === 'household' && hiddenCategories.includes('debts') && (
+          <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['debts']} />
+        )}
       </header>
 
-      {/* ═══ Hero — pure registratie ═══════════════════════════ */}
-      <section
-        className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6"
-        data-testid="debts-hero"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setQuickAddOpen(true)}
-                aria-label="Schuld toevoegen"
-                title="Schuld toevoegen"
-                className="inline-flex min-h-[32px] items-center gap-1.5 border border-[var(--color-debt-200)] bg-[var(--color-debt-50)] px-2.5 py-1 text-xs font-medium text-[var(--color-debt-700)] transition-colors hover:bg-[var(--color-debt-100)] hover:text-[var(--color-debt-800)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-debt-500)]"
-              >
-                <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
-                Schuld toevoegen
-              </button>
-            </div>
-            <p
-              className="mt-1 italic text-[12px] text-[var(--ink-3)]"
-              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-            >
-              {activeDebts.length} schuld{activeDebts.length !== 1 ? 'en' : ''} — vrijheid die je terugkoopt
-            </p>
-            {perspective === 'household' && hiddenCategories.includes('debts') && (
-              <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['debts']} />
-            )}
-          </div>
-        </div>
+      {/* Figures-strip (mini-hero) — Type 2 blueprint sectie 2 */}
+      <FiguresStrip
+        cols={4}
+        figures={[
+          {
+            kicker: 'Totale schuld',
+            amount: <MaskedAmount value={totalBalance} tone="kern" />,
+            sub: `${activeDebts.length} schuld${activeDebts.length !== 1 ? 'en' : ''}`,
+            variant: 'winner',
+          },
+          {
+            kicker: 'Maandlasten',
+            amount: <MaskedAmount value={totalMonthlyPayment} tone="kern" />,
+            sub: 'per maand aflossen',
+          },
+          {
+            kicker: 'Rente (gewogen)',
+            amount: `${weightedAvgInterest.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+            sub: 'gemiddeld per jaar',
+          },
+          {
+            kicker: 'Categorieën',
+            amount: `${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length}`,
+            sub: `type${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length === 1 ? '' : 's'} schuld`,
+          },
+        ]}
+      />
 
-        <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2">
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale schuld</p>
-            <p className="mt-1 text-[var(--ink)]">
-              <MaskedAmount value={totalBalance} tone="kern" className="text-xl font-bold" />
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Aantal</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)] tabular-nums">
-              {activeDebts.length}
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* Toolbar — primaire CTA rechts, voor de cards */}
+      <div className="flex items-center justify-end mb-5">
+        <button
+          type="button"
+          onClick={() => { setQuickAddInitialType(null); setQuickAddOpen(true) }}
+          aria-label="Schuld toevoegen"
+          className="inline-flex min-h-[40px] items-center gap-2 border border-[var(--ink)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+          Schuld toevoegen
+        </button>
+      </div>
 
-      {/* ═══ Lijst per debt-categorie ════════════════════════════ */}
-      <section className="mt-3 sm:mt-6 space-y-1" data-testid="debt-list-section">
+      {/* ═══ Grid per debt-categorie ════════════════════════════
+          Zelfde layout als /core/debts/[type] items-tab: per categorie een
+          grid van VermogenDebtCard + één AddCategoryCard die de QuickAddWizard
+          opent met dat debt-type voor-geselecteerd. */}
+      <section className="mt-3 sm:mt-6 space-y-6" data-testid="debt-list-section">
         {activeDebts.length === 0 && (
           <QuickAddEmptyState intent="debt" onAdd={() => setQuickAddOpen(true)} />
         )}
@@ -325,10 +410,8 @@ export default function DebtsPage() {
 
           return (
             <div key={type}>
-              {/* Group header — klikbaar door naar /core/debts/[type] zodat
-                  toekomstige verdiepings-tabs (bv. Aflossingsstrategie bij
-                  mortgage) automatisch beschikbaar worden. */}
-              <div className="flex items-center gap-2 pt-4 pb-1.5">
+              {/* Group header — altijd klikbaar door naar /core/debts/[type] */}
+              <div className="flex items-center gap-2 pt-2 pb-2.5">
                 <span style={{ color: groupColor }}>
                   <BudgetIcon name={groupIcon} className="h-4 w-4" />
                 </span>
@@ -343,55 +426,28 @@ export default function DebtsPage() {
                 </span>
               </div>
 
-              {/* Debt cards — minimaal, klik opent detail-modal */}
-              <div className="space-y-2">
-                {group.debts.map((debt) => {
-                  const balance = Number(debt.current_balance)
-                  const original = Number(debt.original_amount)
-                  const pct = original > 0 ? ((original - balance) / original) * 100 : 0
-
-                  return (
-                    <div
-                      key={debt.id}
-                      className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
-                      onClick={() => openDebtModal(debt)}
-                      data-testid={`debt-card-${debt.id}`}
-                    >
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)]"
-                        style={{ backgroundColor: groupColor + '15' }}
-                      >
-                        <span style={{ color: groupColor }}>
-                          <BudgetIcon name={groupIcon} className="h-4 w-4" />
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-[var(--ink)] flex items-center gap-1.5">
-                          {debt.name}
-                          <OwnershipBadge ownership={debt.ownership ?? 'personal'} />
-                        </p>
-                        <p className="truncate text-xs text-[var(--ink-3)]">
-                          {DEBT_TYPE_LABELS[debt.debt_type]}
-                          {debt.creditor ? ` • ${debt.creditor}` : ''}
-                        </p>
-                        <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
-                          <div
-                            className="h-full rounded-full bg-kern-500 transition-all duration-500"
-                            style={{ width: `${Math.min(pct, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-[var(--ink)]">
-                          <MaskedAmount value={balance} tone="kern" className="text-sm font-semibold" />
-                        </p>
-                        <p className="text-[var(--ink-3)]">
-                          van <MaskedAmount value={original} tone="kern" className="text-xs" />
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })}
+              {/* Debt cards — zelfde grid + cards als /core/debts/[type].
+                  KPI-strip + sparkline-overlay worden door VermogenDebtCard
+                  zelf gerenderd zodra de props aanwezig zijn. */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {group.debts.map((debt, idx) => (
+                  <VermogenDebtCard
+                    key={debt.id}
+                    debt={debt}
+                    kpiPair={kpiByDebtId.get(debt.id)}
+                    sparklineValues={debtSparklines[debt.id]}
+                    onClick={() => openDebtModal(debt)}
+                    staggerIndex={idx}
+                  />
+                ))}
+                <AddCategoryCard
+                  label={addDebtCta(type)}
+                  onClick={() => { setQuickAddInitialType(type); setQuickAddOpen(true) }}
+                  variant="debt"
+                  shape="item"
+                  staggerIndex={group.debts.length}
+                  ariaLabel={`Voeg item toe aan ${DEBT_TYPE_LABELS[type]}`}
+                />
               </div>
             </div>
           )
@@ -465,8 +521,9 @@ export default function DebtsPage() {
 
       <QuickAddWizard
         open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
+        onClose={() => { setQuickAddOpen(false); setQuickAddInitialType(null) }}
         initialIntent="debt"
+        initialDebtType={quickAddInitialType ?? undefined}
         onSaved={() => router.refresh()}
       />
     </div>

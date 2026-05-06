@@ -3,8 +3,93 @@ import { createClient } from '@/lib/supabase/server'
 import { getDefaultBudgets } from '@/lib/budget-data'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import { type ModuleId } from '@/lib/module-registry'
+import { type ModuleId, type IntentId } from '@/lib/module-registry'
 import { extractFinancialData } from '@/lib/ai/extract-financial-data'
+import { AssetQuickInputSchema, DebtQuickInputSchema } from '@/lib/quick-add/validation'
+import { buildAssetDraft, buildDebtDraft } from '@/lib/quick-add/build-drafts'
+import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
+import type { GoalSlug } from '@/lib/goals/types'
+import { GOAL_MODULE_PRESETS } from '@/lib/goals/catalog'
+
+/**
+ * Best-effort mapping van een nieuwe goal-slug naar de oude `IntentId` zodat
+ * downstream features die nog `profiles.onboarding_intent` lezen niet stuk
+ * gaan. Eenmaal alle leescode gemigreerd is naar `primary_goal_slug` kan
+ * deze mapping verdwijnen.
+ */
+const GOAL_TO_INTENT_FALLBACK: Record<GoalSlug, IntentId> = {
+  'grip-uitgaven': 'grip_uitgaven',
+  'vermogen-overzicht': 'overzicht_geld',
+  noodfonds: 'grip_uitgaven',
+  'schulden-aflossen': 'overzicht_geld',
+  'eerder-stoppen': 'toekomst',
+  'bewust-leven': 'coaching',
+}
+
+/**
+ * Module-vereisten — server-side fallback voor modules die een rekening
+ * verwachten:
+ *   · `budgetteren` heeft minstens één cash-asset met `has_budget_tracking=true`
+ *     nodig (anders kunnen transacties niet aan budgetten gekoppeld worden).
+ *   · `aandelenregistratie` heeft minstens één investment-asset met
+ *     `has_holdings_tracking=true` nodig (anders is de Holdings-app leeg).
+ *
+ * Wanneer de gebruiker de bezittingen-stap heeft overgeslagen of de juiste
+ * categorie niet heeft toegevoegd, seedt de server hier een placeholder met
+ * saldo 0. De gebruiker kan dat later in /core/assets/{type} bewerken.
+ *
+ * Conform CLAUDE.md fallback-regel: een feature mag niet stilzwijgend breken
+ * omdat een andere module geen data heeft.
+ */
+function applyModuleSeeding(
+  quickAssets: AssetQuickInput[],
+  activeModules: ModuleId[] | undefined,
+): AssetQuickInput[] {
+  if (!activeModules) return quickAssets
+  const result = [...quickAssets]
+  if (activeModules.includes('budgetteren') && !result.some((a) => a.asset_type === 'cash')) {
+    result.push({ asset_type: 'cash', name: 'Lopende rekening', current_value: 0, field3: null })
+  }
+  if (
+    activeModules.includes('aandelenregistratie') &&
+    !result.some((a) => a.asset_type === 'investment')
+  ) {
+    result.push({ asset_type: 'investment', name: 'Beleggingsrekening', current_value: 0, field3: null })
+  }
+  return result
+}
+
+/**
+ * Activeer module-tracking-flags op zojuist-ingevoegde assets.
+ *
+ * - `budgetteren` actief → alle cash-assets krijgen `has_budget_tracking = true`
+ * - `aandelenregistratie` actief → alle investment-assets krijgen
+ *   `has_holdings_tracking = true`
+ *
+ * Deze post-insert UPDATE laat de bestaande RPC-SQL onveranderd (die kent de
+ * tracking-kolommen niet). De fallback-pad doet de equivalente write inline.
+ */
+async function applyModuleTrackingFlags(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  activeModules: ModuleId[] | undefined,
+) {
+  if (!activeModules) return
+  if (activeModules.includes('budgetteren')) {
+    await supabase
+      .from('assets')
+      .update({ has_budget_tracking: true })
+      .eq('user_id', userId)
+      .eq('asset_type', 'cash')
+  }
+  if (activeModules.includes('aandelenregistratie')) {
+    await supabase
+      .from('assets')
+      .update({ has_holdings_tracking: true })
+      .eq('user_id', userId)
+      .eq('asset_type', 'investment')
+  }
+}
 
 /** Retry a function up to maxRetries times with exponential backoff */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
@@ -25,15 +110,17 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
 /**
  * Build the RPC payload for the atomic save_onboarding_data function.
  * Structures all onboarding data into the format expected by the plpgsql function.
+ *
+ * widget_prefs is server-controlled: nieuwe gebruikers starten altijd met een
+ * leeg dashboard ({ widgets: [] }). De gebruiker stelt later widgets in via
+ * Instellingen — onboarding raakt het dashboard niet meer.
  */
 function buildRpcPayload(
   identity: z.infer<typeof bodySchema>['identity'],
   budgetAmounts: Record<string, number>,
   budgetteringMode: string | undefined,
-  bankAccounts: z.infer<typeof bodySchema>['bankAccounts'],
-  assets: z.infer<typeof bodySchema>['assets'],
-  debts: z.infer<typeof bodySchema>['debts'],
-  widgetPrefs: z.infer<typeof bodySchema>['widgetPrefs'],
+  quickAssets: AssetQuickInput[],
+  quickDebts: DebtQuickInput[],
   aowTargetAge: number,
   idempotencyKey: string | undefined,
   horizonData: z.infer<typeof bodySchema>['horizonData'],
@@ -118,21 +205,26 @@ function buildRpcPayload(
     budgettering_mode: budgetteringMode ?? 'manual',
     parent_budgets: parentBudgets,
     child_budgets: childBudgets,
-    bank_accounts: (bankAccounts ?? []).map((a, i) => ({ ...a, sort_order: i })),
-    assets: (assets ?? []).map((a, i) => ({
-      ...a,
+    // Geen bank_accounts meer in onboarding — cash-rekeningen worden als
+    // `cash`-type asset toegevoegd via de QuickAddWizard. De RPC verwijdert
+    // bestaande bank_accounts (regel `iban=''`) en cash-assets aan het begin
+    // van die step; daarna worden cash-assets in stap 7 (assets) ingevoegd.
+    bank_accounts: [],
+    // QuickAddInput → volledige Asset-row via buildAssetDraft. Die helper
+    // levert alle velden die de RPC verwacht (subtype/risk_profile/etc.
+    // zijn null en de full form vult ze later aan).
+    assets: quickAssets.map((q, i) => ({
+      ...buildAssetDraft(q),
       sort_order: i,
-      purchase_value: a.purchase_value ?? a.current_value,
-      expected_return: a.expected_return ?? 0,
-      monthly_contribution: a.monthly_contribution ?? 0,
     })),
-    debts: (debts ?? []).map((d, i) => ({
-      ...d,
+    debts: quickDebts.map((q, i) => ({
+      ...buildDebtDraft(q),
       sort_order: i,
-      original_amount: d.original_amount ?? d.current_balance,
-      minimum_payment: d.minimum_payment ?? d.monthly_payment,
     })),
-    widget_prefs: widgetPrefs ?? null,
+    // Lege widgets-array → mergeWidgetPrefs() retourneert alle catalog-widgets
+    // met enabled:false, dus dashboard is leeg na onboarding. De gebruiker
+    // configureert dit zelf in Instellingen.
+    widget_prefs: { widgets: [] },
     aow_target_age: aowTargetAge,
     aow_monthly: NL_AOW_MONTHLY,
   }
@@ -157,61 +249,13 @@ const bodySchema = z.object({
     temporal_balance: z.number().int().min(1).max(5).optional(),
   }),
   budgetAmounts: z.record(z.string(), z.number().min(0)),
-  bankAccounts: z.array(z.object({
-    name: z.string().min(1),
-    bank_name: z.string().min(1),
-    account_type: z.string(),
-    balance: z.number(),
-    has_budget_tracking: z.boolean().optional(),
-  })).optional(),
-  assets: z.array(z.object({
-    name: z.string().min(1),
-    asset_type: z.string(),
-    current_value: z.number().min(0),
-    purchase_value: z.number().min(0).optional(),
-    expected_return: z.number().optional(),
-    monthly_contribution: z.number().min(0).optional(),
-    institution: z.string().optional(),
-    // Type-specific
-    subtype: z.string().optional(),
-    risk_profile: z.string().optional(),
-    tax_benefit: z.boolean().optional(),
-    is_liquid: z.boolean().optional(),
-    lock_end_date: z.string().optional(),
-    ticker_symbol: z.string().optional(),
-    rental_income: z.number().optional(),
-    woz_value: z.number().optional(),
-    retirement_provider_type: z.string().optional(),
-    depreciation_rate: z.number().optional(),
-    address_postcode: z.string().optional(),
-    address_house_number: z.string().optional(),
-  })).optional(),
-  debts: z.array(z.object({
-    name: z.string().min(1),
-    debt_type: z.string(),
-    original_amount: z.number().min(0).optional(),
-    current_balance: z.number().min(0),
-    interest_rate: z.number().min(0),
-    minimum_payment: z.number().min(0).optional(),
-    monthly_payment: z.number().min(0),
-    creditor: z.string().optional(),
-    // Type-specific
-    subtype: z.string().optional(),
-    repayment_type: z.string().optional(),
-    is_tax_deductible: z.boolean().optional(),
-    fixed_rate_end_date: z.string().optional(),
-    nhg: z.boolean().optional(),
-    credit_limit: z.number().optional(),
-    draagkrachtmeting_date: z.string().optional(),
-  })).optional(),
-  widgetPrefs: z.object({
-    widgets: z.array(z.object({
-      id: z.string(),
-      enabled: z.boolean(),
-      size: z.enum(['quarter', 'half', 'full']),
-      order: z.number(),
-    })),
-  }).optional(),
+  // Onboarding gebruikt het 3-velden-quickadd-shape voor bezittingen en
+  // schulden. De server roept buildAssetDraft / buildDebtDraft aan om naar
+  // volledige rijen te converteren — dezelfde logica als de Server Action
+  // op /core. Bank_accounts vervalt: een bankrekening wordt toegevoegd als
+  // `cash`-type quickAsset met optionele `field3` voor de bankinstelling.
+  quickAssets: z.array(AssetQuickInputSchema).optional(),
+  quickDebts: z.array(DebtQuickInputSchema).optional(),
   budgetteringMode: z.enum(['none', 'template', 'manual']).optional(),
   idempotencyKey: z.string().uuid().optional(),
   /** User-selected modules from the persona/custom step */
@@ -242,8 +286,17 @@ const bodySchema = z.object({
     })).optional(),
   }).optional(),
   newsDescription: z.string().max(500).optional(),
-  /** User-selected intent from the onboarding intent step */
+  /** User-selected intent from the onboarding intent step (legacy field — kept for clients that haven't shipped goal yet) */
   intent: z.enum(['coaching', 'grip_uitgaven', 'overzicht_geld', 'toekomst', 'alles', 'nieuws']).optional(),
+  /** User-selected goal-slug from the new onboarding goal step (mei 2026+) */
+  selectedGoalSlug: z.enum([
+    'grip-uitgaven',
+    'vermogen-overzicht',
+    'noodfonds',
+    'schulden-aflossen',
+    'eerder-stoppen',
+    'bewust-leven',
+  ]).optional(),
   /** Pre-extracted data from client-side review (avoids re-running AI extraction) */
   extractionData: z.object({
     assets: z.array(z.object({
@@ -287,7 +340,38 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Ongeldige invoer', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { identity, horizonData, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode, idempotencyKey, activeModules, newsDescription, extractionData, intent } = parsed.data
+  const {
+    identity,
+    horizonData,
+    budgetAmounts,
+    quickAssets: rawQuickAssets,
+    quickDebts: rawQuickDebts,
+    budgetteringMode,
+    idempotencyKey,
+    activeModules: rawActiveModules,
+    newsDescription,
+    extractionData,
+    intent: rawIntent,
+    selectedGoalSlug,
+  } = parsed.data
+
+  // Resolve modules: als de client geen activeModules stuurde maar wel een
+  // goal heeft gekozen, leid de modules af van GOAL_MODULE_PRESETS. Zo blijft
+  // de rest van de save-route (die gestuurd wordt door activeModules) werken.
+  const activeModules: ModuleId[] | undefined = rawActiveModules && rawActiveModules.length > 0
+    ? rawActiveModules
+    : (selectedGoalSlug ? [...GOAL_MODULE_PRESETS[selectedGoalSlug]] : undefined)
+
+  // Effective intent voor backward-compat met `profiles.onboarding_intent`
+  // en downstream features die nog op de oude IntentId leunen.
+  const intent: IntentId | undefined = rawIntent
+    ?? (selectedGoalSlug ? GOAL_TO_INTENT_FALLBACK[selectedGoalSlug] : undefined)
+
+  // Pas module-vereisten-seeding toe vóór persist: bv. een placeholder cash-
+  // rekening als budgetteren actief is zonder cash-asset. Vermijdt module-
+  // landing-pagina's met lege state. Zie applyModuleSeeding().
+  const quickAssets: AssetQuickInput[] = applyModuleSeeding(rawQuickAssets ?? [], activeModules)
+  const quickDebts: DebtQuickInput[] = rawQuickDebts ?? []
 
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
@@ -313,17 +397,14 @@ export async function POST(req: Request) {
     }
 
     if (existingProfile?.onboarding_completed) {
-      // Onboarding already completed — skip data creation but still update modules
-      // so re-running onboarding picks up the new module selection
-      if (activeModules && activeModules.length > 0) {
-        await supabase
-          .from('profiles')
-          .update({
-            active_modules: activeModules,
-            budgeting_active: (activeModules as ModuleId[]).includes('budgetteren'),
-            onboarding_intent: intent ?? null,
-          })
-          .eq('id', user.id)
+      // Onboarding already completed — skip data creation but still update
+      // het primaire-doel + intent zodat een herstart van onboarding de
+      // nieuwe doelvraag oppakt.
+      if (intent || selectedGoalSlug) {
+        const updates: Record<string, unknown> = {}
+        if (intent) updates.onboarding_intent = intent
+        if (selectedGoalSlug) updates.primary_goal_slug = selectedGoalSlug
+        await supabase.from('profiles').update(updates).eq('id', user.id)
       }
       return Response.json({ success: true, alreadyCompleted: true })
     }
@@ -456,7 +537,7 @@ export async function POST(req: Request) {
     // step fails, the entire save is rolled back. No partial data possible.
     const rpcPayload = buildRpcPayload(
       identity, budgetAmounts, budgetteringMode,
-      bankAccounts, assets, debts, widgetPrefs,
+      quickAssets, quickDebts,
       aowTargetAge, idempotencyKey,
       horizonData, newsDescription, intent,
     )
@@ -470,17 +551,18 @@ export async function POST(req: Request) {
       if (result.error) {
         throw new Error(result.error)
       }
-      // Set initial phase and persist active modules
+      // Set initial phase
       if (!result.already_completed) {
         const profileUpdates: Record<string, unknown> = {
           last_known_phase: 'recovery',
           completed_onboarding_steps: completedSteps,
           onboarding_intent: intent ?? null,
+          primary_goal_slug: selectedGoalSlug ?? null,
         }
-        // Persist selected modules when provided by the persona step
+        // budgeting_active follows the intent's preset so onboarding-flow gating
+        // (e.g. "show budgets step") stays in sync. Tracking on individual
+        // assets governs sidebar visibility (see app/(app)/layout.tsx).
         if (activeModules && activeModules.length > 0) {
-          profileUpdates.active_modules = activeModules
-          // Keep budgeting_active in sync — it's a derived boolean convenience column
           profileUpdates.budgeting_active = (activeModules as ModuleId[]).includes('budgetteren')
         }
         // News-only: store financial context and AI-estimated income/expenses
@@ -556,6 +638,12 @@ export async function POST(req: Request) {
             if (error) console.error('AI-extracted life events insert error:', error)
           }
         }
+
+        // Module-tracking-flags activeren op de juiste assets. De RPC laat
+        // has_budget_tracking / has_holdings_tracking standaard false; we
+        // zetten ze hier expliciet aan zodat de Budgetteren- en Holdings-
+        // apps direct een rekening hebben om mee te werken.
+        await applyModuleTrackingFlags(supabase, user.id, activeModules)
       }
       return Response.json({ success: true, alreadyCompleted: result.already_completed ?? false })
     }
@@ -588,10 +676,6 @@ export async function POST(req: Request) {
       budgeting_active: budgetingActive,
       updated_at: new Date().toISOString(),
     }
-    // Persist the selected module set when provided
-    if (activeModules && activeModules.length > 0) {
-      profileData.active_modules = activeModules
-    }
     // Only include idempotency key if the column exists (migration may not be applied yet)
     if (!profileError || !profileError.message?.includes('onboarding_idempotency_key')) {
       profileData.onboarding_idempotency_key = idempotencyKey ?? null
@@ -607,10 +691,18 @@ export async function POST(req: Request) {
     profileData.fire_legacy_amount = horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null
     profileData.fire_end_age = horizonData?.fire_end_age ?? identity.fire_end_age ?? 90
     profileData.temporal_balance = horizonData?.temporal_balance ?? identity.temporal_balance ?? 3
-    profileData.news_description = newsDescription ?? null
-    profileData.onboarding_intent = intent ?? null
+    // Optionele metadata-kolommen: schrijf alléén als er waarde is. Dat
+    // voorkomt een schema-cache-miss in omgevingen waar de bijbehorende
+    // migratie nog niet is toegepast (PostgREST faalt op een onbekende
+    // kolom, ook bij `null`-waarde). Voor het geval de kolom wél geschreven
+    // wordt maar tóch ontbreekt (partial-migration-state) doet de upsert
+    // hieronder een retry-pad zonder die kolom.
+    if (newsDescription) profileData.news_description = newsDescription
+    if (intent) profileData.onboarding_intent = intent
+    if (selectedGoalSlug) profileData.primary_goal_slug = selectedGoalSlug
     profileData.completed_onboarding_steps = completedSteps
-    if (widgetPrefs) profileData.widget_prefs = widgetPrefs
+    // Server-controlled: leeg dashboard na onboarding. Zie buildRpcPayload.
+    profileData.widget_prefs = { widgets: [] }
     // News-only: store financial context and AI-estimated income/expenses
     if (isNewsOnly) {
       if (financialContext) profileData.financial_context = financialContext
@@ -618,9 +710,43 @@ export async function POST(req: Request) {
       if (aiExpensesEstimate != null) profileData.estimated_monthly_expenses = aiExpensesEstimate
     }
 
-    const { error: profileErr } = await supabase
-      .from('profiles')
-      .upsert(profileData)
+    // Upsert met schema-cache-miss-recovery: als de DB een optionele
+    // metadata-kolom mist (migratie nog niet toegepast), strippen we die
+    // kolom en proberen we opnieuw. Voorkomt dat onboarding stilvalt op een
+    // partial-migration-state.
+    const OPTIONAL_PROFILE_COLUMNS = [
+      'news_description',
+      'onboarding_intent',
+      'primary_goal_slug',
+      'onboarding_idempotency_key',
+      'completed_onboarding_steps',
+      'expected_return',
+      'inflation_rate',
+      'retirement_expense_method',
+      'retirement_expense_custom_amount',
+      'fire_end_strategy',
+      'fire_legacy_amount',
+      'fire_end_age',
+      'temporal_balance',
+      'widget_prefs',
+      'financial_context',
+    ] as const
+    let profileErr: { message?: string; code?: string } | null = null
+    for (let attempt = 0; attempt < OPTIONAL_PROFILE_COLUMNS.length + 1; attempt++) {
+      const { error } = await supabase.from('profiles').upsert(profileData)
+      if (!error) {
+        profileErr = null
+        break
+      }
+      profileErr = error
+      const missing = OPTIONAL_PROFILE_COLUMNS.find(
+        (col) => error.message?.includes(`'${col}'`),
+      )
+      if (!missing || !(missing in profileData)) break
+      // eslint-disable-next-line no-console
+      console.warn(`[onboarding-save] schema-cache miss op '${missing}' — retry zonder deze kolom`)
+      delete profileData[missing]
+    }
     if (profileErr) throw new Error(`Profiel opslaan mislukt: ${profileErr.message}`)
 
     // 2. Create budget hierarchy with user amounts — BATCHED for performance
@@ -721,117 +847,96 @@ export async function POST(req: Request) {
       }
     })
 
-    // 3. Insert optional bank accounts + companion cash assets
-    // Delete existing onboarding-created bank accounts (without IBAN) to avoid wiping bank-connected ones
+    // 3. Insert assets via QuickAddInput → buildAssetDraft. Cash-rekeningen
+    // zitten als `cash`-type tussen de quickAssets — geen aparte
+    // bank_accounts-flow meer in onboarding.
+    //
+    // Cleanup-volgorde mirrort de RPC: eerst lege bank_accounts en cash-
+    // assets verwijderen (van een vorige onboarding-poging), dan alle
+    // non-cash, dan inserten.
     await supabase.from('bank_accounts').delete().eq('user_id', user.id).eq('iban', '')
-    // Also delete existing onboarding-created cash assets (companion assets from previous attempt)
     await supabase.from('assets').delete().eq('user_id', user.id).eq('asset_type', 'cash')
 
-    let companionCashAssetIds: string[] = []
-    if (bankAccounts && bankAccounts.length > 0) {
-      // 3a. Create companion cash assets first (same pattern as seed-persona.ts)
-      const cashAssetRows = bankAccounts.map((a, i) => ({
-        user_id: user.id,
-        name: a.name,
-        asset_type: 'cash' as const,
-        current_value: a.balance,
-        purchase_value: a.balance,
-        expected_return: 0,
-        monthly_contribution: 0,
-        institution: a.bank_name,
-        is_active: true,
-        sort_order: i,
-        ownership: 'personal',
-        net_worth_inclusion_pct: 100,
-        is_liquid: true,
-        subtype: a.account_type,
-        has_budget_tracking: a.has_budget_tracking ?? (budgetteringMode !== 'none'),
-      }))
-
-      const { data: cashAssets, error: cashErr } = await supabase
-        .from('assets')
-        .insert(cashAssetRows)
-        .select('id')
-      if (cashErr) throw new Error(`Cash assets opslaan mislukt: ${cashErr.message}`)
-      companionCashAssetIds = (cashAssets ?? []).map((a) => a.id)
-
-      // 3b. Create bank accounts with linked_asset_id pointing to companion cash assets
-      const rows = bankAccounts.map((a, i) => ({
-        user_id: user.id,
-        name: a.name,
-        bank_name: a.bank_name,
-        account_type: a.account_type,
-        balance: a.balance,
-        iban: '',
-        is_active: true,
-        sort_order: i,
-        linked_asset_id: companionCashAssetIds[i] ?? null,
-      }))
-      const { error: bankErr } = await supabase.from('bank_accounts').insert(rows)
-      if (bankErr) throw new Error(`Bankrekeningen opslaan mislukt: ${bankErr.message}`)
-    }
-
-    // 4. Insert optional assets (delete existing non-cash ones on retry to prevent duplicates)
-    // Cash assets were already handled above for bank accounts
-    if (assets && assets.length > 0) {
+    if (quickAssets.length > 0) {
       await supabase.from('assets').delete().eq('user_id', user.id).neq('asset_type', 'cash')
-      // Offset sort_order by number of companion cash assets to avoid conflicts
-      const assetSortOffset = companionCashAssetIds.length
-      const rows = assets.map((a, i) => ({
-        user_id: user.id,
-        name: a.name,
-        asset_type: a.asset_type,
-        current_value: a.current_value,
-        purchase_value: a.purchase_value ?? a.current_value,
-        purchase_date: new Date().toISOString().split('T')[0],
-        expected_return: a.expected_return ?? 0,
-        monthly_contribution: a.monthly_contribution ?? 0,
-        institution: a.institution || null,
-        is_active: true,
-        sort_order: assetSortOffset + i,
-        // Type-specific
-        subtype: a.subtype || null,
-        risk_profile: a.risk_profile || null,
-        tax_benefit: a.tax_benefit ?? null,
-        is_liquid: a.is_liquid ?? null,
-        lock_end_date: a.lock_end_date || null,
-        ticker_symbol: a.ticker_symbol || null,
-        rental_income: a.rental_income ?? null,
-        woz_value: a.woz_value ?? null,
-        retirement_provider_type: a.retirement_provider_type || null,
-        depreciation_rate: a.depreciation_rate ?? null,
-        address_postcode: a.address_postcode || null,
-        address_house_number: a.address_house_number || null,
-      }))
+      const today = new Date().toISOString().split('T')[0]
+      const hasBudgetteren = activeModules?.includes('budgetteren') ?? false
+      const hasAandelenregistratie = activeModules?.includes('aandelenregistratie') ?? false
+      const rows = quickAssets.map((q, i) => {
+        const draft = buildAssetDraft(q)
+        return {
+          user_id: user.id,
+          name: draft.name,
+          asset_type: draft.asset_type,
+          current_value: draft.current_value,
+          purchase_value: draft.purchase_value,
+          purchase_date: today,
+          expected_return: draft.expected_return,
+          monthly_contribution: draft.monthly_contribution,
+          institution: draft.institution,
+          is_active: true,
+          sort_order: i,
+          // Type-specific
+          subtype: draft.subtype,
+          risk_profile: draft.risk_profile,
+          tax_benefit: draft.tax_benefit,
+          is_liquid: draft.is_liquid,
+          lock_end_date: draft.lock_end_date,
+          ticker_symbol: draft.ticker_symbol,
+          rental_income: draft.rental_income,
+          woz_value: draft.woz_value,
+          retirement_provider_type: draft.retirement_provider_type,
+          depreciation_rate: draft.depreciation_rate,
+          address_postcode: draft.address_postcode,
+          address_house_number: draft.address_house_number,
+          ownership: draft.ownership,
+          net_worth_inclusion_pct: draft.net_worth_inclusion_pct,
+          notes: draft.notes,
+          // Module-tracking-flags inline meegeven (zelfde semantiek als
+          // applyModuleTrackingFlags, maar voor het fallback-pad scheelt
+          // dat een extra UPDATE-roundtrip).
+          has_budget_tracking: hasBudgetteren && draft.asset_type === 'cash',
+          has_holdings_tracking: hasAandelenregistratie && draft.asset_type === 'investment',
+        }
+      })
       const { error: assetErr } = await supabase.from('assets').insert(rows)
       if (assetErr) throw new Error(`Bezittingen opslaan mislukt: ${assetErr.message}`)
     }
 
-    // 5. Insert optional debts (delete existing ones on retry to prevent duplicates)
-    if (debts && debts.length > 0) {
+    // 4. Insert debts via QuickAddInput → buildDebtDraft.
+    if (quickDebts.length > 0) {
       await supabase.from('debts').delete().eq('user_id', user.id)
-      const rows = debts.map((d, i) => ({
-        user_id: user.id,
-        name: d.name,
-        debt_type: d.debt_type,
-        original_amount: d.original_amount ?? d.current_balance,
-        current_balance: d.current_balance,
-        interest_rate: d.interest_rate,
-        minimum_payment: d.minimum_payment ?? d.monthly_payment,
-        monthly_payment: d.monthly_payment,
-        start_date: new Date().toISOString().split('T')[0],
-        creditor: d.creditor || null,
-        is_active: true,
-        sort_order: i,
-        // Type-specific
-        subtype: d.subtype || null,
-        repayment_type: d.repayment_type || null,
-        is_tax_deductible: d.is_tax_deductible ?? null,
-        fixed_rate_end_date: d.fixed_rate_end_date || null,
-        nhg: d.nhg ?? null,
-        credit_limit: d.credit_limit ?? null,
-        draagkrachtmeting_date: d.draagkrachtmeting_date || null,
-      }))
+      const today = new Date().toISOString().split('T')[0]
+      const rows = quickDebts.map((q, i) => {
+        const draft = buildDebtDraft(q)
+        return {
+          user_id: user.id,
+          name: draft.name,
+          debt_type: draft.debt_type,
+          original_amount: draft.original_amount,
+          current_balance: draft.current_balance,
+          interest_rate: draft.interest_rate,
+          minimum_payment: draft.minimum_payment,
+          monthly_payment: draft.monthly_payment,
+          start_date: today,
+          end_date: draft.end_date,
+          creditor: draft.creditor,
+          is_active: true,
+          sort_order: i,
+          // Type-specific
+          subtype: draft.subtype,
+          repayment_type: draft.repayment_type,
+          is_tax_deductible: draft.is_tax_deductible,
+          fixed_rate_end_date: draft.fixed_rate_end_date,
+          nhg: draft.nhg,
+          credit_limit: draft.credit_limit,
+          draagkrachtmeting_date: draft.draagkrachtmeting_date,
+          tax_year: draft.tax_year,
+          ownership: draft.ownership,
+          net_worth_inclusion_pct: draft.net_worth_inclusion_pct,
+          include_aflossing_in_savings: draft.include_aflossing_in_savings,
+        }
+      })
       const { error: debtErr } = await supabase.from('debts').insert(rows)
       if (debtErr) throw new Error(`Schulden opslaan mislukt: ${debtErr.message}`)
     }

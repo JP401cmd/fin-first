@@ -219,6 +219,16 @@ export interface ModuleGuideCardSpec {
   steps: { key: string; label: string; href?: string }[]
 }
 
+export interface GoalGuideCardSpec {
+  type: 'goalGuide'
+  /** Slug uit `lib/goals/types.ts` — opzettelijk niet sterker getypt om
+   *  cyclische imports en server/client-divergentie te vermijden. */
+  goalSlug: string
+  module: CardModule
+  title: string
+  steps: { key: string; label: string; href?: string }[]
+}
+
 // ── Union Type ──────────────────────────────────────────────
 
 export type BriefingCardSpec =
@@ -242,6 +252,7 @@ export type BriefingCardSpec =
   | DecisionPatternsCardSpec
   | FreedomDaysTrendCardSpec
   | ModuleGuideCardSpec
+  | GoalGuideCardSpec
 
 // ── SSE Event Types ─────────────────────────────────────────
 
@@ -329,4 +340,5 @@ export const CARD_SPAN: Record<BriefingCardSpec['type'], number> = {
   decisionPatterns: 2,
   freedomDaysTrend: 2,
   moduleGuide: 2,
+  goalGuide: 2,
 }

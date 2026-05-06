@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { Kicker } from '@/components/editorial'
+import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip } from '@/components/editorial'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
@@ -49,14 +49,45 @@ import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wiz
 import { AssetEditConnectionSection } from './asset-edit-connection-section'
 import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
 import { InvestmentHoldingCard } from '@/components/holdings/investment-holding-card'
+import { VermogenAssetCard } from './vermogen-asset-card'
+import { AddCategoryCard } from './add-category-card'
+import { buildKpiContext } from '@/lib/kpi-context'
+import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
+import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
+import { loadConnectionsByAssetIds, type AssetConnectionSummary } from '@/lib/connections-data'
 import type { AssetsPageData } from '@/lib/assets-data-loader'
 
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
+
+const ASSET_ITEM_NOUN: Record<AssetType, [string, string]> = {
+  cash: ['rekening', 'rekeningen'],
+  savings: ['rekening', 'rekeningen'],
+  investment: ['positie', 'posities'],
+  retirement: ['regeling', 'regelingen'],
+  eigen_huis: ['woning', 'woningen'],
+  real_estate: ['object', 'objecten'],
+  crypto: ['positie', 'posities'],
+  vehicle: ['voertuig', 'voertuigen'],
+  physical: ['item', 'items'],
+  deelneming: ['deelneming', 'deelnemingen'],
+  levensverzekering: ['polis', 'polissen'],
+  vordering: ['vordering', 'vorderingen'],
+  other: ['item', 'items'],
+}
+
+function addAssetCta(type: AssetType): string {
+  return `Voeg ${ASSET_ITEM_NOUN[type][0]} toe`
+}
 
 export default function AssetsPage({ initialAssetId, initialData }: { initialAssetId?: string; initialData?: AssetsPageData } = {}) {
   const router = useRouter()
   const fc = useFc()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [quickAddInitialType, setQuickAddInitialType] = useState<AssetType | null>(null)
+  // Filter-state: lege Set = alles tonen, niet-leeg = alleen geselecteerde
+  // types tonen in de cards-grid en in de projection-chart. Wordt aangestuurd
+  // door klikken op rijen in de Verdeling-tabel onderaan.
+  const [selectedTypes, setSelectedTypes] = useState<Set<AssetType>>(new Set())
   const [assets, setAssets] = useState<Asset[]>(() => {
     if (!initialData) return []
     const rawAssets = initialData.assets as unknown as Asset[]
@@ -101,6 +132,11 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>(initialData ? initialData.valuations as unknown as Record<string, Valuation[]> : {})
   const [dailyExpenses, setDailyExpenses] = useState(initialData?.dailyExpenses ?? 0)
   const [budgetingActive, setBudgetingActive] = useState(initialData?.budgetingActive ?? true)
+  // Cards-decoraties (sparklines + connections) — client-side fetch zodra
+  // assets geladen zijn. Failure is non-fataal: lege maps → cards renderen
+  // zonder breuklijn-overlay of plug-indicator.
+  const [assetSparklines, setAssetSparklines] = useState<Record<string, number[]>>({})
+  const [connectionsByAssetId, setConnectionsByAssetId] = useState<Record<string, AssetConnectionSummary>>({})
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
   const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
@@ -274,6 +310,61 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
     return map
   }, [activeAssets])
 
+  // ── KPI's per asset (zelfde patroon als asset-category-page) ──
+  // Context-build uit lokale state: assets (huidige user) + mortgages
+  // (al geladen voor overwaarde-koppelingen). Holdings/cashStats blijven
+  // leeg — die KPI's vervallen op deze overview-pagina, het zijn diepere
+  // categorie-pagina-KPI's. Voor de mainline-strip (rente, looptijd,
+  // overwaarde, LTV) is dit voldoende.
+  const kpiByAssetId = useMemo(() => {
+    const ctx = buildKpiContext({
+      assets: activeAssets.map((a) => ({
+        id: a.id,
+        asset_type: a.asset_type,
+        current_value: Number(a.current_value),
+        linked_asset_id: a.linked_asset_id ?? null,
+      })),
+      debts: mortgages.map((m) => ({
+        id: m.id,
+        debt_type: 'mortgage' as const,
+        current_balance: Number(m.current_balance),
+        linked_asset_id: m.linked_asset_id ?? null,
+      })),
+      holdings: [],
+    }).asset
+    const map = new Map<string, KpiPair>()
+    for (const asset of activeAssets) {
+      const pair = computeAssetKpi(asset, ctx)
+      if (pair.primary || pair.secondary) {
+        map.set(asset.id, pair)
+      }
+    }
+    return map
+  }, [activeAssets, mortgages])
+
+  // ── Client-side fetch: sparklines + connections ──────────────
+  // Zelfde data als de categorie-pagina laadt zodat `<VermogenAssetCard>`
+  // op deze overview identiek rendert als op `/core/assets/[type]`.
+  useEffect(() => {
+    const ids = activeAssets.map((a) => a.id)
+    if (ids.length === 0) {
+      setAssetSparklines({})
+      setConnectionsByAssetId({})
+      return
+    }
+    const supabase = createClient()
+    let cancelled = false
+    Promise.allSettled([
+      loadEntitySparklines(supabase, 'asset', ids),
+      loadConnectionsByAssetIds(supabase, ids),
+    ]).then(([sparkRes, connRes]) => {
+      if (cancelled) return
+      setAssetSparklines(sparkRes.status === 'fulfilled' ? sparkRes.value : {})
+      setConnectionsByAssetId(connRes.status === 'fulfilled' ? connRes.value : {})
+    })
+    return () => { cancelled = true }
+  }, [activeAssets])
+
   // Portfolio projection
   const projection = useMemo(
     () => projectPortfolio(activeAssets, projectionYears * 12),
@@ -367,115 +458,89 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Editorial header — blueprint Type 2 (List) */}
-      <header className="mb-5 space-y-2">
-        {/* Kicker met 28×1px streep */}
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
-          <span
-            aria-hidden
-            className="inline-block h-px w-7 shrink-0"
-            style={{ background: 'var(--module-active-500)' }}
-          />
-          Bezittingen · {activeAssets.length} item{activeAssets.length !== 1 ? 's' : ''}
-        </div>
-        {/* Headline met italic-em "vrijheid" */}
-        <h1
-          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
-          style={{ fontFamily: 'var(--font-playfair, serif)' }}
-        >
-          Opgeslagen{' '}
-          <em
-            className="font-normal italic"
-            style={{ color: 'var(--module-active-700)' }}
-          >
-            vrijheid
-          </em>
-        </h1>
+      {/* ═══ Editorial header (Type 2 — List) ═══════════════════════
+          Hergebruikt editorial-primitives: Kicker, EditorialHeadline,
+          EditorialDeck, FiguresStrip. Geen hand-rolled markup. */}
+
+      {/* 3px module-accent-bar */}
+      <div className="h-[3px] w-full mb-5" style={{ background: 'var(--module-active-500)' }} aria-hidden="true" />
+
+      <header className="mb-5 space-y-3">
+        <Kicker size="large">Bezittingen · opgeslagen vrijheid</Kicker>
+
+        <EditorialHeadline emphasis="vrijheid" size="lg">
+          Opgeslagen vrijheid
+        </EditorialHeadline>
+
+        <EditorialDeck>
+          Elke bezitting is opgeslagen tijd — geld dat voor je werkt in plaats van andersom.
+          {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar — gewogen naar inclusiepercentage.`}
+        </EditorialDeck>
+
+        {perspective === 'household' && hiddenCategories.includes('assets') && (
+          <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['assets']} />
+        )}
       </header>
 
-      {/* Original section header (compact) */}
-      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setQuickAddOpen(true)}
-                aria-label="Bezitting toevoegen"
-                title="Bezitting toevoegen"
-                className="inline-flex min-h-[32px] items-center gap-1.5 border border-kern-200 bg-[var(--color-kern-50)] px-2.5 py-1 text-xs font-medium text-kern-700 transition-colors hover:bg-kern-100 hover:text-kern-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
-              >
-                <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
-                Bezitting toevoegen
-              </button>
-            </div>
-            <p
-              className="mt-1 italic text-[12px] text-[var(--ink-3)]"
-              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-            >
-              {activeAssets.length} bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
-            </p>
-            {perspective === 'household' && hiddenCategories.includes('assets') && (
-              <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['assets']} />
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/core/assets/revalue"
-              className="inline-flex items-center gap-2 rounded-[var(--r)] border border-kern-200 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Herwaarderen
-            </Link>
-          </div>
-        </div>
+      {/* Figures-strip (mini-hero) — Totale waarde krijgt highlight-marker */}
+      <FiguresStrip
+        cols={4}
+        figures={[
+          {
+            kicker: 'Totale waarde',
+            amount: fc(totalValue),
+            sub: dailyExpenses > 0 && totalValue > 0
+              ? `${formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid`
+              : `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
+            variant: 'winner',
+          },
+          {
+            kicker: 'Maandelijkse inleg',
+            amount: fc(totalMonthlyContrib),
+            sub: 'totale inleg per maand',
+          },
+          {
+            kicker: 'Rendement totaal',
+            amount: totalPurchase > 0
+              ? `${totalValue >= totalPurchase ? '+' : ''}${fc(totalValue - totalPurchase)}`
+              : '—',
+            sub: totalPurchase > 0
+              ? totalValue >= totalPurchase ? 'sinds aankoop' : 'verlies sinds aankoop'
+              : 'geen aankoopwaarde bekend',
+            variant: totalPurchase > 0
+              ? totalValue >= totalPurchase ? 'positive' : 'negative'
+              : 'neutral',
+          },
+          {
+            kicker: `Waarde over ${projectionYears} jaar`,
+            amount: fc(futureValue),
+            sub: dailyExpenses > 0 && futureValue > 0
+              ? `${formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid`
+              : `+${fc(projectedGrowth)} verwacht`,
+            variant: 'positive',
+          },
+        ]}
+      />
 
-        <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale waarde</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{fc(totalValue)}</p>
-            {dailyExpenses > 0 && totalValue > 0 && (
-              <p className="mt-0.5 text-xs text-kern-600/70" data-testid="total-value-freedom">
-                {formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid
-              </p>
-            )}
-          </div>
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Maandelijkse inleg</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{fc(totalMonthlyContrib)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Rendement (totaal)</p>
-            {totalPurchase > 0 ? (
-              <>
-                <p className={`mt-1 text-xl font-bold ${totalValue >= totalPurchase ? 'text-positive' : 'text-negative'}`}>
-                  {totalValue >= totalPurchase ? '+' : ''}{fc(totalValue - totalPurchase)}
-                </p>
-                {dailyExpenses > 0 && Math.abs(totalValue - totalPurchase) > 0 && (
-                  <p className={`mt-0.5 text-xs ${totalValue >= totalPurchase ? 'text-positive/70' : 'text-negative/70'}`} data-testid="return-freedom">
-                    {(() => {
-                      const fd = calculateFreedomTime(Math.abs(totalValue - totalPurchase), dailyExpenses)
-                      const fdStr = formatFreedomTimeString(fd, 'short', true)
-                      return totalValue >= totalPurchase ? `${fdStr} vrijheid gewonnen` : `${fdStr} vrijheid verloren`
-                    })()}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="mt-1 text-xl font-bold text-[var(--ink-3)]">-</p>
-            )}
-          </div>
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Waarde over {projectionYears} jaar</p>
-            <p className="mt-1 text-xl font-bold text-emerald-600">{fc(futureValue)}</p>
-            {dailyExpenses > 0 && futureValue > 0 && (
-              <p className="mt-0.5 text-xs text-emerald-500/70" data-testid="future-value-freedom">
-                {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
+      {/* Toolbar — primaire CTA + Herwaarderen rechts */}
+      <div className="mb-5 flex items-center justify-end gap-2">
+        <Link
+          href="/core/assets/revalue"
+          className="inline-flex min-h-[40px] items-center gap-2 border border-[var(--border-md)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          Herwaarderen
+        </Link>
+        <button
+          type="button"
+          onClick={() => { setQuickAddInitialType(null); setQuickAddOpen(true) }}
+          aria-label="Bezitting toevoegen"
+          className="inline-flex min-h-[40px] items-center gap-2 border border-[var(--ink)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+          Bezitting toevoegen
+        </button>
+      </div>
 
       {/* Allocation + projection — collapsible card */}
       <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
@@ -577,8 +642,11 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         )}
       </div>
 
-      {/* Grouped asset list */}
-      <section className="mt-3 sm:mt-6 space-y-1">
+      {/* Grouped asset cards — grid per categorie, conform /core/assets/[type].
+          Elke categorie krijgt een klikbare header die doorlinkt naar de
+          categorie-pagina. De "+" kaart aan het einde van elk grid opent de
+          QuickAddWizard met dat type voor-geselecteerd. */}
+      <section className="mt-3 sm:mt-6 space-y-6">
         {activeAssets.length === 0 && (
           <QuickAddEmptyState intent="asset" onAdd={() => setQuickAddOpen(true)} />
         )}
@@ -587,164 +655,47 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           if (!group || group.assets.length === 0) return null
           const groupColor = ASSET_TYPE_COLORS[type]
           const groupIcon = ASSET_TYPE_ICONS[type]
-          const isCash = type === 'cash'
 
           return (
             <div key={type}>
-              {/* Group header — klikbaar bij cash zodat gebruikers naar de
-                  categorie-pagina (incl. Budgetteren tab) navigeren. Voor
-                  andere types blijft het een statische kicker. */}
-              <div className="flex items-center gap-2 pt-4 pb-1.5">
+              {/* Group header — altijd klikbaar door naar /core/assets/[type] */}
+              <div className="flex items-center gap-2 pt-2 pb-2.5">
                 <span style={{ color: groupColor }}><BudgetIcon name={groupIcon} className="h-4 w-4" /></span>
-                {isCash ? (
-                  <Link
-                    href="/core/assets/cash"
-                    className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] hover:text-kern-600 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
-                  >
-                    {ASSET_TYPE_LABELS[type]}
-                  </Link>
-                ) : (
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                    {ASSET_TYPE_LABELS[type]}
-                  </h3>
-                )}
+                <Link
+                  href={`/core/assets/${type}`}
+                  className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] hover:text-kern-600 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
+                >
+                  {ASSET_TYPE_LABELS[type]}
+                </Link>
                 <span className="text-xs tabular-nums text-[var(--ink-3)]">
                   {fc(group.total)}
                 </span>
               </div>
 
-              {/* Asset cards */}
-              <div className="space-y-2">
-                {group.assets.map((asset) => {
-                  const value = Number(asset.current_value)
-                  const purchase = Number(asset.purchase_value)
-                  const returnPct = purchase > 0 ? ((value - purchase) / purchase) * 100 : 0
-                  const icon = ASSET_TYPE_ICONS[asset.asset_type] ?? 'Briefcase'
-                  const color = ASSET_TYPE_COLORS[asset.asset_type]
-                  const hasBudget = isCash && budgetingActive && asset.has_budget_tracking && linkedBankAccounts.has(asset.id)
-
-                  return (
-                    <div
-                      key={asset.id}
-                      className={`flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors ${
-                        hasBudget ? 'hover:border-emerald-200 hover:bg-emerald-50/30' : 'hover:border-kern-200 hover:bg-kern-50/30'
-                      }`}
-                      onClick={() => handleAssetClick(asset)}
-                    >
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)]"
-                        style={{ backgroundColor: color + '15' }}
-                      >
-                        <span style={{ color }}><BudgetIcon name={icon} className="h-4 w-4" /></span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-[var(--ink)] flex items-center gap-1.5">
-                          {asset.name}
-                          <OwnershipBadge ownership={asset.ownership ?? 'personal'} />
-                          {hasBudget && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 border border-emerald-200">
-                              <BarChart3 className="h-2.5 w-2.5" /> Transacties
-                            </span>
-                          )}
-                          {asset.has_holdings_tracking && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-kern-50 px-1.5 py-0.5 text-[9px] font-medium text-kern-700 border border-kern-200">
-                              <TrendingUp className="h-2.5 w-2.5" /> Holdings
-                            </span>
-                          )}
-                        </p>
-                        <p className="truncate text-xs text-[var(--ink-3)]">
-                          {hasBudget
-                            ? [
-                                asset.subtype && ASSET_SUBTYPE_LABELS.cash?.[asset.subtype],
-                                asset.account_number,
-                                asset.institution,
-                              ].filter(Boolean).join(' \u2022 ') || (asset.subtype === 'contant_geld' ? 'Contant geld' : 'Bankrekening')
-                            : [
-                                ASSET_TYPE_LABELS[asset.asset_type],
-                                asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype],
-                                asset.institution,
-                                asset.asset_type === 'deelneming' && asset.ownership_percentage != null ? `${asset.ownership_percentage}% belang` : null,
-                                asset.asset_type === 'levensverzekering' && asset.expiry_date ? (() => {
-                                  const now = new Date()
-                                  const end = new Date(asset.expiry_date!)
-                                  const diffMs = end.getTime() - now.getTime()
-                                  if (diffMs <= 0) return 'Verlopen'
-                                  const diffYears = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
-                                  const diffMonths = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
-                                  if (diffYears > 0) return `Nog ${diffYears} jaar${diffMonths > 0 ? ` en ${diffMonths} mnd` : ''}`
-                                  return `Nog ${diffMonths} maanden`
-                                })() : null,
-                                asset.asset_type === 'vordering' && asset.lock_end_date ? (() => {
-                                  const now = new Date()
-                                  const end = new Date(asset.lock_end_date!)
-                                  const diffMs = end.getTime() - now.getTime()
-                                  if (diffMs <= 0) return 'Afgelopen'
-                                  const diffYears = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
-                                  const diffMonths = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
-                                  if (diffYears > 0) return `Nog ${diffYears} jaar${diffMonths > 0 ? ` en ${diffMonths} mnd` : ''}`
-                                  return `Nog ${diffMonths} maanden`
-                                })() : null,
-                              ].filter(Boolean).join(' \u2022 ')
-                          }
-                        </p>
-                        {asset.asset_type === 'deelneming' && asset.annual_dividend != null && asset.annual_dividend > 0 && (
-                          <p className="text-[10px] text-teal-600/80">
-                            Dividend: {fc(asset.annual_dividend)} p.j.
-                          </p>
-                        )}
-                        {asset.asset_type === 'levensverzekering' && Number(asset.monthly_contribution) > 0 && (
-                          <p className="text-[10px] text-purple-600/80">
-                            Premie: {fc(Number(asset.monthly_contribution))} p/m
-                          </p>
-                        )}
-                        {asset.asset_type === 'vordering' && (
-                          <p className="text-[10px] text-sky-600/80">
-                            {[
-                              `Rente: ${Number(asset.expected_return)}% p.j.`,
-                              Number(asset.monthly_contribution) > 0 ? `Aflossing: ${fc(Number(asset.monthly_contribution))} p/m` : null,
-                            ].filter(Boolean).join(' \u2022 ')}
-                          </p>
-                        )}
-                        {asset.asset_type === 'vordering' && asset.subtype === 'dga_lening' && asset.linked_asset_id && (() => {
-                          const linked = assets.find(a => a.id === asset.linked_asset_id)
-                          if (!linked) return null
-                          return (
-                            <p className="text-[10px] text-teal-600/80">
-                              DGA-lening bij {linked.name}
-                            </p>
-                          )
-                        })()}
-                        {(asset.net_worth_inclusion_pct ?? 100) < 100 && (
-                          <span className="mt-0.5 inline-block rounded bg-kern-50 border border-kern-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-kern-600">
-                            {asset.net_worth_inclusion_pct}% meegeteld
-                          </span>
-                        )}
-                      </div>
-                      {/* Mini sparkline for non-cash asset cards */}
-                      {!hasBudget && (() => {
-                        const assetVals = valuations[asset.id]
-                        if (assetVals && assetVals.length >= 2) {
-                          const sorted = [...assetVals].sort((a, b) => a.valuation_date.localeCompare(b.valuation_date))
-                          return <MiniSparkline valuations={sorted} className="hidden sm:block" />
-                        }
-                        return null
-                      })()}
-                      <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold text-[var(--ink)]">{fc(value)}</p>
-                        {dailyExpenses > 0 && value > 0 && (
-                          <p className={`text-[10px] ${hasBudget ? 'text-emerald-500/70' : 'text-kern-500/70'}`} data-testid="asset-card-freedom">
-                            {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'short', true)} vrijheid
-                          </p>
-                        )}
-                        {!hasBudget && purchase > 0 && (
-                          <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                            {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
+              {/* Asset cards — zelfde grid + cards als /core/assets/[type].
+                  KPI-strip, sparkline-overlay, connection-badge en app-chip
+                  worden door VermogenAssetCard zelf gerenderd zodra de props
+                  aanwezig zijn. */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {group.assets.map((asset, idx) => (
+                  <VermogenAssetCard
+                    key={asset.id}
+                    asset={asset}
+                    kpiPair={kpiByAssetId.get(asset.id)}
+                    connection={connectionsByAssetId[asset.id]}
+                    sparklineValues={assetSparklines[asset.id]}
+                    onClick={handleAssetClick}
+                    staggerIndex={idx}
+                  />
+                ))}
+                <AddCategoryCard
+                  label={addAssetCta(type)}
+                  onClick={() => { setQuickAddInitialType(type); setQuickAddOpen(true) }}
+                  variant="asset"
+                  shape="item"
+                  staggerIndex={group.assets.length}
+                  ariaLabel={`Voeg item toe aan ${ASSET_TYPE_LABELS[type]}`}
+                />
               </div>
             </div>
           )
@@ -843,8 +794,9 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
 
       <QuickAddWizard
         open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
+        onClose={() => { setQuickAddOpen(false); setQuickAddInitialType(null) }}
         initialIntent="asset"
+        initialAssetType={quickAddInitialType ?? undefined}
         onSaved={() => router.refresh()}
       />
     </div>

@@ -386,8 +386,14 @@ function prefersReducedMotion(): boolean {
  * — die regelt cross-fade-and-slide automatisch via `view-transition-name`
  * CSS-properties op TopBar/Content/BottomBar.
  */
+type ViewTransitionLike = {
+  ready?: Promise<void>
+  finished?: Promise<void>
+  updateCallbackDone?: Promise<void>
+  skipTransition?: () => void
+}
 type DocumentWithViewTransitions = Document & {
-  startViewTransition?: (callback: () => void) => unknown
+  startViewTransition?: (callback: () => void) => ViewTransitionLike
 }
 
 function hasViewTransitions(): boolean {
@@ -397,11 +403,23 @@ function hasViewTransitions(): boolean {
 
 function startViewTransition(callback: () => void): void {
   const doc = document as DocumentWithViewTransitions
-  if (typeof doc.startViewTransition === 'function') {
-    doc.startViewTransition(callback)
-  } else {
+  if (typeof doc.startViewTransition !== 'function') {
     callback()
+    return
   }
+  const transition = doc.startViewTransition(callback)
+  // De View Transitions API heeft drie promises (ready/finished/updateCallbackDone)
+  // die alle drie met AbortError rejecten als de transitie wordt geskipped door
+  // een nieuwe transitie. Skipped is verwacht en functioneel onschadelijk; alle
+  // drie swallowen voorkomt unhandled-rejection-spam in de Next.js dev-overlay.
+  const swallow = (err: unknown) => {
+    if (err instanceof Error && err.name !== 'AbortError') {
+      console.error('[nav-stack] view transition error:', err)
+    }
+  }
+  transition?.ready?.catch(swallow)
+  transition?.finished?.catch(swallow)
+  transition?.updateCallbackDone?.catch(swallow)
 }
 
 // ── Context ──────────────────────────────────────────────────────
@@ -499,15 +517,10 @@ export function NavStackProvider({
       }, true)
     }
 
-    if (hasViewTransitions() && !reduced) {
-      // View Transitions API regelt de animatie automatisch — wij hoeven
-      // alleen de DOM-mutatie binnen de callback te triggeren. We zetten
-      // alsnog de phase voor onze custom-fallback-CSS (zodat browsers met
-      // view-transitions ook onze keyframes kunnen draaien op opt-in basis).
-      startViewTransition(applyMutation)
-    } else {
-      applyMutation()
-    }
+    // Geen view-transition wrap hier: de pathname-watcher useEffect doet dat
+    // canonical wanneer Next.js de pathname wisselt. Dubbel wrappen veroorzaakt
+    // AbortError 'Transition was skipped'.
+    applyMutation()
 
     // Reset transition naar idle na de animatie-duur. Zonder reduced-motion
     // én zonder view-transitions doen we dit altijd; met view-transitions ook

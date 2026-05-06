@@ -282,6 +282,38 @@ export function getDeepeningSlug(entry: DeepeningEntry): string {
 }
 
 /**
+ * Bepaal welke apps actief zijn op basis van tracking-flags op assets/debts.
+ *
+ * Een app is actief als minstens één asset/debt de bijbehorende tracking-vlag
+ * heeft staan. Returns app-slugs (zoals `getDeepeningSlug` ze produceert) — bij
+ * multi-app categorieën met dezelfde label ("Hypotheekplanner" op zowel mortgage
+ * als eigen_huis) wordt dezelfde slug uit beide bronnen geactiveerd.
+ *
+ * Wordt gebruikt door de Sidebar om de apps-strip te filteren: een app
+ * verschijnt alleen wanneer de gebruiker daadwerkelijk een gekoppeld
+ * asset/debt heeft.
+ */
+export function getActiveAppKeys(
+  assets: Array<Asset>,
+  debts: Array<Debt>,
+): string[] {
+  const active = new Set<string>()
+  for (const entry of CATEGORY_DEEPENINGS) {
+    if (!entry.isItemTracked) continue
+    const items = entry.kind === 'asset' ? assets : debts
+    const matchingType = items.filter(
+      (i) =>
+        ('asset_type' in i && (i as Asset).asset_type === entry.type) ||
+        ('debt_type' in i && (i as Debt).debt_type === entry.type),
+    )
+    if (matchingType.some((i) => entry.isItemTracked!(i))) {
+      active.add(getDeepeningSlug(entry))
+    }
+  }
+  return [...active]
+}
+
+/**
  * Tel hoeveel items in een lijst de app gebruiken (en hoeveel in totaal).
  * Voor de strip op de categoriekaart en de samenvatting in de banner.
  *

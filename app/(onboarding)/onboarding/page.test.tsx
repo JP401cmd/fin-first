@@ -19,7 +19,7 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep('budgets', [
       'intro',
       'identity',
-      'intent',
+      'goal',
       'bezittingen',
       'budgets',
       'saving',
@@ -35,7 +35,7 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep('budgets', [
       'intro',
       'identity',
-      'intent',
+      'goal',
       'nieuws_only',
       'saving',
       'success',
@@ -51,7 +51,7 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep('verzonnen_stap', [
       'intro',
       'identity',
-      'intent',
+      'goal',
       'bezittingen',
       'budgets',
       'saving',
@@ -66,43 +66,42 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep(undefined, [
       'intro',
       'identity',
-      'intent',
+      'goal',
       'saving',
       'success',
     ])
     expect(result.step).toBe('identity')
   })
 
-  it('preserves the existing migration path (persona → intent handled upstream)', () => {
-    // The migration map in `loadFromLocalStorage` renames 'persona'/'modules'
-    // to 'intent' before dispatch, so by the time `_resolveRestoredStep`
-    // sees it, it should be a valid 'intent' step.
+  it('heals legacy "intent" step name directly to "goal"', () => {
+    // The migration map in `_resolveRestoredStep` renames the legacy
+    // 'intent' step to its current 'goal' equivalent before checking
+    // membership in the active order.
     const result = _resolveRestoredStep('intent', [
       'intro',
       'identity',
-      'intent',
+      'goal',
       'bezittingen',
       'saving',
       'success',
     ])
-    expect(result).toEqual({ step: 'intent', healed: false })
+    expect(result).toEqual({ step: 'goal', healed: false })
   })
 
-  it('heals legacy "modules" step name directly to "intent"', () => {
-    const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+  it('heals legacy "modules" step name directly to "goal"', () => {
+    const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
     const result = _resolveRestoredStep('modules', [...activeOrder])
-    // 'modules' is mapped to 'intent' inside _resolveRestoredStep
-    expect(result).toEqual({ step: 'intent', healed: false })
+    expect(result).toEqual({ step: 'goal', healed: false })
   })
 
-  it('heals legacy "persona" step name directly to "intent"', () => {
-    const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+  it('heals legacy "persona" step name directly to "goal"', () => {
+    const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
     const result = _resolveRestoredStep('persona', [...activeOrder])
-    expect(result).toEqual({ step: 'intent', healed: false })
+    expect(result).toEqual({ step: 'goal', healed: false })
   })
 
   it('heals legacy "extras" step name directly to "bezittingen"', () => {
-    const activeOrder = ['intro', 'identity', 'intent', 'bezittingen', 'saving', 'success'] as const
+    const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
     const result = _resolveRestoredStep('extras', [...activeOrder])
     expect(result).toEqual({ step: 'bezittingen', healed: false })
   })
@@ -115,7 +114,7 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     const result = _resolveRestoredStep('horizon', [
       'intro',
       'identity',
-      'intent',
+      'goal',
       'bezittingen',
       'saving',
       'success',
@@ -134,9 +133,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     estimated_monthly_expenses: '2200',
   }
 
-  // PreferencesData and HorizonData shapes — use `as any` because the full
-  // shapes aren't exported and we only care about pass-through here.
-  const basePreferences = {} as unknown as (typeof _initialState)['preferences']
+  // HorizonData shape — pass-through only; we only care about restore behavior.
   const baseHorizon = _initialState.horizon
 
   let warnSpy: ReturnType<typeof vi.spyOn>
@@ -154,16 +151,14 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        intent: null,
+        goal: null,
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
         newsDescription: '',
         extraction: null,
         budgetAmounts: {},
-        bankAccounts: [],
-        assets: [],
-        debts: [],
-        preferences: basePreferences,
+        quickAssets: [],
+        quickDebts: [],
         lastStep: 'budgets',
       },
     })
@@ -179,16 +174,14 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        intent: null,
+        goal: null,
         activeModules: ['nieuws'],
         horizon: baseHorizon,
         newsDescription: '',
         extraction: null,
         budgetAmounts: {},
-        bankAccounts: [],
-        assets: [],
-        debts: [],
-        preferences: basePreferences,
+        quickAssets: [],
+        quickDebts: [],
         // Cast because the persisted shape is typed to the current union,
         // but we're simulating a draft saved before the flow changed.
         lastStep: 'budgets' as (typeof _initialState)['step'],
@@ -205,16 +198,14 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        intent: null,
+        goal: null,
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
         newsDescription: '',
         extraction: null,
         budgetAmounts: {},
-        bankAccounts: [],
-        assets: [],
-        debts: [],
-        preferences: basePreferences,
+        quickAssets: [],
+        quickDebts: [],
         lastStep: 'verzonnen_stap' as unknown as (typeof _initialState)['step'],
       },
     })
@@ -228,7 +219,7 @@ describe('onboarding _firstNavigationRecoveryStep', () => {
     const result = _firstNavigationRecoveryStep([
       'intro',
       'identity',
-      'intent',
+      'goal',
       'bezittingen',
       'budgets',
       'saving',
@@ -241,12 +232,12 @@ describe('onboarding _firstNavigationRecoveryStep', () => {
   it('returns the first selectable step when identity is absent', () => {
     const result = _firstNavigationRecoveryStep([
       'intro',
-      'intent',
+      'goal',
       'nieuws_only',
       'saving',
       'success',
     ])
-    expect(result).toBe('intent')
+    expect(result).toBe('goal')
   })
 
   it('falls back to identity when the active order is empty', () => {
@@ -261,7 +252,7 @@ describe('onboarding _firstNavigationRecoveryStep', () => {
     const activeStepOrder = [
       'intro',
       'identity',
-      'intent',
+      'goal',
       'bezittingen',
       'saving',
       'success',

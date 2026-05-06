@@ -26,7 +26,6 @@ import {
   Inbox,
   Newspaper,
   BarChart3,
-  Calculator,
   Search,
   ChevronDown,
   ChevronsLeft,
@@ -39,12 +38,12 @@ import { useModuleAccess } from '@/components/app/feature-access-provider'
 import {
   getActiveNavModules,
   type NavModule,
-  type ModuleId,
 } from '@/lib/module-registry'
 import { useSidebarCollapsed } from '@/lib/hooks/use-sidebar-collapsed'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { ShellFlagToggle } from '@/components/app/shell/shell-flag-toggle'
+import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -66,6 +65,13 @@ export type SidebarProps = {
   userName: string
   /** Role van de user — bij `'superadmin'` verschijnt extra Beheer-link in footer. */
   role?: string
+  /**
+   * App-slugs die actief zijn op basis van tracking-flags op assets/debts —
+   * de bron van waarheid is `getActiveAppKeys()` uit
+   * `components/core/category-deepening-registry.ts`. Een app uit `MODULES.apps`
+   * verschijnt alleen wanneer haar `appKey` in deze lijst staat.
+   */
+  activeAppKeys?: string[]
 }
 
 // ── Module-config ────────────────────────────────────────────────────────────
@@ -86,7 +92,8 @@ type ModuleEntry = {
   subTags: SubTag[]
   /**
    * Optionele tag-strip met *apps* (verdiepingen) van de module. Alleen
-   * gerenderd voor apps wiens `moduleId` actief is in `useModuleAccess()`.
+   * gerenderd voor apps wiens `appKey` voorkomt in `activeAppKeys` — d.w.z.
+   * minstens één gekoppeld asset/debt heeft de tracking-vlag aan staan.
    * Apps zijn de category-deepening-entries uit
    * `components/core/category-deepening-registry.ts` (Budgetteren, Holdings,
    * Aflosstrategie, Hypotheekplanner, Verhuurrendement).
@@ -97,8 +104,12 @@ type ModuleEntry = {
 type AppTag = {
   label: string
   href: string
-  /** Vereiste module — entry verschijnt alleen als deze actief is. */
-  moduleId: ModuleId
+  /**
+   * App-slug — moet matchen met de slug uit `getDeepeningSlug()` op de
+   * bijbehorende registry-entry. Een app verschijnt alleen wanneer deze slug
+   * in `activeAppKeys` staat (= ≥1 asset/debt heeft de tracking-vlag aan).
+   */
+  appKey: string
 }
 
 type SubTag = {
@@ -108,8 +119,9 @@ type SubTag = {
 
 // Conform plan §3.3: tag-strip toont *categorieën* (eerste rij). Daaronder
 // optioneel een *apps*-strip met de verdiepende functionaliteit per module —
-// alleen apps waarvan de bijbehorende module actief is. Apps deeplinken naar
-// hun categorie-pagina met de juiste `?tab=`-state, conform plan §2.5.
+// alleen apps die geactiveerd zijn door minstens één gekoppeld asset/debt
+// (zie `getActiveAppKeys()` in category-deepening-registry.ts). Apps
+// deeplinken naar hun categorie-pagina met de juiste `?tab=`-state.
 const MODULES: ModuleEntry[] = [
   {
     key: 'kern',
@@ -123,15 +135,14 @@ const MODULES: ModuleEntry[] = [
       { label: 'Schulden', href: '/core/debts' },
     ],
     apps: [
-      // Bron: components/core/category-deepening-registry.ts. Hrefs deeplinken
-      // naar de categorie-pagina met `?tab=<slug>` zodat de gebruiker direct
-      // in de app-tab landt. Aflosstrategie linkt naar /core/debts (niet één
-      // specifiek debt-type), gebruiker kiest daar zelf de relevante schuld.
-      { label: 'Budgetteren',     href: '/core/assets/cash?tab=budgetteren',          moduleId: 'budgetteren' },
-      { label: 'Holdings',        href: '/core/assets/holdings',                      moduleId: 'aandelenregistratie' },
-      { label: 'Hypotheekplanner', href: '/core/debts/mortgage?tab=hypotheekplanner', moduleId: 'toekomstplannen' },
-      { label: 'Aflosstrategie',  href: '/core/debts',                                 moduleId: 'toekomstplannen' },
-      { label: 'Verhuurrendement', href: '/core/assets/real_estate?tab=verhuurrendement', moduleId: 'vermogensregistratie' },
+      // Bron: components/core/category-deepening-registry.ts. `appKey` matcht
+      // de slug uit `getDeepeningSlug()` zodat de Sidebar kan filteren op
+      // welke apps daadwerkelijk een gekoppeld asset/debt hebben.
+      { label: 'Budgetteren',      href: '/core/assets/cash?tab=budgetteren',              appKey: 'budgetteren' },
+      { label: 'Holdings',         href: '/core/assets/holdings',                          appKey: 'holdings' },
+      { label: 'Hypotheekplanner', href: '/core/debts/mortgage?tab=hypotheekplanner',      appKey: 'hypotheekplanner' },
+      { label: 'Aflosstrategie',   href: '/core/debts',                                    appKey: 'aflosstrategie' },
+      { label: 'Verhuurrendement', href: '/core/assets/real_estate?tab=verhuurrendement',  appKey: 'verhuurrendement' },
     ],
   },
   {
@@ -167,10 +178,6 @@ const OVERIGE_BASE: OverigeEntry[] = [
   { label: 'Berichten', Icon: Inbox, href: '/berichten' },
   { label: 'Nieuws', Icon: Newspaper, href: '/nieuws' },
   { label: 'Rapportages', Icon: BarChart3, href: '/rapportages' },
-  // Fase 3 — global tool route. FIRE-simulator hangt buiten alle modules en
-  // verdient een directe entry naast Rapportages.
-  // Plan: docs/navigatie-redesign-plan.md §3.3 (overige-sectie globaal).
-  { label: 'FIRE-simulator', Icon: Calculator, href: '/tools/fire-sim' },
 ]
 
 type FooterLink = {
@@ -235,6 +242,7 @@ export function Sidebar({
   userInitials,
   userName,
   role,
+  activeAppKeys = [],
 }: SidebarProps) {
   const pathname = usePathname() ?? '/'
   const [collapsed, setCollapsed] = useSidebarCollapsed()
@@ -242,9 +250,11 @@ export function Sidebar({
 
   const activeModule = detectActiveModule(pathname)
 
-  // Module-fallback: kijken welke nav-modules tenminste één actief gating-module hebben.
-  // We gebruiken de echte bron-of-truth (`getActiveNavModules`) i.p.v. zelf moduleId's
-  // matchen — zo blijft de fallback synchroon met BottomNav en widget-gating.
+  // Module-fallback: welke nav-modules ten minste één actief module hebben.
+  // We gebruiken de echte bron-of-truth (`getActiveNavModules`) i.p.v. zelf
+  // moduleId's matchen — zo blijft de fallback synchroon met BottomNav en
+  // widget-gating. App-zichtbaarheid in de strip wordt afzonderlijk
+  // gefilterd op `activeAppKeys` (zie ModuleRow).
   const activeNavModules = getActiveNavModules(activeModules)
 
   // Width drives both sidebar shell and `<main>`-offset in DesktopSidebarShell
@@ -268,7 +278,7 @@ export function Sidebar({
         collapsed={collapsed}
         activeModule={activeModule}
         activeNavModules={activeNavModules}
-        activeModules={activeModules}
+        activeAppKeys={activeAppKeys}
         netWorth={netWorth}
         actionCount={actionCount}
         fireAge={fireAge}
@@ -355,17 +365,24 @@ function BrandingRow({
           <ChevronsLeft className="w-3.5 h-3.5" aria-hidden />
         </button>
       </div>
-      <button
-        type="button"
-        // ⌘K is een skeleton — search-implementatie volgt later (plan §9 Q6).
-        className="inline-flex items-center gap-1.5 px-2 h-8 border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]/50 hover:text-[var(--ink-2)] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
-        aria-label="Zoeken"
-        title="Zoeken (⌘K) — binnenkort beschikbaar"
-      >
-        <Search className="w-3.5 h-3.5" aria-hidden />
-        <span className="font-mono text-[10px] uppercase tracking-[0.15em]">⌘K</span>
-      </button>
+      <SearchTrigger />
     </div>
+  )
+}
+
+function SearchTrigger() {
+  const { open } = useCommandPalette()
+  return (
+    <button
+      type="button"
+      onClick={open}
+      className="inline-flex items-center gap-1.5 px-2 h-8 border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]/50 hover:text-[var(--ink-2)] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+      aria-label="Zoeken in TriFinity"
+      title="Zoeken (⌘K)"
+    >
+      <Search className="w-3.5 h-3.5" aria-hidden />
+      <span className="font-mono text-[10px] uppercase tracking-[0.15em]">⌘K</span>
+    </button>
   )
 }
 
@@ -377,7 +394,7 @@ function ModulesSection({
   collapsed,
   activeModule,
   activeNavModules,
-  activeModules,
+  activeAppKeys,
   netWorth,
   actionCount,
   fireAge,
@@ -385,7 +402,7 @@ function ModulesSection({
   collapsed: boolean
   activeModule: NavModule | null
   activeNavModules: NavModule[]
-  activeModules: ModuleId[]
+  activeAppKeys: string[]
   netWorth: number
   actionCount: number
   fireAge: number | null
@@ -410,7 +427,7 @@ function ModulesSection({
               isActive={mod.key === activeModule}
               isEnabled={isModuleNavActive}
               metric={metrics[mod.key]}
-              activeModules={activeModules}
+              activeAppKeys={activeAppKeys}
             />
           )
         })}
@@ -440,14 +457,14 @@ function ModuleRow({
   isActive,
   isEnabled,
   metric,
-  activeModules,
+  activeAppKeys,
 }: {
   module: ModuleEntry
   collapsed: boolean
   isActive: boolean
   isEnabled: boolean
   metric: string
-  activeModules: ModuleId[]
+  activeAppKeys: string[]
 }) {
   const Icon = module.Icon
   const styleVars = moduleVars(module.key)
@@ -462,10 +479,12 @@ function ModuleRow({
       ? 'bg-[color-mix(in_oklch,var(--module-active-500)_8%,transparent)] text-[var(--module-active-700)]'
       : 'text-[var(--ink-2)] hover:bg-[var(--subtle)]/50 hover:text-[var(--ink)]'
 
-  // Inactive modules linken naar Instellingen-modules-sectie i.p.v. de module-route,
-  // conform plan §2.6 fallback-regel.
-  const targetHref = isEnabled ? module.href : '/identity/instellingen#modules'
-  const tooltip = isEnabled ? module.label : `${module.label} — Activeer in Instellingen`
+  // Module-toggle is verwijderd uit Trifinity; modules zijn altijd enabled.
+  // De fallback-tak (`!isEnabled`) blijft hieronder bestaan voor het geval
+  // toekomstige module-gating teruggebracht wordt, maar wordt momenteel
+  // niet bereikt. `targetHref` valt terug op de module-route zelf.
+  const targetHref = module.href
+  const tooltip = module.label
 
   if (collapsed) {
     return (
@@ -564,11 +583,12 @@ function ModuleRow({
         <SubTagStrip subTags={module.subTags} />
       )}
 
-      {/* Apps-strip — alleen op active+enabled module met apps wiens module
-          ook geactiveerd is (filter via activeModules). */}
+      {/* Apps-strip — alleen op active+enabled module met apps die door
+          minstens één gekoppeld asset/debt geactiveerd zijn (filter via
+          activeAppKeys, gevoed door tracking-flags op assets en debts). */}
       {isActive && isEnabled && module.apps && module.apps.length > 0 && (
         <AppTagStrip
-          apps={module.apps.filter((a) => activeModules.includes(a.moduleId))}
+          apps={module.apps.filter((a) => activeAppKeys.includes(a.appKey))}
         />
       )}
 
@@ -614,25 +634,22 @@ function SubTagStrip({ subTags, dimmed = false }: { subTags: SubTag[]; dimmed?: 
   // module visueel blijft dominen, maar de sub-pages wel scanbaar zijn.
   const baseColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
   const linkHoverClass = dimmed ? 'hover:text-[var(--ink-2)]' : 'hover:text-[var(--ink)]'
+  // Vertical stack: elke sub-tag op eigen rij. pl-[42px] = px-3 (12) + icon (18)
+  // + gap-3 (12) zodat de tags onder de module-label uitlijnen i.p.v. onder de
+  // icon-kolom. Communiceert duidelijker de parent/child-relatie.
   return (
     <div
-      className={`italic text-[12px] leading-snug mt-0 px-3 pb-2 -mt-1.5 ${baseColorClass}`}
+      className={`flex flex-col italic text-[12px] leading-snug pl-[42px] pr-3 pb-2 -mt-1 ${baseColorClass}`}
       style={{ fontFamily: SOURCE_SERIF }}
     >
-      {subTags.map((tag, idx) => (
-        <span key={tag.href}>
-          <Link
-            href={tag.href}
-            className={`${linkHoverClass} transition-colors duration-150`}
-          >
-            {tag.label}
-          </Link>
-          {idx < subTags.length - 1 && (
-            <span aria-hidden className="mx-1.5 text-[var(--ink-4)]">
-              ·
-            </span>
-          )}
-        </span>
+      {subTags.map((tag) => (
+        <Link
+          key={tag.href}
+          href={tag.href}
+          className={`block py-0.5 ${linkHoverClass} transition-colors duration-150`}
+        >
+          {tag.label}
+        </Link>
       ))}
     </div>
   )
@@ -652,8 +669,11 @@ function AppTagStrip({ apps, dimmed = false }: { apps: AppTag[]; dimmed?: boolea
   const bodyColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
   const linkHoverClass = dimmed ? 'hover:text-[var(--ink-2)]' : 'hover:text-[var(--ink)]'
   const stripeColor = dimmed ? 'var(--rule-soft, var(--border-ed))' : 'var(--module-active-500)'
+  // Vertical stack — zelfde indent als SubTagStrip (pl-[42px]) zodat alle
+  // children van de module onder de label uitlijnen. Kicker "apps" staat
+  // boven de stack als sectie-marker.
   return (
-    <div className="px-3 pb-2.5 -mt-1">
+    <div className="pl-[42px] pr-3 pb-2.5 -mt-1">
       <div className="flex items-center gap-1.5 mb-0.5 text-[9px] font-mono uppercase tracking-[0.18em] text-[var(--ink-3)]">
         <span
           aria-hidden
@@ -663,23 +683,17 @@ function AppTagStrip({ apps, dimmed = false }: { apps: AppTag[]; dimmed?: boolea
         apps
       </div>
       <div
-        className={`text-[11px] leading-snug ${bodyColorClass}`}
+        className={`flex flex-col text-[11px] leading-snug ${bodyColorClass}`}
         style={{ fontFamily: SOURCE_SERIF }}
       >
-        {apps.map((app, idx) => (
-          <span key={app.href}>
-            <Link
-              href={app.href}
-              className={`${linkHoverClass} transition-colors duration-150`}
-            >
-              {app.label}
-            </Link>
-            {idx < apps.length - 1 && (
-              <span aria-hidden className="mx-1.5 text-[var(--ink-4)]">
-                ·
-              </span>
-            )}
-          </span>
+        {apps.map((app) => (
+          <Link
+            key={app.href}
+            href={app.href}
+            className={`block py-0.5 ${linkHoverClass} transition-colors duration-150`}
+          >
+            {app.label}
+          </Link>
         ))}
       </div>
     </div>

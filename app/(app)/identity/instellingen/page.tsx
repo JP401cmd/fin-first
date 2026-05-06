@@ -28,10 +28,6 @@ import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/
 import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
-import { useModuleAccess } from '@/components/app/feature-access-provider'
-import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
-import { ModuleActivationModal, MODULE_REQUIRED_STEPS } from '@/components/app/module-activation-modal'
 
 // ── Typography helpers ────────────────────────────────────────────────────
 
@@ -90,18 +86,6 @@ export default function InstellingenPage() {
   const [gegevensOpen, setGegevensOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [rebalancingOpen, setRebalancingOpen] = useState(false)
-  const [modulesOpen, setModulesOpen] = useState(false)
-
-  // ─ Module toggle state ─
-  const [moduleToggleErrors, setModuleToggleErrors] = useState<string[]>([])
-  const { activeModules, refreshModules } = useModuleAccess()
-  const { modules: activeModuleToggles, toggle: toggleModule, saving: moduleSaving } = useModuleToggle(activeModules, refreshModules)
-
-  // ─ Module onboarding state (progressive onboarding for new modules) ─
-  const [completedSteps, setCompletedSteps] = useState<string[]>([])
-  const [pendingModuleId, setPendingModuleId] = useState<ModuleId | null>(null)
-  const [forcedMissingSteps, setForcedMissingSteps] = useState<string[]>([])  // Steps to re-show even if completed
-  const [userNetIncome, setUserNetIncome] = useState<number>(2500)
 
   // ─ Section: Financiële toelichting ─
   const [toelichtingOpen, setToelichtingOpen] = useState(false)
@@ -222,7 +206,7 @@ export default function InstellingenPage() {
       const [notifData, profileData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
-          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold, financial_context, completed_onboarding_steps, net_monthly_income'
+          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold, financial_context'
         ).eq('id', user.id).single(),
       ])
 
@@ -340,15 +324,6 @@ export default function InstellingenPage() {
         if (d.financial_context) {
           setFinancialContext(d.financial_context as string)
           setFinancialContextSaved(d.financial_context as string)
-        }
-
-        // Completed onboarding steps (for progressive module onboarding)
-        if (d.completed_onboarding_steps) {
-          setCompletedSteps(d.completed_onboarding_steps as string[])
-        }
-        // Net monthly income (for module activation budget calculations)
-        if (d.net_monthly_income) {
-          setUserNetIncome(d.net_monthly_income as number)
         }
       }
 
@@ -779,137 +754,6 @@ export default function InstellingenPage() {
           Modules, notificaties, berekeningen, weergave en gegevensbeheer.
         </p>
       </header>
-
-      {/* ── Modules ──────────────────────────────────────────────────── */}
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setModulesOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Modules</h2>
-            {!modulesOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                {activeModuleToggles.length} van {MODULE_CATALOG.length} actief
-              </p>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${modulesOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {modulesOpen && (
-          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-4">
-            <p className="text-xs text-[var(--ink-3)]">
-              Kies welke modules actief zijn. Minstens één basismodule is vereist.
-            </p>
-
-            {/* Error messages from validation */}
-            {moduleToggleErrors.length > 0 && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                {moduleToggleErrors.map((err, i) => (
-                  <p key={i} className="text-xs text-red-700">{err}</p>
-                ))}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {MODULE_CATALOG.map((mod) => {
-                const isActive = activeModuleToggles.includes(mod.id)
-                const hasDependency = mod.requires.length > 0 || (mod.requiresOneOf && mod.requiresOneOf.length > 0)
-
-                const dependencyLabel = (() => {
-                  if (mod.requires.length > 0) {
-                    const labels = mod.requires
-                      .map((id) => MODULE_CATALOG.find((m) => m.id === id)?.label ?? id)
-                      .join(', ')
-                    return `Vereist: ${labels}`
-                  }
-                  if (mod.requiresOneOf && mod.requiresOneOf.length > 0) {
-                    const labels = mod.requiresOneOf
-                      .map((id) => MODULE_CATALOG.find((m) => m.id === id)?.label ?? id)
-                      .join(' of ')
-                    return `Vereist: ${labels}`
-                  }
-                  return null
-                })()
-
-                return (
-                  <div
-                    key={mod.id}
-                    className="flex items-start justify-between rounded-xl border border-[var(--border-ed)] px-4 py-3 gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[var(--ink)]">
-                        {mod.label}
-                        {mod.inDevelopment && (
-                          <span className="ml-1.5 inline-flex align-middle text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                            In ontwikkeling
-                          </span>
-                        )}
-                      </p>
-                      <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-snug">{mod.description}</p>
-                      {hasDependency && dependencyLabel && (
-                        <p className="mt-1 text-[11px] text-[var(--ink-4)]">{dependencyLabel}</p>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={isActive}
-                      aria-label={`${mod.label} ${isActive ? 'uitschakelen' : 'inschakelen'}`}
-                      disabled={moduleSaving}
-                      onClick={async () => {
-                        setModuleToggleErrors([])
-                        // When enabling a module, check if required onboarding steps are completed
-                        if (!isActive) {
-                          const requiredSteps = MODULE_REQUIRED_STEPS[mod.id as ModuleId] ?? []
-                          let missing = requiredSteps.filter((s) => !completedSteps.includes(s))
-                          // For budgetteren: also check if user has any bank accounts
-                          // Even if bezittingen was completed for another module, the user may
-                          // not have created bank accounts — force the step if none exist
-                          let forced: string[] = []
-                          if (mod.id === 'budgetteren' && !missing.includes('bezittingen')) {
-                            const supabase = createClient()
-                            const { count } = await supabase
-                              .from('bank_accounts')
-                              .select('*', { count: 'exact', head: true })
-                              .eq('is_active', true)
-                            if (!count || count === 0) {
-                              missing = ['bezittingen', ...missing]
-                              forced = ['bezittingen']
-                            }
-                          }
-                          if (missing.length > 0) {
-                            setForcedMissingSteps(forced)
-                            setPendingModuleId(mod.id as ModuleId)
-                            return
-                          }
-                        }
-                        const result = await toggleModule(mod.id, !isActive)
-                        if (!result.success) {
-                          setModuleToggleErrors(result.errors)
-                          // Auto-clear errors after 5 seconds
-                          setTimeout(() => setModuleToggleErrors([]), 5000)
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-wil-500 disabled:opacity-50 ${
-                        isActive ? 'bg-wil-500' : 'bg-zinc-300'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                          isActive ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </section>
 
       {/* ── A: Notificaties ─────────────────────────────────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
@@ -2705,42 +2549,6 @@ export default function InstellingenPage() {
           </div>
         </div>
       </BottomSheet>
-
-      {/* ── Module activation modal (embedded onboarding forms) ──────── */}
-      {pendingModuleId && (
-        <ModuleActivationModal
-          moduleId={pendingModuleId}
-          completedSteps={completedSteps.filter((s) => !forcedMissingSteps.includes(s))}
-          open={!!pendingModuleId}
-          onClose={() => { setPendingModuleId(null); setForcedMissingSteps([]) }}
-          activeModules={activeModuleToggles}
-          netIncome={userNetIncome}
-          onComplete={async (newSteps) => {
-            // Merge new steps into completed set
-            const updatedSteps = [...new Set([...completedSteps, ...newSteps])]
-            setCompletedSteps(updatedSteps)
-
-            // Persist to backend (fire-and-forget with error logging)
-            if (newSteps.length > 0) {
-              fetch('/api/onboarding-steps', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ steps: updatedSteps }),
-              }).catch((err) => console.error('Failed to save onboarding steps:', err))
-            }
-
-            // Now actually toggle the module on
-            const moduleToActivate = pendingModuleId
-            setPendingModuleId(null)
-
-            const result = await toggleModule(moduleToActivate, true)
-            if (!result.success) {
-              setModuleToggleErrors(result.errors)
-              setTimeout(() => setModuleToggleErrors([]), 5000)
-            }
-          }}
-        />
-      )}
 
     </div>
   )

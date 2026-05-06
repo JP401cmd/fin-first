@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 
-import { useToast } from '@/components/app/toast-provider'
+import { useOptionalToast } from '@/components/app/toast-provider'
 import { quickAdd } from '@/app/actions/quick-add'
 import {
   ASSET_QUICK_ADD_LABELS,
@@ -73,6 +73,19 @@ export interface QuickAddWizardProps {
    */
   initialAssetType?: AssetType
   initialDebtType?: DebtType
+  /**
+   * Twee operatie-modi:
+   *   · `commit` (default) — schrijft direct via de `quickAdd` Server Action
+   *     en navigeert / verfrist na succes. Gebruikt op `/core` en de
+   *     categorie-detail-pagina's.
+   *   · `collect` — slaat NIETS op; geeft het verzamelde item door via
+   *     `onCollect` zodat een parent (bv. onboarding) het in eigen lokale
+   *     state kan houden tot een batch-submit. In deze modus wordt de
+   *     gekoppelde-schuld-prompt overgeslagen — een onboarding-gebruiker
+   *     voegt asset en debt apart toe.
+   */
+  mode?: 'commit' | 'collect'
+  onCollect?: (item: QuickAddInput) => void
   onSaved?: (result: { assetId?: string; debtId?: string }) => void
 }
 
@@ -103,13 +116,19 @@ export function QuickAddWizard({
   initialIntent,
   initialAssetType,
   initialDebtType,
+  mode = 'commit',
+  onCollect,
   onSaved,
 }: QuickAddWizardProps) {
   const [state, dispatch] = useReducer(wizardReducer, initialWizardState)
   const [isSaving, setIsSaving] = useState(false)
   const [linkDebtCtx, setLinkDebtCtx] = useState<LinkDebtContext>(null)
-  const { addToast } = useToast()
+  // Optionele toast: wizard wordt ook in onboarding-layout gebruikt waar geen
+  // ToastProvider zit. In collect-mode roepen we addToast toch niet aan; in
+  // commit-mode is de provider altijd aanwezig (app-shell).
+  const { addToast } = useOptionalToast()
   const router = useRouter()
+  const isCollectMode = mode === 'collect'
 
   // Type-prefill is alleen actief wanneer hij past bij intent — dezelfde
   // soft-fail-regel als in de reducer. We berekenen 'm hier opnieuw zodat
@@ -145,6 +164,27 @@ export function QuickAddWizard({
 
   const submitQuickAdd = useCallback(
     async (input: QuickAddInput) => {
+      // Collect-mode: alleen verzamelen, geen DB-write. De parent krijgt het
+      // item via `onCollect` en bewaart het tot een batch-submit (onboarding).
+      if (isCollectMode) {
+        dispatch({
+          type: 'SUCCESS',
+          payload: {
+            step: 'success',
+            kind: input.kind,
+            assetName: input.kind !== 'debt' ? input.asset.name : undefined,
+            debtName:
+              input.kind === 'asset_with_debt' ? input.debt.name : undefined,
+            netAmount:
+              input.kind === 'asset_with_debt'
+                ? input.asset.current_value - input.debt.current_balance
+                : undefined,
+          },
+        })
+        onCollect?.(input)
+        return
+      }
+
       setIsSaving(true)
       dispatch({ type: 'SAVING' })
 
@@ -204,7 +244,7 @@ export function QuickAddWizard({
         setIsSaving(false)
       }
     },
-    [addToast, onSaved, router],
+    [isCollectMode, onCollect, addToast, onSaved, router],
   )
 
   // ── Asset-details → linkDebt prompt OR submit ──────────────────
@@ -220,7 +260,10 @@ export function QuickAddWizard({
         field3: draft.field3 ?? null,
       }
 
-      const suggestsDebt = LINKED_DEBT_SUGGESTIONS[draft.asset_type]
+      // Collect-mode skipt de gekoppelde-schuld-prompt: het asset is nog niet
+      // opgeslagen (dus geen linked_asset_id beschikbaar) en de onboarding-
+      // gebruiker voegt schuld apart toe als die er is.
+      const suggestsDebt = !isCollectMode && LINKED_DEBT_SUGGESTIONS[draft.asset_type]
       if (!suggestsDebt) {
         await submitQuickAdd({ kind: 'asset', asset: complete })
         return
@@ -257,7 +300,7 @@ export function QuickAddWizard({
         setIsSaving(false)
       }
     },
-    [addToast, onSaved, router, submitQuickAdd],
+    [isCollectMode, addToast, onSaved, router, submitQuickAdd],
   )
 
   // ── Debt-details (stand-alone of gekoppeld) ────────────────────

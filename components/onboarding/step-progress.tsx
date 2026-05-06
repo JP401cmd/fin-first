@@ -4,7 +4,7 @@
 
 const PHASES = [
   { key: 'gegevens', label: 'Gegevens' },
-  { key: 'modules', label: 'Modules' },
+  { key: 'modules', label: 'Doel' },
   { key: 'instellen', label: 'Instellen' },
   { key: 'klaar', label: 'Klaar' },
 ] as const

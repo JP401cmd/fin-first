@@ -66,11 +66,32 @@ import { NavStackProvider } from '@/components/app/shell/nav-stack-provider'
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 
+export type SidebarMetrics = {
+  /** Netto vermogen (assets − debts, gewogen volgens inclusion-pct). */
+  netWorth: number
+  /** Aantal openstaande/uitgestelde acties (Wil-module). */
+  actionCount: number
+  /** FIRE-leeftijd uit meest recente snapshot, of `null` als nog niet berekend. */
+  fireAge: number | null
+  /**
+   * App-slugs die geactiveerd zijn door minstens één gekoppeld asset/debt —
+   * voedt de Sidebar's apps-strip filter zodat apps alleen verschijnen
+   * wanneer de gebruiker ze daadwerkelijk gebruikt.
+   */
+  activeAppKeys: string[]
+}
+
 export type ResponsiveShellProps = {
   /** Email van de ingelogde user — gebruikt voor AppHeader (oude shell) en initials/name afleiding (nieuwe shell sidebar). */
   email: string
   /** Role van de user (default 'user'). Doorgegeven aan AppHeader voor superadmin-link. */
   role?: string
+  /**
+   * Sidebar-kerncijfers, voorberekend in de server-layout zodat ze synchroon
+   * met dashboard/horizon blijven. Optioneel: bij weglaten valt de Sidebar
+   * terug op zero/null placeholders (tijdens rendering buiten layout-context).
+   */
+  sidebarMetrics?: SidebarMetrics
   /** Pagina-content. */
   children: ReactNode
 }
@@ -193,19 +214,21 @@ function LegacyShell({
 function NewShell({
   email,
   role,
+  sidebarMetrics,
   children,
 }: ResponsiveShellProps) {
   const initials = getInitials(email)
   const userName = getUserName(email)
 
-  // Mock-props voor Sidebar (Fase 0.2). Echte data integratie is een latere
-  // taak (Fase 1.x): netWorth komt uit assets-totaal, actionCount uit will-
-  // signalen, fireAge uit FIRE-projection. Tot dan: nullen + `null` zodat de
-  // Sidebar haar metric-strip rendert met de "—" / "·" placeholders die zij
-  // al ondersteunt voor leege state.
-  const netWorth = 0
-  const actionCount = 0
-  const fireAge: number | null = null
+  // Sidebar-kerncijfers komen uit `app/(app)/layout.tsx` (server) — netWorth
+  // weegt mee via net_worth_inclusion_pct (consistent met dashboard), actionCount
+  // is open + postponed acties, fireAge is meest recente snapshot. Wanneer geen
+  // metrics worden meegegeven (rendering buiten layout-context) tonen we de
+  // placeholders die Sidebar zelf al ondersteunt: 0 / 0 / null → '€ 0' / '·' / '—'.
+  const netWorth = sidebarMetrics?.netWorth ?? 0
+  const actionCount = sidebarMetrics?.actionCount ?? 0
+  const fireAge = sidebarMetrics?.fireAge ?? null
+  const activeAppKeys = sidebarMetrics?.activeAppKeys ?? []
 
   // Media-query-gated single-mount: pre-hydratie blijven beide shells in de
   // boom (SSR-output matcht, geen flash op eerste paint). Direct na de eerste
@@ -231,6 +254,7 @@ function NewShell({
           userInitials={initials}
           userName={userName}
           role={role}
+          activeAppKeys={activeAppKeys}
         />
       </SidebarPortal>
 
@@ -291,12 +315,17 @@ function NewShell({
 export function ResponsiveShell({
   email,
   role,
+  sidebarMetrics,
   children,
 }: ResponsiveShellProps) {
   const [enabled] = useFeatureFlag(NEW_NAVIGATION_SHELL_FLAG)
 
   if (enabled) {
-    return <NewShell email={email} role={role}>{children}</NewShell>
+    return (
+      <NewShell email={email} role={role} sidebarMetrics={sidebarMetrics}>
+        {children}
+      </NewShell>
+    )
   }
 
   return <LegacyShell email={email} role={role}>{children}</LegacyShell>

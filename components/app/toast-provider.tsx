@@ -31,6 +31,18 @@ export function useToast() {
   return ctx
 }
 
+/**
+ * Defensieve variant: retourneert een no-op `addToast` als er géén
+ * `ToastProvider` in de tree zit. Bedoeld voor componenten die in
+ * meerdere contexten worden gebruikt (bv. `QuickAddWizard` op /core mét
+ * provider, en in onboarding-layout zónder provider). Het signaal-niveau
+ * blijft hetzelfde — toast-fallback degradeert stil.
+ */
+export function useOptionalToast(): ToastContextType {
+  const ctx = useContext(ToastContext)
+  return ctx ?? { toasts: [], addToast: () => {}, removeToast: () => {} }
+}
+
 // ── Toast Item ──────────────────────────────────────────────────────
 
 function ToastItem({
