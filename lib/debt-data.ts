@@ -84,7 +84,23 @@ export interface Debt {
   // schuld op basis van deze boolean. Default false zodat bestaande
   // gebruikers geen app-tracking krijgen zonder dat ze die hebben geactiveerd.
   has_strategy_tracking: boolean
+  // ── Provenance (zie supabase/migrations/<...>_add_aangifte_source.sql) ──
+  // Herkomst van deze rij. Optioneel in TS — DB heeft NOT NULL DEFAULT
+  // 'manual'. Zelfde semantiek als `Asset.source`. 'aangifte_import' wordt
+  // gezet door de Belastingdienst-flow, 'broker_csv' / 'bank_psd2' door
+  // andere import-paden.
+  source?: DebtSource
+  // Peildatum van de bron (bv. 1 januari van het belastingjaar). NULL voor
+  // manueel ingevoerde schulden.
+  imported_peildatum?: string | null
 }
+
+/**
+ * Provenance tag voor een debt-rij. Spiegelbeeld van `AssetSource`; beide
+ * worden gevalideerd door dezelfde CHECK-constraint set in de migratie
+ * `<...>_add_aangifte_source.sql`.
+ */
+export type DebtSource = 'manual' | 'aangifte_import' | 'broker_csv' | 'bank_psd2'
 
 export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
   mortgage: 'Hypotheek',

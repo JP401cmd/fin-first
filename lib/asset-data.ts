@@ -111,7 +111,25 @@ export interface Asset {
   // array betekent dat de gebruiker nog niets heeft gelogd — Verhuurrendement
   // toont dan een aanmoediging om te beginnen met loggen.
   vacancy_log: Array<{ month: string; occupied: boolean }>
+  // ── Provenance (zie supabase/migrations/<...>_add_aangifte_source.sql) ──
+  // Herkomst van deze rij. Optioneel in TS — de DB heeft NOT NULL DEFAULT
+  // 'manual' dus elke rij die uit Supabase komt heeft een waarde, maar
+  // bestaande factories en tests die `Asset`-literals construeren hoeven
+  // dit veld niet te kennen. Pas wanneer code provenance-bewust is (bv.
+  // bulk-delete van aangifte-imports, "Verifieer"-pill op stale data),
+  // wordt het expliciet uitgelezen.
+  source?: AssetSource
+  // Peildatum van de bron (bv. 1 januari van het belastingjaar voor
+  // aangifte_import). NULL voor manueel ingevoerde rijen.
+  imported_peildatum?: string | null
 }
+
+/**
+ * Provenance tag voor een asset/debt-rij. Houdt synchroon met de CHECK
+ * constraint `assets_source_check` in
+ * `supabase/migrations/<...>_add_aangifte_source.sql`.
+ */
+export type AssetSource = 'manual' | 'aangifte_import' | 'broker_csv' | 'bank_psd2'
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   cash: 'Cash / Bankrekeningen',
