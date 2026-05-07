@@ -49,14 +49,18 @@ export function PrivacyNotice({ compact = false }: PrivacyNoticeProps) {
       aria-labelledby="privacy-notice-heading"
       className={compact ? 'space-y-3' : 'space-y-4'}
     >
-      {/* Kicker-met-streepje volgt editorial-kicker-pattern */}
+      {/* Kicker-met-streepje volgt editorial-kicker-pattern. De `id` koppelt
+          aan `aria-labelledby` op de section zodat screen-readers de sectie
+          met deze kop aanduiden. */}
       <p className="flex items-center text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
         <span
           className="inline-block w-7 h-px bg-[var(--color-kern-500)] mr-2.5 align-middle"
           aria-hidden="true"
         />
         <span aria-hidden="true">🔒</span>
-        <span className="ml-1.5">Hoe we omgaan met jouw data</span>
+        <span id="privacy-notice-heading" className="ml-1.5">
+          Hoe we omgaan met jouw data
+        </span>
       </p>
 
       {/* Hoofdregel — italic body met paarse em (kern-700 voor kern-context) */}
@@ -115,8 +119,9 @@ export function PrivacyNotice({ compact = false }: PrivacyNoticeProps) {
       {/* Drie kerngaranties — krant-stijl footnote */}
       {!compact && (
         <p className="font-serif italic text-xs text-[var(--ink-3)] leading-relaxed border-t border-dotted border-[var(--border-ed)] pt-3 max-w-[60ch]">
-          Het PDF-bestand wordt in je browser gelezen door <span className="font-mono not-italic text-[11px]">pdfjs-dist</span>.
-          BSN&apos;s worden lokaal vervangen door <span className="font-mono not-italic text-[11px]">[BSN]</span> voordat de tekst
+          Het PDF-bestand wordt in je browser gelezen door <span className="font-mono not-italic text-[11px]">pdfjs-dist</span>;
+          de parser draait lokaal en roept geen externe CDN aan. BSN&apos;s worden lokaal vervangen
+          door <span className="font-mono not-italic text-[11px]">[BSN]</span> voordat de tekst
           naar de server gaat. Daarna kies jij zelf per regel of die in jouw vermogen mag landen.
         </p>
       )}

@@ -40,6 +40,19 @@ import type {
 // generate a NEW idempotency key to retry a failed import. This mirrors
 // the holdings-route pattern (`X-Idempotency-Key` header) but with a
 // longer TTL because aangifte-imports are larger and less repeatable.
+//
+// Concurrency: een naïve "check then write"-flow laat twee gelijktijdige
+// POSTs (double-click, abuse) langs de cache.get-controle glippen vóór de
+// eerste de set heeft gedaan. We tracken daarom *in-flight keys* in een
+// aparte `Set` die zo vroeg mogelijk in de handler wordt gezet en in een
+// `try/finally` weer leeggemaakt; daarmee gedraagt de cache zich als een
+// per-key mutex zonder dat we een externe semaphore nodig hebben.
+//
+// Onbounded growth: de cache wordt alleen opgeschoond bij elke POST. In een
+// pathologisch scenario (veel unieke keys per dag) kan hij oneindig groeien.
+// We bewaken dat met een MAX_CACHE_SIZE en een eenvoudige FIFO-eviction op
+// timestamp — geen volledige LRU want het toegangspatroon is per key
+// nagenoeg one-shot.
 
 interface CachedResponse {
   body: AangifteImportResponse
@@ -49,6 +62,8 @@ interface CachedResponse {
 
 const idempotencyCache = new Map<string, CachedResponse>()
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000 // 24h
+const MAX_CACHE_SIZE = 1000
+const inFlightKeys = new Set<string>()
 
 function cleanExpiredIdempotencyKeys(): void {
   const now = Date.now()
@@ -57,6 +72,30 @@ function cleanExpiredIdempotencyKeys(): void {
       idempotencyCache.delete(key)
     }
   }
+}
+
+/**
+ * Plaats een entry in de cache. Bij overschrijding van MAX_CACHE_SIZE
+ * verwijderen we de oudste entry (laagste timestamp). Niet volledig LRU,
+ * maar voldoende voor het verwachte one-shot toegangspatroon. Veiliger dan
+ * onbounded groeien.
+ */
+function setCachedResponseWithCap(
+  key: string,
+  entry: CachedResponse,
+): void {
+  if (idempotencyCache.size >= MAX_CACHE_SIZE && !idempotencyCache.has(key)) {
+    let oldestKey: string | null = null
+    let oldestTimestamp = Number.POSITIVE_INFINITY
+    for (const [k, v] of idempotencyCache.entries()) {
+      if (v.timestamp < oldestTimestamp) {
+        oldestTimestamp = v.timestamp
+        oldestKey = k
+      }
+    }
+    if (oldestKey) idempotencyCache.delete(oldestKey)
+  }
+  idempotencyCache.set(key, entry)
 }
 
 // ── Zod schemas ─────────────────────────────────────────────────────
@@ -140,6 +179,17 @@ const ProfileUpdatesSchema = z
 // PostgreSQL's DATE type without timezone surprises.
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
+// Mortgage-pair schema. Indices verwijzen naar posities in `assets` en
+// `debts` arrays die de client meestuurt. `.strict()` weigert extra velden
+// zodat een misvormde pair direct als 400 verschijnt — de server hoeft
+// nooit te raden welke pair-shape geldig is.
+const LinkedMortgagePairSchema = z
+  .object({
+    asset_idx: z.number().int().min(0),
+    debt_idx: z.number().int().min(0),
+  })
+  .strict()
+
 const importPayloadSchema = z
   .object({
     assets: z.array(AssetReviewItemSchema),
@@ -148,6 +198,7 @@ const importPayloadSchema = z
     peildatum: z.string().regex(ISO_DATE_REGEX, 'Peildatum moet ISO yyyy-mm-dd zijn'),
     tax_year: z.number().int().min(2000).max(2100),
     idempotency_key: z.string().uuid('idempotency_key moet een geldige UUID zijn'),
+    linked_mortgage_pairs: z.array(LinkedMortgagePairSchema).optional(),
   })
   .strict()
 
@@ -229,6 +280,56 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json(cached.body, { status: cached.status })
   }
 
+  // Concurrent-double-click guard: een tweede POST met dezelfde key terwijl
+  // de eerste nog draait krijgt 409 Conflict. Dit voorkomt dat twee
+  // gelijktijdige requests beide de write-loop ingaan vóór de cache-set
+  // gebeurt, met dubbele rijen tot gevolg. De `inFlightKeys.add` moet vóór
+  // de eerste write plaatsvinden en de finally-block na de laatste, zodat
+  // de window zo klein mogelijk blijft.
+  if (inFlightKeys.has(cacheKey)) {
+    const conflictBody: AangifteImportResponse = {
+      ok: false,
+      error: 'Import al bezig.',
+    }
+    return Response.json(conflictBody, { status: 409 })
+  }
+  inFlightKeys.add(cacheKey)
+
+  try {
+    return await runImportWritePhase({
+      supabase,
+      user,
+      payload,
+      cacheKey,
+    })
+  } finally {
+    // Lock-release: ongeacht success/failure of throw moet de key weer
+    // beschikbaar zijn voor toekomstige retries (met diezelfde of een
+    // nieuwe idempotency-key).
+    inFlightKeys.delete(cacheKey)
+  }
+}
+
+// ── Write-phase helper ──────────────────────────────────────────────
+//
+// Eigenlijke schrijfketen, geëxtraheerd zodat de POST-handler een
+// schoon try/finally om de inFlightKeys-lock kan plaatsen. De helper
+// gooit niet door — alle errors worden hier afgehandeld als 500-response;
+// de caller hoeft alleen de lock te releasen.
+
+interface WritePhaseArgs {
+  supabase: Awaited<ReturnType<typeof createClient>>
+  user: { id: string }
+  payload: AangifteImportPayload
+  cacheKey: string
+}
+
+async function runImportWritePhase({
+  supabase,
+  user,
+  payload,
+  cacheKey,
+}: WritePhaseArgs): Promise<Response> {
   // Write phase — orchestrated as a series of typed Supabase calls.
   //
   // We deliberately do NOT use a single RPC here (unlike save-own-data)
@@ -309,13 +410,13 @@ export async function POST(req: Request): Promise<Response> {
       insertedAssetIds.push(newId)
       assetIdByIndex.set(i, newId)
 
-      // Optional snapshot row: only when the user supplied a different
-      // actual value. Stores the peildatum value so the historic
-      // anchor is preserved.
-      if (
-        typeof item.current_value_actual === 'number' &&
-        item.current_value_actual !== draft.current_value
-      ) {
+      // Optional snapshot row: gemaakt zodra de gebruiker een actuele
+      // waarde invulde — ook als die exact gelijk is aan de peildatumwaarde.
+      // Reden: zelfs een gelijke waarde is een bewust historisch anker
+      // ("we wisten dat dit op peildatum X zo was") en moet niet stilzwijgend
+      // verdwijnen. Wijziging tov de oorspronkelijke condition die alleen
+      // bij ongelijkheid een snapshot maakte.
+      if (typeof item.current_value_actual === 'number') {
         const snapshotRow = {
           user_id: user.id,
           snapshot_date: payload.peildatum,
@@ -392,10 +493,8 @@ export async function POST(req: Request): Promise<Response> {
       insertedDebtIds.push(newId)
       debtIdByIndex.set(i, newId)
 
-      if (
-        typeof item.current_balance_actual === 'number' &&
-        item.current_balance_actual !== draft.current_balance
-      ) {
+      // Snapshot bij elk gevuld actual-veld — zie commentaar bij assets-tak.
+      if (typeof item.current_balance_actual === 'number') {
         const snapshotRow = {
           user_id: user.id,
           snapshot_date: payload.peildatum,
@@ -418,40 +517,78 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
-    // 3. Mortgage-coupling: if the payload contained both an eigen_huis
-    //    asset and a mortgage debt without `linked_asset_id`, link them
-    //    automatically. This mirrors the design doc's UX promise of
-    //    "één kaart 'Eigen woning' met beide regels samen". We pick the
-    //    *first* eigen_huis as the link target — the review-step is
-    //    expected to disambiguate when multiple are present.
-    const firstEigenHuisIdx = payload.assets.findIndex(
-      (a) => a.asset_type === 'eigen_huis',
-    )
-    if (firstEigenHuisIdx !== -1) {
-      const eigenHuisId = assetIdByIndex.get(firstEigenHuisIdx)
-      if (eigenHuisId) {
-        for (let i = 0; i < payload.debts.length; i++) {
-          const debtItem = payload.debts[i]
-          // `linked_asset_id` is optional in the payload (review-step
-          // only fills it in if the user manually overrode the link).
-          // Falsy covers both undefined and null, which is exactly the
-          // condition where we want to auto-link.
-          if (
-            debtItem.debt_type === 'mortgage' &&
-            !debtItem.linked_asset_id
-          ) {
-            const debtId = debtIdByIndex.get(i)
-            if (!debtId) continue
-            const { error: linkErr } = await supabase
-              .from('debts')
-              .update({
-                linked_asset_id: eigenHuisId,
-                is_tax_deductible: true,
-              })
-              .eq('id', debtId)
-              .eq('user_id', user.id)
-            if (linkErr) {
-              throw { phase: 'mortgage_link', err: linkErr }
+    // 3. Mortgage-coupling: koppel `debts.linked_asset_id` aan de
+    //    bijbehorende eigen-woning-asset.
+    //
+    //    Voorkeurspad — `payload.linked_mortgage_pairs`: de client (review-
+    //    step) berekent de pairs op basis van de uiteindelijk verstuurde
+    //    arrays en stuurt ze expliciet mee. Wij respecteren die mapping
+    //    één-op-één. Dit ontkoppelt de server-heuristiek van de UI-keuze
+    //    en voorkomt dat alle mortgages aan de éérste eigen_huis gehangen
+    //    worden bij meerdere panden.
+    //
+    //    Fallback — geen pairs gegeven: oudere clients zonder de nieuwe
+    //    veld krijgen het oude greedy-gedrag (eerste eigen_huis vangt alle
+    //    ongelinkte mortgages). Backward-compat is belangrijk omdat de
+    //    payload-shape niet versioned is en clients tijdens een rolling
+    //    deploy nog de oude shape kunnen sturen.
+    const explicitPairs = payload.linked_mortgage_pairs ?? []
+    if (explicitPairs.length > 0) {
+      for (const pair of explicitPairs) {
+        // Defensief: indices buiten range (mismatched arrays) overslaan
+        // ipv crashen — een verkeerd gevormde pair mag de hele import
+        // niet kelderen.
+        const assetItem = payload.assets[pair.asset_idx]
+        const debtItem = payload.debts[pair.debt_idx]
+        if (!assetItem || !debtItem) continue
+        if (assetItem.asset_type !== 'eigen_huis') continue
+        if (debtItem.debt_type !== 'mortgage') continue
+        // Respecteer een client-side override op `linked_asset_id`: als
+        // de gebruiker handmatig een ander asset koos, overschrijven we
+        // dat niet.
+        if (debtItem.linked_asset_id) continue
+        const eigenHuisId = assetIdByIndex.get(pair.asset_idx)
+        const debtId = debtIdByIndex.get(pair.debt_idx)
+        if (!eigenHuisId || !debtId) continue
+        const { error: linkErr } = await supabase
+          .from('debts')
+          .update({
+            linked_asset_id: eigenHuisId,
+            is_tax_deductible: true,
+          })
+          .eq('id', debtId)
+          .eq('user_id', user.id)
+        if (linkErr) {
+          throw { phase: 'mortgage_link', err: linkErr }
+        }
+      }
+    } else {
+      // Fallback voor backwards-compat: oude greedy-heuristiek.
+      const firstEigenHuisIdx = payload.assets.findIndex(
+        (a) => a.asset_type === 'eigen_huis',
+      )
+      if (firstEigenHuisIdx !== -1) {
+        const eigenHuisId = assetIdByIndex.get(firstEigenHuisIdx)
+        if (eigenHuisId) {
+          for (let i = 0; i < payload.debts.length; i++) {
+            const debtItem = payload.debts[i]
+            if (
+              debtItem.debt_type === 'mortgage' &&
+              !debtItem.linked_asset_id
+            ) {
+              const debtId = debtIdByIndex.get(i)
+              if (!debtId) continue
+              const { error: linkErr } = await supabase
+                .from('debts')
+                .update({
+                  linked_asset_id: eigenHuisId,
+                  is_tax_deductible: true,
+                })
+                .eq('id', debtId)
+                .eq('user_id', user.id)
+              if (linkErr) {
+                throw { phase: 'mortgage_link', err: linkErr }
+              }
             }
           }
         }
@@ -493,13 +630,13 @@ export async function POST(req: Request): Promise<Response> {
       logSafeError('goal_guide_completion', err)
     })
 
-    // Success — cache and return.
+    // Success — cache (met size-cap eviction) en return.
     const successBody: AangifteImportResponse = {
       ok: true,
       asset_ids: insertedAssetIds,
       debt_ids: insertedDebtIds,
     }
-    idempotencyCache.set(cacheKey, {
+    setCachedResponseWithCap(cacheKey, {
       body: successBody,
       status: 200,
       timestamp: Date.now(),

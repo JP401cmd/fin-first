@@ -88,6 +88,25 @@ export interface AangifteDebtReviewItem extends DebtQuickInput {
   current_balance_actual?: number
 }
 
+// ── Mortgage-coupling pair ───────────────────────────────────────────
+
+/**
+ * Eén (eigen_huis, mortgage) koppeling — door indexen in de assets- en
+ * debts-arrays geïdentificeerd. De client-side builder
+ * (`lib/aangifte/build-drafts.ts`) berekent deze pairs op basis van wat
+ * de gebruiker uiteindelijk reviewt; de server gebruikt ze om
+ * `debts.linked_asset_id` te vullen op de zojuist ingevoegde rijen.
+ *
+ * Indexen verwijzen naar de **post-review, pre-skip** posities — de
+ * client moet zijn pairs herberekenen na elke remove/skip-operatie zodat
+ * de indexen consistent blijven met de uiteindelijk verstuurde
+ * `assets[]` en `debts[]` arrays.
+ */
+export interface AangifteLinkedMortgagePair {
+  asset_idx: number
+  debt_idx: number
+}
+
 // ── Import payload (frontend → API) ──────────────────────────────────
 
 /**
@@ -112,6 +131,14 @@ export interface AangifteImportPayload {
   tax_year: number
   /** Client-generated UUID for idempotent retries. */
   idempotency_key: string
+  /**
+   * Optional: client-computed pairs of (eigen_huis asset, mortgage debt).
+   * When present, the server uses these explicitly to set
+   * `debts.linked_asset_id`. When absent (older clients), the server falls
+   * back to greedy heuristic matching of the first eigen_huis to all
+   * unlinked mortgages — backward-compat met de B3-implementatie.
+   */
+  linked_mortgage_pairs?: AangifteLinkedMortgagePair[]
 }
 
 // ── Import response (API → frontend) ─────────────────────────────────

@@ -22,12 +22,13 @@
  *   - Geen pdf.worker via CDN: gebruik bundled `pdf.worker.min.mjs` zodat
  *     de gebruiker geen externe CDN-call ziet en CSP soepel blijft.
  *
- * Pdf.js worker setup conform de officiele Next.js / pdfjs-dist guidance:
- * dynamische import van pdfjs-dist + GlobalWorkerOptions.workerSrc op een
- * statische pad. Wij gebruiken pdfjs-dist v4 (legacy build niet nodig in
- * moderne Next.js 16 + React 19). De worker wordt onderdeel van de bundle
- * via Next's static asset pipeline; we wijzen naar het workerPort-pad dat
- * Next runtime publiceert.
+ * Pdf.js worker setup: de worker (`pdf.worker.min.mjs`) wordt door een
+ * postinstall-script (`scripts/copy-pdfjs-worker.mjs`) vanuit
+ * `node_modules/pdfjs-dist/build/` naar `public/` gekopieerd. Dat
+ * resulteert in een Next.js-served static asset op `/pdf.worker.min.mjs`
+ * dat we aan `GlobalWorkerOptions.workerSrc` toewijzen. Voordeel boven
+ * CDN-route: geen externe call, CSP-compatibel, geen supply-chain-
+ * dependency op het host-runtime, geen IP/UA-leak naar derden.
  */
 
 import { useCallback, useRef, useState } from 'react'
@@ -58,21 +59,24 @@ const TAX_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 1 - 
  * zodat de zware bibliotheek pas geladen wordt bij eerste klik (next/lazy
  * doet dit voor componenten, dynamic import doet hetzelfde voor libs).
  *
- * Worker-strategie: pdfjs-dist v4 ships pdf.worker.min.mjs. Next.js serveert
- * node_modules niet als static, dus de eenvoudigste robuuste setup is via
- * een version-locked unpkg.com CDN (zelfde major.minor). Voor strikte CSP
- * kan deze later naar /public/ worden verplaatst — V1 prioriteert werkende
- * fallback boven zero-CDN.
+ * Worker-strategie: pdfjs-dist v4 ships `pdf.worker.min.mjs` als losse
+ * worker-bundle. Een postinstall-hook (`scripts/copy-pdfjs-worker.mjs`)
+ * kopieert deze naar `public/pdf.worker.min.mjs` zodat Next.js het op
+ * een stabiel pad serveert. Wij wijzen `GlobalWorkerOptions.workerSrc`
+ * exact daarheen — geen CDN, geen externe netwerk-call.
  */
+// Statisch pad onder /public; wordt door de postinstall-hook gevuld zodat
+// Next.js het als static asset serveert. Constante uitgelift uit de
+// functie omdat hij ook door de version-mismatch-warning gebruikt wordt.
+const PDFJS_WORKER_SRC = '/pdf.worker.min.mjs'
+
 async function extractTextFromPdf(file: File): Promise<string> {
   // Dynamische import — voorkomt dat pdfjs op SSR landt en houdt de bundle
   // kleiner voor users die de feature niet aanraken.
   const pdfjs = await import('pdfjs-dist')
 
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    // Version-locked CDN-pad — pin op de versie die in package.json staat
-    // zodat we nooit een mismatched worker laden.
-    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+    pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC
   }
 
   const arrayBuffer = await file.arrayBuffer()
@@ -240,7 +244,8 @@ export function UploadStep({
         </h2>
         <p className="font-serif italic text-sm text-[var(--ink-2)] leading-relaxed border-l-2 border-[var(--color-kern-500)] pl-3 max-w-[60ch]">
           Download eerst &quot;Kopie van de aangifte&quot; via Mijn Belastingdienst, en sleep
-          die hier naartoe. Wij lezen de bedragen lokaal — de PDF zelf gaat nooit naar de server.
+          die hier naartoe. De PDF zelf gaat nooit naar de server. Alleen de bedragen-tekst
+          (zonder BSN) wordt geanalyseerd door onze AI.
         </p>
       </div>
 
@@ -310,9 +315,8 @@ export function UploadStep({
       {/* Loading state */}
       {parsing && (
         <div className="flex flex-col items-center gap-4 border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 min-h-[200px]">
-          <div className="animate-pulse">
-            <WillDots size={48} state="loading" />
-          </div>
+          {/* WillDots heeft een eigen state-gestuurde puls; geen extra wrapper-animate-pulse. */}
+          <WillDots size={48} state="loading" />
           <div className="text-center space-y-1">
             <p className="font-serif italic text-base text-[var(--ink-2)]">
               Bedragen worden gelezen...

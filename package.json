@@ -16,6 +16,7 @@
     "db:new": "npx supabase migration new",
     "db:status": "npx supabase migration list",
     "prepare": "husky",
+    "postinstall": "node scripts/copy-pdfjs-worker.mjs",
     "build:check": "next build",
     "test": "vitest",
     "test:run": "vitest run"

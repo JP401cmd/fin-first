@@ -83,6 +83,10 @@ export function AangifteImportPane({
 }: AangifteImportPaneProps) {
   const [step, setStep] = useState<Step>('choose')
   const [extraction, setExtraction] = useState<AangifteExtractionResult | null>(null)
+  // Bewaar welke invoerroute (PDF of handmatig) de gebruiker koos zodat
+  // back-navigatie vanaf de review-stap terugkeert naar dezelfde plek
+  // — zonder dit zou een PDF-gebruiker abrupt op de manual-wizard belanden.
+  const [previousInputStep, setPreviousInputStep] = useState<'pdf' | 'manual'>('manual')
 
   /** Reset state bij sluiten zodat een tweede open in een schone choose-stap landt. */
   const handleClose = useCallback(() => {
@@ -136,15 +140,14 @@ export function AangifteImportPane({
     : step === 'review' ? 'Controle'
     : 'Klaar'
 
-  // Back-navigation per stap. Vanaf 'review' → terug naar de input-stap.
+  // Back-navigation per stap. Vanaf 'review' → terug naar de oorspronkelijke
+  // invoerroute (`previousInputStep`) zodat de gebruiker daar landt waar
+  // zij begon: PDF-uploaders gaan terug naar de drop-zone, manual-typers
+  // naar de wizard.
   const handleBack = step === 'choose'
     ? undefined
     : step === 'review'
-      ? () => {
-          // Terug naar de input-stap. Welke? Zonder extraction valt-back-up
-          // naar 'choose'; anders naar 'manual' (snelste her-edit).
-          setStep('manual')
-        }
+      ? () => setStep(previousInputStep)
       : () => setStep('choose')
 
   return (
@@ -158,8 +161,14 @@ export function AangifteImportPane({
       <div className="px-4 sm:px-6 pb-6 max-w-[640px] mx-auto">
         {step === 'choose' && (
           <ChooseStep
-            onPickPdf={() => setStep('pdf')}
-            onPickManual={() => setStep('manual')}
+            onPickPdf={() => {
+              setPreviousInputStep('pdf')
+              setStep('pdf')
+            }}
+            onPickManual={() => {
+              setPreviousInputStep('manual')
+              setStep('manual')
+            }}
             onCancel={handleClose}
           />
         )}
@@ -168,7 +177,10 @@ export function AangifteImportPane({
           <UploadStep
             fallbackTaxYear={fallbackTaxYear}
             onExtracted={handleExtracted}
-            onSwitchToManual={() => setStep('manual')}
+            onSwitchToManual={() => {
+              setPreviousInputStep('manual')
+              setStep('manual')
+            }}
             onCancel={handleClose}
           />
         )}
@@ -178,7 +190,10 @@ export function AangifteImportPane({
             fallbackTaxYear={fallbackTaxYear}
             onSubmit={handleExtracted}
             onCancel={handleClose}
-            onSwitchToPdf={() => setStep('pdf')}
+            onSwitchToPdf={() => {
+              setPreviousInputStep('pdf')
+              setStep('pdf')
+            }}
           />
         )}
 

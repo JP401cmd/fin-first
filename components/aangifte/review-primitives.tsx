@@ -177,14 +177,15 @@ export function ReviewCard({
           </div>
         </div>
 
-        {/* Acties */}
+        {/* Acties — 44x44 touch-target conform WCAG 2.2 (verplichte review-actie
+            + destructieve actie verdienen de full target-size). */}
         <div className="flex flex-col gap-1 shrink-0">
           <button
             type="button"
             onClick={onConfirm}
             aria-label={confirmed ? 'Bevestigd' : 'Bevestig deze regel'}
             aria-pressed={confirmed}
-            className={`flex h-8 w-8 items-center justify-center transition-colors ${
+            className={`flex h-10 w-10 items-center justify-center transition-colors ${
               confirmed
                 ? 'bg-[var(--color-kern-600)] text-[var(--paper)]'
                 : 'text-[var(--ink-4)] hover:bg-[var(--subtle)] hover:text-[var(--color-kern-700)]'
@@ -196,7 +197,7 @@ export function ReviewCard({
             type="button"
             onClick={onRemove}
             aria-label="Verwijder"
-            className="flex h-8 w-8 items-center justify-center text-[var(--ink-4)] hover:bg-[var(--subtle)] hover:text-[var(--negative)] transition-colors"
+            className="flex h-10 w-10 items-center justify-center text-[var(--ink-4)] hover:bg-[var(--subtle)] hover:text-[var(--negative)] transition-colors"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>

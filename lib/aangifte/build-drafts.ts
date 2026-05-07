@@ -36,7 +36,11 @@
 // All consumers of this function should rely ONLY on the typed return
 // value — no hidden side effects, no async work.
 
-import type { AangifteAssetReviewItem, AangifteDebtReviewItem } from './types'
+import type {
+  AangifteAssetReviewItem,
+  AangifteDebtReviewItem,
+  AangifteLinkedMortgagePair,
+} from './types'
 import type { AangifteExtractionResult } from './extraction-schema'
 
 // ── Field3 mapping ───────────────────────────────────────────────────
@@ -133,20 +137,19 @@ function firstTokenOrNull(s: string): string | null {
 // ── Mortgage-coupling logic ──────────────────────────────────────────
 
 /**
- * Pair indexes: each entry says "asset at `asset_idx` and debt at
- * `debt_idx` belong together as one Eigen-woning kaart". The review-UI
- * uses these to render a combined card; the API endpoint uses them to
- * set `linked_asset_id` on the persisted mortgage row.
+ * Re-export of `AangifteLinkedMortgagePair` from `./types` zodat
+ * bestaande consumers (`build-drafts.test.ts`, `review-step.tsx`) hun
+ * import-paden niet hoeven aan te passen. Pair-indexen verwijzen naar
+ * posities in de assets- en debts-arrays — de review-UI rendert ze als
+ * één gecombineerde kaart, en de import-API gebruikt ze om
+ * `debts.linked_asset_id` te vullen op de zojuist gepersisteerde rijen.
  *
- * Why indexes instead of object refs: the review-step lets the user
- * delete rows; if we shipped object-refs they'd dangle on delete.
- * Indexes are stable while the review-step keeps the original arrays
- * intact, and the UI re-derives the pairs after every mutation.
+ * Why indexes instead of object refs: de review-step laat de gebruiker
+ * rijen verwijderen; object-refs zouden bij delete kunnen dangle.
+ * Indexen zijn stabiel zolang de review-step de originele arrays intact
+ * houdt, en de UI berekent de pairs opnieuw na elke mutatie.
  */
-export interface AangifteLinkedMortgagePair {
-  asset_idx: number
-  debt_idx: number
-}
+export type { AangifteLinkedMortgagePair }
 
 /**
  * Build the (eigen_huis, mortgage) pairs in stable order.

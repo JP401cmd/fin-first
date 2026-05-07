@@ -89,91 +89,97 @@ const BOX1_KIND_VALUES = ['loon', 'pensioen', 'aow', 'uitkering', 'winst'] as co
 
 // ── Sub-schemas ──────────────────────────────────────────────────────
 
-const assetExtractionSchema = z.object({
-  name: z
-    .string()
-    .describe(
-      'Beschrijvende naam van de bezitting, bijv. "ING betaalrekening", "ASN spaarrekening", "Eigen woning" of "DEGIRO portefeuille". Hou het kort.',
-    ),
-  asset_type: z
-    .enum(ASSET_TYPE_VALUES)
-    .describe(
-      'Type bezitting; mapping vanuit aangifte: bank/spaargeld → cash of savings, beleggingen/effecten → investment, eigen woning Box 1 → eigen_huis, tweede woning Box 3 → real_estate, crypto → crypto, vorderingen op derden/DGA → vordering, aanmerkelijk belang Box 2 → deelneming.',
-    ),
-  current_value: z
-    .number()
-    .describe(
-      'Waarde op peildatum 1 januari in euro. Positief getal. Voor eigen_huis is dit de WOZ-waarde of marktwaarde — beide mogen, maar woz_value moet ook gevuld worden als die in de aangifte staat.',
-    ),
-  subtype: z
-    .string()
-    .nullable()
-    .describe(
-      'Subtype indien expliciet vermeld, bijv. "savings_account" voor spaargeld, "etf" voor beleggingen. Null als de aangifte het subtype niet noemt.',
-    ),
-  woz_value: z
-    .number()
-    .nullable()
-    .describe(
-      'WOZ-waarde van het eigen huis in euro. Alleen invullen wanneer asset_type=eigen_huis EN de aangifte een WOZ-waarde noemt. Null in alle andere gevallen.',
-    ),
-})
+const assetExtractionSchema = z
+  .object({
+    name: z
+      .string()
+      .describe(
+        'Beschrijvende naam van de bezitting, bijv. "ING betaalrekening", "ASN spaarrekening", "Eigen woning" of "DEGIRO portefeuille". Hou het kort.',
+      ),
+    asset_type: z
+      .enum(ASSET_TYPE_VALUES)
+      .describe(
+        'Type bezitting; mapping vanuit aangifte: bank/spaargeld → cash of savings, beleggingen/effecten → investment, eigen woning Box 1 → eigen_huis, tweede woning Box 3 → real_estate, crypto → crypto, vorderingen op derden/DGA → vordering, aanmerkelijk belang Box 2 → deelneming.',
+      ),
+    current_value: z
+      .number()
+      .describe(
+        'Waarde op peildatum 1 januari in euro. Positief getal. Voor eigen_huis is dit de WOZ-waarde of marktwaarde — beide mogen, maar woz_value moet ook gevuld worden als die in de aangifte staat.',
+      ),
+    subtype: z
+      .string()
+      .nullable()
+      .describe(
+        'Subtype indien expliciet vermeld, bijv. "savings_account" voor spaargeld, "etf" voor beleggingen. Null als de aangifte het subtype niet noemt.',
+      ),
+    woz_value: z
+      .number()
+      .nullable()
+      .describe(
+        'WOZ-waarde van het eigen huis in euro. Alleen invullen wanneer asset_type=eigen_huis EN de aangifte een WOZ-waarde noemt. Null in alle andere gevallen.',
+      ),
+  })
+  .strict()
 
-const debtExtractionSchema = z.object({
-  name: z
-    .string()
-    .describe(
-      'Beschrijvende naam van de schuld, bijv. "Hypotheek ABN AMRO", "Studielening DUO" of "Persoonlijke lening Santander".',
-    ),
-  debt_type: z
-    .enum(DEBT_TYPE_VALUES)
-    .describe(
-      'Type schuld; mapping: eigenwoningschuld Box 1 → mortgage, studieschuld DUO → student_loan, doorlopend krediet/roodstand → revolving_credit, persoonlijke lening → personal_loan, autolening → car_loan, creditcard → credit_card, belastingschuld → belastingschuld, familielening → familielening, DGA-schuld → dga_schuld.',
-    ),
-  current_balance: z
-    .number()
-    .describe('Openstaand saldo op peildatum 1 januari in euro. Positief getal.'),
-  interest_rate: z
-    .number()
-    .nullable()
-    .describe(
-      'Jaarlijkse rente in %, indien expliciet in de aangifte vermeld. Null als de aangifte de rente niet noemt — schat NIET zelf.',
-    ),
-  repayment_type: z
-    .enum(['aflossingsvrij', 'annuiteit', 'lineair'])
-    .nullable()
-    .describe(
-      'Aflossingsvorm voor hypotheken: annuïteit, lineair of aflossingsvrij. Null voor andere schuldtypen of wanneer niet vermeld.',
-    ),
-  subtype: z
-    .string()
-    .nullable()
-    .describe(
-      'Subtype indien expliciet vermeld, bijv. "annuiteit" voor hypotheek, "nieuw_stelsel" voor DUO. Null als onbekend.',
-    ),
-  is_tax_deductible: z
-    .boolean()
-    .nullable()
-    .describe(
-      'true voor mortgage met eigenwoningschuld-status (rente fiscaal aftrekbaar). false of null voor andere schulden.',
-    ),
-})
+const debtExtractionSchema = z
+  .object({
+    name: z
+      .string()
+      .describe(
+        'Beschrijvende naam van de schuld, bijv. "Hypotheek ABN AMRO", "Studielening DUO" of "Persoonlijke lening Santander".',
+      ),
+    debt_type: z
+      .enum(DEBT_TYPE_VALUES)
+      .describe(
+        'Type schuld; mapping: eigenwoningschuld Box 1 → mortgage, studieschuld DUO → student_loan, doorlopend krediet/roodstand → revolving_credit, persoonlijke lening → personal_loan, autolening → car_loan, creditcard → credit_card, belastingschuld → belastingschuld, familielening → familielening, DGA-schuld → dga_schuld.',
+      ),
+    current_balance: z
+      .number()
+      .describe('Openstaand saldo op peildatum 1 januari in euro. Positief getal.'),
+    interest_rate: z
+      .number()
+      .nullable()
+      .describe(
+        'Jaarlijkse rente in %, indien expliciet in de aangifte vermeld. Null als de aangifte de rente niet noemt — schat NIET zelf.',
+      ),
+    repayment_type: z
+      .enum(['aflossingsvrij', 'annuiteit', 'lineair'])
+      .nullable()
+      .describe(
+        'Aflossingsvorm voor hypotheken: annuïteit, lineair of aflossingsvrij. Null voor andere schuldtypen of wanneer niet vermeld.',
+      ),
+    subtype: z
+      .string()
+      .nullable()
+      .describe(
+        'Subtype indien expliciet vermeld, bijv. "annuiteit" voor hypotheek, "nieuw_stelsel" voor DUO. Null als onbekend.',
+      ),
+    is_tax_deductible: z
+      .boolean()
+      .nullable()
+      .describe(
+        'true voor mortgage met eigenwoningschuld-status (rente fiscaal aftrekbaar). false of null voor andere schulden.',
+      ),
+  })
+  .strict()
 
-const box1ComponentSchema = z.object({
-  kind: z
-    .enum(BOX1_KIND_VALUES)
-    .describe(
-      'Soort Box 1-inkomen: loon (jaaropgaaf werkgever), pensioen (lopende uitkering), aow (AOW-uitkering), uitkering (WW/WIA/bijstand) of winst (winst uit onderneming / ROW).',
-    ),
-  annual_amount: z
-    .number()
-    .describe('Bruto bedrag per jaar in euro. Voor maandbedragen vermenigvuldig met 12.'),
-  label: z
-    .string()
-    .describe(
-      'Korte herkenbare label voor de review-UI, bijv. "Bruto loon werkgever", "AOW-uitkering" of "Pensioen ABP". De gebruiker ziet dit terug.',
-    ),
-})
+const box1ComponentSchema = z
+  .object({
+    kind: z
+      .enum(BOX1_KIND_VALUES)
+      .describe(
+        'Soort Box 1-inkomen: loon (jaaropgaaf werkgever), pensioen (lopende uitkering), aow (AOW-uitkering), uitkering (WW/WIA/bijstand) of winst (winst uit onderneming / ROW).',
+      ),
+    annual_amount: z
+      .number()
+      .describe('Bruto bedrag per jaar in euro. Voor maandbedragen vermenigvuldig met 12.'),
+    label: z
+      .string()
+      .describe(
+        'Korte herkenbare label voor de review-UI, bijv. "Bruto loon werkgever", "AOW-uitkering" of "Pensioen ABP". De gebruiker ziet dit terug.',
+      ),
+  })
+  .strict()
 
 // ── Top-level schema ────────────────────────────────────────────────
 

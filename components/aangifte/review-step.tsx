@@ -276,6 +276,13 @@ export function ReviewStep({ extraction, mode, onSuccess, onCancel }: ReviewStep
    * `conflictResolution='skip'` worden niet meegestuurd. Bij `conflictResolution='replace'`
    * kan de server kiezen om te overschrijven (B3-implementatie); we sturen
    * de vlag mee voor zichtbaarheid.
+   *
+   * Mortgage-coupling: na de filter-stap berekenen we `linked_mortgage_pairs`
+   * door alle (eigen_huis, mortgage)-paren in stabiele volgorde te matchen.
+   * Indexen verwijzen naar posities in de **gefilterde** assets- en
+   * debts-arrays die we daadwerkelijk versturen — niet naar de oorspronkelijke
+   * extractie. Reden: de gebruiker kan rijen verwijderen of skippen, en de
+   * server moet de juiste rij-volgorde zien.
    */
   const buildPayload = (): AangifteImportPayload => {
     const idempotencyKey =
@@ -315,6 +322,24 @@ export function ReviewStep({ extraction, mode, onSuccess, onCancel }: ReviewStep
         return item
       })
 
+    // Compute (eigen_huis, mortgage) pairs op de gefilterde arrays. Greedy:
+    // de eerste vrije mortgage wordt aan elke eigen_huis gekoppeld. Identiek
+    // aan `computeLinkedMortgagePairs` in `lib/aangifte/build-drafts.ts` —
+    // we duppen niet de import omdat die een andere shape (review-drafts)
+    // verwacht; de logica is klein genoeg om hier inline te houden.
+    const linkedMortgagePairs: { asset_idx: number; debt_idx: number }[] = []
+    const usedDebtIdx = new Set<number>()
+    for (let aIdx = 0; aIdx < assetItems.length; aIdx += 1) {
+      if (assetItems[aIdx].asset_type !== 'eigen_huis') continue
+      for (let dIdx = 0; dIdx < debtItems.length; dIdx += 1) {
+        if (usedDebtIdx.has(dIdx)) continue
+        if (debtItems[dIdx].debt_type !== 'mortgage') continue
+        linkedMortgagePairs.push({ asset_idx: aIdx, debt_idx: dIdx })
+        usedDebtIdx.add(dIdx)
+        break
+      }
+    }
+
     // Profile updates uit Box 1 income mapping
     const profile: AangifteProfileUpdates = {}
     let mainIncomeTotal = 0
@@ -346,6 +371,7 @@ export function ReviewStep({ extraction, mode, onSuccess, onCancel }: ReviewStep
       peildatum: extraction.peildatum,
       tax_year: extraction.tax_year,
       idempotency_key: idempotencyKey,
+      linked_mortgage_pairs: linkedMortgagePairs,
     }
   }
 
