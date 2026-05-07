@@ -2321,7 +2321,9 @@ function ProjectionChart({
   const chartW = w - pad.left - pad.right
   const chartH = h - pad.top - pad.bottom
 
-  const maxVal = Math.max(...data.map((d) => d.total), currentValue) * 1.05
+  const rawMax = Math.max(...data.map((d) => d.total), currentValue)
+  if (rawMax <= 0) return <div className="flex h-40 items-center justify-center text-xs text-[var(--ink-3)]">Geen data</div>
+  const maxVal = rawMax * 1.05
   const maxMonth = data.length
 
   const step = Math.max(1, Math.floor(maxMonth / 60))
@@ -2342,8 +2344,8 @@ function ProjectionChart({
   return (
     <div ref={ref}>
     <svg viewBox={`0 0 ${w} ${h}`} className="mt-3 h-auto w-full" preserveAspectRatio="xMidYMid meet" data-testid="projection-area-chart">
-      {yTicks.map((val) => (
-        <g key={val}>
+      {yTicks.map((val, i) => (
+        <g key={i}>
           <line x1={pad.left} y1={y(val)} x2={w - pad.right} y2={y(val)} stroke="#f4f4f5" strokeWidth="0.5" />
           <text x={pad.left - 6} y={y(val) + 3} textAnchor="end" fontSize="7" fill="#a1a1aa">
             {val >= 1000 ? `${Math.round(val / 1000)}k` : val}

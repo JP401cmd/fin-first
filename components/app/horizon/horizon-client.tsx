@@ -41,7 +41,7 @@ import {
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw,
-  ChevronDown, ChevronUp, Heart,
+  ChevronDown, ChevronUp, Heart, Compass,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -188,6 +188,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [chartMode, setChartMode] = useState<'vermogenspad' | 'vermogensopbouw'>('vermogenspad')
 
   // Kassabon modal state
+  const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
   const [showCountdownReceipt, setShowCountdownReceipt] = useState(false)
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
@@ -419,6 +420,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         profileResult.data?.retirement_expense_custom_amount,
         profileMonthlyExpenses * 12,
       )
+
+      setRetirementMethod((profileResult.data?.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod)
 
       const dob = profileResult.data?.date_of_birth ?? null
 
@@ -2001,31 +2004,35 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
             </button>
 
-            {/* KPI 4: Aftellen */}
+            {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
               type="button"
-              onClick={() => setShowCountdownReceipt(true)}
+              onClick={() => router.push('/horizon/uitgaven-na-pensioen')}
               className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              data-testid="hero-stat-countdown"
-              title={hasPerspectiveHero ? (isPartnerView ? `Aftellen tot FIRE-datum van ${perspectiveHero!.householdName}` : 'Aftellen tot gezamenlijke FIRE-datum') : undefined}
+              data-testid="hero-stat-retirement-expense"
+              title={
+                retirementMethod === 'custom_amount'
+                  ? 'Zelf samengesteld — aanpassen of herzien'
+                  : retirementMethod === 'current_income'
+                    ? 'Op basis van huidig inkomen — verfijnen'
+                    : 'Op basis van essentiële budgetten — verfijnen'
+              }
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
-                <Calendar className="h-3 w-3 shrink-0" aria-hidden />
-                <span>Aftellen</span>
+                <Compass className="h-3 w-3 shrink-0" aria-hidden />
+                <span>Na pensioen</span>
               </div>
               <div
-                className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
-                {hasPerspectiveHero
-                  ? (perspectiveHero!.countdownDays > 0 ? perspectiveHero!.countdownDays.toLocaleString('nl-NL') : '0')
-                  : effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
+                <MaskedAmount value={input?.yearlyMustExpenses ?? 0} tone="horizon" monoWhenVisible={false} />
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                dagen
+                per jaar
               </div>
             </button>
           </div>
@@ -2145,29 +2152,28 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
             </button>
 
-            {/* KPI 4: Aftellen */}
+            {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
               type="button"
-              onClick={() => setShowCountdownReceipt(true)}
+              onClick={() => router.push('/horizon/uitgaven-na-pensioen')}
               className="p-3 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              data-testid="hero-stat-retirement-expense"
             >
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
-                <Calendar className="h-3 w-3 shrink-0" aria-hidden />
-                <span>Aftellen</span>
+                <Compass className="h-3 w-3 shrink-0" aria-hidden />
+                <span>Na pensioen</span>
               </div>
               <div
-                className="text-[18px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                className="text-[18px] font-black leading-none tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
-                {hasPerspectiveHero
-                  ? (perspectiveHero!.countdownDays > 0 ? perspectiveHero!.countdownDays.toLocaleString('nl-NL') : '0')
-                  : effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
+                <MaskedAmount value={input?.yearlyMustExpenses ?? 0} tone="horizon" monoWhenVisible={false} />
               </div>
               <div
                 className="italic text-[10px] text-[var(--ink-3)] mt-1"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                dagen
+                per jaar
               </div>
             </button>
           </div>

@@ -28,6 +28,7 @@ export const horizonNav: ModuleNavConfig = {
   color: 'purple',
   items: [
     { label: 'Overzicht', href: '/horizon' },
+    { label: 'Uitgave na pensioen', href: '/horizon/uitgaven-na-pensioen' },
   ],
 }
 
