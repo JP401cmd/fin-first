@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus, Trash2, Wallet } from 'lucide-react'
+import { FileDown, Plus, Trash2, Wallet } from 'lucide-react'
 import { WillDots } from '@/components/app/will-dots'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { SpeechBubble } from './speech-bubble'
@@ -23,6 +23,10 @@ import type { AssetQuickInput, DebtQuickInput, QuickAddInput } from '@/lib/quick
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { TypeIcon } from '@/components/app/quick-add-wizard/icon-map'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import {
+  AangifteImportPane,
+  type AangifteCollectedPayload,
+} from './aangifte-import-pane'
 
 /**
  * Onboarding-stap voor bezittingen en schulden — gebruikt dezelfde
@@ -72,6 +76,10 @@ export function OnboardingBezittingen({
   // alsnog activeren).
   const [budgetPromptCash, setBudgetPromptCash] = useState<AssetQuickInput | null>(null)
   const [budgetPromptDismissed, setBudgetPromptDismissed] = useState(false)
+  // Aangifte-import pane: opent bij klik op de secundaire CTA. Items
+  // komen via `onCollect` terug en worden direct in `quickAssets` /
+  // `quickDebts` geduwd — net als de QuickAddWizard in collect-mode.
+  const [showAangifteImport, setShowAangifteImport] = useState(false)
 
   const isBudgetterenActive = activeModules.includes('budgetteren')
 
@@ -106,6 +114,49 @@ export function OnboardingBezittingen({
     onAssetsChange(quickAssets.filter((_, idx) => idx !== i))
   const removeDebt = (i: number) =>
     onDebtsChange(quickDebts.filter((_, idx) => idx !== i))
+
+  /**
+   * Map een aangifte-import payload naar de `AssetQuickInput` /
+   * `DebtQuickInput` shapes die de onboarding-state al gebruikt. De
+   * aangifte-flow werkt met dezelfde shape (via `AangifteAssetReviewItem
+   * extends AssetQuickInput`), dus de mapping is dun:
+   *
+   * - `current_value_actual` (delta-veld uit review-step) wint van
+   *   `current_value` (peildatum-bedrag) — de live-rij moet actuele
+   *   realiteit reflecteren. Het peildatum-bedrag landt later als
+   *   balance_snapshot via de import-API in `direct-import` mode; in
+   *   `onboarding-collect` mode is het peildatum-bedrag verloren als de
+   *   gebruiker een actuele waarde invoert (bewuste keuze: collect-mode
+   *   batched alles bij `save-own-data` en die schrijft geen snapshots).
+   */
+  const handleAangifteCollect = (payload: AangifteCollectedPayload) => {
+    const newAssets: AssetQuickInput[] = payload.assets.map((item) => ({
+      asset_type: item.asset_type,
+      name: item.name,
+      current_value:
+        typeof item.current_value_actual === 'number' && item.current_value_actual > 0
+          ? item.current_value_actual
+          : item.current_value,
+      field3: item.field3 ?? null,
+    }))
+    const newDebts: DebtQuickInput[] = payload.debts.map((item) => ({
+      debt_type: item.debt_type,
+      name: item.name,
+      current_balance:
+        typeof item.current_balance_actual === 'number' && item.current_balance_actual > 0
+          ? item.current_balance_actual
+          : item.current_balance,
+      field3: item.field3 ?? null,
+      linked_asset_id: item.linked_asset_id ?? null,
+    }))
+    onAssetsChange([...quickAssets, ...newAssets])
+    onDebtsChange([...quickDebts, ...newDebts])
+  }
+
+  // CTA wordt verborgen zodra de gebruiker meer dan 3 items heeft —
+  // heavy-users hebben er geen behoefte aan en de QuickAddWizard-flow
+  // blijft schoon.
+  const aangifteCtaVisible = quickAssets.length + quickDebts.length < 3
 
   const totalAssets = useMemo(
     () => quickAssets.reduce((s, a) => s + (Number(a.current_value) || 0), 0),
@@ -156,6 +207,43 @@ export function OnboardingBezittingen({
           aanvullen.
         </SpeechBubble>
       </div>
+
+      {/* Aangifte-import secundaire CTA — zichtbaar bij <3 items zodat
+          heavy-users er geen last van hebben. Editorial style: kicker-streep,
+          italic naam, mono-meta. */}
+      {aangifteCtaVisible && (
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => setShowAangifteImport(true)}
+            className="group flex w-full items-start gap-3 border border-[var(--border-ed)] hover:border-[var(--color-kern-500)] bg-[var(--paper)] hover:bg-[var(--subtle)]/40 px-4 py-3 text-left transition-colors"
+          >
+            <FileDown
+              className="h-5 w-5 shrink-0 mt-0.5 text-[var(--color-kern-700)] group-hover:text-[var(--color-kern-800)]"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+            <div className="flex-1 min-w-0 space-y-0.5">
+              <p className="flex items-center text-[10px] font-semibold uppercase tracking-[0.10em] text-[var(--color-kern-700)]">
+                <span
+                  className="inline-block w-5 h-px bg-[var(--color-kern-500)] mr-2 align-middle"
+                  aria-hidden="true"
+                />
+                Sneller starten
+              </p>
+              <p className="font-serif text-sm text-[var(--ink)]">
+                Importeer uit{' '}
+                <em className="font-serif italic font-normal text-[var(--color-kern-700)]">
+                  belastingaangifte
+                </em>
+              </p>
+              <p className="font-serif italic text-xs text-[var(--ink-3)]">
+                hele Kern in 1 minuut &mdash; bezittingen, schulden, inkomen
+              </p>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* ── Bezittingen ──────────────────────────────────────── */}
       <section className="mb-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-sm">
@@ -277,6 +365,16 @@ export function OnboardingBezittingen({
           </div>
         </div>
       </BottomSheet>
+
+      {/* Aangifte-import pane — collect-mode: items komen via onCollect
+          terug en worden in dezelfde batch met de rest opgeslagen door
+          save-own-data, geen aparte API-call. */}
+      <AangifteImportPane
+        open={showAangifteImport}
+        onClose={() => setShowAangifteImport(false)}
+        mode="onboarding-collect"
+        onCollect={handleAangifteCollect}
+      />
     </div>
   )
 }

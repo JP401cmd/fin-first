@@ -714,11 +714,9 @@ function AangifteImportPaneLoader({ onClose, onImported }: AangifteImportPaneLoa
   // stays small for users who never trigger the import.
   useEffect(() => {
     let cancelled = false
-    // TODO[B2-merge]: when components/onboarding/aangifte-import-pane.tsx
-    // lands, remove the @ts-expect-error directive on the next line. The
-    // catch-branch becomes dead code at that point but stays as a defence
-    // against import errors during deploy.
-    // @ts-expect-error — module is delivered by Phase B2 (parallel).
+    // Dynamic import keeps the koppelingen-page bundle small for users
+    // who never trigger the import flow. The catch-branch below stays
+    // as a deploy-time defence against transient import errors.
     import('@/components/onboarding/aangifte-import-pane')
       .then((mod: Record<string, unknown>) => {
         if (cancelled) return

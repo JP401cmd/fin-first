@@ -11,6 +11,8 @@ import type { QuickAddIntent } from '@/lib/quick-add/types'
  *   · Playfair italic kop
  *   · Source Serif subtekst die uitlegt wat de feature oplevert
  *   · 1 primaire CTA, kleur-gecoördineerd met het intent (kern/debt)
+ *   · optionele secundaire link voor aangifte-import (alleen als parent
+ *     `onImport` doorgeeft) — graceful degradation als de prop ontbreekt.
  *
  * Voldoet aan de bijbel-regel "Geen CTA = doodlopend" omdat `onAdd` een
  * verplichte prop is; de parent-pagina haakt die aan de gedeelde
@@ -21,9 +23,15 @@ import type { QuickAddIntent } from '@/lib/quick-add/types'
 export interface EmptyStateProps {
   intent: QuickAddIntent
   onAdd: () => void
+  /**
+   * Optionele secundaire actie: opent de aangifte-import flow. Alleen
+   * relevant voor `intent='asset'` (bezittingen-pagina). Als undefined
+   * wordt de link niet gerenderd — graceful degradation.
+   */
+  onImport?: () => void
 }
 
-export function EmptyState({ intent, onAdd }: EmptyStateProps) {
+export function EmptyState({ intent, onAdd, onImport }: EmptyStateProps) {
   const isAsset = intent === 'asset'
   const Icon = isAsset ? Wallet : CreditCard
   const heading = isAsset ? 'Nog geen bezittingen' : 'Nog geen schulden'
@@ -66,6 +74,19 @@ export function EmptyState({ intent, onAdd }: EmptyStateProps) {
       >
         {ctaLabel}
       </button>
+
+      {/* Secundaire aangifte-import link — alleen als parent `onImport` levert.
+          Volgt UI/UX-skill empty-state patroon: secundaire link in mono UPPERCASE
+          onder de primaire CTA, geen knop-styling om hiërarchie te bewaren. */}
+      {onImport && (
+        <button
+          type="button"
+          onClick={onImport}
+          className="text-[10px] font-mono uppercase tracking-[0.10em] text-[var(--color-kern-700)] hover:text-[var(--color-kern-800)] underline underline-offset-4 decoration-1 transition-colors -mt-2"
+        >
+          of importeer in één keer uit je belastingaangifte
+        </button>
+      )}
     </div>
   )
 }

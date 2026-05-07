@@ -46,6 +46,7 @@ import {
 } from '@/lib/asset-data'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
+import { AangifteImportPane } from '@/components/onboarding/aangifte-import-pane'
 import { AssetEditConnectionSection } from './asset-edit-connection-section'
 import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
 import { InvestmentHoldingCard } from '@/components/holdings/investment-holding-card'
@@ -83,6 +84,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const router = useRouter()
   const fc = useFc()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [aangifteImportOpen, setAangifteImportOpen] = useState(false)
   const [quickAddInitialType, setQuickAddInitialType] = useState<AssetType | null>(null)
   // Filter-state: lege Set = alles tonen, niet-leeg = alleen geselecteerde
   // types tonen in de cards-grid en in de projection-chart. Wordt aangestuurd
@@ -648,7 +650,11 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           QuickAddWizard met dat type voor-geselecteerd. */}
       <section className="mt-3 sm:mt-6 space-y-6">
         {activeAssets.length === 0 && (
-          <QuickAddEmptyState intent="asset" onAdd={() => setQuickAddOpen(true)} />
+          <QuickAddEmptyState
+            intent="asset"
+            onAdd={() => setQuickAddOpen(true)}
+            onImport={() => setAangifteImportOpen(true)}
+          />
         )}
         {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
           const group = byType[type]
@@ -798,6 +804,13 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         initialIntent="asset"
         initialAssetType={quickAddInitialType ?? undefined}
         onSaved={() => router.refresh()}
+      />
+
+      <AangifteImportPane
+        open={aangifteImportOpen}
+        onClose={() => setAangifteImportOpen(false)}
+        mode="direct-import"
+        onImported={() => router.refresh()}
       />
     </div>
   )
