@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Source_Serif_4, DM_Mono, Inter, Andada_Pro } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { ServiceWorkerRegister } from "@/components/app/service-worker-register";
 import "./globals.css";
 
 // LCP-font: hero h1 op /core, /will, /horizon en alle category-pages.
@@ -88,6 +87,11 @@ export const metadata: Metadata = {
  */
 const PALETTE_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('tf-palette-theme');if(!t)return;var p={cream:{bg:'#f5efe2',paper:'#fbf7ec',subtle:'#f3ead9',ed:'#e3dac8',md:'#ccc1aa'},licht:{bg:'#fbf2e7',paper:'#fef9ef',subtle:'#f5ecd6',ed:'#e6dcc4',md:'#d4c8a8'},'fd-bruin':{bg:'#e9dcb8',paper:'#f0e6cf',subtle:'#e0d2a8',ed:'#c9b88e',md:'#a89968'}}[t];if(!p)return;var r=document.documentElement.style;r.setProperty('--bg',p.bg);r.setProperty('--paper',p.paper);r.setProperty('--subtle',p.subtle);r.setProperty('--border-ed',p.ed);r.setProperty('--border-md',p.md);r.setProperty('--background',p.bg);}catch(e){}})();`
 
+// Inline service-worker registratie. Reden voor inline (i.p.v. een client-component
+// in <body>): static-analyzers (PWABuilder, Play Store crawl) parsen alleen HTML —
+// een useEffect-call zien zij niet. Dev-fail (geen /sw.js) wordt stil afgevangen.
+const SW_REGISTER_SCRIPT = `(function(){if(!('serviceWorker' in navigator))return;window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(e){console.warn('[trifinity] sw register failed:',e);});});})();`
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -97,13 +101,13 @@ export default function RootLayout({
     <html lang="nl" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: SW_REGISTER_SCRIPT }} />
       </head>
       <body
         className={`${playfair.variable} ${sourceSerif.variable} ${dmMono.variable} ${inter.variable} ${andadaPro.variable} antialiased`}
         suppressHydrationWarning
       >
         {children}
-        <ServiceWorkerRegister />
         <SpeedInsights />
       </body>
     </html>
