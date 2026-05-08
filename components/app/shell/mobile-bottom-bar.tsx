@@ -186,7 +186,7 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
   // flex-row, zodat we MEEschuiven bij push/pop (plan §4.1 cruciaal verschil
   // met v2 waar BottomNav buiten de animation-layer zat).
   const wrapperClasses =
-    'border-t-2 border-[var(--ink)] bg-[var(--paper)]/90 backdrop-blur-md safe-bottom'
+    'border-t-2 border-[var(--ink)] bg-[var(--paper)]/90 backdrop-blur-md'
 
   if (kind === 'tabs') {
     return (
@@ -199,7 +199,7 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
   if (kind === 'action-bar' && effectiveConfig?.kind === 'action-bar') {
     return (
       <div
-        className={`${wrapperClasses} flex items-center gap-2 px-3`}
+        className={`${wrapperClasses} flex items-center gap-2 px-3 pb-[var(--safe-area-bottom)]`}
         style={{ minHeight: 'var(--bottom-nav-height)' }}
       >
         {/* Secondary links (terug-context), primary rechts (forward-action) —
@@ -216,7 +216,7 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
     const actions = effectiveConfig.actions.slice(0, 4)
     return (
       <div
-        className={`${wrapperClasses} flex items-stretch px-1`}
+        className={`${wrapperClasses} flex items-stretch px-1 pb-[var(--safe-area-bottom)]`}
         style={{ minHeight: 'var(--bottom-nav-height)' }}
         role="toolbar"
       >

@@ -41,7 +41,7 @@ import {
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw,
-  ChevronDown, ChevronUp, Heart, Compass,
+  ChevronDown, ChevronUp, Heart, Compass, ArrowLeftRight,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -71,6 +71,14 @@ const BacktestingModal = dynamic(() =>
 )
 const StrategieModal = dynamic(() =>
   import('@/components/app/horizon/strategie-modal').then(m => ({ default: m.StrategieModal })),
+  { ssr: false }
+)
+const UitgavenPane = dynamic(() =>
+  import('@/components/app/horizon/uitgaven-pane').then(m => ({ default: m.UitgavenPane })),
+  { ssr: false }
+)
+const EventPane = dynamic(() =>
+  import('@/components/app/horizon/event-pane').then(m => ({ default: m.EventPane })),
   { ssr: false }
 )
 const PhaseModalOpbouw = dynamic(() =>
@@ -104,6 +112,8 @@ import { runUnifiedProjection, toSimResult, runSimulationUnified as runSimAowSto
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
+import { CollapsibleSection } from '@/components/app/collapsible-section'
+import { HorizonCashflowSankey } from '@/components/app/horizon/horizon-cashflow-sankey'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
@@ -189,6 +199,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // Kassabon modal state
   const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
+  const [uitgavenPaneOpen, setUitgavenPaneOpen] = useState(false)
+  const [eventPaneOpen, setEventPaneOpen] = useState(false)
+  const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
+  const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view' | 'edit'>('catalog')
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
   const [showCountdownReceipt, setShowCountdownReceipt] = useState(false)
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
@@ -220,6 +234,29 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     // Support ?strategie=open query param (redirect from /horizon/strategie)
     if (strategieParam === 'open') {
       setActiveModal('strategie')
+      shouldReplace = true
+    }
+
+    // Support ?uitgaven=open query param (redirect from /horizon/uitgaven-na-pensioen)
+    const uitgavenParam = searchParams.get('uitgaven')
+    if (uitgavenParam === 'open') {
+      setUitgavenPaneOpen(true)
+      shouldReplace = true
+    }
+
+    // Support ?event=new | ?event=<id> | ?event=<id>&edit=true
+    const eventParam = searchParams.get('event')
+    const eventEditParam = searchParams.get('edit')
+    if (eventParam) {
+      if (eventParam === 'new') {
+        setEventPaneEditingId(null)
+        setEventPaneMode('catalog')
+        setEventPaneOpen(true)
+      } else {
+        setEventPaneEditingId(eventParam)
+        setEventPaneMode(eventEditParam === 'true' ? 'edit' : 'view')
+        setEventPaneOpen(true)
+      }
       shouldReplace = true
     }
 
@@ -2007,7 +2044,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
               type="button"
-              onClick={() => router.push('/horizon/uitgaven-na-pensioen')}
+              onClick={() => setUitgavenPaneOpen(true)}
               className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-retirement-expense"
               title={
@@ -2155,7 +2192,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
               type="button"
-              onClick={() => router.push('/horizon/uitgaven-na-pensioen')}
+              onClick={() => setUitgavenPaneOpen(true)}
               className="p-3 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-retirement-expense"
             >
@@ -2481,6 +2518,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           visibleMaxAge={visibleMax}
                           scenarioEvents={scenarioOverlayData?.events}
                           scenarioColor={scenarioOverlayData?.color}
+                          onViewEvent={id => {
+                            setEventPaneEditingId(id)
+                            setEventPaneMode('view')
+                            setEventPaneOpen(true)
+                          }}
+                          onEditEvent={id => {
+                            setEventPaneEditingId(id)
+                            setEventPaneMode('edit')
+                            setEventPaneOpen(true)
+                          }}
                         />
                       )}
 
@@ -2599,6 +2646,26 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         </div>
       </section>
 
+      {/* === Geldstroom-Sankey (per jaar, scrubbable) === */}
+      {simResult && currentAge != null && simResult.rows.length > 0 && (
+        <section className="mt-5 sm:mt-8">
+          <CollapsibleSection
+            storageKey="horizon-cashflow-sankey"
+            title="Hoe stroomt jouw geld per jaar"
+            summary="Bekijk inkomstenbronnen en uitgaven-categorieën voor een specifiek jaar"
+            icon={<ArrowLeftRight className="h-4 w-4 text-[var(--ink-3)]" />}
+          >
+            <HorizonCashflowSankey
+              simRows={simResult.rows}
+              unifiedRows={unifiedRows}
+              debts={debts}
+              currentAge={currentAge}
+              fireAge={simResult.fireAge}
+            />
+          </CollapsibleSection>
+        </section>
+      )}
+
       {/* Detail modal (enige interactiepunt voor simulatie) */}
       {simResult && (
         <SimChartModal
@@ -2620,7 +2687,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           <div className="flex items-center justify-between mb-4">
             <h3 className="label-editorial text-[var(--ink-2)]">Levensgebeurtenissen</h3>
             <button
-              onClick={() => setShowAddEventModal(true)}
+              onClick={() => { setEventPaneEditingId(null); setEventPaneMode('catalog'); setEventPaneOpen(true) }}
               className="flex items-center gap-1.5 rounded-[var(--r)] border border-horizon-200 bg-horizon-50 px-3 py-1.5 text-xs font-medium text-horizon-600 transition hover:bg-horizon-100"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -2642,29 +2709,52 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               const evImpactIdx = events.findIndex(e => e.id === ev.id)
               const evImpact = evImpactIdx >= 0 ? impacts[evImpactIdx] : null
               return (
-                <button
+                <div
                   key={ev.id}
-                  onClick={() => { setSelectedEventId(ev.id); setViewModalMode('view') }}
-                  className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-left transition hover:border-horizon-300 hover:bg-horizon-50/30 min-h-[44px]"
+                  className="group relative flex w-full items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition hover:border-horizon-300 hover:bg-horizon-50/30 min-h-[44px]"
                 >
-                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
-                    {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[evCatalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm font-medium text-[var(--ink)] truncate">{ev.name}</p>
-                    <p className="text-[11px] sm:text-xs text-[var(--ink-3)]">
-                      {ev.target_age != null ? `Leeftijd ${ev.target_age}` : 'Geen leeftijd'}
-                      {evImpact && evImpact.fireDelayMonths !== 0 && (
-                        <span className={evImpact.fireDelayMonths > 0 ? ' text-negative' : ' text-positive'}>
-                          {' · '}{evImpact.fireDelayMonths > 0 ? '+' : ''}{evImpact.fireDelayMonths} mnd
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  {ev.target_age != null && (
-                    <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-4)]">{ev.target_age}j</span>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEventPaneEditingId(ev.id)
+                      setEventPaneMode('view')
+                      setEventPaneOpen(true)
+                    }}
+                    className="flex flex-1 items-center gap-3 text-left min-w-0"
+                    aria-label={`Bekijk ${ev.name}`}
+                  >
+                    <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
+                      {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[evCatalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-[var(--ink)] truncate">{ev.name}</p>
+                      <p className="text-[11px] sm:text-xs text-[var(--ink-3)]">
+                        {ev.target_age != null ? `Leeftijd ${ev.target_age}` : 'Geen leeftijd'}
+                        {evImpact && evImpact.fireDelayMonths !== 0 && (
+                          <span className={evImpact.fireDelayMonths > 0 ? ' text-negative' : ' text-positive'}>
+                            {' · '}{evImpact.fireDelayMonths > 0 ? '+' : ''}{evImpact.fireDelayMonths} mnd
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    {ev.target_age != null && (
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-4)]">{ev.target_age}j</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEventPaneEditingId(ev.id)
+                      setEventPaneMode('edit')
+                      setEventPaneOpen(true)
+                    }}
+                    className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] opacity-60 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                    aria-label={`Bewerk ${ev.name}`}
+                    title="Bewerken"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               )
             }
 
@@ -2689,7 +2779,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       <p className="text-xs sm:text-sm text-emerald-600/60">Nog geen opbouw-gebeurtenissen gepland</p>
                       <p className="text-[11px] sm:text-xs text-[var(--ink-4)] mt-1">Denk aan: erfenis, AOW, pensioenuitkering, verkoop woning</p>
                       <button
-                        onClick={() => setShowAddEventModal(true)}
+                        onClick={() => { setEventPaneEditingId(null); setEventPaneMode('catalog'); setEventPaneOpen(true) }}
                         className="mt-3 flex items-center gap-1 rounded-full border border-emerald-300/60 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600 transition hover:bg-emerald-100"
                       >
                         <Plus className="h-3 w-3" />
@@ -2717,7 +2807,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       <p className="text-xs sm:text-sm text-red-500/60">Nog geen investeringen gepland</p>
                       <p className="text-[11px] sm:text-xs text-[var(--ink-4)] mt-1">Denk aan: kinderen, verbouwing, wereldreis, studie</p>
                       <button
-                        onClick={() => setShowAddEventModal(true)}
+                        onClick={() => { setEventPaneEditingId(null); setEventPaneMode('catalog'); setEventPaneOpen(true) }}
                         className="mt-3 flex items-center gap-1 rounded-full border border-red-300/60 bg-red-50 px-3 py-1 text-xs font-medium text-red-500 transition hover:bg-red-100"
                       >
                         <Plus className="h-3 w-3" />
@@ -6145,6 +6235,24 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         </>
       )}
       <StrategieModal open={activeModal === 'strategie'} onClose={() => { setActiveModal(null); loadData() }} />
+      <UitgavenPane open={uitgavenPaneOpen} onClose={() => { setUitgavenPaneOpen(false); loadData() }} />
+      {input && fireParams && fireStrategy && withdrawalStrategyConfig && (
+        <EventPane
+          open={eventPaneOpen}
+          onClose={() => setEventPaneOpen(false)}
+          editingId={eventPaneEditingId}
+          initialMode={eventPaneMode}
+          events={events}
+          baselineInput={input}
+          baselineFire={fire}
+          fireParams={fireParams}
+          fireStrategy={fireStrategy}
+          withdrawalStrategy={withdrawalStrategyConfig}
+          endAge={fireStrategy.endAge ?? 90}
+          householdMode={initialData.hasPartner ?? false}
+          onChanged={() => loadData()}
+        />
+      )}
     </div>
   )
 }

@@ -383,7 +383,7 @@ export default function AowLeeftijdPage() {
               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 transition-colors disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              {saving ? 'Opslaan...' : editingId ? 'Bijwerken' : 'Toevoegen'}
+              {saving ? 'Opslaan...' : editingId ? 'Opslaan' : 'Toevoegen'}
             </button>
             <button
               onClick={() => setSheetOpen(false)}

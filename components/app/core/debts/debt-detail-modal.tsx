@@ -46,6 +46,7 @@ export function DebtDetailModal({
   onEdit,
   onRevalue,
   onDelete,
+  embedded = false,
 }: {
   debt: Debt
   valuations: Valuation[] | undefined
@@ -55,6 +56,14 @@ export function DebtDetailModal({
   onEdit: () => void
   onRevalue: () => void
   onDelete: () => void
+  /**
+   * Wanneer true rendert deze component alleen de body (geen interne
+   * `<ShellOverlay kind="pane">` wrapper, geen interne actie-rij). De
+   * pane-wrapper levert de overlay en footer-knoppen via `<ShellOverlay>`
+   * met `primaryAction`/`secondaryAction`. Default false zodat bestaande
+   * call-sites (bv. `/core/debts`) ongewijzigd blijven.
+   */
+  embedded?: boolean
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showHvB, setShowHvB] = useState(false)
@@ -115,9 +124,10 @@ export function DebtDetailModal({
   const icon = DEBT_TYPE_ICONS[debt.debt_type] ?? 'CircleDot'
   const linkedAsset = debt.linked_asset_id ? userAssets.find((a) => a.id === debt.linked_asset_id) : null
 
-  return (
+  // Body — gedeeld tussen standalone (eigen `<ShellOverlay kind="pane">`)
+  // en embedded (pane-wrapper levert de overlay + footer-knoppen).
+  const body = (
     <>
-    <ShellOverlay open={true} onClose={onClose} kind="pane" title={debt.name}>
         {/* Subheader with icon and type info */}
         <div className="flex items-center gap-3 border-b border-[var(--border-ed)] px-6 py-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-kern-50">
@@ -416,36 +426,46 @@ export function DebtDetailModal({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
-          <button
-            onClick={onRevalue}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] border border-kern-200 px-3 py-2 text-xs font-medium text-kern-700 hover:bg-kern-50"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Saldo bijwerken
-          </button>
-          <button
-            onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-            Bewerken
-          </button>
-          {/* Delete-trigger — opent een confirm-overlay (plan §5.3, driewegregel
-              kind="confirm"). Vorige inline-toggle werd vervangen omdat een
-              onomkeerbare actie hoort in een echte confirm-modal met focus-trap
-              en duidelijke destructive-framing. */}
-          <button
-            onClick={() => setConfirmDelete(true)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
-            aria-label="Schuld verwijderen"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-    </ShellOverlay>
+        {/* Actions — alleen in standalone-mode. In embedded-mode levert
+            de pane-wrapper Bewerken (primary) + Saldo bijwerken (secondary)
+            in de pane-footer; verwijderen zit als header-action icon. */}
+        {!embedded && (
+          <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
+            <button
+              onClick={onRevalue}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] border border-kern-200 px-3 py-2 text-xs font-medium text-kern-700 hover:bg-kern-50"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Saldo bijwerken
+            </button>
+            <button
+              onClick={onEdit}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+              Bewerken
+            </button>
+            {/* Delete-trigger — opent een confirm-overlay (plan §5.3, driewegregel
+                kind="confirm"). Vorige inline-toggle werd vervangen omdat een
+                onomkeerbare actie hoort in een echte confirm-modal met focus-trap
+                en duidelijke destructive-framing. */}
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+              aria-label="Schuld verwijderen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+    </>
+  )
 
+  // Sibling-overlays die zowel in standalone als embedded mode beschikbaar
+  // moeten zijn (delete-confirm, HvB-vergelijker). Worden naast de pane
+  // gerenderd zodat ze los van de host-overlay sluiten/openen.
+  const siblings = (
+    <>
       {/* Delete-confirm-overlay — kind="confirm" volgens plan §5.3.
           Smal centered modal met focus-trap; primaire CTA destructive. */}
       <ShellOverlay
@@ -506,6 +526,24 @@ export function DebtDetailModal({
           />
         )
       })()}
+    </>
+  )
+
+  if (embedded) {
+    return (
+      <>
+        {body}
+        {siblings}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <ShellOverlay open={true} onClose={onClose} kind="pane" title={debt.name}>
+        {body}
+      </ShellOverlay>
+      {siblings}
     </>
   )
 }

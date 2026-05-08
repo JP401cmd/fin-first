@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -35,6 +35,26 @@ import {
   type LifestyleId,
 } from '@/lib/retirement-aspirations'
 
+/**
+ * Status die de pane-wrapper nodig heeft om de standaard pane-footer (primary/
+ * secondary action) te kunnen aansturen. Wordt elke render geüpdatet via
+ * `onActionsChange`, zodat de pane `disabled`/`loading` realtime kan volgen.
+ */
+export interface UitgavenPaneActionsState {
+  /** True wanneer er iets op te slaan valt (custom-flow met geldig bedrag). */
+  canSave: boolean
+  /** True tijdens een lopende save-call (PUT /api/fire-settings). */
+  saving: boolean
+  /** True direct na succesvolle save — gebruikt voor "Klaar ✓"-flash. */
+  savedFlash: boolean
+  /** True wanneer de huidige methode `custom_amount` is. Pane laat de save-
+   *  knop alleen daar zien — bij andere methoden slaat een methode-klik direct
+   *  op (zonder expliciete CTA), dus de pane-footer is dan overbodig. */
+  isCustom: boolean
+  /** Aanroepbaar door de pane-footer wanneer de gebruiker op "Opslaan" klikt. */
+  save: () => void
+}
+
 interface Props {
   initialMethod: RetirementExpenseMethod
   customAmount: number | null
@@ -44,6 +64,11 @@ interface Props {
   currentRetirementExpense: number
   budgetingActive: boolean
   savedAspirations?: unknown
+  /** Wanneer true: geen back-link en geen page-level padding (pane regelt header). */
+  inPane?: boolean
+  /** Wanneer aanwezig: child rapporteert save-state aan de pane-wrapper, en het
+   *  inline save-blok wordt onderdrukt zodat de pane-footer de enige CTA is. */
+  onActionsChange?: (state: UitgavenPaneActionsState) => void
 }
 
 /** Merge bewaarde JSON met defaults zodat nieuwe keys altijd een fallback hebben. */
@@ -170,21 +195,52 @@ export default function UitgavenNaPensioenClient(props: Props) {
     void save('custom_amount', finalAmount, answers)
   }
 
+  // Publiceer save-state aan een eventuele pane-wrapper. We gebruiken een
+  // stabiele ref voor `saveCustom` zodat we de callback niet hoeven te
+  // memoriseren — dit voorkomt dat consumers per render her-renderen.
+  // Ref-update gaat via useEffect i.p.v. tijdens render (lint-regel
+  // `react-hooks/refs`). De effect-deps bevatten `saveCustom` zelf, dus
+  // de ref blijft synchrone met de meest recente snapshot.
+  const saveCustomRef = useRef(saveCustom)
+  useEffect(() => {
+    saveCustomRef.current = saveCustom
+  }, [saveCustom])
+  useEffect(() => {
+    if (!props.onActionsChange) return
+    props.onActionsChange({
+      canSave: method === 'custom_amount' && finalAmount > 0 && !saving,
+      saving,
+      savedFlash,
+      isCustom: method === 'custom_amount',
+      // Wrapper-fn houdt de identiteit stabiel maar roept altijd de laatste
+      // save-handler aan (state-snapshots zouden anders verouderen).
+      save: () => saveCustomRef.current(),
+    })
+  }, [method, finalAmount, saving, savedFlash, props.onActionsChange])
+
+  // Zodra de pane de footer overneemt (`onActionsChange` aanwezig) onderdrukken
+  // we het inline save-blok om dubbele CTAs te voorkomen.
+  const showInlineSaveBlock = !props.onActionsChange
+
   return (
-    <div className="mx-auto max-w-4xl px-4 sm:px-6 pb-12">
-      {/* Back-link voor desktop — mobile gebruikt shell-TopBar */}
-      <div className="pt-4 pb-2 lg:pt-8">
-        <Link
-          href="/horizon"
-          className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-          Terug naar Horizon
-        </Link>
-      </div>
+    // In-pane: outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
+    // Standalone route: pagina-content houdt eigen `px-*` voor canvas-marges.
+    <div className={`mx-auto max-w-4xl ${props.inPane ? 'pb-8' : 'px-4 sm:px-6 pb-12'}`}>
+      {/* Back-link alleen op standalone route — pane heeft eigen header */}
+      {!props.inPane && (
+        <div className="pt-4 pb-2 lg:pt-8">
+          <Link
+            href="/horizon"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+            Terug naar Horizon
+          </Link>
+        </div>
+      )}
 
       {/* ── Editorial hero ─────────────────────────────────────────── */}
-      <header className="pt-6 sm:pt-10">
+      <header className={props.inPane ? 'pt-2' : 'pt-6 sm:pt-10'}>
         <Kicker size="large">Toekomst</Kicker>
         <EditorialHeadline emphasis="nodig" className="mt-3">
           Wat heb je straks nodig?
@@ -387,31 +443,35 @@ export default function UitgavenNaPensioenClient(props: Props) {
             </div>
           </div>
 
-          {/* ── Save-blok (inline onderaan) ─────────────────────────── */}
-          <div
-            className="mt-8 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-5 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-4"
-            aria-live="polite"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="text-[9px] uppercase tracking-[0.18em] font-mono opacity-70">
-                {savedFlash ? 'Opgeslagen' : 'Voorlopig totaal'}
-              </div>
-              <div
-                className="text-2xl sm:text-3xl font-black leading-none tracking-[-0.02em] truncate"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                {formatMaskedCurrency(finalAmount, masked)} / jr
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={saveCustom}
-              disabled={saving || finalAmount <= 0}
-              className="shrink-0 px-5 py-3 rounded-lg bg-[var(--paper)] text-[var(--ink)] font-semibold text-sm hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          {/* ── Save-blok (inline onderaan) ──────────────────────────
+              Wordt onderdrukt wanneer een pane-wrapper `onActionsChange`
+              meestuurt — dan levert de pane-footer de save-CTA. */}
+          {showInlineSaveBlock && (
+            <div
+              className="mt-8 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-5 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-4"
+              aria-live="polite"
             >
-              {saving ? 'Opslaan…' : savedFlash ? 'Klaar ✓' : 'Opslaan als doelbedrag voor vrijheid'}
-            </button>
-          </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[9px] uppercase tracking-[0.18em] font-mono opacity-70">
+                  {savedFlash ? 'Opgeslagen' : 'Voorlopig totaal'}
+                </div>
+                <div
+                  className="text-2xl sm:text-3xl font-black leading-none tracking-[-0.02em] truncate"
+                  style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                >
+                  {formatMaskedCurrency(finalAmount, masked)} / jr
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={saveCustom}
+                disabled={saving || finalAmount <= 0}
+                className="shrink-0 px-5 py-3 rounded-lg bg-[var(--paper)] text-[var(--ink)] font-semibold text-sm hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Opslaan…' : savedFlash ? 'Klaar ✓' : 'Opslaan als doelbedrag voor vrijheid'}
+              </button>
+            </div>
+          )}
           {error && (
             <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
               {error}

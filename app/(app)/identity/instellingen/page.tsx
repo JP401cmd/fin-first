@@ -1316,8 +1316,8 @@ export default function InstellingenPage() {
             De gekozen methode bepaalt het FIRE-doel, alle vrijheidsdagen-berekeningen en de dagprijs in De Kern, De Horizon en de belastingpagina.
           </p>
           <p className="mt-2 font-sans text-[11px]">
-            <Link href="/horizon/uitgaven-na-pensioen" className="text-[var(--ink-2)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
-              → Stel je uitgaven gedetailleerd samen op /horizon/uitgaven-na-pensioen
+            <Link href="/horizon?uitgaven=open" className="text-[var(--ink-2)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
+              → Stel je uitgaven gedetailleerd samen in De Horizon
             </Link>
           </p>
         </div>

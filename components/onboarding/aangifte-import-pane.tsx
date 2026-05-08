@@ -158,7 +158,9 @@ export function AangifteImportPane({
       kind="pane"
       title={paneTitle}
     >
-      <div className="px-4 sm:px-6 pb-6 max-w-[640px] mx-auto">
+      {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
+          Behoud max-w + mx-auto voor leesbreedte-clamp van het wizard-formulier. */}
+      <div className="pb-6 max-w-[640px] mx-auto">
         {step === 'choose' && (
           <ChooseStep
             onPickPdf={() => {

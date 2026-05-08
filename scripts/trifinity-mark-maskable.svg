@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    TriFinity maskable icon — same monogram, fitted into the
+    Android maskable safe-zone (centre 80% of canvas, ø ~408px).
+    Background fills the full 512×512 so launcher masks (circle,
+    squircle, rounded-rect, teardrop) all crop into solid cream.
+    No outer frame; the launcher provides the silhouette.
+  -->
+  <rect width="512" height="512" fill="#fbf2e7"/>
+
+  <!-- T crossbar: shrunk to ~58% of canvas width, centred. -->
+  <rect x="143" y="186" width="226" height="36" fill="#1a1916"/>
+
+  <!-- T stem: thinner, descends to y=378. -->
+  <rect x="240" y="186" width="32" height="192" fill="#1a1916"/>
+
+  <!-- Period accent — kern-brown dot to the right of the stem. -->
+  <circle cx="338" cy="358" r="18" fill="#6b4339"/>
+</svg>

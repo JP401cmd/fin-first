@@ -24,7 +24,7 @@
 import type { ReactNode } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
-import { SlideInPane } from './slide-in-pane'
+import { SlideInPane, type PaneAction } from './slide-in-pane'
 
 type ShellOverlayKind = 'pane' | 'sheet' | 'confirm'
 type SheetSize = 'sm' | 'md' | 'lg' | 'xl' | 'full'
@@ -38,12 +38,28 @@ type ShellOverlayProps = {
   size?: SheetSize
   /** Alleen voor kind="confirm". Kleurt primaire CTA rood. */
   destructive?: boolean
-  /** Alleen voor kind="pane". Toont ←-knop in pane-header. */
+  /** Alleen voor kind="pane". ←-knop wijst standaard naar `onClose`; geef
+   *  `onBack` mee als je een eigen back-handler nodig hebt (bv. naar een
+   *  voorafgaande sub-mode binnen de pane). */
   onBack?: () => void
   /** Pane-header actions (rechts naast titel). Alleen voor kind="pane". */
   actions?: ReactNode
+  /** Standaard pane-footer — primary action (links, solid). Alleen voor
+   *  kind="pane". Wanneer minimaal één van primary/secondary is doorgegeven
+   *  verschijnt een sticky footer in zowel desktop SlideInPane als mobile
+   *  BottomSheet-fallback. Knoppen worden links uitgelijnd om visuele
+   *  overlap met de zwevende chat-FAB rechtsonderin te voorkomen. */
+  primaryAction?: PaneAction
+  /** Standaard pane-footer — secondary action (rechts naast primary,
+   *  outline). Alleen voor kind="pane". Zie `primaryAction` voor
+   *  render-strategie. */
+  secondaryAction?: PaneAction
   children: ReactNode
 }
+
+// Re-export voor consumers die direct het type nodig hebben (bv. wrappers
+// die `primaryAction` als prop accepteren en doorgeven).
+export type { PaneAction }
 
 export function ShellOverlay({
   open,
@@ -54,6 +70,8 @@ export function ShellOverlay({
   destructive = false,
   onBack,
   actions,
+  primaryAction,
+  secondaryAction,
   children,
 }: ShellOverlayProps) {
   // SSR-safe matchMedia hook — bepaalt voor `kind="pane"` of we de SlideInPane
@@ -72,6 +90,42 @@ export function ShellOverlay({
     //
     // TODO Fase 0.5: vervang BottomSheet-fallback door stack-push via
     // NavStackProvider, zodat het mobile-overlay-gevoel verdwijnt.
+    //
+    // De mobile-footer-slot dupliceert de desktop-footer-knoppen visueel
+    // identiek, maar layoutet ze als full-width-naast-elkaar (`flex-1`).
+    // Volgorde: **primary EERST (links), secondary erna** — gelijk aan de
+    // desktop pane-footer (zie `slide-in-pane.tsx`). Reden: gebruikers-
+    // mental-model identiek over breakpoints heen. Op mobile is er geen
+    // zwevende chat-FAB náást de buttons, dus de links-uitlijning is hier
+    // niet om overlap-redenen — alleen voor consistentie.
+    // Touch-target ≥44px via `min-h-11`.
+    const hasFooter = Boolean(primaryAction || secondaryAction)
+    const mobileFooterSlot = hasFooter ? (
+      <div className="flex items-center gap-2">
+        {primaryAction && (
+          <button
+            type="button"
+            onClick={primaryAction.onClick}
+            disabled={primaryAction.disabled || primaryAction.loading}
+            className="inline-flex flex-1 min-h-11 items-center justify-center bg-[var(--ink)] px-4 text-sm font-medium leading-none text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+          >
+            {primaryAction.loading ? `${primaryAction.label} …` : primaryAction.label}
+          </button>
+        )}
+        {secondaryAction && (
+          <button
+            type="button"
+            onClick={secondaryAction.onClick}
+            disabled={secondaryAction.disabled}
+            className="inline-flex flex-1 min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-4 text-sm font-medium leading-none text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+          >
+            {secondaryAction.label}
+          </button>
+        )}
+      </div>
+    ) : undefined
     return (
       <>
         <SlideInPane
@@ -80,10 +134,18 @@ export function ShellOverlay({
           onBack={onBack}
           title={title}
           actions={actions}
+          primaryAction={primaryAction}
+          secondaryAction={secondaryAction}
         >
           {children}
         </SlideInPane>
-        <BottomSheet open={open && !isLgUp} onClose={onClose} title={title} size="full">
+        <BottomSheet
+          open={open && !isLgUp}
+          onClose={onClose}
+          title={title}
+          size="full"
+          footerSlot={mobileFooterSlot}
+        >
           {children}
         </BottomSheet>
       </>

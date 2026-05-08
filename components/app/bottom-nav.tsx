@@ -43,7 +43,7 @@ export function BottomNav() {
   if (visibleTabs.length <= 1) return null
 
   return (
-    <nav className="fixed bottom-0 left-0 z-40 border-t-2 border-[var(--border-md)] bg-[var(--paper)]/90 backdrop-blur-md safe-bottom transition-[right] duration-300 md:hidden" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
+    <nav className="fixed bottom-0 left-0 z-40 border-t-2 border-[var(--border-md)] bg-[var(--paper)]/90 backdrop-blur-md transition-[right] duration-300 md:hidden" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
       <BottomNavTabs />
     </nav>
   )
@@ -69,7 +69,7 @@ export function BottomNavTabs() {
   if (visibleTabs.length <= 1) return null
 
   return (
-    <div className="flex items-center justify-around w-full" style={{ height: 'var(--bottom-nav-height)' }}>
+    <div className="flex items-stretch justify-around w-full pb-[var(--safe-area-bottom)]">
       {visibleTabs.map((tab) => {
         // tab may be undefined if tabConfig lookup fails (defensive guard)
         if (!tab) return null
@@ -82,7 +82,8 @@ export function BottomNavTabs() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.06em] transition-colors border-t-3 ${
+            style={{ height: 'var(--bottom-nav-height)' }}
+            className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium uppercase tracking-[0.06em] transition-colors border-t-3 ${
               isNonKern ? 'animate-nav-reveal' : ''
             } ${
               isActive

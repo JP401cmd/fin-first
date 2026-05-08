@@ -87,7 +87,9 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
 
   return (
     <ShellOverlay open={true} onClose={onClose} kind="pane" title="Toekomstpaden">
-        <div className="space-y-6 px-6 py-6">
+        {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
+            Hier alleen verticaal ritme. */}
+        <div className="space-y-6">
           {/* Diverging paths chart */}
           <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
             <DivergingPathsChart scenarios={scenarios} fireTarget={fireTarget} />

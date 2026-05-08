@@ -28,7 +28,7 @@ export const horizonNav: ModuleNavConfig = {
   color: 'purple',
   items: [
     { label: 'Overzicht', href: '/horizon' },
-    { label: 'Uitgave na pensioen', href: '/horizon/uitgaven-na-pensioen' },
+    { label: 'Uitgave na pensioen', href: '/horizon?uitgaven=open' },
   ],
 }
 
@@ -62,6 +62,8 @@ export const OVERLAY_QUERY_KEYS = {
   debt:      'debt',
   asset:     'asset',
   strategie: 'strategie',
+  uitgaven:  'uitgaven',
+  event:     'event',
   tab:       'tab',
   edit:      'edit',
   via:       'via',
@@ -71,4 +73,4 @@ export const OVERLAY_QUERY_KEYS = {
 export type OverlayQueryKey = keyof typeof OVERLAY_QUERY_KEYS
 
 /** Welke keys daadwerkelijk een pane-overlay openen. `tab` is in-page; `edit/via/month` zijn modifier/transient. */
-export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'strategie'] as const satisfies readonly OverlayQueryKey[]
+export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'strategie', 'uitgaven', 'event'] as const satisfies readonly OverlayQueryKey[]

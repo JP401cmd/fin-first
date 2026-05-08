@@ -838,7 +838,8 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
   if (loading) {
     return (
       <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
-        <div className="px-5 py-4">
+        {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill). */}
+        <div>
           <div className="space-y-4">
             <div className="h-8 w-48 animate-pulse rounded-[var(--r)] bg-[var(--subtle)]" />
             <div className="h-4 w-80 animate-pulse rounded-[var(--r)] bg-[var(--subtle)]" />
@@ -861,7 +862,8 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
   if (error || !input) {
     return (
       <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
-        <div className="px-5 py-4">
+        {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill). */}
+        <div>
           <p className="font-sans text-sm text-[var(--ink-2)]">{error ?? 'Geen data beschikbaar.'}</p>
         </div>
       </ShellOverlay>
@@ -874,7 +876,8 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
 
   return (
     <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
-      <div className="px-5 py-4">
+      {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill). */}
+      <div>
 
         {/* ── Subtitle + active badges ────────────────────────────── */}
         <header className="mb-6">

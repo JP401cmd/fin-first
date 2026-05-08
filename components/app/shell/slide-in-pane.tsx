@@ -30,17 +30,39 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, X } from 'lucide-react'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 
+/**
+ * Pane-actie voor primaire / secundaire knop in de standaard footer-bar.
+ * Hergebruikt het visuele patroon van `mobile-bottom-bar.tsx` action-bar
+ * variant (primary = solid ink-bg, secondary = outline) zodat desktop pane
+ * en mobile bottom-bar één visuele taal delen. Touch-target ≥44px is via
+ * `min-h-11` afgedwongen.
+ */
+export type PaneAction = {
+  label: string
+  onClick: () => void
+  /** Wanneer true: knop is gedisabled (opacity 50, geen cursor-pointer). */
+  disabled?: boolean
+  /** Wanneer true op de primary: vervang label door "…" en blokkeer click. */
+  loading?: boolean
+}
+
 type SlideInPaneProps = {
   open: boolean
   onClose: () => void
   /** Optionele back-knop in pane-header. Wanneer aangereikt verschijnt ←
-   *  links naast de titel; anders alleen ✕ rechts. Use-case: pane "verdiept"
-   *  (transactie-detail vanuit budget — plan §6.1). */
+   *  links naast de titel met deze handler; anders valt de ←-knop terug op
+   *  `onClose` (zodat de affordance altijd bestaat — sommige flows tonen
+   *  een bevestiging op back terwijl ✕ rechts een snelle exit blijft). */
   onBack?: () => void
   title?: string
   children: ReactNode
   /** Optionele actions in pane-header (rechts naast titel, vóór ✕). */
   actions?: ReactNode
+  /** Standaard footer-actie. Wanneer minimaal één van primary/secondary is
+   *  doorgegeven verschijnt een sticky footer-bar onderin de pane. Beide
+   *  weggelaten = geen footer (geen lege bar). */
+  primaryAction?: PaneAction
+  secondaryAction?: PaneAction
 }
 
 const SLIDE_DURATION_MS = 240
@@ -53,6 +75,8 @@ export function SlideInPane({
   title,
   children,
   actions,
+  primaryAction,
+  secondaryAction,
 }: SlideInPaneProps) {
   // `mounted` controleert of we überhaupt in de portal renderen. Tijdens de
   // exit-animatie blijven we gemount totdat de transitionend-callback klaar is,
@@ -161,9 +185,21 @@ export function SlideInPane({
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
-      className="hidden lg:flex fixed right-0 z-40 flex-col bg-[var(--paper)] border-l border-[var(--border-ed)] shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.12)] lg:w-[480px] xl:w-[560px]"
+      // z-index = 40: bewust LAGER dan zwevende FAB's (chat-panel, activation-
+      // button) op `z-50`. De chat-bubble moet boven de pane blijven floaten
+      // omdat hij globale assistentie aanbiedt — ook tijdens een open pane.
+      // Om visuele overlap met de pane-footer-knoppen rechtsonderin te
+      // voorkomen, worden de footer-knoppen LINKS uitgelijnd (zie footer-bar
+      // hieronder). Zo blijft de chat-FAB bereikbaar én vallen de pane-acties
+      // ruim links van de bubble.
+      className="hidden lg:flex fixed right-0 z-40 flex-col bg-[var(--paper)] border-l border-[var(--border-ed)] shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.12)] lg:w-[560px] xl:w-[680px]"
       style={{
-        top: 'var(--header-height)',
+        // Pane reikt tot de bovenkant van de viewport: in de new-navigation-shell
+        // (file-header r3-8) wordt geen AppHeader gerenderd, dus er is geen
+        // header-strook om onder te schuiven. Tot 0 doorlopen geeft visueel
+        // ruimte voor een prominente close-affordance bovenin én voorkomt een
+        // lege strook bij flag-aan. `bottom: 0` blijft ongemoeid.
+        top: 0,
         bottom: 0,
         // Closed state: volledig rechts uit beeld. Open state: 0.
         // We gebruiken inline-style omdat de transitie tussen twee states
@@ -176,20 +212,21 @@ export function SlideInPane({
         willChange: 'transform',
       }}
     >
-      {/* Pane-header — back-knop links (optioneel), titel midden, actions + ✕ rechts.
+      {/* Pane-header — back-knop links (standaard), titel midden, actions + ✕ rechts.
           Krant-stijl: scherpe hoeken, geen rounded. Hoogte 56px = 1px ruimer
-          dan AppHeader (57px) zodat content-area visueel niet wegschuift. */}
+          dan AppHeader (57px) zodat content-area visueel niet wegschuift.
+          De ←-knop is **altijd** zichtbaar: wanneer geen `onBack` is doorgegeven
+          valt deze terug op `onClose`, zodat de affordance bestaat ongeacht
+          de flow. ✕ rechtsboven blijft daarnaast als snelle-exit-knop staan. */}
       <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-ed)] px-4 py-3">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Terug"
-            className="touch-target text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onBack ?? handleClose}
+          aria-label={onBack ? 'Terug' : 'Sluiten'}
+          className="touch-target text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] shrink-0"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
 
         {title && (
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -208,7 +245,7 @@ export function SlideInPane({
           </div>
         )}
 
-        {/* Spacer wanneer geen titel maar wel back-knop, zodat actions/✕ rechts blijven. */}
+        {/* Spacer wanneer geen titel, zodat actions/✕ rechts blijven uitgelijnd. */}
         {!title && <div className="flex-1" />}
 
         {actions && <div className="flex items-center gap-1 shrink-0">{actions}</div>}
@@ -223,13 +260,62 @@ export function SlideInPane({
         </button>
       </div>
 
-      {/* Body — eigen scroll, safe-area-padding onderaan voor iOS-notch op iPad-landscape. */}
+      {/* Body — eigen scroll, safe-area-padding onderaan voor iOS-notch op iPad-landscape.
+          De buitenste div behoudt scroll-eigenschappen; een inner-wrapper levert de
+          standaard content-padding (28→32px horizontaal / 24→28px verticaal). Pixel-
+          waarden i.p.v. spacing-tokens omdat de Editorial-tokens niet exact passen
+          op de gewenste pane-ademruimte. Consumers renderen géén eigen outer-padding
+          meer op het top-level child binnen `<ShellOverlay kind="pane">` — innerlijke
+          section-padding (cards, dividers) blijft uiteraard wél aan de consument. */}
       <div
         className="min-h-0 flex-1 overflow-y-auto safe-bottom"
         style={{ overscrollBehaviorY: 'contain' }}
       >
-        {children}
+        <div className="px-7 py-6 lg:px-8 lg:py-7">
+          {children}
+        </div>
       </div>
+
+      {/* Standaard footer-bar — alleen renderen wanneer minimaal één actie is
+          doorgegeven (geen lege bar bij read-only panes). De footer staat
+          BUITEN de scroll-div en is daardoor altijd zichtbaar onderaan de
+          pane (sticky-gedrag via flex-column-layout: header + flex-1 scroll-
+          body + footer). De pane-flex-column zorgt dat de footer geen
+          padding nodig heeft op de body — die kan tot onder de footer
+          doorscrollen omdat ze in een aparte flex-row leven. */}
+      {(primaryAction || secondaryAction) && (
+        // Knoppen LINKS uitgelijnd (`justify-start`) — bewust afwijkend van
+        // platform-conventie (rechts) om visuele overlap met de zwevende
+        // chat-FAB rechtsonderin te voorkomen. Volgorde: primary EERST
+        // (links), secondary erna. Reden: primary blijft het eerste vaste
+        // visuele anker en valt nog verder weg van de FAB; secondary
+        // ("Annuleren") komt ernaast en blijft eveneens ruim links van de
+        // bubble.
+        <div className="flex shrink-0 items-center justify-start gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)] px-7 py-4 lg:px-8">
+          {primaryAction && (
+            <button
+              type="button"
+              onClick={primaryAction.onClick}
+              disabled={primaryAction.disabled || primaryAction.loading}
+              className="inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-4 text-sm font-medium leading-none text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+            >
+              {primaryAction.loading ? `${primaryAction.label} …` : primaryAction.label}
+            </button>
+          )}
+          {secondaryAction && (
+            <button
+              type="button"
+              onClick={secondaryAction.onClick}
+              disabled={secondaryAction.disabled}
+              className="inline-flex min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-4 text-sm font-medium leading-none text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+            >
+              {secondaryAction.label}
+            </button>
+          )}
+        </div>
+      )}
     </div>,
     document.body,
   )

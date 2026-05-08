@@ -1,28 +1,51 @@
 {
   "name": "TriFinity",
   "short_name": "TriFinity",
-  "description": "Jouw persoonlijke finance freedom navigator",
+  "description": "Geld is opgeslagen tijd — persoonlijke financiën in beweging",
+  "id": "/",
   "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#faf9f6",
+  "background_color": "#f5efe2",
+  "categories": ["finance", "productivity", "lifestyle"],
+  "lang": "nl-NL",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Kern",
+      "short_name": "Kern",
+      "description": "Bezittingen en schulden",
+      "url": "/core",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Horizon",
+      "short_name": "Horizon",
+      "description": "Vrijheidshorizon en simulaties",
+      "url": "/horizon",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

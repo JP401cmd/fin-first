@@ -224,7 +224,7 @@
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
-  --bottom-nav-height: 64px;
+  --bottom-nav-height: 56px;
 }
 
 @theme inline {
@@ -965,6 +965,80 @@ body {
 }
 .slider-touch--neutral::-moz-range-progress {
   background: #52525b;
+}
+
+/* ── Module-aware editorial slider (per ui-ux skill *Range-thumb dimensies*) ──
+   Compact, ink-track + module-active fill, scherpe editorial look.
+   16px thumb desktop / 18px op (pointer:coarse). */
+.slider-module {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+  outline: none;
+  touch-action: pan-y;
+  padding: 8px 0;
+}
+.slider-module::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--ink);
+  border: none;
+  border-radius: 1px;
+}
+.slider-module::-moz-range-track {
+  height: 2px;
+  background: var(--ink);
+  border: none;
+  border-radius: 1px;
+}
+.slider-module::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--module-active-500, var(--color-horizon-500));
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -7px;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.slider-module::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--module-active-500, var(--color-horizon-500));
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.slider-module:hover::-webkit-slider-thumb,
+.slider-module:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.2);
+  background: var(--module-active-700, var(--color-horizon-700));
+}
+.slider-module:hover::-moz-range-thumb,
+.slider-module:focus-visible::-moz-range-thumb {
+  transform: scale(1.2);
+  background: var(--module-active-700, var(--color-horizon-700));
+}
+@media (pointer: coarse) {
+  .slider-module::-webkit-slider-runnable-track,
+  .slider-module::-moz-range-track {
+    height: 3px;
+  }
+  .slider-module::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+    border-width: 1.5px;
+    margin-top: -7.5px;
+  }
+  .slider-module::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-width: 1.5px;
+  }
 }
 
 /* ── Navigation reveal animation (post-activation) ──────── */

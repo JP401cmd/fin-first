@@ -55,3 +55,11 @@ nul
 # auth state (contains tokens)
 auth-state.json
 auth_result.json
+
+# Claude Code harness-local state — never commit
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+.claude/fix-mojibake.ps1
+
+# research artifacts
+signin2.yaml

@@ -15,7 +15,8 @@
  * dezelfde behaviour, alleen via één centrale wrapper.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { AlertTriangle, Building2 } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
@@ -35,18 +36,43 @@ import type { Asset } from '@/lib/asset-data'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
+/**
+ * Shape die `DebtForm` (in `embedded`-mode) publiceert naar de pane-wrapper.
+ * Volgt hetzelfde ref-gebaseerde save-handler patroon als
+ * `EventEditActionsState` (event-pane-edit.tsx).
+ */
+export type DebtEditActionsState = {
+  canSave: boolean
+  saving: boolean
+  isEditing: boolean
+  /** Roept de meest recente save-handler aan (via ref). */
+  save: () => void
+}
+
 export function DebtForm({
   debt,
   userAssets,
   allDebts,
   onClose,
   onSaved,
+  embedded = false,
+  onActionsChange,
 }: {
   debt?: Debt
   userAssets: Asset[]
   allDebts?: Debt[]
   onClose: () => void
   onSaved: () => void
+  /**
+   * Wanneer true rendert deze component alleen de body (geen ShellOverlay,
+   * geen interne Annuleren/Opslaan-knoppen). De pane-wrapper levert beide.
+   */
+  embedded?: boolean
+  /**
+   * Publiceert save-state naar de pane-wrapper zodat die de primary CTA
+   * (Opslaan/Bijwerken) in de pane-footer kan renderen.
+   */
+  onActionsChange?: (state: DebtEditActionsState) => void
 }) {
   const isEdit = !!debt
 
@@ -95,6 +121,11 @@ export function DebtForm({
   const [useCalculatedPayment, setUseCalculatedPayment] = useState(true)
   // Berekend vs eigen saldo
   const [useCalculatedBalance, setUseCalculatedBalance] = useState(true)
+  // Stabiele "nu" voor de remaining-months-berekening in `calculatedPayment`.
+  // Eenmaal gevangen bij mount zodat render-purity (react-hooks/purity)
+  // gerespecteerd wordt; sub-seconde precisie is niet relevant voor een
+  // formuliers-context die binnen seconden tot minuten geopend blijft.
+  const [nowMs] = useState(() => Date.now())
 
   const subtypeOptions = DEBT_SUBTYPE_LABELS[debtType]
   const visibleFields = DEBT_TYPE_FIELDS[debtType]
@@ -128,7 +159,7 @@ export function DebtForm({
     let months: number | null = null
     if (endDate) {
       months = Math.max(1, Math.round(
-        (new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44),
+        (new Date(endDate).getTime() - nowMs) / (1000 * 60 * 60 * 24 * 30.44),
       ))
     }
 
@@ -150,7 +181,7 @@ export function DebtForm({
     if (rate === 0) return Math.round((bal / months) * 100) / 100
     const factor = Math.pow(1 + monthlyRate, months)
     return Math.round(bal * (monthlyRate * factor) / (factor - 1) * 100) / 100
-  }, [currentBalance, interestRate, endDate, repaymentType, useCalculatedBalance, calculatedBalance])
+  }, [currentBalance, interestRate, endDate, repaymentType, useCalculatedBalance, calculatedBalance, nowMs])
 
   function handleTypeChange(type: DebtType) {
     setDebtType(type)
@@ -320,8 +351,26 @@ export function DebtForm({
     onSaved()
   }
 
-  return (
-    <ShellOverlay open={true} onClose={onClose} kind="sheet" size="lg" title={isEdit ? 'Schuld bewerken' : 'Nieuwe schuld'}>
+  // Publiceer save-state naar pane-wrapper (zelfde ref-pattern als
+  // EventPaneEdit). Save-handler-ref voorkomt stale closures op de form-
+  // state; de wrapper-effect heeft alleen de primitives nodig om de juiste
+  // CTA-state te tonen.
+  const saveHandlerRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    saveHandlerRef.current = () => { void handleSave() }
+  })
+  const canSave = !saving && Boolean(name) && Boolean(currentBalance)
+  useEffect(() => {
+    if (!onActionsChange) return
+    onActionsChange({
+      canSave,
+      saving,
+      isEditing: isEdit,
+      save: () => saveHandlerRef.current(),
+    })
+  }, [onActionsChange, canSave, saving, isEdit])
+
+  const formContent = (
       <div className="p-6">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -660,7 +709,7 @@ export function DebtForm({
                     </select>
                     {debtType === 'dga_schuld' && userAssets.filter((a) => a.asset_type === 'deelneming').length === 0 && (
                       <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-                        Voeg eerst een deelneming toe bij <a href="/core/assets" className="underline text-teal-600">Bezittingen</a>.
+                        Voeg eerst een deelneming toe bij <Link href="/core/assets" className="underline text-teal-600">Bezittingen</Link>.
                       </p>
                     )}
                   </div>
@@ -932,22 +981,33 @@ export function DebtForm({
           </div>
         )}
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-          >
-            Annuleren
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !name || !currentBalance}
-            className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-          >
-            {saving ? 'Opslaan...' : isEdit ? 'Bijwerken' : 'Toevoegen'}
-          </button>
-        </div>
+        {/* Inline Annuleren/Opslaan — alleen in standalone-mode. In
+            embedded-mode levert de pane-wrapper deze knoppen via
+            primaryAction/secondaryAction. */}
+        {!embedded && (
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Annuleren
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !name || !currentBalance}
+              className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            >
+              {saving ? 'Opslaan...' : isEdit ? 'Opslaan' : 'Toevoegen'}
+            </button>
+          </div>
+        )}
       </div>
+  )
+
+  if (embedded) return formContent
+  return (
+    <ShellOverlay open={true} onClose={onClose} kind="sheet" size="lg" title={isEdit ? 'Schuld bewerken' : 'Nieuwe schuld'}>
+      {formContent}
     </ShellOverlay>
   )
 }

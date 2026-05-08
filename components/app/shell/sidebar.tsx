@@ -162,7 +162,7 @@ const MODULES: ModuleEntry[] = [
     href: '/horizon',
     Icon: Compass,
     subTags: [
-      { label: 'Uitgave na pensioen', href: '/horizon/uitgaven-na-pensioen' },
+      { label: 'Uitgave na pensioen', href: '/horizon?uitgaven=open' },
       { label: 'Wat-Als', href: '/horizon/whatif' },
       { label: 'Doorrekening', href: '/horizon/doorrekening-test' },
     ],

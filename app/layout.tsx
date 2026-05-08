@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Source_Serif_4, DM_Mono, Inter, Andada_Pro } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { ServiceWorkerRegister } from "@/components/app/service-worker-register";
 import "./globals.css";
 
 // LCP-font: hero h1 op /core, /will, /horizon en alle category-pages.
@@ -60,6 +61,16 @@ export const metadata: Metadata = {
   title: "TriFinity — Ken je waarheid. Kies je vrijheid. Leef je tijd.",
   description: "Geld is opgeslagen tijd. TriFinity vertaalt je financien naar vrijheid — jouw persoonlijke finance freedom navigator.",
   manifest: '/manifest.json',
+  // Icons block: gives Next.js explicit references for favicon, Apple touch
+  // icon, and the PWA icons that Bubblewrap reads from the manifest later.
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -92,6 +103,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         {children}
+        <ServiceWorkerRegister />
         <SpeedInsights />
       </body>
     </html>

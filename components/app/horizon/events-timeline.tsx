@@ -19,6 +19,8 @@ export function EventsTimeline({
   visibleMaxAge,
   scenarioEvents,
   scenarioColor,
+  onViewEvent,
+  onEditEvent,
 }: {
   events: LifeEvent[]
   currentAge: number
@@ -28,6 +30,10 @@ export function EventsTimeline({
   visibleMaxAge?: number
   scenarioEvents?: Array<{ name: string; target_age: number | null; event_type: string }>
   scenarioColor?: string
+  /** Klik op event-marker → opent view-pane */
+  onViewEvent?: (eventId: string) => void
+  /** Klik op bewerk-knopje in tooltip → opent edit-pane direct */
+  onEditEvent?: (eventId: string) => void
 }) {
   const { masked } = useMaskedAmounts()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -150,7 +156,10 @@ export function EventsTimeline({
               key={ev.id}
               onMouseEnter={() => setHoveredId(ev.id)}
               onMouseLeave={() => setHoveredId(null)}
-              style={{ cursor: 'default' }}
+              onClick={() => onViewEvent?.(ev.id)}
+              style={{ cursor: onViewEvent ? 'pointer' : 'default' }}
+              role={onViewEvent ? 'button' : undefined}
+              aria-label={onViewEvent ? `Bekijk ${ev.name}` : undefined}
             >
               {/* Vertical tick from axis to icon */}
               <line
@@ -198,7 +207,9 @@ export function EventsTimeline({
               {/* Hover tooltip — amount lines per financial impact */}
               {isHovered && (() => {
                 const lines = eventAmountLines(ev)
-                const tooltipH = 14 + lines.length * 11
+                const showEditBtn = !!onEditEvent
+                const editBtnH = showEditBtn ? 16 : 0
+                const tooltipH = 14 + lines.length * 11 + editBtnH
                 const tooltipW = 140
                 const tx = Math.max(PAD.left, Math.min(cx - tooltipW / 2, W - PAD.right - tooltipW))
                 const txCenter = Math.max(PAD.left + tooltipW / 2, Math.min(cx, W - PAD.right - tooltipW / 2))
@@ -229,6 +240,38 @@ export function EventsTimeline({
                         {line.label}
                       </text>
                     ))}
+                    {showEditBtn && (
+                      <g
+                        onClick={e => {
+                          e.stopPropagation()
+                          onEditEvent?.(ev.id)
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        role="button"
+                        aria-label={`Bewerk ${ev.name}`}
+                      >
+                        <rect
+                          x={tx + tooltipW - 56}
+                          y={tooltipH - 14}
+                          width={52}
+                          height={11}
+                          rx={2}
+                          fill="var(--paper)"
+                          opacity={0.18}
+                        />
+                        <text
+                          x={tx + tooltipW - 30}
+                          y={tooltipH - 5}
+                          textAnchor="middle"
+                          fontSize={7}
+                          fontWeight={600}
+                          fill="var(--paper)"
+                          fontFamily="var(--font-inter, sans-serif)"
+                        >
+                          ✎ Bewerk
+                        </text>
+                      </g>
+                    )}
                   </g>
                 )
               })()}

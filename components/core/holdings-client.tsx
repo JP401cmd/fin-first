@@ -1147,102 +1147,6 @@ function ManualPriceOverrideModal({
   )
 }
 
-// ── Holding colors for allocation chart ─────────────────────────
-
-const HOLDING_COLORS = [
-  '#3b82f6', // blue
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#8b5cf6', // violet
-  '#f97316', // orange
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-  '#6366f1', // indigo
-  '#84cc16', // lime
-  '#d946ef', // fuchsia
-  '#14b8a6', // teal
-  '#e11d48', // rose
-]
-
-// ── Holdings allocation donut chart (SVG) ─────────────────────
-
-function HoldingsAllocationPie({
-  holdings,
-  total,
-}: {
-  holdings: { id: string; name: string; ticker: string | null; value: number }[]
-  total: number
-}) {
-  const fc = useFc()
-  const size = 140
-  const cx = size / 2
-  const cy = size / 2
-  const r = 50
-  const strokeWidth = 24
-
-  const segments = holdings.map((h, i) => ({
-    id: h.id,
-    name: h.name,
-    pct: total > 0 ? h.value / total : 0,
-    color: HOLDING_COLORS[i % HOLDING_COLORS.length],
-  }))
-
-  const circumference = 2 * Math.PI * r
-  let offset = 0
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      className="shrink-0"
-      data-testid="allocation-donut"
-    >
-      {/* Background ring for empty state */}
-      {segments.length === 0 && (
-        <circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke="#e4e4e7"
-          strokeWidth={strokeWidth}
-        />
-      )}
-      {segments.map((seg) => {
-        const dash = seg.pct * circumference
-        const gap = circumference - dash
-        const currentOffset = offset
-        offset += dash
-
-        return (
-          <circle
-            key={seg.id}
-            cx={cx}
-            cy={cy}
-            r={r}
-            fill="none"
-            stroke={seg.color}
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${dash} ${gap}`}
-            strokeDashoffset={-currentOffset}
-            transform={`rotate(-90 ${cx} ${cy})`}
-          />
-        )
-      })}
-      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="11" fontWeight="700" fill="#18181b">
-        {fc(total)}
-      </text>
-      <text x={cx} y={cy + 8} textAnchor="middle" fontSize="8" fill="#a1a1aa">
-        totaal
-      </text>
-      <text x={cx} y={cy + 18} textAnchor="middle" fontSize="8" fill="#a1a1aa">
-        {holdings.length} holding{holdings.length !== 1 ? 's' : ''}
-      </text>
-    </svg>
-  )
-}
-
 // ── Holding form modal ─────────────────────────────────────────
 
 function HoldingForm({
@@ -2153,7 +2057,7 @@ function HoldingEditForm({
             disabled={saving || !name}
             className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
-            {saving ? 'Bijwerken...' : 'Bijwerken'}
+            {saving ? 'Opslaan...' : 'Opslaan'}
           </button>
         </div>
       </div>

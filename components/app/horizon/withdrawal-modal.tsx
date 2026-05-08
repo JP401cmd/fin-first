@@ -123,7 +123,9 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
 
   return (
     <ShellOverlay open={true} onClose={onClose} kind="pane" title="Opnamestrategie">
-        <div className="space-y-6 px-6 py-6">
+        {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
+            Hier alleen verticaal ritme. */}
+        <div className="space-y-6">
           {/* Strategy tabs */}
           <section>
             <div className="flex flex-wrap gap-2">

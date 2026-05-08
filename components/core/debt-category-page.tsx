@@ -22,7 +22,10 @@ import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
 import { CategoryHistoryChart } from './category-history-chart'
 import type { CategoryHistoryData } from '@/lib/load-category-history'
-import { DebtDetailSheet } from './debt-detail-sheet'
+import { DebtPane } from '@/components/app/core/debts/debt-pane'
+import { createClient } from '@/lib/supabase/client'
+import type { Valuation } from '@/components/app/core/debts/debt-types'
+import type { Asset } from '@/lib/asset-data'
 import {
   findDeepenings,
   getDeepeningComponent,
@@ -131,11 +134,71 @@ export function DebtCategoryPage({
 
   const debts = initialDebts
   const [quickAddOpen, setQuickAddOpen] = useState(false)
-  const [selectedDebtId, setSelectedDebtId] = useState<string | null>(null)
+  // URL-driven pane-state: `?debt=<id>` opent de slide-in pane voor die
+  // schuld. Consistent met asset-category-page.tsx; `debt` is al de
+  // canonieke OVERLAY_QUERY_KEY uit `lib/navigation.ts`.
+  const requestedDebtId = searchParams.get('debt')
   const selectedDebt = useMemo(
-    () => debts.find((d) => d.id === selectedDebtId) ?? null,
-    [debts, selectedDebtId],
+    () => debts.find((d) => d.id === requestedDebtId) ?? null,
+    [debts, requestedDebtId],
   )
+
+  const setSelectedDebtId = useCallback(
+    (id: string | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (id) {
+        params.set('debt', id)
+      } else {
+        params.delete('debt')
+      }
+      const queryString = params.toString()
+      router.replace(
+        `/core/debts/${type}${queryString ? `?${queryString}` : ''}`,
+        { scroll: false },
+      )
+    },
+    [router, searchParams, type],
+  )
+
+  // Side-data voor de pane: valuations (lazy per geselecteerde debt) en
+  // de assets-lijst (eenmalig — debt-form heeft die nodig voor linked-asset
+  // selecties bij mortgage/dga_schuld).
+  const [valuationsByDebtId, setValuationsByDebtId] = useState<Record<string, Valuation[]>>({})
+  const [userAssets, setUserAssets] = useState<Asset[]>([])
+
+  useEffect(() => {
+    const supabase = createClient()
+    let cancelled = false
+    supabase
+      .from('assets')
+      .select('id, name, asset_type, current_value, linked_asset_id, is_active')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => {
+        if (cancelled) return
+        if (data) setUserAssets(data as Asset[])
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!requestedDebtId) return
+    if (valuationsByDebtId[requestedDebtId]) return
+    const supabase = createClient()
+    let cancelled = false
+    supabase
+      .from('valuations')
+      .select('*')
+      .eq('entity_id', requestedDebtId)
+      .eq('entity_type', 'debt')
+      .order('valuation_date', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        setValuationsByDebtId((prev) => ({ ...prev, [requestedDebtId]: data as Valuation[] }))
+      })
+    return () => { cancelled = true }
+  }, [requestedDebtId, valuationsByDebtId])
 
   // Multi-app: een schuld-categorie kan meerdere apps tonen (bv. mortgage
   // → Aflosstrategie + Hypotheekplanner). Symmetrisch met
@@ -247,7 +310,7 @@ export function DebtCategoryPage({
 
   const openDebtDetail = useCallback((debtId: string) => {
     setSelectedDebtId(debtId)
-  }, [])
+  }, [setSelectedDebtId])
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -313,9 +376,13 @@ export function DebtCategoryPage({
         }}
       />
 
-      <DebtDetailSheet
+      <DebtPane
         debt={selectedDebt}
+        valuations={selectedDebt ? valuationsByDebtId[selectedDebt.id] : undefined}
+        userAssets={userAssets}
+        allDebts={debts}
         onClose={() => setSelectedDebtId(null)}
+        onChanged={() => router.refresh()}
       />
     </div>
   )

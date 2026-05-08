@@ -15,6 +15,14 @@ type BottomSheetProps = {
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
   /** Initial mobile height (e.g. '60vh'). Drag up expands to full 92vh. Desktop ignores this. */
   initialMobileHeight?: string
+  /**
+   * Optionele sticky footer-slot, gerenderd buiten de scroll-content. Gebruikt
+   * door `<ShellOverlay kind="pane">` voor de mobile-fallback om dezelfde
+   * primary/secondary action-bar te tonen als de desktop SlideInPane-footer.
+   * Slot leeft binnen de tray (niet `position: fixed`), zodat detent-strategie
+   * (peek/mid/full) intact blijft. Wanneer leeggelaten: geen footer.
+   */
+  footerSlot?: ReactNode
 }
 
 const sizeClasses = {
@@ -30,7 +38,7 @@ const DISMISS_PERCENT = 0.3    // 30% of sheet height
 const SPRING_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const VELOCITY_SAMPLES = 5
 
-export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -464,6 +472,16 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
         >
           {children}
         </div>
+
+        {/* Optionele sticky footer-slot — staat buiten de scroll-content zodat
+            primary/secondary acties altijd zichtbaar blijven. Border-top en
+            paper-bg zijn consistent met de desktop SlideInPane-footer, zodat
+            beide rendermodi visueel uitwisselbaar zijn. */}
+        {footerSlot && (
+          <div className="shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 py-3">
+            {footerSlot}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

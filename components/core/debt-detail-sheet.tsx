@@ -22,6 +22,11 @@ interface DebtDetailSheetProps {
 }
 
 /**
+ * @deprecated Vervangen door `<DebtPane>` in
+ * `components/app/core/debts/debt-pane.tsx` (mei 2026). De pane biedt
+ * volwaardige view/edit/herwaarder-flow als slide-in pane i.p.v. de oude
+ * read-only sheet die naar `/core/debts?debt=<id>` linkte.
+ *
  * Eenvoudige read-only detail-sheet voor een schuld op de categorie-pagina.
  *
  * Bewerken/herwaarderen gaat via de volledige flow op `/core/debts?debt=<id>`

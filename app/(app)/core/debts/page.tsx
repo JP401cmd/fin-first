@@ -18,13 +18,11 @@ import type { Asset } from '@/lib/asset-data'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 
-// Detail-modal flow blijft bestaan — registratie-overzicht is slechts de
-// nieuwe schil. De volledige debt-detail/edit/revaluatie-pijplijn leeft nog
-// steeds in dezelfde shared modal-componenten.
+// Detail-flow draait via `<DebtPane>` — dezelfde slide-in pane als op
+// `/core/debts/[type]`. URL-driven via `?debt=<id>` zodat deeplinks en
+// browser-back symmetrisch werken met de categorie-pagina's.
 import type { Valuation } from '@/components/app/core/debts/debt-types'
-import { DebtDetailModal } from '@/components/app/core/debts/debt-detail-modal'
-import { DebtForm } from '@/components/app/core/debts/debt-form'
-import { ValuationModal } from '@/components/app/core/debts/debt-valuation-modal'
+import { DebtPane } from '@/components/app/core/debts/debt-pane'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -37,8 +35,6 @@ import { computeDebtKpi } from '@/lib/debt-kpi'
 import type { KpiPair } from '@/lib/asset-kpi'
 
 // ── Types ───────────────────────────────────────────────────
-
-type ModalStep = 'detail' | 'edit' | 'revalue'
 
 const DEBT_ITEM_NOUN: Record<DebtType, string> = {
   mortgage: 'hypotheek',
@@ -76,23 +72,20 @@ export default function DebtsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // De /core/debts/[type] pagina linkt detail-clicks via `?debt=<id>` terug
-  // naar deze overzichtspagina. We respecteren die query-param en openen
-  // direct het juiste modal — zo blijft de bestaande deep-link werkend.
-  const initialDebtId = searchParams.get('debt') ?? undefined
+  // URL-driven pane-state: `?debt=<id>` opent de slide-in pane voor die
+  // schuld. Consistent met `/core/debts/[type]` (debt-category-page.tsx).
+  const requestedDebtId = searchParams.get('debt')
 
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [quickAddInitialType, setQuickAddInitialType] = useState<DebtType | null>(null)
   const [debts, setDebts] = useState<Debt[]>([])
-  const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
+  const [valuationsByDebtId, setValuationsByDebtId] = useState<Record<string, Valuation[]>>({})
   const [userAssets, setUserAssets] = useState<Asset[]>([])
   // Per-debt sparkline-historie (12 maanden) voor de breuklijn-overlay op
   // VermogenDebtCard. Zelfde shape als asset-categorie-pagina.
   const [debtSparklines, setDebtSparklines] = useState<Record<string, number[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null)
-  const [modalStep, setModalStep] = useState<ModalStep>('detail')
 
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
@@ -150,6 +143,8 @@ export default function DebtsPage() {
     }
   }, [perspective])
 
+  // Lazy-load valuations zodra een specifieke schuld geselecteerd wordt —
+  // pane gebruikt dit voor de waarde-historie sectie.
   const loadValuations = useCallback(async (debtId: string) => {
     const supabase = createClient()
     const { data } = await supabase
@@ -160,7 +155,7 @@ export default function DebtsPage() {
       .order('valuation_date', { ascending: false })
       .limit(20)
     if (data) {
-      setValuations((prev) => ({ ...prev, [debtId]: data as Valuation[] }))
+      setValuationsByDebtId((prev) => ({ ...prev, [debtId]: data as Valuation[] }))
     }
   }, [])
 
@@ -202,44 +197,41 @@ export default function DebtsPage() {
     return () => { cancelled = true }
   }, [debts])
 
-  // ── Detail-modal openen vanuit deep-link ───────────────────
+  // ── Pane-state setters ─────────────────────────────────────
 
+  // URL-state setter — opent/sluit de pane via shallow route-replace zodat
+  // deeplinks deelbaar zijn en browser-back de pane sluit zonder van pagina
+  // te wisselen. Symmetrisch met asset-category-page.tsx.
+  const setSelectedDebtId = useCallback(
+    (id: string | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (id) {
+        params.set('debt', id)
+      } else {
+        params.delete('debt')
+      }
+      const queryString = params.toString()
+      router.replace(`/core/debts${queryString ? `?${queryString}` : ''}`, { scroll: false })
+    },
+    [router, searchParams],
+  )
+
+  // Geselecteerde debt = lookup uit lijst o.b.v. URL-state.
+  const selectedDebt = useMemo(
+    () => debts.find((d) => d.id === requestedDebtId) ?? null,
+    [debts, requestedDebtId],
+  )
+
+  // Lazy-load valuations zodra een schuld via URL-state geselecteerd wordt —
+  // de pane heeft de waarde-historie nodig voor de view-mode-charts.
   useEffect(() => {
-    if (!initialDebtId || loading || debts.length === 0) return
-    const found = debts.find(d => d.id === initialDebtId)
-    if (found) {
-      setSelectedDebt(found)
-      setModalStep('detail')
-      loadValuations(found.id)
-    }
-  }, [initialDebtId, loading, debts, loadValuations])
-
-  // ── Acties ─────────────────────────────────────────────────
+    if (!selectedDebt) return
+    if (valuationsByDebtId[selectedDebt.id]) return
+    loadValuations(selectedDebt.id)
+  }, [selectedDebt, valuationsByDebtId, loadValuations])
 
   function openDebtModal(debt: Debt) {
-    setSelectedDebt(debt)
-    setModalStep('detail')
-    loadValuations(debt.id)
-  }
-
-  function closeDebtModal() {
-    setSelectedDebt(null)
-    setModalStep('detail')
-    // Verwijder de `?debt=` query param zonder navigatie/page-reload zodat
-    // browser-back niet onverwachts terug naar de modal-state springt.
-    if (initialDebtId) {
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete('debt')
-      const qs = params.toString()
-      router.replace(`/core/debts${qs ? `?${qs}` : ''}`, { scroll: false })
-    }
-  }
-
-  async function deleteDebt(id: string) {
-    const supabase = createClient()
-    await supabase.from('debts').delete().eq('id', id)
-    setDebts((prev) => prev.filter((d) => d.id !== id))
-    closeDebtModal()
+    setSelectedDebtId(debt.id)
   }
 
   // ── Afgeleide waarden ──────────────────────────────────────
@@ -454,70 +446,23 @@ export default function DebtsPage() {
         })}
       </section>
 
-      {/* ═══ Modals — bestaand detail-modal patroon blijft ═══════ */}
-
-      {selectedDebt && modalStep === 'detail' && (
-        <DebtDetailModal
-          debt={selectedDebt}
-          valuations={valuations[selectedDebt.id]}
-          userAssets={userAssets}
-          dailyExpenses={0}
-          onClose={closeDebtModal}
-          onEdit={() => setModalStep('edit')}
-          onRevalue={() => setModalStep('revalue')}
-          onDelete={() => deleteDebt(selectedDebt.id)}
-        />
-      )}
-
-      {selectedDebt && modalStep === 'edit' && (
-        <DebtForm
-          debt={selectedDebt}
-          userAssets={userAssets}
-          allDebts={debts}
-          onClose={() => setModalStep('detail')}
-          onSaved={() => {
-            setModalStep('detail')
-            loadDebts().then(() => {
-              const supabase = createClient()
-              supabase
-                .from('debts')
-                .select('*')
-                .eq('id', selectedDebt.id)
-                .single()
-                .then(({ data }) => {
-                  if (data) setSelectedDebt(data as Debt)
-                })
-            })
-          }}
-        />
-      )}
-
-      {selectedDebt && modalStep === 'revalue' && (
-        <ValuationModal
-          entityId={selectedDebt.id}
-          entityType="debt"
-          entityName={selectedDebt.name}
-          entitySubtype={selectedDebt.debt_type}
-          netWorthInclusionPct={selectedDebt.net_worth_inclusion_pct ?? 100}
-          currentValue={Number(selectedDebt.current_balance)}
-          onClose={() => setModalStep('detail')}
-          onSaved={() => {
-            setModalStep('detail')
-            loadDebts().then(() => {
-              const supabase = createClient()
-              supabase
-                .from('debts')
-                .select('*')
-                .eq('id', selectedDebt.id)
-                .single()
-                .then(({ data }) => {
-                  if (data) setSelectedDebt(data as Debt)
-                })
-            })
-            loadValuations(selectedDebt.id)
-          }}
-        />
-      )}
+      {/* ═══ Detail-pane — uniforme slide-in flow (driewegregel kind="pane")
+          Zelfde pane als op `/core/debts/[type]` zodat klikken op een
+          debt-card geen page-navigatie meer triggert maar de detail/edit/
+          revaluatie ter plekke opent. */}
+      <DebtPane
+        debt={selectedDebt}
+        valuations={selectedDebt ? valuationsByDebtId[selectedDebt.id] : undefined}
+        userAssets={userAssets}
+        allDebts={debts}
+        dailyExpenses={0}
+        onClose={() => setSelectedDebtId(null)}
+        onChanged={() => {
+          loadDebts()
+          if (selectedDebt) loadValuations(selectedDebt.id)
+          router.refresh()
+        }}
+      />
 
       <QuickAddWizard
         open={quickAddOpen}

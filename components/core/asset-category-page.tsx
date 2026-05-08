@@ -38,7 +38,7 @@ import { CategoryTabs, type CategoryTab } from './category-tabs'
 import { CategoryHistoryChart } from './category-history-chart'
 import { ModuleTipStrip } from './module-tip-strip'
 import { CoreKengetallen } from './core-kengetallen'
-import { AssetDetailFlow } from './asset-detail-flow'
+import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import {
   findDeepenings,
   getDeepeningComponent,
@@ -288,10 +288,30 @@ export function AssetCategoryPage({
   // de server-component opnieuw laadt — daarna update React de prop.
   const assets = initialAssets
   const [quickAddOpen, setQuickAddOpen] = useState(false)
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
+  // URL-driven pane-state: `?asset=<id>` opent de slide-in pane voor die
+  // asset. Gebruikt URL i.p.v. lokale state zodat deeplinks en browser-back
+  // correct werken (consistent met `?debt=<id>` deep-linking).
+  const requestedAssetId = searchParams.get('asset')
   const selectedAsset = useMemo(
-    () => assets.find((a) => a.id === selectedAssetId) ?? null,
-    [assets, selectedAssetId],
+    () => assets.find((a) => a.id === requestedAssetId) ?? null,
+    [assets, requestedAssetId],
+  )
+
+  const setSelectedAssetId = useCallback(
+    (id: string | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (id) {
+        params.set('asset', id)
+      } else {
+        params.delete('asset')
+      }
+      const queryString = params.toString()
+      router.replace(
+        `/core/assets/${type}${queryString ? `?${queryString}` : ''}`,
+        { scroll: false },
+      )
+    },
+    [router, searchParams, type],
   )
 
   // ── Deepening-resolutie ───────────────────────────────────
@@ -454,7 +474,7 @@ export function AssetCategoryPage({
       }
       setSelectedAssetId(asset.id)
     },
-    [bankAccountByAssetId, router],
+    [bankAccountByAssetId, router, setSelectedAssetId],
   )
 
   return (
@@ -577,10 +597,10 @@ export function AssetCategoryPage({
         }}
       />
 
-      <AssetDetailFlow
+      <AssetPane
         asset={selectedAsset}
         onClose={() => setSelectedAssetId(null)}
-        onAfterSave={() => router.refresh()}
+        onChanged={() => router.refresh()}
       />
     </div>
   )

@@ -46,6 +46,14 @@ interface MortgageRow {
 }
 
 /**
+ * @deprecated Vervangen door `<AssetPane>` in
+ * `components/app/core/assets/asset-pane.tsx` (mei 2026). De pane biedt
+ * dezelfde view/edit/herwaarder-flow maar als slide-in pane (driewegregel
+ * `kind="pane"`) i.p.v. een BottomSheet, met view-mode + edit-mode in één
+ * overlay en behoud van Herwaarderen-actie in beide modi. Deze file blijft
+ * bestaan zolang er nog externe verwijzingen zijn, maar nieuwe call-sites
+ * moeten direct `<AssetPane>` gebruiken.
+ *
  * Volledige asset detail-flow zoals op `/core/assets`. Hergebruikt de drie
  * modals uit `assets-client.tsx` (`AssetDetailModal`, `AssetForm`,
  * `ValuationModal`) zodat de gebruiker op de categoriepagina dezelfde rijke

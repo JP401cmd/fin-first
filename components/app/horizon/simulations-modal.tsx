@@ -103,7 +103,9 @@ export function SimulationsModal({
   if (computing || !mc) {
     return (
       <ShellOverlay open={true} onClose={onClose} kind="pane" title="Monte Carlo Simulaties">
-          <div className="flex flex-col items-center justify-center p-12 py-10">
+          {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
+              Extra verticale lucht voor centered loader. */}
+          <div className="flex flex-col items-center justify-center py-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-horizon-500 border-t-transparent" />
             <p className="mt-4 text-sm text-[var(--ink-3)]">
               Monte Carlo simulaties berekenen ({simCount.toLocaleString('nl-NL')} paden)...
@@ -121,7 +123,9 @@ export function SimulationsModal({
 
   return (
     <ShellOverlay open={true} onClose={onClose} kind="pane" title="Monte Carlo Simulaties">
-        <div className="space-y-6 px-6 py-6">
+        {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
+            Hier alleen verticaal ritme. */}
+        <div className="space-y-6">
           {/* Settings */}
           <button
             onClick={() => setShowSettings(!showSettings)}

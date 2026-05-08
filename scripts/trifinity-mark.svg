@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    TriFinity icon — geometric "T" monogram in editorial style.
+    Cream background (#fbf2e7), ink-coloured T-shape (#1a1916),
+    accent dot in kern-brown (#6b4339) — the period from "tf.".
+    No external fonts required; pure geometry so it renders crisply
+    at every size from 16px favicon to 512px Play Store icon.
+  -->
+  <rect width="512" height="512" fill="#fbf2e7"/>
+
+  <!-- Outer hairline frame, ~6px stroke equivalent at 512px (1.2% of canvas). -->
+  <rect
+    x="32" y="32" width="448" height="448"
+    fill="none"
+    stroke="#1a1916"
+    stroke-width="6"
+  />
+
+  <!-- T crossbar: horizontal slab at the top third, leaving a clear visual top-rule. -->
+  <rect x="112" y="160" width="288" height="44" fill="#1a1916"/>
+
+  <!-- T stem: vertical slab descending from the crossbar. -->
+  <rect x="234" y="160" width="44" height="232" fill="#1a1916"/>
+
+  <!-- Period accent (kern-brown), echoes the "tf." wordmark in landing/header.tsx. -->
+  <circle cx="368" cy="370" r="22" fill="#6b4339"/>
+</svg>

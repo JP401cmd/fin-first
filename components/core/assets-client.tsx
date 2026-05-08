@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
   Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon, ExternalLink,
@@ -8,7 +8,8 @@ import {
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip } from '@/components/editorial'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -24,6 +25,34 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 function useFc() {
   const { masked } = useMaskedAmounts()
   return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
+}
+
+/**
+ * Wrapper die `BottomSheet` rendert in standalone-mode en alleen children
+ * teruggeeft in embedded-mode. Hergebruikt door `AssetDetailModal`,
+ * `AssetForm` en `ValuationModal` zodat ze in een `<ShellOverlay kind="pane">`
+ * embedbaar zijn zonder code-duplicatie. Geen render-overhead in standalone-
+ * mode (1 component-laag identiek aan voorheen).
+ */
+function MaybeBottomSheet({
+  embedded,
+  onClose,
+  title,
+  size,
+  children,
+}: {
+  embedded: boolean
+  onClose: () => void
+  title: string
+  size: 'sm' | 'md' | 'lg' | 'xl' | 'full'
+  children: ReactNode
+}) {
+  if (embedded) return <>{children}</>
+  return (
+    <BottomSheet open={true} onClose={onClose} title={title} size={size}>
+      {children}
+    </BottomSheet>
+  )
 }
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
@@ -82,6 +111,7 @@ function addAssetCta(type: AssetType): string {
 
 export default function AssetsPage({ initialAssetId, initialData }: { initialAssetId?: string; initialData?: AssetsPageData } = {}) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const fc = useFc()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [aangifteImportOpen, setAangifteImportOpen] = useState(false)
@@ -116,8 +146,10 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const [showForm, setShowForm] = useState(false)
   const [newAssetType, setNewAssetType] = useState<AssetType | null>(null)
   const [editAsset, setEditAsset] = useState<Asset | null>(null)
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
-  const [modalStep, setModalStep] = useState<'detail' | 'edit' | 'revalue'>('detail')
+  // URL-driven pane-state: `?asset=<id>` opent de slide-in pane voor die
+  // asset. Consistent met `/core/assets/[type]` (asset-category-page.tsx)
+  // en met deeplink-conventie uit `OVERLAY_QUERY_KEYS`.
+  const requestedAssetId = searchParams.get('asset')
   const [projectionYears, setProjectionYears] = useState(10)
   const [insightOpen, setInsightOpen] = useState(false)
   useEffect(() => {
@@ -131,7 +163,6 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
     setInsightOpen(next)
     try { localStorage.setItem('collapsible_assets-insight', String(next)) } catch { /* */ }
   }
-  const [valuations, setValuations] = useState<Record<string, Valuation[]>>(initialData ? initialData.valuations as unknown as Record<string, Valuation[]> : {})
   const [dailyExpenses, setDailyExpenses] = useState(initialData?.dailyExpenses ?? 0)
   const [budgetingActive, setBudgetingActive] = useState(initialData?.budgetingActive ?? true)
   // Cards-decoraties (sparklines + connections) — client-side fetch zodra
@@ -142,12 +173,6 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
   const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
-
-  function getMortgageForAsset(assetId: string): { name: string; balance: number } | null {
-    const m = mortgages.find((m) => m.linked_asset_id === assetId)
-    if (!m) return null
-    return { name: m.name, balance: Number(m.current_balance) }
-  }
 
   const loadAssets = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -258,41 +283,15 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
     }
   }, [perspective])
 
-  const loadValuations = useCallback(async (assetId: string) => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('valuations')
-      .select('*')
-      .eq('entity_id', assetId)
-      .eq('entity_type', 'asset')
-      .order('valuation_date', { ascending: false })
-    if (data) {
-      setValuations((prev) => ({ ...prev, [assetId]: data as Valuation[] }))
-    }
-  }, [])
-
-  // Load all valuations for sparklines on asset cards
-  const loadAllValuations = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('valuations')
-      .select('*')
-      .eq('entity_type', 'asset')
-      .order('valuation_date', { ascending: true })
-    if (data) {
-      const grouped: Record<string, Valuation[]> = {}
-      for (const v of data as Valuation[]) {
-        if (!grouped[v.entity_id]) grouped[v.entity_id] = []
-        grouped[v.entity_id].push(v)
-      }
-      setValuations(grouped)
-    }
-  }, [])
+  // `valuations` state blijft als opt-in cache voor componenten die de
+  // overzicht-pagina als embedded host gebruiken (bv. legacy core-page
+  // modal-embed met `initialAssetId`). Voor de hoofdflow leest `<AssetPane>`
+  // valuations zelf — geen top-level prefetch meer noodzakelijk.
 
   useEffect(() => {
     const signal = perspectiveSignal
-    loadAssets(signal).then(() => { if (!signal.aborted) loadAllValuations() })
-  }, [loadAssets, loadAllValuations, perspectiveSignal])
+    loadAssets(signal)
+  }, [loadAssets, perspectiveSignal])
 
   const activeAssets = assets.filter((a) => a.is_active !== false)
   const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0)
@@ -375,64 +374,63 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const futureValue = projection.length > 0 ? projection[projection.length - 1].total : totalValue
   const projectedGrowth = futureValue - totalValue
 
-  async function deleteAsset(id: string) {
-    const supabase = createClient()
-    // Check if this is a cash asset before deleting (for budgeting_active sync)
-    const deletedAsset = assets.find(a => a.id === id)
-    await supabase.from('assets').delete().eq('id', id)
-    setAssets((prev) => prev.filter((a) => a.id !== id))
-    setSelectedAsset(null)
-
-    // After delete: sync budgeting_active if deleted asset was a cash type
-    if (deletedAsset?.asset_type === 'cash') {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: trackingAssets } = await supabase
-          .from('assets')
-          .select('id')
-          .eq('asset_type', 'cash')
-          .eq('has_budget_tracking', true)
-          .eq('is_active', true)
-
-        const hasAnyBudgetTracking = (trackingAssets?.length ?? 0) > 0
-        await supabase
-          .from('profiles')
-          .update({ budgeting_active: hasAnyBudgetTracking })
-          .eq('id', user.id)
+  // URL-state setter — pane-open/-close wisselt `?asset=<id>` via shallow
+  // route-replace. Consistent met asset-category-page.tsx zodat deeplinks
+  // en browser-back symmetrisch werken.
+  const setSelectedAssetId = useCallback(
+    (id: string | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (id) {
+        params.set('asset', id)
+      } else {
+        params.delete('asset')
       }
-    }
-  }
+      const queryString = params.toString()
+      router.replace(
+        `/core/assets${queryString ? `?${queryString}` : ''}`,
+        { scroll: false },
+      )
+    },
+    [router, searchParams],
+  )
 
-  // Open modal from initialAssetId prop (embedded in core page modal)
+  // Geselecteerde asset = lookup uit lijst o.b.v. URL. Memoized zodat
+  // pane-prop alleen herrendert bij echte id-wisseling.
+  const selectedAsset = useMemo(
+    () => assets.find((a) => a.id === requestedAssetId) ?? null,
+    [assets, requestedAssetId],
+  )
+
+  // Initial deep-link via prop (gebruikt door de core-page modal-embed):
+  // promote prop naar URL-state op de eerste render zodat alle vervolg-
+  // navigatie via dezelfde URL-driven flow loopt.
+  const initialAssetIdAppliedRef = useRef(false)
   useEffect(() => {
+    if (initialAssetIdAppliedRef.current) return
     if (!initialAssetId || loading || assets.length === 0) return
+    if (requestedAssetId === initialAssetId) {
+      initialAssetIdAppliedRef.current = true
+      return
+    }
     const found = assets.find(a => a.id === initialAssetId)
     if (found) {
-      setSelectedAsset(found)
-      setModalStep('detail')
+      initialAssetIdAppliedRef.current = true
+      setSelectedAssetId(initialAssetId)
     }
-  }, [initialAssetId, loading, assets])
-
-  function openAssetModal(asset: Asset) {
-    setSelectedAsset(asset)
-    setModalStep('detail')
-    loadValuations(asset.id)
-  }
-
-  function closeAssetModal() {
-    setSelectedAsset(null)
-    setModalStep('detail')
-  }
+  }, [initialAssetId, loading, assets, requestedAssetId, setSelectedAssetId])
 
   function handleAssetClick(asset: Asset) {
-    // Cash assets with active budget tracking deep-link to the cash-categorie
-    // pagina (which exposes the Budgetteren tab). Other assets keep the
-    // existing detail-modal — registratie zonder verdieping is fundament.
+    // Cash assets met actieve budget-tracking deep-linken naar de cash-
+    // categorie-pagina. Reden: `/core/assets/cash` toont de Budgetteren-app
+    // (transactie-tabel + categorie-strip) als verdiepende tab; daar wil
+    // de gebruiker direct in zitten zodra hij op een tracker-rekening klikt.
+    // De `?asset=<id>`-pane werkt op die pagina ook, dus de detail-overlay
+    // blijft bereikbaar.
     if (asset.asset_type === 'cash' && budgetingActive && asset.has_budget_tracking) {
       router.push(`/core/assets/cash?asset=${asset.id}`)
       return
     }
-    openAssetModal(asset)
+    setSelectedAssetId(asset.id)
   }
 
   if (loading) {
@@ -708,70 +706,21 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         })}
       </section>
 
-      {/* Asset detail modal */}
-      {selectedAsset && modalStep === 'detail' && (
-        <AssetDetailModal
-          asset={selectedAsset}
-          valuations={valuations[selectedAsset.id]}
-          mortgage={getMortgageForAsset(selectedAsset.id)}
-          dailyExpenses={dailyExpenses}
-          allAssets={assets}
-          onClose={closeAssetModal}
-          onEdit={() => setModalStep('edit')}
-          onRevalue={() => setModalStep('revalue')}
-          onDelete={() => deleteAsset(selectedAsset.id)}
-        />
-      )}
+      {/* Asset detail/edit/revalue — uniforme slide-in pane (driewegregel
+          kind="pane"). Vervangt de oude BottomSheet-tripple (detail / edit /
+          revalue) zodat deze overzicht-pagina dezelfde flow gebruikt als
+          `/core/assets/[type]`. Pane laadt zelf side-data (valuations,
+          mortgages, allAssets, bankAccounts, connection, holdings) en kan
+          daardoor in elke context worden ingezet. */}
+      <AssetPane
+        asset={selectedAsset}
+        onClose={() => setSelectedAssetId(null)}
+        onChanged={() => {
+          loadAssets()
+          router.refresh()
+        }}
+      />
 
-      {/* Edit form modal */}
-      {selectedAsset && modalStep === 'edit' && (
-        <AssetForm
-          asset={selectedAsset}
-          linkedBankAccounts={linkedBankAccounts}
-          budgetingActive={budgetingActive}
-          onClose={() => setModalStep('detail')}
-          onSaved={() => {
-            setModalStep('detail')
-            loadAssets().then(async () => {
-              // Refresh selectedAsset with updated data
-              const supabase = createClient()
-              const [assetRes, profileRes] = await Promise.all([
-                supabase.from('assets').select('*').eq('id', selectedAsset.id).single(),
-                supabase.from('profiles').select('budgeting_active, net_monthly_income, estimated_monthly_expenses').single(),
-              ])
-              if (assetRes.data) setSelectedAsset(assetRes.data as Asset)
-              const nowInactive = profileRes.data?.budgeting_active === false
-              setBudgetingActive(!nowInactive)
-              if (nowInactive && (!profileRes.data?.net_monthly_income || !profileRes.data?.estimated_monthly_expenses)) {
-                router.push('/core?showEstimates=true')
-              }
-            })
-          }}
-        />
-      )}
-
-      {/* Revaluation modal */}
-      {selectedAsset && modalStep === 'revalue' && (
-        <ValuationModal
-          entityId={selectedAsset.id}
-          entityType="asset"
-          entityName={selectedAsset.name}
-          entitySubtype={selectedAsset.asset_type}
-          netWorthInclusionPct={selectedAsset.net_worth_inclusion_pct ?? 100}
-          currentValue={Number(selectedAsset.current_value)}
-          onClose={() => setModalStep('detail')}
-          onSaved={() => {
-            setModalStep('detail')
-            loadAssets().then(() => {
-              const supabase = createClient()
-              supabase.from('assets').select('*').eq('id', selectedAsset.id).single().then(({ data }) => {
-                if (data) setSelectedAsset(data as Asset)
-              })
-            })
-            loadValuations(selectedAsset.id)
-          }}
-        />
-      )}
 
       {/* New asset form */}
       {showForm && (
@@ -818,6 +767,23 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
 
 // ── Asset detail modal ───────────────────────────────────────
 
+/**
+ * Shape die `AssetDetailModal` (in `embedded`-mode) en `AssetForm` (idem)
+ * publiceren naar hun pane-wrapper, zodat de pane-footer/header de juiste
+ * acties kan tonen zonder zelf de interne form-state te kennen.
+ *
+ * Pattern hergebruikt uit `event-pane-edit.tsx` (`EventEditActionsState`):
+ * een ref-gebaseerde save-handler voorkomt dat we de callback-identity
+ * elke render hoeven te ontkoppelen van een nieuwe closure.
+ */
+export type AssetEditActionsState = {
+  canSave: boolean
+  saving: boolean
+  isEditing: boolean
+  /** Roept de meest recente save-handler aan (via ref). */
+  save: () => void
+}
+
 export function AssetDetailModal({
   asset,
   valuations,
@@ -830,6 +796,7 @@ export function AssetDetailModal({
   onEdit,
   onRevalue,
   onDelete,
+  embedded = false,
 }: {
   asset: Asset
   valuations: Valuation[] | undefined
@@ -851,11 +818,22 @@ export function AssetDetailModal({
   onEdit: () => void
   onRevalue: () => void
   onDelete: () => void
+  /**
+   * Wanneer true rendert deze component alleen de body (geen `BottomSheet`
+   * wrapper, geen interne actie-bar). De pane-wrapper levert de overlay
+   * en footer-knoppen via `<ShellOverlay kind="pane">`. Default false
+   * zodat bestaande call-sites (bv. `/core/assets`) ongewijzigd blijven.
+   */
+  embedded?: boolean
 }) {
   const fc = useFc()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
   const [holdingsCount, setHoldingsCount] = useState(0)
+  // Stabiele "nu" voor remaining-time-berekeningen verderop. Wordt eenmaal
+  // bij mount vastgelegd zodat render-purity (react-hooks/purity) gerespecteerd
+  // wordt; voor een detail-modal is sub-seconde precisie niet relevant.
+  const [nowMs] = useState(() => Date.now())
   const value = Number(asset.current_value)
   const purchase = Number(asset.purchase_value)
   const returnPct = purchase > 0 ? ((value - purchase) / purchase) * 100 : 0
@@ -924,8 +902,11 @@ export function AssetDetailModal({
 
   const availableDebts = allDebts.filter(d => !d.linked_asset_id)
 
-  return (
-    <BottomSheet open={true} onClose={onClose} title={asset.name} size="lg">
+  // Body-renderer — gedeeld tussen standalone (BottomSheet) en embedded
+  // (pane-content) modi. Houdt dezelfde DOM-structuur, alleen de buitenste
+  // wrapper verschilt zodat de pane-driewegregel respecteerd blijft.
+  const body = (
+    <>
         {/* Subheader */}
         <div className="flex items-center gap-3 px-6 pb-2">
           <div
@@ -1199,7 +1180,7 @@ export function AssetDetailModal({
               const lockEnd = new Date(asset.lock_end_date)
               const formatted = lockEnd.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
               if (asset.asset_type === 'vordering') {
-                const diffMs = lockEnd.getTime() - Date.now()
+                const diffMs = lockEnd.getTime() - nowMs
                 const remaining = diffMs <= 0 ? '(afgelopen)' : (() => {
                   const y = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
                   const m = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
@@ -1215,7 +1196,7 @@ export function AssetDetailModal({
             if (asset.expiry_date) {
               const endDate = new Date(asset.expiry_date)
               const formatted = endDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
-              const diffMs = endDate.getTime() - Date.now()
+              const diffMs = endDate.getTime() - nowMs
               const remaining = diffMs <= 0 ? '(verlopen)' : (() => {
                 const y = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
                 const m = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
@@ -1307,45 +1288,56 @@ export function AssetDetailModal({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
-          <button
-            onClick={hasActiveHoldings ? undefined : onRevalue}
-            disabled={hasActiveHoldings}
-            title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
-            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] border px-3 py-2 text-xs font-medium ${
-              hasActiveHoldings
-                ? 'border-[var(--border-ed)] text-[var(--ink-3)] cursor-not-allowed bg-[var(--subtle)]'
-                : 'border-kern-200 text-kern-700 hover:bg-kern-50'
-            }`}
-            data-testid="revalue-btn"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Herwaarderen
-          </button>
-          <button
-            onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-            Bewerken
-          </button>
-          {confirmDelete ? (
+        {/* Actions — alleen in standalone-mode. In embedded-mode levert de
+            pane-wrapper de footer-knoppen (Bewerken + Herwaarderen) en de
+            header-action (Verwijderen-icon). */}
+        {!embedded && (
+          <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
             <button
-              onClick={onDelete}
-              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+              onClick={hasActiveHoldings ? undefined : onRevalue}
+              disabled={hasActiveHoldings}
+              title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
+              className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] border px-3 py-2 text-xs font-medium ${
+                hasActiveHoldings
+                  ? 'border-[var(--border-ed)] text-[var(--ink-3)] cursor-not-allowed bg-[var(--subtle)]'
+                  : 'border-kern-200 text-kern-700 hover:bg-kern-50'
+              }`}
+              data-testid="revalue-btn"
             >
-              Bevestigen
+              <RefreshCw className="h-3.5 w-3.5" />
+              Herwaarderen
             </button>
-          ) : (
             <button
-              onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+              onClick={onEdit}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Edit3 className="h-3.5 w-3.5" />
+              Bewerken
             </button>
-          )}
-        </div>
+            {confirmDelete ? (
+              <button
+                onClick={onDelete}
+                className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+              >
+                Bevestigen
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+    </>
+  )
+
+  if (embedded) return body
+  return (
+    <BottomSheet open={true} onClose={onClose} title={asset.name} size="lg">
+      {body}
     </BottomSheet>
   )
 }
@@ -2384,6 +2376,8 @@ export function AssetForm({
   onSaved,
   budgetingActive = true,
   initialConnection = null,
+  embedded = false,
+  onActionsChange,
 }: {
   asset?: Asset
   defaultType?: AssetType
@@ -2398,6 +2392,18 @@ export function AssetForm({
    * meegegeven uit de batch-fetch bij modal-open.
    */
   initialConnection?: import('@/lib/connections-data').AssetConnectionSummary | null
+  /**
+   * Wanneer true rendert deze component alleen de body en publiceert het
+   * save-state naar de pane-wrapper via `onActionsChange`. Geen interne
+   * BottomSheet, geen interne Annuleren/Opslaan-knoppen.
+   */
+  embedded?: boolean
+  /**
+   * Callback om de huidige save-state naar de pane-wrapper te publiceren.
+   * De wrapper rendert dan een primary CTA (Opslaan/Bijwerken) in de
+   * pane-footer die `state.save()` aanroept.
+   */
+  onActionsChange?: (state: AssetEditActionsState) => void
 }) {
   const fc = useFc()
   const isEdit = !!asset
@@ -2754,8 +2760,32 @@ export function AssetForm({
     onSaved()
   }
 
+  // Publiceer save-state naar pane-wrapper (zelfde patroon als
+  // EventPaneEdit). Een ref voor de save-handler voorkomt stale closures:
+  // de wrapper roept altijd de meest recente handler aan zonder dat we de
+  // callback-identity hoeven te invalideren bij elke state-mutatie.
+  const saveHandlerRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    saveHandlerRef.current = () => { void handleSave() }
+  })
+  const canSave = !saving && Boolean(name) && Boolean(currentValue)
+  useEffect(() => {
+    if (!onActionsChange) return
+    onActionsChange({
+      canSave,
+      saving,
+      isEditing: isEdit,
+      save: () => saveHandlerRef.current(),
+    })
+  }, [onActionsChange, canSave, saving, isEdit])
+
   return (
-    <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Asset bewerken' : 'Nieuwe asset'} size="lg">
+    <MaybeBottomSheet
+      embedded={embedded}
+      onClose={onClose}
+      title={isEdit ? 'Asset bewerken' : 'Nieuwe asset'}
+      size="lg"
+    >
         <div className="space-y-3 px-6">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -3395,22 +3425,27 @@ export function AssetForm({
           </div>
         )}
 
-        <div className="mt-5 flex justify-end gap-2 px-6 pb-6">
-          <button
-            onClick={onClose}
-            className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-          >
-            Annuleren
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !name || !currentValue}
-            className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-          >
-            {saving ? 'Opslaan...' : isEdit ? 'Bijwerken' : 'Toevoegen'}
-          </button>
-        </div>
-    </BottomSheet>
+        {/* Inline Annuleren/Opslaan — alleen in standalone-mode. In
+            embedded-mode levert de pane-wrapper deze knoppen via
+            `primaryAction` + `secondaryAction` in de pane-footer. */}
+        {!embedded && (
+          <div className="mt-5 flex justify-end gap-2 px-6 pb-6">
+            <button
+              onClick={onClose}
+              className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Annuleren
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !name || !currentValue}
+              className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            >
+              {saving ? 'Opslaan...' : isEdit ? 'Opslaan' : 'Toevoegen'}
+            </button>
+          </div>
+        )}
+    </MaybeBottomSheet>
   )
 }
 
@@ -3583,52 +3618,3 @@ export function ValuationModal({
   )
 }
 
-function ValuationHistory({
-  entityId,
-  valuations,
-  onLoad,
-}: {
-  entityId: string
-  valuations: Valuation[] | undefined
-  onLoad: () => void
-}) {
-  const fc = useFc()
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    if (!loaded) {
-      setLoaded(true)
-      onLoad()
-    }
-  }, [loaded, onLoad])
-
-  if (!valuations || valuations.length === 0) return null
-
-  return (
-    <div className="mt-4 border-t border-[var(--border-ed)] pt-3">
-      <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Waardehistorie</p>
-      <div className="space-y-1">
-        {valuations.map((v) => {
-          const prev = valuations.find((vv) => vv.valuation_date < v.valuation_date)
-          const diff = prev ? Number(v.value) - Number(prev.value) : null
-          return (
-            <div key={v.id} className="flex items-center gap-3 text-xs">
-              <span className="w-20 shrink-0 text-[var(--ink-3)]">
-                {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>
-              <span className="font-medium text-[var(--ink-2)]">{fc(Number(v.value))}</span>
-              {diff !== null && (
-                <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {diff >= 0 ? '+' : ''}{fc(diff)}
-                </span>
-              )}
-              {v.notes && (
-                <span className="truncate text-[var(--ink-3)]">{v.notes}</span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
