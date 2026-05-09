@@ -36,7 +36,6 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 const MOCK_PROPS: SidebarProps = {
   netWorth: 142_000,
   actionCount: 4,
-  fireAge: 62,
   unreadMessageCount: 2,
   userInitials: 'JP',
   userName: 'Jan Pieter',
@@ -79,7 +78,6 @@ export function SidebarDemo() {
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
           <DemoMetaRow label="netWorth" value={`€ ${MOCK_PROPS.netWorth.toLocaleString('nl-NL')}`} />
           <DemoMetaRow label="actionCount" value={String(MOCK_PROPS.actionCount)} />
-          <DemoMetaRow label="fireAge" value={MOCK_PROPS.fireAge !== null ? `${MOCK_PROPS.fireAge}` : '—'} />
           <DemoMetaRow label="unreadMessageCount" value={String(MOCK_PROPS.unreadMessageCount ?? 0)} />
           <DemoMetaRow label="userInitials" value={MOCK_PROPS.userInitials} />
           <DemoMetaRow label="userName" value={MOCK_PROPS.userName} />
