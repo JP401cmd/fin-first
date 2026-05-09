@@ -1,10 +1,12 @@
-'use client'
+﻿'use client'
 
 import { useState, memo } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { AlertTriangle } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getCashflowForecastTips } from '@/lib/chart-tips'
 
 export type ForecastPoint = {
   month: string
@@ -134,6 +136,19 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forec
 
   return (
     <div ref={ref} data-testid="cashflow-forecast-chart">
+      {/* Inline ChartTips */}
+      <div className="mb-2 flex justify-end">
+        <ChartTips
+          storageKey="cashflow_forecast_chart"
+          tips={getCashflowForecastTips({
+            monthCount: forecast.length,
+            alertCount: alerts.length,
+            warningThreshold: 500,
+          })}
+          align="right"
+        />
+      </div>
+
       {/* Alerts */}
       {alerts.length > 0 && (
         <div className="mb-4 space-y-2" data-testid="cashflow-forecast-alerts">

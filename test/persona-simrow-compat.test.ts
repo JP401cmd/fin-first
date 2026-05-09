@@ -564,7 +564,7 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
         household_id: null,
         partner_split_pct: null,
         net_worth_inclusion_pct: 100,
-        has_strategy_tracking: false,
+        has_hypotheekplanner_tracking: false,
       }))
     }
 

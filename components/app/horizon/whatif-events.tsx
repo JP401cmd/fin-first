@@ -19,6 +19,10 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 export interface WhatIfEvent extends LifeEvent {
   /** Temporarily disabled in what-if (not persisted) */
   whatIfDisabled?: boolean
+  /** Lives only in client state — added by a preset or slider, not in DB. */
+  is_scenario_only?: boolean
+  /** Source of a scenario-only event: 'preset:<id>' or 'slider:<key>'. */
+  scenario_origin?: string
 }
 
 interface EventImpact {
@@ -257,13 +261,19 @@ export function WhatIfEventsPanel({
                           if (impact) setSelectedImpact(impact)
                         }}
                       >
-                        <p className="truncate font-sans text-sm font-medium text-[var(--ink)]">
-                          {ev.name}
+                        <p className="flex items-center gap-1.5 truncate font-sans text-sm font-medium text-[var(--ink)]">
+                          <span className="truncate">{ev.name}</span>
+                          {ev.is_scenario_only && (
+                            <span className="shrink-0 rounded-full border border-horizon-300 bg-horizon-50 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0.05em] text-horizon-700">
+                              Scenario
+                            </span>
+                          )}
                         </p>
                         <p className="font-sans text-[10px] text-[var(--ink-4)]">
                           {ev.target_age ? `leeftijd ${ev.target_age}` : '—'}
                           {Number(ev.one_time_cost) !== 0 && ` · ${formatMaskedCurrency(Number(ev.one_time_cost), masked)}`}
                           {Number(ev.monthly_cost_change) !== 0 && ` · ${formatMaskedCurrency(Number(ev.monthly_cost_change), masked)}/mnd`}
+                          {Number(ev.monthly_income_change) !== 0 && ` · ${formatMaskedCurrency(Number(ev.monthly_income_change), masked)}/mnd inkomen`}
                         </p>
                       </button>
 

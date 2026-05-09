@@ -1,9 +1,22 @@
 'use client'
 
 import { formatCurrency } from '@/lib/format'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
+import {
+  buildSliderEvent,
+  applySliderEvent,
+  readSliderValueFromEvents,
+  clearScenarioEvents,
+  type SliderKey,
+} from '@/lib/scenario-events'
+import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 
+/**
+ * WhatIfOverrides is now a derived view, but kept as a public type for
+ * components that still consume the snapshot shape (WhatIfActions / Chat /
+ * Scenarios). Pages compute it via deriveOverridesFromEvents.
+ */
 export interface WhatIfOverrides {
   monthlyIncome: number
   workDaysPerWeek: number
@@ -12,10 +25,13 @@ export interface WhatIfOverrides {
   extraContribution: number
 }
 
-interface WhatIfSlidersProps {
-  overrides: WhatIfOverrides
+interface SlidersProps {
   baseline: WhatIfOverrides
-  onChange: (overrides: WhatIfOverrides) => void
+  events: WhatIfEvent[]
+  setEvents: (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => void
+  currentAge: number
+  /** When true, render only the slider grid — no card wrapper, no headers. */
+  bare?: boolean
 }
 
 function DeltaBadge({ current, base, format }: { current: number; base: number; format: (v: number) => string }) {
@@ -43,6 +59,7 @@ function SliderRow({
   onChange,
   minLabel,
   maxLabel,
+  hint,
 }: {
   label: string
   value: number
@@ -55,12 +72,19 @@ function SliderRow({
   onChange: (v: number) => void
   minLabel: string
   maxLabel: string
+  /** Optional micro-hint shown right of the label, e.g. event-event link. */
+  hint?: string
 }) {
   return (
     <div className="py-1.5">
       <div className="mb-1 flex items-center justify-between">
         <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
           {label}
+          {hint && (
+            <span className="ml-2 font-mono text-[9px] font-normal normal-case tracking-normal text-[var(--ink-4)]">
+              {hint}
+            </span>
+          )}
         </span>
         <span className="flex items-center">
           <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
@@ -86,19 +110,127 @@ function SliderRow({
   )
 }
 
-export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersProps) {
-  const [expanded, setExpanded] = useState(true)
+function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
+  const incomeValue = readSliderValueFromEvents('income', events, baseline)
+  const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
+  const savingsValue = readSliderValueFromEvents('savings', events, baseline)
+  const extraValue = readSliderValueFromEvents('extra_inleg', events, baseline)
 
-  const set = (key: keyof WhatIfOverrides, value: number) => {
-    onChange({ ...overrides, [key]: value })
+  const setSliderValue = (key: SliderKey, value: number) => {
+    const newEvent = buildSliderEvent(key, value, baseline, currentAge)
+    setEvents(prev => applySliderEvent(prev, key, newEvent))
   }
 
-  // Mobile: collapsed summary
-  const summary = `${formatCurrency(overrides.monthlyIncome)} · ${overrides.workDaysPerWeek} dagen · ${Math.round(overrides.savingsRate)}%`
+  const hasSliderEvent = events.some(e => e.scenario_origin?.startsWith('slider:'))
+
+  const resetAll = () => {
+    setEvents(prev => clearScenarioEvents(prev, 'slider:'))
+  }
+
+  return (
+    <>
+      <div className="xl:grid xl:grid-cols-2 xl:gap-x-6">
+        <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+          <SliderRow
+            label="Maandinkomen"
+            hint="→ Inkomenswijziging-event"
+            value={incomeValue}
+            baseValue={baseline.monthlyIncome}
+            min={0}
+            max={15000}
+            step={100}
+            formatValue={formatCurrency}
+            formatDelta={v => formatCurrency(v) + '/mnd'}
+            onChange={v => setSliderValue('income', v)}
+            minLabel="€ 0"
+            maxLabel="€ 15.000"
+          />
+        </div>
+
+        <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+          <SliderRow
+            label="Werkdagen per week"
+            hint="→ Part-time-event"
+            value={workdaysValue}
+            baseValue={baseline.workDaysPerWeek}
+            min={1}
+            max={5}
+            step={1}
+            formatValue={v => `${v} dagen`}
+            formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
+            onChange={v => setSliderValue('workdays', v)}
+            minLabel="1 dag"
+            maxLabel="5 dagen"
+          />
+        </div>
+
+        <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+          <SliderRow
+            label="Spaarquote"
+            hint="→ Lifestyle-event"
+            value={savingsValue}
+            baseValue={baseline.savingsRate}
+            min={0}
+            max={80}
+            step={1}
+            formatValue={v => `${Math.round(v)}%`}
+            formatDelta={v => `${Math.round(v)}%`}
+            onChange={v => setSliderValue('savings', v)}
+            minLabel="0%"
+            maxLabel="80%"
+          />
+        </div>
+
+        <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+          <SliderRow
+            label="Extra inleg"
+            hint="→ Extra-inleg-event"
+            value={extraValue}
+            baseValue={0}
+            min={0}
+            max={5000}
+            step={50}
+            formatValue={formatCurrency}
+            formatDelta={v => formatCurrency(v) + '/mnd'}
+            onChange={v => setSliderValue('extra_inleg', v)}
+            minLabel="€ 0"
+            maxLabel="€ 5.000"
+          />
+        </div>
+      </div>
+
+      {hasSliderEvent && (
+        <button
+          type="button"
+          onClick={resetAll}
+          className="mt-3 w-full rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-3 py-2 font-sans text-xs font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-700"
+        >
+          Verfijn-events wissen
+        </button>
+      )}
+
+      <p className="mt-3 font-sans text-[10px] leading-snug text-[var(--ink-4)]">
+        Elke slider maakt of bewerkt een levensgebeurtenis in je scenario. Open
+        het paneel Levensgebeurtenissen onderaan om ze handmatig aan te passen.
+      </p>
+    </>
+  )
+}
+
+export function WhatIfSliders({ baseline, events, setEvents, currentAge, bare = false }: SlidersProps) {
+  const [expanded, setExpanded] = useState(true)
+
+  if (bare) {
+    return <SliderGrid baseline={baseline} events={events} setEvents={setEvents} currentAge={currentAge} />
+  }
+
+  const incomeValue = readSliderValueFromEvents('income', events, baseline)
+  const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
+  const savingsValue = readSliderValueFromEvents('savings', events, baseline)
+  const summary = `${formatCurrency(incomeValue)} · ${workdaysValue} dagen · ${Math.round(savingsValue)}%`
 
   return (
     <div className="card-editorial overflow-hidden">
-      {/* Header — always visible */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -119,112 +251,61 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
         )}
       </button>
 
-      {/* Desktop: always-visible label */}
       <div className="hidden px-4 pb-3 pt-3 md:block">
         <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
           Scenario-parameters
         </p>
       </div>
 
-      {/* Sliders — expandable on mobile, always visible on desktop */}
       <div className={`px-4 pb-4 ${expanded ? 'block' : 'hidden'} md:block`}>
-        {/* First 4 sliders: 2-col grid on desktop */}
-        <div className="xl:grid xl:grid-cols-2 xl:gap-x-6">
-          <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-            <SliderRow
-              label="Maandinkomen"
-              value={overrides.monthlyIncome}
-              baseValue={baseline.monthlyIncome}
-              min={0}
-              max={15000}
-              step={100}
-              formatValue={formatCurrency}
-              formatDelta={v => formatCurrency(v) + '/mnd'}
-              onChange={v => set('monthlyIncome', v)}
-              minLabel="€ 0"
-              maxLabel="€ 15.000"
-            />
-          </div>
+        <SliderGrid baseline={baseline} events={events} setEvents={setEvents} currentAge={currentAge} />
+      </div>
+    </div>
+  )
+}
 
-          <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-            <SliderRow
-              label="Werkdagen per week"
-              value={overrides.workDaysPerWeek}
-              baseValue={baseline.workDaysPerWeek}
-              min={1}
-              max={5}
-              step={1}
-              formatValue={v => `${v} dagen`}
-              formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
-              onChange={v => set('workDaysPerWeek', v)}
-              minLabel="1 dag"
-              maxLabel="5 dagen"
-            />
-          </div>
+export function WhatIfSlidersCollapsible({
+  baseline,
+  events,
+  setEvents,
+  currentAge,
+}: SlidersProps) {
+  // Auto-detect manual tuning: any slider-origin event present.
+  const hasSliderEvent = events.some(e => e.is_scenario_only && e.scenario_origin?.startsWith('slider:'))
+  const [userOpen, setUserOpen] = useState(false)
+  const open = userOpen || hasSliderEvent
 
-          <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-            <SliderRow
-              label="Spaarquote"
-              value={overrides.savingsRate}
-              baseValue={baseline.savingsRate}
-              min={0}
-              max={80}
-              step={1}
-              formatValue={v => `${Math.round(v)}%`}
-              formatDelta={v => `${Math.round(v)}%`}
-              onChange={v => set('savingsRate', v)}
-              minLabel="0%"
-              maxLabel="80%"
-            />
-          </div>
-
-          <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-            <SliderRow
-              label="Verwacht rendement"
-              value={overrides.expectedReturn}
-              baseValue={baseline.expectedReturn}
-              min={2}
-              max={12}
-              step={0.5}
-              formatValue={v => `${v.toFixed(1)}%`}
-              formatDelta={v => `${v.toFixed(1)}%`}
-              onChange={v => set('expectedReturn', v)}
-              minLabel="2%"
-              maxLabel="12%"
-            />
+  return (
+    <div className="card-editorial overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setUserOpen(prev => !prev)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ink)]"
+      >
+        <div className="flex items-center gap-3">
+          <SlidersHorizontal className="h-4 w-4 text-[var(--ink-3)]" aria-hidden />
+          <div>
+            <p className="font-sans text-sm font-semibold text-[var(--ink)]">
+              Verfijn handmatig
+            </p>
+            <p className="mt-0.5 font-sans text-xs text-[var(--ink-3)]">
+              Pas inkomen, sparen of extra inleg zelf aan — wordt opgeslagen als events
+            </p>
           </div>
         </div>
-
-        {/* 5th slider: full width */}
-        <SliderRow
-          label="Extra maandelijkse inleg"
-          value={overrides.extraContribution}
-          baseValue={baseline.extraContribution}
-          min={0}
-          max={5000}
-          step={50}
-          formatValue={formatCurrency}
-          formatDelta={v => formatCurrency(v) + '/mnd'}
-          onChange={v => set('extraContribution', v)}
-          minLabel="€ 0"
-          maxLabel="€ 5.000"
-        />
-
-        {/* Reset button */}
-        {(overrides.monthlyIncome !== baseline.monthlyIncome
-          || overrides.workDaysPerWeek !== baseline.workDaysPerWeek
-          || overrides.savingsRate !== baseline.savingsRate
-          || overrides.expectedReturn !== baseline.expectedReturn
-          || overrides.extraContribution !== baseline.extraContribution) && (
-          <button
-            type="button"
-            onClick={() => onChange(baseline)}
-            className="mt-3 w-full rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-3 py-2 font-sans text-xs font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-700"
-          >
-            Terug naar werkelijkheid
-          </button>
+        {open ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
         )}
-      </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-[var(--border-ed)] px-4 pb-4 pt-3">
+          <SliderGrid baseline={baseline} events={events} setEvents={setEvents} currentAge={currentAge} />
+        </div>
+      )}
     </div>
   )
 }

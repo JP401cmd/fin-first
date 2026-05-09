@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * POST `/api/debts/toggle-strategy`
+ * POST `/api/debts/toggle-hypotheekplanner`
  *
- * Schakelt `has_strategy_tracking` aan/uit voor een specifieke debt-record.
- * Wordt gebruikt door zowel de Aflosstrategie-app als de Hypotheekplanner-app:
- * een hypotheek is technisch ook een `debt`, dus beide modules delen dezelfde
- * boolean op de onderliggende rij.
+ * Schakelt `has_hypotheekplanner_tracking` aan/uit voor een specifieke debt-record.
+ * Wordt gebruikt door de Hypotheekplanner-app om equity-opbouw, oversluit-
+ * scenario's en hypotheek-vs-beleggen vergelijking te activeren voor een
+ * mortgage. Aflosstrategie is sinds de v2-refactor globaal en gebruikt deze
+ * vlag niet — vandaar dat dit endpoint mortgage-specifiek leest/schrijft.
  *
  * Body: `{ id: string, enabled: boolean }`
  *
@@ -36,10 +37,10 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from('debts')
-    .update({ has_strategy_tracking: body.enabled })
+    .update({ has_hypotheekplanner_tracking: body.enabled })
     .eq('id', body.id)
     .eq('user_id', user.id)
-    .select('id, has_strategy_tracking, name')
+    .select('id, has_hypotheekplanner_tracking, name')
     .single()
 
   if (error) {

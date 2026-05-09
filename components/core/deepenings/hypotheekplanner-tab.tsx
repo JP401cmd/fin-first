@@ -7,8 +7,8 @@
  * Entry-points:
  *  - Onder `/core/debts/mortgage?tab=hypotheekplanner` (kind='debt') — de
  *    primaire entry. We zoeken de eerste actieve mortgage met
- *    `has_strategy_tracking === true` en lezen `linked_asset_id` voor het
- *    gekoppelde huis.
+ *    `has_hypotheekplanner_tracking === true` en lezen `linked_asset_id`
+ *    voor het gekoppelde huis.
  *  - Onder `/core/assets/eigen_huis?tab=hypotheekplanner` (kind='asset') —
  *    secundaire entry. We zoeken het eerste actieve eigen_huis met
  *    `has_woonbalans_tracking === true` en lookuppen de mortgage via
@@ -25,8 +25,7 @@
  *    pas inhoud krijgt zodra gebruiker een hypotheek koppelt.
  *
  * Data-loading: client-side bij tab-mount. Symmetrisch met
- * `aflosstrategie-tab.tsx` en `cash-budgetteren-tab.tsx` — de host-pagina
- * levert geen mortgage-prop.
+ * `cash-budgetteren-tab.tsx` — de host-pagina levert geen mortgage-prop.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -146,13 +145,15 @@ function HypotheekplannerActive({ type }: { type: AssetType | DebtType }) {
             .select('*')
             .eq('debt_type', 'mortgage')
             .eq('is_active', true)
-            .eq('has_strategy_tracking', true)
+            .eq('has_hypotheekplanner_tracking', true)
             .order('current_balance', { ascending: false }),
+          // Aflosstrategie is sinds de v2-refactor globaal: alle actieve
+          // schulden tellen mee als "andere getrackte schulden" in de
+          // payoff-projectie (geen per-debt tracking-vlag-filter meer).
           supabase
             .from('debts')
             .select('*')
             .eq('is_active', true)
-            .eq('has_strategy_tracking', true)
             .neq('debt_type', 'mortgage'),
           supabase
             .from('assets')

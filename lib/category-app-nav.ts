@@ -59,7 +59,7 @@ export interface CategoryNavAssetInput {
 
 export interface CategoryNavDebtInput {
   debt_type: DebtType
-  has_strategy_tracking?: boolean | null
+  has_hypotheekplanner_tracking?: boolean | null
 }
 
 // Asset/Debt-vrije check voor `isItemTracked` — we hergebruiken niet de
@@ -88,7 +88,10 @@ function isAssetTracked(
 }
 
 function isDebtTracked(debt: CategoryNavDebtInput): boolean {
-  return debt.has_strategy_tracking === true
+  // Sinds de v2-refactor heeft alleen de Hypotheekplanner-app (mortgage)
+  // nog een per-debt tracking-vlag. Aflosstrategie is globaal en heeft
+  // geen registry-entry meer (zie components/core/category-deepening-registry.ts).
+  return debt.has_hypotheekplanner_tracking === true
 }
 
 // ── Builder ──────────────────────────────────────────────────
@@ -98,9 +101,9 @@ function isDebtTracked(debt: CategoryNavDebtInput): boolean {
  * Will-dashboard. Volgorde volgt `CATEGORY_DEEPENINGS` zodat tabs op de
  * categorie-pagina en links in de balk in dezelfde lees-volgorde verschijnen.
  *
- * Multi-app-categorieën (zoals `mortgage` met Aflosstrategie + Hypotheekplanner)
- * leveren meerdere links — één per app-entry. De `slug` in de href
- * disambigueert welke tab geopend wordt.
+ * Multi-app-categorieën (een categorie met meerdere registry-entries) leveren
+ * meerdere links — één per app-entry. De `slug` in de href disambigueert
+ * welke tab geopend wordt.
  *
  * Een entry levert geen link wanneer:
  * - de bijbehorende module niet in `activeModules` zit; OF
@@ -180,6 +183,6 @@ export function projectAssetForCategoryNav(asset: Asset): CategoryNavAssetInput 
 export function projectDebtForCategoryNav(debt: Debt): CategoryNavDebtInput {
   return {
     debt_type: debt.debt_type,
-    has_strategy_tracking: debt.has_strategy_tracking,
+    has_hypotheekplanner_tracking: debt.has_hypotheekplanner_tracking,
   }
 }

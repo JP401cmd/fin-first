@@ -1,16 +1,17 @@
-'use client'
+﻿'use client'
 
 /**
- * Gedeelde aflossings-engine UI — wordt door zowel de Aflosstrategie-app
- * (fase 4) als de Hypotheekplanner-app (fase 5) gebruikt. Bevat de hele
- * strategie-vergelijking: avalanche/snowball-toggle, extra-aflos-slider,
- * projectie-chart, vergelijkings-message en lening-tabel.
+ * Gedeelde aflossings-engine UI — wordt zowel door de globale "Schuldenprofiel
+ * & Aflosroute"-kaart op `/core/debts` als door de Hypotheekplanner-app
+ * gebruikt. Bevat de hele strategie-vergelijking: 4-strategie segmented
+ * control, extra-aflos-slider, projectie-chart, vergelijkings-message en
+ * lening-tabel.
  *
  * Bewuste keuze: deze component is presentatie-only. Hij raakt geen API
  * aan, doet geen fetches en kent geen toggle-flow — die leeft in de
  * detail-sheet van een schuld. De caller bepaalt zelf welke debts hij
- * doorgeeft (alle getrackte schulden, of alleen één hypotheek + getrackte
- * andere schulden) via `debts` + optionele `focusDebtId`.
+ * doorgeeft (alle actieve schulden, of alleen één hypotheek + andere
+ * schulden) via `debts` + optionele `focusDebtId`.
  *
  * Hergebruikt:
  *  - `simulatePayoff()` + `payoffSummary()` uit `lib/debt-data.ts` voor de
@@ -29,7 +30,7 @@
  * `hover:bg-[var(--subtle)]`.
  */
 
-import { memo, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import type { Debt } from '@/lib/debt-data'
 import { simulatePayoff, payoffSummary, type PayoffStrategy } from '@/lib/debt-data'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -39,15 +40,17 @@ import {
   DebtPayoffTrajectoryChart,
   StrategyComparisonMessage,
 } from '@/components/app/core/debts/debt-comparison-chart'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getDebtPayoffStrategyTips } from '@/lib/chart-tips'
 
 // ── Types ────────────────────────────────────────────────────
 
 export interface DebtPayoffStrategyProps {
   /**
-   * Schulden die de engine moet meenemen. Caller bepaalt de filter:
-   * Aflosstrategie-app levert alle actieve schulden waar
-   * `has_strategy_tracking === true`, Hypotheekplanner levert óf alleen
-   * deze hypotheek óf de hypotheek + andere getrackte schulden.
+   * Schulden die de engine moet meenemen. Caller bepaalt de filter: de
+   * globale "Schuldenprofiel & Aflosroute"-kaart op `/core/debts` levert
+   * alle actieve schulden, Hypotheekplanner levert de hypotheek + andere
+   * actieve schulden voor context.
    */
   debts: Debt[]
   /**
@@ -58,13 +61,24 @@ export interface DebtPayoffStrategyProps {
   focusDebtId?: string
   /** Default extra payment (€/maand). Default 0. */
   initialExtraPayment?: number
-  /** Default strategy. Default `avalanche` — bespaart meestal het meest. */
-  initialStrategy?: 'avalanche' | 'snowball'
   /**
-   * Optioneel — kicker-tekst boven de header. Aflosstrategie-app gebruikt
-   * "AFLOSSTRATEGIE", Hypotheekplanner gebruikt "AFLOSPLAN".
+   * Initiele strategie-keuze. Volgt de uitgebreide `PayoffStrategy`-set:
+   * snowball, avalanche, highest_balance of custom. Default `avalanche` —
+   * bespaart meestal het meest aan rente.
+   */
+  initialStrategy?: PayoffStrategy
+  /**
+   * Optioneel — kicker-tekst boven de header. Globale kaart gebruikt
+   * "Aflosroute", Hypotheekplanner gebruikt "Aflosplan".
    */
   kicker?: string
+  /**
+   * Optionele callback die wordt aangeroepen wanneer de gebruiker van
+   * strategie wisselt. Gebruikt door `/core/debts` om de keuze als
+   * `?strategie=...` query-param te persisteren (deeplink-vriendelijk).
+   * Hypotheekplanner laat dit weg — de strategie blijft local state daar.
+   */
+  onStrategyChange?: (strategy: PayoffStrategy) => void
 }
 
 // ── Constants ────────────────────────────────────────────────
@@ -155,9 +169,15 @@ function buildPerDebtPayoffMap(
 // ── Subcomponenten ───────────────────────────────────────────
 
 /**
- * Strategy-toggle als segmented control. Twee opties (avalanche, snowball)
- * met scherpe hoeken, kern-bruin voor de actieve knop. Geen radio-buttons
- * met vinkjes — de visuele "ingedrukt" state is genoeg.
+ * Strategy-toggle als 4-optie segmented control. Volgt het krant-pattern:
+ * scherpe hoeken, kern-bruin voor de actieve knop, géén radio-vinkjes — de
+ * visuele "ingedrukt" state is genoeg. Op smal scherm (< sm) klappen de
+ * vier knoppen naar een 2×2 grid om de subkop leesbaar te houden; op
+ * desktop staan ze op één rij.
+ *
+ * `current` zit bewust niet in de UI: dat is een interne strategie die
+ * `simulatePayoff()` gebruikt voor "huidig schema". Eindgebruikers kiezen
+ * altijd één van de vier targeting-strategieën.
  */
 function StrategyToggle({
   value,
@@ -168,19 +188,33 @@ function StrategyToggle({
 }) {
   const options: { id: PayoffStrategy; label: string; sub: string }[] = [
     {
-      id: 'avalanche',
-      label: 'Avalanche',
-      sub: 'Hoogste rente eerst — bespaart meeste rente',
-    },
-    {
       id: 'snowball',
       label: 'Sneeuwbal',
-      sub: 'Kleinste eerst — geeft motivatie door snelle wins',
+      sub: 'Kleinste eerst — snelle wins',
+    },
+    {
+      id: 'avalanche',
+      label: 'Avalanche',
+      sub: 'Hoogste rente — bespaart meest',
+    },
+    {
+      id: 'highest_balance',
+      label: 'Grootste eerst',
+      sub: 'Hoogste saldo — band-aid eraf',
+    },
+    {
+      id: 'custom',
+      label: 'Eigen volgorde',
+      sub: 'Volgt jouw schuld-volgorde',
     },
   ]
 
   return (
-    <div role="radiogroup" aria-label="Aflossingsstrategie" className="grid grid-cols-2 gap-px bg-[var(--border-ed)]">
+    <div
+      role="radiogroup"
+      aria-label="Aflossingsstrategie"
+      className="grid grid-cols-2 gap-px bg-[var(--border-ed)] sm:grid-cols-4"
+    >
       {options.map((opt) => {
         const active = value === opt.id
         return (
@@ -508,8 +542,7 @@ function DebtTableRow({
 /**
  * Empty state voor wanneer er geen actieve schulden zijn (of geen schulden
  * met balance > 0). Volgt de empty-state-gids: kicker + serif italic
- * uitleg, geen primaire CTA — de toggle-flow leeft per spec in de
- * detail-sheet.
+ * uitleg, geen primaire CTA — schuld toevoegen leeft op de hoofdpagina.
  */
 function DebtPayoffEmpty() {
   return (
@@ -518,8 +551,7 @@ function DebtPayoffEmpty() {
         Geen actieve schulden
       </p>
       <p className="mt-2 font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
-        Activeer aflossingstracking op een lening om hier je schuldvrije
-        route te zien.
+        Voeg een schuld toe om hier je schuldvrije route te zien.
       </p>
     </div>
   )
@@ -541,10 +573,39 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
   initialExtraPayment = 0,
   initialStrategy = 'avalanche',
   kicker = 'Aflosstrategie',
+  onStrategyChange,
 }: DebtPayoffStrategyProps) {
-  const [strategy, setStrategy] = useState<PayoffStrategy>(initialStrategy)
+  // ── Controlled vs uncontrolled strategy ──
+  // Wanneer de parent `onStrategyChange` levert, gedraagt de component zich
+  // controlled: `initialStrategy` is de single source of truth en lokale
+  // state is overbodig (de parent bepaalt wanneer en wat er verandert via
+  // bv. URL-sync op `/core/debts`). Anders (zoals in Hypotheekplanner) blijft
+  // de keuze lokaal — daar leeft de strategie volledig binnen de tab.
+  //
+  // Deze splitsing voorkomt het anti-pattern "setState binnen useEffect bij
+  // prop-wijziging" dat React Compiler/strict-mode oppakt als cascading
+  // render. De controlled-pad doet 0 setState; de uncontrolled-pad doet
+  // alleen setState bij user-interactie.
+  const isControlled = onStrategyChange != null
+  const [localStrategy, setLocalStrategy] = useState<PayoffStrategy>(initialStrategy)
+  const strategy = isControlled ? initialStrategy : localStrategy
   const [extraPayment, setExtraPayment] = useState<number>(initialExtraPayment)
   const { masked } = useMaskedAmounts()
+
+  // Toggle-callback: in controlled-modus delegeren aan parent, in
+  // uncontrolled-modus eigen state updaten. Visuele update is in beide
+  // gevallen synchroon — controlled via re-render door parent, uncontrolled
+  // via lokale setState.
+  const handleStrategyChange = useCallback(
+    (next: PayoffStrategy) => {
+      if (isControlled) {
+        onStrategyChange(next)
+      } else {
+        setLocalStrategy(next)
+      }
+    },
+    [isControlled, onStrategyChange],
+  )
 
   // Filter de "echt actieve" debts éénmaal per props-wijziging — wordt
   // hergebruikt door header (totaal/aantal), simulatie en tabel.
@@ -559,28 +620,52 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
   )
 
   // ── Simulaties ────────────────────────────────────────────
-  // We runnen drie simulaties: de geselecteerde strategie + extra
-  // (current view), en beide strategieën met €0 extra (voor de bestaande
-  // <DebtPayoffTrajectoryChart> en <StrategyComparisonMessage>). Bij
-  // `extraPayment > 0` runnen we ook de baseline-versie van de gekozen
-  // strategie zodat het impact-label kan vergelijken.
+  // We runnen alle vier targeting-strategieën met de huidige `extraPayment`
+  // — die voeden de chart als `StrategyTrajectory[]`, waarbij de actieve
+  // strategie dik gerenderd wordt en de andere drie als dunne contextlijnen.
+  // Daarnaast runnen we per strategie de €0-baseline zodat de
+  // <StrategyComparisonMessage> kan vergelijken (active+extra vs active+€0,
+  // of bij €0 vs de andere baselines).
+  //
+  // Vier × twee = acht simulaties. `simulatePayoff` is goedkoop genoeg
+  // (<5ms voor typische schuld-portfolios) en `useMemo` zorgt dat het alleen
+  // herhaalt bij `activeDebts`/`extraPayment` wijzigingen.
 
-  const snowballBaseline = useMemo(
-    () => simulatePayoff(activeDebts, 'snowball', 0),
-    [activeDebts],
+  const PAYOFF_STRATEGIES: PayoffStrategy[] = useMemo(
+    () => ['snowball', 'avalanche', 'highest_balance', 'custom'],
+    [],
   )
-  const avalancheBaseline = useMemo(
-    () => simulatePayoff(activeDebts, 'avalanche', 0),
-    [activeDebts],
+
+  const strategyTrajectories = useMemo(
+    () =>
+      PAYOFF_STRATEGIES.map((id) => {
+        const months = simulatePayoff(activeDebts, id, extraPayment)
+        return {
+          id,
+          months,
+          summary: payoffSummary(months),
+        }
+      }),
+    [activeDebts, extraPayment, PAYOFF_STRATEGIES],
   )
+
+  const baselineSummariesByStrategy = useMemo(() => {
+    const map: Partial<Record<PayoffStrategy, ReturnType<typeof payoffSummary>>> = {}
+    for (const id of PAYOFF_STRATEGIES) {
+      const months = simulatePayoff(activeDebts, id, 0)
+      map[id] = payoffSummary(months)
+    }
+    return map
+  }, [activeDebts, PAYOFF_STRATEGIES])
+
   const selectedWithExtra = useMemo(
-    () => simulatePayoff(activeDebts, strategy, extraPayment),
-    [activeDebts, strategy, extraPayment],
+    () => strategyTrajectories.find((s) => s.id === strategy)?.months ?? [],
+    [strategyTrajectories, strategy],
   )
-
-  const snowballSummary = useMemo(() => payoffSummary(snowballBaseline), [snowballBaseline])
-  const avalancheSummary = useMemo(() => payoffSummary(avalancheBaseline), [avalancheBaseline])
-  const selectedSummary = useMemo(() => payoffSummary(selectedWithExtra), [selectedWithExtra])
+  const selectedSummary = useMemo(
+    () => strategyTrajectories.find((s) => s.id === strategy)?.summary ?? payoffSummary([]),
+    [strategyTrajectories, strategy],
+  )
 
   // ── Per-debt payoff map voor de tabel ──────────────────────
   const perDebtPayoff = useMemo(
@@ -589,10 +674,10 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
   )
 
   // ── Impact-label voor de slider ───────────────────────────
-  // Vergelijk de geselecteerde strategie met-extra tegen dezelfde
-  // strategie zonder extra. Toont alleen wanneer extra > 0.
-  const baselineForStrategy = strategy === 'avalanche' ? avalancheBaseline : snowballBaseline
-  const baselineSummary = strategy === 'avalanche' ? avalancheSummary : snowballSummary
+  // Vergelijk de actieve strategie met-extra tegen dezelfde strategie
+  // zonder extra. Toont alleen wanneer extra > 0.
+  const baselineSummary =
+    baselineSummariesByStrategy[strategy] ?? payoffSummary([])
 
   const monthsSaved = Math.max(0, baselineSummary.totalMonths - selectedSummary.totalMonths)
   const interestSaved = Math.max(0, baselineSummary.totalInterest - selectedSummary.totalInterest)
@@ -608,11 +693,6 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
     extraPayment > 0 && interestSaved > 0
       ? formatMaskedCurrency(interestSaved, masked)
       : null
-
-  // Suppress unused-variable warning: `baselineForStrategy` kan in
-  // toekomstige uitbreidingen handig zijn (bv. losse lijn op de chart).
-  // Voorlopig onderdrukken we via void-assignment; ESLint pakt dat op.
-  void baselineForStrategy
 
   // ── Empty state ───────────────────────────────────────────
   if (activeDebts.length === 0) {
@@ -631,7 +711,7 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
   // ── Hoofd-render ──────────────────────────────────────────
   return (
     <section data-testid="debt-payoff-strategy" className="space-y-4">
-      {/* ── Header — kicker + KPI-strip ────────────────────── */}
+      {/* ── Header — kicker + KPI-strip + ChartTips ────────── */}
       <header className="flex items-baseline justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
@@ -648,10 +728,19 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
             totaal
           </p>
         </div>
+        <ChartTips
+          storageKey="debt_payoff_strategy"
+          tips={getDebtPayoffStrategyTips({
+            strategy,
+            debtCount: activeDebts.length,
+            hasFocusDebt: !!focusDebtId,
+          })}
+          align="right"
+        />
       </header>
 
       {/* ── Strategie-toggle ───────────────────────────────── */}
-      <StrategyToggle value={strategy} onChange={setStrategy} />
+      <StrategyToggle value={strategy} onChange={handleStrategyChange} />
 
       {/* ── Extra-aflos-slider ─────────────────────────────── */}
       <ExtraPaymentSlider
@@ -662,25 +751,25 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
       />
 
       {/* ── Trajectvergelijkings-chart ─────────────────────── */}
-      {/* De bestaande <DebtPayoffTrajectoryChart> verwacht beide
-          strategieën als baseline. Hij is bewust niet gevoelig voor
-          extra-aflos — hij toont de strategiekeuze, niet de slider-
-          impact. De slider-impact zit in het label boven (live cijfers)
-          + de <StrategyComparisonMessage> hieronder. Dit voorkomt dat
-          de hoofd-chart bij elke slider-tick herrendert. */}
+      {/* Alle vier strategieën worden als lijn gerenderd, waarbij de
+          actieve strategie dik wordt getekend met fill-area en payoff-
+          marker, en de andere drie dun-en-doorzichtig als context. Bij
+          slider-verandering re-runt de hele set zodat de chart de
+          extra-aflos-impact 1:1 reflecteert. */}
       <DebtPayoffTrajectoryChart
-        snowballMonths={snowballBaseline}
-        avalancheMonths={avalancheBaseline}
-        snowballSummary={snowballSummary}
-        avalancheSummary={avalancheSummary}
+        strategies={strategyTrajectories}
+        activeStrategyId={strategy}
+        extraPayment={extraPayment}
       />
 
       {/* ── Strategie-vergelijking ─────────────────────────── */}
       {/* dailyExpenses=0 → freedom-time hint blijft achterwege; dat is
           context die per pagina anders ligt en hier niet thuis hoort. */}
       <StrategyComparisonMessage
-        snowballSummary={snowballSummary}
-        avalancheSummary={avalancheSummary}
+        baselineSummaries={baselineSummariesByStrategy}
+        activeStrategyId={strategy}
+        activeWithExtraSummary={selectedSummary}
+        extraPayment={extraPayment}
         dailyExpenses={0}
       />
 

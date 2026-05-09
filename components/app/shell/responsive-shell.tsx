@@ -39,9 +39,9 @@
  *    TopBar + MobileBottomBar nemen het over.
  *
  * ── Sidebar-mock-data (Fase 0.2) ─────────────────────────────────────
- * In deze fase krijgt Sidebar mock-props (netWorth=0, actionCount=0,
- * fireAge=null) omdat productie-data integratie een aparte taak is
- * (Fase 1.x). userInitials + userName worden afgeleid uit `email`.
+ * In deze fase krijgt Sidebar mock-props (netWorth=0, actionCount=0)
+ * omdat productie-data integratie een aparte taak is (Fase 1.x).
+ * userInitials + userName worden afgeleid uit `email`.
  *
  * ── Bekende edge-cases tijdens transitiefase ─────────────────────────
  * - Pagina's met ingebakken back-knoppen (zie docs/shell-agnostische-
@@ -71,8 +71,6 @@ export type SidebarMetrics = {
   netWorth: number
   /** Aantal openstaande/uitgestelde acties (Wil-module). */
   actionCount: number
-  /** FIRE-leeftijd uit meest recente snapshot, of `null` als nog niet berekend. */
-  fireAge: number | null
   /**
    * App-slugs die geactiveerd zijn door minstens één gekoppeld asset/debt —
    * voedt de Sidebar's apps-strip filter zodat apps alleen verschijnen
@@ -222,12 +220,11 @@ function NewShell({
 
   // Sidebar-kerncijfers komen uit `app/(app)/layout.tsx` (server) — netWorth
   // weegt mee via net_worth_inclusion_pct (consistent met dashboard), actionCount
-  // is open + postponed acties, fireAge is meest recente snapshot. Wanneer geen
-  // metrics worden meegegeven (rendering buiten layout-context) tonen we de
-  // placeholders die Sidebar zelf al ondersteunt: 0 / 0 / null → '€ 0' / '·' / '—'.
+  // is open + postponed acties. Wanneer geen metrics worden meegegeven
+  // (rendering buiten layout-context) tonen we de placeholders die Sidebar zelf
+  // al ondersteunt: 0 / 0 → '€ 0' / '·'.
   const netWorth = sidebarMetrics?.netWorth ?? 0
   const actionCount = sidebarMetrics?.actionCount ?? 0
-  const fireAge = sidebarMetrics?.fireAge ?? null
   const activeAppKeys = sidebarMetrics?.activeAppKeys ?? []
 
   // Media-query-gated single-mount: pre-hydratie blijven beide shells in de
@@ -250,7 +247,6 @@ function NewShell({
         <Sidebar
           netWorth={netWorth}
           actionCount={actionCount}
-          fireAge={fireAge}
           userInitials={initials}
           userName={userName}
           role={role}

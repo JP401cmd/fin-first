@@ -185,6 +185,7 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   backtesting_score: 'toekomstplannen',
   levensgebeurtenissen: 'toekomstplannen',
   vrijheidsvoortgang: 'toekomstplannen',
+  surplus_gap: 'toekomstplannen',
 }
 
 // ── Lookup Maps ─────────────────────────────────────────────────────────────

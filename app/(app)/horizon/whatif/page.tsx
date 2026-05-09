@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -24,6 +24,8 @@ import {
   formatFireAge,
   formatFireAgeShort,
   formatFireAgeDelta,
+  runMonteCarlo,
+  type MonteCarloResult,
 } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
@@ -38,27 +40,37 @@ import {
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
-import type { Asset } from '@/lib/asset-data'
+import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { SimChart } from '@/components/app/horizon/sim-chart'
+import { SimChart, type ScenarioOverlay, type MonteCarloOverlay } from '@/components/app/horizon/sim-chart'
+import { type SavedScenario, WHATIF_SCENARIO_COLORS } from '@/lib/scenario-types'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
-import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
-import { applyWhatIfOverrides, buildBaselineOverrides, applyWhatIfOverridesToUnified } from '@/lib/whatif-overrides'
+import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
+import {
+  deriveOverridesFromEvents,
+  buildSliderEvent,
+  type SliderKey,
+} from '@/lib/scenario-events'
 import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
-import { WhatIfPresets } from '@/components/app/horizon/whatif-presets'
+import { WhatIfPresets, PRESET_EXPLAINERS } from '@/components/app/horizon/whatif-presets'
 import { WhatIfChat, type WhatIfScenarioContext } from '@/components/app/horizon/whatif-chat'
 import { WhatIfScenarios } from '@/components/app/horizon/whatif-scenarios'
+import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getFireProjectionTips, getWealthCompositionTips } from '@/lib/chart-tips'
+import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-assumptions'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { useChatContext } from '@/components/app/chat/chat-provider'
-import { Loader2, AlertTriangle, ArrowRight, ChevronUp, ChevronDown, Hourglass, Target, TrendingUp, Equal } from 'lucide-react'
+import { Loader2, AlertTriangle, ArrowRight, ChevronUp, ChevronDown, Hourglass, Target, TrendingUp, Equal, Activity } from 'lucide-react'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { type StackedRow } from '@/lib/wealth-composition'
@@ -98,8 +110,20 @@ export default function WhatIfPage() {
   const [bankAccountCash, setBankAccountCash] = useState(0)
   const [withdrawalStrategyConfig, setWithdrawalStrategyConfig] = useState<WithdrawalStrategyConfig>(WITHDRAWAL_DEFAULTS)
 
-  // ── What-If overrides ────────────────────────────────────
-  const [overrides, setOverrides] = useState<WhatIfOverrides | null>(null)
+  // ── Per-asset-type return-deltas (decimaal, bv. { investment: 0.02 }). ──
+  const [returnDeltas, setReturnDeltas] = useState<Record<string, number>>({})
+
+  // ── Active preset (for ChartOverlayExplainer + baseline emphasis) ──
+  const [activePresetId, setActivePresetId] = useState<string | null>(null)
+
+  // ── Multi-scenario manager ──────────────────────────────
+  /** Mirror of saved scenarios from WhatIfScenarios — used to render pinned overlays. */
+  const [savedScenariosMirror, setSavedScenariosMirror] = useState<SavedScenario[]>([])
+  /** Up to 2 saved scenario ids whose lines are overlaid on the chart. */
+  const [pinnedScenarioIds, setPinnedScenarioIds] = useState<string[]>([])
+
+  // ── Monte Carlo overlay toggle ──────────────────────────
+  const [mcEnabled, setMcEnabled] = useState(false)
 
   // ── BottomSheet for full comparison ─────────────────────
   const [comparisonOpen, setComparisonOpen] = useState(false)
@@ -235,19 +259,7 @@ export default function WhatIfPage() {
 
       setInput(horizonInput)
       setEvents((eventsResult.data ?? []).map(e => ({ ...e } as WhatIfEvent)))
-
-      // Initialize sliders from real data
-      const savingsRate = monthlyIncome > 0
-        ? Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100)
-        : 0
-
-      setOverrides({
-        monthlyIncome: Math.round(monthlyIncome),
-        workDaysPerWeek: 5,
-        savingsRate: Math.max(0, Math.min(80, savingsRate)),
-        expectedReturn: fireParams.grossReturn * 100, // as percentage, from user profile
-        extraContribution: 0,
-      })
+      // Scenario state (overrides) is derived from events; no setOverrides call needed.
     } catch (err) {
       console.error('Error loading what-if data:', err)
       setError('Kon gegevens niet laden.')
@@ -277,23 +289,122 @@ export default function WhatIfPage() {
     setEvents(prev => prev.map(e => e.id === id ? updated : e))
   }, [])
 
-  // ── Load saved scenario ────────────────────────────────────
-  const handleLoadScenario = useCallback((loadedOverrides: WhatIfOverrides, loadedEvents: WhatIfEvent[]) => {
-    setOverrides(loadedOverrides)
-    setEvents(loadedEvents)
-  }, [])
-
-  // ── Active events (for simulation) ────────────────────────
-  const activeEvents = useMemo(() =>
-    events.filter(e => !e.whatIfDisabled),
-    [events]
-  )
-
   // ── Derived baseline values (snapshot of real data) ──────
   const baseline = useMemo<WhatIfOverrides | null>(() => {
     if (!input) return null
     return buildBaselineOverrides(input, userGrossReturn)
   }, [input, userGrossReturn])
+
+  // ── Asset groups for MarketAssumptions preview (gewogen rendement per asset_type) ──
+  const assetGroups = useMemo(() => {
+    const map = new Map<string, { totalValue: number; weightedReturnSum: number }>()
+    for (const a of fullAssets) {
+      if (!a.is_active) continue
+      const inclPct = (Number(a.net_worth_inclusion_pct ?? 100) / 100)
+      const value = Number(a.current_value) * inclPct
+      if (value <= 0) continue
+      const baseRet = (Number(a.expected_return) / 100) || userGrossReturn
+      const existing = map.get(a.asset_type)
+      if (existing) {
+        existing.totalValue += value
+        existing.weightedReturnSum += value * baseRet
+      } else {
+        map.set(a.asset_type, { totalValue: value, weightedReturnSum: value * baseRet })
+      }
+    }
+    return Array.from(map.entries()).map(([assetType, data]) => ({
+      assetType,
+      label: ASSET_TYPE_LABELS[assetType as keyof typeof ASSET_TYPE_LABELS] ?? assetType,
+      weightedReturn: data.weightedReturnSum / data.totalValue,
+    }))
+  }, [fullAssets, userGrossReturn])
+
+  // ── Current age (used by scenario events, presets, sliders) ──
+  const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
+
+  // ── Load saved scenario — translate any non-baseline overrides into slider scenario-events. ──
+  const handleLoadScenario = useCallback((loadedOverrides: WhatIfOverrides, loadedEvents: WhatIfEvent[]) => {
+    if (!baseline || currentAge === null) {
+      setEvents(loadedEvents)
+      return
+    }
+    const sliderEvents: WhatIfEvent[] = []
+    const sliderKeys: SliderKey[] = ['income', 'workdays', 'savings', 'extra_inleg']
+    const sliderValueByKey: Record<SliderKey, number> = {
+      income: loadedOverrides.monthlyIncome,
+      workdays: loadedOverrides.workDaysPerWeek,
+      savings: loadedOverrides.savingsRate,
+      extra_inleg: loadedOverrides.extraContribution,
+    }
+    for (const key of sliderKeys) {
+      const ev = buildSliderEvent(key, sliderValueByKey[key], baseline, currentAge)
+      if (ev) sliderEvents.push(ev)
+    }
+    // Drop any incoming scenario_only events from prior loads — keep only DB events from the saved set.
+    const realEvents = loadedEvents.filter(e => !e.is_scenario_only)
+    setEvents([...realEvents, ...sliderEvents])
+    // Restore return-delta from absolute saved value
+    const deltaPp = loadedOverrides.expectedReturn - baseline.expectedReturn
+    // Backward compat: saved scenarios store a single absolute expectedReturn.
+    // Apply that delta uniformly to every asset-type that exists in the user's portfolio.
+    if (Math.abs(deltaPp) > 0.01) {
+      const uniformDelta = deltaPp / 100
+      const next: Record<string, number> = {}
+      for (const a of fullAssets) {
+        if (a.is_active) next[a.asset_type] = uniformDelta
+      }
+      setReturnDeltas(next)
+    } else {
+      setReturnDeltas({})
+    }
+  }, [baseline, currentAge, fullAssets])
+
+  // ── Pin/unpin handler for saved scenarios (max 2 overlays). ──
+  const handlePinToggle = useCallback((id: string) => {
+    setPinnedScenarioIds(prev => {
+      if (prev.includes(id)) return prev.filter(p => p !== id)
+      if (prev.length >= 2) return prev // ignore if at max
+      return [...prev, id]
+    })
+  }, [])
+
+  // ── Sync scenario list mirror; auto-unpin deleted ids. ──
+  const handleScenariosChange = useCallback((next: SavedScenario[]) => {
+    setSavedScenariosMirror(next)
+    const stillExists = new Set(next.map(s => s.id))
+    setPinnedScenarioIds(prev => prev.filter(id => stillExists.has(id)))
+  }, [])
+
+  // ── Event partitions (baseline = DB only, scenario = DB + scenario-only) ──
+  const baselineDbEvents = useMemo(
+    () => events.filter(e => !e.whatIfDisabled && !e.is_scenario_only),
+    [events]
+  )
+  const scenarioActiveEvents = useMemo(
+    () => events.filter(e => !e.whatIfDisabled),
+    [events]
+  )
+  const scenarioOnlyEvents = useMemo(
+    () => events.filter(e => e.is_scenario_only),
+    [events]
+  )
+
+  // ── Derived overrides (events + return override → WhatIfOverrides shape) ──
+  const overrides = useMemo<WhatIfOverrides | null>(() => {
+    if (!baseline) return null
+    // Translate per-asset deltas back to a single absolute expectedReturn for
+    // backward-compat with the WhatIfOverrides shape consumed by Actions/Chat/Scenarios.
+    // Use the average of all set deltas as a representative number.
+    const deltaValues = Object.values(returnDeltas)
+    const avgDelta = deltaValues.length > 0
+      ? deltaValues.reduce((s, v) => s + v, 0) / deltaValues.length
+      : 0
+    const expectedReturnAbsolute = Math.abs(avgDelta) > 0.0001
+      ? baseline.expectedReturn + avgDelta * 100
+      : null
+    return deriveOverridesFromEvents(scenarioOnlyEvents, baseline, expectedReturnAbsolute)
+  }, [baseline, scenarioOnlyEvents, returnDeltas])
+
 
   // ── Base UnifiedProjectionInput (built once from loaded data) ──────────
   const baseUnifiedInput = useMemo<UnifiedProjectionInput | null>(() => {
@@ -325,11 +436,11 @@ export default function WhatIfPage() {
     }
   }, [input, fullAssets, fullDebts, fireStrategy, userGrossReturn, userInflation, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig, userAowAge])
 
-  // ── What-if UnifiedProjectionInput (overrides applied directly) ──────────
+  // ── What-if UnifiedProjectionInput — per-asset-type return-deltas toegepast in engine ──
   const whatIfUnifiedInput = useMemo<UnifiedProjectionInput | null>(() => {
-    if (!baseUnifiedInput || !overrides || !baseline) return null
-    return applyWhatIfOverridesToUnified(baseUnifiedInput, overrides, baseline)
-  }, [baseUnifiedInput, overrides, baseline])
+    if (!baseUnifiedInput) return null
+    return { ...baseUnifiedInput, returnDeltaByAssetType: returnDeltas }
+  }, [baseUnifiedInput, returnDeltas])
 
   // ── Legacy what-if FinancialInput (for dailyExpenses display only) ──────
   const { adjustedInput: whatIfInput, annualSavings: whatIfAnnualSavings_sim } = useMemo(() => {
@@ -337,38 +448,100 @@ export default function WhatIfPage() {
     return applyWhatIfOverrides(input, overrides, baseline)
   }, [input, overrides, baseline])
 
-  // ── Run baseline simulation ──────────────────────────────
+  // ── Run baseline simulation (DB events only) ──────────────────
   const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
     if (!baseUnifiedInput) return null
-    const cashflows = lifeEventsToCashflows(activeEvents)
+    const cashflows = lifeEventsToCashflows(baselineDbEvents)
     const unifiedResult = runUnifiedProjection({ ...baseUnifiedInput, cashflows })
     return { result: toSimResult(unifiedResult), cashflows }
-  }, [baseUnifiedInput, activeEvents])
+  }, [baseUnifiedInput, baselineDbEvents])
 
-  // ── Run what-if simulation ───────────────────────────────
+  // ── Run what-if simulation (DB + scenario events; return override applied) ──
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
     if (!whatIfUnifiedInput) return null
-    const cashflows = lifeEventsToCashflows(activeEvents)
+    const cashflows = lifeEventsToCashflows(scenarioActiveEvents)
     const unifiedResult = runUnifiedProjection({ ...whatIfUnifiedInput, cashflows })
     return { result: toSimResult(unifiedResult), cashflows }
-  }, [whatIfUnifiedInput, activeEvents])
+  }, [whatIfUnifiedInput, scenarioActiveEvents])
 
-  // ── Impact computation (per-event FIRE delta) ──────────────
+  // ── Pinned scenario overlays — re-run sim per pinned saved scenario ──
+  const pinnedOverlays = useMemo<ScenarioOverlay[]>(() => {
+    if (!baseUnifiedInput || pinnedScenarioIds.length === 0) return []
+    const result: ScenarioOverlay[] = []
+    for (const id of pinnedScenarioIds) {
+      const scenario = savedScenariosMirror.find(s => s.id === id)
+      if (!scenario) continue
+      // Build LifeEvents from the saved scenario.events shape (numeric coercion).
+      const scenarioEvents: WhatIfEvent[] = (scenario.events ?? [])
+        .filter(e => !e.whatIfDisabled)
+        .map(e => ({
+          id: e.id,
+          name: e.name,
+          event_type: e.event_type,
+          target_age: e.target_age,
+          target_date: null,
+          one_time_cost: Number(e.one_time_cost ?? 0),
+          monthly_cost_change: Number(e.monthly_cost_change ?? 0),
+          monthly_income_change: Number(e.monthly_income_change ?? 0),
+          duration_months: Number(e.duration_months ?? 0),
+          icon: 'Calendar',
+          is_active: true,
+          sort_order: 0,
+          is_indexed: false,
+          metadata: e.metadata ?? {},
+        }))
+      const cashflows = lifeEventsToCashflows(scenarioEvents)
+      // Translate scenario's saved absolute return → uniform delta across all asset-types.
+      const pinReturnDelta = (baseline && scenario.overrides?.expectedReturn != null)
+        ? (scenario.overrides.expectedReturn - baseline.expectedReturn) / 100
+        : 0
+      const sim = runUnifiedProjection({ ...baseUnifiedInput, cashflows, returnDelta: pinReturnDelta })
+      const rows = toSimResult(sim).rows
+      const points: [number, number][] = []
+      if (rows.length > 0) {
+        points.push([rows[0].age, rows[0].startPortfolio])
+        for (const r of rows) points.push([r.age + 1, r.endPortfolio])
+      }
+      const color = WHATIF_SCENARIO_COLORS[scenario.colorIndex ?? 0]
+      result.push({
+        name: `pinned-${scenario.id}`,
+        label: scenario.name,
+        color: color.hex,
+        points,
+      })
+    }
+    return result
+  }, [pinnedScenarioIds, savedScenariosMirror, baseUnifiedInput, baseline])
+
+  // ── Monte Carlo overlay (when toggled on) ─────────────
+  const mcResult = useMemo<MonteCarloResult | null>(() => {
+    if (!mcEnabled || !input) return null
+    const yearsToShow = Math.max(20, 90 - (input.dateOfBirth ? ageAtDate(input.dateOfBirth) : 30))
+    return runMonteCarlo(input, 1000, yearsToShow)
+  }, [mcEnabled, input])
+
+  const monteCarloOverlay = useMemo<MonteCarloOverlay | undefined>(() => {
+    if (!mcResult || !input) return undefined
+    const startAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : 30
+    return { ...mcResult.percentiles, startAge }
+  }, [mcResult, input])
+
+  // ── Impact computation (per-event FIRE delta within the scenario) ──────────────
   const computeImpact = useCallback((eventId: string) => {
     if (!whatIfUnifiedInput) return null
 
     const event = events.find(e => e.id === eventId)
     if (!event) return null
 
-    // Simulate WITH this event (all active events)
-    const eventsWithThis = activeEvents.some(e => e.id === eventId)
-      ? activeEvents
-      : [...activeEvents, event]
+    // Simulate WITH this event (all currently-active scenario events)
+    const eventsWithThis = scenarioActiveEvents.some(e => e.id === eventId)
+      ? scenarioActiveEvents
+      : [...scenarioActiveEvents, event]
     const cfWith = lifeEventsToCashflows(eventsWithThis)
     const simWith = toSimResult(runUnifiedProjection({ ...whatIfUnifiedInput, cashflows: cfWith }))
 
     // Simulate WITHOUT this event
-    const eventsWithout = activeEvents.filter(e => e.id !== eventId)
+    const eventsWithout = scenarioActiveEvents.filter(e => e.id !== eventId)
     const cfWithout = lifeEventsToCashflows(eventsWithout)
     const simWithout = toSimResult(runUnifiedProjection({ ...whatIfUnifiedInput, cashflows: cfWithout }))
 
@@ -388,25 +561,28 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [whatIfUnifiedInput, events, activeEvents])
+  }, [whatIfUnifiedInput, events, scenarioActiveEvents])
 
   // ── Derived values for display ───────────────────────────
-  const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
+  // (currentAge declared earlier at line ~288 for use in handleLoadScenario.)
   const baselineFireAge = baselineSim?.result.fireAgeFractional ?? null
   const whatIfFireAge = whatIfSim?.result.fireAgeFractional ?? null
   const fireAgeDelta = baselineFireAge !== null && whatIfFireAge !== null
     ? whatIfFireAge - baselineFireAge
     : null
 
-  // Annual savings for scenario summary
-  const whatIfAnnualSavings = whatIfUnifiedInput?.annualSavings ?? whatIfAnnualSavings_sim
+  // Annual savings for scenario summary — derived overrides feed the legacy helper.
+  const whatIfAnnualSavings = whatIfAnnualSavings_sim || (input?.monthlyContributions ?? 0) * 12
   const baselineAnnualSavings = baseUnifiedInput?.annualSavings ?? (input?.monthlyContributions ?? 0) * 12
+
+  // ── Preset active flag (drives ChartOverlayExplainer + baseline emphasis) ──
+  const presetActive = activePresetId !== null
 
   // ── Scenario key for SimChart animation replay ─────────
   const scenarioKey = useMemo(() => {
     if (!overrides) return 'default'
-    return `${overrides.monthlyIncome}-${overrides.workDaysPerWeek}-${overrides.savingsRate}-${overrides.expectedReturn}-${overrides.extraContribution}-${activeEvents.length}`
-  }, [overrides, activeEvents.length])
+    return `${overrides.monthlyIncome}-${overrides.workDaysPerWeek}-${overrides.savingsRate}-${overrides.expectedReturn}-${overrides.extraContribution}-${scenarioActiveEvents.length}`
+  }, [overrides, scenarioActiveEvents.length])
 
   // ── Wealth composition (simplified: inleg vs groei) ──────────
   const wealthCompositionRows: StackedRow[] = useMemo(() => {
@@ -516,7 +692,7 @@ export default function WhatIfPage() {
       baselineFireAge: baselineFireAge != null ? Math.round(baselineFireAge * 10) / 10 : null,
       scenarioFireAge: whatIfFireAge != null ? Math.round(whatIfFireAge * 10) / 10 : null,
       fireDeltaMonths: fireAgeDelta != null ? Math.round(fireAgeDelta * 12) : null,
-      activeEvents: activeEvents.map(ev => ({
+      activeEvents: scenarioActiveEvents.map(ev => ({
         name: ev.name,
         event_type: ev.event_type,
         target_age: ev.target_age ?? null,
@@ -526,7 +702,7 @@ export default function WhatIfPage() {
         duration_months: Number(ev.duration_months) || 0,
       })),
     }
-  }, [overrides, baseline, baselineFireAge, whatIfFireAge, fireAgeDelta, activeEvents])
+  }, [overrides, baseline, baselineFireAge, whatIfFireAge, fireAgeDelta, scenarioActiveEvents])
 
   // Class for the dimension wrapper — skip own veil when arriving via dream gate
   const dimensionClass = viaDreamgate.current
@@ -811,8 +987,30 @@ export default function WhatIfPage() {
               </div>
             )}
 
-            {/* ── Chart mode toggle (Pad / Opbouw) ──────────── */}
-            <div className="mb-2 flex items-center justify-end gap-1">
+            {/* ── Editorial overlay-explainer when a preset is active ─────── */}
+            <ChartOverlayExplainer active={presetActive && !!activePresetId}>
+              {activePresetId ? PRESET_EXPLAINERS[activePresetId] : ''}
+            </ChartOverlayExplainer>
+
+            {/* ── Chart toolbar: Monte Carlo toggle + mode toggle ─────── */}
+            <div className="mb-2 flex flex-wrap items-center justify-end gap-1">
+              {chartMode === 'vermogenspad' && (
+                <button
+                  type="button"
+                  onClick={() => setMcEnabled(prev => !prev)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
+                    mcEnabled
+                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                  }`}
+                  aria-pressed={mcEnabled}
+                  style={{ minHeight: 32 }}
+                  title="Toon p10-p90 onzekerheidsbanden (1000 simulaties)"
+                >
+                  <Activity className="h-3 w-3" aria-hidden />
+                  Onzekerheid
+                </button>
+              )}
               {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => (
                 <button
                   key={mode}
@@ -829,6 +1027,29 @@ export default function WhatIfPage() {
                   {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
                 </button>
               ))}
+
+              {/* ── Inline ChartTips: kleine "i" met editorial popover ── */}
+              <ChartTips
+                storageKey="whatif_main_chart"
+                tips={
+                  chartMode === 'vermogenspad'
+                    ? getFireProjectionTips({
+                        fireAge: simResult.fireAge,
+                        aowAge: Math.round(userAowAge.fractional),
+                        currentAge: currentAge ?? 30,
+                        hasMonteCarlo: !!monteCarloOverlay,
+                        hasScenario: pinnedOverlays.length > 0,
+                        hasBaseline: !!baselineSim,
+                        planningMode: 'fire',
+                      })
+                    : getWealthCompositionTips({
+                        fireAge: simResult.fireAge,
+                        aowAge: Math.round(userAowAge.fractional),
+                        currentAge: currentAge ?? 30,
+                      })
+                }
+                align="right"
+              />
             </div>
 
             <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
@@ -849,6 +1070,9 @@ export default function WhatIfPage() {
                         targetEndPortfolio={simResult.targetEndPortfolio}
                         baselineRows={baselineSim?.result.rows}
                         baselineFireAge={baselineFireAge}
+                        baselineEmphasis={(presetActive || pinnedOverlays.length > 0) ? 'compare' : 'ghost'}
+                        scenarioOverlays={pinnedOverlays.length > 0 ? pinnedOverlays : undefined}
+                        monteCarloOverlay={monteCarloOverlay}
                         dailyExpenseRate={input ? input.yearlyMustExpenses / 365 : undefined}
                         visibleMinAge={visibleMin}
                         visibleMaxAge={visibleMax}
@@ -950,29 +1174,21 @@ export default function WhatIfPage() {
             <div className="mt-2 flex flex-wrap items-center gap-4 font-sans text-[10px] text-[var(--ink-4)]">
               <span className="flex items-center gap-1.5">
                 <svg width="20" height="3" aria-hidden="true">
-                  <line x1="0" y1="1.5" x2="20" y2="1.5" stroke="var(--ink-4)" strokeWidth="2.5" opacity="0.55" />
+                  <line
+                    x1="0" y1="1.5" x2="20" y2="1.5"
+                    stroke={presetActive ? 'var(--color-horizon-700, #8a6e42)' : 'var(--ink-4)'}
+                    strokeWidth="2.5"
+                    opacity={presetActive ? 0.85 : 0.55}
+                  />
                 </svg>
-                Huidige realiteit
+                {presetActive ? 'Werkelijkheid' : 'Huidige realiteit'}
               </span>
               <span className="flex items-center gap-1.5">
                 <svg width="20" height="2" aria-hidden="true">
                   <line x1="0" y1="1" x2="20" y2="1" stroke="var(--hor-t, #8a6e42)" strokeWidth="2.5" />
                 </svg>
-                Wat-als scenario
+                {presetActive ? 'Scenario' : 'Wat-als scenario'}
               </span>
-              {simCashflows.length > 0 && simCashflows.map(cf => (
-                <span
-                  key={cf.id}
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[10px] font-medium ${
-                    cf.direction === 'income'
-                      ? 'border-horizon-200 bg-horizon-50 text-horizon-700'
-                      : 'border-kern-200 bg-kern-50/60 text-kern-700'
-                  }`}
-                >
-                  {cf.direction === 'income' ? '↑' : '↓'}{' '}
-                  {cf.name} (leeftijd {cf.fromAge})
-                </span>
-              ))}
               {ieExpanded && (
                 <>
                   <span className="flex items-center gap-1.5">
@@ -996,69 +1212,81 @@ export default function WhatIfPage() {
           </div>
         </section>
 
-        {/* ── Two-column layout: controls ────────────────────── */}
-        <div className="mt-4 px-4 sm:px-6 lg:grid lg:grid-cols-2 lg:gap-6">
+        {/* ── Single-column controls — presets first as hero ─────── */}
+        <div className="mt-4 px-4 sm:px-6 space-y-4">
 
-          {/* ── Left column: sliders + events ──────────────────── */}
-          <div className="min-w-0 space-y-4">
-            <WhatIfSliders
-              overrides={overrides}
-              baseline={baseline}
-              onChange={setOverrides}
-            />
-
-            <WhatIfEventsPanel
-              events={events}
-              onToggleEvent={handleToggleEvent}
-              onAddEvent={handleAddEvent}
-              onRemoveEvent={handleRemoveEvent}
-              onEditEvent={handleEditEvent}
-              baselineFireAge={baselineFireAge}
-              computeImpact={computeImpact}
-              dailyExpenses={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
-              isHousehold={isHousehold}
-            />
-          </div>
-
-          {/* ── Right column: presets + saved + actions + chat ── */}
-          <div className="mt-4 min-w-0 space-y-4 lg:mt-0">
-            {/* Presets */}
-            <div className="card-editorial overflow-hidden">
-              <div className="h-[3px] bg-horizon-500" />
-              <div className="px-4 py-3">
-                <p className="mb-2.5 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
-                  Snelle scenario&apos;s
-                </p>
-                <WhatIfPresets
-                  baseline={baseline}
-                  overrides={overrides}
-                  onChange={setOverrides}
-                  isHousehold={isHousehold}
-                />
-              </div>
+          {/* Presets — toggle-eerst, hero-positie */}
+          <div className="card-editorial overflow-hidden">
+            <div className="h-[3px] bg-horizon-500" />
+            <div className="px-4 py-4 sm:px-5 sm:py-5">
+              <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
+                Wat als ik...
+              </p>
+              <WhatIfPresets
+                baseline={baseline}
+                events={events}
+                setEvents={setEvents}
+                currentAge={currentAge ?? 30}
+                isHousehold={isHousehold}
+                onActiveChange={setActivePresetId}
+              />
             </div>
-
-            <WhatIfScenarios
-              overrides={overrides}
-              events={events}
-              fireAge={whatIfFireAge}
-              onLoadScenario={handleLoadScenario}
-            />
-
-            <WhatIfActions
-              overrides={overrides}
-              baseline={baseline}
-              baselineFireAge={baselineFireAge}
-              whatIfFireAge={whatIfFireAge}
-              whatIfAnnualSavings={whatIfAnnualSavings}
-              baselineAnnualSavings={baselineAnnualSavings}
-            />
-
-            <WhatIfChat
-              onAddEvent={handleAddEvent}
-              scenarioContext={chatScenarioContext}
-            />
           </div>
+
+          {/* Sliders — verfijn-niveau, gesloten by default */}
+          <WhatIfSlidersCollapsible
+            baseline={baseline}
+            events={events}
+            setEvents={setEvents}
+            currentAge={currentAge ?? 30}
+          />
+
+          {/* Marktbias — per-asset-groep rendement-delta */}
+          <WhatIfMarketAssumptions
+            value={returnDeltas}
+            onChange={setReturnDeltas}
+            assetGroups={assetGroups}
+          />
+
+          {/* Actions */}
+          <WhatIfActions
+            overrides={overrides}
+            baseline={baseline}
+            baselineFireAge={baselineFireAge}
+            whatIfFireAge={whatIfFireAge}
+            whatIfAnnualSavings={whatIfAnnualSavings}
+            baselineAnnualSavings={baselineAnnualSavings}
+          />
+
+          {/* Levensgebeurtenissen */}
+          <WhatIfEventsPanel
+            events={events}
+            onToggleEvent={handleToggleEvent}
+            onAddEvent={handleAddEvent}
+            onRemoveEvent={handleRemoveEvent}
+            onEditEvent={handleEditEvent}
+            baselineFireAge={baselineFireAge}
+            computeImpact={computeImpact}
+            dailyExpenses={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
+            isHousehold={isHousehold}
+          />
+
+          {/* Bewaarde scenario's — laden + pin als overlay */}
+          <WhatIfScenarios
+            overrides={overrides}
+            events={events}
+            fireAge={whatIfFireAge}
+            onLoadScenario={handleLoadScenario}
+            pinnedIds={pinnedScenarioIds}
+            onPinToggle={handlePinToggle}
+            onScenariosChange={handleScenariosChange}
+          />
+
+          {/* Will-chat */}
+          <WhatIfChat
+            onAddEvent={handleAddEvent}
+            scenarioContext={chatScenarioContext}
+          />
         </div>
 
         {/* Footer */}

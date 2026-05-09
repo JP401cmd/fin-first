@@ -107,7 +107,7 @@ function makeDebt(overrides: Partial<Debt>): Debt {
     net_worth_inclusion_pct: 100,
     include_aflossing_in_savings: false,
     custom_aflossing_amount: null,
-    has_strategy_tracking: false,
+    has_hypotheekplanner_tracking: false,
     ...overrides,
   }
 }

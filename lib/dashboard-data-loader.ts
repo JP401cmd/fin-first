@@ -549,7 +549,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Horizon extra: sim rows for vermogenspad chart
   // Uses runUnifiedProjection() — the same engine as the horizon page — for per-asset-type
   // rendement, per-schuld aflossing, and proper Box 3 per asset category.
-  let simRows: { age: number; endPortfolio: number; phase: string }[] | null = null
+  let simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null = null
   let simRequiredPortfolio: number | null = null
   let simFireAgeFractional: number | null = null
   if (dob && netWorth > 0) {
@@ -593,7 +593,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       }
       const unifiedResult = runUnifiedProjection(unifiedInput)
       const simResult = toSimResult(unifiedResult)
-      simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
+      simRows = simResult.rows.map(r => ({
+        age: r.age,
+        endPortfolio: r.endPortfolio,
+        phase: r.phase,
+        flowIn: r.flowIn,
+        flowOut: r.flowOut,
+        oneTimeNet: r.oneTimeNet,
+      }))
       // Pensioen post-processing: use actual projected portfolio at AOW age
       // instead of binary-search minimum (consistent with useHorizonFireSim #473)
       if (isPensioen) {
@@ -1738,7 +1745,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       })),
       (debtsResult.data ?? []).map((d) => ({
         debt_type: (d as { debt_type: Debt['debt_type'] }).debt_type,
-        has_strategy_tracking: (d as { has_strategy_tracking?: boolean | null }).has_strategy_tracking,
+        has_hypotheekplanner_tracking: (d as { has_hypotheekplanner_tracking?: boolean | null }).has_hypotheekplanner_tracking,
       })),
       activeModules as ModuleId[],
     ),

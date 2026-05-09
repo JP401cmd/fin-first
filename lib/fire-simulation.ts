@@ -41,6 +41,14 @@ export interface SimCashflow {
   fromAge: number      // age at which cashflow starts / one-time occurs
   toAge: number | null // recurring: stops at this age (null = until endAge); one_time: ignored
   indexed: boolean     // true: amount grows with inflation
+  /**
+   * Optional portfolio shock (signed proportion). When set on a one-time
+   * cashflow, the simulation engine multiplies the running portfolio by
+   * (1 + portfolioPct) at fromAge instead of adding `amount`. Used by
+   * market_shock events so the loss scales with the portfolio at that age.
+   * Examples: -0.37 = 37% drop, +0.20 = 20% gain.
+   */
+  portfolioPct?: number
 }
 
 export interface IncomeExpenseItem {
@@ -166,9 +174,19 @@ export function runSimulation(
   function oneTimeAmount(cf: SimCashflow, age: number): number {
     if (cf.type !== 'one_time') return 0
     if (cf.fromAge !== age) return 0
+    // Portfolio shocks are applied separately (depend on running portfolio).
+    if (cf.portfolioPct !== undefined) return 0
     const yrsFromNow = age - currentAge
     const nominal = cf.indexed ? cf.amount * Math.pow(1 + inflation, yrsFromNow) : cf.amount
     return cf.direction === 'income' ? nominal : -nominal
+  }
+
+  /** Compute portfolio delta from a shock cashflow at a given age. */
+  function portfolioShockDelta(cf: SimCashflow, age: number, portfolio: number): number {
+    if (cf.type !== 'one_time') return 0
+    if (cf.fromAge !== age) return 0
+    if (cf.portfolioPct === undefined) return 0
+    return portfolio * cf.portfolioPct
   }
 
   // Resolve withdrawal strategy — default to static (identical to old hardcoded logic)
@@ -229,6 +247,14 @@ export function runSimulation(
 
       // Apply one-time cashflows to portfolio BEFORE growth
       let oneTimeNet = 0
+      // Portfolio shocks first — they scale with running portfolio.
+      for (const cf of cashflows) {
+        const delta = portfolioShockDelta(cf, age, portfolio)
+        if (delta !== 0) {
+          portfolio += delta
+          oneTimeNet += delta
+        }
+      }
       for (const cf of cashflows) {
         const amt = oneTimeAmount(cf, age)
         portfolio += amt
@@ -426,6 +452,14 @@ export function runSimulation(
     const portfolioPreOneTime = portfolio
 
     let oneTimeNet = 0
+    // Portfolio shocks first (scale with running portfolio)
+    for (const cf of cashflows) {
+      const delta = portfolioShockDelta(cf, age, portfolio)
+      if (delta !== 0) {
+        portfolio += delta
+        oneTimeNet += delta
+      }
+    }
     for (const cf of cashflows) {
       const amt = oneTimeAmount(cf, age)
       portfolio += amt
@@ -723,6 +757,27 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
         })
       }
       skipGenericCost = true
+    }
+
+    // Market shock: one-time portfolio multiplier (signed pct on running portfolio)
+    if (ev.event_type === 'market_shock') {
+      const pct = Number(meta.shockPercentage ?? 0)
+      if (pct !== 0) {
+        flows.push({
+          id: `le-shock-${ev.id}`,
+          name: ev.name,
+          type: 'one_time',
+          direction: pct < 0 ? 'expense' : 'income',
+          amount: 0,
+          fromAge: age,
+          toAge: age,
+          indexed: false,
+          portfolioPct: pct,
+        })
+      }
+      skipGenericCost = true
+      skipGenericMonthlyCost = true
+      skipGenericMonthlyIncome = true
     }
 
     // Begrafenis: eenmalige kost = uitvaartkosten + extraWensen - verzekeringDekking + grafrechten

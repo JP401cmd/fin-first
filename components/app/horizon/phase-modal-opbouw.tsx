@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * Fase 2.2 — onderdeel van new-navigation-shell migratie.
@@ -12,6 +12,8 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
 import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getPhaseChartZoomTips } from '@/lib/chart-tips'
 import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-events-in-phase'
 import { StressTestSection } from '@/components/app/horizon/phase-analysis/stress-test-section'
 import { MonteCarloOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/monte-carlo-opbouw'
@@ -188,14 +190,26 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
       <div className="p-5 space-y-4">
         {/* 1. Phase Chart Zoom — full trajectory with accumulation phase highlighted */}
         {allRows && allRows.length > 2 && (
-          <PhaseChartZoom
-            allRows={allRows}
-            phaseFilter="accumulation"
-            accentColor="var(--color-horizon-600)"
-            annotations={[
-              { age: fireAge, label: 'FIRE' },
-            ]}
-          />
+          <>
+            <div className="flex justify-end">
+              <ChartTips
+                storageKey="phase_chart_zoom_opbouw"
+                tips={getPhaseChartZoomTips({
+                  phase: 'accumulation',
+                  hasAnnotations: true,
+                })}
+                align="right"
+              />
+            </div>
+            <PhaseChartZoom
+              allRows={allRows}
+              phaseFilter="accumulation"
+              accentColor="var(--color-horizon-600)"
+              annotations={[
+                { age: fireAge, label: 'FIRE' },
+              ]}
+            />
+          </>
         )}
 
         {/* 2. Fase-header — compact summary line */}

@@ -1,8 +1,10 @@
-'use client'
+﻿'use client'
 
 import { useState, useMemo, useCallback, useRef, memo } from 'react'
 import type { DomainColor } from '@/lib/navigation'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getTrendChartTips } from '@/lib/chart-tips'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -53,6 +55,12 @@ export type TrendChartProps = {
   className?: string
   /** data-testid attribute */
   testId?: string
+  /**
+   * Optionele storage-key voor inline ChartTips. Indien gegeven verschijnt
+   * een kleine "i"-knop naast de title (of rechtsboven als geen title) met
+   * editorial popover-uitleg over de chart.
+   */
+  tipsStorageKey?: string
 }
 
 // ── Color definitions per module theme ───────────────────────
@@ -133,6 +141,7 @@ export const TrendChart = memo(function TrendChart({
   height = 260,
   className = '',
   testId = 'trend-chart',
+  tipsStorageKey,
 }: TrendChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [hoveredSeriesId, setHoveredSeriesId] = useState<string | null>(null)
@@ -340,14 +349,33 @@ export const TrendChart = memo(function TrendChart({
   const fillAnim = hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none'
   const projAnim = hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) 595ms both' : 'none'
 
+  // ── ChartTips inline element (optional, only when tipsStorageKey is set) ──
+  const chartTipsElement = tipsStorageKey ? (
+    <ChartTips
+      storageKey={tipsStorageKey}
+      tips={getTrendChartTips({
+        mode,
+        seriesCount: series.length,
+        hasProjected: showProjected && series.some((s) => s.data.some((d) => d.projected != null)),
+        yAxisLabel,
+      })}
+      align="right"
+    />
+  ) : null
+
   // ── Render ──────────────────────────────────────────────────
   return (
     <div ref={ref} className={className} data-testid={testId} data-mode={mode} data-module-color={moduleColor}>
-      {/* Title */}
-      {title && (
-        <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]" data-testid={`${testId}-title`}>
-          {title}
-        </h3>
+      {/* Title + optional ChartTips */}
+      {(title || chartTipsElement) && (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          {title ? (
+            <h3 className="text-sm font-semibold text-[var(--ink-2)]" data-testid={`${testId}-title`}>
+              {title}
+            </h3>
+          ) : <span />}
+          {chartTipsElement}
+        </div>
       )}
 
       {/* SVG Chart */}

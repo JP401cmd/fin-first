@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Save, FolderOpen, Trash2, X, Check, Loader2, ChevronDown } from 'lucide-react'
+import { Save, FolderOpen, Trash2, X, Check, Loader2, ChevronDown, Pin, PinOff } from 'lucide-react'
 import type { WhatIfOverrides } from './whatif-sliders'
 import type { WhatIfEvent } from './whatif-events'
-import type { SavedScenario } from '@/lib/scenario-types'
+import { type SavedScenario, WHATIF_SCENARIO_COLORS } from '@/lib/scenario-types'
 import { formatFireAgeShort } from '@/lib/horizon-data'
 
 interface WhatIfScenariosProps {
@@ -12,6 +12,12 @@ interface WhatIfScenariosProps {
   events: WhatIfEvent[]
   fireAge: number | null
   onLoadScenario: (overrides: WhatIfOverrides, events: WhatIfEvent[]) => void
+  /** Scenario-ids currently pinned as overlay on the chart (max 2). */
+  pinnedIds?: string[]
+  /** Toggle pin-state for a scenario. */
+  onPinToggle?: (id: string) => void
+  /** Notify parent whenever the saved-scenario list changes (after fetch / save / delete). */
+  onScenariosChange?: (scenarios: SavedScenario[]) => void
 }
 
 export function WhatIfScenarios({
@@ -19,6 +25,9 @@ export function WhatIfScenarios({
   events,
   fireAge,
   onLoadScenario,
+  pinnedIds = [],
+  onPinToggle,
+  onScenariosChange,
 }: WhatIfScenariosProps) {
   const [scenarios, setScenarios] = useState<SavedScenario[]>([])
   const [loading, setLoading] = useState(false)
@@ -45,7 +54,8 @@ export function WhatIfScenarios({
       const res = await fetch('/api/scenarios')
       if (res.ok) {
         const data = await res.json()
-        setScenarios(data.scenarios ?? [])
+        const list: SavedScenario[] = data.scenarios ?? []
+        setScenarios(list)
       }
     } catch {
       // Silently fail — not critical
@@ -55,6 +65,12 @@ export function WhatIfScenarios({
   }, [])
 
   useEffect(() => { fetchScenarios() }, [fetchScenarios])
+
+  // Sync scenarios up to parent after render — never inside a setState updater
+  // (which would fire during render and trigger cross-component setState errors).
+  useEffect(() => {
+    onScenariosChange?.(scenarios)
+  }, [scenarios, onScenariosChange])
 
   // Save scenario
   const handleSave = async () => {
@@ -244,43 +260,81 @@ export function WhatIfScenarios({
                 Nog geen opgeslagen scenario&apos;s.
               </p>
             ) : (
-              scenarios.map(scenario => (
-                <div
-                  key={scenario.id}
-                  className="flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 transition-colors hover:border-horizon-300"
-                >
-                  {/* Scenario info — clickable to load */}
-                  <button
-                    type="button"
-                    onClick={() => handleLoad(scenario)}
-                    className="flex-1 text-left"
+              scenarios.map(scenario => {
+                const isPinned = pinnedIds.includes(scenario.id)
+                const scenarioColor = WHATIF_SCENARIO_COLORS[scenario.colorIndex ?? 0]
+                const pinDisabled = !onPinToggle || (!isPinned && pinnedIds.length >= 2)
+                return (
+                  <div
+                    key={scenario.id}
+                    className={`flex items-center gap-2 rounded-[var(--r)] border bg-[var(--paper)] px-3 py-2 transition-colors ${
+                      isPinned
+                        ? 'border-horizon-400 ring-1 ring-horizon-200'
+                        : 'border-[var(--border-ed)] hover:border-horizon-300'
+                    }`}
                   >
-                    <p className="font-sans text-[12px] font-medium text-[var(--ink)]">
-                      {scenario.name}
-                    </p>
-                    <p className="font-sans text-[10px] text-[var(--ink-3)]">
-                      FIRE {formatFireAgeShort(scenario.fireAge)}
-                      {scenario.events.length > 0 && (
-                        <> · {scenario.events.length} event{scenario.events.length !== 1 ? 's' : ''}</>
-                      )}
-                      <> · {new Date(scenario.createdAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</>
-                    </p>
-                  </button>
-                  {/* Delete */}
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(scenario.id)}
-                    disabled={deleting === scenario.id}
-                    className="rounded-md p-1.5 text-[var(--ink-4)] transition-colors hover:bg-kern-50 hover:text-kern-600"
-                    title="Verwijder scenario"
-                  >
-                    {deleting === scenario.id
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Trash2 className="h-3.5 w-3.5" />
-                    }
-                  </button>
-                </div>
-              ))
+                    {/* Color dot */}
+                    <span
+                      aria-hidden
+                      className="block h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: scenarioColor.hex }}
+                    />
+                    {/* Scenario info — clickable to load */}
+                    <button
+                      type="button"
+                      onClick={() => handleLoad(scenario)}
+                      className="flex-1 text-left"
+                    >
+                      <p className="font-sans text-[12px] font-medium text-[var(--ink)]">
+                        {scenario.name}
+                      </p>
+                      <p className="font-sans text-[10px] text-[var(--ink-3)]">
+                        FIRE {formatFireAgeShort(scenario.fireAge)}
+                        {scenario.events.length > 0 && (
+                          <> · {scenario.events.length} event{scenario.events.length !== 1 ? 's' : ''}</>
+                        )}
+                        <> · {new Date(scenario.createdAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</>
+                      </p>
+                    </button>
+                    {/* Pin/unpin */}
+                    {onPinToggle && (
+                      <button
+                        type="button"
+                        onClick={() => onPinToggle(scenario.id)}
+                        disabled={pinDisabled}
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
+                          isPinned
+                            ? 'bg-horizon-100 text-horizon-700 hover:bg-horizon-200'
+                            : 'text-[var(--ink-4)] hover:bg-horizon-50 hover:text-horizon-600 disabled:opacity-30 disabled:hover:bg-transparent'
+                        }`}
+                        title={
+                          isPinned
+                            ? 'Niet meer als overlay tonen'
+                            : pinDisabled
+                              ? 'Maximum 2 overlays — unpin er eerst een'
+                              : 'Toon als overlay op chart'
+                        }
+                        aria-pressed={isPinned}
+                      >
+                        {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
+                    {/* Delete */}
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(scenario.id)}
+                      disabled={deleting === scenario.id}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--ink-4)] transition-colors hover:bg-kern-50 hover:text-kern-600"
+                      title="Verwijder scenario"
+                    >
+                      {deleting === scenario.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Trash2 className="h-3.5 w-3.5" />
+                      }
+                    </button>
+                  </div>
+                )
+              })
             )}
           </div>
         )}

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useMemo, useState, memo } from 'react'
 import {
@@ -11,6 +11,8 @@ import {
 } from '@/lib/benchmark-comparison'
 import { TrendingUp, TrendingDown, Minus, BarChart3, Info } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getBenchmarkComparisonTips } from '@/lib/chart-tips'
 
 // ── Chart component ──────────────────────────────────────────
 
@@ -247,27 +249,43 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
   return (
     <div ref={ref} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-kern-600" />
           <h2 className="text-sm font-semibold text-[var(--ink-2)]">Benchmark vergelijking</h2>
         </div>
-        {/* Period buttons */}
-        <div className="flex items-center gap-1" data-testid="benchmark-period-buttons">
-          {periods.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => onPeriodChange(p)}
-              data-testid={`benchmark-period-${p.id}`}
-              className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                activePeriod.id === p.id
-                  ? 'bg-kern-100 text-kern-700'
-                  : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* Period buttons */}
+          <div className="flex items-center gap-1" data-testid="benchmark-period-buttons">
+            {periods.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onPeriodChange(p)}
+                data-testid={`benchmark-period-${p.id}`}
+                className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                  activePeriod.id === p.id
+                    ? 'bg-kern-100 text-kern-700'
+                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {/* ChartTips */}
+          <ChartTips
+            storageKey="benchmark_comparison_chart"
+            tips={getBenchmarkComparisonTips({
+              activePeriod: activePeriod.label,
+              benchmarkCount: comparison.benchmarks.length,
+              hasOutperformance:
+                comparison.benchmarks.length > 0
+                  ? comparison.portfolio.returnPct >
+                    Math.max(...comparison.benchmarks.map((b) => b.returnPct))
+                  : null,
+            })}
+            align="right"
+          />
         </div>
       </div>
 

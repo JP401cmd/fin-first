@@ -3,13 +3,14 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import { Plus, BarChart3, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon } from '@/components/app/budget-shared'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import {
   type Debt,
   type DebtType,
+  type PayoffStrategy,
   DEBT_TYPE_LABELS,
   DEBT_TYPE_ICONS,
   DEBT_TYPE_COLORS,
@@ -17,6 +18,10 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import { DebtPayoffStrategy } from '@/components/core/deepenings/debt-payoff-strategy'
+import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 // Detail-flow draait via `<DebtPane>` — dezelfde slide-in pane als op
 // `/core/debts/[type]`. URL-driven via `?debt=<id>` zodat deeplinks en
@@ -75,6 +80,11 @@ export default function DebtsPage() {
   // URL-driven pane-state: `?debt=<id>` opent de slide-in pane voor die
   // schuld. Consistent met `/core/debts/[type]` (debt-category-page.tsx).
   const requestedDebtId = searchParams.get('debt')
+  // URL-driven strategie-keuze voor de "Schuldenprofiel & Aflosroute"-kaart.
+  // Deeplink-vriendelijk en symmetrisch met `?debt=...` — een geldige waarde
+  // valt direct in de juiste segmented-control. Onbekende waarden vallen
+  // terug op `avalanche` (bespaart de meeste rente per simulatie).
+  const requestedStrategie = searchParams.get(OVERLAY_QUERY_KEYS.strategie)
 
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [quickAddInitialType, setQuickAddInitialType] = useState<DebtType | null>(null)
@@ -86,6 +96,11 @@ export default function DebtsPage() {
   const [debtSparklines, setDebtSparklines] = useState<Record<string, number[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Aflosroute-kaart open/dicht. Gesloten by default zodat de pagina rustig
+  // start; gebruiker klapt 'm open zodra ze de strategie willen verkennen.
+  const [aflosrouteOpen, setAflosrouteOpen] = useState(false)
+  const { masked } = useMaskedAmounts()
+  const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
 
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
@@ -215,6 +230,46 @@ export default function DebtsPage() {
     },
     [router, searchParams],
   )
+
+  // Valideer de URL-waarde tegen de bekende strategie-set. Onbekende of
+  // ontbrekende waarden vallen terug op `avalanche` (default in de engine).
+  const VALID_STRATEGIES: readonly PayoffStrategy[] = useMemo(
+    () => ['snowball', 'avalanche', 'highest_balance', 'custom'] as const,
+    [],
+  )
+  const strategieFromUrl: PayoffStrategy = useMemo(() => {
+    if (
+      requestedStrategie &&
+      (VALID_STRATEGIES as readonly string[]).includes(requestedStrategie)
+    ) {
+      return requestedStrategie as PayoffStrategy
+    }
+    return 'avalanche'
+  }, [requestedStrategie, VALID_STRATEGIES])
+
+  // URL-sync voor de strategie-keuze. We schrijven alleen wanneer de waarde
+  // verandert om history-vervuiling te voorkomen. `avalanche` (default) komt
+  // niet in de URL terecht — net als andere "default"-states blijft de URL
+  // dan kort.
+  const setStrategieInUrl = useCallback(
+    (s: PayoffStrategy) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (s === 'avalanche') {
+        params.delete(OVERLAY_QUERY_KEYS.strategie)
+      } else {
+        params.set(OVERLAY_QUERY_KEYS.strategie, s)
+      }
+      const queryString = params.toString()
+      router.replace(`/core/debts${queryString ? `?${queryString}` : ''}`, { scroll: false })
+    },
+    [router, searchParams],
+  )
+
+  // Auto-open de kaart wanneer de gebruiker via deeplink `?strategie=…` arriveert
+  // — anders zou de query-param opnieuw moeten worden geactiveerd met een klik.
+  useEffect(() => {
+    if (requestedStrategie) setAflosrouteOpen(true)
+  }, [requestedStrategie])
 
   // Geselecteerde debt = lookup uit lijst o.b.v. URL-state.
   const selectedDebt = useMemo(
@@ -371,8 +426,55 @@ export default function DebtsPage() {
         ]}
       />
 
+      {/* Schuldenprofiel & Aflosroute — collapsible card.
+          Spiegelbeeld van de "Verdeling & Projectie"-kaart op /core/assets
+          (zie components/core/assets-client.tsx). Embed `<DebtPayoffStrategy>`
+          met 4-strategie segmented control + extra-aflos-slider. Strategie-
+          keuze persist via `?strategie=…` (zie OVERLAY_QUERY_KEYS) zodat
+          deeplinks deelbaar zijn. */}
+      {activeDebts.length > 0 && (
+        <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+          {/* ── Accent bar ── */}
+          <div className="h-[3px] w-full bg-kern-500" />
+
+          {/* ── Header (clickable toggle) ── */}
+          <button
+            type="button"
+            onClick={() => setAflosrouteOpen((v) => !v)}
+            aria-expanded={aflosrouteOpen}
+            className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+          >
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${aflosrouteOpen ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+            <div className="flex min-w-0 flex-1 items-center justify-between">
+              <Kicker>
+                <BarChart3 className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden="true" />
+                Schuldenprofiel &amp; Aflosroute
+              </Kicker>
+              <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                {fc(totalBalance)}
+              </p>
+            </div>
+          </button>
+
+          {/* ── Content ── */}
+          {aflosrouteOpen && (
+            <div className="p-4 sm:p-6">
+              <DebtPayoffStrategy
+                debts={activeDebts}
+                initialStrategy={strategieFromUrl}
+                kicker="Aflosroute"
+                onStrategyChange={setStrategieInUrl}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Toolbar — primaire CTA rechts, voor de cards */}
-      <div className="flex items-center justify-end mb-5">
+      <div className="flex items-center justify-end mb-5 mt-5 sm:mt-6">
         <button
           type="button"
           onClick={() => { setQuickAddInitialType(null); setQuickAddOpen(true) }}

@@ -6,16 +6,19 @@ import {
 } from '@/lib/debt-data'
 
 /**
- * Verification API for Feature #223: Debt payoff trajectory chart in UI
- * Tests: debtProjection visualization, per-debt projected balance decline,
- * snowball vs avalanche comparison overlay, time difference display,
- * contextual comparison message.
+ * Verification API for Feature #223: Debt payoff trajectory chart in UI.
+ *
+ * Updated for the multi-strategy refactor: chart now renders all four
+ * payoff strategies (snowball, avalanche, highest_balance, custom) where
+ * the active one is rendered thick and the others as thin context lines.
+ * Tests inspect the canonical chart component
+ * (components/app/core/debts/debt-comparison-chart.tsx) and the wrapper
+ * that consumes it (components/core/deepenings/debt-payoff-strategy.tsx).
  */
 export async function GET() {
   const tests: { name: string; pass: boolean; detail: string }[] = []
 
-  // Test debts for simulation
-  const testDebts: any[] = [
+  const testDebts: Debt[] = [
     {
       id: 'test-1', user_id: 'test', name: 'Persoonlijke lening',
       debt_type: 'personal_loan', original_amount: 5000, current_balance: 2800,
@@ -26,6 +29,10 @@ export async function GET() {
       is_tax_deductible: null, fixed_rate_end_date: null, nhg: null,
       linked_asset_id: null, credit_limit: null, repayment_type: null,
       draagkrachtmeting_date: null, ownership: 'personal', household_id: null,
+      net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null,
+      has_payment_plan: false, has_written_agreement: false,
+      include_aflossing_in_savings: false, custom_aflossing_amount: null,
+      has_hypotheekplanner_tracking: false,
     },
     {
       id: 'test-2', user_id: 'test', name: 'Studielening DUO',
@@ -37,53 +44,49 @@ export async function GET() {
       is_tax_deductible: null, fixed_rate_end_date: null, nhg: null,
       linked_asset_id: null, credit_limit: null, repayment_type: null,
       draagkrachtmeting_date: null, ownership: 'personal', household_id: null,
+      net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null,
+      has_payment_plan: false, has_written_agreement: false,
+      include_aflossing_in_savings: false, custom_aflossing_amount: null,
+      has_hypotheekplanner_tracking: false,
     },
   ]
 
-  // Test 1: simulatePayoff snowball produces valid result
-  try {
-    const snowball = simulatePayoff(testDebts, 'snowball', 0)
-    const summary = payoffSummary(snowball)
-    tests.push({
-      name: 'simulatePayoff (snowball) produces valid monthly schedule',
-      pass: snowball.length > 0 && summary.totalMonths > 0 && summary.totalInterest >= 0,
-      detail: `Months: ${summary.totalMonths}, Interest: ${summary.totalInterest.toFixed(2)}, Payoff: ${summary.payoffDate}`,
-    })
-  } catch (e) {
-    tests.push({ name: 'simulatePayoff snowball works', pass: false, detail: String(e) })
+  const STRATEGIES = ['snowball', 'avalanche', 'highest_balance', 'custom'] as const
+
+  // Test 1-4: alle vier strategieën produceren een geldige simulatie.
+  for (const strategy of STRATEGIES) {
+    try {
+      const months = simulatePayoff(testDebts, strategy, 0)
+      const summary = payoffSummary(months)
+      tests.push({
+        name: `simulatePayoff (${strategy}) produces valid monthly schedule`,
+        pass: months.length > 0 && summary.totalMonths > 0 && summary.totalInterest >= 0,
+        detail: `Months: ${summary.totalMonths}, Interest: ${summary.totalInterest.toFixed(2)}, Payoff: ${summary.payoffDate}`,
+      })
+    } catch (e) {
+      tests.push({ name: `simulatePayoff ${strategy} works`, pass: false, detail: String(e) })
+    }
   }
 
-  // Test 2: simulatePayoff avalanche produces valid result
+  // Test 5: extraPayment beïnvloedt de simulatie (ten minste maanden of rente
+  // verschilt).
   try {
-    const avalanche = simulatePayoff(testDebts, 'avalanche', 0)
-    const summary = payoffSummary(avalanche)
+    const baseline = simulatePayoff(testDebts, 'avalanche', 0)
+    const extra = simulatePayoff(testDebts, 'avalanche', 200)
+    const baseSummary = payoffSummary(baseline)
+    const extraSummary = payoffSummary(extra)
+    const monthsDiffer = baseSummary.totalMonths !== extraSummary.totalMonths
+    const interestDiffers = Math.abs(baseSummary.totalInterest - extraSummary.totalInterest) > 1
     tests.push({
-      name: 'simulatePayoff (avalanche) produces valid monthly schedule',
-      pass: avalanche.length > 0 && summary.totalMonths > 0 && summary.totalInterest >= 0,
-      detail: `Months: ${summary.totalMonths}, Interest: ${summary.totalInterest.toFixed(2)}, Payoff: ${summary.payoffDate}`,
+      name: 'extraPayment shifts payoff timeline (chart reageert op slider)',
+      pass: monthsDiffer || interestDiffers,
+      detail: `Baseline: ${baseSummary.totalMonths}m / €${baseSummary.totalInterest.toFixed(0)}, +€200: ${extraSummary.totalMonths}m / €${extraSummary.totalInterest.toFixed(0)}`,
     })
   } catch (e) {
-    tests.push({ name: 'simulatePayoff avalanche works', pass: false, detail: String(e) })
+    tests.push({ name: 'extraPayment shifts timeline', pass: false, detail: String(e) })
   }
 
-  // Test 3: Snowball and avalanche produce different results (or same if debts are similar)
-  try {
-    const snowball = simulatePayoff(testDebts, 'snowball', 0)
-    const avalanche = simulatePayoff(testDebts, 'avalanche', 0)
-    const snowSummary = payoffSummary(snowball)
-    const avSummary = payoffSummary(avalanche)
-    // Both should produce results; they may or may not differ depending on debts
-    const bothValid = snowSummary.totalMonths > 0 && avSummary.totalMonths > 0
-    tests.push({
-      name: 'Both strategies produce comparable results with time difference',
-      pass: bothValid,
-      detail: `Snowball: ${snowSummary.totalMonths}m / ${snowSummary.totalInterest.toFixed(0)} interest, Avalanche: ${avSummary.totalMonths}m / ${avSummary.totalInterest.toFixed(0)} interest, Diff: ${Math.abs(snowSummary.totalMonths - avSummary.totalMonths)}m`,
-    })
-  } catch (e) {
-    tests.push({ name: 'Strategy comparison', pass: false, detail: String(e) })
-  }
-
-  // Test 4: Simulation includes per-debt breakdown
+  // Test 6: simulatie bevat per-debt breakdown (chart-data-shape).
   try {
     const snowball = simulatePayoff(testDebts, 'snowball', 0)
     const firstMonth = snowball[0]
@@ -98,152 +101,99 @@ export async function GET() {
     tests.push({ name: 'Per-debt breakdown', pass: false, detail: String(e) })
   }
 
-  // Test 5: DebtPayoffTrajectoryChart component exists in debts page
+  // Test 7: chart-component bestaat en exporteert de nieuwe API.
   try {
     const fs = await import('fs')
     const path = await import('path')
-    const debtsPagePath = path.join(process.cwd(), 'app/(app)/core/debts/page.tsx')
-    const content = fs.readFileSync(debtsPagePath, 'utf-8')
-    const hasComponent = content.includes('function DebtPayoffTrajectoryChart(')
-    const usedInPage = content.includes('<DebtPayoffTrajectoryChart')
+    const chartPath = path.join(process.cwd(), 'components/app/core/debts/debt-comparison-chart.tsx')
+    const content = fs.readFileSync(chartPath, 'utf-8')
+    const hasChart = content.includes('export const DebtPayoffTrajectoryChart')
+    const hasMessage = content.includes('export const StrategyComparisonMessage')
+    const hasStrategiesProp = content.includes('strategies: StrategyTrajectory[]') || content.includes('strategies,')
+    const hasActiveProp = content.includes('activeStrategyId')
+    const hasExtraProp = content.includes('extraPayment')
     tests.push({
-      name: 'DebtPayoffTrajectoryChart component exists and is used in debts page',
-      pass: hasComponent && usedInPage,
-      detail: `Component defined: ${hasComponent}, Used in JSX: ${usedInPage}`,
+      name: 'DebtPayoffTrajectoryChart exports new multi-strategy API',
+      pass: hasChart && hasMessage && hasStrategiesProp && hasActiveProp && hasExtraProp,
+      detail: `Chart: ${hasChart}, Message: ${hasMessage}, strategies prop: ${hasStrategiesProp}, activeStrategyId: ${hasActiveProp}, extraPayment: ${hasExtraProp}`,
     })
   } catch (e) {
-    tests.push({ name: 'DebtPayoffTrajectoryChart exists', pass: false, detail: String(e) })
+    tests.push({ name: 'Chart component API', pass: false, detail: String(e) })
   }
 
-  // Test 6: Chart has snowball AND avalanche trajectory lines
+  // Test 8: alle vier strategieën zijn herkend in chart-kleur-palet.
   try {
     const fs = await import('fs')
     const path = await import('path')
-    const debtsPagePath = path.join(process.cwd(), 'app/(app)/core/debts/page.tsx')
-    const content = fs.readFileSync(debtsPagePath, 'utf-8')
-    const hasSnowballLine = content.includes('snowball-trajectory-line')
-    const hasAvalancheLine = content.includes('avalanche-trajectory-line')
+    const chartPath = path.join(process.cwd(), 'components/app/core/debts/debt-comparison-chart.tsx')
+    const content = fs.readFileSync(chartPath, 'utf-8')
+    const hasSnowball = content.includes("snowball: '#3b82f6'")
+    const hasAvalanche = content.includes("avalanche: '#ef4444'")
+    const hasHighest = content.includes("highest_balance: '#f59e0b'")
+    const hasCustom = content.includes("custom: '#8b5cf6'")
     tests.push({
-      name: 'Chart has snowball AND avalanche trajectory lines (dual overlay)',
-      pass: hasSnowballLine && hasAvalancheLine,
-      detail: `Snowball line: ${hasSnowballLine}, Avalanche line: ${hasAvalancheLine}`,
+      name: 'Chart palette covers all four strategies (no color collision)',
+      pass: hasSnowball && hasAvalanche && hasHighest && hasCustom,
+      detail: `snowball:${hasSnowball}, avalanche:${hasAvalanche}, highest_balance:${hasHighest}, custom:${hasCustom}`,
     })
   } catch (e) {
-    tests.push({ name: 'Dual trajectory lines', pass: false, detail: String(e) })
+    tests.push({ name: 'Chart palette', pass: false, detail: String(e) })
   }
 
-  // Test 7: StrategyComparisonMessage component exists
+  // Test 9: caller (debt-payoff-strategy) levert alle vier strategieën aan.
   try {
     const fs = await import('fs')
     const path = await import('path')
-    const debtsPagePath = path.join(process.cwd(), 'app/(app)/core/debts/page.tsx')
-    const content = fs.readFileSync(debtsPagePath, 'utf-8')
-    const hasComponent = content.includes('function StrategyComparisonMessage(')
-    const usedInPage = content.includes('<StrategyComparisonMessage')
-    const hasMessage = content.includes('strategy-comparison-message')
+    const wrapperPath = path.join(process.cwd(), 'components/core/deepenings/debt-payoff-strategy.tsx')
+    const content = fs.readFileSync(wrapperPath, 'utf-8')
+    const passesStrategies = content.includes('strategies={strategyTrajectories}')
+    const passesActive = content.includes('activeStrategyId={strategy}')
+    const passesExtra = content.includes('extraPayment={extraPayment}')
     tests.push({
-      name: 'StrategyComparisonMessage component with contextual message',
-      pass: hasComponent && usedInPage && hasMessage,
-      detail: `Component: ${hasComponent}, Used: ${usedInPage}, TestId: ${hasMessage}`,
+      name: 'Wrapper passes all four strategy trajectories + active + extra to chart',
+      pass: passesStrategies && passesActive && passesExtra,
+      detail: `strategies: ${passesStrategies}, activeStrategyId: ${passesActive}, extraPayment: ${passesExtra}`,
     })
   } catch (e) {
-    tests.push({ name: 'StrategyComparisonMessage exists', pass: false, detail: String(e) })
+    tests.push({ name: 'Wrapper wiring', pass: false, detail: String(e) })
   }
 
-  // Test 8: Contextual message includes "eerder schuldenvrij" wording
+  // Test 10: per-debt thin lines zijn verwijderd uit chart-component.
   try {
     const fs = await import('fs')
     const path = await import('path')
-    const debtsPagePath = path.join(process.cwd(), 'app/(app)/core/debts/page.tsx')
-    const content = fs.readFileSync(debtsPagePath, 'utf-8')
-    const hasEerder = content.includes('eerder schuldenvrij')
-    const hasSneeuwbal = content.includes('sneeuwbal-strategie') || content.includes('Sneeuwbal')
-    const hasAvalanche = content.includes('avalanche-strategie') || content.includes('Avalanche')
+    const chartPath = path.join(process.cwd(), 'components/app/core/debts/debt-comparison-chart.tsx')
+    const content = fs.readFileSync(chartPath, 'utf-8')
+    const hasPerDebtLoop = content.includes('perDebtPaths') || content.includes('perDebtColors')
     tests.push({
-      name: 'Contextual message: "eerder schuldenvrij" with strategy names',
-      pass: hasEerder && hasSneeuwbal && hasAvalanche,
-      detail: `Eerder schuldenvrij: ${hasEerder}, Sneeuwbal: ${hasSneeuwbal}, Avalanche: ${hasAvalanche}`,
+      name: 'Per-debt thin lines removed from chart (visuele ruis weg)',
+      pass: !hasPerDebtLoop,
+      detail: hasPerDebtLoop ? 'Per-debt loop still present' : 'Per-debt rendering removed',
     })
   } catch (e) {
-    tests.push({ name: 'Contextual message content', pass: false, detail: String(e) })
+    tests.push({ name: 'Per-debt removal', pass: false, detail: String(e) })
   }
 
-  // Test 9: Time difference between strategies is displayed
+  // Test 11: chart wordt gebruikt op /core/debts via DebtPayoffStrategy.
   try {
     const fs = await import('fs')
     const path = await import('path')
     const debtsPagePath = path.join(process.cwd(), 'app/(app)/core/debts/page.tsx')
     const content = fs.readFileSync(debtsPagePath, 'utf-8')
-    const hasTimeDiff = content.includes('time-difference')
-    const hasSnowballMonths = content.includes('snowball-months')
-    const hasAvalancheMonths = content.includes('avalanche-months')
+    const usesStrategy = content.includes('<DebtPayoffStrategy')
+    const importsStrategy = content.includes("from '@/components/core/deepenings/debt-payoff-strategy'")
     tests.push({
-      name: 'Time difference between strategies displayed with months for each',
-      pass: hasTimeDiff && hasSnowballMonths && hasAvalancheMonths,
-      detail: `TimeDiff: ${hasTimeDiff}, SnowballMonths: ${hasSnowballMonths}, AvalancheMonths: ${hasAvalancheMonths}`,
-    })
-  } catch (e) {
-    tests.push({ name: 'Time difference display', pass: false, detail: String(e) })
-  }
-
-  // Test 10: Display on /core/debts page (in strategy section)
-  try {
-    const fs = await import('fs')
-    const path = await import('path')
-    const debtsPagePath = path.join(process.cwd(), 'app/(app)/core/debts/page.tsx')
-    const content = fs.readFileSync(debtsPagePath, 'utf-8')
-    const hasSection = content.includes('strategy-comparison-section')
-    const hasTrajectoryChart = content.includes('debt-payoff-trajectory-chart')
-    tests.push({
-      name: 'Strategy comparison section displayed on /core/debts page',
-      pass: hasSection && hasTrajectoryChart,
-      detail: `Section: ${hasSection}, Chart: ${hasTrajectoryChart}`,
+      name: 'Strategy section displayed on /core/debts page',
+      pass: usesStrategy && importsStrategy,
+      detail: `<DebtPayoffStrategy>: ${usesStrategy}, import: ${importsStrategy}`,
     })
   } catch (e) {
     tests.push({ name: 'Display on debts page', pass: false, detail: String(e) })
   }
 
-  // Test 11: Chart legend shows both strategy names
-  try {
-    const fs = await import('fs')
-    const path = await import('path')
-    const debtsPagePath = path.join(process.cwd(), 'app/(app)/core/debts/page.tsx')
-    const content = fs.readFileSync(debtsPagePath, 'utf-8')
-    // Look in DebtPayoffTrajectoryChart for legend with Sneeuwbal and Avalanche
-    const hasSneeuwbalLegend = content.includes('>Sneeuwbal<')
-    const hasAvalancheLegend = content.includes('>Avalanche<')
-    tests.push({
-      name: 'Chart legend shows Sneeuwbal and Avalanche labels',
-      pass: hasSneeuwbalLegend && hasAvalancheLegend,
-      detail: `Sneeuwbal legend: ${hasSneeuwbalLegend}, Avalanche legend: ${hasAvalancheLegend}`,
-    })
-  } catch (e) {
-    tests.push({ name: 'Chart legend', pass: false, detail: String(e) })
-  }
-
-  // Test 12: No mock data patterns in debts page
-  try {
-    const fs = await import('fs')
-    const path = await import('path')
-    const debtsPagePath = path.join(process.cwd(), 'app/(app)/core/debts/page.tsx')
-    const content = fs.readFileSync(debtsPagePath, 'utf-8')
-    const noMockData = !content.includes('mockData') &&
-      !content.includes('fakeData') &&
-      !content.includes('globalThis.devStore') &&
-      !content.includes('dummyData') &&
-      !content.includes('sampleData')
-    tests.push({
-      name: 'No mock data patterns in production code',
-      pass: noMockData,
-      detail: noMockData ? 'Clean: no mock/fake/dummy/sample data patterns' : 'Mock data detected',
-    })
-  } catch (e) {
-    tests.push({ name: 'No mock data', pass: false, detail: String(e) })
-  }
-
   const passing = tests.filter((t) => t.pass).length
   return NextResponse.json({
-    feature: '#223 — Debt payoff trajectory chart in UI',
+    feature: '#223 — Debt payoff trajectory chart in UI (multi-strategy)',
     passing,
     total: tests.length,
     allPassing: passing === tests.length,

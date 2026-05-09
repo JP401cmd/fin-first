@@ -12,12 +12,24 @@ import { SWR } from '@/lib/constants'
 /**
  * GET /api/snapshots/auto
  *
- * Automatic monthly snapshot endpoint. Creates a snapshot for the authenticated
- * user if one hasn't been created this month yet. Designed to be called by:
- * - External cron service (e.g., Supabase Edge Functions, Vercel Cron)
- * - Client-side on dashboard load (idempotent — safe to call multiple times)
+ * Automatic monthly snapshot endpoint. Always recomputes and upserts the
+ * current-month snapshot for the authenticated user. The upsert is idempotent
+ * on (user_id, snapshot_date), so repeated calls within a day overwrite the
+ * same row with fresh values — they do not create duplicates.
  *
- * Returns: { created: boolean, snapshot: {...}, metrics: {...} }
+ * Designed to be called by:
+ * - External cron service (e.g., Supabase Edge Functions, Vercel Cron)
+ * - Client-side on dashboard load (safe to call multiple times)
+ *
+ * Why no early-return on existence: a snapshot row may exist for this month
+ * with stale or null extended fields (e.g., fire_age) — for example, a seeded
+ * historical snapshot, or a row inserted before the user visited /horizon.
+ * Always recomputing keeps the row in sync with the latest portfolio + horizon
+ * params. The projection is cheap. AutoSnapshotTrigger throttles itself to
+ * once per mount via a ref (see lib/hooks/use-auto-snapshot.ts), so this runs
+ * at most once per page load.
+ *
+ * Returns: { updated: true, snapshot: {...}, metrics: {...} }
  */
 export async function GET() {
   const supabase = await createClient()
@@ -29,24 +41,6 @@ export async function GET() {
 
   const now = new Date()
   const today = now.toISOString().split('T')[0]
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-
-  // Check if a snapshot already exists this month
-  const { data: existingSnapshots } = await supabase
-    .from('net_worth_snapshots')
-    .select('id, snapshot_date, net_worth, total_assets, total_debts, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score')
-    .eq('user_id', user.id)
-    .gte('snapshot_date', monthStart)
-    .order('snapshot_date', { ascending: false })
-    .limit(1)
-
-  if (existingSnapshots && existingSnapshots.length > 0) {
-    return NextResponse.json({
-      created: false,
-      message: 'Snapshot al aangemaakt deze maand',
-      snapshot: existingSnapshots[0],
-    })
-  }
 
   // Fetch all required data in parallel
   const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
@@ -257,7 +251,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    created: true,
+    updated: true,
     snapshot: {
       ...snapshot,
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,

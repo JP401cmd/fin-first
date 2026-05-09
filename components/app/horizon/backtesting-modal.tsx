@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * Fase 2.2 — onderdeel van new-navigation-shell migratie.
@@ -22,6 +22,8 @@ import {
 } from '@/lib/horizon-data'
 import { NAMED_PERIODS } from '@/lib/msci-data'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getBacktestTips } from '@/lib/chart-tips'
 
 type Props = {
   input: FinancialInput
@@ -56,15 +58,26 @@ export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }
             Hier alleen verticaal ritme. */}
         <div className="space-y-6">
 
-          {/* Kicker */}
-          <p className="label-editorial text-horizon-600">
-            HISTORISCH BEWIJS — 1970 TOT 2024
-            {perspectiveLabel && (
-              <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-horizon-700">
-                {perspectiveLabel}
-              </span>
-            )}
-          </p>
+          {/* Kicker met inline ChartTips */}
+          <div className="flex items-center justify-between gap-3">
+            <p className="label-editorial text-horizon-600">
+              HISTORISCH BEWIJS — 1970 TOT 2024
+              {perspectiveLabel && (
+                <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-horizon-700">
+                  {perspectiveLabel}
+                </span>
+              )}
+            </p>
+            <ChartTips
+              storageKey="backtest_chart"
+              tips={getBacktestTips({
+                successRate: result.successRate,
+                swrPercent: swr * 100,
+                pathCount: result.allPaths.length,
+              })}
+              align="right"
+            />
+          </div>
 
           {/* Metric band */}
           <div className="grid grid-cols-3 gap-3">

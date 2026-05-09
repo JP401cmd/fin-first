@@ -110,11 +110,17 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
 
   // Horizon
   fireRange,
-  simRows: Array.from({ length: 10 }, (_, i) => ({
-    age: 35 + i * 3,
-    endPortfolio: 187500 + i * 52000,
-    phase: i < 6 ? 'opbouw' : i < 8 ? 'transitie' : 'onttrekking',
-  })),
+  simRows: Array.from({ length: 10 }, (_, i) => {
+    const isAccumulation = i < 6
+    return {
+      age: 35 + i * 3,
+      endPortfolio: 187500 + i * 52000,
+      phase: i < 6 ? 'opbouw' : i < 8 ? 'transitie' : 'onttrekking',
+      flowIn: isAccumulation ? 28000 : 6000,
+      flowOut: isAccumulation ? 12000 : 32000,
+      oneTimeNet: 0,
+    }
+  }),
   simRequiredPortfolio: 580000,
   backtestSuccessRate: 87,
   backtestNamedPaths: [

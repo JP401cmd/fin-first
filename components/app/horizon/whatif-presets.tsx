@@ -1,226 +1,195 @@
 'use client'
 
-import { useState } from 'react'
-import { formatCurrency } from '@/lib/format'
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Briefcase, TrendingUp, PiggyBank, Rocket, Palmtree,
-  UserMinus, SlidersHorizontal,
+  AlertTriangle, Gift, Baby, GraduationCap, Home, Wrench, Truck,
+  Activity, Hourglass, TrendingDown, UserMinus,
 } from 'lucide-react'
+import {
+  PRESETS, PRESET_CATEGORIES, eventsMatchPreset, clearScenarioEvents,
+  type PresetSpec, type PresetCategory,
+} from '@/lib/scenario-events'
+import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 
-// ── Preset definitions ──────────────────────────────────────────────────────
+export { PRESET_EXPLAINERS } from '@/lib/scenario-events'
 
-interface Preset {
-  id: string
-  label: string
-  description: string
-  icon: React.ReactNode
-  /** Compute the overrides to apply, given the baseline */
-  apply: (baseline: WhatIfOverrides) => WhatIfOverrides
-  /** Short summary of what changes */
-  summary: (baseline: WhatIfOverrides) => string
-  /** Only show for household users */
-  householdOnly?: boolean
+const ICONS: Record<string, React.ReactNode> = {
+  Briefcase: <Briefcase className="h-5 w-5" />,
+  TrendingUp: <TrendingUp className="h-5 w-5" />,
+  PiggyBank: <PiggyBank className="h-5 w-5" />,
+  Rocket: <Rocket className="h-5 w-5" />,
+  Palmtree: <Palmtree className="h-5 w-5" />,
+  AlertTriangle: <AlertTriangle className="h-5 w-5" />,
+  Gift: <Gift className="h-5 w-5" />,
+  Baby: <Baby className="h-5 w-5" />,
+  GraduationCap: <GraduationCap className="h-5 w-5" />,
+  Home: <Home className="h-5 w-5" />,
+  Wrench: <Wrench className="h-5 w-5" />,
+  Truck: <Truck className="h-5 w-5" />,
+  Activity: <Activity className="h-5 w-5" />,
+  Hourglass: <Hourglass className="h-5 w-5" />,
+  TrendingDown: <TrendingDown className="h-5 w-5" />,
+  UserMinus: <UserMinus className="h-5 w-5" />,
 }
 
-const PRESETS: Preset[] = [
-  {
-    id: 'part-time',
-    label: 'Part-time',
-    description: '4 dagen per week werken',
-    icon: <Briefcase className="h-3.5 w-3.5" />,
-    apply: (b) => ({
-      ...b,
-      workDaysPerWeek: 4,
-      monthlyIncome: b.monthlyIncome,
-    }),
-    summary: (b) => b.workDaysPerWeek <= 4 ? '4 dagen/week' : `${b.workDaysPerWeek} → 4 dagen`,
-  },
-  {
-    id: 'raise',
-    label: 'Loonsverhoging',
-    description: '+10% bruto inkomen',
-    icon: <TrendingUp className="h-3.5 w-3.5" />,
-    apply: (b) => ({
-      ...b,
-      monthlyIncome: Math.round(b.monthlyIncome * 1.1 / 100) * 100,
-    }),
-    summary: (b) => `+${formatCurrency(Math.round(b.monthlyIncome * 0.1 / 100) * 100)}/mnd`,
-  },
-  {
-    id: 'frugal',
-    label: 'Zuinig leven',
-    description: 'Spaarquote +15 procentpunt',
-    icon: <PiggyBank className="h-3.5 w-3.5" />,
-    apply: (b) => ({
-      ...b,
-      savingsRate: Math.min(80, b.savingsRate + 15),
-    }),
-    summary: (b) => `${Math.round(b.savingsRate)}% → ${Math.min(80, Math.round(b.savingsRate + 15))}%`,
-  },
-  {
-    id: 'fire-sprinter',
-    label: 'FIRE sprinter',
-    description: 'Maximaal versnellen',
-    icon: <Rocket className="h-3.5 w-3.5" />,
-    apply: (b) => ({
-      ...b,
-      savingsRate: Math.min(80, b.savingsRate + 10),
-      extraContribution: b.extraContribution + 300,
-    }),
-    summary: () => '+10% sparen, +€ 300 inleg',
-  },
-  {
-    id: 'sabbatical',
-    label: 'Mini-sabbatical',
-    description: '3 dagen, lager inkomen',
-    icon: <Palmtree className="h-3.5 w-3.5" />,
-    apply: (b) => ({
-      ...b,
-      workDaysPerWeek: 3,
-      monthlyIncome: b.monthlyIncome,
-      savingsRate: Math.max(0, b.savingsRate - 10),
-    }),
-    summary: (b) => b.workDaysPerWeek <= 3 ? '3 dagen/week, −10% sparen' : `${b.workDaysPerWeek} → 3 dagen, −10% sparen`,
-  },
-  // ── Household-specific presets ──────────────────────────────
-  {
-    id: 'partner-stopt',
-    label: 'Partner stopt',
-    description: 'Partner stopt met werken — inkomen halveert',
-    icon: <UserMinus className="h-3.5 w-3.5" />,
-    householdOnly: true,
-    apply: (b) => ({
-      ...b,
-      monthlyIncome: Math.round(b.monthlyIncome * 0.5 / 100) * 100,
-      savingsRate: Math.max(0, b.savingsRate - 15),
-    }),
-    summary: (b) => `inkomen ${formatCurrency(b.monthlyIncome)} → ${formatCurrency(Math.round(b.monthlyIncome * 0.5 / 100) * 100)}, −15% sparen`,
-  },
-  {
-    id: 'split-5050',
-    label: '50/50 verdeling',
-    description: 'Gelijke verdeling — alles 50/50 splitsen',
-    icon: <SlidersHorizontal className="h-3.5 w-3.5" />,
-    householdOnly: true,
-    apply: (b) => ({
-      ...b,
-      // 50/50 split: no income change, but savings rate adjusts to reflect equal burden
-      savingsRate: Math.max(0, Math.min(80, Math.round(b.savingsRate * 0.9))),
-      extraContribution: 0,
-    }),
-    summary: (b) => `spaarquote ${Math.round(b.savingsRate)}% → ${Math.max(0, Math.min(80, Math.round(b.savingsRate * 0.9)))}%`,
-  },
-]
+const STORAGE_KEY = 'whatif:presets:category'
 
-// ── WhatIfPresets component ─────────────────────────────────────────────────
+interface CardProps {
+  preset: PresetSpec
+  active: boolean
+  baseline: WhatIfOverrides
+  onClick: () => void
+}
+
+function PresetCard({ preset, active, baseline, onClick }: CardProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`flex min-h-[88px] flex-col gap-1.5 rounded-lg border p-3 text-left transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${
+        active
+          ? 'border-horizon-500 bg-horizon-50 shadow-sm ring-2 ring-horizon-500/20'
+          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-horizon-300 hover:shadow-sm'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className={active ? 'text-horizon-600' : 'text-[var(--ink-3)]'}>
+          {ICONS[preset.iconKey] ?? <Activity className="h-5 w-5" />}
+        </span>
+        {active && (
+          <span className="font-mono text-[10px] tabular-nums text-horizon-700">
+            {preset.summary(baseline)}
+          </span>
+        )}
+      </div>
+      <h3 className={`font-sans text-sm font-semibold ${active ? 'text-horizon-700' : 'text-[var(--ink)]'}`}>
+        {preset.label}
+      </h3>
+      <p className="font-sans text-xs leading-snug text-[var(--ink-3)]">
+        {preset.description}
+      </p>
+    </button>
+  )
+}
+
+interface FilterProps {
+  value: PresetCategory
+  onChange: (v: PresetCategory) => void
+}
+
+function CategoryFilter({ value, onChange }: FilterProps) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Scenario-categorie"
+      className="-mx-1 mb-3 flex snap-x snap-mandatory gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {PRESET_CATEGORIES.map(cat => {
+        const active = cat.id === value
+        return (
+          <button
+            key={cat.id}
+            role="tab"
+            aria-selected={active}
+            type="button"
+            onClick={() => onChange(cat.id)}
+            className={`shrink-0 snap-start rounded-full border px-3 py-1.5 font-sans text-xs font-medium transition-colors ${
+              active
+                ? 'border-horizon-500 bg-horizon-500 text-white'
+                : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-horizon-300'
+            }`}
+            style={{ minHeight: 32 }}
+          >
+            {cat.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export function WhatIfPresets({
   baseline,
-  overrides,
-  onChange,
+  events,
+  setEvents,
+  currentAge,
   isHousehold = false,
+  onActiveChange,
 }: {
   baseline: WhatIfOverrides
-  overrides: WhatIfOverrides
-  onChange: (overrides: WhatIfOverrides) => void
+  events: WhatIfEvent[]
+  setEvents: (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => void
+  currentAge: number
   isHousehold?: boolean
+  /** Optional callback notified when active preset changes (id or null). */
+  onActiveChange?: (id: string | null) => void
 }) {
-  const [activePreset, setActivePreset] = useState<string | null>(null)
+  const [category, setCategory] = useState<PresetCategory>(() => {
+    if (typeof window === 'undefined') return 'werk'
+    const stored = window.localStorage.getItem(STORAGE_KEY) as PresetCategory | null
+    if (stored && PRESET_CATEGORIES.some(c => c.id === stored)) return stored
+    return 'werk'
+  })
 
-  // Filter presets based on household status
-  const visiblePresets = PRESETS.filter(p => !p.householdOnly || isHousehold)
-
-  const handlePresetClick = (preset: Preset) => {
-    if (activePreset === preset.id) {
-      // Deactivate — reset to baseline
-      setActivePreset(null)
-      onChange(baseline)
-    } else {
-      // Apply preset
-      setActivePreset(preset.id)
-      onChange(preset.apply(baseline))
+  const updateCategory = (c: PresetCategory) => {
+    setCategory(c)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(STORAGE_KEY, c)
     }
   }
 
-  // Clear active preset when user manually changes sliders
-  // (detected by overrides not matching any preset's output)
-  const isActivePresetStillMatching = activePreset
-    ? JSON.stringify(overrides) === JSON.stringify(
-        visiblePresets.find(p => p.id === activePreset)?.apply(baseline)
-      )
-    : false
+  const visiblePresets = useMemo(
+    () => PRESETS.filter(p => p.category === category && (!p.householdOnly || isHousehold)),
+    [category, isHousehold],
+  )
 
-  const effectiveActive = isActivePresetStillMatching ? activePreset : null
+  // Derive active preset from scenario events.
+  const activePresetId = useMemo<string | null>(() => {
+    for (const preset of PRESETS) {
+      if (eventsMatchPreset(events, preset.id)) return preset.id
+    }
+    return null
+  }, [events])
 
-  // Separate personal and household presets for display
-  const personalPresets = visiblePresets.filter(p => !p.householdOnly)
-  const householdPresets = visiblePresets.filter(p => p.householdOnly)
+  useEffect(() => {
+    onActiveChange?.(activePresetId)
+  }, [activePresetId, onActiveChange])
+
+  const handlePresetClick = (preset: PresetSpec) => {
+    if (activePresetId === preset.id) {
+      setEvents(prev => clearScenarioEvents(prev, `preset:${preset.id}`))
+    } else {
+      const newEvents = preset.buildEvents(baseline, currentAge)
+      setEvents(prev => [
+        ...clearScenarioEvents(prev, 'preset:'),
+        ...newEvents,
+      ])
+    }
+  }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        {personalPresets.map(preset => {
-          const isActive = effectiveActive === preset.id
-
-          return (
-            <button
-              key={preset.id}
-              type="button"
-              aria-pressed={effectiveActive === preset.id}
-              title={preset.description}
-              onClick={() => handlePresetClick(preset)}
-              className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2 transition-all ${
-                isActive
-                  ? 'border-horizon-400 bg-horizon-50 text-horizon-700 shadow-sm'
-                  : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-horizon-300 hover:shadow-sm'
-              }`}
-            >
-              <span className={isActive ? 'text-horizon-600' : 'text-[var(--ink-3)]'}>
-                {preset.icon}
-              </span>
-              <span className="font-sans text-xs font-semibold">
-                {preset.label}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {householdPresets.length > 0 && (
-        <>
-          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-4)]">
-            Huishouden
+    <div>
+      <CategoryFilter value={category} onChange={updateCategory} />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {visiblePresets.length === 0 ? (
+          <p className="col-span-full py-4 text-center font-sans text-xs text-[var(--ink-4)]">
+            Geen presets in deze categorie {isHousehold ? '' : '— huishouden-presets vereisen partner-perspectief'}.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {householdPresets.map(preset => {
-              const isActive = effectiveActive === preset.id
-
-              return (
-                <button
-                  key={preset.id}
-                  type="button"
-                  aria-pressed={effectiveActive === preset.id}
-                  title={preset.description}
-                  onClick={() => handlePresetClick(preset)}
-                  className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2 transition-all ${
-                    isActive
-                      ? 'border-horizon-400 bg-horizon-50 text-horizon-700 shadow-sm'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-horizon-300 hover:shadow-sm'
-                  }`}
-                >
-                  <span className={isActive ? 'text-horizon-600' : 'text-[var(--ink-3)]'}>
-                    {preset.icon}
-                  </span>
-                  <span className="font-sans text-xs font-semibold">
-                    {preset.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
+        ) : (
+          visiblePresets.map(preset => (
+            <PresetCard
+              key={preset.id}
+              preset={preset}
+              active={activePresetId === preset.id}
+              baseline={baseline}
+              onClick={() => handlePresetClick(preset)}
+            />
+          ))
+        )}
+      </div>
     </div>
   )
 }

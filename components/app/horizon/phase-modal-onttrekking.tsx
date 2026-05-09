@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * Fase 2.2 — onderdeel van new-navigation-shell migratie.
@@ -17,6 +17,8 @@ import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
 import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getPhaseChartZoomTips } from '@/lib/chart-tips'
 import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-events-in-phase'
 import { StressTestSection } from '@/components/app/horizon/phase-analysis/stress-test-section'
 import { MonteCarloOnttrekken } from '@/components/app/horizon/phase-analysis/onttrekken/monte-carlo-onttrekken'
@@ -213,14 +215,26 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
       <div className="space-y-4 p-5">
         {/* 1. PhaseChartZoom — full trajectory with withdrawal phase highlighted */}
         {allRows && allRows.length > 2 && (
-          <PhaseChartZoom
-            allRows={allRows}
-            phaseFilter="withdrawal"
-            accentColor="var(--color-kern-500)"
-            annotations={[
-              { age: startAge, label: 'Start onttrekking' },
-            ]}
-          />
+          <>
+            <div className="flex justify-end">
+              <ChartTips
+                storageKey="phase_chart_zoom_onttrekking"
+                tips={getPhaseChartZoomTips({
+                  phase: 'withdrawal',
+                  hasAnnotations: true,
+                })}
+                align="right"
+              />
+            </div>
+            <PhaseChartZoom
+              allRows={allRows}
+              phaseFilter="withdrawal"
+              accentColor="var(--color-kern-500)"
+              annotations={[
+                { age: startAge, label: 'Start onttrekking' },
+              ]}
+            />
+          </>
         )}
 
         {/* 2. Fase-header */}

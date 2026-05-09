@@ -13,7 +13,6 @@
  */
 
 import type { ReactNode } from 'react'
-import Link from 'next/link'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'

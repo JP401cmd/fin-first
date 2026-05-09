@@ -249,7 +249,7 @@ export default function TestDebtTrajectoryPage() {
     ownership: 'personal',
     household_id: null,
     net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false, has_written_agreement: false,
-    include_aflossing_in_savings: false, custom_aflossing_amount: null, has_strategy_tracking: false,
+    include_aflossing_in_savings: false, custom_aflossing_amount: null, has_hypotheekplanner_tracking: false,
   }), [])
 
   // Create simulated valuation history
@@ -292,7 +292,7 @@ export default function TestDebtTrajectoryPage() {
     ownership: 'personal',
     household_id: null,
     net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false, has_written_agreement: false,
-    include_aflossing_in_savings: false, custom_aflossing_amount: null, has_strategy_tracking: false,
+    include_aflossing_in_savings: false, custom_aflossing_amount: null, has_hypotheekplanner_tracking: false,
   }), [])
 
   // Linear debt test
@@ -325,7 +325,7 @@ export default function TestDebtTrajectoryPage() {
     ownership: 'personal',
     household_id: null,
     net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false, has_written_agreement: false,
-    include_aflossing_in_savings: false, custom_aflossing_amount: null, has_strategy_tracking: false,
+    include_aflossing_in_savings: false, custom_aflossing_amount: null, has_hypotheekplanner_tracking: false,
   }), [])
 
   useEffect(() => {

@@ -158,6 +158,10 @@ const BacktestingScoreWidget = dynamic(
   () => import('./backtesting-score-widget').then(m => ({ default: m.BacktestingScoreWidget })),
   { loading: WidgetLoadingFallback }
 )
+const SurplusGapWidget = dynamic(
+  () => import('./surplus-gap-widget').then(m => ({ default: m.SurplusGapWidget })),
+  { loading: WidgetLoadingFallback }
+)
 const InflatieImpactWidget = dynamic(
   () => import('./inflatie-impact-widget').then(m => ({ default: m.InflatieImpactWidget })),
   { loading: WidgetLoadingFallback }
@@ -457,7 +461,7 @@ export interface DashboardData {
   // Horizon: scenario range (optimistic/expected/pessimistic FIRE ages)
   fireRange: FireRange | null
   // Horizon: simplified sim rows for vermogenspad chart (age + portfolio + phase)
-  simRows: { age: number; endPortfolio: number; phase: string }[] | null
+  simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null
   // Horizon: requiredFirePortfolio uit runSimulation (null als geen birth_date)
   simRequiredPortfolio: number | null
   // Horizon: backtesting success rate + named crash paths
@@ -720,6 +724,8 @@ function renderWidgetById(
       return <VrijheidsMijlpalenWidget size={size} data={data} href={href} />
     case 'backtesting_score':
       return <BacktestingScoreWidget size={size} data={data} href={href} />
+    case 'surplus_gap':
+      return <SurplusGapWidget size={size} data={data} href={href} />
     case 'inflatie_impact':
       return <InflatieImpactWidget size={size} data={data} href={href} />
     case 'beleggingsrendement':

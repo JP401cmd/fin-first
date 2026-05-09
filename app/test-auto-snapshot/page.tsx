@@ -6,14 +6,14 @@ import { useState } from 'react'
  * Feature #97: Monthly auto-snapshot creation workflow
  *
  * Tests:
- * 1. GET /api/snapshots/auto creates snapshot with all metrics
- * 2. Idempotent: calling again returns existing snapshot
+ * 1. GET /api/snapshots/auto upserts snapshot with all metrics
+ * 2. Idempotent: calling again upserts the same row (no duplicate)
  * 3. POST /api/snapshots captures all key fields
  * 4. Verifies: net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score
  */
 
 type SnapshotResult = {
-  created?: boolean
+  updated?: boolean
   snapshot?: Record<string, unknown>
   metrics?: Record<string, unknown>
   calculation?: Record<string, unknown>
@@ -45,14 +45,14 @@ export default function TestAutoSnapshot() {
 
     const testSteps: TestStep[] = [
       { name: '1. Auth check: API requires authentication', status: 'pending', detail: '' },
-      { name: '2. GET /api/snapshots/auto creates snapshot', status: 'pending', detail: '' },
+      { name: '2. GET /api/snapshots/auto upserts snapshot', status: 'pending', detail: '' },
       { name: '3. Snapshot has net_worth value', status: 'pending', detail: '' },
       { name: '4. freedom_percentage captured', status: 'pending', detail: '' },
       { name: '5. fire_age captured', status: 'pending', detail: '' },
       { name: '6. sovereignty_level captured', status: 'pending', detail: '' },
       { name: '7. savings_rate captured', status: 'pending', detail: '' },
       { name: '8. resilience_score captured', status: 'pending', detail: '' },
-      { name: '9. Idempotent: second call returns existing', status: 'pending', detail: '' },
+      { name: '9. Idempotent: second call upserts same row', status: 'pending', detail: '' },
       { name: '10. POST /api/snapshots also captures all fields', status: 'pending', detail: '' },
     ]
     setSteps(testSteps)
@@ -91,7 +91,7 @@ export default function TestAutoSnapshot() {
       }
 
       if (data?.snapshot) {
-        updateStep(1, 'pass', `Snapshot ${data.created ? 'aangemaakt' : 'al aanwezig'}: date=${(data.snapshot as Record<string, unknown>).snapshot_date}`)
+        updateStep(1, 'pass', `Snapshot ${data.updated ? 'geüpsert' : 'response zonder updated-flag'}: date=${(data.snapshot as Record<string, unknown>).snapshot_date}`)
       } else {
         updateStep(1, 'fail', `Geen snapshot in response: ${JSON.stringify(data)}`)
         setRunning(false)
@@ -153,15 +153,17 @@ export default function TestAutoSnapshot() {
       updateStep(7, 'fail', 'resilience_score is missing')
     }
 
-    // Step 9: Idempotent check
+    // Step 9: Idempotent check — second call should also succeed and upsert
+    // the same row (no duplicate, fresh values).
     updateStep(8, 'running', 'Calling auto endpoint again...')
     try {
       const res2 = await fetch('/api/snapshots/auto')
       const data2: SnapshotResult = await res2.json()
-      if (data2.created === false) {
-        updateStep(8, 'pass', `Idempotent: created=false, message="${data2.message}"`)
+      if (data2.updated && data2.snapshot) {
+        const snap2 = data2.snapshot as Record<string, unknown>
+        updateStep(8, 'pass', `Idempotent upsert: same date=${snap2.snapshot_date}, no duplicate row created`)
       } else {
-        updateStep(8, 'pass', `Second call: created=${data2.created} (may have created daily snapshot)`)
+        updateStep(8, 'fail', `Second call missing updated/snapshot: ${JSON.stringify(data2)}`)
       }
     } catch (e) {
       updateStep(8, 'fail', `Error: ${e}`)
@@ -216,7 +218,7 @@ export default function TestAutoSnapshot() {
             { label: 'sovereignty_level via computeSovereigntyLevel()', detail: 'Levels -2 to 6 based on net worth, expenses, freedom%, consumer debt', pass: true },
             { label: 'savings_rate from fire projection', detail: '(monthly_savings / monthly_income) × 100', pass: true },
             { label: 'resilience_score via computeResilienceScore()', detail: '0-100 composite: emergency + diversification + debt_ratio + savings', pass: true },
-            { label: 'Idempotent: one snapshot per month', detail: 'Checks for existing snapshot this month before creating new one', pass: true },
+            { label: 'Idempotent: upsert on (user_id, snapshot_date)', detail: 'Always recomputes and upserts — keeps fire_age + extended fields fresh, no duplicate rows', pass: true },
             { label: 'Graceful fallback for missing columns', detail: 'Retries without extended fields if migration not applied yet', pass: true },
           ].map((item, i) => (
             <div key={i} style={{

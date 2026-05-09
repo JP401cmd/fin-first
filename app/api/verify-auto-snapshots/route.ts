@@ -206,8 +206,10 @@ export async function GET() {
     if (autoExists) {
       const autoSource = readFileSync(autoPath, 'utf8')
       const isGetEndpoint = autoSource.includes('export async function GET()')
-      const hasIdempotency = autoSource.includes('existingSnapshots') && autoSource.includes('created: false')
-      const hasMonthCheck = autoSource.includes('monthStart')
+      // Idempotency now comes from the upsert on (user_id, snapshot_date) — the
+      // route always recomputes and writes, so there is no early-return / existence
+      // check anymore. We verify the upsert + onConflict instead.
+      const hasIdempotency = autoSource.includes('upsert(') && autoSource.includes("onConflict: 'user_id,snapshot_date'")
 
       // Check auto-trigger integration
       const triggerPath = join(cwd, 'components/app/auto-snapshot-trigger.tsx')
@@ -223,7 +225,7 @@ export async function GET() {
         name: 'GET /api/snapshots/auto endpoint + auto-trigger on login',
         pass: isGetEndpoint && hasIdempotency && triggerExists && hookExists && layoutUsesAutoSnapshot,
         detail: isGetEndpoint && hasIdempotency && layoutUsesAutoSnapshot
-          ? 'GET endpoint with idempotent monthly check + AutoSnapshotTrigger in app layout'
+          ? 'GET endpoint with idempotent upsert on (user_id, snapshot_date) + AutoSnapshotTrigger in app layout'
           : `GET: ${isGetEndpoint}, idempotent: ${hasIdempotency}, trigger: ${triggerExists}, layout: ${layoutUsesAutoSnapshot}`,
       })
     } else {

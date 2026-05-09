@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * Fase 1.2 — onderdeel van new-navigation-shell migratie.
@@ -36,6 +36,8 @@ import type { Valuation } from './debt-types'
 import { DebtTrajectoryChart } from './debt-trajectory-chart'
 import HypotheekVsBeleggenModal from './hypotheek-vs-beleggen-modal'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getDebtTrajectoryTips } from '@/lib/chart-tips'
 
 export function DebtDetailModal({
   debt,
@@ -383,6 +385,16 @@ export function DebtDetailModal({
           {debt.notes && <p className="text-xs text-[var(--ink-3)]">{debt.notes}</p>}
 
           {/* Debt trajectory chart: actual vs projected */}
+          <div className="flex justify-end">
+            <ChartTips
+              storageKey="debt_trajectory_chart"
+              tips={getDebtTrajectoryTips({
+                repaymentType: debt.repayment_type ?? 'other',
+                hasValuations: !!(valuations && valuations.length > 0),
+              })}
+              align="right"
+            />
+          </div>
           <DebtTrajectoryChart debt={debt} valuations={valuations} />
 
           {/* Valuation history */}

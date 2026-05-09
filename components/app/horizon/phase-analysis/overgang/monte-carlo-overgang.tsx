@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { memo, useState, useEffect } from 'react'
 import { BarChart3, CheckCircle2, Info } from 'lucide-react'
@@ -6,6 +6,8 @@ import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getFanChartTips } from '@/lib/chart-tips'
 import { successColor } from '../phase-analysis-utils'
 import {
   runPhaseMonteCarlo,
@@ -183,6 +185,18 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
       {state && (
         <div className="space-y-4">
           {/* ── Fan chart ─────────────────────────────────────── */}
+          <div className="flex justify-end">
+            <ChartTips
+              storageKey="fan_chart_overgang"
+              tips={getFanChartTips({
+                startAge,
+                years: yearsInPhase,
+                hasFireTarget: false,
+                phaseLabel: 'overgang',
+              })}
+              align="right"
+            />
+          </div>
           <FanChart
             percentiles={state.main.percentiles}
             startAge={startAge}

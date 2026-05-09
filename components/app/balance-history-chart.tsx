@@ -1,10 +1,12 @@
-'use client'
+﻿'use client'
 
 import { useState, useMemo, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 import type { EntityBalanceHistory } from '@/lib/net-worth-data'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getBalanceHistoryTips } from '@/lib/chart-tips'
 
 // ── Color palette for entities (warm, editorial tones) ─────────
 const ENTITY_COLORS = [
@@ -55,6 +57,8 @@ type BalanceHistoryChartProps = {
   entities: EntityBalanceHistory[]
   title?: string
   className?: string
+  /** Optionele storage-key voor inline ChartTips. */
+  tipsStorageKey?: string
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -63,6 +67,7 @@ export const BalanceHistoryChart = memo(function BalanceHistoryChart({
   entities,
   title = 'Vermogensopbouw',
   className,
+  tipsStorageKey,
 }: BalanceHistoryChartProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
 
@@ -204,12 +209,23 @@ export const BalanceHistoryChart = memo(function BalanceHistoryChart({
   return (
     <div ref={ref} className={className}>
       {/* Header */}
-      <div className="mb-3 flex items-baseline justify-between">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
         <div className="flex items-center gap-4 text-xs text-[var(--ink-3)]">
           <span className="font-mono tabular-nums">{<MaskedAmount value={latestAssetTotal} tone="kern" />} bezittingen</span>
           {latestDebtTotal > 0 && (
             <span className="font-mono tabular-nums">{<MaskedAmount value={latestDebtTotal} tone="kern" />} schulden</span>
+          )}
+          {tipsStorageKey && (
+            <ChartTips
+              storageKey={tipsStorageKey}
+              tips={getBalanceHistoryTips({
+                entityCount: entities.length,
+                hasDebts: debtEntities.length > 0,
+                monthCount: allDates.length,
+              })}
+              align="right"
+            />
           )}
         </div>
       </div>

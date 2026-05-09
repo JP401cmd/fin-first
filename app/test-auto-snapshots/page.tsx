@@ -16,7 +16,7 @@ type VerifyResponse = {
 }
 
 type SnapshotResponse = {
-  created?: boolean
+  updated?: boolean
   snapshot?: Record<string, unknown>
   metrics?: Record<string, unknown>
   message?: string
@@ -152,7 +152,7 @@ export default function TestAutoSnapshots() {
               <div style={{ fontWeight: 600, fontSize: 14, color: '#6b21a8' }}>Manual: GET /api/snapshots/auto</div>
               <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
                 Authenticated endpoint. Creates a snapshot for the current user if none exists this month.
-                Returns &#123; created: true/false &#125; with full snapshot data.
+                Returns &#123; updated: true &#125; with full snapshot data after recompute + upsert.
               </div>
             </div>
           </div>
@@ -189,7 +189,7 @@ export default function TestAutoSnapshots() {
             ) : (
               <div style={{ padding: 12, borderRadius: 6, backgroundColor: '#f0fdf4', border: '1px solid #dcfce7' }}>
                 <div style={{ fontWeight: 600, color: '#166534', marginBottom: 8 }}>
-                  {liveResult.created ? 'Snapshot aangemaakt!' : 'Snapshot al aanwezig deze maand'}
+                  {liveResult.updated ? 'Snapshot geüpsert (recompute)' : 'Geen update-flag in response'}
                 </div>
                 {liveResult.snapshot && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>

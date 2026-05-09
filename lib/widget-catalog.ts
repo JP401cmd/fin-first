@@ -317,6 +317,15 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     requiredPhase: 'Momentum',
   },
   {
+    id: 'surplus_gap',
+    name: 'Surplus / Gap',
+    description: 'Jaarlijkse vermogensstromen — opbouw vs. inteer',
+    module: 'horizon',
+    sizes: ['quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
+  {
     id: 'inflatie_impact',
     name: 'Inflatie-impact',
     description: 'Koopkrachtverlies door inflatie over tijd',
@@ -579,6 +588,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   box3_drag:                '/core/debts',
   vrijheidsmijlpalen:       '/horizon',
   backtesting_score:        '/horizon?modal=backtesting',
+  surplus_gap:              '/horizon#vermogensstromen',
   swr_monitor:              '/identity/instellingen',
   inflatie_impact:          '/identity/instellingen',
   beleggingsrendement:      '/core/assets',

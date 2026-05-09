@@ -289,9 +289,10 @@ export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
     net_worth_inclusion_pct: 100,
     include_aflossing_in_savings,
     custom_aflossing_amount: null,
-    // App-koppeling — quick-add laat de Aflosstrategie-app bewust uit.
-    // Activeren gebeurt later via de detail-sheet zodat de gebruiker een
-    // expliciete keuze maakt per schuld.
-    has_strategy_tracking: false,
+    // App-koppeling — quick-add laat de Hypotheekplanner-app bewust uit (en
+    // op non-mortgage rijen is de vlag sowieso `false` per DB-default).
+    // Activeren gebeurt later via de mortgage-detail-sheet zodat de gebruiker
+    // een expliciete keuze maakt per hypotheek.
+    has_hypotheekplanner_tracking: false,
   }
 }

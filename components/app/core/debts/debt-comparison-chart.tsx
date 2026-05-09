@@ -1,38 +1,78 @@
 'use client'
 
 import { memo } from 'react'
-import { simulatePayoff, payoffSummary } from '@/lib/debt-data'
+import { simulatePayoff, payoffSummary, type PayoffStrategy } from '@/lib/debt-data'
 
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
+// Strategie-identiteit als kleur. Bewust géén module-tokens (`--module-active-*`)
+// — dit is narratieve kleur per *strategie*, niet per module. Snowball blauw is
+// "snelle wins", avalanche rood "bespaart meest", highest_balance amber
+// "band-aid eraf", custom paars "jouw volgorde". Géén groen — dat is in de app
+// gereserveerd voor `--positive` (winst-signalen).
+const STRATEGY_COLORS: Record<PayoffStrategy, string> = {
+  snowball: '#3b82f6',
+  avalanche: '#ef4444',
+  highest_balance: '#f59e0b',
+  custom: '#8b5cf6',
+  current: '#6b7280',
+}
+
+const STRATEGY_LABELS: Record<PayoffStrategy, string> = {
+  snowball: 'Sneeuwbal',
+  avalanche: 'Avalanche',
+  highest_balance: 'Grootste eerst',
+  custom: 'Eigen volgorde',
+  current: 'Huidig schema',
+}
+
+export interface StrategyTrajectory {
+  id: PayoffStrategy
+  label?: string
+  months: ReturnType<typeof simulatePayoff>
+  summary: ReturnType<typeof payoffSummary>
+}
+
+interface ChartProps {
+  strategies: StrategyTrajectory[]
+  activeStrategyId: PayoffStrategy
+  extraPayment: number
+}
+
+// Dynamische tick-stride zodat 30-jaars hypotheken niet 30 labels op rij krijgen.
+// Drempels gekozen op visueel ritme: bij ≤5 jaar elke 12 mnd geeft genoeg detail,
+// bij langere horizons schuift het naar 2/5/10 jaar zodat er altijd 4-6 labels op
+// de as staan. Bij ≤30 jaar (360 mnd) blijft 5-jaar stride leesbaar; pas vanaf
+// echt langlopende cases (40+) springt het naar 10-jaar.
+function pickXTickStride(maxMonth: number): number {
+  if (maxMonth <= 60) return 12
+  if (maxMonth <= 120) return 24
+  if (maxMonth <= 360) return 60
+  return 120
+}
+
 export const DebtPayoffTrajectoryChart = memo(function DebtPayoffTrajectoryChart({
-  snowballMonths,
-  avalancheMonths,
-  snowballSummary,
-  avalancheSummary,
-}: {
-  snowballMonths: ReturnType<typeof simulatePayoff>
-  avalancheMonths: ReturnType<typeof simulatePayoff>
-  snowballSummary: ReturnType<typeof payoffSummary>
-  avalancheSummary: ReturnType<typeof payoffSummary>
-}) {
+  strategies,
+  activeStrategyId,
+  extraPayment,
+}: ChartProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
-  if (snowballMonths.length === 0 && avalancheMonths.length === 0) return null
+
+  const renderable = strategies.filter((s) => s.months.length > 0)
+  if (renderable.length === 0) return null
 
   const w = 800
   const h = 240
-  const pad = { top: 16, right: 24, bottom: 40, left: 60 }
+  const pad = { top: 16, right: 24, bottom: 44, left: 60 }
   const chartW = w - pad.left - pad.right
   const chartH = h - pad.top - pad.bottom
 
-  // Determine axis bounds from both simulations
   const maxBalance = Math.max(
-    snowballMonths[0]?.totalBalance ?? 0,
-    avalancheMonths[0]?.totalBalance ?? 0,
+    ...renderable.map((s) => s.months[0]?.totalBalance ?? 0),
   )
-  const maxMonth = Math.max(snowballMonths.length, avalancheMonths.length)
+  const maxMonth = Math.max(...renderable.map((s) => s.months.length))
 
   if (maxBalance <= 0 || maxMonth <= 0) return null
 
@@ -43,7 +83,9 @@ export const DebtPayoffTrajectoryChart = memo(function DebtPayoffTrajectoryChart
     return pad.top + chartH - (val / maxBalance) * chartH
   }
 
-  // Sample points for each strategy (max ~80 each for performance)
+  // Sample step is gedeeld over alle strategieën zodat hun lijnen op dezelfde
+  // x-grid liggen — anders kan een korter pad subtiel uit de pas gaan ten
+  // opzichte van een langer pad bij dezelfde maand.
   const sampleStep = Math.max(1, Math.floor(maxMonth / 80))
 
   function buildPath(months: ReturnType<typeof simulatePayoff>) {
@@ -55,6 +97,7 @@ export const DebtPayoffTrajectoryChart = memo(function DebtPayoffTrajectoryChart
 
   function buildFillPath(months: ReturnType<typeof simulatePayoff>) {
     const sampled = months.filter((_, i) => i % sampleStep === 0 || i === months.length - 1)
+    if (sampled.length === 0) return ''
     const linePath = sampled
       .map((m, i) => `${i === 0 ? 'M' : 'L'} ${x(m.month).toFixed(1)},${y(m.totalBalance).toFixed(1)}`)
       .join(' ')
@@ -65,75 +108,50 @@ export const DebtPayoffTrajectoryChart = memo(function DebtPayoffTrajectoryChart
       + ` L ${x(first.month).toFixed(1)},${(pad.top + chartH).toFixed(1)} Z`
   }
 
-  const snowballPath = buildPath(snowballMonths)
-  const avalanchePath = buildPath(avalancheMonths)
-  const snowballFill = buildFillPath(snowballMonths)
-  const avalancheFill = buildFillPath(avalancheMonths)
-
-  // Per-debt breakdown lines for snowball strategy
-  const debtIds = snowballMonths[0]?.debts.map(d => d.id) ?? []
-  const debtNames = snowballMonths[0]?.debts.map(d => d.name) ?? []
-  const perDebtColors = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#ec4899']
-
-  const perDebtPaths: { id: string; name: string; snowballPath: string; avalanchePath: string; color: string }[] = []
-  for (let di = 0; di < debtIds.length; di++) {
-    const id = debtIds[di]
-    const color = perDebtColors[di % perDebtColors.length]
-
-    const snowSampled = snowballMonths.filter((_, i) => i % sampleStep === 0 || i === snowballMonths.length - 1)
-    const avSampled = avalancheMonths.filter((_, i) => i % sampleStep === 0 || i === avalancheMonths.length - 1)
-
-    const sPath = snowSampled
-      .map((m, i) => {
-        const entry = m.debts.find(d => d.id === id)
-        return `${i === 0 ? 'M' : 'L'} ${x(m.month).toFixed(1)},${y(entry?.balance ?? 0).toFixed(1)}`
-      })
-      .join(' ')
-
-    const aPath = avSampled
-      .map((m, i) => {
-        const entry = m.debts.find(d => d.id === id)
-        return `${i === 0 ? 'M' : 'L'} ${x(m.month).toFixed(1)},${y(entry?.balance ?? 0).toFixed(1)}`
-      })
-      .join(' ')
-
-    perDebtPaths.push({
-      id,
-      name: debtNames[di],
-      snowballPath: sPath,
-      avalanchePath: aPath,
-      color,
-    })
-  }
-
   // Y-axis ticks
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(maxBalance * t))
 
-  // X-axis: every 12 months
+  const xStride = pickXTickStride(maxMonth)
   const xTicks: number[] = []
-  for (let m = 12; m < maxMonth; m += 12) xTicks.push(m)
+  for (let m = xStride; m < maxMonth; m += xStride) xTicks.push(m)
   if (maxMonth > 6) xTicks.push(maxMonth)
 
-  // Payoff month markers
-  const snowballPayoffMonth = snowballMonths.length
-  const avalanchePayoffMonth = avalancheMonths.length
+  // Active eerst sorteren zodat de niet-actieve lijnen achter de dikke actieve
+  // lijn renderen — voorkomt dat een dunne lijn over de dikke heen ligt.
+  const ordered = [...renderable].sort((a, b) => {
+    if (a.id === activeStrategyId) return 1
+    if (b.id === activeStrategyId) return -1
+    return 0
+  })
+
+  const active = renderable.find((s) => s.id === activeStrategyId) ?? renderable[0]
+  const activePayoffMonth = active.months.length
+  const activeColor = STRATEGY_COLORS[active.id]
+
+  const subtitleParts: string[] = []
+  if (extraPayment > 0) {
+    subtitleParts.push(`+€${extraPayment.toLocaleString('nl-NL')}/m extra`)
+  }
+  const subtitle = subtitleParts.join(' · ')
 
   return (
     <div ref={ref} data-testid="debt-payoff-trajectory-chart">
-      <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Schuld-trajectvergelijking</p>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+          Schuld-trajectvergelijking
+        </p>
+        {subtitle && (
+          <p className="font-mono tabular-nums text-[10px] text-[var(--ink-3)]">{subtitle}</p>
+        )}
+      </div>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
         <defs>
-          <linearGradient id="snowball-fill-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.01" />
-          </linearGradient>
-          <linearGradient id="avalanche-fill-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ef4444" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#ef4444" stopOpacity="0.01" />
+          <linearGradient id={`payoff-fill-${active.id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={activeColor} stopOpacity="0.10" />
+            <stop offset="100%" stopColor={activeColor} stopOpacity="0.01" />
           </linearGradient>
         </defs>
 
-        {/* Grid lines */}
         {yTicks.map((val) => (
           <g key={val}>
             <line
@@ -146,165 +164,216 @@ export const DebtPayoffTrajectoryChart = memo(function DebtPayoffTrajectoryChart
           </g>
         ))}
 
-        {/* Fill areas */}
-        <path d={snowballFill} fill="url(#snowball-fill-grad)"
-          style={{ animation: hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none', opacity: hasEntered ? undefined : 0 }} />
-        <path d={avalancheFill} fill="url(#avalanche-fill-grad)"
-          style={{ animation: hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none', opacity: hasEntered ? undefined : 0 }} />
-
-        {/* Per-debt lines (thin, for additional detail) */}
-        {perDebtPaths.map((dp) => (
-          <g key={dp.id}>
-            <path
-              d={dp.snowballPath}
-              fill="none"
-              stroke={dp.color}
-              strokeWidth="0.75"
-              strokeOpacity="0.3"
-              strokeLinecap="round"
-            />
-            <path
-              d={dp.avalanchePath}
-              fill="none"
-              stroke={dp.color}
-              strokeWidth="0.75"
-              strokeOpacity="0.3"
-              strokeDasharray="3,2"
-              strokeLinecap="round"
-            />
-          </g>
-        ))}
-
-        {/* Snowball total line (solid blue) */}
+        {/* Fill-area alleen voor actieve strategie — vier overlappende areas
+            zou de chart in een wolk veranderen. */}
         <path
-          d={snowballPath}
+          d={buildFillPath(active.months)}
+          fill={`url(#payoff-fill-${active.id})`}
+          style={{
+            animation: hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none',
+            opacity: hasEntered ? undefined : 0,
+          }}
+        />
+
+        {/* Niet-actieve strategieën als dunne contextlijnen. fadeIn (geen
+            drawPath) — context, niet hoofdverhaal. */}
+        {ordered
+          .filter((s) => s.id !== activeStrategyId)
+          .map((s) => (
+            <path
+              key={s.id}
+              d={buildPath(s.months)}
+              fill="none"
+              stroke={STRATEGY_COLORS[s.id]}
+              strokeWidth="1.25"
+              strokeOpacity="0.45"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                animation: hasEntered ? 'fadeInFill 350ms ease-out 200ms both' : 'none',
+                opacity: hasEntered ? undefined : 0,
+              }}
+              data-testid={`${s.id}-trajectory-line`}
+            />
+          ))}
+
+        {/* Actieve strategie — dik, draw-in animatie, eigen kleur. */}
+        <path
+          d={buildPath(active.months)}
           fill="none"
-          stroke="#3b82f6"
+          stroke={activeColor}
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           pathLength={1}
           strokeDasharray={1}
-          style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }}
-          data-testid="snowball-trajectory-line"
+          style={{
+            strokeDashoffset: hasEntered ? undefined : 1,
+            animation: hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none',
+          }}
+          data-testid={`${active.id}-trajectory-line`}
         />
 
-        {/* Avalanche total line (solid red) */}
-        <path
-          d={avalanchePath}
-          fill="none"
-          stroke="#ef4444"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          pathLength={1}
-          strokeDasharray={1}
-          style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) 80ms both' : 'none' }}
-          data-testid="avalanche-trajectory-line"
-        />
-
-        {/* Snowball payoff marker */}
-        {snowballPayoffMonth < maxMonth && (
+        {/* Payoff-marker alleen op de actieve strategie. */}
+        {activePayoffMonth < maxMonth && (
           <>
             <line
-              x1={x(snowballPayoffMonth)} y1={pad.top}
-              x2={x(snowballPayoffMonth)} y2={pad.top + chartH}
-              stroke="#3b82f6" strokeWidth="1" strokeDasharray="4,3" strokeOpacity="0.5"
+              x1={x(activePayoffMonth)} y1={pad.top}
+              x2={x(activePayoffMonth)} y2={pad.top + chartH}
+              stroke={activeColor} strokeWidth="1" strokeDasharray="4,3" strokeOpacity="0.5"
             />
             <circle
-              cx={x(snowballPayoffMonth)} cy={y(0)}
-              r="4" fill="#3b82f6" stroke="white" strokeWidth="1.5"
+              cx={x(activePayoffMonth)} cy={y(0)}
+              r="4" fill={activeColor} stroke="white" strokeWidth="1.5"
             />
           </>
         )}
 
-        {/* Avalanche payoff marker */}
-        {avalanchePayoffMonth < maxMonth && (
-          <>
-            <line
-              x1={x(avalanchePayoffMonth)} y1={pad.top}
-              x2={x(avalanchePayoffMonth)} y2={pad.top + chartH}
-              stroke="#ef4444" strokeWidth="1" strokeDasharray="4,3" strokeOpacity="0.5"
-            />
-            <circle
-              cx={x(avalanchePayoffMonth)} cy={y(0)}
-              r="4" fill="#ef4444" stroke="white" strokeWidth="1.5"
-            />
-          </>
-        )}
-
-        {/* X-axis labels */}
         {xTicks.map((m) => (
-          <text key={m} x={x(m)} y={h - 18} textAnchor="middle" fontSize="8" fill="#a1a1aa">
+          <text key={m} x={x(m)} y={h - 22} textAnchor="middle" fontSize="8" fill="#a1a1aa">
             {m >= 12 ? `${Math.floor(m / 12)}j` : `${m}m`}
           </text>
         ))}
 
-        {/* Legend */}
-        <g transform={`translate(${pad.left}, ${h - 8})`}>
-          <line x1="0" y1="0" x2="16" y2="0" stroke="#3b82f6" strokeWidth="2.5" />
-          <text x="20" y="3" fontSize="8" fill="#71717a">Sneeuwbal</text>
-          <line x1="110" y1="0" x2="126" y2="0" stroke="#ef4444" strokeWidth="2.5" />
-          <text x="130" y="3" fontSize="8" fill="#71717a">Avalanche</text>
+        {/* Legenda — alle vier labels, gekleurd streepje + label, actieve in
+            font-semibold. Krant-mono UPPERCASE. */}
+        <g transform={`translate(${pad.left}, ${h - 6})`}>
+          {ordered
+            .slice()
+            .sort((a, b) => {
+              const order: PayoffStrategy[] = ['snowball', 'avalanche', 'highest_balance', 'custom', 'current']
+              return order.indexOf(a.id) - order.indexOf(b.id)
+            })
+            .map((s, i) => {
+              const isActive = s.id === activeStrategyId
+              const xOffset = i * 150
+              return (
+                <g key={s.id} transform={`translate(${xOffset}, 0)`}>
+                  <line
+                    x1="0" y1="0" x2="14" y2="0"
+                    stroke={STRATEGY_COLORS[s.id]}
+                    strokeWidth={isActive ? '2.5' : '1.25'}
+                    strokeOpacity={isActive ? 1 : 0.6}
+                  />
+                  <text
+                    x="20" y="3"
+                    fontSize="9"
+                    fontFamily="var(--font-dm-mono), monospace"
+                    fill={isActive ? '#3f3f46' : '#a1a1aa'}
+                    fontWeight={isActive ? 600 : 400}
+                    letterSpacing="0.5"
+                  >
+                    {(s.label ?? STRATEGY_LABELS[s.id]).toUpperCase()}
+                  </text>
+                </g>
+              )
+            })}
         </g>
       </svg>
     </div>
   )
 })
 
-export const StrategyComparisonMessage = memo(function StrategyComparisonMessage({
-  snowballSummary,
-  avalancheSummary,
-  dailyExpenses,
-}: {
-  snowballSummary: ReturnType<typeof payoffSummary>
-  avalancheSummary: ReturnType<typeof payoffSummary>
+interface ComparisonProps {
+  baselineSummaries: Partial<Record<PayoffStrategy, ReturnType<typeof payoffSummary>>>
+  activeStrategyId: PayoffStrategy
+  activeWithExtraSummary: ReturnType<typeof payoffSummary>
+  extraPayment: number
   dailyExpenses: number
-}) {
+}
+
+function formatMonthSpan(months: number): string {
+  if (months <= 0) return '0m'
+  const y = Math.floor(months / 12)
+  const m = months % 12
+  if (y === 0) return `${m} ${m === 1 ? 'maand' : 'maanden'}`
+  if (m === 0) return `${y} ${y === 1 ? 'jaar' : 'jaar'}`
+  return `${y}j ${m}m`
+}
+
+export const StrategyComparisonMessage = memo(function StrategyComparisonMessage({
+  baselineSummaries,
+  activeStrategyId,
+  activeWithExtraSummary,
+  extraPayment,
+  dailyExpenses,
+}: ComparisonProps) {
   const { masked } = useMaskedAmounts()
-  if (snowballSummary.totalMonths === 0 && avalancheSummary.totalMonths === 0) return null
 
-  const snowMonths = snowballSummary.totalMonths
-  const avMonths = avalancheSummary.totalMonths
-  const snowInterest = snowballSummary.totalInterest
-  const avInterest = avalancheSummary.totalInterest
+  const activeBaseline = baselineSummaries[activeStrategyId]
+  if (!activeBaseline || activeBaseline.totalMonths === 0) return null
 
-  const monthDiff = Math.abs(snowMonths - avMonths)
-  const interestDiff = Math.abs(snowInterest - avInterest)
-
-  // Determine which strategy wins on time and on interest
-  const avalancheFaster = avMonths < snowMonths
-  const avalancheCheaper = avInterest < snowInterest
-  const sameTime = monthDiff === 0
-  const sameInterest = interestDiff < 1
+  const accentColor = STRATEGY_COLORS[activeStrategyId]
+  const activeLabel = STRATEGY_LABELS[activeStrategyId]
 
   let message = ''
-  let bgClass = ''
-  let textClass = ''
+  let interestDiff = 0
+  let monthDiff = 0
 
-  if (sameTime && sameInterest) {
-    message = 'Beide strategieën leiden tot hetzelfde resultaat voor jouw schulden.'
-    bgClass = 'border-[var(--border-ed)] bg-[var(--subtle)]'
-    textClass = 'text-[var(--ink-2)]'
-  } else if (avalancheFaster && avalancheCheaper) {
-    message = `Bij avalanche-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij en bespaar je ${formatMaskedCurrency(interestDiff, masked)} aan rente.`
-    bgClass = 'border-red-200 bg-red-50'
-    textClass = 'text-red-700'
-  } else if (!avalancheFaster && !avalancheCheaper && !sameTime) {
-    message = `Bij sneeuwbal-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij en bespaar je ${formatMaskedCurrency(interestDiff, masked)} aan rente.`
-    bgClass = 'border-blue-200 bg-blue-50'
-    textClass = 'text-blue-700'
-  } else if (avalancheCheaper) {
-    message = `Bij avalanche-strategie bespaar je ${formatMaskedCurrency(interestDiff, masked)} aan rente${!sameTime ? ` (${avalancheFaster ? `${monthDiff} maanden sneller` : `${monthDiff} maanden langer`})` : ''}.`
-    bgClass = 'border-red-200 bg-red-50'
-    textClass = 'text-red-700'
+  if (extraPayment > 0) {
+    // Vergelijk active+extra vs active+€0 — toont de impact van de slider
+    // binnen de gekozen strategie.
+    monthDiff = Math.max(0, activeBaseline.totalMonths - activeWithExtraSummary.totalMonths)
+    interestDiff = Math.max(0, activeBaseline.totalInterest - activeWithExtraSummary.totalInterest)
+
+    if (monthDiff === 0 && interestDiff < 1) {
+      message = `Met ${formatMaskedCurrency(extraPayment, masked)}/m extra geen merkbaar verschil bij ${activeLabel.toLowerCase()}.`
+    } else {
+      const parts: string[] = []
+      parts.push(`Met ${formatMaskedCurrency(extraPayment, masked)}/m extra`)
+      if (interestDiff >= 1) {
+        parts.push(`bespaar je ${formatMaskedCurrency(interestDiff, masked)} aan rente`)
+      }
+      if (monthDiff > 0) {
+        parts.push(
+          interestDiff >= 1
+            ? `en ben je ${formatMonthSpan(monthDiff)} eerder schuldenvrij`
+            : `ben je ${formatMonthSpan(monthDiff)} eerder schuldenvrij`,
+        )
+      }
+      message = `${parts.join(' ')}.`
+    }
   } else {
-    message = `Bij sneeuwbal-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij${!sameInterest ? `, maar betaal je ${formatMaskedCurrency(interestDiff, masked)} meer rente` : ''}.`
-    bgClass = 'border-blue-200 bg-blue-50'
-    textClass = 'text-blue-700'
+    // Bij €0 extra: vergelijk de actieve strategie met de andere baselines en
+    // pak de meest informatieve diff. Als de actieve "wint" op rente vs een
+    // andere, toon dat. Anders toon je tegen welke alternatief het verlies
+    // het kleinst is — eerlijk, geen valse winnaar.
+    const others = (Object.keys(baselineSummaries) as PayoffStrategy[]).filter(
+      (id) => id !== activeStrategyId && baselineSummaries[id]?.totalMonths,
+    )
+    if (others.length === 0) return null
+
+    let bestComparison: { otherId: PayoffStrategy; iDiff: number; mDiff: number; activeWins: boolean } | null = null
+    for (const otherId of others) {
+      const other = baselineSummaries[otherId]
+      if (!other) continue
+      const iDiff = activeBaseline.totalInterest - other.totalInterest
+      const mDiff = activeBaseline.totalMonths - other.totalMonths
+      const score = Math.abs(iDiff) + Math.abs(mDiff) * 50
+      if (!bestComparison || score > Math.abs(bestComparison.iDiff) + Math.abs(bestComparison.mDiff) * 50) {
+        bestComparison = { otherId, iDiff, mDiff, activeWins: iDiff < 0 }
+      }
+    }
+
+    if (!bestComparison) return null
+
+    const otherLabel = STRATEGY_LABELS[bestComparison.otherId]
+    interestDiff = Math.abs(bestComparison.iDiff)
+    monthDiff = Math.abs(bestComparison.mDiff)
+
+    if (interestDiff < 1 && monthDiff === 0) {
+      message = `${activeLabel} en ${otherLabel.toLowerCase()} leiden tot hetzelfde resultaat voor jouw schulden.`
+    } else if (bestComparison.activeWins) {
+      const parts: string[] = [`${activeLabel} bespaart ${formatMaskedCurrency(interestDiff, masked)} aan rente t.o.v. ${otherLabel.toLowerCase()}`]
+      if (monthDiff > 0) parts.push(`(${formatMonthSpan(monthDiff)} sneller)`)
+      message = `${parts.join(' ')}.`
+    } else {
+      const parts: string[] = [`${otherLabel} bespaart ${formatMaskedCurrency(interestDiff, masked)} aan rente t.o.v. ${activeLabel.toLowerCase()}`]
+      if (monthDiff > 0) parts.push(`(${formatMonthSpan(monthDiff)} sneller)`)
+      message = `${parts.join(' ')}.`
+    }
   }
 
-  // Add freedom-time context if dailyExpenses available
   let freedomNote = ''
   if (dailyExpenses > 0 && interestDiff > 100) {
     const savedDays = Math.round(interestDiff / dailyExpenses)
@@ -315,28 +384,14 @@ export const StrategyComparisonMessage = memo(function StrategyComparisonMessage
 
   return (
     <div
-      className={`mt-3 rounded-[var(--r-lg)] border p-3 text-center ${bgClass}`}
+      className="mt-3 border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-[var(--ink-2)]"
+      style={{ borderLeft: `3px solid ${accentColor}` }}
       data-testid="strategy-comparison-message"
     >
-      <p className={`text-sm font-medium ${textClass}`} data-testid="strategy-comparison-text">
+      <p className="text-sm leading-relaxed" data-testid="strategy-comparison-text">
         {message}
-        {freedomNote && <span className="font-normal text-kern-600">{freedomNote}</span>}
+        {freedomNote && <span className="font-serif italic text-[var(--ink-3)]">{freedomNote}</span>}
       </p>
-      {!sameTime && (
-        <div className="mt-2 flex items-center justify-center gap-6 text-xs text-[var(--ink-3)]">
-          <span data-testid="snowball-months">
-            <span className="inline-block h-2 w-2 rounded-full bg-blue-500 mr-1" />
-            Sneeuwbal: {snowMonths} mnd
-          </span>
-          <span data-testid="avalanche-months">
-            <span className="inline-block h-2 w-2 rounded-full bg-red-500 mr-1" />
-            Avalanche: {avMonths} mnd
-          </span>
-          <span data-testid="time-difference">
-            Verschil: {monthDiff} {monthDiff === 1 ? 'maand' : 'maanden'}
-          </span>
-        </div>
-      )}
     </div>
   )
 })

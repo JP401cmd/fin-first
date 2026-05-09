@@ -1,10 +1,12 @@
-'use client'
+﻿'use client'
 
 import { memo, useState, useEffect } from 'react'
 import { BarChart3, AlertTriangle, Info } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { FanChart } from '../fan-chart'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getFanChartTips } from '@/lib/chart-tips'
 import { successColor, successBgColor } from '../phase-analysis-utils'
 import {
   runPhaseMonteCarlo,
@@ -184,6 +186,18 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
           </div>
 
           {/* -- Fan chart --------------------------------------------------- */}
+          <div className="flex justify-end">
+            <ChartTips
+              storageKey="fan_chart_onttrekken"
+              tips={getFanChartTips({
+                startAge,
+                years: yearsInPhase,
+                hasFireTarget: false,
+                phaseLabel: 'onttrekking',
+              })}
+              align="right"
+            />
+          </div>
           <FanChart
             percentiles={state.main.percentiles}
             startAge={startAge}

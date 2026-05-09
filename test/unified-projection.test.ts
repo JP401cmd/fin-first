@@ -123,7 +123,7 @@ function makeDebt(overrides: Partial<Debt> & { debt_type: Debt['debt_type'] }): 
     household_id: null,
     partner_split_pct: null,
     net_worth_inclusion_pct: overrides.net_worth_inclusion_pct ?? 100,
-    has_strategy_tracking: false,
+    has_hypotheekplanner_tracking: false,
   }
 }
 

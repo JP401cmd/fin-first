@@ -4,11 +4,15 @@
 // categorie-pagina, gekoppeld aan een specifieke module of "app". Bij `cash`
 // toont de tab Budgetteren, bij `investment` toont de tab Holdings, etc.
 //
-// Multi-app: Eén categorie kan meerdere apps hebben (bv. `mortgage` krijgt
-// zowel Aflosstrategie als Hypotheekplanner). Daarom retourneert
+// Multi-app: Eén categorie kan meerdere apps hebben. Daarom retourneert
 // `findDeepenings()` een **array** van entries; `findDeepening()` blijft
 // bestaan als alias voor de eerste match (backwards-compat) zodat bestaande
 // call-sites blijven werken.
+//
+// Sinds de v2-refactor (mei 2026) is Aflosstrategie geen tab meer maar een
+// globale "Schuldenprofiel & Aflosroute"-kaart op `/core/debts`. Daarom
+// staan er hier geen Aflosstrategie-entries meer. Hypotheekplanner blijft
+// een per-debt opt-in via `has_hypotheekplanner_tracking` op mortgage-rijen.
 //
 // Toevoegen van een nieuwe verdieping kost één entry — de tab-component zelf
 // wordt opgehaald via `getDeepeningComponent()` zodat callers nooit direct
@@ -29,7 +33,6 @@ import type { ModuleId } from '@/lib/module-registry'
 import { CashBudgetterenTab } from './deepenings/cash-budgetteren-tab'
 import { InvestmentHoldingsTab } from './deepenings/investment-holdings-tab'
 import { CryptoHoldingsTab } from './deepenings/crypto-holdings-tab'
-import { AflosstrategieTab } from './deepenings/aflosstrategie-tab'
 import { HypotheekplannerTab } from './deepenings/hypotheekplanner-tab'
 import { VerhuurrendementTab } from './deepenings/verhuurrendement-tab'
 
@@ -89,29 +92,14 @@ export interface DeepeningEntry {
 /**
  * De volledige lijst van bekende verdiepingen. Eén of meer entries per
  * (type, kind) — meerdere entries betekent dat een categorie meerdere apps
- * heeft (bv. `mortgage` met Aflosstrategie + Hypotheekplanner). De
- * volgorde in de array bepaalt de volgorde van de tabs op de
+ * heeft. De volgorde in de array bepaalt de volgorde van de tabs op de
  * categorie-pagina.
- */
-/**
- * Debt-types die de Aflosstrategie-app krijgen. Eén entry per type — de
- * tab-component (`AflosstrategieTab`) is gedeeld, de registry-entries staan
- * los zodat per type de items-tab telling correct werkt en toekomstige
- * type-specifieke tweaks (label/copy) één plek hebben.
  *
- * `mortgage` zit ook in deze lijst: een hypotheek doet mee in de gedeelde
- * snowball/avalanche-engine. De Hypotheekplanner-app komt er straks als
- * tweede entry naast (multi-app per categorie via slug-disambiguation).
+ * Aflosstrategie heeft geen entry: sinds de v2-refactor leeft die als globale
+ * "Schuldenprofiel & Aflosroute"-kaart op `/core/debts` (zie
+ * `app/(app)/core/debts/page.tsx`). Hypotheekplanner blijft per-debt
+ * (mortgage-only) via `has_hypotheekplanner_tracking`.
  */
-const AFLOSSTRATEGIE_DEBT_TYPES: readonly DebtType[] = [
-  'personal_loan',
-  'student_loan',
-  'car_loan',
-  'credit_card',
-  'revolving_credit',
-  'mortgage',
-] as const
-
 export const CATEGORY_DEEPENINGS: DeepeningEntry[] = [
   {
     type: 'cash',
@@ -156,31 +144,14 @@ export const CATEGORY_DEEPENINGS: DeepeningEntry[] = [
       'has_holdings_tracking' in item && item.has_holdings_tracking === true,
     toggleEndpoint: '/api/assets/toggle-holdings',
   },
-  // ── Aflosstrategie — zes debt-types ─────────────────────────
-  // Eén DebtType per entry. De `isItemTracked`/`toggleEndpoint`/`moduleId`/
-  // `label`/`tipStripCopy` zijn per definitie identiek; alleen `type`
-  // verschilt. Een `.map()` houdt de bron bondig en het registry stabiel
-  // voor uitbreidingen (bv. Hypotheekplanner naast `mortgage`).
-  ...AFLOSSTRATEGIE_DEBT_TYPES.map((type): DeepeningEntry => ({
-    type,
-    kind: 'debt',
-    label: 'Aflosstrategie',
-    moduleId: 'toekomstplannen',
-    tipStripCopy:
-      'Activeer Toekomstplannen om je optimale aflossingsroute over al je schulden te zien.',
-    isItemTracked: (item) =>
-      'has_strategy_tracking' in item && item.has_strategy_tracking === true,
-    toggleEndpoint: '/api/debts/toggle-strategy',
-  })),
   // ── Hypotheekplanner — twee entries ────────────────────────
   // Eén op de `mortgage` (debt) categorie, één op het `eigen_huis` (asset).
   // Beide leiden tot dezelfde `<HypotheekplannerTab>`-component, maar via
   // een ander `isItemTracked`/`toggleEndpoint`-paar dat de host-pagina
   // gebruikt voor zijn telling en (toekomstig) toggle-flow.
   //
-  // Volgorde-noot: dit entry komt ná de Aflosstrategie-entry voor
-  // `mortgage`, zodat de tabs op `/core/debts/mortgage` in deze volgorde
-  // verschijnen: Items → Aflosstrategie → Hypotheekplanner.
+  // De debt-entry leest `has_hypotheekplanner_tracking` (mortgage-only); de
+  // asset-entry leest `has_woonbalans_tracking` op het gekoppelde eigen_huis.
   {
     type: 'mortgage',
     kind: 'debt',
@@ -189,8 +160,9 @@ export const CATEGORY_DEEPENINGS: DeepeningEntry[] = [
     tipStripCopy:
       "Activeer Toekomstplannen om je equity, oversluit-scenario's en hypotheek-vs-beleggen vergelijking te zien.",
     isItemTracked: (item) =>
-      'has_strategy_tracking' in item && item.has_strategy_tracking === true,
-    toggleEndpoint: '/api/debts/toggle-strategy',
+      'has_hypotheekplanner_tracking' in item &&
+      (item as Debt).has_hypotheekplanner_tracking === true,
+    toggleEndpoint: '/api/debts/toggle-hypotheekplanner',
   },
   {
     type: 'eigen_huis',
@@ -380,23 +352,11 @@ const DEEPENING_COMPONENTS: Partial<
     real_estate: VerhuurrendementTab,
   },
   debt: {
-    // Aflosstrategie als single-app voor vijf debt-types — slug-keyed
-    // disambiguation is hier niet nodig.
-    personal_loan: AflosstrategieTab,
-    student_loan: AflosstrategieTab,
-    car_loan: AflosstrategieTab,
-    credit_card: AflosstrategieTab,
-    revolving_credit: AflosstrategieTab,
-    // `mortgage` is multi-app: zowel Aflosstrategie als Hypotheekplanner.
-    // Slugs zijn afgeleid van de entry-labels via `getDeepeningSlug()`:
-    //   - "Aflosstrategie"     → `aflosstrategie`
-    //   - "Hypotheekplanner"   → `hypotheekplanner`
-    // De volgorde hier is niet bindend — de tab-volgorde komt uit de
-    // CATEGORY_DEEPENINGS-array.
-    mortgage: {
-      aflosstrategie: AflosstrategieTab,
-      hypotheekplanner: HypotheekplannerTab,
-    },
+    // Sinds de v2-refactor heeft alleen `mortgage` nog een tab — de
+    // Hypotheekplanner. Andere debt-types hebben geen verdieping; hun pagina
+    // toont alleen de items-tab. Aflosstrategie leeft als globale kaart op
+    // `/core/debts` en zit daarom niet meer in deze registry.
+    mortgage: HypotheekplannerTab,
   },
 }
 

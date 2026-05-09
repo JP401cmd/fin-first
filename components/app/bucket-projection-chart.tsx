@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, memo } from 'react'
 import type { BucketProjectionResult, BucketRow } from '@/lib/bucket-projection'
@@ -9,6 +9,8 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { TrendingUp, TrendingDown, Info, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getBucketProjectionTips } from '@/lib/chart-tips'
 
 // ── View types ──────────────────────────────────────────────
 
@@ -855,6 +857,16 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
             Vergelijk {alternativeMethod === 'werkelijk' ? 'werkelijk' : 'forfaitair'} rendement
           </button>
         )}
+
+        {/* Inline ChartTips */}
+        <ChartTips
+          storageKey="bucket_projection_chart"
+          tips={getBucketProjectionTips({
+            view: chartView,
+            totalYears,
+          })}
+          align="right"
+        />
       </div>
 
       {/* Chart */}

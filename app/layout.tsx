@@ -89,8 +89,14 @@ const PALETTE_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('tf-pale
 
 // Inline service-worker registratie. Reden voor inline (i.p.v. een client-component
 // in <body>): static-analyzers (PWABuilder, Play Store crawl) parsen alleen HTML —
-// een useEffect-call zien zij niet. Dev-fail (geen /sw.js) wordt stil afgevangen.
-const SW_REGISTER_SCRIPT = `(function(){if(!('serviceWorker' in navigator))return;window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(e){console.warn('[trifinity] sw register failed:',e);});});})();`
+// een useEffect-call zien zij niet. Crawlers bezoeken alleen productie-URLs, dus we
+// gaten registratie op productie en saneren in dev (een eerder gebouwde `public/sw.js`
+// is in git getrackt en wordt door `next dev` gewoon geserveerd; zonder de unregister
+// blijft een stale SW alle `/api/*`-requests onderscheppen en breekt HMR de fetches
+// met "Failed to fetch").
+const SW_REGISTER_SCRIPT = process.env.NODE_ENV === 'production'
+  ? `(function(){if(!('serviceWorker' in navigator))return;window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(e){console.warn('[trifinity] sw register failed:',e);});});})();`
+  : `(function(){if(!('serviceWorker' in navigator))return;navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister();});}).catch(function(){});if(window.caches&&caches.keys){caches.keys().then(function(keys){keys.forEach(function(k){caches.delete(k);});}).catch(function(){});}})();`
 
 export default function RootLayout({
   children,

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -114,6 +114,14 @@ import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { HorizonCashflowSankey } from '@/components/app/horizon/horizon-cashflow-sankey'
+import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import {
+  getFireProjectionTips,
+  getWealthCompositionTips,
+  getIncomeExpenseTips,
+  getCashflowSankeyTips,
+} from '@/lib/chart-tips'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
@@ -2355,7 +2363,62 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     </button>
                   ))}
                 </div>
+
+                {/* ── Inline ChartTips: kleine "i" met editorial popover ── */}
+                <ChartTips
+                  storageKey="horizon_main_chart"
+                  tips={
+                    chartMode === 'vermogenspad'
+                      ? getFireProjectionTips({
+                          fireAge: simResult.fireAge,
+                          aowAge: Math.round(userAowAge.fractional),
+                          currentAge: currentAge ?? 30,
+                          hasMonteCarlo: !!monteCarloOverlay,
+                          hasScenario: !!scenarioOverlayData,
+                          hasBaseline: false,
+                          planningMode,
+                        })
+                      : getWealthCompositionTips({
+                          fireAge: simResult.fireAge,
+                          aowAge: Math.round(userAowAge.fractional),
+                          currentAge: currentAge ?? 30,
+                        })
+                  }
+                  align="right"
+                />
               </div>
+
+              {/* ── Editorial quote-explainers per actieve overlay/optie ── */}
+              <ChartOverlayExplainer active={isAowStopActive}>
+                <em>Stop op AOW</em> simuleert wat er gebeurt als je tot je
+                AOW-leeftijd doorwerkt en daarna pas onttrekt — zo zie je of
+                je geplande pensioenleeftijd haalbaar is zónder voortijdig FIRE.
+              </ChartOverlayExplainer>
+
+              <ChartOverlayExplainer active={scenariosExpanded && !!scenarioData}>
+                De <em>scenario-lijnen</em> tonen je vermogenspad onder een
+                voorzichtiger en optimistischer rendement (±2 procentpunt).
+                Zo zie je hoe gevoelig je pad is voor onzekere markten.
+              </ChartOverlayExplainer>
+
+              <ChartOverlayExplainer active={mcExpanded && !!mcData}>
+                <em>Monte Carlo</em> simuleert duizend marktverlopen — de bandbreedte
+                toont de range van uitkomsten, de stippellijn de mediane uitkomst.
+                Het percentage is de geschatte kans dat je geld het volhoudt.
+              </ChartOverlayExplainer>
+
+              <ChartOverlayExplainer active={!!selectedScenarioId && !!scenarioOverlayData}>
+                Het <em>opgeslagen scenario</em> verschijnt als spookrand naast
+                je huidige pad — zo vergelijk je in één oogopslag hoe een eerder
+                doorgerekend wat-als zich verhoudt tot je actuele plan.
+              </ChartOverlayExplainer>
+
+              <ChartOverlayExplainer active={chartMode === 'vermogensopbouw'}>
+                In <em>opbouw</em>-modus zie je de samenstelling van je vermogen —
+                hoeveel komt uit eigen bijdragen, hoeveel uit rendement, en hoe
+                schulden je netto vermogen drukken. Geeft inzicht in waar je
+                groei vandaan komt.
+              </ChartOverlayExplainer>
 
               {/* ── AOW-stop waarschuwingsbanner ── */}
               {isAowStopActive && (
@@ -2465,22 +2528,33 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           }
                         </button>
                         {incomeExpenseExpanded && (
-                          <div className="flex items-center gap-1 pr-3" onPointerDown={(e) => e.stopPropagation()}>
-                            {(['lines', 'breakdown'] as const).map((mode) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => setIeViewMode(mode)}
-                                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none cursor-pointer ${
-                                  ieViewMode === mode
-                                    ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                                    : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                                }`}
-                                aria-pressed={ieViewMode === mode}
-                              >
-                                {mode === 'lines' ? 'Lijnen' : 'Bronnen'}
-                              </button>
-                            ))}
+                          <div className="flex items-center gap-2 pr-3" onPointerDown={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1">
+                              {(['lines', 'breakdown'] as const).map((mode) => (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  onClick={() => setIeViewMode(mode)}
+                                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none cursor-pointer ${
+                                    ieViewMode === mode
+                                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                                  }`}
+                                  aria-pressed={ieViewMode === mode}
+                                >
+                                  {mode === 'lines' ? 'Lijnen' : 'Bronnen'}
+                                </button>
+                              ))}
+                            </div>
+                            <ChartTips
+                              storageKey="income_expense_chart"
+                              tips={getIncomeExpenseTips({
+                                fireAge: simResult.fireAge,
+                                aowAge: Math.round(userAowAge.fractional),
+                                viewMode: ieViewMode,
+                              })}
+                              align="right"
+                            />
                           </div>
                         )}
                       </div>
@@ -2655,6 +2729,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             summary="Bekijk inkomstenbronnen en uitgaven-categorieën voor een specifiek jaar"
             icon={<ArrowLeftRight className="h-4 w-4 text-[var(--ink-3)]" />}
           >
+            <div className="mb-2 flex justify-end">
+              <ChartTips
+                storageKey="cashflow_sankey"
+                tips={getCashflowSankeyTips({
+                  fireAge: simResult.fireAge,
+                  currentAge: currentAge,
+                })}
+                align="right"
+              />
+            </div>
             <HorizonCashflowSankey
               simRows={simResult.rows}
               unifiedRows={unifiedRows}

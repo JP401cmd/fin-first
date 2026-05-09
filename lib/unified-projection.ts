@@ -167,6 +167,20 @@ export interface UnifiedProjectionInput {
   grossReturn: number
   /** Inflatiepercentage (decimaal, bijv. 0.02) */
   inflationRate: number
+  /**
+   * Optionele rendement-delta in decimaal (bv. +0.02 = +2 pp). Wordt uniform
+   * opgeteld bij elke asset-rendement (per-asset expected_return + delta) én
+   * bij de fallback. Schulden (interest_rate) blijven onaangeroerd.
+   * Default 0 = geen effect, identiek aan zonder delta.
+   */
+  returnDelta?: number
+  /**
+   * Per-asset-type rendement-delta (decimal). Wint van `returnDelta` voor
+   * types die in de map staan; types die niet in de map staan vallen terug
+   * op `returnDelta`. Maakt scenario's mogelijk waarin alleen 'investment'
+   * +3 pp krijgt terwijl 'cash' onaangeroerd blijft.
+   */
+  returnDeltaByAssetType?: Record<string, number>
 
   // ── Box 3 ─────────────────────────────────────────────────
   /** Box 3 berekeningsmethode */
@@ -345,6 +359,8 @@ function initRunningBuckets(
   assets: Asset[],
   fallbackReturn: number,
   box3Method: Box3Method,
+  returnDelta: number = 0,
+  returnDeltaByAssetType?: Record<string, number>,
 ): RunningBucket[] {
   const activeAssets = assets.filter(a => a.is_active)
 
@@ -360,7 +376,10 @@ function initRunningBuckets(
 
     // Detect depreciation via shared utility (handles explicit rate + vehicle migration)
     const depInfo = resolveDepreciation(asset)
-    const ret = depInfo ? 0 : (Number(asset.expected_return) / 100 || fallbackReturn)
+    const baseRet = (Number(asset.expected_return) / 100) || fallbackReturn
+    // Per-asset-type delta wins; falls back to the global delta.
+    const typeDelta = returnDeltaByAssetType?.[asset.asset_type] ?? returnDelta
+    const ret = depInfo ? 0 : baseRet + typeDelta
     const annualDep = depInfo ? depInfo.baseValue * (depInfo.rate / 100) : 0
 
     const existing = typeMap.get(type)
@@ -984,6 +1003,8 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
   function oneTimeAmount(cf: SimCashflow, age: number): number {
     if (cf.type !== 'one_time') return 0
     if (cf.fromAge !== age) return 0
+    // Portfolio shocks are applied separately (depend on running portfolio).
+    if (cf.portfolioPct !== undefined) return 0
     const yrsFromNow = age - currentAge
     const nominal = cf.indexed ? cf.amount * Math.pow(1 + inflationRate, yrsFromNow) : cf.amount
     return cf.direction === 'income' ? nominal : -nominal
@@ -1127,6 +1148,13 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     let previousWithdrawal = 0
 
     for (let age = startAge; age < simEndAge; age++) {
+      // Apply portfolio shocks (market_shock) FIRST — scale all tiers by (1 + pct).
+      for (const cf of cashflows) {
+        if (cf.portfolioPct !== undefined && cf.type === 'one_time' && cf.fromAge === age) {
+          const factor = 1 + cf.portfolioPct
+          for (const t of tiers) t.value *= factor
+        }
+      }
       // Apply one-time cashflows — distribute proportionally across tiers
       for (const cf of cashflows) {
         const amt = oneTimeAmount(cf, age)
@@ -1249,6 +1277,12 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     let previousWithdrawal = 0
 
     for (let age = startAge; age < simEndAge; age++) {
+      // Apply portfolio shocks (market_shock) FIRST.
+      for (const cf of cashflows) {
+        if (cf.portfolioPct !== undefined && cf.type === 'one_time' && cf.fromAge === age) {
+          portfolio *= (1 + cf.portfolioPct)
+        }
+      }
       // Apply one-time cashflows before growth
       for (const cf of cashflows) {
         portfolio += oneTimeAmount(cf, age)
@@ -1292,7 +1326,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
   // ── Binary search: requiredAt(candidateFireAge) ────────────────────
 
   /** Initial running buckets for average return estimation */
-  const initialBuckets = initRunningBuckets(assets, grossReturn, box3Method)
+  const initialBuckets = initRunningBuckets(assets, grossReturn, box3Method, input.returnDelta ?? 0, input.returnDeltaByAssetType)
   // Inject disconnected bank account cash as a cash bucket
   if (input.bankAccountCash && input.bankAccountCash > 0) {
     const existingCash = initialBuckets.find(b => b.assetType === 'cash')
@@ -1363,7 +1397,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
 
   // ── Phase 1: Accumulation + FIRE-age detection ─────────────────────
 
-  const runningBuckets = initRunningBuckets(assets, grossReturn, box3Method)
+  const runningBuckets = initRunningBuckets(assets, grossReturn, box3Method, input.returnDelta ?? 0, input.returnDeltaByAssetType)
   // Inject disconnected bank account cash as a cash bucket (same as initialBuckets)
   if (input.bankAccountCash && input.bankAccountCash > 0) {
     const existingCash = runningBuckets.find(b => b.assetType === 'cash')
@@ -1432,6 +1466,14 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     const preOneTimeNetWorth = sumBucketValues(runningBuckets)
       - runningDebts.reduce((s, rd) => s + rd.balance * (rd.netWorthInclusionPct / 100), 0)
 
+    // Apply portfolio shocks FIRST — scale investable buckets by (1 + pct).
+    for (const cf of cashflows) {
+      if (cf.portfolioPct !== undefined && cf.type === 'one_time' && cf.fromAge === age) {
+        const factor = 1 + cf.portfolioPct
+        const investable = runningBuckets.filter(b => INVESTABLE_ASSET_TYPES.has(b.assetType))
+        for (const b of investable) b.value *= factor
+      }
+    }
     // One-time cashflows — add to investable buckets proportionally
     let oneTimeNet = 0
     for (const cf of cashflows) {
@@ -1663,6 +1705,14 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       b.annualContribution = 0
     }
 
+    // Apply portfolio shocks FIRST — scale investable buckets by (1 + pct).
+    for (const cf of cashflows) {
+      if (cf.portfolioPct !== undefined && cf.type === 'one_time' && cf.fromAge === age) {
+        const factor = 1 + cf.portfolioPct
+        const investable = runningBuckets.filter(b => INVESTABLE_ASSET_TYPES.has(b.assetType))
+        for (const b of investable) b.value *= factor
+      }
+    }
     // One-time cashflows
     let oneTimeNet = 0
     for (const cf of cashflows) {

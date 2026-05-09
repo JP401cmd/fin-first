@@ -80,10 +80,12 @@ export interface Debt {
   include_aflossing_in_savings: boolean
   custom_aflossing_amount: number | null // null = berekend, getal = eigen bedrag p/m
   // ── App-koppeling (zie components/core/category-deepening-registry.ts) ──
-  // Aflosstrategie-app (en Hypotheekplanner voor mortgages) tracken een
-  // schuld op basis van deze boolean. Default false zodat bestaande
-  // gebruikers geen app-tracking krijgen zonder dat ze die hebben geactiveerd.
-  has_strategy_tracking: boolean
+  // Hypotheekplanner-app tracked een mortgage op basis van deze boolean
+  // (alleen relevant voor `debt_type === 'mortgage'`). Aflosstrategie is
+  // sinds de v2-refactor een globale kaart op /core/debts en gebruikt geen
+  // per-debt opt-in meer. Default false zodat bestaande gebruikers geen
+  // app-tracking krijgen zonder dat ze die hebben geactiveerd.
+  has_hypotheekplanner_tracking: boolean
   // ── Provenance (zie supabase/migrations/<...>_add_aangifte_source.sql) ──
   // Herkomst van deze rij. Optioneel in TS — DB heeft NOT NULL DEFAULT
   // 'manual'. Zelfde semantiek als `Asset.source`. 'aangifte_import' wordt
@@ -626,7 +628,12 @@ export function debtProjection(debt: Debt): {
 
 // ── Payoff strategies ────────────────────────────────────────
 
-export type PayoffStrategy = 'snowball' | 'avalanche' | 'current'
+export type PayoffStrategy =
+  | 'snowball'
+  | 'avalanche'
+  | 'highest_balance'
+  | 'custom'
+  | 'current'
 
 export interface StrategyMonth {
   month: number
@@ -646,7 +653,9 @@ export interface StrategyMonth {
 /**
  * Simulate multi-debt payoff with a given strategy and optional extra monthly payment.
  * - snowball: target smallest balance first
- * - avalanche: target highest interest rate first
+ * - avalanche: target highest interest rate first (saves most interest)
+ * - highest_balance: target highest balance first (rip the band-aid off)
+ * - custom: respect user-defined order (`debts.sort_order` ascending)
  * - current: just use each debt's own monthly_payment
  */
 export function simulatePayoff(
@@ -659,9 +668,11 @@ export function simulatePayoff(
     debts.filter((d) => d.repayment_type === 'aflossingsvrij').map((d) => d.id),
   )
 
+  // Capture the original entry order so the `custom` strategy has a stable
+  // tie-breaker when `sort_order` is missing or duplicated.
   const active = debts
     .filter((d) => Number(d.current_balance) > 0 && d.is_active)
-    .map((d) => ({
+    .map((d, originalIndex) => ({
       id: d.id,
       name: d.name,
       balance: Number(d.current_balance),
@@ -669,6 +680,8 @@ export function simulatePayoff(
       minPayment: Number(d.minimum_payment),
       monthlyPayment: Number(d.monthly_payment),
       isInterestOnly: interestOnlyIds.has(d.id),
+      sortOrder: Number.isFinite(Number(d.sort_order)) ? Number(d.sort_order) : 0,
+      originalIndex,
     }))
 
   if (active.length === 0) return []
@@ -687,13 +700,28 @@ export function simulatePayoff(
     const date = new Date(now)
     date.setMonth(date.getMonth() + month)
 
-    // Sort for targeting: snowball by balance, avalanche by rate (descending)
-    // Exclude interest-only debts from targeting
-    let sorted = [...active.filter((d) => d.balance > 0.01 && !d.isInterestOnly)]
+    // Sort for targeting. Excludes interest-only debts because they have no
+    // principal to amortize within the simulation horizon (rente-only blijft
+    // staan, snowball/avalanche/etc. mogen ze niet als focus pakken).
+    //
+    // - snowball:        smallest balance first (motivatie via snelle wins)
+    // - avalanche:       highest rate first (bespaart meeste rente)
+    // - highest_balance: largest balance first (rip the band-aid off)
+    // - custom:          user-defined order via `sort_order` ascending,
+    //                    tie-breaker: oorspronkelijke binnenkomst-volgorde
+    // - current:         no targeting — `monthly_payment` per debt is leidend
+    const sorted = [...active.filter((d) => d.balance > 0.01 && !d.isInterestOnly)]
     if (strategy === 'snowball') {
       sorted.sort((a, b) => a.balance - b.balance)
     } else if (strategy === 'avalanche') {
       sorted.sort((a, b) => b.rate - a.rate)
+    } else if (strategy === 'highest_balance') {
+      sorted.sort((a, b) => b.balance - a.balance)
+    } else if (strategy === 'custom') {
+      sorted.sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+        return a.originalIndex - b.originalIndex
+      })
     }
 
     // Calculate interest first

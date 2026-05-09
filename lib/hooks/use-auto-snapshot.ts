@@ -5,17 +5,16 @@ import { useEffect, useRef } from 'react'
 /**
  * useAutoSnapshot — Client-side auto-snapshot trigger
  *
- * On component mount, calls GET /api/snapshots/auto to create a monthly
- * snapshot if one doesn't exist yet. This is idempotent and fire-and-forget.
+ * On component mount, calls GET /api/snapshots/auto to recompute and upsert
+ * the current-month snapshot. The endpoint always recomputes and upserts on
+ * (user_id, snapshot_date), so calling it repeatedly is safe and keeps the
+ * row in sync with the latest portfolio + horizon params (incl. fire_age).
  *
- * The endpoint:
- * - Checks if a snapshot already exists for the current month
- * - If not, creates one capturing: net_worth, total_assets, total_debts,
- *   freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score
- * - Returns { created: false } if already captured this month
+ * The endpoint captures: net_worth, total_assets, total_debts,
+ * freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score.
  *
  * Designed to be called from the authenticated app layout so every user
- * gets automatic monthly snapshots without needing an external cron.
+ * gets a fresh monthly snapshot without needing an external cron.
  *
  * Combined with the Supabase Edge Function cron (for users who don't log in),
  * this ensures comprehensive monthly snapshot coverage.
@@ -24,7 +23,8 @@ export function useAutoSnapshot() {
   const triggered = useRef(false)
 
   useEffect(() => {
-    // Only trigger once per mount (React StrictMode may double-mount)
+    // Only trigger once per mount (React StrictMode may double-mount).
+    // This also throttles the always-upsert route to once per page load.
     if (triggered.current) return
     triggered.current = true
 
@@ -38,10 +38,9 @@ export function useAutoSnapshot() {
         return null
       })
       .then(data => {
-        if (data?.created) {
-          console.log('[AutoSnapshot] Monthly snapshot created:', data.snapshot?.snapshot_date)
+        if (data?.updated) {
+          console.log('[AutoSnapshot] Monthly snapshot upserted:', data.snapshot?.snapshot_date)
         }
-        // If data?.created === false, snapshot already existed — all good
       })
       .catch(() => {
         // Silent fail — auto-snapshot is non-critical

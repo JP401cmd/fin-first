@@ -59,6 +59,7 @@ export const SimChart = memo(function SimChart({
   aowAgeFractional,
   planningMode = 'fire',
   showDepletionWarning,
+  baselineEmphasis = 'ghost',
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -89,6 +90,8 @@ export const SimChart = memo(function SimChart({
   planningMode?: 'fire' | 'pensioen'
   /** Show red depletion zone when portfolio hits zero (AOW-stop mode) */
   showDepletionWarning?: boolean
+  /** Baseline rendering: 'ghost' (default, faint gray reference) or 'compare' (solid horizon-700, side-by-side feel) */
+  baselineEmphasis?: 'ghost' | 'compare'
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -577,19 +580,22 @@ export const SimChart = memo(function SimChart({
           </>
         )}
 
-        {/* Baseline ghost-line (what-if mode) — solid gray reference */}
+        {/* Baseline reference line (what-if mode) — emphasis switches between
+            faint ghost (no preset active) and solid compare (preset active). */}
         {baselinePts.length > 1 && (
           <path
             d={pointsToPath(baselinePts)}
             fill="none"
-            stroke="var(--ink-4, #bbb8b0)"
-            strokeWidth={2.5}
+            stroke={baselineEmphasis === 'compare'
+              ? 'var(--color-horizon-700, #8a6e42)'
+              : 'var(--ink-4, #bbb8b0)'}
+            strokeWidth={baselineEmphasis === 'compare' ? 2 : 2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
             pathLength={1}
             strokeDasharray="1"
             strokeDashoffset={hasEntered ? 0 : 1}
-            opacity={0.55}
+            opacity={baselineEmphasis === 'compare' ? 0.85 : 0.55}
             style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)' : 'none' }}
           />
         )}
@@ -1034,6 +1040,7 @@ export const SimChart = memo(function SimChart({
           ))}
         </div>
       )}
+
     </div>
   )
 })

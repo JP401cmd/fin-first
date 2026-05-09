@@ -192,7 +192,7 @@ function personaDebtToDebt(pd: PersonaData['debts'][0]): Debt {
     household_id: null,
     partner_split_pct: null,
     net_worth_inclusion_pct: 100,
-    has_strategy_tracking: false,
+    has_hypotheekplanner_tracking: false,
   }
 }
 

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * Fase 2.2 — onderdeel van new-navigation-shell migratie.
@@ -12,6 +12,8 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { PhaseDetailTable } from '@/components/app/horizon/phase-detail-table'
 import { PhaseChartZoom } from '@/components/app/horizon/phase-analysis/phase-chart-zoom'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getPhaseChartZoomTips } from '@/lib/chart-tips'
 import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-events-in-phase'
 import { StressTestSection } from '@/components/app/horizon/phase-analysis/stress-test-section'
 import { MonteCarloOvergang } from '@/components/app/horizon/phase-analysis/overgang/monte-carlo-overgang'
@@ -149,15 +151,27 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
       <div className="space-y-4 p-5">
         {/* 1. PhaseChartZoom — full trajectory with transition phase highlighted */}
         {allRows && allRows.length > 2 && (
-          <PhaseChartZoom
-            allRows={allRows}
-            phaseFilter="transition"
-            accentColor="var(--color-horizon-400)"
-            annotations={[
-              { age: fireAge, label: 'FIRE' },
-              { age: aowAge, label: 'AOW' },
-            ]}
-          />
+          <>
+            <div className="flex justify-end">
+              <ChartTips
+                storageKey="phase_chart_zoom_overgang"
+                tips={getPhaseChartZoomTips({
+                  phase: 'transition',
+                  hasAnnotations: true,
+                })}
+                align="right"
+              />
+            </div>
+            <PhaseChartZoom
+              allRows={allRows}
+              phaseFilter="transition"
+              accentColor="var(--color-horizon-400)"
+              annotations={[
+                { age: fireAge, label: 'FIRE' },
+                { age: aowAge, label: 'AOW' },
+              ]}
+            />
+          </>
         )}
 
         {/* 2. Fase-header — compact summary line */}

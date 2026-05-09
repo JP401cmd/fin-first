@@ -12,7 +12,7 @@
  *  - Sub-tag-strip toont alleen *categorieën* (Bezittingen/Schulden,
  *    Wat-Als/Doorrekening) — geen apps, conform plan §3.3.
  *  - Echte routes (Link) ipv mock-buttons.
- *  - Echte data via props (netto-vermogen, acties, FIRE-leeftijd, badge).
+ *  - Echte data via props (netto-vermogen, acties, badge).
  */
 'use client'
 
@@ -55,8 +55,6 @@ export type SidebarProps = {
   netWorth: number
   /** Aantal openstaande acties — getoond als "· {n} acties" rechts van "De Wil". */
   actionCount: number
-  /** FIRE-leeftijd (jaren) — getoond als "{n} jr" rechts van "De Horizon". `null` als nog niet berekend. */
-  fireAge: number | null
   /** Aantal ongelezen berichten in Inbox-rij. */
   unreadMessageCount?: number
   /** 1-2 letter avatar-initialen, uppercase. */
@@ -96,7 +94,7 @@ type ModuleEntry = {
    * minstens één gekoppeld asset/debt heeft de tracking-vlag aan staan.
    * Apps zijn de category-deepening-entries uit
    * `components/core/category-deepening-registry.ts` (Budgetteren, Holdings,
-   * Aflosstrategie, Hypotheekplanner, Verhuurrendement).
+   * Hypotheekplanner, Verhuurrendement).
    */
   apps?: AppTag[]
 }
@@ -141,7 +139,6 @@ const MODULES: ModuleEntry[] = [
       { label: 'Budgetteren',      href: '/core/assets/cash?tab=budgetteren',              appKey: 'budgetteren' },
       { label: 'Holdings',         href: '/core/assets/holdings',                          appKey: 'holdings' },
       { label: 'Hypotheekplanner', href: '/core/debts/mortgage?tab=hypotheekplanner',      appKey: 'hypotheekplanner' },
-      { label: 'Aflosstrategie',   href: '/core/debts',                                    appKey: 'aflosstrategie' },
       { label: 'Verhuurrendement', href: '/core/assets/real_estate?tab=verhuurrendement',  appKey: 'verhuurrendement' },
     ],
   },
@@ -238,7 +235,6 @@ function detectActiveModule(pathname: string): NavModule | null {
 export function Sidebar({
   netWorth,
   actionCount,
-  fireAge,
   unreadMessageCount = 0,
   userInitials,
   userName,
@@ -282,7 +278,6 @@ export function Sidebar({
         activeAppKeys={activeAppKeys}
         netWorth={netWorth}
         actionCount={actionCount}
-        fireAge={fireAge}
       />
 
       <div className="border-t border-[var(--border-ed)]" aria-hidden />
@@ -398,7 +393,6 @@ function ModulesSection({
   activeAppKeys,
   netWorth,
   actionCount,
-  fireAge,
 }: {
   collapsed: boolean
   activeModule: NavModule | null
@@ -406,12 +400,11 @@ function ModulesSection({
   activeAppKeys: string[]
   netWorth: number
   actionCount: number
-  fireAge: number | null
 }) {
   const metrics: Record<NavModule, string> = {
     kern: formatNetWorthShort(netWorth),
     wil: actionCount > 0 ? `· ${actionCount}` : '·',
-    horizon: fireAge !== null ? `${fireAge} jr` : '—',
+    horizon: '·',
   }
 
   return (
