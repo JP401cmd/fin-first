@@ -156,7 +156,11 @@ export function CryptoKpiStrip({
   const detailsId = 'crypto-kpi-details'
 
   return (
-    <section className="space-y-4 border-b border-[var(--border-ed)] pb-5">
+    // Outer wrapper: alleen interne ritme (`space-y-4`) — de visuele
+    // afsluiting (border-b + padding-bottom) wordt nu opgenomen door het
+    // paper-blok in `crypto-holdings-page.tsx` zodat de KPI-strip optisch
+    // één geheel vormt met de hero-band.
+    <div className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
           Kencijfers
@@ -164,7 +168,7 @@ export function CryptoKpiStrip({
         <PeriodToggle period={period} onChange={onPeriodChange} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4">
         <KpiCell
           label="Totale waarde"
           value={fc(totalValue)}
@@ -190,6 +194,7 @@ export function CryptoKpiStrip({
           tone={
             !hasReturnData ? 'neutral' : returnPct >= 0 ? 'positive' : 'negative'
           }
+          highlight
         />
         <KpiCell
           label="Top performer"
@@ -244,7 +249,7 @@ export function CryptoKpiStrip({
           {hasTaxAndCosts && <TaxAndCostsSubStrip box3={box3} fees={fees} />}
         </div>
       )}
-    </section>
+    </div>
   )
 }
 
@@ -506,25 +511,67 @@ interface KpiCellProps {
   value: string
   sub?: string
   tone?: 'positive' | 'negative' | 'neutral'
+  /**
+   * Toon de halve transparante highlight-streep (`--module-active-200`) achter
+   * het hoofdbedrag. Per CLAUDE.md max één highlight-marker per pagina-sectie:
+   * gebruik dit alleen op de "uitkomst-cel" die de gebruiker scant
+   * (in deze strip: Rendement over de gekozen periode).
+   */
+  highlight?: boolean
 }
 
-function KpiCell({ label, value, sub, tone = 'neutral' }: KpiCellProps) {
+function KpiCell({ label, value, sub, tone = 'neutral', highlight = false }: KpiCellProps) {
+  // Tone-coloring blijft op het hoofdbedrag — neutraal = standaard ink, plus
+  // groen/rood voor positief/negatief. Identiek mapping als voorheen, alleen
+  // de typografie eromheen verandert (Playfair black i.p.v. DM Mono bold).
   const toneClass =
     tone === 'positive'
       ? 'text-positive'
       : tone === 'negative'
         ? 'text-negative'
         : 'text-[var(--ink)]'
+
+  // Cel-container: rechter-divider tussen cellen, plus onderborder op de eerste
+  // twee cellen op mobiel (2-koloms layout). Op `sm:` (4-koloms) verdwijnt die
+  // onderborder weer — alle vier de cellen staan dan op één rij. Match met
+  // BudgetKpiCell zodat budgetten en crypto exact dezelfde "balk-discipline"
+  // volgen.
+  const cellClass =
+    'p-3 sm:p-4 border-r border-[var(--rule-soft)] last:border-r-0 [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0 text-center'
+
+  // Hoofdbedrag in Playfair (figures-strip-uitzondering op DM-Mono-regel —
+  // staat zo expliciet in CLAUDE.md figures-strip-kaart). `tabular-nums` blijft
+  // essentieel voor uitlijning tussen cellen.
+  const amountClass = `mt-1 sm:mt-1.5 font-serif font-black text-[22px] sm:text-[28px] leading-none tracking-[-0.02em] tabular-nums ${toneClass}`
+
   return (
-    <div>
-      <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+    <div className={cellClass}>
+      <p className="text-[10px] uppercase tracking-[0.18em] font-mono font-semibold text-[var(--ink-3)]">
         {label}
       </p>
-      <p className={`mt-1 font-mono text-xl font-bold tabular-nums ${toneClass}`}>
-        {value}
+      <p
+        className={amountClass}
+        style={{ fontFamily: 'var(--font-playfair, serif)' }}
+      >
+        {highlight ? (
+          <span
+            className="inline px-1"
+            style={{
+              backgroundImage:
+                'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+            }}
+          >
+            {value}
+          </span>
+        ) : (
+          value
+        )}
       </p>
       {sub && (
-        <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[var(--ink-4)]">
+        <p
+          className="mt-1 italic text-[11px] sm:text-[12px] text-[var(--ink-3)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           {sub}
         </p>
       )}

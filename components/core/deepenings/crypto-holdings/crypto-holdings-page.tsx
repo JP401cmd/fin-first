@@ -113,20 +113,36 @@ export function CryptoHoldingsPage({
   const activePeriodReturn = periodReturns?.[period]
 
   return (
+    // Outer wrapper houdt het verticale ritme tussen de paper-band en de
+    // overige secties (`space-y-8` = 32px gap, gelijk aan de standaard
+    // sectie-spacing op de pagina). Geen `-mx-`-truc meer: de host
+    // (`asset-category-page.tsx`) levert al `px-4 sm:px-6` rond de tab-
+    // content, dus de paper-band en de chart/distribution/grid/transactions
+    // delen dezelfde outer-rand (1104px op max-w-6xl) — uniformiteit met
+    // `/core/budgets` waar de heroBand óók binnen host-padding zit.
     <div className="space-y-8">
-      {/* 1. KPI-strip — hoofd-figures-strip altijd zichtbaar; de drie
-          sub-strips (P&L incl. FIFO-toggle, Risico, Fiscaal & Kosten) zitten
-          achter een "Detailweergave"-toggle zodat boven-de-vouw rustig blijft. */}
-      <CryptoKpiStrip
-        holdings={holdings}
-        period={period}
-        onPeriodChange={setPeriod}
-        periodReturn={activePeriodReturn}
-        realizedPnL={realizedPnL}
-        realizedPnLFifo={realizedPnLFifo}
-        volatility={volatility}
-        fees={fees}
-      />
+      {/* 1. Hero-band: paper-blok rond de KPI-strip met harde ink-borders
+          boven en onder als afgebakend "blok" (zelfde editorial discipline
+          als budgetten — zie `budgets-client.tsx` regel 1485). De interne
+          `px-4 sm:px-6` levert horizontale ademruimte voor de KPI-content
+          binnen de paper-bg en spiegelt `CategoryHero`
+          (`asset-category-page.tsx` regel 672) zodat de hero ritmisch
+          consistent is met de rest van de Kern-module. */}
+      <section className="border-t border-b border-[var(--ink)] bg-[var(--paper)] px-4 py-5 sm:px-6 sm:py-7">
+        {/* KPI-strip — hoofd-figures altijd zichtbaar; de drie sub-strips
+            (P&L incl. FIFO-toggle, Risico, Fiscaal & Kosten) zitten achter
+            een "Detailweergave"-toggle zodat boven-de-vouw rustig blijft. */}
+        <CryptoKpiStrip
+          holdings={holdings}
+          period={period}
+          onPeriodChange={setPeriod}
+          periodReturn={activePeriodReturn}
+          realizedPnL={realizedPnL}
+          realizedPnLFifo={realizedPnLFifo}
+          volatility={volatility}
+          fees={fees}
+        />
+      </section>
 
       {/* 2. Performance-chart — full-width. Tijdseries lezen breder beter
           dan smal; de allocation-donut zit nu in het verdelings-blok. */}

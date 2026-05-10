@@ -267,6 +267,34 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Sub-meta**: `font-serif italic text-[11px] text-[var(--ink-3)] mt-1.5`.
 - **Optionele teken-prefix** voor positieve uitkomst: `+€` zoals `+€203.375`.
 
+### Categorie-app-tab hero-band (KPI-paper-blok)
+- **Toepassen op**: categorie-app-tabs binnen een module-categorie-pagina (`?tab=<appKey>`) — bv. crypto Holdings, investment Holdings, cash Budgetteren, mortgage Aflosstrategie, plus de standalone equivalenten op `/core/budgets`, `/core/assets/holdings`. Geldt ook voor andere "app"-tabs die een KPI-balk als entry-point hebben.
+- **Doel**: de KPI-balk leest als afgebakend hero-blok (paper-bg + harde ink-borders), maar **respecteert de tab-padding** zodat z'n outer-rand exact gelijk is aan tabs, charts, panels en tabellen op dezelfde tab. Geen blok mag visueel breder of smaller zijn dan een ander — uniformiteit zoals op `/core/budgets`.
+- **Niet toepassen op**: items-tab (lijst-content houdt normale tab-padding zonder hero-band), detail-pagina's (Type 3 — eigen header), forms/wizards (Type 4 — eigen layout), empty-state-blokken (geen hero-band-suggestie wanneer er geen data is).
+- **Implementatie** (in de tab-component of de page-component die de tab rendert):
+  ```tsx
+  <div className="space-y-8">
+    {/* hero-band: paper-blok binnen host-padding */}
+    <section className="border-t border-b border-[var(--ink)] bg-[var(--paper)] px-4 py-5 sm:px-6 sm:py-7">
+      {/* KPI-balk / figures-strip (kicker + period-toggle + cellen) */}
+    </section>
+
+    {/* overige secties zonder eigen wrapper-padding — host levert via px-4 sm:px-6 */}
+    <ChartSection />
+    <PanelSection />
+    <ListSection />
+    <TransactionsSection />
+  </div>
+  ```
+- **Geen `-mx-4 sm:-mx-6`-truc**: een eerdere versie van deze kaart liet de KPI-band uitbreken naar volle `max-w-6xl`-breedte. Dat gaf een 24px overshoot t.o.v. tabs en charts en leverde een visuele inconsistentie op (paper-bg breder dan de rest-content). Verworpen — de hero-band blijft binnen de host-padding.
+- **Geen aparte rest-wrapper**: de overige secties hangen rechtstreeks aan de top-level `space-y-8`. Een tweede wrapper met eigen `px-4 sm:px-6` zou dubbel inspringen veroorzaken (host levert al). De `space-y-8` op de top-level levert ook de gap onder de hero-band — geen `pt-8` nodig.
+- **Border-keuze**: `border-t border-b border-[var(--ink)]` (harde ink-border) — niet de zachte `--border-ed`. De hero-band moet als duidelijk afgebakend "blok" lezen, niet als subtiele scheiding.
+- **Padding-keuze hero-band**: `px-4 py-5 sm:px-6 sm:py-7` — verticaal matched met `CategoryHero` in `asset-category-page.tsx`; horizontaal komt de KPI-content na host-padding (24px) plus paper-padding (24px) = 48px van max-w-6xl rand. De **outer-rand** van de paper-band lijnt uit met tabs/charts (X=161 op 1441px viewport); de **content** binnen de paper-band staat 24px ingedrukt t.o.v. tabs. Dit verschil is acceptabel en spiegelt budgetten waar de heroChild ook met `px-4` ingedrukt is.
+- **KPI-strip zelf** (bv. `crypto-kpi-strip.tsx`) draagt **geen** eigen `border-b` of `bg-paper` meer — dat zit op het host-section-blok. De inner-wrapper blijft een simpele `<div className="space-y-4">` voor het ritme tussen kicker-rij + cellen + collapsible details.
+- **Sub-strips onder een toggle** (P&L, risico, fiscaal): blijven binnen het paper-blok wanneer de toggle openstaat — de hero-band rekt dan natuurlijk mee. Geen aparte band per sub-strip.
+- **Niet stapelen**: één hero-band per tab. Bouw geen tweede paper-band onder de KPI-balk voor sub-secties (bv. "Performance" of "Verdeling") — die secties leven binnen de gewone tab-padding zonder eigen ink-borders. Reden: meer dan één hero-band per scherm vlakt de hiërarchie af.
+- **Verificatie**: meet via DevTools de outer-rand van paper-band, tablist en eerste rest-sectie. Alle drie moeten dezelfde X-coördinaten hebben (op 1441px viewport: L=161, R=1265, W=1104). Als het paper-blok breder oogt → `-mx-` is per ongeluk geslopen of een aparte rest-wrapper drukt dubbel in.
+
 ### Scenario-callout / regime-info
 - **Toepassen op**: bovenaan kassabonnen, scenario-output, regime-vergelijkingen — uitleg van de geactiveerde regel/instelling die het scenario bepaalt.
 - **Niet toepassen op**: generieke info-tekst, tooltips, hints in forms.
@@ -426,7 +454,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
      - Cards (≤20 items, heterogeen): `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`, mini-artikel-blueprint.
      - Tabel (>20 items, vergelijking): editorial dotted ritme, headers in mono UPPERCASE, numerieke kolommen rechts uitgelijnd in DM Mono.
   6. Empty-state (als count = 0): zie Type 9.
-  7. Optionele app-tab onderaan (cash → Budgetteren, investment → Holdings).
+  7. Optionele app-tab onderaan (cash → Budgetteren, investment → Holdings, crypto → Holdings, mortgage → Aflosstrategie). De app-tab-content volgt de patroon-kaart *Categorie-app-tab hero-band (KPI-paper-blok)* — KPI-balk staat in een paper-blok met `border-t border-b border-[var(--ink)] bg-[var(--paper)]` binnen de host-padding, overige secties hangen direct in de top-level `space-y-8`. Geen `-mx-` uitbreek-truc; alle blokken hebben dezelfde outer-breedte als de tabs.
 - **Mobile**: filter-bar wordt scroll-x chip-strip; search verbergt achter een knop; sort-control wordt segmented control onder de toolbar; CTA blijft prominent.
 
 ### Type 3: Detail-pagina
