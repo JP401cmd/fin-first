@@ -22,6 +22,12 @@ export interface HoldingsPageData {
   totalValue: number
   totalCost: number
   source: string
+  /**
+   * Yearly essentiële uitgaven uit de must-budgets — voor de FIRE-deck-regel
+   * onder de hero ("dekt X jaar uitgaven bij 4% SWR"). 0 als budget-module
+   * niet gebruikt wordt; UI verbergt de regel dan.
+   */
+  yearlyEssentialExpenses: number
 }
 
 interface AssetJoin {
@@ -36,7 +42,7 @@ export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<
   const user = await getCachedUser(supabase)
   if (!user) throw new Error('Not authenticated')
 
-  const [{ data: invRows }, { data: cryRows }] = await Promise.all([
+  const [{ data: invRows }, { data: cryRows }, { data: essentialBudgets }] = await Promise.all([
     supabase
       .from('investment_holdings')
       .select('*, asset:assets!asset_id(id, name, has_holdings_tracking)')
@@ -49,7 +55,23 @@ export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<
       .eq('is_active', true)
       .eq('assets.has_holdings_tracking', true)
       .order('created_at', { ascending: true }),
+    // Essentiële uitgaven voor FIRE-deck onder de hero. Spiegelt
+    // app/api/snapshots/route.ts:37-48 zodat dezelfde definitie wordt gebruikt.
+    supabase
+      .from('budgets')
+      .select('default_limit, interval')
+      .eq('is_essential', true)
+      .in('budget_type', ['expense'])
+      .is('parent_id', null),
   ])
+
+  const yearlyEssentialExpenses = (essentialBudgets ?? []).reduce(
+    (s: number, b: { default_limit: number | string; interval: string }) => {
+      const limit = Number(b.default_limit) || 0
+      return s + (b.interval === 'yearly' ? limit : limit * 12)
+    },
+    0,
+  )
 
   const investmentRows = ((invRows ?? []) as Array<Record<string, unknown>>)
     .filter((h) => h.asset != null)
@@ -103,5 +125,6 @@ export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<
     totalValue,
     totalCost,
     source: 'server',
+    yearlyEssentialExpenses,
   }
 })

@@ -1375,7 +1375,8 @@ function TypedHoldingsSection({
   const totalEur = holdings.reduce((sum, h) => sum + h.valueEur, 0)
 
   const headerLabel = assetType === 'crypto' ? 'Coins' : 'Posities'
-  const deepenLink = `/core/assets/${assetType}?tab=holdings`
+  const deepenSlug = assetType === 'crypto' ? 'crypto-holdings' : 'aandelen-holdings'
+  const deepenLink = `/core/assets/${assetType}?tab=${deepenSlug}`
 
   // Loading-state: typed-holdings nog niet binnen. We tonen een lichte
   // skeleton-blokje in plaats van een spinner — past bij krant-stijl en

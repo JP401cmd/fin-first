@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/components/app/budget-shared'
+import { Plus, X, ArrowLeft, ArrowUpRight, ArrowDownRight, Briefcase, Receipt, DollarSign, PieChart, RefreshCw, AlertTriangle, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
 import { formatTimestamp, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -25,11 +23,18 @@ import dynamic from 'next/dynamic'
 
 const HoldingsHeatmap = dynamic(() => import('@/components/app/holdings-heatmap'), { ssr: false })
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { Kicker } from '@/components/editorial'
+import { Kicker, EditorialHeadline } from '@/components/editorial'
 import { IsinLookupField, type IsinResolved } from '@/components/holdings/isin-lookup-field'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
+import { PortfolioSummary } from './holdings/portfolio-summary'
+import {
+  HoldingsToolbar,
+  type SortKey,
+  type AssetClassFilter,
+} from './holdings/holdings-toolbar'
+import { HoldingRow } from './holdings/holding-row'
 
 type Holding = {
   id: string
@@ -89,7 +94,8 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editHolding, setEditHolding] = useState<Holding | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  // Delete-confirmatie leeft nu binnen het ⋯-menu per rij (HoldingRow). De
+  // page-level state is enkel een loading-flag op de actieve verwijdering.
   const [deleting, setDeleting] = useState<string | null>(null)
   const [txHolding, setTxHolding] = useState<Holding | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -105,8 +111,14 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     }
     return 'list'
   })
+  // Sort & filter (per-tab, niet gepersisteerd — verwart bij filter-reset)
+  const [sortKey, setSortKey] = useState<SortKey>('weight')
+  const [assetFilterChip, setAssetFilterChip] = useState<AssetClassFilter>('all')
   // Dividend yield data for heatmap color mode
   const [dividendData, setDividendData] = useState<Map<string, number>>(new Map())
+  // Forward dividend (12 mnd projected) — totaal-bruto uit /api/dividends.
+  // Wordt netto NL (na 15% bronbelasting) berekend in PortfolioSummary.
+  const [forwardDividendBruto, setForwardDividendBruto] = useState<number | null>(null)
   // Per-holding daily change data from last price refresh
   const [priceUpdates, setPriceUpdates] = useState<Map<string, HoldingPriceUpdate>>(new Map())
   // Track whether a form was recently submitted to prevent re-submission on back navigation
@@ -171,9 +183,10 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     }
   }
 
-  // Load dividend data for heatmap dividend yield color mode
+  // Load dividend data — voor heatmap-kleurmodus EN voor figures-strip
+  // (forward dividend 12M netto NL). Eén fetch, twee consumers.
   useEffect(() => {
-    if (viewMode !== 'heatmap' || holdings.length === 0) return
+    if (holdings.length === 0) return
     let cancelled = false
     ;(async () => {
       try {
@@ -182,20 +195,25 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         const data = await res.json()
         if (cancelled) return
         const map = new Map<string, number>()
+        let totalProjected = 0
         if (data.holdings && Array.isArray(data.holdings)) {
           for (const h of data.holdings) {
             if (h.holding_id && typeof h.dividend_yield === 'number') {
               map.set(h.holding_id, h.dividend_yield)
             }
+            if (typeof h.projected_annual_income === 'number') {
+              totalProjected += h.projected_annual_income
+            }
           }
         }
         setDividendData(map)
+        setForwardDividendBruto(totalProjected > 0 ? totalProjected : null)
       } catch {
         // Non-critical — dividend data is optional
       }
     })()
     return () => { cancelled = true }
-  }, [viewMode, holdings.length])
+  }, [holdings.length])
 
   // Push a history entry when a modal opens so the back button closes the modal
   // instead of navigating away. After form submission, replace the entry to
@@ -266,7 +284,6 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         setTotalCost(newTotalCost)
         return updated
       })
-      setDeleteConfirm(null)
     } catch {
       setError('Kon holding niet verwijderen')
     } finally {
@@ -360,8 +377,6 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     return holdings.filter(h => isPriceStale(h)).length
   }, [holdings, isPriceStale])
 
-  const totalReturn = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
-
   // Box 3 tax summary for the entire portfolio
   const box3Summary = useMemo(() => {
     const holdingValues = holdings.map(h => ({
@@ -369,19 +384,6 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       value: (h.current_price ?? h.avg_purchase_price) * Math.max(0, h.units),
     }))
     return calculatePortfolioBox3(holdingValues)
-  }, [holdings])
-
-  // Compute allocation data for donut chart — each holding as a slice
-  const allocationData = useMemo(() => {
-    if (holdings.length === 0) return []
-    return holdings
-      .map((h) => {
-        const price = h.current_price ?? h.avg_purchase_price
-        const value = price * h.units
-        return { id: h.id, name: h.name, ticker: h.ticker, value }
-      })
-      .filter((h) => h.value > 0)
-      .sort((a, b) => b.value - a.value)
   }, [holdings])
 
   // Compute holdings data for portfolio allocation visualization (with classification)
@@ -403,46 +405,168 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       .filter((h) => h.value > 0)
   }, [holdings])
 
-  // Apply optional asset filter from URL and group holdings by parent asset
-  const filteredHoldings = useMemo(() => {
+  // Apply optional asset filter from URL (?asset=<uuid> deeplink van categoriepagina).
+  const urlFiltered = useMemo(() => {
     if (!assetFilter) return holdings
     return holdings.filter((h) => h.asset_id === assetFilter)
   }, [holdings, assetFilter])
 
-  // Group holdings by parent asset name for section rendering.
-  // Returns an ordered array of { assetId, assetName, items } groups.
-  const groupedHoldings = useMemo(() => {
-    const groups = new Map<string, { assetId: string; assetName: string; items: Holding[] }>()
-    for (const h of filteredHoldings) {
-      const key = h.asset_id ?? '__no_asset__'
-      const existing = groups.get(key)
-      if (existing) {
-        existing.items.push(h)
-      } else {
-        groups.set(key, {
-          assetId: key,
-          assetName: h.asset_name ?? 'Overig',
-          items: [h],
-        })
-      }
+  // Welke chips zijn zinvol — alleen tonen wat de gebruiker daadwerkelijk
+  // heeft. Tip uit ui-ux skill: chip-rij niet vol gooien met lege opties.
+  const availableClasses = useMemo<AssetClassFilter[]>(() => {
+    const result: AssetClassFilter[] = ['all']
+    const hasInvestment = urlFiltered.some((h) => {
+      const bucket = (h as Holding & { bucket?: string }).bucket
+      return bucket === 'investment' || (!bucket && h.asset_class !== 'crypto')
+    })
+    const hasCrypto = urlFiltered.some((h) => {
+      const bucket = (h as Holding & { bucket?: string }).bucket
+      return bucket === 'crypto'
+    })
+    if (hasInvestment) result.push('investment')
+    if (hasCrypto) result.push('crypto')
+    return result
+  }, [urlFiltered])
+
+  // Pas de filter-chip toe op de URL-gefilterde set.
+  const chipFiltered = useMemo(() => {
+    if (assetFilterChip === 'all') return urlFiltered
+    return urlFiltered.filter((h) => {
+      const bucket = (h as Holding & { bucket?: string }).bucket
+      if (assetFilterChip === 'crypto') return bucket === 'crypto'
+      return bucket === 'investment' || !bucket
+    })
+  }, [urlFiltered, assetFilterChip])
+
+  // Sortering — default 'weight' (gewicht aflopend, Sharesight/Empower-conventie).
+  const sortedHoldings = useMemo(() => {
+    const list = [...chipFiltered]
+    const valueOf = (h: Holding) =>
+      (h.current_price ?? h.avg_purchase_price) * Math.max(0, h.units)
+    const returnOf = (h: Holding) => {
+      const cost = h.avg_purchase_price * Math.max(0, h.units)
+      if (cost <= 0) return Number.NEGATIVE_INFINITY
+      return ((valueOf(h) - cost) / cost) * 100
     }
-    return Array.from(groups.values())
-  }, [filteredHoldings])
+    if (sortKey === 'weight') list.sort((a, b) => valueOf(b) - valueOf(a))
+    else if (sortKey === 'return')
+      list.sort((a, b) => returnOf(b) - returnOf(a))
+    else if (sortKey === 'today')
+      list.sort(
+        (a, b) =>
+          (b.daily_change_percent ?? Number.NEGATIVE_INFINITY) -
+          (a.daily_change_percent ?? Number.NEGATIVE_INFINITY),
+      )
+    else if (sortKey === 'alpha') list.sort((a, b) => a.name.localeCompare(b.name))
+    return list
+  }, [chipFiltered, sortKey])
+
+  // Top-3 winnaars op return% — voor highlight-marker op marktwaarde-bedrag
+  // in de mini-artikel-blueprint. Skill r94: max één marker per pagina-sectie,
+  // hier breed geïnterpreteerd als "alleen de beste prestatie binnen de lijst"
+  // → alleen #1 winnaar krijgt marker, om signal niet te verwateren.
+  const winnerIds = useMemo(() => {
+    const list = sortedHoldings
+      .filter((h) => h.units > 0)
+      .map((h) => {
+        const cost = h.avg_purchase_price * Math.max(0, h.units)
+        const value = (h.current_price ?? h.avg_purchase_price) * Math.max(0, h.units)
+        const ret = cost > 0 ? ((value - cost) / cost) * 100 : Number.NEGATIVE_INFINITY
+        return { id: h.id, ret }
+      })
+      .filter((x) => x.ret > 0)
+      .sort((a, b) => b.ret - a.ret)
+    return new Set(list.slice(0, 1).map((x) => x.id))
+  }, [sortedHoldings])
+
+  // Vandaag-aggregatie — gewogen gemiddelde van per-holding `daily_change_percent`,
+  // gewogen op marktwaarde. Null als geen enkele holding een feed-update heeft.
+  const todayChange = useMemo<{ pct: number | null; eur: number | null }>(() => {
+    let weightedSum = 0
+    let valueSumWithFeed = 0
+    let feedCount = 0
+    for (const h of holdings) {
+      if (h.units <= 0) continue
+      const dp = h.daily_change_percent ?? priceUpdates.get(h.id)?.dailyChangePercent ?? null
+      if (dp === null) continue
+      const value = (h.current_price ?? h.avg_purchase_price) * h.units
+      weightedSum += value * dp
+      valueSumWithFeed += value
+      feedCount++
+    }
+    if (feedCount === 0 || valueSumWithFeed === 0) {
+      return { pct: null, eur: null }
+    }
+    const pct = weightedSum / valueSumWithFeed
+    const eur = (valueSumWithFeed * pct) / 100
+    return { pct, eur }
+  }, [holdings, priceUpdates])
+
+  // Asset-class snapshot voor de hero-strip (compacte one-liner direct onder
+  // de figures-strip). Groeperen op `bucket` (investment/crypto) → robuuster
+  // dan asset_class, dat oudere holdings vaak missen.
+  const assetClassBreakdown = useMemo(() => {
+    const groups = new Map<string, number>()
+    for (const h of holdings) {
+      if (h.units <= 0) continue
+      const value = (h.current_price ?? h.avg_purchase_price) * h.units
+      const bucket = (h as Holding & { bucket?: string }).bucket
+      const key =
+        bucket === 'crypto'
+          ? 'Crypto'
+          : (h.asset_class === 'etf' || h.asset_class === 'fonds')
+            ? 'ETF/fondsen'
+            : 'Aandelen'
+      groups.set(key, (groups.get(key) ?? 0) + value)
+    }
+    return Array.from(groups.entries())
+      .map(([label, value]) => ({
+        label,
+        value,
+        pct: totalValue > 0 ? (value / totalValue) * 100 : 0,
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [holdings, totalValue])
+
+  // Concentratie — top-3 posities als % van portfolio. Bekende risico-metric
+  // (Snowball/Sharesight) en voor FIRE-publiek relevant: te veel concentratie
+  // in 1-2 namen verhoogt sequence-risk. Tonen we enkel als ≥3 posities.
+  const concentrationTop3Pct = useMemo(() => {
+    if (holdings.length < 3 || totalValue <= 0) return null
+    const values = holdings
+      .filter((h) => h.units > 0)
+      .map((h) => (h.current_price ?? h.avg_purchase_price) * h.units)
+      .sort((a, b) => b - a)
+    const top3 = values.slice(0, 3).reduce((s, v) => s + v, 0)
+    return (top3 / totalValue) * 100
+  }, [holdings, totalValue])
 
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent" />
         </div>
       </div>
     )
   }
 
+  // Forward dividend netto NL — 15% bronbelasting afgetrokken van projected.
+  const forwardDividendNetNl = forwardDividendBruto !== null
+    ? forwardDividendBruto * 0.85
+    : null
+
+  // Conditional rendering thresholds. Allocatie en benchmark blijven vrijwel
+  // altijd zichtbaar — de chart-componenten hebben eigen empty-states. Alleen
+  // de dividend-tracker verbergen we als er niets te tonen is.
+  const showAllocation = holdingsForAllocation.length >= 1
+  const showBenchmark = holdings.length >= 2
+  const showDividendTracker = (forwardDividendBruto ?? 0) > 0
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Editorial header — blueprint Type 2 (List) */}
-      <header className="mb-5 space-y-2">
+      {/* Editorial header — blueprint Type 2 (List). Korte krant-koprij. */}
+      <header className="mb-2 space-y-2">
         <Link
           href="/core/assets"
           className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
@@ -450,166 +574,73 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
           <ArrowLeft className="h-3 w-3" />
           Terug naar Vermogen
         </Link>
-        {/* Kicker met streep */}
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] mt-3">
-          <span
-            aria-hidden
-            className="inline-block h-px w-7 shrink-0"
-            style={{ background: 'var(--module-active-500)' }}
-          />
-          Holdings · {holdings.length} actief
-        </div>
-        {/* Headline met italic-em "portfolio" */}
-        <h1
-          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
-          style={{ fontFamily: 'var(--font-playfair, serif)' }}
-        >
-          Jouw{' '}
-          <em
-            className="font-normal italic"
-            style={{ color: 'var(--module-active-700)' }}
-          >
-            portfolio
-          </em>
-        </h1>
-        <p
-          className="italic text-[12.5px] text-[var(--ink-3)]"
-          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-        >
-          {holdings.length} actieve holding{holdings.length !== 1 ? 's' : ''} in je portfolio
-        </p>
+        <Kicker>Holdings · {holdings.length} actief</Kicker>
+        <EditorialHeadline emphasis="portfolio">Jouw portfolio</EditorialHeadline>
       </header>
 
-      {/* Original action-bar */}
-      <section className="rounded-[var(--r-lg)] border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2
-              className="font-bold text-base"
-              style={{ fontFamily: 'var(--font-playfair, serif)' }}
-            >
-              Acties
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefreshPrices}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100 disabled:opacity-50"
-              title="Prijzen vernieuwen"
-              data-testid="refresh-prices-btn"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Vernieuwen...' : 'Prijzen vernieuwen'}
-            </button>
-            <Link
-              href="/core/assets/holdings/import"
-              className="inline-flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100"
-              title="CSV importeren"
-            >
-              <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">CSV import</span>
-            </Link>
-            <button
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
-            >
-              <Plus className="h-4 w-4" />
-              Holding toevoegen
-            </button>
-          </div>
+      {/* Refresh / stale banners — apart, geen kaart eromheen */}
+      {staleCount > 0 && (
+        <div
+          className="flex items-center gap-2 border border-[var(--module-active-300)] bg-[var(--module-active-50)]/60 p-3"
+          data-testid="stale-price-warning"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--module-active-700)]" />
+          <p className="text-xs text-[var(--ink-2)]">
+            <span className="font-semibold">{staleCount} holding{staleCount !== 1 ? 's' : ''}</span>{' '}
+            met verouderde prijzen — vernieuw of werk handmatig bij via het ⋯-menu.
+          </p>
         </div>
-
-        {/* Stale price warning banner */}
-        {staleCount > 0 && (
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 p-3" data-testid="stale-price-warning">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-kern-500" />
-            <p className="text-xs text-kern-700">
-              <span className="font-semibold">{staleCount} holding{staleCount !== 1 ? 's' : ''}</span> met verouderde prijzen.
-              Gebruik &quot;Prijzen vernieuwen&quot; of werk de prijs handmatig bij via het bewerk-icoon.
-            </p>
-          </div>
-        )}
-
-        {/* Refresh result banner */}
-        {refreshResult && (
-          <div className={`mt-4 flex items-center gap-2 rounded-lg border p-3 ${
+      )}
+      {refreshResult && (
+        <div
+          className={`mt-2 flex items-center gap-2 border p-3 ${
             refreshResult.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50'
+              ? 'border-[var(--positive)] bg-[var(--positive)]/5'
               : refreshResult.type === 'warning'
-                ? 'border-kern-200 bg-kern-50'
-                : 'border-red-200 bg-red-50'
-          }`} data-testid="refresh-result">
-            {refreshResult.type === 'success' && <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />}
-            {refreshResult.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0 text-kern-500" />}
-            {refreshResult.type === 'error' && <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />}
-            <p className={`text-xs ${
-              refreshResult.type === 'success'
-                ? 'text-emerald-700'
-                : refreshResult.type === 'warning'
-                  ? 'text-kern-700'
-                  : 'text-red-700'
-            }`}>
-              {refreshResult.message}
-            </p>
-            <button
-              onClick={() => setRefreshResult(null)}
-              className="ml-auto shrink-0 rounded p-0.5 hover:bg-black/5"
-            >
-              <X className="h-3 w-3 text-[var(--ink-3)]" />
-            </button>
-          </div>
-        )}
-
-        {/* KPI Stats */}
-        <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale waarde</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{fc(totalValue)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale kostprijs</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{fc(totalCost)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Rendement</p>
-            {totalCost > 0 ? (
-              <p className={`mt-1 text-xl font-bold ${totalReturn >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(1)}%
-                <span className="ml-1 text-sm font-medium">
-                  ({totalReturn >= 0 ? '+' : ''}{fc(totalValue - totalCost)})
-                </span>
-              </p>
-            ) : (
-              <p className="mt-1 text-xl font-bold text-[var(--ink-3)]">-</p>
-            )}
-          </div>
+                ? 'border-[var(--module-active-300)] bg-[var(--module-active-50)]/60'
+                : 'border-[var(--negative)] bg-[var(--negative)]/5'
+          }`}
+          data-testid="refresh-result"
+        >
+          {refreshResult.type === 'success' && <CheckCircle className="h-4 w-4 shrink-0 text-[var(--positive)]" />}
+          {refreshResult.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--module-active-700)]" />}
+          {refreshResult.type === 'error' && <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--negative)]" />}
+          <p className="text-xs text-[var(--ink-2)]">{refreshResult.message}</p>
+          <button
+            onClick={() => setRefreshResult(null)}
+            aria-label="Sluit melding"
+            className="ml-auto shrink-0 p-0.5 hover:bg-[var(--ink)]/5"
+          >
+            <X className="h-3 w-3 text-[var(--ink-3)]" />
+          </button>
         </div>
+      )}
 
-        {/* Box 3 belastingimpact */}
-        {box3Summary.totalValue > 0 && (
-          <div className="mt-4 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Totale Box 3 heffing</p>
-                <p className="mt-1 text-lg font-bold font-mono tabular-nums text-[var(--ink)]">
-                  {fc(box3Summary.totalTax)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Effectief tarief</p>
-                <p className="mt-1 text-sm font-bold font-mono tabular-nums text-[var(--ink)]">
-                  {(box3Summary.effectiveRate * 100).toFixed(2)}%
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
+      {/* Hero summary — figures-strip + allocatie-strip + period selector + Box 3 + FIRE deck */}
+      <PortfolioSummary
+        totalValue={totalValue}
+        totalCost={totalCost}
+        todayChangeEur={todayChange.eur}
+        todayChangePct={todayChange.pct}
+        forwardDividendNetNl={forwardDividendNetNl}
+        box3={box3Summary}
+        yearlyEssentialExpenses={initialData?.yearlyEssentialExpenses ?? 0}
+        activePeriod={benchmarkPeriod}
+        onPeriodChange={handleBenchmarkPeriodChange}
+        comparison={benchmarkComparison}
+        assetClassBreakdown={assetClassBreakdown}
+        concentrationTop3Pct={concentrationTop3Pct}
+      />
 
-      {/* Portfolio allocation visualization — donut chart with sector/geography/asset class views */}
-      {holdingsForAllocation.length > 0 && (
-        <section className="mt-3 sm:mt-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6" data-testid="portfolio-allocation">
+      {/* Allocatie-donut — full breakdown met view-tabs (asset-class/sector/regio).
+          Anchor `#portfolio-allocation` zodat de compacte strip in de hero
+          hierheen kan deeplinken via in-page jump. */}
+      {showAllocation && (
+        <section
+          id="portfolio-allocation"
+          className="mt-6 scroll-mt-20 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6"
+          data-testid="portfolio-allocation"
+        >
           <div className="mb-4">
             <Kicker>
               <PieChart className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
@@ -623,9 +654,9 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         </section>
       )}
 
-      {/* Benchmark comparison */}
-      {holdings.length > 0 && (
-        <section className="mt-3 sm:mt-6">
+      {/* Benchmark — alleen vanaf 3 holdings */}
+      {showBenchmark && (
+        <section className="mt-6">
           <BenchmarkComparisonChart
             comparison={benchmarkComparison}
             onPeriodChange={handleBenchmarkPeriodChange}
@@ -635,60 +666,87 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         </section>
       )}
 
-      {/* Dividend Tracker */}
-      {holdings.length > 0 && (
-        <section className="mt-3 sm:mt-6" data-testid="dividend-tracker-section">
+      {/* Dividend-tracker — alleen wanneer er ook dividend is */}
+      {showDividendTracker && (
+        <section className="mt-6" data-testid="dividend-tracker-section">
           <DividendTracker />
         </section>
       )}
 
       {/* Error */}
       {error && (
-        <div className="mt-4 rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="mt-4 border border-[var(--negative)] bg-[var(--negative)]/5 p-4">
+          <p className="text-sm text-[var(--negative)]">{error}</p>
           <button
             onClick={() => { setError(null); setLoading(true); loadHoldings() }}
-            className="mt-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+            className="mt-2 inline-flex min-h-[32px] items-center px-3 py-1.5 text-[11px] font-mono font-semibold uppercase tracking-[0.12em] bg-[var(--negative)] text-[var(--paper)] border border-[var(--negative)] hover:opacity-90"
           >
             Opnieuw proberen
           </button>
         </div>
       )}
 
-      {/* View toggle: list vs heatmap */}
+      {/* Holdings-toolbar — sort, filter, acties */}
       {holdings.length > 0 && (
-        <div className="mt-3 sm:mt-6 flex items-center justify-between" data-testid="holdings-view-toggle">
-          <Kicker>Holdings</Kicker>
-          <div className="flex gap-0.5 rounded-lg bg-[var(--subtle)] p-0.5">
-            <button
-              type="button"
-              onClick={() => handleViewModeChange('list')}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                viewMode === 'list' ? 'bg-kern-600 text-white shadow-sm' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-              }`}
-              data-testid="view-toggle-list"
-            >
-              <List className="h-3 w-3" />
-              Lijst
-            </button>
-            <button
-              type="button"
-              onClick={() => handleViewModeChange('heatmap')}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                viewMode === 'heatmap' ? 'bg-kern-600 text-white shadow-sm' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-              }`}
-              data-testid="view-toggle-heatmap"
-            >
-              <LayoutGrid className="h-3 w-3" />
-              Heatmap
-            </button>
-          </div>
+        <div className="mt-6">
+          <HoldingsToolbar
+            totalCount={holdings.length}
+            filteredCount={sortedHoldings.length}
+            sort={sortKey}
+            onSortChange={setSortKey}
+            filter={assetFilterChip}
+            onFilterChange={setAssetFilterChip}
+            availableClasses={availableClasses}
+            refreshing={refreshing}
+            onRefresh={handleRefreshPrices}
+            onAdd={() => setShowForm(true)}
+          />
         </div>
       )}
 
-      {/* Heatmap view */}
+      {/* View-toggle list/heatmap — secundair, klein, alleen vanaf 5+ holdings */}
+      {holdings.length >= 5 && (
+        <div
+          className="mt-3 flex items-center justify-end gap-1"
+          data-testid="holdings-view-toggle"
+        >
+          <button
+            type="button"
+            onClick={() => handleViewModeChange('list')}
+            aria-pressed={viewMode === 'list'}
+            className={`min-h-[28px] inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-[0.12em] border transition-colors ${
+              viewMode === 'list'
+                ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]'
+                : 'bg-transparent text-[var(--ink-3)] border-[var(--rule-soft)] hover:text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+            }`}
+            data-testid="view-toggle-list"
+          >
+            <List className="h-3 w-3" />
+            Lijst
+          </button>
+          <button
+            type="button"
+            onClick={() => handleViewModeChange('heatmap')}
+            aria-pressed={viewMode === 'heatmap'}
+            className={`min-h-[28px] inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-[0.12em] border transition-colors ${
+              viewMode === 'heatmap'
+                ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]'
+                : 'bg-transparent text-[var(--ink-3)] border-[var(--rule-soft)] hover:text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+            }`}
+            data-testid="view-toggle-heatmap"
+          >
+            <LayoutGrid className="h-3 w-3" />
+            Heatmap
+          </button>
+        </div>
+      )}
+
+      {/* Heatmap weergave */}
       {viewMode === 'heatmap' && holdings.length > 0 && (
-        <section className="mt-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6" data-testid="holdings-heatmap-section">
+        <section
+          className="mt-3 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6"
+          data-testid="holdings-heatmap-section"
+        >
           <HoldingsHeatmap
             holdings={holdings.map(h => ({
               id: h.id,
@@ -711,242 +769,83 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         </section>
       )}
 
-      {/* Holdings list — grouped by parent asset */}
-      <section className={`mt-3 sm:mt-6 space-y-4 ${viewMode === 'heatmap' && filteredHoldings.length > 0 ? 'hidden' : ''}`}>
-        {filteredHoldings.length === 0 && !loading && (
-          <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
-            <Briefcase className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
-            <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">Geen holdings gevonden</p>
-            <p className="mt-1 text-xs text-[var(--ink-3)]">
-              {assetFilter
-                ? 'Dit vermogensbestanddeel heeft geen holdings met tracking ingeschakeld.'
-                : "Schakel 'Holdings bijhouden' in bij een belegging om je posities hier te zien."}
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-3">
-              {assetFilter && (
-                <Link
-                  href="/core/assets/holdings"
-                  className="inline-flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100"
-                >
-                  Alle holdings bekijken
-                </Link>
-              )}
-              <button
-                onClick={() => setShowForm(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
-              >
-                <Plus className="h-4 w-4" />
-                Holding toevoegen
-              </button>
-              <Link
-                href="/core/assets/holdings/import"
-                className="inline-flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100"
-              >
-                <Upload className="h-4 w-4" />
-                CSV import
-              </Link>
-            </div>
-          </div>
+      {/* Holdings list — flat, sorted, mini-artikel-blueprint per rij */}
+      <section
+        className={`mt-4 space-y-2 ${viewMode === 'heatmap' && sortedHoldings.length > 0 ? 'hidden' : ''}`}
+      >
+        {sortedHoldings.length === 0 && !loading && (
+          <EmptyState
+            isFiltered={!!assetFilter || assetFilterChip !== 'all'}
+            onAdd={() => setShowForm(true)}
+            onClearFilter={() => {
+              setAssetFilterChip('all')
+              if (assetFilter) router.push('/core/assets/holdings')
+            }}
+          />
         )}
 
-        {/* Asset filter indicator */}
-        {assetFilter && filteredHoldings.length > 0 && (
-          <div className="flex items-center gap-2 text-sm text-[var(--ink-3)]">
-            <span>Gefilterd op: <span className="font-medium text-kern-600">{groupedHoldings[0]?.assetName}</span></span>
+        {/* Asset-filter indicator (URL-niveau, deeplink van categoriepagina) */}
+        {assetFilter && sortedHoldings.length > 0 && (
+          <p
+            className="italic text-[12px] text-[var(--ink-3)] mb-2"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Gefilterd op{' '}
+            <span className="not-italic font-semibold text-[var(--module-active-700)]">
+              {sortedHoldings[0]?.asset_name ?? 'asset'}
+            </span>
+            {' · '}
             <Link
               href="/core/assets/holdings"
-              className="rounded px-1.5 py-0.5 text-xs font-medium text-kern-600 hover:bg-kern-50"
+              className="not-italic underline decoration-[var(--rule-soft)] underline-offset-4 hover:decoration-[var(--ink)]"
             >
-              Filter wissen
+              filter wissen
             </Link>
-          </div>
+          </p>
         )}
 
-        {groupedHoldings.map((group, groupIdx) => (
-          <div key={group.assetId}>
-            {/* Group header — only show when multiple groups are visible */}
-            {groupedHoldings.length > 1 && (
-              <div className={`flex items-center gap-2 ${groupIdx > 0 ? 'mt-6 pt-4 border-t border-kern-100' : ''}`}>
-                <Kicker>
-                  <Briefcase className="h-3 w-3 -mt-0.5 inline mr-1" aria-hidden />
-                  {group.assetName}
-                </Kicker>
-                <span
-                  className="italic text-[11px] text-[var(--ink-3)] ml-1"
-                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                >
-                  {group.items.length} holding{group.items.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-            )}
-            <div className={`space-y-2 ${groupedHoldings.length > 1 ? 'mt-2' : ''}`}>
-              {group.items.map((holding) => {
-                const price = holding.current_price ?? holding.avg_purchase_price
-                const value = price * Math.max(0, holding.units)
-                const cost = holding.avg_purchase_price * Math.max(0, holding.units)
-                const returnPct = cost > 0 ? ((value - cost) / cost) * 100 : 0
-                const stale = isPriceStale(holding)
-                const soldOut = holding.units <= 0
-                // Daily change: prefer DB column, fallback to refresh result
-                const priceUpdate = priceUpdates.get(holding.id)
-                const dailyPct = holding.daily_change_percent ?? priceUpdate?.dailyChangePercent ?? null
+        {sortedHoldings.map((holding) => {
+          const price = holding.current_price ?? holding.avg_purchase_price
+          const value = price * Math.max(0, holding.units)
+          const stale = isPriceStale(holding)
+          const priceUpdate = priceUpdates.get(holding.id)
+          const dailyPct =
+            holding.daily_change_percent ?? priceUpdate?.dailyChangePercent ?? null
+          const weightPct = totalValue > 0 ? (value / totalValue) * 100 : 0
+          const formattedValue =
+            holding.currency && holding.currency !== 'EUR'
+              ? new Intl.NumberFormat('nl-NL', {
+                  style: 'currency',
+                  currency: holding.currency,
+                }).format(Math.max(0, value))
+              : (fc(Math.max(0, value)) as string)
 
-                return (
-                  <div
-                    key={holding.id}
-                    className={`flex items-center gap-3 rounded-xl border bg-[var(--paper)] p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30 ${
-                      soldOut ? 'border-[var(--border-md)] bg-[var(--subtle)]/50 opacity-75' :
-                      stale ? 'border-kern-300 bg-kern-50/20' : 'border-[var(--border-ed)]'
-                    }`}
-                    data-testid={`holding-item-${holding.id}`}
-                    data-sold-out={soldOut ? 'true' : 'false'}
-                    data-units={Math.max(0, holding.units)}
-                  >
-                    {/* Clickable area — navigates to holding detail page */}
-                    <Link
-                      href={`/core/assets/holdings/${holding.id}`}
-                      className="flex min-w-0 flex-1 items-center gap-3"
-                      data-testid={`holding-link-${holding.id}`}
-                    >
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                      soldOut ? 'bg-zinc-100' :
-                      stale ? 'bg-kern-100' : 'bg-kern-50'
-                    }`}>
-                      {soldOut ? (
-                        <CheckCircle className="h-4 w-4 text-[var(--ink-3)]" />
-                      ) : stale ? (
-                        <Clock className="h-4 w-4 text-kern-500" />
-                      ) : (
-                        <TrendingUp className="h-4 w-4 text-kern-600" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className={`truncate text-sm font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>{holding.name}</p>
-                        {soldOut && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-2)]"
-                            data-testid="sold-out-indicator"
-                          >
-                            <CheckCircle className="h-2.5 w-2.5" />
-                            Uitverkocht
-                          </span>
-                        )}
-                        {stale && !soldOut && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full bg-kern-100 px-1.5 py-0.5 text-[10px] font-semibold text-kern-700"
-                            title={`Laatste update: ${formatLastUpdate(holding.last_price_update)}`}
-                            data-testid="stale-indicator"
-                          >
-                            <AlertTriangle className="h-2.5 w-2.5" />
-                            Verouderd
-                          </span>
-                        )}
-                      </div>
-                      <p className="truncate text-xs text-[var(--ink-3)]">
-                        {holding.ticker && <span className={`font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-kern-600'}`}>{holding.ticker}</span>}
-                        {holding.ticker && ' · '}
-                        {holding.currency && holding.currency !== 'EUR' && (
-                          <><span className="font-medium text-kern-500">{holding.currency}</span>{' · '}</>
-                        )}
-                        {soldOut ? <span className="text-[var(--ink-3)]">0 eenheden</span> : `${holding.units} eenheden`}
-                        {holding.institution && ` · ${holding.institution}`}
-                        {holding.purchase_date && ` · ${new Date(holding.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })}`}
-                        {stale && holding.last_price_update && (
-                          <span className="ml-1 text-kern-500">
-                            · Prijs van {formatLastUpdate(holding.last_price_update)}
-                          </span>
-                        )}
-                        {stale && !holding.last_price_update && (
-                          <span className="ml-1 text-kern-500">· Prijs nooit bijgewerkt</span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className={`text-sm font-semibold ${soldOut ? 'text-[var(--ink-3)]' : stale ? 'text-kern-700' : 'text-[var(--ink)]'}`} data-testid={`holding-value-${holding.id}`}>
-                        {holding.currency && holding.currency !== 'EUR'
-                          ? new Intl.NumberFormat('nl-NL', { style: 'currency', currency: holding.currency }).format(Math.max(0, value))
-                          : fc(Math.max(0, value))
-                        }
-                        {stale && !soldOut && <span className="text-[10px] font-normal text-kern-500 block">laatste bekende prijs</span>}
-                      </p>
-                      {/* Daily change from price feed */}
-                      {dailyPct !== null && !soldOut && !stale && (
-                        <p
-                          className={`text-[11px] font-semibold ${dailyPct >= 0 ? 'text-positive' : 'text-negative'}`}
-                          data-testid={`holding-daily-change-${holding.id}`}
-                        >
-                          {dailyPct >= 0 ? '▲' : '▼'} {dailyPct >= 0 ? '+' : ''}{dailyPct.toFixed(2)}% vandaag
-                        </p>
-                      )}
-                      {/* Total return */}
-                      {cost > 0 && !soldOut && (
-                        <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                          {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% totaal
-                        </p>
-                      )}
-                    </div>
-                    </Link>
-                    <div className="flex shrink-0 items-center gap-1">
-                      {stale && (
-                        <button
-                          onClick={() => setOverrideHolding(holding)}
-                          className="rounded-lg p-1.5 text-kern-500 hover:bg-kern-50 hover:text-kern-700"
-                          title="Prijs handmatig bijwerken"
-                          data-testid="manual-override-btn"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setTxHolding(holding)}
-                        className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-emerald-50 hover:text-emerald-600"
-                        title="Transactie registreren"
-                      >
-                        <Receipt className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setEditHolding(holding)}
-                        className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-kern-50 hover:text-kern-600"
-                        title="Bewerken"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </button>
-                      {deleteConfirm === holding.id ? (
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleDelete(holding.id)}
-                            disabled={deleting === holding.id}
-                            className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            data-testid={`delete-confirm-${holding.id}`}
-                          >
-                            {deleting === holding.id ? '...' : 'Ja'}
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(null)}
-                            disabled={deleting === holding.id}
-                            className="rounded-lg border border-[var(--border-ed)] px-2 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Nee
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteConfirm(holding.id)}
-                          className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-red-50 hover:text-red-600"
-                          title="Verwijderen"
-                          data-testid={`delete-trigger-${holding.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+          return (
+            <HoldingRow
+              key={holding.id}
+              holding={{
+                id: holding.id,
+                name: holding.name,
+                ticker: holding.ticker,
+                units: holding.units,
+                currentPrice: price,
+                avgPurchasePrice: holding.avg_purchase_price,
+                currency: holding.currency ?? null,
+                dailyChangePercent: dailyPct,
+                lastPriceUpdate: holding.last_price_update,
+                isStale: stale,
+                isWinner: winnerIds.has(holding.id),
+              }}
+              weightPct={weightPct}
+              formattedValue={formattedValue}
+              formatLastUpdate={formatLastUpdate}
+              onTransaction={() => setTxHolding(holding)}
+              onEdit={() => setEditHolding(holding)}
+              onDelete={() => handleDelete(holding.id)}
+              onManualOverride={() => setOverrideHolding(holding)}
+            />
+          )
+        })}
       </section>
 
       {/* New holding form modal */}
@@ -999,6 +898,58 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
           }}
         />
       )}
+    </div>
+  )
+}
+
+// ── Empty state ──────────────────────────────────────────────────
+
+function EmptyState({
+  isFiltered,
+  onAdd,
+  onClearFilter,
+}: {
+  isFiltered: boolean
+  onAdd: () => void
+  onClearFilter: () => void
+}) {
+  return (
+    <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
+      <Briefcase className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
+      <p
+        className="mt-3 italic text-base text-[var(--ink-2)]"
+        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+      >
+        {isFiltered
+          ? 'Geen holdings binnen dit filter.'
+          : "Schakel 'Holdings bijhouden' in bij een belegging om je posities hier te zien."}
+      </p>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        {isFiltered && (
+          <button
+            type="button"
+            onClick={onClearFilter}
+            className="inline-flex min-h-[32px] items-center px-3 py-1 text-[11px] font-mono font-semibold uppercase tracking-[0.12em] bg-transparent text-[var(--ink-2)] border border-[var(--rule-soft)] hover:border-[var(--ink-3)] hover:text-[var(--ink)]"
+          >
+            Filter wissen
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex min-h-[32px] items-center gap-1.5 px-3 py-1 text-[11px] font-mono font-semibold uppercase tracking-[0.12em] bg-[var(--ink)] text-[var(--paper)] border border-[var(--ink)] hover:bg-[var(--ink-2)]"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Holding toevoegen
+        </button>
+        <Link
+          href="/core/assets/holdings/import"
+          className="inline-flex min-h-[32px] items-center gap-1.5 px-3 py-1 text-[11px] font-mono font-semibold uppercase tracking-[0.12em] bg-transparent text-[var(--ink-2)] border border-[var(--rule-soft)] hover:border-[var(--ink-3)] hover:text-[var(--ink)]"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          CSV import
+        </Link>
+      </div>
     </div>
   )
 }

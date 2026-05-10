@@ -115,7 +115,7 @@ export const CATEGORY_DEEPENINGS: DeepeningEntry[] = [
   {
     type: 'investment',
     kind: 'asset',
-    label: 'Holdings',
+    label: 'Aandelen holdings',
     moduleId: 'aandelenregistratie',
     tipStripCopy:
       'Activeer Aandelenregistratie om individuele holdings, koersen en dagrendement bij te houden.',
@@ -123,15 +123,17 @@ export const CATEGORY_DEEPENINGS: DeepeningEntry[] = [
       'has_holdings_tracking' in item && item.has_holdings_tracking === true,
     toggleEndpoint: '/api/assets/toggle-holdings',
   },
-  // ── Holdings (crypto) ────────────────────────────────────────
-  // Symmetrisch met de investment-Holdings-app: dezelfde label-keuze
-  // ("Holdings"), dezelfde moduleId — gebruikers die de aandelen-/crypto-
-  // registratie aanzetten krijgen direct beide apps. Voor crypto bouwt de
-  // tab zelf een lichte allocation-overview op de typed CryptoHoldingRow's.
+  // ── Crypto holdings ──────────────────────────────────────────
+  // Symmetrisch met de investment-app, maar bewust eigen label
+  // ("Crypto holdings") zodat de sidebar-slug niet collidet met
+  // 'aandelen-holdings'. Beide apps delen wel `moduleId` —
+  // gebruikers die aandelen-/cryptoregistratie aanzetten krijgen
+  // direct beide apps. Voor crypto bouwt de tab zelf een lichte
+  // allocation-overview op de typed CryptoHoldingRow's.
   {
     type: 'crypto',
     kind: 'asset',
-    label: 'Holdings',
+    label: 'Crypto holdings',
     moduleId: 'aandelenregistratie',
     tipStripCopy:
       'Activeer aandelen- en cryptoregistratie voor het volledige coin-overzicht per exchange of wallet.',

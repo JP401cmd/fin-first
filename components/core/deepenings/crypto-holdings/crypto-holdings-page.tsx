@@ -1,9 +1,10 @@
 'use client'
 
 // crypto-holdings-page.tsx — root van de crypto Holdings-app. Orchestreert
-// de KPI-strip (incl. period-toggle + realized/unrealized sub-strip),
-// allocation-donut, performance-chart, heatmap, bron-breakdown,
-// holdings-grid en transactiegeschiedenis tot één samenhangende tab-pagina.
+// de KPI-strip (incl. period-toggle + collapsible detailweergave met de drie
+// sub-strips P&L/Risico/Fiscaal & Kosten), de full-width performance-chart,
+// het verdelings-paneel (segmented-control over donut · bron · spreiding ·
+// heatmap), holdings-grid en transactiegeschiedenis — samen één tab-pagina.
 //
 // Mirror van de investment Holdings-pagina (zie `components/core/holdings-
 // client.tsx`) maar dan gevoed door typed crypto-data en zonder de
@@ -30,11 +31,8 @@ import {
   type CryptoFeesSummary,
 } from '@/lib/crypto-holdings-data'
 import { CryptoKpiStrip } from './crypto-kpi-strip'
-import { CryptoAllocationChart } from './crypto-allocation-chart'
+import { CryptoDistributionPanel } from './crypto-distribution-panel'
 import { CryptoPerformanceChart } from './crypto-performance-chart'
-import { CryptoHeatmap } from './crypto-heatmap'
-import { CryptoSourceBreakdown } from './crypto-source-breakdown'
-import { CryptoSpreadSection } from './crypto-spread-section'
 import {
   CryptoHoldingsGrid,
   type CryptoSortKey,
@@ -116,9 +114,9 @@ export function CryptoHoldingsPage({
 
   return (
     <div className="space-y-8">
-      {/* 1. KPI-strip met period-toggle + realized/unrealized sub-strip
-          (incl. FIFO-toggle), Risico-sub-strip (concentratie + volatiliteit)
-          en Fiscaal/Kosten-sub-strip (Box 3 + fees). */}
+      {/* 1. KPI-strip — hoofd-figures-strip altijd zichtbaar; de drie
+          sub-strips (P&L incl. FIFO-toggle, Risico, Fiscaal & Kosten) zitten
+          achter een "Detailweergave"-toggle zodat boven-de-vouw rustig blijft. */}
       <CryptoKpiStrip
         holdings={holdings}
         period={period}
@@ -130,37 +128,30 @@ export function CryptoHoldingsPage({
         fees={fees}
       />
 
-      {/* 2. Allocation + Performance — twee-koloms desktop, gestapeld mobiel */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <CryptoAllocationChart holdings={holdings} totalValue={totalValue} />
-        <CryptoPerformanceChart
-          points={history}
-          period={period}
-          periodReturn={activePeriodReturn}
-          benchmarkBtc={benchmarkBtc}
-          benchmarkEth={benchmarkEth}
-        />
-      </div>
-
-      {/* 3. Heatmap — volle breedte tussen charts en bron-breakdown */}
-      <CryptoHeatmap
-        holdings={holdings}
-        perHoldingChange24h={periodReturns?.['24h'].perHolding}
+      {/* 2. Performance-chart — full-width. Tijdseries lezen breder beter
+          dan smal; de allocation-donut zit nu in het verdelings-blok. */}
+      <CryptoPerformanceChart
+        points={history}
+        period={period}
+        periodReturn={activePeriodReturn}
+        benchmarkBtc={benchmarkBtc}
+        benchmarkEth={benchmarkEth}
       />
 
-      {/* 4. Bron-breakdown — klikbaar zodat de host filter kan toepassen */}
-      <CryptoSourceBreakdown
+      {/* 3. Verdeling — één paneel met segmented-control voor de vier
+          views (Per coin · Per bron · Spreiding · Heatmap). Vervangt vier
+          afzonderlijke secties. Bron-filter blijft hier toggelen zodat de
+          holdings-grid eronder blijft reageren. */}
+      <CryptoDistributionPanel
         holdings={holdings}
         totalValue={totalValue}
-        activeLabel={sourceFilter}
-        onSelect={setSourceFilter}
+        spread={spread}
+        perHoldingChange24h={periodReturns?.['24h'].perHolding}
+        sourceFilter={sourceFilter}
+        onSourceFilterChange={setSourceFilter}
       />
 
-      {/* 4b. Spreiding per coin — micro-plaat: voor elke unieke symbol
-          welke bronnen leveren hem? Geeft exchange-lock-in inzichtelijk. */}
-      <CryptoSpreadSection spread={spread} />
-
-      {/* 5. Holdings-grid met sort + view-toggle (kaarten/tabel) */}
+      {/* 4. Holdings-grid met sort + view-toggle (kaarten/tabel) */}
       <CryptoHoldingsGrid
         holdings={holdings}
         sortKey={sortKey}
@@ -171,7 +162,7 @@ export function CryptoHoldingsPage({
         sparklinesByHoldingId={sparklinesByHoldingId}
       />
 
-      {/* 6. Recente transacties (alleen als er trades zijn) */}
+      {/* 5. Recente transacties (alleen als er trades zijn) */}
       {transactions.length > 0 && (
         <CryptoTransactionsLog transactions={transactions} />
       )}

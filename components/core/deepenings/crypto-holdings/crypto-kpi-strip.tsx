@@ -21,7 +21,7 @@
 //   - Sub-strips gescheiden door dashed top-border — past bij krantkolom-look
 
 import { useState } from 'react'
-import { Info } from 'lucide-react'
+import { ChevronDown, ChevronRight, Info } from 'lucide-react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -139,6 +139,22 @@ export function CryptoKpiStrip({
   // rendement). Voor users zonder crypto-positie val we terug op 0.
   const box3 = computeCryptoBox3Impact(cryptoOnlyTotal)
 
+  // ── Collapsible "Detailweergave" ───────────────────────────────────────
+  //
+  // Boven-de-vouw rust: de hoofd-figures-strip blijft altijd zichtbaar; de
+  // drie sub-strips (P&L · Risico · Fiscaal & Kosten) verhuizen achter een
+  // toggle. Default ingeklapt — gebruiker initieert zelf het detail-niveau.
+  // Geen animatie: instant open/dicht voorkomt content-shift en is
+  // automatisch reduce-motion-veilig.
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const hasRealizedPnL = !!activeRealizedPnL
+  const hasRisk =
+    concentration.holdingsCount > 0 || !!volatility
+  const hasTaxAndCosts =
+    cryptoOnlyTotal > 0 || (!!fees && fees.feeCount > 0)
+  const hasAnyDetail = hasRealizedPnL || hasRisk || hasTaxAndCosts
+  const detailsId = 'crypto-kpi-details'
+
   return (
     <section className="space-y-4 border-b border-[var(--border-ed)] pb-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -193,32 +209,75 @@ export function CryptoKpiStrip({
         />
       </div>
 
-      {activeRealizedPnL && (
-        <RealizedPnLSubStrip
-          data={activeRealizedPnL}
-          method={costBasisMethod}
-          onMethodChange={setCostBasisMethod}
-          // Toggle-disable als de FIFO-variant niet beschikbaar is. Voorkomt
-          // dat de gebruiker schakelt naar een leeg pad.
-          fifoAvailable={!!realizedPnLFifo}
+      {hasAnyDetail && (
+        <DetailsToggleRow
+          open={detailsOpen}
+          onToggle={() => setDetailsOpen((v) => !v)}
+          controlsId={detailsId}
         />
       )}
 
-      {/* Sub-strip: Risico — concentratie + volatiliteit op één rij. */}
-      {(concentration.holdingsCount > 0 || volatility) && (
-        <RiskSubStrip
-          concentration={concentration}
-          volatility={volatility}
-        />
-      )}
+      {detailsOpen && hasAnyDetail && (
+        <div id={detailsId} className="space-y-4">
+          {hasRealizedPnL && (
+            <RealizedPnLSubStrip
+              data={activeRealizedPnL!}
+              method={costBasisMethod}
+              onMethodChange={setCostBasisMethod}
+              // Toggle-disable als de FIFO-variant niet beschikbaar is. Voorkomt
+              // dat de gebruiker schakelt naar een leeg pad.
+              fifoAvailable={!!realizedPnLFifo}
+            />
+          )}
 
-      {/* Sub-strip: Fiscaal & Kosten — Box 3 indicatie + totaal fees. Toon
-          alleen wanneer er crypto-waarde of fees zijn (anders zijn beide
-          cellen 0 en heeft de strip geen informatie). */}
-      {(cryptoOnlyTotal > 0 || (fees && fees.feeCount > 0)) && (
-        <TaxAndCostsSubStrip box3={box3} fees={fees} />
+          {/* Sub-strip: Risico — concentratie + volatiliteit op één rij. */}
+          {hasRisk && (
+            <RiskSubStrip
+              concentration={concentration}
+              volatility={volatility}
+            />
+          )}
+
+          {/* Sub-strip: Fiscaal & Kosten — Box 3 indicatie + totaal fees. Toon
+              alleen wanneer er crypto-waarde of fees zijn (anders zijn beide
+              cellen 0 en heeft de strip geen informatie). */}
+          {hasTaxAndCosts && <TaxAndCostsSubStrip box3={box3} fees={fees} />}
+        </div>
       )}
     </section>
+  )
+}
+
+// ── Detailweergave-toggle ────────────────────────────────────────────────
+//
+// Eén-rij toggle die de drie sub-strips (P&L · Risico · Fiscaal & Kosten)
+// onthult. Touch-target 44px hoog (CLAUDE.md UI/UX), keyboard-bereikbaar
+// met `aria-expanded` + `aria-controls` zodat screenreaders direct snappen
+// wat er klapt. Caret-icon volgt open/dicht zonder animatie — past bij de
+// instant-show/hide keuze (zie `detailsOpen` comment hierboven).
+
+interface DetailsToggleRowProps {
+  open: boolean
+  onToggle: () => void
+  controlsId: string
+}
+
+function DetailsToggleRow({ open, onToggle, controlsId }: DetailsToggleRowProps) {
+  const Icon = open ? ChevronDown : ChevronRight
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={controlsId}
+      className="group flex min-h-[44px] w-full items-center gap-2 border-t border-dashed border-[var(--border-ed)] pt-4 text-left text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+    >
+      <Icon
+        className="h-3.5 w-3.5 text-[var(--ink-4)] transition-colors group-hover:text-[var(--ink-2)]"
+        aria-hidden="true"
+      />
+      <span>{open ? 'Verberg detailweergave' : 'Toon detailweergave'}</span>
+    </button>
   )
 }
 

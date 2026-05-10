@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import {
@@ -30,7 +31,6 @@ import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { CashOverview } from '@/components/app/cash-overview'
 import { AddCategoryCard } from './add-category-card'
 import { VermogenAssetCard } from './vermogen-asset-card'
@@ -38,7 +38,17 @@ import { CategoryTabs, type CategoryTab } from './category-tabs'
 import { CategoryHistoryChart } from './category-history-chart'
 import { ModuleTipStrip } from './module-tip-strip'
 import { CoreKengetallen } from './core-kengetallen'
-import { AssetPane } from '@/components/app/core/assets/asset-pane'
+
+// Lazy-load: deze overlays openen pas op user-actie. Conditional-mount + dynamic()
+// houdt hun JS-chunk uit het initial-bundle → snellere mobile-LCP op de hero.
+const QuickAddWizard = dynamic(
+  () => import('@/components/app/quick-add-wizard/quick-add-wizard').then((m) => ({ default: m.QuickAddWizard })),
+  { ssr: false },
+)
+const AssetPane = dynamic(
+  () => import('@/components/app/core/assets/asset-pane').then((m) => ({ default: m.AssetPane })),
+  { ssr: false },
+)
 import {
   findDeepenings,
   getDeepeningComponent,
@@ -586,22 +596,26 @@ export function AssetCategoryPage({
         )}
       </div>
 
-      <QuickAddWizard
-        open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
-        initialIntent="asset"
-        initialAssetType={type}
-        onSaved={() => {
-          setQuickAddOpen(false)
-          router.refresh()
-        }}
-      />
+      {quickAddOpen && (
+        <QuickAddWizard
+          open
+          onClose={() => setQuickAddOpen(false)}
+          initialIntent="asset"
+          initialAssetType={type}
+          onSaved={() => {
+            setQuickAddOpen(false)
+            router.refresh()
+          }}
+        />
+      )}
 
-      <AssetPane
-        asset={selectedAsset}
-        onClose={() => setSelectedAssetId(null)}
-        onChanged={() => router.refresh()}
-      />
+      {selectedAsset && (
+        <AssetPane
+          asset={selectedAsset}
+          onClose={() => setSelectedAssetId(null)}
+          onChanged={() => router.refresh()}
+        />
+      )}
     </div>
   )
 }

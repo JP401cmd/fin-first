@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -12,8 +13,12 @@ import {
   Clock, ChevronDown, ChevronUp, Lightbulb,
   Sparkles, SlidersHorizontal, Shield, Building2, AlertTriangle,
 } from 'lucide-react'
-import { Box3PartnerModal } from '@/components/app/core/box3-partner-modal'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+
+const Box3PartnerModal = dynamic(
+  () => import('@/components/app/core/box3-partner-modal').then((m) => ({ default: m.Box3PartnerModal })),
+  { ssr: false },
+)
 
 // ── Types ────────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import {
@@ -11,7 +12,6 @@ import {
 } from '@/lib/debt-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { AddCategoryCard } from './add-category-card'
 import { VermogenDebtCard } from './vermogen-debt-card'
 import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
@@ -22,8 +22,18 @@ import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
 import { CategoryHistoryChart } from './category-history-chart'
 import type { CategoryHistoryData } from '@/lib/load-category-history'
-import { DebtPane } from '@/components/app/core/debts/debt-pane'
 import { createClient } from '@/lib/supabase/client'
+
+// Lazy-load: deze overlays openen pas op user-actie. Houdt hun JS-chunk uit
+// het initial-bundle → snellere mobile-LCP op de hero.
+const QuickAddWizard = dynamic(
+  () => import('@/components/app/quick-add-wizard/quick-add-wizard').then((m) => ({ default: m.QuickAddWizard })),
+  { ssr: false },
+)
+const DebtPane = dynamic(
+  () => import('@/components/app/core/debts/debt-pane').then((m) => ({ default: m.DebtPane })),
+  { ssr: false },
+)
 import type { Valuation } from '@/components/app/core/debts/debt-types'
 import type { Asset } from '@/lib/asset-data'
 import {
@@ -365,25 +375,29 @@ export function DebtCategoryPage({
         </div>
       </div>
 
-      <QuickAddWizard
-        open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
-        initialIntent="debt"
-        initialDebtType={type}
-        onSaved={() => {
-          setQuickAddOpen(false)
-          router.refresh()
-        }}
-      />
+      {quickAddOpen && (
+        <QuickAddWizard
+          open
+          onClose={() => setQuickAddOpen(false)}
+          initialIntent="debt"
+          initialDebtType={type}
+          onSaved={() => {
+            setQuickAddOpen(false)
+            router.refresh()
+          }}
+        />
+      )}
 
-      <DebtPane
-        debt={selectedDebt}
-        valuations={selectedDebt ? valuationsByDebtId[selectedDebt.id] : undefined}
-        userAssets={userAssets}
-        allDebts={debts}
-        onClose={() => setSelectedDebtId(null)}
-        onChanged={() => router.refresh()}
-      />
+      {selectedDebt && (
+        <DebtPane
+          debt={selectedDebt}
+          valuations={valuationsByDebtId[selectedDebt.id]}
+          userAssets={userAssets}
+          allDebts={debts}
+          onClose={() => setSelectedDebtId(null)}
+          onChanged={() => router.refresh()}
+        />
+      )}
     </div>
   )
 }

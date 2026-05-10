@@ -46,6 +46,7 @@
       "mcp__supabase__execute_sql",
       "mcp__supabase__list_migrations",
       "mcp__supabase__get_logs",
+      "mcp__chrome-devtools__*",
       "mcp__supabase__generate_typescript_types",
       "Bash(playwright-cli open:*)",
       "Bash(playwright-cli run-code:*)",
