@@ -173,41 +173,47 @@ function VerhuurrendementActive() {
 
   return (
     <div className="space-y-8">
-      {/* ── Header — kicker + titel + samenvatting ───────────── */}
-      <header>
-        <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
-          Verhuurrendement
-        </p>
-        <h2
-          className="mt-1 font-serif text-xl font-semibold text-[var(--ink)]"
-          style={{ fontFamily: 'var(--font-playfair, serif)' }}
-        >
-          {calcs.length === 1
-            ? 'Eén verhuurd pand in beeld'
-            : `${calcs.length} verhuurde panden in beeld`}
-        </h2>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
-          <Stat
-            label="Marktwaarde totaal"
-            value={fc(totalCurrentValue)}
-          />
-          <Stat
-            label="Eigen geld"
-            value={fc(totalOwnEquity)}
-            tone="primary"
-          />
-          <Stat
-            label="Cashflow per maand"
-            value={`${totalMonthlyCashflow >= 0 ? '+' : '−'}${fc(Math.abs(totalMonthlyCashflow))}`}
-            tone={totalMonthlyCashflow >= 0 ? 'positive' : 'negative'}
-          />
-          <Stat
-            label="Cashflow per jaar"
-            value={`${totalMonthlyCashflow >= 0 ? '+' : '−'}${fc(Math.abs(totalMonthlyCashflow * 12))}`}
-            tone={totalMonthlyCashflow >= 0 ? 'positive' : 'negative'}
-          />
-        </div>
-      </header>
+      {/* ── KPI-hero-band — paper-blok met harde ink-borders rond
+          kicker + titel + stat-grid. Volgt de Categorie-app-tab
+          hero-band-blueprint (zie ui-ux skill, patroon-kaart
+          KPI-paper-blok); zelfde discipline als crypto-holdings-page.tsx
+          en budgets-client.tsx. ─────────────────────────────── */}
+      <section className="border-t border-b border-[var(--ink)] bg-[var(--paper)] px-4 py-5 sm:px-6 sm:py-7">
+        <header>
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Verhuurrendement
+          </p>
+          <h2
+            className="mt-1 font-serif text-xl font-semibold text-[var(--ink)]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            {calcs.length === 1
+              ? 'Eén verhuurd pand in beeld'
+              : `${calcs.length} verhuurde panden in beeld`}
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
+            <Stat
+              label="Marktwaarde totaal"
+              value={fc(totalCurrentValue)}
+            />
+            <Stat
+              label="Eigen geld"
+              value={fc(totalOwnEquity)}
+              tone="primary"
+            />
+            <Stat
+              label="Cashflow per maand"
+              value={`${totalMonthlyCashflow >= 0 ? '+' : '−'}${fc(Math.abs(totalMonthlyCashflow))}`}
+              tone={totalMonthlyCashflow >= 0 ? 'positive' : 'negative'}
+            />
+            <Stat
+              label="Cashflow per jaar"
+              value={`${totalMonthlyCashflow >= 0 ? '+' : '−'}${fc(Math.abs(totalMonthlyCashflow * 12))}`}
+              tone={totalMonthlyCashflow >= 0 ? 'positive' : 'negative'}
+            />
+          </div>
+        </header>
+      </section>
 
       {/* ── Per pand: ROI-card ─────────────────────────────────── */}
       <section className="space-y-3">

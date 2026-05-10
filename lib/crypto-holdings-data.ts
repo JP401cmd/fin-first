@@ -94,6 +94,13 @@ export interface CryptoHoldingRow {
   lastSyncedAt: string | null
   /** Laatste sync-fout van de bron. NULL als laatste run succes was of bron handmatig. */
   lastSyncError: string | null
+  /**
+   * Persoonlijke notitie van de gebruiker bij deze positie. NULL als geen
+   * notitie is ingevoerd. Optioneel veld — alleen consumenten die de detail-
+   * pane (edit-mode) bedienen lezen het. List/grid-views negeren het zonder
+   * verlies.
+   */
+  notes: string | null
 }
 
 /**
@@ -180,6 +187,7 @@ export const loadCryptoHoldingsForUser = cache(
         last_price_update,
         is_fiat_balance,
         is_favorite,
+        notes,
         source_exchange_connection_id,
         source_wallet_address_id,
         asset:assets!asset_id(id, name),
@@ -209,6 +217,7 @@ export const loadCryptoHoldingsForUser = cache(
       last_price_update: string | null
       is_fiat_balance: boolean | null
       is_favorite: boolean | null
+      notes: string | null
       source_exchange_connection_id: string | null
       source_wallet_address_id: string | null
       asset: { id: string; name: string } | { id: string; name: string }[] | null
@@ -331,6 +340,7 @@ export const loadCryptoHoldingsForUser = cache(
         lastPriceUpdate: r.last_price_update,
         lastSyncedAt,
         lastSyncError,
+        notes: r.notes,
       }
     })
 

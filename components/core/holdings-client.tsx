@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Plus, X, ArrowLeft, ArrowUpRight, ArrowDownRight, Briefcase, Receipt, DollarSign, PieChart, RefreshCw, AlertTriangle, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
+import { Plus, X, ArrowLeft, ArrowUpRight, ArrowDownRight, Briefcase, Receipt, DollarSign, PieChart, AlertTriangle, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
 import { formatTimestamp, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -26,8 +26,9 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { Kicker, EditorialHeadline } from '@/components/editorial'
 import { IsinLookupField, type IsinResolved } from '@/components/holdings/isin-lookup-field'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
+import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { PortfolioSummary } from './holdings/portfolio-summary'
 import {
   HoldingsToolbar,
@@ -35,6 +36,10 @@ import {
   type AssetClassFilter,
 } from './holdings/holdings-toolbar'
 import { HoldingRow } from './holdings/holding-row'
+import {
+  InvestmentHoldingPane,
+  type InvestmentHoldingPaneInput,
+} from './holdings/investment-holding-pane'
 
 type Holding = {
   id: string
@@ -82,6 +87,7 @@ type HoldingPriceUpdate = {
 
 export default function HoldingsPage({ initialData }: { initialData?: HoldingsPageData } = {}) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const fc = useFc()
   // Optional URL filter: ?asset=<uuid> shows only holdings from that asset
@@ -93,9 +99,11 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [editHolding, setEditHolding] = useState<Holding | null>(null)
   // Delete-confirmatie leeft nu binnen het ⋯-menu per rij (HoldingRow). De
   // page-level state is enkel een loading-flag op de actieve verwijdering.
+  // Edit-flow leeft sinds mei 2026 niet meer in een eigen modal — die
+  // functionaliteit zit in `<InvestmentHoldingPane>` (Bewerken-knop in de
+  // pane-footer). De `?holding=<id>` URL-state stuurt de pane-open.
   const [deleting, setDeleting] = useState<string | null>(null)
   const [txHolding, setTxHolding] = useState<Holding | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -218,22 +226,20 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   // Push a history entry when a modal opens so the back button closes the modal
   // instead of navigating away. After form submission, replace the entry to
   // prevent the back button from re-opening the (now stale) form.
+  // De pane (`?holding=<id>`) regelt z'n eigen close via URL-state — die zit
+  // dus niet in deze tracking, anders zou de back-knop dubbel-poppen.
   useEffect(() => {
-    const modalOpen = showForm || editHolding !== null || txHolding !== null
+    const modalOpen = showForm || txHolding !== null
     if (modalOpen) {
       // Push a new history entry for the open modal
       window.history.pushState({ holdingsModal: true }, '')
     }
 
-    function onPopState(e: PopStateEvent) {
+    function onPopState() {
       // When user presses back while a modal is open, close the modal
       // instead of navigating away. This prevents re-submission.
       if (showForm) {
         setShowForm(false)
-        return
-      }
-      if (editHolding) {
-        setEditHolding(null)
         return
       }
       if (txHolding) {
@@ -246,7 +252,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     return () => {
       window.removeEventListener('popstate', onPopState)
     }
-  }, [showForm, editHolding, txHolding])
+  }, [showForm, txHolding])
 
   // On mount, check if we arrived here via back-button after a form submission
   // and prevent re-opening the form
@@ -541,9 +547,77 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     return (top3 / totalValue) * 100
   }, [holdings, totalValue])
 
+  // ── Pane URL-state ─────────────────────────────────────────────────
+  // De detail-pane voor één investment-positie leeft op `?holding=<id>`.
+  // We lezen de query-param en zoeken de bijbehorende holding op in de al-
+  // geladen array — geen extra fetch nodig, alle context-data zit al in
+  // `holdings`. Crypto-rijen (`bucket === 'crypto'`) negeren we expliciet:
+  // die hebben een eigen pane-flow op `?crypto=<id>`.
+  const requestedHoldingId = searchParams.get(OVERLAY_QUERY_KEYS.holding)
+  const selectedHoldingForPane: InvestmentHoldingPaneInput | null = useMemo(() => {
+    if (!requestedHoldingId) return null
+    const found = holdings.find((h) => h.id === requestedHoldingId)
+    if (!found) return null
+    const bucket = (found as Holding & { bucket?: string }).bucket
+    if (bucket === 'crypto') return null
+    return {
+      id: found.id,
+      ticker: found.ticker,
+      name: found.name,
+      isin: found.isin,
+      units: found.units,
+      currency: found.currency ?? null,
+      currentPrice: found.current_price,
+      avgPurchasePrice: found.avg_purchase_price,
+      notes: found.notes,
+      // `external_source` is niet aanwezig in de lokale `Holding` type-
+      // definitie (legacy holdings-tabel had het niet), maar de
+      // server-loader in `holdings-data-loader.ts` voegt het via
+      // `select('*')` automatisch toe. Cast-via-Record om de bridge te
+      // maken zonder de centrale Holding-type aan te passen.
+      externalSource:
+        ((found as Holding & { external_source?: string | null }).external_source ??
+          null) || null,
+      lastPriceUpdate: found.last_price_update,
+      dailyChangePercent: found.daily_change_percent ?? null,
+      ter: found.ter ?? null,
+    }
+  }, [holdings, requestedHoldingId])
+
+  // Open de pane door alleen `?holding=<id>` aan de URL toe te voegen —
+  // overige query-state (bv. `?asset=…` deeplink-filter) blijft bestaan.
+  // `router.replace` ipv `push` zodat schakelen tussen posities niet de
+  // history vervuilt; het pane-open-moment zelf is één history-entry,
+  // ongeacht hoeveel rijen de gebruiker bekijkt voordat ze sluiten.
+  const openHoldingPane = useCallback(
+    (id: string) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set(OVERLAY_QUERY_KEYS.holding, id)
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    },
+    [router, pathname, searchParams],
+  )
+
+  // Sluit de pane door alleen `?holding=` uit de URL te halen — overige
+  // query-state blijft behouden zodat de gebruiker terugkeert naar
+  // dezelfde context.
+  const closeHoldingPane = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete(OVERLAY_QUERY_KEYS.holding)
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [router, pathname, searchParams])
+
+  // Pane-callback bij save/delete — laad de holdings opnieuw zodat de
+  // KPI-strip en figures-strip de nieuwe waarden tonen.
+  const handlePaneChanged = useCallback(() => {
+    setLoading(true)
+    loadHoldings()
+  }, [loadHoldings])
+
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
+      <div className="py-5 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent" />
         </div>
@@ -564,7 +638,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   const showDividendTracker = (forwardDividendBruto ?? 0) > 0
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="py-5 sm:py-8">
       {/* Editorial header — blueprint Type 2 (List). Korte krant-koprij. */}
       <header className="mb-2 space-y-2">
         <Link
@@ -578,43 +652,88 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         <EditorialHeadline emphasis="portfolio">Jouw portfolio</EditorialHeadline>
       </header>
 
-      {/* Refresh / stale banners — apart, geen kaart eromheen */}
+      {/* Refresh / stale banners — apart, geen kaart eromheen.
+          Editorial krant-stijl: kicker-rij in mono UPPERCASE + body in italic Source Serif,
+          counters in DM Mono met tabular-nums voor consistente cijferritmiek. */}
       {staleCount > 0 && (
         <div
-          className="flex items-center gap-2 border border-[var(--module-active-300)] bg-[var(--module-active-50)]/60 p-3"
+          className="flex items-start gap-3 border border-[var(--module-active-300)] bg-[var(--module-active-50)]/60 px-4 py-3"
           data-testid="stale-price-warning"
         >
-          <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--module-active-700)]" />
-          <p className="text-xs text-[var(--ink-2)]">
-            <span className="font-semibold">{staleCount} holding{staleCount !== 1 ? 's' : ''}</span>{' '}
-            met verouderde prijzen — vernieuw of werk handmatig bij via het ⋯-menu.
-          </p>
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-active-700)]" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.18em] font-mono font-semibold text-[var(--module-active-700)]">
+              Prijzen verouderd
+            </p>
+            <p className="mt-1 font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
+              <span className="font-mono not-italic font-bold tabular-nums text-[var(--ink)]">{staleCount}</span>
+              {' '}
+              {staleCount === 1 ? 'holding heeft' : 'holdings hebben'} een prijs die niet meer up-to-date is.
+              Vernieuw automatisch of werk handmatig bij via het <span className="font-mono not-italic">⋯</span>-menu.
+            </p>
+          </div>
         </div>
       )}
-      {refreshResult && (
-        <div
-          className={`mt-2 flex items-center gap-2 border p-3 ${
-            refreshResult.type === 'success'
-              ? 'border-[var(--positive)] bg-[var(--positive)]/5'
-              : refreshResult.type === 'warning'
-                ? 'border-[var(--module-active-300)] bg-[var(--module-active-50)]/60'
-                : 'border-[var(--negative)] bg-[var(--negative)]/5'
-          }`}
-          data-testid="refresh-result"
-        >
-          {refreshResult.type === 'success' && <CheckCircle className="h-4 w-4 shrink-0 text-[var(--positive)]" />}
-          {refreshResult.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--module-active-700)]" />}
-          {refreshResult.type === 'error' && <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--negative)]" />}
-          <p className="text-xs text-[var(--ink-2)]">{refreshResult.message}</p>
-          <button
-            onClick={() => setRefreshResult(null)}
-            aria-label="Sluit melding"
-            className="ml-auto shrink-0 p-0.5 hover:bg-[var(--ink)]/5"
+      {refreshResult && (() => {
+        // Per-type stijl-mapping: kicker-kleur + icon volgen success/warning/error-semantiek.
+        // Body-tekst blijft op --ink-2 (italic Source Serif) zodat de melding leesbaar blijft
+        // en de kleurtoekenning gelaagd is — kleur op kicker en icon, niet op de hele paragraaf.
+        const isSuccess = refreshResult.type === 'success'
+        const isWarning = refreshResult.type === 'warning'
+        const containerClass = isSuccess
+          ? 'border-[var(--positive)] bg-[var(--positive)]/5'
+          : isWarning
+            ? 'border-[var(--module-active-300)] bg-[var(--module-active-50)]/60'
+            : 'border-[var(--negative)] bg-[var(--negative)]/5'
+        const kickerLabel = isSuccess
+          ? 'Prijzen vernieuwd'
+          : isWarning
+            ? 'Prijsdienst waarschuwt'
+            : 'Prijzen niet vernieuwd'
+        const kickerColor = isSuccess
+          ? 'text-[var(--positive)]'
+          : isWarning
+            ? 'text-[var(--module-active-700)]'
+            : 'text-[var(--negative)]'
+        // Highlight standalone digit-sequences (counters zoals "3 prijzen vernieuwd")
+        // in DM Mono met tabular-nums — consistent met alle financiële cijfers in de app.
+        // Splitst de server-string op `\d+(?:[.,]\d+)?` zodat elk getal een eigen span krijgt
+        // zonder de italic Source Serif van de omringende body te onderbreken.
+        const tokens = refreshResult.message.split(/(\d+(?:[.,]\d+)?)/)
+        return (
+          <div
+            className={`mt-2 flex items-start gap-3 border px-4 py-3 ${containerClass}`}
+            data-testid="refresh-result"
           >
-            <X className="h-3 w-3 text-[var(--ink-3)]" />
-          </button>
-        </div>
-      )}
+            {isSuccess && <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--positive)]" aria-hidden="true" />}
+            {isWarning && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-active-700)]" aria-hidden="true" />}
+            {refreshResult.type === 'error' && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--negative)]" aria-hidden="true" />}
+            <div className="min-w-0 flex-1">
+              <p className={`text-[10px] uppercase tracking-[0.18em] font-mono font-semibold ${kickerColor}`}>
+                {kickerLabel}
+              </p>
+              <p className="mt-1 font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
+                {tokens.map((token, i) =>
+                  /^\d+(?:[.,]\d+)?$/.test(token) ? (
+                    <span key={i} className="font-mono not-italic font-bold tabular-nums text-[var(--ink)]">
+                      {token}
+                    </span>
+                  ) : (
+                    <span key={i}>{token}</span>
+                  )
+                )}
+              </p>
+            </div>
+            <button
+              onClick={() => setRefreshResult(null)}
+              aria-label="Sluit melding"
+              className="ml-auto shrink-0 p-0.5 hover:bg-[var(--ink)]/5"
+            >
+              <X className="h-3 w-3 text-[var(--ink-3)]" />
+            </button>
+          </div>
+        )
+      })()}
 
       {/* Hero summary — figures-strip + allocatie-strip + period selector + Box 3 + FIRE deck */}
       <PortfolioSummary
@@ -764,7 +883,23 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
               geography: h.geography,
             }))}
             dividendData={dividendData}
-            onHoldingClick={(id) => router.push(`/core/assets/holdings/${id}`)}
+            onHoldingClick={(id) => {
+              // Heatmap-cel openen schakelt naar de detail-pane via
+              // URL-state — symmetrisch met de lijst-rij. Crypto-rijen
+              // ontstaan in de heatmap niet (heatmap krijgt alle rows en
+              // filtert op `asset_class`/`sector`/`geography`); voor de
+              // zekerheid valt het pane-open terug op de full-page route
+              // wanneer de holding niet in de lokale array zit.
+              const target = holdings.find((h) => h.id === id)
+              const bucket =
+                target &&
+                (target as Holding & { bucket?: string }).bucket
+              if (target && bucket !== 'crypto') {
+                openHoldingPane(id)
+              } else {
+                router.push(`/core/assets/holdings/${id}`)
+              }
+            }}
           />
         </section>
       )}
@@ -820,6 +955,14 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
                 }).format(Math.max(0, value))
               : (fc(Math.max(0, value)) as string)
 
+          // Crypto-rijen openen geen investment-pane — die hebben hun eigen
+          // pane-flow (`?crypto=<id>`) op de crypto-Holdings-app. Voor nu
+          // negeren we de pane-trigger op crypto-rijen en laten de Link
+          // doorgaan naar de full-page route. Investment-rijen openen de
+          // nieuwe pane via URL-state.
+          const bucket = (holding as Holding & { bucket?: string }).bucket
+          const isInvestmentRow = bucket !== 'crypto'
+
           return (
             <HoldingRow
               key={holding.id}
@@ -840,9 +983,22 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
               formattedValue={formattedValue}
               formatLastUpdate={formatLastUpdate}
               onTransaction={() => setTxHolding(holding)}
-              onEdit={() => setEditHolding(holding)}
+              // "Bewerken" in het ⋯-menu opent voortaan de pane (waarin de
+              // gebruiker via de footer-knop "Bewerken" naar edit-mode kan
+              // schakelen). Conform spec: geen aparte HoldingEditForm-modal
+              // meer.
+              onEdit={
+                isInvestmentRow
+                  ? () => openHoldingPane(holding.id)
+                  : () => {
+                      // Crypto-rijen op deze legacy-pagina hebben (nog) geen
+                      // pane-flow; we blijven via de Link naar de full-page
+                      // detail navigeren — geen actie hier.
+                    }
+              }
               onDelete={() => handleDelete(holding.id)}
               onManualOverride={() => setOverrideHolding(holding)}
+              onOpen={isInvestmentRow ? () => openHoldingPane(holding.id) : undefined}
             />
           )
         })}
@@ -860,18 +1016,16 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         />
       )}
 
-      {/* Edit holding form modal */}
-      {editHolding && (
-        <HoldingEditForm
-          holding={editHolding}
-          onClose={() => setEditHolding(null)}
-          onSaved={() => {
-            setEditHolding(null)
-            setLoading(true)
-            loadHoldings()
-          }}
-        />
-      )}
+      {/* Investment-holding detail-pane — opent vanaf `?holding=<id>`.
+          Op desktop een SlideInPane rechts; op mobile een full-height
+          BottomSheet als fallback (regelt `<ShellOverlay kind="pane">`
+          automatisch). Sibling van de andere modals zodat de
+          driewegregel-overlay-strategie consistent blijft. */}
+      <InvestmentHoldingPane
+        holding={selectedHoldingForPane}
+        onClose={closeHoldingPane}
+        onChanged={handlePaneChanged}
+      />
 
       {/* Transaction form modal */}
       {txHolding && (
@@ -1484,537 +1638,6 @@ function HoldingForm({
   )
 }
 
-// ── Holding edit form modal ────────────────────────────────────
-
-function HoldingEditForm({
-  holding,
-  onClose,
-  onSaved,
-}: {
-  holding: Holding
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const fc = useFc()
-  // LocalStorage key for draft state
-  const draftKey = `holding-edit-draft-${holding.id}`
-
-  // Load draft from localStorage if it exists (recover after accidental refresh)
-  const loadDraft = useCallback(() => {
-    try {
-      const raw = typeof window !== 'undefined' ? localStorage.getItem(draftKey) : null
-      if (raw) {
-        const draft = JSON.parse(raw)
-        // Only use draft if it's for the same holding version
-        if (draft.holdingId === holding.id) {
-          return draft
-        }
-      }
-    } catch { /* ignore parse errors */ }
-    return null
-  }, [draftKey, holding.id])
-
-  const draft = loadDraft()
-
-  const [name, setName] = useState(draft?.name ?? holding.name)
-  const [isin, setIsin] = useState<string>(draft?.isin ?? (holding.isin || ''))
-  const [ticker, setTicker] = useState(draft?.ticker ?? (holding.ticker || ''))
-  const [tickerStatus, setTickerStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
-  const [tickerInfo, setTickerInfo] = useState<{
-    displayName?: string
-    price?: number
-    currency?: string
-    hint?: string
-  } | null>(null)
-  const tickerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [units, setUnits] = useState(draft?.units ?? String(holding.units))
-  const [avgPrice, setAvgPrice] = useState(draft?.avgPrice ?? String(holding.avg_purchase_price))
-  const [currentPrice, setCurrentPrice] = useState(draft?.currentPrice ?? String(holding.current_price ?? ''))
-  const [notes, setNotes] = useState(draft?.notes ?? (holding.notes || ''))
-  const [ter, setTer] = useState(draft?.ter ?? (holding.ter != null ? String((holding.ter * 100).toFixed(2).replace(/\.?0+$/, '')) : ''))
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showDraftNotice, setShowDraftNotice] = useState(!!draft)
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
-  const [conflictData, setConflictData] = useState<{
-    message: string
-    server_state: Record<string, unknown>
-  } | null>(null)
-
-  const validateTicker = useCallback((value: string) => {
-    if (tickerDebounceRef.current) clearTimeout(tickerDebounceRef.current)
-    const trimmed = value.trim().toUpperCase()
-    if (!trimmed) {
-      setTickerStatus('idle')
-      setTickerInfo(null)
-      return
-    }
-    setTickerStatus('checking')
-    tickerDebounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/prices/${encodeURIComponent(trimmed)}`)
-        const data = await res.json()
-        if (data.available) {
-          setTickerStatus('valid')
-          setTickerInfo({
-            displayName: data.displayName,
-            price: data.price,
-            currency: data.currency,
-          })
-        } else {
-          setTickerStatus('invalid')
-          setTickerInfo({ hint: data.hint })
-        }
-      } catch {
-        setTickerStatus('idle')
-        setTickerInfo(null)
-      }
-    }, 600)
-  }, [])
-
-  // TER annual cost calculation for edit form
-  const editTerDecimal = ter ? Number(ter) / 100 : 0
-  const editFormValue = (Number(currentPrice) || Number(avgPrice) || 0) * (Number(units) || 1)
-  const editTerAnnualCost = editTerDecimal * editFormValue
-
-  // Track dirty state (form values differ from original holding)
-  const originalTerStr = holding.ter != null ? String((holding.ter * 100).toFixed(2).replace(/\.?0+$/, '')) : ''
-  const isDirty = useMemo(() => {
-    return (
-      name !== holding.name ||
-      ticker !== (holding.ticker || '') ||
-      isin !== (holding.isin || '') ||
-      units !== String(holding.units) ||
-      avgPrice !== String(holding.avg_purchase_price) ||
-      currentPrice !== String(holding.current_price ?? '') ||
-      notes !== (holding.notes || '') ||
-      ter !== originalTerStr
-    )
-  }, [name, ticker, isin, units, avgPrice, currentPrice, notes, ter, holding, originalTerStr])
-
-  // Auto-save draft to localStorage when form is dirty
-  useEffect(() => {
-    if (isDirty) {
-      try {
-        localStorage.setItem(draftKey, JSON.stringify({
-          holdingId: holding.id,
-          name, ticker, isin, units, avgPrice, currentPrice, notes, ter,
-          savedAt: new Date().toISOString(),
-        }))
-      } catch { /* ignore storage errors */ }
-    } else {
-      // Clean up draft when form matches original
-      try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
-    }
-  }, [isDirty, draftKey, holding.id, name, ticker, isin, units, avgPrice, currentPrice, notes, ter])
-
-  // Warn on page refresh/close when form has unsaved changes
-  useEffect(() => {
-    if (!isDirty) return
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      // Modern browsers ignore custom messages, but returning a string is required for some
-      e.returnValue = 'Je hebt onopgeslagen wijzigingen. Weet je zeker dat je wilt vernieuwen?'
-      return e.returnValue
-    }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [isDirty])
-
-  // Handle close with unsaved changes confirmation
-  function handleClose() {
-    if (isDirty) {
-      setShowCloseConfirm(true)
-    } else {
-      cleanupAndClose()
-    }
-  }
-
-  // Discard draft and close
-  function cleanupAndClose() {
-    try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
-    onClose()
-  }
-
-  // Discard recovered draft and reset to original holding values
-  function discardDraft() {
-    setName(holding.name)
-    setTicker(holding.ticker || '')
-    setIsin(holding.isin || '')
-    setUnits(String(holding.units))
-    setAvgPrice(String(holding.avg_purchase_price))
-    setCurrentPrice(String(holding.current_price ?? ''))
-    setNotes(holding.notes || '')
-    setTer(holding.ter != null ? String((holding.ter * 100).toFixed(2).replace(/\.?0+$/, '')) : '')
-    setShowDraftNotice(false)
-    try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
-  }
-
-  const newValue = (Number(currentPrice) || Number(avgPrice) || 0) * (Number(units) || 1)
-  const oldValue = (holding.current_price ?? holding.avg_purchase_price) * holding.units
-
-  async function handleSave(forceOverwrite = false) {
-    if (!name) return
-    setSaving(true)
-    setError(null)
-    if (!forceOverwrite) setConflictData(null)
-
-    try {
-      const payload: Record<string, unknown> = {
-        id: holding.id,
-        name,
-        ticker: ticker || null,
-        isin: isin || null,
-        units: Number(units) || 1,
-        avg_purchase_price: Number(avgPrice) || 0,
-        current_price: currentPrice ? Number(currentPrice) : null,
-        notes: notes || null,
-        ter: ter ? Number(ter) / 100 : null,
-        ter_source: ter ? 'manual' : null,
-      }
-
-      // Send expected_updated_at for optimistic concurrency control
-      // (skip if force-overwriting after a conflict)
-      if (!forceOverwrite && holding.updated_at) {
-        payload.expected_updated_at = holding.updated_at
-      }
-
-      const res = await fetch('/api/holdings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (res.status === 409) {
-        const data = await res.json()
-        // Check if this is a concurrency conflict (not a duplicate ticker warning)
-        if (data.conflict) {
-          setConflictData({
-            message: data.message || 'Deze holding is ondertussen gewijzigd door een andere sessie.',
-            server_state: data.server_state || {},
-          })
-          return
-        }
-      }
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Kon holding niet bijwerken')
-      }
-
-      // Clear draft on successful save
-      try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
-      onSaved()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Onbekende fout')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // Apply server values after a conflict (reload the form with latest data)
-  function handleReloadFromServer() {
-    if (!conflictData?.server_state) return
-    const s = conflictData.server_state
-    if (s.name !== undefined) setName(String(s.name))
-    if (s.ticker !== undefined) setTicker(String(s.ticker || ''))
-    if (s.units !== undefined) setUnits(String(s.units))
-    if (s.avg_purchase_price !== undefined) setAvgPrice(String(s.avg_purchase_price))
-    if (s.current_price !== undefined) setCurrentPrice(String(s.current_price ?? ''))
-    if (s.notes !== undefined) setNotes(String(s.notes || ''))
-    if (s.ter !== undefined) setTer(s.ter != null ? String((Number(s.ter) * 100).toFixed(2).replace(/\.?0+$/, '')) : '')
-    setConflictData(null)
-    setError(null)
-  }
-
-  return (
-    <BottomSheet open={true} onClose={handleClose} title="Holding bewerken" size="md">
-      <div className="p-5" data-testid="holding-edit-modal">
-        {/* Unsaved changes close confirmation */}
-        {showCloseConfirm && (
-          <div className="mb-4 rounded-lg border border-orange-300 bg-orange-50 p-3" data-testid="unsaved-changes-warning">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-orange-800">Onopgeslagen wijzigingen</p>
-                <p className="mt-1 text-xs text-orange-700">
-                  Je hebt wijzigingen die nog niet zijn opgeslagen. Wil je deze verwijderen of verder bewerken?
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={cleanupAndClose}
-                    className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
-                    data-testid="discard-changes-btn"
-                  >
-                    Wijzigingen verwijderen
-                  </button>
-                  <button
-                    onClick={() => setShowCloseConfirm(false)}
-                    className="rounded-md border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
-                    data-testid="keep-editing-btn"
-                  >
-                    Verder bewerken
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Draft recovered notice (after page refresh) */}
-        {showDraftNotice && (
-          <div className="mb-4 rounded-lg border border-blue-300 bg-blue-50 p-3" data-testid="draft-recovered-notice">
-            <div className="flex items-start gap-2">
-              <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-blue-800">Concept hersteld</p>
-                <p className="mt-1 text-xs text-blue-700">
-                  Je onopgeslagen wijzigingen zijn hersteld na het vernieuwen van de pagina.
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => setShowDraftNotice(false)}
-                    className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                    data-testid="accept-draft-btn"
-                  >
-                    Doorgaan met concept
-                  </button>
-                  <button
-                    onClick={discardDraft}
-                    className="rounded-md border border-blue-300 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                    data-testid="discard-draft-btn"
-                  >
-                    Origineel laden
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Unsaved changes indicator */}
-        {isDirty && !showCloseConfirm && !showDraftNotice && (
-          <div className="mb-3 flex items-center gap-1.5 rounded-md bg-kern-50 px-3 py-1.5 border border-kern-200" data-testid="dirty-indicator">
-            <div className="h-2 w-2 rounded-full bg-kern-500 animate-pulse" />
-            <span className="text-[11px] font-medium text-kern-700">Onopgeslagen wijzigingen</span>
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="text-xs text-red-600">{error}</p>
-          </div>
-        )}
-
-        {/* Concurrent edit conflict warning */}
-        {conflictData && (
-          <div className="mb-4 rounded-lg border border-kern-300 bg-kern-50 p-3" data-testid="conflict-warning">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-kern-800">Bewerkingsconflict</p>
-                <p className="mt-1 text-xs text-kern-700">{conflictData.message}</p>
-                {conflictData.server_state && (
-                  <div className="mt-2 rounded border border-kern-200 bg-[var(--paper)]/60 p-2">
-                    <p className="text-[10px] font-medium text-kern-600 mb-1">Huidige waarden op de server:</p>
-                    <p className="text-xs text-[var(--ink-2)]">
-                      Naam: <span className="font-medium">{String(conflictData.server_state.name || '-')}</span>
-                      {' · '}Eenheden: <span className="font-medium">{String(conflictData.server_state.units || '-')}</span>
-                      {' · '}Prijs: <span className="font-medium">{conflictData.server_state.current_price != null ? fc(Number(conflictData.server_state.current_price)) : '-'}</span>
-                    </p>
-                  </div>
-                )}
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={handleReloadFromServer}
-                    className="rounded-md bg-kern-600 px-3 py-1 text-xs font-medium text-white hover:bg-kern-700"
-                    data-testid="conflict-reload-btn"
-                  >
-                    Serverwaarden laden
-                  </button>
-                  <button
-                    onClick={() => handleSave(true)}
-                    disabled={saving}
-                    className="rounded-md border border-kern-300 px-3 py-1 text-xs font-medium text-kern-700 hover:bg-kern-100 disabled:opacity-50"
-                    data-testid="conflict-overwrite-btn"
-                  >
-                    {saving ? 'Overschrijven...' : 'Toch overschrijven'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-3">
-          <IsinLookupField
-            id="edit-holding-isin"
-            value={isin}
-            onChange={setIsin}
-            onResolved={(r: IsinResolved) => {
-              if (!ticker) {
-                setTicker(r.ticker)
-                validateTicker(r.ticker)
-              }
-              if (!name || name === holding.name) setName(r.name)
-            }}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam *</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN</label>
-              <input
-                value={ticker}
-                onChange={(e) => {
-                  setTicker(e.target.value)
-                  validateTicker(e.target.value)
-                }}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-              {tickerStatus === 'checking' && (
-                <p className="mt-1 flex items-center gap-1 font-sans text-[11px] text-[var(--ink-3)]">
-                  <span className="inline-block h-3 w-3 animate-spin rounded-full border border-[var(--border-md)] border-t-transparent" />
-                  Ticker controleren…
-                </p>
-              )}
-              {tickerStatus === 'valid' && tickerInfo && (
-                <p className="mt-1 font-sans text-[11px] text-kern-700">
-                  ✓ {tickerInfo.displayName ?? ticker.toUpperCase()} —{' '}
-                  {tickerInfo.currency} {tickerInfo.price?.toFixed(2)}
-                </p>
-              )}
-              {tickerStatus === 'invalid' && (
-                <p className="mt-1 font-sans text-[11px] text-[var(--ink-3)]">
-                  Ticker niet gevonden.{' '}
-                  {tickerInfo?.hint ?? 'Voeg een beurs-suffix toe, bijv. .AS (Amsterdam), .DE (Frankfurt), .L (Londen).'}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aantal eenheden</label>
-              <input
-                type="number"
-                step="0.001"
-                value={units}
-                onChange={(e) => setUnits(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Gem. aankoopprijs</label>
-              <input
-                type="number"
-                step="0.01"
-                value={avgPrice}
-                onChange={(e) => setAvgPrice(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidige prijs</label>
-              <input
-                type="number"
-                step="0.01"
-                value={currentPrice}
-                onChange={(e) => setCurrentPrice(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Live value preview */}
-          <div className="rounded-lg border border-kern-200 bg-kern-50/50 p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-kern-700">Portfolio waarde (deze holding)</span>
-              <span className="text-sm font-bold text-[var(--ink)]">{fc(newValue)}</span>
-            </div>
-            {newValue !== oldValue && (
-              <p className={`mt-1 text-xs font-medium ${newValue >= oldValue ? 'text-positive' : 'text-negative'}`}>
-                {newValue >= oldValue ? '+' : ''}{fc(newValue - oldValue)} t.o.v. huidige waarde
-              </p>
-            )}
-          </div>
-
-          {/* TER (Total Expense Ratio) */}
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">TER — Total Expense Ratio (optioneel)</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                max="10"
-                inputMode="decimal"
-                value={ter}
-                onChange={(e) => setTer(e.target.value)}
-                className="w-32 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
-                placeholder="0.22"
-                data-testid="holding-ter-input"
-              />
-              <span className="text-sm text-[var(--ink-3)]">%</span>
-              {ter && editFormValue > 0 && (
-                <span className="text-xs text-[var(--ink-3)] font-mono tabular-nums" data-testid="ter-annual-cost">
-                  = {new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(editTerAnnualCost)}/jaar
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-[11px] text-[var(--ink-3)]">
-              Vind de TER op de fonds factsheet of Morningstar
-            </p>
-            {Number(ter) > 10 && (
-              <p className="mt-1 text-[11px] text-red-500">TER mag maximaal 10% zijn</p>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
-            />
-          </div>
-
-          {/* Progressive disclosure: hint when ticker/ISIN present but no TER */}
-          {!ter && (holding.ticker || holding.isin) && (
-            <div className="rounded-lg border border-kern-100 bg-kern-50/50 px-3 py-2" data-testid="ter-hint">
-              <p className="text-[11px] text-kern-600">
-                💡 Tip: voeg de TER toe om jaarlijkse fondskosten inzichtelijk te maken
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={handleClose}
-            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-          >
-            Annuleren
-          </button>
-          <button
-            onClick={() => handleSave()}
-            disabled={saving || !name}
-            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-          >
-            {saving ? 'Opslaan...' : 'Opslaan'}
-          </button>
-        </div>
-      </div>
-    </BottomSheet>
-  )
-}
 
 // ── Holding transaction form modal ─────────────────────────────
 

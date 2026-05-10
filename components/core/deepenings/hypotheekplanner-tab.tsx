@@ -278,84 +278,90 @@ function ActivePlanner({ mortgage, house, otherTrackedDebts }: ActivePlannerProp
 
   return (
     <div className="space-y-8">
-      {/* ── Header — hypotheek-detail strip ───────────────────────── */}
-      <header>
-        <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
-          Hypotheekplanner
-        </p>
-        <h2
-          className="mt-1 font-serif text-xl font-semibold text-[var(--ink)]"
-          style={{ fontFamily: 'var(--font-playfair, serif)' }}
-        >
-          {mortgage.name}
-        </h2>
-        {/* Drie-kolom meta-strip: marktwaarde / restschuld / equity (alleen
-            bij gekoppeld huis) of slechts schuld + type bij ontbrekend huis. */}
-        <div className="mt-3 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
-          {hasLinkedHouse ? (
-            <>
-              <Stat
-                label="Marktwaarde"
-                value={fc(marketValue!)}
-              />
-              <Stat
-                label="Schuld"
-                value={fc(balance)}
-                tone="negative"
-              />
-              <Stat
-                label="Eigen vermogen"
-                value={fc(Math.max(0, marketValue! - balance))}
-                tone="primary"
-              />
-            </>
-          ) : (
-            <>
-              <Stat label="Schuld" value={fc(balance)} tone="negative" />
-              <Stat label="Looptijd" value={formatYearSpan(months)} />
-            </>
+      {/* ── KPI-hero-band — paper-blok met harde ink-borders rond
+          kicker + titel + stat-grid + status-strip. Volgt de
+          Categorie-app-tab hero-band-blueprint (zie ui-ux skill,
+          patroon-kaart KPI-paper-blok); zelfde discipline als
+          crypto-holdings-page.tsx en budgets-client.tsx. ─────── */}
+      <section className="border-t border-b border-[var(--ink)] bg-[var(--paper)] px-4 py-5 sm:px-6 sm:py-7">
+        <header>
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            Hypotheekplanner
+          </p>
+          <h2
+            className="mt-1 font-serif text-xl font-semibold text-[var(--ink)]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            {mortgage.name}
+          </h2>
+          {/* Drie-kolom meta-strip: marktwaarde / restschuld / equity (alleen
+              bij gekoppeld huis) of slechts schuld + type bij ontbrekend huis. */}
+          <div className="mt-3 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
+            {hasLinkedHouse ? (
+              <>
+                <Stat
+                  label="Marktwaarde"
+                  value={fc(marketValue!)}
+                />
+                <Stat
+                  label="Schuld"
+                  value={fc(balance)}
+                  tone="negative"
+                />
+                <Stat
+                  label="Eigen vermogen"
+                  value={fc(Math.max(0, marketValue! - balance))}
+                  tone="primary"
+                />
+              </>
+            ) : (
+              <>
+                <Stat label="Schuld" value={fc(balance)} tone="negative" />
+                <Stat label="Looptijd" value={formatYearSpan(months)} />
+              </>
+            )}
+            <Stat
+              label="Type"
+              value={mortgage.subtype ?? repaymentType}
+            />
+            <Stat
+              label="Rente"
+              value={`${interestRate.toFixed(2)}%`}
+            />
+          </div>
+          {/* Status-strip: NHG, fiscaal aftrekbaar, fixe-eind-datum.
+              Alleen tonen wanneer relevant — anders zou de strip 90% van
+              de hypotheken een lege lijn geven. */}
+          {(mortgage.nhg || mortgage.is_tax_deductible || mortgage.fixed_rate_end_date) && (
+            <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--ink-3)]">
+              {mortgage.nhg && (
+                <li className="inline-flex items-center gap-1">
+                  <Shield className="h-3 w-3" aria-hidden="true" />
+                  NHG
+                </li>
+              )}
+              {mortgage.is_tax_deductible && (
+                <li className="inline-flex items-center gap-1">
+                  <Percent className="h-3 w-3" aria-hidden="true" />
+                  Hypotheekrenteaftrek
+                </li>
+              )}
+              {mortgage.fixed_rate_end_date && (
+                <li className="inline-flex items-center gap-1">
+                  <Building2 className="h-3 w-3" aria-hidden="true" />
+                  Rente vast tot{' '}
+                  <span className="font-mono tabular-nums">
+                    {new Date(mortgage.fixed_rate_end_date).toLocaleDateString(
+                      'nl-NL',
+                      { month: 'short', year: 'numeric' },
+                    )}
+                  </span>
+                </li>
+              )}
+            </ul>
           )}
-          <Stat
-            label="Type"
-            value={mortgage.subtype ?? repaymentType}
-          />
-          <Stat
-            label="Rente"
-            value={`${interestRate.toFixed(2)}%`}
-          />
-        </div>
-        {/* Status-strip: NHG, fiscaal aftrekbaar, fixe-eind-datum.
-            Alleen tonen wanneer relevant — anders zou de strip 90% van
-            de hypotheken een lege lijn geven. */}
-        {(mortgage.nhg || mortgage.is_tax_deductible || mortgage.fixed_rate_end_date) && (
-          <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--ink-3)]">
-            {mortgage.nhg && (
-              <li className="inline-flex items-center gap-1">
-                <Shield className="h-3 w-3" aria-hidden="true" />
-                NHG
-              </li>
-            )}
-            {mortgage.is_tax_deductible && (
-              <li className="inline-flex items-center gap-1">
-                <Percent className="h-3 w-3" aria-hidden="true" />
-                Hypotheekrenteaftrek
-              </li>
-            )}
-            {mortgage.fixed_rate_end_date && (
-              <li className="inline-flex items-center gap-1">
-                <Building2 className="h-3 w-3" aria-hidden="true" />
-                Rente vast tot{' '}
-                <span className="font-mono tabular-nums">
-                  {new Date(mortgage.fixed_rate_end_date).toLocaleDateString(
-                    'nl-NL',
-                    { month: 'short', year: 'numeric' },
-                  )}
-                </span>
-              </li>
-            )}
-          </ul>
-        )}
-      </header>
+        </header>
+      </section>
 
       {/* ── Hero (alleen bij gekoppeld huis) ──────────────────── */}
       {hasLinkedHouse && (

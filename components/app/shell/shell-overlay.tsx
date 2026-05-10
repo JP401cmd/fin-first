@@ -145,6 +145,7 @@ export function ShellOverlay({
           title={title}
           size="full"
           footerSlot={mobileFooterSlot}
+          actions={actions}
         >
           {children}
         </BottomSheet>

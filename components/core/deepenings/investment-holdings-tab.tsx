@@ -21,13 +21,9 @@ import { ModuleTipStrip } from '../module-tip-strip'
  *   met deeplink naar Instellingen. De `<HoldingsPage />` wordt dan nooit
  *   gemount.
  *
- * Layout-discipline:
- * - `HoldingsPage` heeft een eigen `mx-auto max-w-6xl px-4 sm:px-6 …`
- *   wrapper. De `AssetCategoryPage` rendert deze tab al binnen een
- *   `max-w-5xl` container met `px-4 sm:px-6`. Met `-mx-4 sm:-mx-6` heffen
- *   we de outer-padding op zodat HoldingsPage zijn eigen ademing
- *   terugkrijgt. De max-width blijft gecapped op `max-w-5xl` — dat is
- *   bewust de tab-context.
+ * Layout: `<HoldingsPage />` is embeddable — host (de category-page tab-container)
+ * levert horizontale padding via `asset-category-page.tsx` regel 494.
+ * Geen breakout meer nodig.
  */
 export function InvestmentHoldingsTab({ moduleActive, initialData }: DeepeningTabProps) {
   // Splits op de outer-prop: bij module-uit zien we de actieve tak nooit.
@@ -71,16 +67,12 @@ interface InvestmentHoldingsActiveProps {
 }
 
 /**
- * Embed de volledige `<HoldingsPage />` in de tab. We negeren bewust de
- * outer-padding van de tab-container (zie layout-noot bovenin) zodat
- * HoldingsPage zijn eigen breakpoints kan gebruiken. Wanneer `initialData`
- * ontbreekt valt HoldingsPage terug op zijn eigen client-side fetch — geen
- * losse skeleton hier nodig, dat regelt HoldingsPage zelf.
+ * Embed de volledige `<HoldingsPage />` in de tab. Sinds de wrapper-refactor
+ * (mei 2026) levert `HoldingsPage` zelf geen outer `mx-auto max-w-*` of
+ * `px-*` meer — host-padding van de category-tab-container voldoet. Wanneer
+ * `initialData` ontbreekt valt HoldingsPage terug op zijn eigen client-side
+ * fetch — geen losse skeleton hier nodig.
  */
 function InvestmentHoldingsActive({ initialData }: InvestmentHoldingsActiveProps) {
-  return (
-    <div className="-mx-4 sm:-mx-6">
-      <HoldingsPage initialData={initialData} />
-    </div>
-  )
+  return <HoldingsPage initialData={initialData} />
 }

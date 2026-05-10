@@ -335,6 +335,58 @@ export function ResilienceContextMessage({ snapshots }: { snapshots: SnapshotFor
   )
 }
 
+export function FireAgeContextMessage({ snapshots }: { snapshots: SnapshotForTrend[] }) {
+  const withAge = snapshots.filter(s => s.fire_age !== null && s.fire_age !== undefined)
+  if (withAge.length < 2) return null
+
+  const first = withAge[0]
+  const last = withAge[withAge.length - 1]
+  const firstAge = first.fire_age as number
+  const lastAge = last.fire_age as number
+  // Positive diff = age dropped = improved (eerder vrij)
+  const diff = Math.round((firstAge - lastAge) * 10) / 10
+
+  const firstDate = new Date(first.snapshot_date)
+  const lastDate = new Date(last.snapshot_date)
+  const monthSpan = (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + (lastDate.getMonth() - firstDate.getMonth())
+  const monthLabel = monthSpan === 1 ? '1 maand' : `${monthSpan} maanden`
+
+  const absDiff = Math.abs(diff)
+  const diffLabel = absDiff >= 1
+    ? `${Math.round(absDiff)} ${Math.round(absDiff) === 1 ? 'jaar' : 'jaar'}`
+    : `${Math.round(absDiff * 12)} ${Math.round(absDiff * 12) === 1 ? 'maand' : 'maanden'}`
+
+  return (
+    <div className="mb-4 rounded-[var(--r)] border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="fire-age-context-message">
+      <p className="text-sm text-horizon-800">
+        {diff > 0 ? (
+          <>
+            <span className="font-semibold text-emerald-700">
+              Je FIRE-leeftijd is gedaald van {Math.round(firstAge)} naar {Math.round(lastAge)} in {monthLabel}
+            </span>
+            {' — '}
+            je ligt {diffLabel} voor!
+          </>
+        ) : diff < 0 ? (
+          <>
+            <span className="font-semibold text-amber-700">
+              Je FIRE-leeftijd is gestegen van {Math.round(firstAge)} naar {Math.round(lastAge)} in {monthLabel}
+            </span>
+            {' — '}
+            {diffLabel} verschoven; bekijk je spaarquote en uitgaven.
+          </>
+        ) : (
+          <>
+            Je FIRE-leeftijd is stabiel gebleven op{' '}
+            <span className="font-bold">{Math.round(lastAge)} jaar</span>
+            {monthSpan > 0 && <> over {monthLabel}</>}.
+          </>
+        )}
+      </p>
+    </div>
+  )
+}
+
 export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) {
   const withScore = snapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
   if (withScore.length < 2) return null

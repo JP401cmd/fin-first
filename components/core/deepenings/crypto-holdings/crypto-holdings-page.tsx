@@ -16,7 +16,8 @@
 // initial state; alleen view-state (sortering, filter, view-mode, periode)
 // leeft hier in `useState`.
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Coins, Plug, Wallet } from 'lucide-react'
 import {
   computeCryptoSpread,
@@ -30,6 +31,7 @@ import {
   type CryptoVolatilityMetric,
   type CryptoFeesSummary,
 } from '@/lib/crypto-holdings-data'
+import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { CryptoKpiStrip } from './crypto-kpi-strip'
 import { CryptoDistributionPanel } from './crypto-distribution-panel'
 import { CryptoPerformanceChart } from './crypto-performance-chart'
@@ -39,6 +41,7 @@ import {
   type CryptoViewMode,
 } from './crypto-holdings-grid'
 import { CryptoTransactionsLog } from './crypto-transactions-log'
+import { CryptoHoldingPane } from './crypto-holding-pane'
 
 export interface CryptoHoldingsPageProps {
   holdings: CryptoHoldingRow[]
@@ -97,6 +100,44 @@ export function CryptoHoldingsPage({
   // 30d komt overeen met de oude hardcoded chart-window — gebruiker ziet bij
   // eerste laad hetzelfde overzicht als R6.
   const [period, setPeriod] = useState<CryptoReturnPeriod>('30d')
+
+  // ── Pane URL-state ─────────────────────────────────────────────────
+  // De pane voor één coin leeft op `?crypto=<id>`. We lezen de query-param
+  // en zoeken de bijbehorende holding op uit de al-geladen array — geen
+  // extra fetch nodig (alle data zit al in props). `selectedHolding=null`
+  // betekent: pane is dicht. `selectedSparkline` haalt de 7-daagse reeks
+  // uit de page-bundle zodat we niet apart hoeven te fetchen.
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const requestedHoldingId = searchParams.get(OVERLAY_QUERY_KEYS.cryptoHolding)
+  const selectedHolding = useMemo(
+    () => holdings.find((h) => h.id === requestedHoldingId) ?? null,
+    [holdings, requestedHoldingId],
+  )
+  const selectedSparkline = selectedHolding && sparklinesByHoldingId
+    ? sparklinesByHoldingId[selectedHolding.id]
+    : undefined
+
+  // Sluit de pane door alleen `?crypto=` uit de URL te halen — overige
+  // query-state (zoals `?tab=crypto-holdings`) blijft behouden zodat de
+  // gebruiker terugkeert naar dezelfde tab. `router.replace` ipv `push`
+  // omdat één pane-open al een history-entry kostte (zie click-handlers
+  // in `crypto-holdings-grid.tsx`); sluit-actie hoeft daar niet bovenop
+  // te stapelen.
+  const closePane = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete(OVERLAY_QUERY_KEYS.cryptoHolding)
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [router, pathname, searchParams])
+
+  // Pane-callback bij save/delete — laad de page-bundle opnieuw zodat de
+  // holdings-list, KPI-strip en figures-strip de nieuwe waarden tonen.
+  // `router.refresh()` re-rendert de server-component zonder URL-wissel.
+  const handlePaneChanged = useCallback(() => {
+    router.refresh()
+  }, [router])
 
   let totalValue = 0
   for (const h of holdings) totalValue += h.valueEur
@@ -182,6 +223,20 @@ export function CryptoHoldingsPage({
       {transactions.length > 0 && (
         <CryptoTransactionsLog transactions={transactions} />
       )}
+
+      {/* 6. Coin-detail pane — opent vanaf `?crypto=<id>` (zie URL-state
+          hookup boven). Op desktop een SlideInPane rechts, op mobile een
+          full-height BottomSheet als fallback. De pane leeft als sibling
+          binnen de `space-y-8`-flow zodat hij geen ruimte inneemt wanneer
+          gesloten (`null` → niets in DOM) en geen layout-shift veroorzaakt
+          op de holdings-tab. Sparkline-data komt uit `sparklinesByHoldingId`
+          zodat geen extra fetch nodig is. */}
+      <CryptoHoldingPane
+        holding={selectedHolding}
+        sparkline={selectedSparkline}
+        onClose={closePane}
+        onChanged={handlePaneChanged}
+      />
     </div>
   )
 }

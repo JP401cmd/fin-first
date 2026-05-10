@@ -69,3 +69,6 @@ auth_result.json
 
 # research artifacts
 signin2.yaml
+
+# local debug screenshots / scratch
+.tmp/

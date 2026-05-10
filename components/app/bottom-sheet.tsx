@@ -23,6 +23,13 @@ type BottomSheetProps = {
    * (peek/mid/full) intact blijft. Wanneer leeggelaten: geen footer.
    */
   footerSlot?: ReactNode
+  /**
+   * Header-action elementen rechts naast de titel (vóór de close-knop).
+   * Gebruikt door `<ShellOverlay kind="pane">` voor de mobile-fallback zodat
+   * delete-/share-icons die op desktop in de SlideInPane-header-rij staan,
+   * ook op mobile zichtbaar zijn. Wanneer leeggelaten: alleen close-knop.
+   */
+  actions?: ReactNode
 }
 
 const sizeClasses = {
@@ -38,7 +45,7 @@ const DISMISS_PERCENT = 0.3    // 30% of sheet height
 const SPRING_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const VELOCITY_SAMPLES = 5
 
-export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -429,8 +436,12 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
           <div className="h-1 w-10 rounded-full bg-[var(--border-md)]" />
         </div>
 
-        {/* Header — blueprint Type 5 (Modal) met kicker-streep + Playfair titel */}
-        {title && (
+        {/* Header — blueprint Type 5 (Modal) met kicker-streep + Playfair titel.
+            Actions-slot (rechts van titel, vóór close-knop) ontvangt
+            header-icons zoals de delete-knop van entity-panes; mirror van
+            de desktop SlideInPane-header zodat dezelfde affordances op
+            mobile bereikbaar blijven. */}
+        {(title || actions) && (
           <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <span
@@ -438,14 +449,21 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
                 className="inline-block h-px w-7 shrink-0"
                 style={{ background: 'var(--module-active-500)' }}
               />
-              <h3
-                id={titleId}
-                className="font-bold text-[var(--ink)] truncate"
-                style={{ fontFamily: 'var(--font-playfair, serif)' }}
-              >
-                {title}
-              </h3>
+              {title && (
+                <h3
+                  id={titleId}
+                  className="font-bold text-[var(--ink)] truncate"
+                  style={{ fontFamily: 'var(--font-playfair, serif)' }}
+                >
+                  {title}
+                </h3>
+              )}
             </div>
+            {actions && (
+              <div className="flex shrink-0 items-center gap-1 ml-2">
+                {actions}
+              </div>
+            )}
             <button
               onClick={handleProgrammaticClose}
               aria-label="Sluiten"

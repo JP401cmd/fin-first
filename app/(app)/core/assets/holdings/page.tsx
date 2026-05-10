@@ -6,7 +6,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 function HoldingsLoading() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
+    <div className="py-5 sm:py-12">
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
       </div>
@@ -28,7 +28,9 @@ export default async function HoldingsServerPage() {
   return (
     <Suspense fallback={<HoldingsLoading />}>
       <NavStackMeta title="Holdings" bottomBar={{ kind: 'tabs' }} />
-      <HoldingsPage initialData={holdingsData ?? undefined} />
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <HoldingsPage initialData={holdingsData ?? undefined} />
+      </div>
     </Suspense>
   )
 }

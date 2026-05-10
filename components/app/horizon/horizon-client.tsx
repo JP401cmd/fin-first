@@ -49,7 +49,7 @@ import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { usePerspective } from '@/components/app/perspective-provider'
-import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
+import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeContextMessage, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -178,6 +178,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [snapshotResilience, setSnapshotResilience] = useState<number | null>(initialData.snapshotResilience)
   const [resilienceSnapshots, setResilienceSnapshots] = useState<SnapshotForTrend[]>(initialData.resilienceSnapshots)
   const [healthChartOpen, setHealthChartOpen] = useState(false)
+  const [fireAgeChartOpen, setFireAgeChartOpen] = useState(false)
   const [events, setEvents] = useState<LifeEvent[]>(initialData.events)
   const [impacts, setImpacts] = useState<LifeEventImpact[]>(initialData.impacts)
   const [actions, setActions] = useState<Action[]>(initialData.actions)
@@ -3319,128 +3320,132 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         </section>
       </FeatureGate>
 
-      {/* === 5b. Health Score Trend Chart (Deep Dive) === */}
-      <FeatureGate featureId="gezondheids_score" fallback="hidden">
-        <section className="mt-5 sm:mt-8" data-testid="health-trend-section">
-          <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
-            {/* ── Accent bar ── */}
-            <div className="h-[3px] w-full bg-horizon-500" />
-
-            {/* ── Header (clickable toggle) ── */}
-            <button
-              type="button"
-              onClick={() => setHealthChartOpen(v => !v)}
-              aria-expanded={healthChartOpen}
-              className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
-            >
-              <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${healthChartOpen ? 'rotate-180' : ''}`} />
-              <div className="flex min-w-0 flex-1 items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Heart className="h-4 w-4 fill-horizon-500 text-horizon-500" />
-                  <h3 className="label-editorial text-[var(--ink-2)]">Gezondheidsverloop</h3>
-                </div>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => { e.stopPropagation(); setShowResilienceReceipt(true) }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setShowResilienceReceipt(true) } }}
-                  className="flex items-center gap-1.5 rounded-full bg-horizon-50 px-2.5 py-1 transition-colors hover:bg-horizon-100"
-                  data-testid="health-score-card"
-                  title={`Financiële Gezondheid: ${snapshotResilience !== null ? snapshotResilience : healthScore.total} / 100`}
-                >
-                  <Heart className="h-3.5 w-3.5 fill-horizon-500 text-horizon-500" />
-                  <span className="font-mono text-sm font-semibold tabular-nums text-horizon-700">
-                    {snapshotResilience !== null ? snapshotResilience : healthScore.total}/100
-                  </span>
-                </div>
-              </div>
-            </button>
-
-            {/* ── Content ── */}
-            {healthChartOpen && (
-              resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowResilienceReceipt(true)}
-                  className="w-full cursor-pointer p-4 text-left transition-colors hover:bg-[var(--subtle)] sm:p-6"
-                >
-                  <ResilienceContextMessage snapshots={resilienceSnapshots} />
-                  <ResilienceTrendChart snapshots={resilienceSnapshots} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowResilienceReceipt(true)}
-                  className="w-full cursor-pointer p-6 text-center transition-colors hover:bg-[var(--subtle)] sm:p-8"
-                >
-                  <Heart className="mx-auto mb-2 h-8 w-8 text-horizon-300" />
-                  <p className="text-sm text-[var(--ink-3)]">
-                    Gebruik de app langer om het verloop in je financiële gezondheid weer te geven
-                  </p>
-                </button>
-              )
-            )}
-          </div>
-        </section>
-      </FeatureGate>
-
-      {/* === 5b. FIRE Age Trend Chart (Deep Dive) === */}
+      {/* === 5b. Verloop-grid: Gezondheid + FIRE-leeftijd (Deep Dive) === */}
       {(() => {
         const fireAgeSnapshots = resilienceSnapshots.filter(s => s.fire_age !== null && s.fire_age !== undefined)
-        if (fireAgeSnapshots.length < 2) return null
-        const first = fireAgeSnapshots[0]
-        const last = fireAgeSnapshots[fireAgeSnapshots.length - 1]
-        const firstAge = first.fire_age as number
-        const lastAge = last.fire_age as number
-        const diff = Math.round((firstAge - lastAge) * 10) / 10
-        const firstMonth = new Date(first.snapshot_date).toLocaleDateString('nl-NL', { month: 'long' })
-        const lastMonth = new Date(last.snapshot_date).toLocaleDateString('nl-NL', { month: 'long' })
-        const improved = diff > 0
+        const hasFireTrend = fireAgeSnapshots.length >= 2
+        const last = hasFireTrend ? fireAgeSnapshots[fireAgeSnapshots.length - 1] : null
+        const lastAge = last ? (last.fire_age as number) : null
 
         return (
-          <section className="mt-5 sm:mt-8" data-testid="fire-age-trend-section">
-            <div className="mb-3">
-              <h2 className="label-editorial text-[var(--ink-2)]">
-                <Hourglass className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
-                Je FIRE-leeftijd over tijd
-              </h2>
-              <p className="mt-1 text-sm text-[var(--ink-3)]">
-                Hoe je vrijheidsleeftijd zich ontwikkelt — lager is beter
-              </p>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
-              {/* Contextual progress message */}
-              <div className="mb-4 rounded-[var(--r)] border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="fire-age-context-message">
-                <p className="text-sm text-horizon-800">
-                  {improved ? (
-                    <>
-                      In <span className="font-semibold">{firstMonth}</span> was je FIRE-leeftijd{' '}
-                      <span className="font-bold">{Math.round(firstAge)}</span>, nu{' '}
-                      <span className="font-bold">{Math.round(lastAge)}</span> —{' '}
-                      <span className="font-semibold text-emerald-700">
-                        je ligt {diff >= 1 ? `${Math.round(diff)} ${Math.round(diff) === 1 ? 'jaar' : 'jaar'}` : `${Math.round(diff * 12)} ${Math.round(diff * 12) === 1 ? 'maand' : 'maanden'}`} voor!
-                      </span>
-                    </>
-                  ) : diff < 0 ? (
-                    <>
-                      In <span className="font-semibold">{firstMonth}</span> was je FIRE-leeftijd{' '}
-                      <span className="font-bold">{Math.round(firstAge)}</span>, nu{' '}
-                      <span className="font-bold">{Math.round(lastAge)}</span> —{' '}
-                      <span className="font-semibold text-amber-700">
-                        {Math.abs(diff) >= 1 ? `${Math.round(Math.abs(diff))} ${Math.round(Math.abs(diff)) === 1 ? 'jaar' : 'jaar'}` : `${Math.round(Math.abs(diff) * 12)} ${Math.round(Math.abs(diff) * 12) === 1 ? 'maand' : 'maanden'}`} verschoven
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      Je FIRE-leeftijd is stabiel gebleven op{' '}
-                      <span className="font-bold">{Math.round(lastAge)} jaar</span>
-                    </>
+          <div className="mt-5 grid gap-4 sm:mt-8 sm:gap-5 lg:grid-cols-2">
+            {/* ── Gezondheidsverloop ── */}
+            <FeatureGate featureId="gezondheids_score" fallback="hidden">
+              <section data-testid="health-trend-section">
+                <div className="h-full overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)]">
+                  {/* Accent bar */}
+                  <div className="h-[3px] w-full bg-horizon-500" />
+
+                  {/* Header (clickable toggle) */}
+                  <button
+                    type="button"
+                    onClick={() => setHealthChartOpen(v => !v)}
+                    aria-expanded={healthChartOpen}
+                    className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+                  >
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${healthChartOpen ? 'rotate-180' : ''}`} />
+                    <div className="flex min-w-0 flex-1 items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Heart className="h-4 w-4 fill-horizon-500 text-horizon-500" />
+                        <h3 className="label-editorial text-[var(--ink-2)]">Gezondheidsverloop</h3>
+                      </div>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); setShowResilienceReceipt(true) }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setShowResilienceReceipt(true) } }}
+                        className="flex items-center gap-1.5 rounded-full bg-horizon-50 px-2.5 py-1 transition-colors hover:bg-horizon-100"
+                        data-testid="health-score-card"
+                        title={`Financiële Gezondheid: ${snapshotResilience !== null ? snapshotResilience : healthScore.total} / 100`}
+                      >
+                        <Heart className="h-3.5 w-3.5 fill-horizon-500 text-horizon-500" />
+                        <span className="font-mono text-sm font-semibold tabular-nums text-horizon-700">
+                          {snapshotResilience !== null ? snapshotResilience : healthScore.total}/100
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Content */}
+                  {healthChartOpen && (
+                    resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowResilienceReceipt(true)}
+                        className="w-full cursor-pointer p-4 text-left transition-colors hover:bg-[var(--subtle)] sm:p-6"
+                      >
+                        <ResilienceContextMessage snapshots={resilienceSnapshots} />
+                        <ResilienceTrendChart snapshots={resilienceSnapshots} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowResilienceReceipt(true)}
+                        className="w-full cursor-pointer p-6 text-center transition-colors hover:bg-[var(--subtle)] sm:p-8"
+                      >
+                        <Heart className="mx-auto mb-2 h-8 w-8 text-horizon-300" />
+                        <p className="text-sm text-[var(--ink-3)]">
+                          Gebruik de app langer om het verloop in je financiële gezondheid weer te geven
+                        </p>
+                      </button>
+                    )
                   )}
-                </p>
+                </div>
+              </section>
+            </FeatureGate>
+
+            {/* ── FIRE-leeftijd-verloop ── */}
+            <section data-testid="fire-age-trend-section">
+              <div className="h-full overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)]">
+                {/* Accent bar */}
+                <div className="h-[3px] w-full bg-horizon-500" />
+
+                {/* Header (clickable toggle) */}
+                <button
+                  type="button"
+                  onClick={() => setFireAgeChartOpen(v => !v)}
+                  aria-expanded={fireAgeChartOpen}
+                  className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+                >
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${fireAgeChartOpen ? 'rotate-180' : ''}`} />
+                  <div className="flex min-w-0 flex-1 items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Hourglass className="h-4 w-4 text-horizon-500" />
+                      <h3 className="label-editorial text-[var(--ink-2)]">FIRE-verloop</h3>
+                    </div>
+                    {lastAge !== null && (
+                      <div
+                        className="flex items-center gap-1.5 rounded-full bg-horizon-50 px-2.5 py-1"
+                        title={`Huidige FIRE-leeftijd: ${Math.round(lastAge)} jaar`}
+                      >
+                        <Hourglass className="h-3.5 w-3.5 text-horizon-500" />
+                        <span className="font-mono text-sm font-semibold tabular-nums text-horizon-700">
+                          {Math.round(lastAge)} jr
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+
+                {/* Content */}
+                {fireAgeChartOpen && (
+                  hasFireTrend ? (
+                    <div className="p-4 sm:p-6">
+                      <FireAgeContextMessage snapshots={fireAgeSnapshots} />
+                      <FireAgeTrendChart snapshots={resilienceSnapshots} />
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center sm:p-8">
+                      <Hourglass className="mx-auto mb-2 h-8 w-8 text-horizon-300" />
+                      <p className="text-sm text-[var(--ink-3)]">
+                        Gebruik de app langer om het verloop in je FIRE-leeftijd weer te geven
+                      </p>
+                    </div>
+                  )
+                )}
               </div>
-              <FireAgeTrendChart snapshots={resilienceSnapshots} />
-            </div>
-          </section>
+            </section>
+          </div>
         )
       })()}
 

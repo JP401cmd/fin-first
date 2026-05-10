@@ -58,19 +58,32 @@ export const identityNav: ModuleNavConfig = {
  * debts-client, horizon strategie-modal).
  */
 export const OVERLAY_QUERY_KEYS = {
-  budget:    'budget',
-  debt:      'debt',
-  asset:     'asset',
-  strategie: 'strategie',
-  uitgaven:  'uitgaven',
-  event:     'event',
-  tab:       'tab',
-  edit:      'edit',
-  via:       'via',
-  month:     'month',
+  budget:        'budget',
+  debt:          'debt',
+  asset:         'asset',
+  // Eén-coin pane op `/core/assets/crypto?tab=crypto-holdings`. Bewust een
+  // eigen sleutel (niet `asset`) omdat de detail-pane één crypto-holding
+  // toont — niet de parent-asset — en omdat `?asset=…` al in gebruik is
+  // door `AssetPane` op de items-tab van dezelfde categorie. Twee panes
+  // tegelijk via dezelfde key zou ze tegen elkaar laten openen.
+  cryptoHolding: 'crypto',
+  // Eén-positie pane op `/core/assets/holdings` en
+  // `/core/assets/investment?tab=holdings`. Symmetrisch met `cryptoHolding`
+  // maar dan voor investment-holdings (aandelen/ETF/fondsen). Eigen sleutel
+  // ipv `asset` omdat de pane één holding-rij toont — niet de parent-asset
+  // — en `?asset=…` op dezelfde categorie-pagina al gebruikt wordt door
+  // `AssetPane` op de items-tab.
+  holding:       'holding',
+  strategie:     'strategie',
+  uitgaven:      'uitgaven',
+  event:         'event',
+  tab:           'tab',
+  edit:          'edit',
+  via:           'via',
+  month:         'month',
 } as const
 
 export type OverlayQueryKey = keyof typeof OVERLAY_QUERY_KEYS
 
 /** Welke keys daadwerkelijk een pane-overlay openen. `tab` is in-page; `edit/via/month` zijn modifier/transient. */
-export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'strategie', 'uitgaven', 'event'] as const satisfies readonly OverlayQueryKey[]
+export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'cryptoHolding', 'holding', 'strategie', 'uitgaven', 'event'] as const satisfies readonly OverlayQueryKey[]

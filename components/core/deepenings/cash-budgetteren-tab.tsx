@@ -22,15 +22,9 @@ import { ModuleTipStrip } from '../module-tip-strip'
  *   nooit gemount, dus we voorkomen onnodige Supabase-queries en
  *   localStorage-state setup.
  *
- * Layout-discipline:
- * - `BudgetsClient` heeft een eigen `mx-auto max-w-6xl px-4 sm:px-6 …`
- *   wrapper. De `AssetCategoryPage` draait deze tab al binnen een
- *   `max-w-5xl` container met `px-4 sm:px-6`. Een naïeve embed zou dus
- *   dubbele horizontale padding én een te smalle inhoudsruimte krijgen.
- *   Met `-mx-4 sm:-mx-6` heffen we de buitenste padding op zodat
- *   `BudgetsClient` zijn eigen ademing terug krijgt. De max-width blijft
- *   gecapped op `max-w-5xl` (de outer page-container) — bewust, de
- *   tab-context is per definitie smaller dan de standalone /core/budgets.
+ * Layout: `<BudgetsClient />` is embeddable — host (de category-page tab-container)
+ * levert horizontale padding via `asset-category-page.tsx` regel 494
+ * (`<div className="px-4 sm:px-6">`). Geen breakout meer nodig.
  */
 export function CashBudgetterenTab({ moduleActive, initialData }: DeepeningTabProps) {
   // Splits op de outer-prop: bij module-uit zien we de actieve tak nooit, dus
@@ -75,16 +69,12 @@ interface CashBudgetterenActiveProps {
 }
 
 /**
- * Embed de volledige `<BudgetsClient />` in de tab. We negeren bewust de
- * outer-padding van de tab-container (zie layout-noot bovenin) zodat
- * BudgetsClient zijn eigen breakpoints kan gebruiken. Wanneer `initialData`
- * ontbreekt valt BudgetsClient terug op zijn eigen client-side fetch — geen
- * losse skeleton hier nodig, dat regelt BudgetsClient zelf.
+ * Embed de volledige `<BudgetsClient />` in de tab. Sinds de wrapper-refactor
+ * (mei 2026) levert `BudgetsClient` zelf geen outer `mx-auto max-w-*` of
+ * `px-*` meer — host-padding van de category-tab-container voldoet. Wanneer
+ * `initialData` ontbreekt valt BudgetsClient terug op zijn eigen client-side
+ * fetch — geen losse skeleton hier nodig.
  */
 function CashBudgetterenActive({ initialData }: CashBudgetterenActiveProps) {
-  return (
-    <div className="-mx-4 sm:-mx-6">
-      <BudgetsClient initialData={initialData} />
-    </div>
-  )
+  return <BudgetsClient initialData={initialData} />
 }

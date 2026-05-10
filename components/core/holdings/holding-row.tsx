@@ -57,6 +57,14 @@ export type HoldingRowProps = {
   onEdit: () => void
   onDelete: () => void
   onManualOverride: () => void
+  /**
+   * Klik-handler voor de hoofdtitel-link. Wanneer aanwezig: link-default
+   * wordt onderdrukt en `onOpen()` opent de detail-pane via URL-state.
+   * `href` blijft beschikbaar zodat cmd/ctrl/middle-click nog steeds in een
+   * nieuwe tab naar de full-page route gaat. Wanneer afwezig: rij gedraagt
+   * zich als pre-pane-tijdperk en navigeert via de `<Link>`.
+   */
+  onOpen?: () => void
 }
 
 export function HoldingRow({
@@ -68,6 +76,7 @@ export function HoldingRow({
   onEdit,
   onDelete,
   onManualOverride,
+  onOpen,
 }: HoldingRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -123,6 +132,26 @@ export function HoldingRow({
       <div className="flex items-stretch">
         <Link
           href={`/core/assets/holdings/${holding.id}`}
+          onClick={(e) => {
+            // Wanneer een pane-handler is meegegeven onderscheppen we de
+            // standaard-Link-navigatie en openen we de detail-pane via
+            // URL-state. Modifier-keys (cmd/ctrl/shift, middle-click) laten
+            // we ongemoeid zodat "open in nieuwe tab" naar de full-page
+            // route blijft werken — die route blijft staan voor deeplinks.
+            if (!onOpen) return
+            if (e.defaultPrevented) return
+            if (
+              e.metaKey ||
+              e.ctrlKey ||
+              e.shiftKey ||
+              e.altKey ||
+              e.button !== 0
+            ) {
+              return
+            }
+            e.preventDefault()
+            onOpen()
+          }}
           className="flex-1 min-w-0 px-4 py-3 sm:py-3.5 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ink)]"
           data-testid={`holding-link-${holding.id}`}
         >

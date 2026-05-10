@@ -1379,7 +1379,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-8">
+      <div className="py-3 sm:py-8">
         {/* Month selector skeleton */}
         <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-6">
           <div className="mb-3 sm:mb-6 flex items-center justify-between gap-2">
@@ -1447,7 +1447,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
 
   if (error) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
+      <div className="py-5 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
           <button onClick={() => { setError(null); setLoading(true); loadBudgets() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
@@ -1459,7 +1459,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-8">
+    <div className="py-3 sm:py-8">
       {/* Privacy notice for hidden budget data (Feature #537) */}
       {perspective === 'household' && hiddenCategories.includes('budgets') && (
         <div className="mb-4">

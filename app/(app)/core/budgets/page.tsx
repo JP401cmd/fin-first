@@ -10,7 +10,9 @@ export default async function BudgetsPage() {
   return (
     <>
       <NavStackMeta title="Budgetten" bottomBar={{ kind: 'tabs' }} />
-      <BudgetsClient initialData={data} />
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <BudgetsClient initialData={data} />
+      </div>
     </>
   )
 }
