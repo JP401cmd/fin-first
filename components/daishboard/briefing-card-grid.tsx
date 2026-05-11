@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { BriefingCardSpec, ModuleGuideCardSpec, GoalGuideCardSpec, CardModule } from '@/lib/briefing/types'
+import type { BriefingCardSpec, ModuleGuideCardSpec, CardModule } from '@/lib/briefing/types'
 import { CARD_SPAN } from '@/lib/briefing/types'
 import { MetricCard } from './cards/metric-card'
 import { ActionCard } from './cards/action-card'
@@ -29,8 +29,6 @@ import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useModuleGuideState } from '@/lib/hooks/use-module-guide-state'
 import { useGoalGuideState } from '@/lib/hooks/use-goal-guide-state'
 import { MODULE_GUIDE_DISPLAY_ORDER, getModuleGuideSteps } from '@/lib/briefing/module-guide-steps'
-import { getGoalGuideSteps } from '@/lib/briefing/goal-guide-steps'
-import { GOAL_CATALOG } from '@/lib/goals/catalog'
 import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 
 interface BriefingCardGridProps {
@@ -84,33 +82,19 @@ const MODULE_CARD_MODULE: Record<ModuleId, CardModule> = {
 export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: BriefingCardGridProps) {
   const { activeModules } = useModuleAccess()
   const { isCardVisible, hasOnboardingIntent } = useModuleGuideState()
-  const { primaryGoalSlug, isCardVisible: isGoalCardVisible } = useGoalGuideState()
+  // De goal-guide-card wordt sinds de "Stappenplannen-strook" niet meer in de
+  // briefing-grid getoond; we lezen alleen nog `primaryGoalSlug` om te bepalen
+  // of we de module-guide-fallback voor legacy-gebruikers willen renderen.
+  const { primaryGoalSlug } = useGoalGuideState()
   const guideSteps = getModuleGuideSteps()
-  const goalSteps = getGoalGuideSteps()
 
   // Fallback step for inzicht_acties when AI pre-generation didn't produce recommendations
   const hasRecommendations = data.recommendations > 0
 
-  // Build a single goal-guide card if the user heeft een primair doel gekozen
-  const goalGuideCard = useMemo<GoalGuideCardSpec | null>(() => {
-    if (!primaryGoalSlug) return null
-    if (!isGoalCardVisible(primaryGoalSlug)) return null
-    const entry = GOAL_CATALOG[primaryGoalSlug]
-    if (!entry) return null
-    const steps = goalSteps[primaryGoalSlug] ?? []
-    if (steps.length === 0) return null
-    return {
-      type: 'goalGuide',
-      goalSlug: primaryGoalSlug,
-      module: 'wil',
-      title: `Stappen voor: ${entry.label}`,
-      steps,
-    }
-  }, [primaryGoalSlug, isGoalCardVisible, goalSteps])
-
   // Build module-guide cards: only for legacy users (intent-based onboarding zonder primary goal)
   const guideCards = useMemo<ModuleGuideCardSpec[]>(() => {
-    // Users met een primair doel zien dat doel-stappenplan in plaats van per-module-cards
+    // Users met een primair doel zien hun doel-stappenplan in de strook
+    // boven het dashboard — geen module-guide-cards in de briefing.
     if (primaryGoalSlug) return []
     // Users without onboarding_intent (existing users) don't see guide cards
     if (!hasOnboardingIntent) return []
@@ -151,12 +135,10 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
       })
   }, [activeModules, isCardVisible, guideSteps, hasRecommendations, hasOnboardingIntent, primaryGoalSlug])
 
-  // Goal-guide-card heeft voorrang boven module-guide-cards: één card,
-  // outcome-georiënteerd. Module-guide-cards blijven bestaan voor legacy
-  // gebruikers zonder primary_goal_slug.
-  const allGuideCards: (GoalGuideCardSpec | ModuleGuideCardSpec)[] = goalGuideCard
-    ? [goalGuideCard]
-    : guideCards
+  // Sinds de goal-guide-card is verhuisd naar de "Stappenplannen-strook"
+  // boven het dashboard, bestaan in de briefing-grid alleen nog
+  // module-guide-cards (voor legacy gebruikers zonder `primary_goal_slug`).
+  const allGuideCards: ModuleGuideCardSpec[] = guideCards
 
   // Split into guide cards (client) and AI cards (server-composed)
   const hasGuides = allGuideCards.length > 0

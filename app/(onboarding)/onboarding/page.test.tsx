@@ -7,119 +7,156 @@ import {
 } from './page'
 
 // The component module imports a CSS file and a chain of client components
-// (onboarding-intro, onboarding-horizon, etc.) plus `@/lib/supabase/client`.
+// (onboarding-doel, onboarding-identity, etc.) plus `@/lib/supabase/client`.
 // Vitest/Vite handle the CSS import natively. The component imports live at
 // the top of the module but they don't execute at import time — their
 // side-effect surface is limited to `createClient` being called inside the
 // component body, which we never invoke here. So importing `_reducer` and the
 // helpers should be safe in a jsdom environment.
 
+const NEW_ACTIVE_ORDER = [
+  'doel',
+  'identity',
+  'inkomen',
+  'bezittingen',
+  'klaar',
+  'saving',
+  'success',
+] as const
+
+const NEWS_ONLY_ACTIVE_ORDER = [
+  'doel',
+  'nieuws_only',
+  'saving',
+  'success',
+] as const
+
 describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
   it('returns the saved step unchanged when it is in the active order', () => {
-    const result = _resolveRestoredStep('budgets', [
-      'intro',
-      'identity',
-      'goal',
-      'bezittingen',
-      'budgets',
-      'saving',
-      'success',
-    ])
-    expect(result).toEqual({ step: 'budgets', healed: false })
+    const result = _resolveRestoredStep('bezittingen', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'bezittingen', healed: false })
   })
 
-  it('falls back from budgets to nieuws_only when the user is in nieuws-only mode', () => {
-    // Simulates: user previously had a draft on the `budgets` step, then
-    // changed module selection to just "nieuws", so the active flow now
-    // only contains `nieuws_only` between modules and saving.
-    const result = _resolveRestoredStep('budgets', [
-      'intro',
-      'identity',
-      'goal',
-      'nieuws_only',
-      'saving',
-      'success',
-    ])
-    // budgets (canonical idx 4) is past nieuws_only (canonical idx 7) in
-    // the canonical order? No — nieuws_only is 7, budgets is 4, so
-    // nieuws_only IS >= budgets. The walk-forward lands on nieuws_only.
+  it('heals a legacy "budgets" lastStep to the new "klaar" step', () => {
+    // Sinds fase 3 (mei 2026) is `budgets` geen actieve stap meer. Drafts
+    // van vóór de redesign hebben 'm wel als laatste positie. LEGACY_STEP_MAP
+    // mapt 'm naar de dichtstbijzijnde nieuwe stap — `klaar`.
+    const result = _resolveRestoredStep('budgets', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'klaar', healed: true })
+  })
+
+  it('heals a legacy "horizon" lastStep to "klaar"', () => {
+    const result = _resolveRestoredStep('horizon', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'klaar', healed: true })
+  })
+
+  it('heals a legacy "intro" lastStep to "doel"', () => {
+    const result = _resolveRestoredStep('intro', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'doel', healed: true })
+  })
+
+  it('heals a legacy "goal" lastStep to "doel"', () => {
+    const result = _resolveRestoredStep('goal', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'doel', healed: true })
+  })
+
+  it('heals legacy "extras" step name directly to "bezittingen"', () => {
+    const result = _resolveRestoredStep('extras', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'bezittingen', healed: true })
+  })
+
+  it('falls back from budgets to klaar in news-only mode (closest valid step)', () => {
+    // News-only active order bevat alleen `doel` + `nieuws_only`. `budgets`
+    // mapt naar `klaar` (LEGACY_STEP_MAP), maar `klaar` zit niet in de
+    // news-only order — dus walk-forward landt op de eerste actieve stap
+    // met canonical-idx ≥ klaar's idx. `nieuws_only` voldoet aan die
+    // voorwaarde in CANONICAL_STEP_ORDER.
+    const result = _resolveRestoredStep('budgets', [...NEWS_ONLY_ACTIVE_ORDER])
     expect(result.healed).toBe(true)
     expect(result.step).toBe('nieuws_only')
   })
 
   it('falls back to identity when the saved step is not in the canonical union', () => {
-    const result = _resolveRestoredStep('verzonnen_stap', [
-      'intro',
-      'identity',
-      'goal',
-      'bezittingen',
-      'budgets',
-      'saving',
-      'success',
-    ])
+    const result = _resolveRestoredStep('verzonnen_stap', [...NEW_ACTIVE_ORDER])
     expect(result).toEqual({ step: 'identity', healed: true })
   })
 
-  it('never falls back to intro — identity is the minimum', () => {
-    // Missing lastStep should also land on identity, not intro, because
+  it('never falls back to doel — identity is the minimum', () => {
+    // Missing lastStep should also land on identity, not doel, because
     // the restore was triggered by the presence of saved data.
-    const result = _resolveRestoredStep(undefined, [
-      'intro',
-      'identity',
-      'goal',
-      'saving',
-      'success',
-    ])
+    const result = _resolveRestoredStep(undefined, [...NEW_ACTIVE_ORDER])
     expect(result.step).toBe('identity')
   })
 
-  it('heals legacy "intent" step name directly to "goal"', () => {
-    // The migration map in `_resolveRestoredStep` renames the legacy
-    // 'intent' step to its current 'goal' equivalent before checking
-    // membership in the active order.
-    const result = _resolveRestoredStep('intent', [
-      'intro',
-      'identity',
-      'goal',
-      'bezittingen',
-      'saving',
-      'success',
+  it('heals legacy "intent" step name directly to "doel"', () => {
+    // The migration map renames the legacy 'intent' step to 'doel' via
+    // LEGACY_STEP_MAP. Active order bevat `doel`, dus dat is de uitkomst.
+    const result = _resolveRestoredStep('intent', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'doel', healed: true })
+  })
+
+  it('heals legacy "modules" step name directly to "doel"', () => {
+    const result = _resolveRestoredStep('modules', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'doel', healed: true })
+  })
+
+  it('heals legacy "persona" step name directly to "doel"', () => {
+    const result = _resolveRestoredStep('persona', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'doel', healed: true })
+  })
+})
+
+describe('onboarding _reducer — SET_GOAL multi-select', () => {
+  it('merges modules from multiple goals into a deduped union', () => {
+    // 'grip-uitgaven' → ['budgetteren']
+    // 'eerder-stoppen' → ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties']
+    // Verwachte unie (in volgorde van eerste voorkomen):
+    const result = _reducer(_initialState, {
+      type: 'SET_GOAL',
+      goals: ['grip-uitgaven', 'eerder-stoppen'],
+    })
+    expect(result.selectedGoals).toEqual(['grip-uitgaven', 'eerder-stoppen'])
+    expect(result.activeModules).toEqual([
+      'budgetteren',
+      'vermogensregistratie',
+      'toekomstplannen',
+      'inzicht_acties',
     ])
-    expect(result).toEqual({ step: 'goal', healed: false })
   })
 
-  it('heals legacy "modules" step name directly to "goal"', () => {
-    const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
-    const result = _resolveRestoredStep('modules', [...activeOrder])
-    expect(result).toEqual({ step: 'goal', healed: false })
+  it('dedupes overlapping modules across goals', () => {
+    // 'grip-uitgaven' → ['budgetteren']
+    // 'noodfonds' → ['budgetteren', 'inzicht_acties']
+    // budgetteren mag maar éénmaal in de unie staan.
+    const result = _reducer(_initialState, {
+      type: 'SET_GOAL',
+      goals: ['grip-uitgaven', 'noodfonds'],
+    })
+    expect(result.activeModules).toEqual(['budgetteren', 'inzicht_acties'])
   })
 
-  it('heals legacy "persona" step name directly to "goal"', () => {
-    const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
-    const result = _resolveRestoredStep('persona', [...activeOrder])
-    expect(result).toEqual({ step: 'goal', healed: false })
+  it('clears modules when goals array is empty', () => {
+    // Start vanuit een state met actieve modules en zet vervolgens een
+    // lege goal-array — modules moeten teruggaan naar []
+    const withGoal = _reducer(_initialState, {
+      type: 'SET_GOAL',
+      goals: ['grip-uitgaven'],
+    })
+    const cleared = _reducer(withGoal, { type: 'SET_GOAL', goals: [] })
+    expect(cleared.selectedGoals).toEqual([])
+    expect(cleared.activeModules).toEqual([])
   })
+})
 
-  it('heals legacy "extras" step name directly to "bezittingen"', () => {
-    const activeOrder = ['intro', 'identity', 'goal', 'bezittingen', 'saving', 'success'] as const
-    const result = _resolveRestoredStep('extras', [...activeOrder])
-    expect(result).toEqual({ step: 'bezittingen', healed: false })
-  })
-
-  it('walks forward past removed steps to find the next valid one', () => {
-    // Imagine a user who had `horizon` saved but the flow was reduced to
-    // no toekomstplannen. Canonical-wise horizon is between budgets and
-    // preferences. The walk should land on the first active step whose
-    // canonical index is >= horizon's — there is none here, so identity.
-    const result = _resolveRestoredStep('horizon', [
-      'intro',
-      'identity',
-      'goal',
-      'bezittingen',
-      'saving',
-      'success',
-    ])
-    expect(result).toEqual({ step: 'identity', healed: true })
+describe('onboarding _reducer — SET_NEWS_ONLY', () => {
+  it('clears selectedGoals and sets activeModules to [nieuws]', () => {
+    const withGoals = _reducer(_initialState, {
+      type: 'SET_GOAL',
+      goals: ['grip-uitgaven', 'eerder-stoppen'],
+    })
+    const result = _reducer(withGoals, { type: 'SET_NEWS_ONLY' })
+    expect(result.selectedGoals).toEqual([])
+    expect(result.activeModules).toEqual(['nieuws'])
   })
 })
 
@@ -151,7 +188,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        goal: null,
+        selectedGoals: ['grip-uitgaven'],
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
         newsDescription: '',
@@ -159,22 +196,75 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
-        lastStep: 'budgets',
+        lastStep: 'bezittingen',
       },
     })
-    expect(result.step).toBe('budgets')
+    expect(result.step).toBe('bezittingen')
     expect(result.activeModules).toEqual(['budgetteren'])
+    expect(result.selectedGoals).toEqual(['grip-uitgaven'])
     expect(warnSpy).not.toHaveBeenCalled()
   })
 
-  it('heals a lastStep that no longer belongs in the active order', () => {
-    // News-only flow: saved step was `budgets` but the active order now
-    // only has `nieuws_only` between `modules` and `saving`.
+  it('migrates a legacy single-goal draft to a selectedGoals array', () => {
+    // Een draft van vóór fase 3 had `goal: GoalSlug | null`. RESTORE_STATE
+    // wrapt single → array en zet activeModules op de daarbij horende
+    // preset.
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        goal: null,
+        selectedGoals: [],
+        goal: 'grip-uitgaven',
+        activeModules: ['budgetteren'],
+        horizon: baseHorizon,
+        newsDescription: '',
+        extraction: null,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        lastStep: 'bezittingen',
+      },
+    })
+    expect(result.selectedGoals).toEqual(['grip-uitgaven'])
+    expect(result.activeModules).toEqual(['budgetteren'])
+  })
+
+  it('migrates a legacy "budgets" lastStep to "klaar"', () => {
+    // Een draft die was opgeslagen op de oude `budgets`-stap. Sinds fase 3
+    // mapt die naar `klaar` — bewust een healed-fallback zodat de gebruiker
+    // niet terug naar het begin gestuurd wordt.
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: ['grip-uitgaven'],
+        activeModules: ['budgetteren'],
+        horizon: baseHorizon,
+        newsDescription: '',
+        extraction: null,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        // Cast omdat de persisted shape getypeerd is op de huidige union,
+        // maar we simuleren een draft van vóór de flow-change.
+        lastStep: 'budgets' as (typeof _initialState)['step'],
+      },
+    })
+    expect(result.step).toBe('klaar')
+    expect(warnSpy).toHaveBeenCalledOnce()
+    expect(warnSpy.mock.calls[0][0]).toContain('budgets')
+    expect(warnSpy.mock.calls[0][0]).toContain('klaar')
+  })
+
+  it('heals a lastStep that no longer belongs in the news-only active order', () => {
+    // News-only flow heeft alleen doel + nieuws_only — een legacy
+    // bezittingen-lastStep moet healen naar nieuws_only (eerste actieve stap
+    // ≥ bezittingen in canonical).
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: [],
         activeModules: ['nieuws'],
         horizon: baseHorizon,
         newsDescription: '',
@@ -182,15 +272,11 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
-        // Cast because the persisted shape is typed to the current union,
-        // but we're simulating a draft saved before the flow changed.
-        lastStep: 'budgets' as (typeof _initialState)['step'],
+        lastStep: 'bezittingen' as (typeof _initialState)['step'],
       },
     })
     expect(result.step).toBe('nieuws_only')
     expect(warnSpy).toHaveBeenCalledOnce()
-    expect(warnSpy.mock.calls[0][0]).toContain('budgets')
-    expect(warnSpy.mock.calls[0][0]).toContain('nieuws_only')
   })
 
   it('falls back to identity for an unknown lastStep', () => {
@@ -198,7 +284,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: {
         identity: baseIdentity as (typeof _initialState)['identity'],
-        goal: null,
+        selectedGoals: [],
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
         newsDescription: '',
@@ -215,29 +301,16 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
 })
 
 describe('onboarding _firstNavigationRecoveryStep', () => {
-  it('returns identity for a full flow', () => {
-    const result = _firstNavigationRecoveryStep([
-      'intro',
-      'identity',
-      'goal',
-      'bezittingen',
-      'budgets',
-      'saving',
-      'success',
-    ])
-    // First non-intro / non-terminal step is identity.
-    expect(result).toBe('identity')
+  it('returns the first content step for the new active order', () => {
+    const result = _firstNavigationRecoveryStep([...NEW_ACTIVE_ORDER])
+    // Eerste niet-terminal step is `doel` — saving/success worden
+    // overgeslagen, intro bestaat niet meer.
+    expect(result).toBe('doel')
   })
 
-  it('returns the first selectable step when identity is absent', () => {
-    const result = _firstNavigationRecoveryStep([
-      'intro',
-      'goal',
-      'nieuws_only',
-      'saving',
-      'success',
-    ])
-    expect(result).toBe('goal')
+  it('returns the first selectable step when news-only mode is active', () => {
+    const result = _firstNavigationRecoveryStep([...NEWS_ONLY_ACTIVE_ORDER])
+    expect(result).toBe('doel')
   })
 
   it('falls back to identity when the active order is empty', () => {
@@ -248,18 +321,8 @@ describe('onboarding _firstNavigationRecoveryStep', () => {
   it('mirrors the behaviour goToNext/goToBack rely on for an orphaned step', () => {
     // This covers the navigation spec requirement: when state.step is not
     // in activeStepOrder (idx === -1), the recovery helper produces the
-    // first valid non-intro step for SET_STEP to dispatch to.
-    const activeStepOrder = [
-      'intro',
-      'identity',
-      'goal',
-      'bezittingen',
-      'saving',
-      'success',
-    ] as const
-    // `state.step` would be something like 'budgets' here — not in the
-    // active order. The helper is what the component dispatches to.
-    const fallback = _firstNavigationRecoveryStep([...activeStepOrder])
-    expect(fallback).toBe('identity')
+    // first valid non-terminal step for SET_STEP to dispatch to.
+    const fallback = _firstNavigationRecoveryStep([...NEW_ACTIVE_ORDER])
+    expect(fallback).toBe('doel')
   })
 })

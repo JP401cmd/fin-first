@@ -14,6 +14,7 @@ import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-anim
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { ActionCenter } from './action-center'
 import { DoelenStrook } from './doelen-strook'
+import { StappenplannenStrook } from './stappenplannen-strook'
 import { VasteKostenAnalyse, type RecurringItem } from './vaste-kosten-analyse'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { MonthlyCheckinCard } from '@/components/dashboard/monthly-checkin-card'
@@ -136,6 +137,9 @@ export function WillLanding({
             voor vandaag?
           </h1>
         </header>
+
+        {/* ── Stappenplannen-strook (boven het dashboard) ── */}
+        <StappenplannenStrook data={dashboardData} />
 
         {/* ── Sectie 1: Widget grid, DAIshboard of Nieuws ── */}
         <section

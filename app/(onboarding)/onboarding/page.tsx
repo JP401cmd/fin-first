@@ -9,14 +9,15 @@ import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { HorizonData } from '@/components/onboarding/onboarding-horizon'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 
-import { OnboardingIntro } from '@/components/onboarding/onboarding-intro'
+import { OnboardingDoel } from '@/components/onboarding/onboarding-doel'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
-import { OnboardingBudgets } from '@/components/onboarding/onboarding-budgets'
+import { OnboardingInkomen } from '@/components/onboarding/onboarding-inkomen'
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
-import { OnboardingGoal } from '@/components/onboarding/onboarding-goal'
-import { OnboardingHorizon, INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
+import { OnboardingKlaar } from '@/components/onboarding/onboarding-klaar'
+import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
+import { WelcomePopup } from '@/components/onboarding/welcome-popup'
 import { type PersonaId, type IntentId, type ModuleId, getHomePath } from '@/lib/module-registry'
 import type { GoalSlug } from '@/lib/goals/types'
 import {
@@ -29,6 +30,13 @@ import {
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
 
+// ── localStorage key voor de "is de welkomstpopup al gezien?"-flag.
+// Bewust een aparte key buiten het draft-payload: de flag moet ook
+// overleven nadat de draft gewist is (bij voltooiing, of bij een
+// nieuwe sessie die op een andere stap verder gaat dan stap 1). Een
+// nieuwe gebruiker ziet 'm één keer; daarna nooit meer.
+const WELCOME_SEEN_STORAGE_KEY = 'trifinity_onboarding_welcome_seen'
+
 // ── Saving progress messages ─────────────────────────────────
 const SAVING_MESSAGES = [
   'Profiel wordt opgeslagen...',
@@ -40,13 +48,21 @@ const SAVING_MESSAGES = [
 
 // ── Types ────────────────────────────────────────────────────
 
+/**
+ * Active step union sinds de onboarding-redesign (mei 2026, fase 3):
+ * 5 content-stappen (doel → identity → inkomen → bezittingen → klaar)
+ * plus de twee terminal-stappen `saving`/`success`, en het news-only-pad.
+ *
+ * Legacy step-namen (`intro`, `goal`, `budgets`, `horizon`) zijn uit de
+ * actieve flow verwijderd — ze leven nog in `CANONICAL_STEP_ORDER` zodat
+ * self-healing restore werkt op oude localStorage-drafts.
+ */
 type Step =
-  | 'intro'
+  | 'doel'
   | 'identity'
-  | 'goal'
+  | 'inkomen'
   | 'bezittingen'
-  | 'budgets'
-  | 'horizon'
+  | 'klaar'
   | 'nieuws_only'
   | 'saving'
   | 'success'
@@ -56,19 +72,44 @@ type Direction = 'forward' | 'back'
 /**
  * Canonical order of every step that has ever existed in the flow, used as a
  * fallback anchor when a restored `lastStep` is no longer present in the
- * active step order. Keep this in sync with the `Step` union above.
+ * active step order. Bevat zowel de legacy step-namen (intro/goal/budgets/
+ * horizon) als de nieuwe — drafts uit een oudere flow blijven herstelbaar.
  */
-const CANONICAL_STEP_ORDER: readonly Step[] = [
-  'intro',
+const CANONICAL_STEP_ORDER: readonly string[] = [
+  // legacy → nieuw vervangers
+  'intro',       // → doel
+  'doel',
   'identity',
-  'goal',
+  'goal',        // → doel (legacy)
+  'inkomen',
   'bezittingen',
-  'budgets',
-  'horizon',
+  'budgets',     // → klaar (legacy)
+  'horizon',     // → klaar (legacy)
+  'klaar',
   'nieuws_only',
   'saving',
   'success',
 ] as const
+
+/**
+ * Map a legacy lastStep name to the closest current equivalent. Wordt door
+ * `_resolveRestoredStep` toegepast vóór de membership-check zodat een draft
+ * die opgeslagen is met een verwijderde step-naam alsnog landt op een
+ * bestaande stap zonder dat we 'm naar identity terug hoeven te zetten.
+ */
+const LEGACY_STEP_MAP: Record<string, Step> = {
+  // pre-mei 2026 step-namen
+  modules: 'doel',
+  persona: 'doel',
+  intent: 'doel',
+  extras: 'bezittingen',
+  preferences: 'klaar',
+  // fase 3 (mei 2026): intro/goal/budgets/horizon zijn niet meer actief
+  intro: 'doel',
+  goal: 'doel',
+  budgets: 'klaar',
+  horizon: 'klaar',
+}
 
 /**
  * Self-healing restore: given a previously saved `lastStep` and the currently
@@ -77,9 +118,9 @@ const CANONICAL_STEP_ORDER: readonly Step[] = [
  * while the user had a draft in localStorage), we anchor on the saved step's
  * position in the canonical union and walk forward to the first valid step
  * the user has not yet passed, skipping the terminal `saving` / `success`
- * placeholders. As a last resort we fall back to `'identity'` — never
- * `'intro'`, because the presence of saved data means the user is already
- * past the intro.
+ * placeholders. As a last resort we fall back to `'identity'` — never the
+ * eerste stap, because the presence of saved data means the user is already
+ * past the welcome screen.
  */
 export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrder: Step[]): {
   step: Step
@@ -88,36 +129,31 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
   const terminalSteps: Step[] = ['saving', 'success']
   const isSelectable = (s: Step): boolean => !terminalSteps.includes(s)
 
-  // No saved step at all → start at identity (user already past intro if
-  // we're restoring data).
+  // No saved step at all → start at identity (user already past doel if
+  // we're restoring data with at least the user's name in it).
   if (!lastStep) {
     return { step: 'identity', healed: false }
   }
 
-  // Map legacy step names to their current equivalents so old localStorage
-  // drafts resolve correctly even when this function is called directly.
-  const LEGACY_STEP_MAP: Record<string, string> = {
-    modules: 'goal',
-    persona: 'goal',
-    intent: 'goal', // Legacy: intent-stap is hernoemd naar goal (mei 2026)
-    extras: 'bezittingen',
-    preferences: 'horizon', // Legacy: preferences-stap is verwijderd; horizon is nu de laatste content-stap
-  }
-  // eslint-disable-next-line no-param-reassign
-  if (LEGACY_STEP_MAP[lastStep]) lastStep = LEGACY_STEP_MAP[lastStep]
+  // Map legacy step names to their current equivalents before checking
+  // membership in the active order.
+  let resolved = lastStep
+  if (LEGACY_STEP_MAP[resolved]) resolved = LEGACY_STEP_MAP[resolved]
 
   // Happy path: saved step is still in the active order and not terminal.
   if (
-    (activeStepOrder as string[]).includes(lastStep) &&
-    isSelectable(lastStep as Step)
+    (activeStepOrder as string[]).includes(resolved) &&
+    isSelectable(resolved as Step)
   ) {
-    return { step: lastStep as Step, healed: false }
+    // Een mapping naar een andere step (bv. budgets → klaar) telt nog steeds
+    // als healed — de user kreeg een andere step terug dan opgeslagen was.
+    const healed = resolved !== lastStep
+    return { step: resolved as Step, healed }
   }
 
   // Anchor on the saved step's position in the canonical union. If the name
-  // is completely unknown (e.g. a removed step that was never part of the
-  // union) the index is -1 and we fall all the way through to 'identity'.
-  const canonicalIdx = (CANONICAL_STEP_ORDER as readonly string[]).indexOf(lastStep)
+  // is completely unknown the index is -1 and we fall through to identity.
+  const canonicalIdx = CANONICAL_STEP_ORDER.indexOf(resolved)
 
   if (canonicalIdx >= 0) {
     // Walk forward through the active order and take the first selectable
@@ -133,9 +169,9 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
   }
 
   // Last resort: identity if it's in the active order, otherwise the first
-  // selectable step. We intentionally skip 'intro' because the user already
-  // had persisted data — sending them back to the welcome screen would feel
-  // like a full reset.
+  // selectable step. We intentionally skip 'doel' (the first content-stap)
+  // because the user already had persisted data — sending them back to the
+  // goal-keuze would feel like a full reset.
   const identityFallback = activeStepOrder.find((s) => s === 'identity')
   if (identityFallback) {
     return { step: 'identity', healed: true }
@@ -146,64 +182,50 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
 
 /**
  * Pick a safe navigation landing spot when the user's current step is not in
- * the active step order. Skips `intro` (user already past it) and the
- * terminal `saving` / `success` placeholders. Used by `goToNext` / `goToBack`
- * as a self-healing fallback so the navigation buttons never silently no-op.
+ * the active step order. Skips terminal `saving` / `success` placeholders.
+ * Used by `goToNext` / `goToBack` as a self-healing fallback so the
+ * navigation buttons never silently no-op.
  */
 export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
   const recovery = activeStepOrder.find(
-    (s) => s !== 'intro' && s !== 'saving' && s !== 'success'
+    (s) => s !== 'saving' && s !== 'success'
   )
   return recovery ?? activeStepOrder[0] ?? 'identity'
 }
 
 /**
- * Compute the dynamic step order based on which modules the user selected.
+ * Compute the dynamic step order. Sinds de redesign (mei 2026):
  *
- * - `bezittingen` toont *altijd* (behalve in news-only-flow): registreren van
- *   bezittingen en schulden is fundament-werk dat losstaat van module-keuze.
- *   Een gebruiker activeert in deze stap óók optioneel `budgetteren` (via de
- *   cash-asset-prompt) — de step-order reageert daarna op de nieuwe
- *   activeModules en `budgets` schuift erachter.
- * - `budgets` / `horizon` blijven module-gated.
- * - News-only: enkel de vrije-tekst-stap.
+ * - Happy-path: alle 5 content-stappen zijn altijd actief, ongeacht
+ *   module-keuze. Module-gating gebeurt buiten onboarding (eerste-win-pad +
+ *   module-tabs op de detailpagina's).
+ * - News-only: `doel → nieuws_only` (de doel-stap toont een opt-out-link
+ *   die `SET_NEWS_ONLY` dispatcht en direct naar `nieuws_only` springt).
+ *
+ * We blijven `activeModules` als signaal gebruiken om news-only te
+ * detecteren — niet omdat onboarding modules gate't, maar omdat de
+ * downstream save-flow weet hoe news-only verschilt van een gewone flow.
  */
 function computeStepOrder(selectedModules: ModuleId[]): Step[] {
-  const steps: Step[] = ['intro', 'identity', 'goal']
-  const has = (m: ModuleId) => selectedModules.includes(m)
-  const isNewsOnly = selectedModules.length === 1 && has('nieuws')
+  const isNewsOnly = selectedModules.length === 1 && selectedModules[0] === 'nieuws'
 
   if (isNewsOnly) {
-    steps.push('nieuws_only')
-  } else {
-    steps.push('bezittingen')
-    if (has('budgetteren')) steps.push('budgets')
-    if (has('toekomstplannen')) steps.push('horizon')
+    return ['doel', 'nieuws_only', 'saving', 'success']
   }
 
-  steps.push('saving', 'success')
-  return steps
-}
-
-/**
- * For steps in the "instellen" phase (between modules and saving), compute a
- * sub-step indicator like "1 of 3". Returns undefined for non-instellen steps.
- */
-function getSubStep(step: Step, stepOrder: Step[]): { current: number; total: number } | undefined {
-  const installenSteps = stepOrder.filter(
-    (s) => !['intro', 'identity', 'goal', 'saving', 'success'].includes(s)
-  )
-  const idx = installenSteps.indexOf(step)
-  if (idx === -1) return undefined
-  return { current: idx + 1, total: installenSteps.length }
+  return ['doel', 'identity', 'inkomen', 'bezittingen', 'klaar', 'saving', 'success']
 }
 
 interface State {
   step: Step
   direction: Direction
   identity: IdentityData
-  /** Sinds mei 2026: outcome-georiënteerde keuze die de oude `intent` vervangt. */
-  goal: GoalSlug | null
+  /**
+   * Sinds mei 2026 (fase 3): multi-select. De gebruiker mag 1+ goals kiezen
+   * op stap 1 — `activeModules` is de unie van alle gekozen `GOAL_MODULE_PRESETS`.
+   * De primaire goal (eerste in array) bepaalt `getGoalFirstWinPath`.
+   */
+  selectedGoals: GoalSlug[]
   activeModules: ModuleId[]
   horizon: HorizonData
   newsDescription: string
@@ -216,11 +238,13 @@ interface State {
 /** Data portion of state that gets persisted to localStorage (excludes step/direction) */
 interface PersistedData {
   identity: IdentityData
-  /** Selected goal slug — primary keuze sinds mei 2026 */
-  goal: GoalSlug | null
-  /** @deprecated Use goal — kept for migration from old localStorage drafts */
+  /** Selected goal-slugs — primaire keuze sinds mei 2026 (fase 3) */
+  selectedGoals: GoalSlug[]
+  /** @deprecated Use selectedGoals — kept for migration from older drafts */
+  goal?: GoalSlug | null
+  /** @deprecated Use selectedGoals — kept for migration from old localStorage drafts */
   intent?: IntentId | null
-  /** @deprecated Use goal — kept for migration from old localStorage drafts */
+  /** @deprecated Use selectedGoals — kept for migration from old localStorage drafts */
   persona?: PersonaId | null
   activeModules: ModuleId[]
   /** @deprecated Use activeModules — kept for migration from old localStorage drafts */
@@ -238,16 +262,14 @@ interface PersistedData {
 type Action =
   | { type: 'SET_STEP'; step: Step }
   | { type: 'SET_IDENTITY'; data: IdentityData }
-  | { type: 'SET_GOAL'; goal: GoalSlug }
-  /** Opt-out vanaf de goal-stap: zet activeModules op ['nieuws'] en clear goal. */
-  | { type: 'SET_NEWS_ONLY' }
-  | { type: 'TOGGLE_MODULE'; moduleId: ModuleId; enabled: boolean }
   /**
-   * Activeer een module zónder goal te resetten. Gebruikt door contextuele
-   * opt-ins zoals de budgetteren-prompt op de bezittingen-stap: de gebruiker
-   * blijft binnen z'n gekozen doel, voegt alleen één module toe.
+   * Vervangt de oude single-goal action. `goals` is een array — caller mag
+   * 0+ goals doorgeven; lege array zet `activeModules` op `[]` zodat de
+   * volgende-knop disabled wordt door de `OnboardingDoel`-component.
    */
-  | { type: 'ENABLE_MODULE'; moduleId: ModuleId }
+  | { type: 'SET_GOAL'; goals: GoalSlug[] }
+  /** Opt-out vanaf de doel-stap: zet activeModules op ['nieuws'] en clear goals. */
+  | { type: 'SET_NEWS_ONLY' }
   | { type: 'SET_HORIZON'; data: HorizonData }
   | { type: 'SET_NEWS_DESCRIPTION'; value: string }
   | { type: 'SET_EXTRACTION'; data: ExtractionResult | null }
@@ -257,9 +279,9 @@ type Action =
   | { type: 'RESTORE_STATE'; data: PersistedData }
 
 export const _initialState: State = {
-  step: 'intro',
+  step: 'doel',
   direction: 'forward',
-  goal: null,
+  selectedGoals: [],
   activeModules: [],
   identity: {
     full_name: '',
@@ -277,7 +299,11 @@ export const _initialState: State = {
   quickDebts: [],
 }
 
-/** Map a legacy persisted intent (or persona) onto the new GoalSlug. */
+/**
+ * Map een legacy persisted intent (of persona) onto a new GoalSlug. Wordt
+ * door `loadFromLocalStorage` / `RESTORE_STATE` gebruikt om oude drafts te
+ * heelen — single-goal-output, caller wraps in array.
+ */
 function migrateIntentToGoal(
   intent: IntentId | null | undefined,
   persona: PersonaId | null | undefined,
@@ -297,6 +323,26 @@ function migrateIntentToGoal(
   return null
 }
 
+/**
+ * Bereken `activeModules` als unie van alle goals' `GOAL_MODULE_PRESETS`.
+ * Volgorde-stabiel: behoudt de eerste-occurrence-volgorde over de
+ * geselecteerde goals, zodat `getHomePath` (die de eerste module pakt)
+ * een voorspelbaar resultaat geeft bij multi-select.
+ */
+function resolveModulesForGoals(goals: GoalSlug[]): ModuleId[] {
+  const seen = new Set<ModuleId>()
+  const merged: ModuleId[] = []
+  for (const goal of goals) {
+    for (const m of GOAL_MODULE_PRESETS[goal]) {
+      if (!seen.has(m)) {
+        seen.add(m)
+        merged.push(m)
+      }
+    }
+  }
+  return merged
+}
+
 export function _reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_STEP': {
@@ -307,22 +353,12 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, step: action.step, direction }
     }
     case 'SET_GOAL': {
-      const modules = [...GOAL_MODULE_PRESETS[action.goal]]
-      return { ...state, goal: action.goal, activeModules: modules }
+      // Multi-select: bouw activeModules als unie van alle gekozen goals.
+      const modules = resolveModulesForGoals(action.goals)
+      return { ...state, selectedGoals: action.goals, activeModules: modules }
     }
     case 'SET_NEWS_ONLY': {
-      return { ...state, goal: null, activeModules: ['nieuws'] }
-    }
-    case 'TOGGLE_MODULE': {
-      // Always allow toggling — clear goal to null since it no longer matches a preset
-      const updated = action.enabled
-        ? [...state.activeModules, action.moduleId]
-        : state.activeModules.filter((m) => m !== action.moduleId)
-      return { ...state, goal: null, activeModules: updated }
-    }
-    case 'ENABLE_MODULE': {
-      if (state.activeModules.includes(action.moduleId)) return state
-      return { ...state, activeModules: [...state.activeModules, action.moduleId] }
+      return { ...state, selectedGoals: [], activeModules: ['nieuws'] }
     }
     case 'SET_IDENTITY':
       return { ...state, identity: action.data }
@@ -356,14 +392,23 @@ export function _reducer(state: State, action: Action): State {
           `[onboarding] lastStep ${action.data.lastStep ?? '(none)'} not in active order, falling back to ${restoredStep}`
         )
       }
-      const restoredGoal: GoalSlug | null =
-        action.data.goal ?? migrateIntentToGoal(action.data.intent, action.data.persona)
+      // Migrate single-goal drafts naar de nieuwe multi-select array.
+      // Volgorde: nieuwe array > legacy single-goal > legacy intent/persona.
+      let restoredGoals: GoalSlug[] = []
+      if (Array.isArray(action.data.selectedGoals) && action.data.selectedGoals.length > 0) {
+        restoredGoals = action.data.selectedGoals.filter(isGoalSlug)
+      } else if (action.data.goal) {
+        restoredGoals = [action.data.goal]
+      } else {
+        const migrated = migrateIntentToGoal(action.data.intent, action.data.persona)
+        if (migrated) restoredGoals = [migrated]
+      }
       return {
         ...state,
         step: restoredStep,
         direction: 'forward',
         identity: action.data.identity,
-        goal: restoredGoal,
+        selectedGoals: restoredGoals,
         activeModules: restoredModules,
         horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
         newsDescription: action.data.newsDescription ?? '',
@@ -397,7 +442,7 @@ function saveToLocalStorage(state: State) {
   try {
     const data: PersistedData = {
       identity: state.identity,
-      goal: state.goal,
+      selectedGoals: state.selectedGoals,
       activeModules: state.activeModules,
       horizon: state.horizon,
       newsDescription: state.newsDescription,
@@ -451,6 +496,16 @@ function loadFromLocalStorage(): PersistedData | null {
       identity = parsed.identity as IdentityData
     }
 
+    // Migratie selectedGoals: nieuwe shape > legacy single `goal` > leeg array.
+    // De daadwerkelijke intent/persona-fallback gebeurt in `RESTORE_STATE`
+    // omdat dat dichter bij waar de array daadwerkelijk wordt gezet leeft.
+    let selectedGoals: GoalSlug[] = []
+    if (Array.isArray(parsed.selectedGoals)) {
+      selectedGoals = parsed.selectedGoals.filter(isGoalSlug)
+    } else if (parsed.goal && isGoalSlug(parsed.goal)) {
+      selectedGoals = [parsed.goal]
+    }
+
     // Migratie: een draft van vóór de QuickAddWizard-flow heeft `bankAccounts`,
     // `assets`, `debts` met de oude shape. Die items zijn niet 1:1 te mappen
     // op de nieuwe 3-velden-input zonder data te verzinnen — dus we droppen
@@ -458,6 +513,7 @@ function loadFromLocalStorage(): PersistedData | null {
     // onboarding (transient draft, geen permanente data).
     const data: PersistedData = {
       identity,
+      selectedGoals,
       goal: isGoalSlug(parsed.goal) ? parsed.goal : null,
       intent: parsed.intent ?? null,
       persona: parsed.persona ?? null,
@@ -472,11 +528,9 @@ function loadFromLocalStorage(): PersistedData | null {
       lastStep: parsed.lastStep,
     }
 
-    // Map old step names to new ones
-    if (data.lastStep === ('persona' as string)) data.lastStep = 'goal'
-    if (data.lastStep === ('modules' as string)) data.lastStep = 'goal'
-    if (data.lastStep === ('intent' as string)) data.lastStep = 'goal'
-    if (data.lastStep === ('extras' as string)) data.lastStep = 'bezittingen'
+    // Legacy step-namen worden door `_resolveRestoredStep` zelf gemapt;
+    // hier laten we ze ongemoeid zodat de healed-flag in RESTORE_STATE
+    // accuraat aangeeft of er een mapping heeft plaatsgevonden.
 
     return data
   } catch {
@@ -492,6 +546,26 @@ function clearLocalStorage() {
   }
 }
 
+// ── Module-tint wrapper-style ───────────────────────────────
+// Onboarding leeft buiten een specifieke module (de gebruiker is modules
+// aan het kiezen), maar de stappen-componenten consumeren --module-active-*
+// tokens voor kicker-strepen, italic-em en voortgangsbalk. Default is `kern`
+// — warm, mensgericht. We zetten alle shades expliciet zodat de componenten
+// geen fallback hoeven te kennen.
+const KERN_MODULE_TINT_STYLE = {
+  '--module-active-50': 'var(--color-kern-50)',
+  '--module-active-100': 'var(--color-kern-100)',
+  '--module-active-200': 'var(--color-kern-200)',
+  '--module-active-300': 'var(--color-kern-300)',
+  '--module-active-400': 'var(--color-kern-400)',
+  '--module-active-500': 'var(--color-kern-500)',
+  '--module-active-600': 'var(--color-kern-600)',
+  '--module-active-700': 'var(--color-kern-700)',
+  '--module-active-800': 'var(--color-kern-800)',
+  '--module-active-900': 'var(--color-kern-900)',
+  '--module-active-950': 'var(--color-kern-950)',
+} as React.CSSProperties
+
 // ── Main Component ───────────────────────────────────────────
 
 export default function OnboardingPage() {
@@ -505,8 +579,27 @@ export default function OnboardingPage() {
   const [saveMessageIdx, setSaveMessageIdx] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [restoredNotice, setRestoredNotice] = useState(false)
+  // Welkomstpopup: alleen tonen bij eerste binnenkomst, niet bij restored-draft
+  // (de gebruiker is dan al terug-bezig en de begroeting voelt op dat moment
+  // als ruis). De show-beslissing wordt in de check-effect onderaan genomen
+  // — initial false zodat SSR en eerste paint geen popup tonen.
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false)
 
   const activeStepOrder = useMemo(() => computeStepOrder(state.activeModules), [state.activeModules])
+
+  // Content-stappen voor de voortgangsbalk (excl. saving/success).
+  // We typen het als `Step[]` zodat `indexOf` `state.step` (incl. terminal
+  // stappen) accepteert — de terminal-stappen zitten niet in de array en
+  // krijgen daardoor automatisch idx === -1 → fallback naar 1.
+  const contentSteps = useMemo<Step[]>(
+    () => activeStepOrder.filter((s) => s !== 'saving' && s !== 'success'),
+    [activeStepOrder],
+  )
+  const totalContentSteps = contentSteps.length
+  const currentContentStep = useMemo(() => {
+    const idx = contentSteps.indexOf(state.step)
+    return idx === -1 ? 1 : idx + 1
+  }, [contentSteps, state.step])
 
   const goToBack = useCallback(() => {
     const idx = activeStepOrder.indexOf(state.step)
@@ -524,8 +617,6 @@ export default function OnboardingPage() {
       dispatch({ type: 'SET_STEP', step: activeStepOrder[idx - 1] })
     }
   }, [activeStepOrder, state.step])
-
-  const currentSubStep = useMemo(() => getSubStep(state.step, activeStepOrder), [state.step, activeStepOrder])
 
   // Check if already onboarded + restore from localStorage
   useEffect(() => {
@@ -550,11 +641,29 @@ export default function OnboardingPage() {
 
       // Try to restore previously entered data from localStorage
       const saved = loadFromLocalStorage()
-      if (saved && (saved.identity.full_name || saved.identity.date_of_birth)) {
+      const hasRestoredDraft = Boolean(
+        saved && (saved.identity.full_name || saved.identity.date_of_birth),
+      )
+      if (hasRestoredDraft && saved) {
         dispatch({ type: 'RESTORE_STATE', data: saved })
         setRestoredNotice(true)
         // Auto-dismiss after 4 seconds
         setTimeout(() => setRestoredNotice(false), 4000)
+      }
+
+      // Welkomstpopup-beslissing: alleen tonen voor een nieuwe gebruiker die
+      // (a) de popup nog niet eerder gezien heeft EN (b) geen draft heeft die
+      // gerestored is. Een restored-draft betekent dat de gebruiker al midden
+      // in onboarding zit — een begroetende popup zou daar verwarrend zijn.
+      let welcomeSeen = false
+      try {
+        welcomeSeen = localStorage.getItem(WELCOME_SEEN_STORAGE_KEY) === 'true'
+      } catch {
+        // localStorage onbereikbaar (privacy-modus) — toon de popup dan maar
+        // gewoon; bij volgende sessie verschijnt 'm opnieuw, geen kwaad.
+      }
+      if (!welcomeSeen && !hasRestoredDraft) {
+        setShowWelcomePopup(true)
       }
 
       setLoading(false)
@@ -562,13 +671,25 @@ export default function OnboardingPage() {
     check()
   }, [supabase, router])
 
-  // Persist state to localStorage on every step change (except saving/success)
+  // Welkomstpopup wegklikken: zet de flag in localStorage zodat hij niet
+  // terugkomt bij een refresh tijdens dezelfde onboarding-sessie. Het is
+  // geen kritiek pad — bij localStorage-fail loggen we niets en valt de
+  // popup gewoon nog een keer in beeld bij volgende sessie.
+  const dismissWelcomePopup = useCallback(() => {
+    try {
+      localStorage.setItem(WELCOME_SEEN_STORAGE_KEY, 'true')
+    } catch {
+      // ignore — popup verschijnt eventueel opnieuw, acceptabel
+    }
+    setShowWelcomePopup(false)
+  }, [])
+
+  // Persist state to localStorage on every step change (except saving/success).
+  // We slaan ook op stap 1 (`doel`) op, anders zou een gebruiker die alleen
+  // doelen kiest en daarna afhaakt z'n keuze verliezen.
   useEffect(() => {
     if (['saving', 'success'].includes(state.step)) return
-    // Only save if user has entered at least some data
-    if (state.step !== 'intro') {
-      saveToLocalStorage(state)
-    }
+    saveToLocalStorage(state)
   }, [state])
 
   // ── Handlers ─────────────────────────────────────────────────
@@ -641,9 +762,13 @@ export default function OnboardingPage() {
         }
       }
 
-      // Add chosen goal — primary signal voor de doel-stappen-flow
-      if (state.goal) {
-        body.selectedGoalSlug = state.goal
+      // Add chosen goals — primary signal voor de doel-stappen-flow.
+      // Server accepteert array (`selectedGoalSlugs`) sinds fase 3. We sturen
+      // ook `selectedGoalSlug` (eerste van de array) voor backward-compat
+      // met oudere server-deploys die nog niet het array-veld kennen.
+      if (state.selectedGoals.length > 0) {
+        body.selectedGoalSlugs = state.selectedGoals
+        body.selectedGoalSlug = state.selectedGoals[0]
       }
 
       // Add news description if present
@@ -685,7 +810,6 @@ export default function OnboardingPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        // eslint-disable-next-line no-console
         console.error(`[onboarding-save] server rejected payload (status ${res.status}): ${JSON.stringify(data)}`)
         // Build a human-readable summary of Zod field errors when present
         let detail = ''
@@ -700,16 +824,15 @@ export default function OnboardingPage() {
 
       // Pre-generate AI recommendations for goals waar /will het primaire
       // landingspad is — anders is de pagina leeg bij eerste bezoek.
-      if (state.goal === 'bewust-leven' || state.goal === 'noodfonds') {
+      const aiPregenGoals: GoalSlug[] = ['bewust-leven', 'noodfonds']
+      if (state.selectedGoals.some((g) => aiPregenGoals.includes(g))) {
         try {
           const res = await fetch('/api/ai/recommendations/initial', { method: 'POST' })
           if (!res.ok) {
-            // eslint-disable-next-line no-console
             console.error('[onboarding] AI pre-generation returned', res.status, res.statusText)
           }
         } catch (err) {
           // Non-blocking: log but don't prevent onboarding from completing
-          // eslint-disable-next-line no-console
           console.error('[onboarding] AI pre-generation failed:', err)
         }
       }
@@ -749,7 +872,7 @@ export default function OnboardingPage() {
     if (idx === -1) {
       // Self-heal: current step is no longer in the active order (e.g. the
       // user had a draft pointing at a step that was removed). Dispatch to
-      // the first valid non-intro step instead of silently no-op'ing.
+      // the first valid step instead of silently no-op'ing.
       const fallback = _firstNavigationRecoveryStep(activeStepOrder)
       console.warn(
         `[onboarding] goToNext: step ${state.step} not in active order, falling back to ${fallback}`
@@ -760,8 +883,8 @@ export default function OnboardingPage() {
     const next = activeStepOrder[idx + 1]
     // Safety net: if the next step is 'saving', invoke the actual save handler
     // instead of just dispatching to the saving screen. Without this, any
-    // module combination would dead-end at 90% on
-    // the progress bar (the saving step never triggers the POST itself).
+    // module combination would dead-end at 90% on the progress bar (the
+    // saving step never triggers the POST itself).
     if (next === 'saving') {
       handleSaveOwnData()
       return
@@ -773,6 +896,34 @@ export default function OnboardingPage() {
 
   const dismissError = useCallback(() => setSaveError(null), [])
 
+  // Helper voor stap 4 → handlers de orchestrator nodig heeft.
+  const handleAssetsChange = useCallback(
+    (items: AssetQuickInput[]) => dispatch({ type: 'SET_QUICK_ASSETS', items }),
+    [],
+  )
+  const handleDebtsChange = useCallback(
+    (items: DebtQuickInput[]) => dispatch({ type: 'SET_QUICK_DEBTS', items }),
+    [],
+  )
+
+  // Voor stap 5 → recap: cumulatief netto vermogen. `null` als de gebruiker
+  // bezittingen + schulden bewust heeft overgeslagen (recap toont dan "—").
+  const netWorthForKlaar = useMemo(() => {
+    const hasAny = state.quickAssets.length + state.quickDebts.length > 0
+    if (!hasAny) return null
+    const totalAssets = state.quickAssets.reduce((s, a) => s + (Number(a.current_value) || 0), 0)
+    const totalDebts = state.quickDebts.reduce((s, d) => s + (Number(d.current_balance) || 0), 0)
+    return totalAssets - totalDebts
+  }, [state.quickAssets, state.quickDebts])
+
+  const netMonthlyIncomeForKlaar = useMemo(() => {
+    const raw = state.identity.net_monthly_income
+    if (!raw) return 0
+    const cleaned = raw.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.')
+    const n = Number(cleaned)
+    return isFinite(n) && n > 0 ? n : 0
+  }, [state.identity.net_monthly_income])
+
   // ── Render ───────────────────────────────────────────────────
 
   if (loading) {
@@ -783,10 +934,22 @@ export default function OnboardingPage() {
     )
   }
 
-  const showHeader = !['intro', 'success', 'saving'].includes(state.step)
+  // De nieuwe shell heeft z'n eigen sticky voortgangsbalk en back-affordance;
+  // de logo/logout-strip blijft daarboven actief voor alle content-stappen.
+  // Verbergen alleen op `saving`/`success` — daar is het visuele eindpunt
+  // genoeg, en de uitloggen-knop hoort niet bij een eindscherm.
+  const showHeader = !['saving', 'success'].includes(state.step)
 
   return (
-    <div className="flex min-h-screen flex-col items-center px-4 py-8 sm:justify-center sm:px-6 sm:py-12">
+    <div
+      className="flex min-h-screen flex-col items-center px-4 py-8 sm:justify-center sm:px-6 sm:py-12"
+      style={KERN_MODULE_TINT_STYLE}
+    >
+      {/* ── Welkomstpopup ─────────────────────────────────────────
+          Eén keer per nieuwe gebruiker, vóór stap 1. Niet voor restored
+          drafts (zie check-effect). Sluit alleen via primary CTA of ESC. */}
+      {showWelcomePopup && <WelcomePopup onDismiss={dismissWelcomePopup} />}
+
       {/* ── Sticky error banner ─────────────────────────────────── */}
       {saveError && (
         <div
@@ -834,7 +997,7 @@ export default function OnboardingPage() {
         >
           <div className="mx-auto flex max-w-[640px] items-center justify-between gap-3">
             <p className="text-sm text-green-700">
-              ✓ Je eerder ingevulde gegevens zijn hersteld
+              {'✓'} Je eerder ingevulde gegevens zijn hersteld
             </p>
             <button
               onClick={() => setRestoredNotice(false)}
@@ -849,8 +1012,10 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <div className={`w-full max-w-[480px] sm:max-w-[640px] ${saveError || restoredNotice ? 'mt-16' : ''}`}>
-        {/* Logo / Header */}
+      <div className={`w-full max-w-[480px] sm:max-w-[640px] lg:max-w-none ${saveError || restoredNotice ? 'mt-16' : ''}`}>
+        {/* Logo / Header — staat boven de shell-progressbar omdat dat z'n
+            eigen sticky-rij heeft. Logout-knop blijft beschikbaar voor alle
+            content-stappen. */}
         {showHeader && (
           <div className="relative mb-10 sm:mb-12 text-center">
             <h1 className="font-display text-4xl font-bold tracking-tight text-[var(--ink)]">
@@ -866,8 +1031,20 @@ export default function OnboardingPage() {
         )}
 
         <StepTransition key={state.step} direction={state.direction}>
-          {state.step === 'intro' && (
-            <OnboardingIntro onNext={goToNext} onLogout={handleLogout} />
+          {state.step === 'doel' && (
+            <OnboardingDoel
+              selectedGoals={state.selectedGoals}
+              onChange={(goals) => dispatch({ type: 'SET_GOAL', goals })}
+              onNext={goToNext}
+              onNewsOnly={() => {
+                // Skip naar nieuws-only flow: zet modules op ['nieuws'] +
+                // spring naar 'nieuws_only'-stap.
+                dispatch({ type: 'SET_NEWS_ONLY' })
+                dispatch({ type: 'SET_STEP', step: 'nieuws_only' })
+              }}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
           )}
 
           {state.step === 'identity' && (
@@ -876,21 +1053,28 @@ export default function OnboardingPage() {
               onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
               onNext={goToNext}
               onBack={goToBack}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
             />
           )}
 
-          {state.step === 'goal' && (
-            <OnboardingGoal
-              selectedGoal={state.goal}
-              onSelect={(goal) => dispatch({ type: 'SET_GOAL', goal })}
+          {state.step === 'inkomen' && (
+            <OnboardingInkomen
+              data={{
+                household_type: state.identity.household_type,
+                number_of_children: state.identity.number_of_children,
+                net_monthly_income: state.identity.net_monthly_income,
+              }}
+              onChange={(income) =>
+                dispatch({
+                  type: 'SET_IDENTITY',
+                  data: { ...state.identity, ...income },
+                })
+              }
               onNext={goToNext}
               onBack={goToBack}
-              onNewsOnly={() => {
-                // Skip naar nieuws-only flow: zet modules op ['nieuws'] +
-                // spring naar 'nieuws_only'-stap.
-                dispatch({ type: 'SET_NEWS_ONLY' })
-                dispatch({ type: 'SET_STEP', step: 'nieuws_only' })
-              }}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
             />
           )}
 
@@ -898,37 +1082,25 @@ export default function OnboardingPage() {
             <OnboardingBezittingen
               quickAssets={state.quickAssets}
               quickDebts={state.quickDebts}
-              onAssetsChange={(items) => dispatch({ type: 'SET_QUICK_ASSETS', items })}
-              onDebtsChange={(items) => dispatch({ type: 'SET_QUICK_DEBTS', items })}
+              onAssetsChange={handleAssetsChange}
+              onDebtsChange={handleDebtsChange}
               onNext={goToNext}
               onBack={goToBack}
-              activeModules={state.activeModules}
-              onActivateBudgetteren={() => dispatch({ type: 'ENABLE_MODULE', moduleId: 'budgetteren' })}
-              subStep={currentSubStep}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
             />
           )}
 
-          {state.step === 'budgets' && (
-            <OnboardingBudgets
-              amounts={state.budgetAmounts}
-              onChange={(amounts) => dispatch({ type: 'SET_BUDGET_AMOUNTS', amounts })}
-              netIncome={Number(state.identity.net_monthly_income) || 0}
-              householdType={state.identity.household_type}
-              numberOfChildren={state.identity.number_of_children}
-              onNext={goToNext}
+          {state.step === 'klaar' && (
+            <OnboardingKlaar
+              selectedGoals={state.selectedGoals}
+              netMonthlyIncome={netMonthlyIncomeForKlaar}
+              netWorth={netWorthForKlaar}
+              onAddMore={() => dispatch({ type: 'SET_STEP', step: 'bezittingen' })}
+              onFinish={handleSaveOwnData}
               onBack={goToBack}
-              subStep={currentSubStep}
-            />
-          )}
-
-          {state.step === 'horizon' && (
-            <OnboardingHorizon
-              data={state.horizon}
-              onChange={(data) => dispatch({ type: 'SET_HORIZON', data })}
-              onNext={goToNext}
-              onBack={goToBack}
-              activeModules={state.activeModules}
-              subStep={currentSubStep}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
             />
           )}
 
@@ -978,13 +1150,16 @@ export default function OnboardingPage() {
             <OnboardingSuccess
               onDashboard={() => {
                 clearLocalStorage()
-                const destination = state.goal
-                  ? getGoalFirstWinPath(state.goal)
+                // Primaire goal (eerste in array) bepaalt het first-win-pad;
+                // fallback naar getHomePath als er geen goals zijn (news-only).
+                const primaryGoal = state.selectedGoals[0]
+                const destination = primaryGoal
+                  ? getGoalFirstWinPath(primaryGoal)
                   : getHomePath(state.activeModules)
                 router.push(destination + '?welcome=1')
               }}
               activeModules={state.activeModules}
-              goal={state.goal ?? undefined}
+              goal={state.selectedGoals[0]}
             />
           )}
         </StepTransition>

@@ -1,12 +1,19 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { WillDots } from '@/components/app/will-dots'
-import { SpeechBubble } from './speech-bubble'
-import { StepProgress } from './step-progress'
+import { useState, useCallback, useMemo } from 'react'
+import { OnboardingShell } from './onboarding-shell'
+import { FactsPanel } from './facts-panel'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
+/**
+ * Canonieke shape voor de identity-data die de orchestrator opslaat.
+ * Wordt in deze stap alleen voor `full_name` en `date_of_birth` gebruikt;
+ * huishoudens-, inkomens- en uitgaven-velden komen pas in stap 3
+ * (`OnboardingInkomen`) aan bod. We houden de shape bewust gelijk zodat de
+ * orchestrator één state-object kan blijven gebruiken — dat scheelt
+ * migraties van localStorage-drafts.
+ */
 export interface IdentityData {
   full_name: string
   date_of_birth: string
@@ -16,32 +23,35 @@ export interface IdentityData {
   estimated_monthly_expenses: string
 }
 
-type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income'
+type FieldKey = 'full_name' | 'date_of_birth'
 
-/** Field ID mapping for scroll-to-error */
 const FIELD_IDS: Record<FieldKey, string> = {
   full_name: 'ob-name',
   date_of_birth: 'ob-dob',
-  net_monthly_income: 'ob-income',
 }
 
-function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
+/**
+ * Validatie alleen op naam + DOB (income verhuist naar
+ * `OnboardingInkomen`). Behoudt dezelfde regels als de oude implementatie
+ * zodat server-zod (full_name min-2, dob ≥18 ≤100 jaar) blijft kloppen.
+ */
+function getFieldErrors(data: Pick<IdentityData, 'full_name' | 'date_of_birth'>): Partial<Record<FieldKey, string>> {
   const errors: Partial<Record<FieldKey, string>> = {}
 
-  // Name: min 2 characters
   if (!data.full_name.trim()) {
     errors.full_name = 'Naam is verplicht'
   } else if (data.full_name.trim().length < 2) {
     errors.full_name = 'Naam moet minimaal 2 tekens bevatten'
   }
 
-  // Date of birth: 18-100 years old
   if (!data.date_of_birth) {
     errors.date_of_birth = 'Geboortedatum is verplicht'
   } else {
     const dob = new Date(data.date_of_birth)
     const now = new Date()
-    const age = now.getFullYear() - dob.getFullYear() -
+    const age =
+      now.getFullYear() -
+      dob.getFullYear() -
       (now < new Date(now.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0)
     if (isNaN(dob.getTime())) {
       errors.date_of_birth = 'Ongeldige datum'
@@ -54,21 +64,34 @@ function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
     }
   }
 
-  // Income: > 0
-  if (!data.net_monthly_income) {
-    errors.net_monthly_income = 'Maandinkomen is verplicht'
-  } else {
-    const income = Number(data.net_monthly_income)
-    if (isNaN(income)) {
-      errors.net_monthly_income = 'Voer een geldig bedrag in'
-    } else if (income <= 0) {
-      errors.net_monthly_income = 'Inkomen moet hoger dan \u20AC0 zijn'
-    } else if (income > 1000000) {
-      errors.net_monthly_income = 'Voer een realistisch maandinkomen in'
-    }
-  }
-
   return errors
+}
+
+/**
+ * Bereken huidige leeftijd uit een DOB-string. Voor de dynamische tekst
+ * in het facts-paneel. Returns `null` voor een ongeldige of lege DOB —
+ * caller toont dan de fallback-copy.
+ */
+function deriveAge(dob: string): number | null {
+  if (!dob) return null
+  const date = new Date(dob)
+  if (isNaN(date.getTime())) return null
+  const now = new Date()
+  const age =
+    now.getFullYear() -
+    date.getFullYear() -
+    (now < new Date(now.getFullYear(), date.getMonth(), date.getDate()) ? 1 : 0)
+  return age >= 0 && age <= 120 ? age : null
+}
+
+export interface OnboardingIdentityProps {
+  data: IdentityData
+  onChange: (data: IdentityData) => void
+  onNext: () => void
+  onBack: () => void
+  /** 1-indexed stap-nummer voor de voortgangsbalk (default 2). */
+  currentStep?: number
+  totalSteps?: number
 }
 
 export function OnboardingIdentity({
@@ -76,31 +99,28 @@ export function OnboardingIdentity({
   onChange,
   onNext,
   onBack,
-}: {
-  data: IdentityData
-  onChange: (data: IdentityData) => void
-  onNext: () => void
-  onBack: () => void
-}) {
+  currentStep = 2,
+  totalSteps = 5,
+}: OnboardingIdentityProps) {
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)
 
-  const errors = getFieldErrors(data)
+  const errors = useMemo(() => getFieldErrors(data), [data])
   const isValid = Object.keys(errors).length === 0
+  const disableNext = submitted && !isValid
 
-  const showError = (field: FieldKey) => (touched[field] || submitted) ? errors[field] : undefined
-  const markTouched = (field: FieldKey) => setTouched((prev) => ({ ...prev, [field]: true }))
+  const showError = (field: FieldKey) =>
+    touched[field] || submitted ? errors[field] : undefined
+  const markTouched = (field: FieldKey) =>
+    setTouched((prev) => ({ ...prev, [field]: true }))
 
   const inputErrorClass = (field: FieldKey) =>
     showError(field)
       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-      : 'border-[var(--border-ed)] focus:border-wil-500 focus:ring-wil-500'
-
-  // After first submit, disable button while errors exist
-  const disableNext = submitted && !isValid
+      : 'border-[var(--border-ed)] focus:border-[var(--module-active-500)] focus:ring-[var(--module-active-500)]'
 
   const scrollToFirstError = useCallback(() => {
-    const fieldOrder: FieldKey[] = ['full_name', 'date_of_birth', 'net_monthly_income']
+    const fieldOrder: FieldKey[] = ['full_name', 'date_of_birth']
     for (const field of fieldOrder) {
       if (errors[field]) {
         const el = document.getElementById(FIELD_IDS[field])
@@ -118,47 +138,73 @@ export function OnboardingIdentity({
     if (isValid) {
       onNext()
     } else {
-      // Scroll to first error on mobile
       requestAnimationFrame(scrollToFirstError)
     }
   }
 
-  return (
-    <div className="pb-20 sm:pb-0">
-      <button
-        onClick={onBack}
-        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors duration-150"
+  // Headline-em: italic Playfair op "voorstellen" in --module-active-700.
+  const headline = (
+    <>
+      Even{' '}
+      <em
+        className="font-normal italic"
+        style={{ color: 'var(--module-active-700)' }}
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-        </svg>
-        Terug
-      </button>
+        voorstellen
+      </em>
+    </>
+  )
 
-      <div className="mb-8">
-        <StepProgress currentPhase="gegevens" />
-      </div>
+  // Dynamic facts-copy: zodra DOB valide is, toon leeftijd-aware tekst.
+  // Anders fallback uit het plan (CBS Levensverwachting).
+  const age = deriveAge(data.date_of_birth)
+  const factsSub = age
+    ? `Op je ${age}e staan de meeste mensen nog 25 tot 30 jaar voor hun pensioendoel.`
+    : 'gemiddelde levensverwachting in Nederland'
+  const factsStat = age ? `${age}` : '81'
+  const factsSource = age ? 'CBS Levensverwachting, 2024' : 'CBS Levensverwachting, 2024'
 
-      <p className="label-editorial mb-2 text-[var(--ink-4)]">Jouw gegevens</p>
-
-      {/* Will question */}
-      <div className="mb-6 sm:mb-8 flex items-start gap-3">
-        <div className="shrink-0"><WillDots size={48} /></div>
-        <SpeechBubble>Om je pad naar vrijheid te berekenen, moet ik je eerst leren kennen. Je inkomen bepaalt hoeveel vrijheidstijd je elke maand opbouwt &mdash; en je leeftijd helpt me inschatten hoeveel tijd er nog voor je ligt.</SpeechBubble>
-      </div>
-
-      <div className="space-y-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-sm p-5 sm:p-6">
+  return (
+    <OnboardingShell
+      kicker="Profiel"
+      romanNum="ii."
+      title={headline}
+      deck="Zodat we de bedragen op jouw situatie kunnen afstemmen."
+      factsPanel={
+        <FactsPanel stat={factsStat} sub={factsSub} source={factsSource} />
+      }
+      currentStep={currentStep}
+      totalSteps={totalSteps}
+      onBack={onBack}
+      footer={
+        <button
+          type="button"
+          onClick={handleNext}
+          disabled={disableNext}
+          className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Verder
+        </button>
+      }
+    >
+      <div className="space-y-6">
         {submitted && !isValid && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3" role="alert">
+          <div
+            className="border border-red-200 bg-red-50 px-4 py-3"
+            role="alert"
+          >
             <p className="text-sm font-medium text-red-700">
               Vul alle verplichte velden correct in om door te gaan
             </p>
           </div>
         )}
 
-        {/* Full name */}
+        {/* Volledige naam */}
         <div>
-          <label htmlFor="ob-name" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+          <label
+            htmlFor="ob-name"
+            className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
+          >
             Volledige naam <span className="text-red-400">*</span>
           </label>
           <input
@@ -168,101 +214,54 @@ export function OnboardingIdentity({
             onChange={(e) => onChange({ ...data, full_name: e.target.value })}
             onBlur={() => markTouched('full_name')}
             placeholder="Je naam"
+            autoComplete="name"
             aria-invalid={!!showError('full_name')}
             aria-describedby={showError('full_name') ? 'ob-name-error' : undefined}
-            className={`w-full rounded-xl bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
+            className={`w-full bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
           />
           {showError('full_name') && (
-            <p id="ob-name-error" className="mt-1 text-xs text-red-500" role="alert">{showError('full_name')}</p>
+            <p
+              id="ob-name-error"
+              className="mt-1 text-xs text-red-500"
+              role="alert"
+            >
+              {showError('full_name')}
+            </p>
           )}
         </div>
 
-        {/* Date of birth */}
+        {/* Geboortedatum */}
         <div>
-          <label htmlFor="ob-dob" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+          <label
+            htmlFor="ob-dob"
+            className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
+          >
             Geboortedatum <span className="text-red-400">*</span>
           </label>
           <input
             id="ob-dob"
             type="date"
             value={data.date_of_birth}
-            onChange={(e) => onChange({ ...data, date_of_birth: e.target.value })}
+            onChange={(e) =>
+              onChange({ ...data, date_of_birth: e.target.value })
+            }
             onBlur={() => markTouched('date_of_birth')}
+            autoComplete="bday"
             aria-invalid={!!showError('date_of_birth')}
             aria-describedby={showError('date_of_birth') ? 'ob-dob-error' : undefined}
-            className={`w-full rounded-xl bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
+            className={`w-full bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
           />
           {showError('date_of_birth') && (
-            <p id="ob-dob-error" className="mt-1 text-xs text-red-500" role="alert">{showError('date_of_birth')}</p>
+            <p
+              id="ob-dob-error"
+              className="mt-1 text-xs text-red-500"
+              role="alert"
+            >
+              {showError('date_of_birth')}
+            </p>
           )}
         </div>
-
-        {/* Net monthly income */}
-        <div>
-          <label htmlFor="ob-income" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
-            Netto maandinkomen <span className="text-red-400">*</span>
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
-            <input
-              id="ob-income"
-              type="text"
-              inputMode="decimal"
-              value={data.net_monthly_income}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9.,]/g, '')
-                onChange({ ...data, net_monthly_income: val })
-              }}
-              onBlur={() => markTouched('net_monthly_income')}
-              placeholder="0"
-              autoComplete="off"
-              aria-invalid={!!showError('net_monthly_income')}
-              aria-describedby={showError('net_monthly_income') ? 'ob-income-error' : 'ob-income-hint'}
-              className={`w-full rounded-xl bg-[var(--subtle)] py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('net_monthly_income')}`}
-            />
-          </div>
-          {showError('net_monthly_income') ? (
-            <p id="ob-income-error" className="mt-1 text-xs text-red-500" role="alert">{showError('net_monthly_income')}</p>
-          ) : (
-            <p id="ob-income-hint" className="mt-1 text-xs text-[var(--ink-4)]">Huishouden netto-inkomen (samen als je samenwoont).</p>
-          )}
-        </div>
-
-        {/* Estimated monthly expenses (optional) */}
-        <div>
-          <label htmlFor="ob-estimated-expenses" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
-            Geschatte maandelijkse uitgaven
-          </label>
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
-            <input
-              id="ob-estimated-expenses"
-              type="text"
-              inputMode="decimal"
-              value={data.estimated_monthly_expenses}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9.,]/g, '')
-                onChange({ ...data, estimated_monthly_expenses: val })
-              }}
-              placeholder="0"
-              autoComplete="off"
-              className="w-full rounded-xl bg-[var(--subtle)] py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border border-[var(--border-ed)] focus:border-wil-500 focus:ring-1 focus:ring-wil-500 sm:text-sm"
-            />
-          </div>
-          <p className="mt-1 text-xs text-[var(--ink-4)]">Een ruwe schatting is voldoende — dit helpt bij het berekenen van je vrijheidsdoel</p>
-        </div>
       </div>
-
-      {/* Sticky nav on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,8px)] pt-3 backdrop-blur-sm sm:static sm:mt-8 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
-        <button
-          onClick={handleNext}
-          disabled={disableNext}
-          className="w-full min-h-[44px] rounded-xl bg-wil-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Volgende
-        </button>
-      </div>
-    </div>
+    </OnboardingShell>
   )
 }

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import {
-  ASSET_GROUP_FOR_TYPE,
   ASSET_TYPE_COLORS,
   ASSET_TYPE_ICONS,
   ASSET_TYPE_LABELS,
@@ -292,19 +291,10 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
   const assetGroups = useMemo(() => groupAssetsByType(initialData), [initialData])
   const debtGroups = useMemo(() => groupDebtsByType(initialData), [initialData])
 
-  // Splits asset-groepen in Bezittingen vs Wonen. Eigen woning krijgt een
-  // eigen sectie boven Bezittingen omdat het qua lifecycle (kopen/wonen/
-  // verkopen), liquiditeit en koppeling met hypotheek anders is dan
-  // portfolio-assets. Zie ASSET_GROUP_FOR_TYPE in lib/asset-data.ts.
-  const { wonenGroups, bezittingenGroups } = useMemo(() => {
-    const wonen: AssetCategoryGroup[] = []
-    const bezit: AssetCategoryGroup[] = []
-    for (const g of assetGroups) {
-      if (ASSET_GROUP_FOR_TYPE[g.type] === 'wonen') wonen.push(g)
-      else bezit.push(g)
-    }
-    return { wonenGroups: wonen, bezittingenGroups: bezit }
-  }, [assetGroups])
+  // Asset-groepen worden op `/core` als één gecombineerde lijst gerenderd
+  // (inclusief eigen_huis). De AssetGroup-typering in lib/asset-data.ts
+  // blijft bestaan voor het vermogen-rapport en andere consumers die wél
+  // op groep-niveau willen splitsen.
 
   // ── Samengestelde KPI's per categorie ───────────────────────
   // Eén context-build per render — de helper bouwt 3 Maps (holdings per
@@ -412,22 +402,13 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         onShowNetWorthReceipt={() => setShowNetWorthReceipt(true)}
       />
 
-      {/* === Wonen — eigen sectie voor eigen woning ================ */}
-      {/*
-        Eigen woning krijgt een eigen sectie omdat het qua lifecycle en
-        liquiditeit anders is dan portfolio-assets. Beleggingsvastgoed
-        (real_estate) blijft bij Bezittingen — dat is een belegging,
-        geen "wonen". Zie ASSET_GROUP_FOR_TYPE in lib/asset-data.ts.
-      */}
-      <WonenSection
-        groups={wonenGroups}
-        initialData={initialData}
-        assetCategoryKpis={assetCategoryKpis}
-        activeModules={activeModules}
-        onAdd={() => setQuickAddIntent('asset')}
-      />
-
       {/* === Bezittingen — full-bleed sectie, gelijk aan hero ====== */}
+      {/*
+        Alle asset-groepen (inclusief eigen_huis) staan in één gecombineerde
+        lijst. De AssetGroup-typering blijft bestaan in de data-laag voor
+        het vermogen-rapport, maar visueel op /core is er één eenduidige
+        Bezittingen-sectie.
+      */}
       <section className="border-b border-[var(--border-ed)] bg-[var(--paper)]">
         <div className="px-4 py-6 sm:px-6 sm:py-8">
           <SectionHeader
@@ -436,9 +417,9 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
             allLabel="Alle"
           />
 
-          {bezittingenGroups.length > 0 ? (
+          {assetGroups.length > 0 ? (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {bezittingenGroups.map((group, idx) => {
+              {assetGroups.map((group, idx) => {
                 // Multi-app: een categorie kan meerdere registry-entries
                 // hebben. Voor MVP tonen we precies één strip op de Kern-
                 // landing — anders wordt de kaart visueel overladen. We
@@ -487,7 +468,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
                 label="Bezitting toevoegen"
                 onClick={() => setQuickAddIntent('asset')}
                 variant="asset"
-                staggerIndex={bezittingenGroups.length}
+                staggerIndex={assetGroups.length}
                 ariaLabel="Nieuwe bezitting toevoegen"
               />
             </div>
@@ -560,121 +541,6 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
           netWorth={netWorth}
         />
       </BottomSheet>
-    </div>
-  )
-}
-
-// ── Wonen-sectie ─────────────────────────────────────────────
-
-/**
- * Eigen sectie voor "Wonen" — alleen `eigen_huis`-assets. Beleggingsvastgoed
- * (`real_estate`) blijft bij Bezittingen want het is een belegging, geen
- * "wonen". Toekomst: kan uitgebreid worden met `real_estate` als de UX
- * dat rechtvaardigt.
- *
- * Empty-state is bewust slim & dimmed (geen full hero) zodat de sectie
- * zichtbaar blijft voor gebruikers zonder eigen huis — conform het
- * "module-zichtbaarheid"-principe uit CLAUDE.md: een feature die uit
- * staat verbergen we niet, maar tonen we gedimd met een CTA.
- */
-function WonenSection({
-  groups,
-  initialData,
-  assetCategoryKpis,
-  activeModules,
-  onAdd,
-}: {
-  groups: AssetCategoryGroup[]
-  initialData: CorePageData
-  assetCategoryKpis: Map<string, KpiPair>
-  activeModules: string[]
-  onAdd: () => void
-}) {
-  return (
-    <section className="border-b border-[var(--border-ed)] bg-[var(--paper)]">
-      <div className="px-4 py-6 sm:px-6 sm:py-8">
-        <SectionHeader
-          kicker="Wonen"
-          allHref={groups.length > 0 ? '/core/assets/eigen_huis' : undefined}
-          allLabel={groups.length > 0 ? 'Alle' : undefined}
-        />
-
-        {groups.length > 0 ? (
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {groups.map((group, idx) => {
-              const deepenings = findDeepenings(group.type, 'asset')
-              const primaryDeepening = deepenings[0]
-              const moduleActive = primaryDeepening
-                ? activeModules.includes(primaryDeepening.moduleId)
-                : false
-              const groupAssets = initialData.fullAssets.filter(
-                (a) => a.is_active && a.asset_type === group.type,
-              )
-              const tracked =
-                countTrackedItems(group.type, 'asset', groupAssets)?.tracked ??
-                0
-              return (
-                <CategoryCard
-                  key={group.type}
-                  iconName={ASSET_TYPE_ICONS[group.type]}
-                  label={ASSET_TYPE_LABELS[group.type]}
-                  total={group.total}
-                  count={group.count}
-                  meta={`${group.count} item${group.count === 1 ? '' : 's'}`}
-                  segments={group.segments}
-                  categoryKpis={assetCategoryKpis.get(group.type)}
-                  sparklineValues={initialData.categorySparklines[`asset:${group.type}`]}
-                  href={`/core/assets/${group.type}`}
-                  staggerIndex={idx}
-                  variant="asset"
-                  appStrip={
-                    primaryDeepening
-                      ? {
-                          appLabel: primaryDeepening.label,
-                          moduleActive,
-                          trackedCount: tracked,
-                          totalCount: groupAssets.length,
-                          tabHref: `/core/assets/${group.type}?tab=${getDeepeningSlug(primaryDeepening)}`,
-                        }
-                      : undefined
-                  }
-                />
-              )
-            })}
-            <AddCategoryCard
-              label="Woning toevoegen"
-              onClick={onAdd}
-              variant="asset"
-              staggerIndex={groups.length}
-              ariaLabel="Nieuwe woning toevoegen"
-            />
-          </div>
-        ) : (
-          <EmptyWonenState onClick={onAdd} />
-        )}
-      </div>
-    </section>
-  )
-}
-
-function EmptyWonenState({ onClick }: { onClick: () => void }) {
-  return (
-    <div className="mt-4 flex items-center justify-between gap-4 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-4 sm:px-6">
-      <div className="flex-1 min-w-0">
-        <p className="font-serif text-[15px] italic text-[var(--ink-2)]">
-          Geen eigen woning geregistreerd.
-        </p>
-        <p className="mt-1 text-[12px] text-[var(--ink-3)]">
-          Voeg je woning toe om woonbalans, overwaarde en hypotheek-koppeling te zien.
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={onClick}
-        className="shrink-0 inline-flex h-9 items-center gap-1.5 border border-kern-300 bg-kern-50 px-3 text-[12px] font-medium text-kern-700 transition-colors hover:bg-kern-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-      >
-        Voeg woning toe
-      </button>
     </div>
   )
 }

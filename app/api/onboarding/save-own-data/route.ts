@@ -248,7 +248,11 @@ const bodySchema = z.object({
     fire_end_age: z.number().int().min(60).max(120).optional(),
     temporal_balance: z.number().int().min(1).max(5).optional(),
   }),
-  budgetAmounts: z.record(z.string(), z.number().min(0)),
+  // budgetAmounts is optioneel sinds de onboarding-redesign (fase 3, mei 2026):
+  // de nieuwe 5-stappen-flow heeft geen budgets-stap meer, dus we sturen
+  // standaard een leeg object. Server vult ontbrekende slug-amounts aan met
+  // de catalog-defaults via `budgetAmounts[slug] ?? default_limit`.
+  budgetAmounts: z.record(z.string(), z.number().min(0)).optional().default({}),
   // Onboarding gebruikt het 3-velden-quickadd-shape voor bezittingen en
   // schulden. De server roept buildAssetDraft / buildDebtDraft aan om naar
   // volledige rijen te converteren — dezelfde logica als de Server Action
@@ -288,7 +292,13 @@ const bodySchema = z.object({
   newsDescription: z.string().max(500).optional(),
   /** User-selected intent from the onboarding intent step (legacy field — kept for clients that haven't shipped goal yet) */
   intent: z.enum(['coaching', 'grip_uitgaven', 'overzicht_geld', 'toekomst', 'alles', 'nieuws']).optional(),
-  /** User-selected goal-slug from the new onboarding goal step (mei 2026+) */
+  /**
+   * Legacy single-goal field — kept for backward-compat met clients die nog
+   * niet de multi-select doel-stap hebben uitgerold. Sinds fase 3 (mei 2026)
+   * stuurt de page.tsx zowel `selectedGoalSlug` (eerste-goal) als
+   * `selectedGoalSlugs` (volledige array); oude builds zonder array blijven
+   * werken.
+   */
   selectedGoalSlug: z.enum([
     'grip-uitgaven',
     'vermogen-overzicht',
@@ -297,6 +307,20 @@ const bodySchema = z.object({
     'eerder-stoppen',
     'bewust-leven',
   ]).optional(),
+  /**
+   * Multi-select goal-slugs uit de nieuwe doel-stap (fase 3, mei 2026). De
+   * server gebruikt de eerste entry als primaire-goal voor
+   * `profiles.primary_goal_slug` en de unie van alle entries' presets om
+   * `activeModules` af te leiden wanneer de client die niet meestuurt.
+   */
+  selectedGoalSlugs: z.array(z.enum([
+    'grip-uitgaven',
+    'vermogen-overzicht',
+    'noodfonds',
+    'schulden-aflossen',
+    'eerder-stoppen',
+    'bewust-leven',
+  ])).optional(),
   /** Pre-extracted data from client-side review (avoids re-running AI extraction) */
   extractionData: z.object({
     assets: z.array(z.object({
@@ -352,20 +376,52 @@ export async function POST(req: Request) {
     newsDescription,
     extractionData,
     intent: rawIntent,
-    selectedGoalSlug,
+    selectedGoalSlug: rawSelectedGoalSlug,
+    selectedGoalSlugs: rawSelectedGoalSlugs,
   } = parsed.data
 
-  // Resolve modules: als de client geen activeModules stuurde maar wel een
-  // goal heeft gekozen, leid de modules af van GOAL_MODULE_PRESETS. Zo blijft
-  // de rest van de save-route (die gestuurd wordt door activeModules) werken.
-  const activeModules: ModuleId[] | undefined = rawActiveModules && rawActiveModules.length > 0
-    ? rawActiveModules
-    : (selectedGoalSlug ? [...GOAL_MODULE_PRESETS[selectedGoalSlug]] : undefined)
+  // Normaliseer de goal-input: de fase-3 client stuurt zowel een array
+  // (`selectedGoalSlugs`) als de eerste-entry (`selectedGoalSlug`); oudere
+  // clients alleen de single. We bouwen daaruit één array en één primaire-
+  // goal-veld zodat downstream-code geen if-cascades hoeft.
+  const selectedGoalSlugs: GoalSlug[] =
+    rawSelectedGoalSlugs && rawSelectedGoalSlugs.length > 0
+      ? [...rawSelectedGoalSlugs]
+      : rawSelectedGoalSlug
+        ? [rawSelectedGoalSlug]
+        : []
+  // Primaire goal (eerste in array) — bron voor `profiles.primary_goal_slug`
+  // en de intent-fallback. Bewust niet `primaryGoalSlug` om verwarring met
+  // de DB-kolom-naam (`primary_goal_slug`) te voorkomen.
+  const primaryGoalSlug: GoalSlug | undefined = selectedGoalSlugs[0]
+
+  // Resolve modules: als de client geen activeModules stuurde maar wel
+  // goal(s), leid de modules af van GOAL_MODULE_PRESETS via union-merge.
+  // Zo blijft de rest van de save-route (die gestuurd wordt door
+  // activeModules) werken, ook bij multi-goal clients.
+  let resolvedModules: ModuleId[] | undefined = undefined
+  if (rawActiveModules && rawActiveModules.length > 0) {
+    resolvedModules = rawActiveModules
+  } else if (selectedGoalSlugs.length > 0) {
+    const seen = new Set<ModuleId>()
+    const merged: ModuleId[] = []
+    for (const slug of selectedGoalSlugs) {
+      for (const m of GOAL_MODULE_PRESETS[slug]) {
+        if (!seen.has(m)) {
+          seen.add(m)
+          merged.push(m)
+        }
+      }
+    }
+    resolvedModules = merged
+  }
+  const activeModules: ModuleId[] | undefined = resolvedModules
 
   // Effective intent voor backward-compat met `profiles.onboarding_intent`
-  // en downstream features die nog op de oude IntentId leunen.
+  // en downstream features die nog op de oude IntentId leunen. Bij multi-goal
+  // gebruiken we de primaire goal — exact één intent per profile.
   const intent: IntentId | undefined = rawIntent
-    ?? (selectedGoalSlug ? GOAL_TO_INTENT_FALLBACK[selectedGoalSlug] : undefined)
+    ?? (primaryGoalSlug ? GOAL_TO_INTENT_FALLBACK[primaryGoalSlug] : undefined)
 
   // Pas module-vereisten-seeding toe vóór persist: bv. een placeholder cash-
   // rekening als budgetteren actief is zonder cash-asset. Vermijdt module-
@@ -400,10 +456,10 @@ export async function POST(req: Request) {
       // Onboarding already completed — skip data creation but still update
       // het primaire-doel + intent zodat een herstart van onboarding de
       // nieuwe doelvraag oppakt.
-      if (intent || selectedGoalSlug) {
+      if (intent || primaryGoalSlug) {
         const updates: Record<string, unknown> = {}
         if (intent) updates.onboarding_intent = intent
-        if (selectedGoalSlug) updates.primary_goal_slug = selectedGoalSlug
+        if (primaryGoalSlug) updates.primary_goal_slug = primaryGoalSlug
         await supabase.from('profiles').update(updates).eq('id', user.id)
       }
       return Response.json({ success: true, alreadyCompleted: true })
@@ -557,7 +613,7 @@ export async function POST(req: Request) {
           last_known_phase: 'recovery',
           completed_onboarding_steps: completedSteps,
           onboarding_intent: intent ?? null,
-          primary_goal_slug: selectedGoalSlug ?? null,
+          primary_goal_slug: primaryGoalSlug ?? null,
         }
         // budgeting_active follows the intent's preset so onboarding-flow gating
         // (e.g. "show budgets step") stays in sync. Tracking on individual
@@ -699,7 +755,7 @@ export async function POST(req: Request) {
     // hieronder een retry-pad zonder die kolom.
     if (newsDescription) profileData.news_description = newsDescription
     if (intent) profileData.onboarding_intent = intent
-    if (selectedGoalSlug) profileData.primary_goal_slug = selectedGoalSlug
+    if (primaryGoalSlug) profileData.primary_goal_slug = primaryGoalSlug
     profileData.completed_onboarding_steps = completedSteps
     // Server-controlled: leeg dashboard na onboarding. Zie buildRpcPayload.
     profileData.widget_prefs = { widgets: [] }
@@ -743,7 +799,6 @@ export async function POST(req: Request) {
         (col) => error.message?.includes(`'${col}'`),
       )
       if (!missing || !(missing in profileData)) break
-      // eslint-disable-next-line no-console
       console.warn(`[onboarding-save] schema-cache miss op '${missing}' — retry zonder deze kolom`)
       delete profileData[missing]
     }
