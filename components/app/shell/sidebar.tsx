@@ -483,7 +483,7 @@ function ModuleRow({
 
   if (collapsed) {
     return (
-      <div className="relative" style={isActive ? styleVars : undefined}>
+      <div className="relative" style={isEnabled ? styleVars : undefined}>
         {isActive && isEnabled && (
           <span
             aria-hidden
@@ -496,14 +496,24 @@ function ModuleRow({
           aria-label={tooltip}
           title={tooltip}
           className={`flex items-center justify-center w-full h-12 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[var(--ink)] ${baseRowClass}`}
-          style={isActive ? styleVars : undefined}
+          style={isEnabled ? styleVars : undefined}
         >
           {/* Module-icon met optionele Lock-overlay voor uitgeschakelde modules.
               Lock-badge is een visuele markering naast de gedimde tekst-kleur,
               zodat gebruikers met kleurblindheid of high-contrast modes ook
               zien dat de module uit staat (WCAG 1.4.1 Use of Color). */}
           <span className="relative inline-flex">
-            <Icon className="w-5 h-5" aria-hidden />
+            <Icon
+              className="w-5 h-5"
+              style={
+                isEnabled
+                  ? isActive
+                    ? { color: 'var(--module-active-700)' }
+                    : { color: 'var(--module-active-500)', opacity: 0.7 }
+                  : undefined
+              }
+              aria-hidden
+            />
             {!isEnabled && (
               <Lock
                 aria-hidden
@@ -520,7 +530,7 @@ function ModuleRow({
   // Sub-tag-strip krijgt een eigen klikgebied per tag; door dit BUITEN de
   // hoofd-link te plaatsen (sibling, niet child) voorkomen we genest-link-warnings.
   return (
-    <div className="relative" style={isActive ? styleVars : undefined}>
+    <div className="relative" style={isEnabled ? styleVars : undefined}>
       {isActive && isEnabled && (
         <span
           aria-hidden
@@ -537,7 +547,13 @@ function ModuleRow({
         <span className="relative inline-flex shrink-0 mt-0.5">
           <Icon
             className="w-[18px] h-[18px]"
-            style={isActive && isEnabled ? { color: 'var(--module-active-700)' } : undefined}
+            style={
+              isEnabled
+                ? isActive
+                  ? { color: 'var(--module-active-700)' }
+                  : { color: 'var(--module-active-500)', opacity: 0.7 }
+                : undefined
+            }
             aria-hidden
           />
           {!isEnabled && (

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportConfig } from '@/lib/report-data'
-import { FileText, Trash2, Eye, Sparkles, Scale, BarChart3 } from 'lucide-react'
+import { FileText, Trash2, Eye, Sparkles, Scale, BarChart3, Layers, Compass } from 'lucide-react'
 import {
   Kicker,
   EditorialHeadline,
@@ -111,6 +111,9 @@ export default function RapportagesPage() {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
+  // Peildatum voor het Vermogensoverzicht (Kern-rapport). Default = vandaag,
+  // analoog aan Balansstaat hierboven.
+  const [vermogenDate, setVermogenDate] = useState(new Date().toISOString().split('T')[0])
 
   // Set default selection when period type changes
   useEffect(() => {
@@ -425,6 +428,103 @@ export default function RapportagesPage() {
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
             Per categorie en per maand, inclusief trendanalyse over zes maanden.
+          </p>
+        </div>
+      </CardEditorial>
+
+      {/* === IV. Vermogensoverzicht (Kern-rapport) === */}
+      <CardEditorial accent className="mt-6">
+        <div className="p-6 sm:p-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Kicker size="small">
+              <Layers className="h-3 w-3" aria-hidden />
+              <span>Vermogensoverzicht</span>
+            </Kicker>
+            <span
+              className="italic text-sm text-[var(--module-active-700)]"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              aria-hidden
+            >
+              iv.
+            </span>
+          </div>
+
+          <EditorialHeadline level="h2" size="sm" emphasis="inventaris" className="mb-2">
+            Een inventaris van het bezit
+          </EditorialHeadline>
+
+          <EditorialDeck className="mb-5">
+            Elke bezitting en schuld met alle kenmerken. Plus een diepere blik per actieve app: budgetten, holdings, woonbalans, verhuurrendement, hypotheekplanner.
+          </EditorialDeck>
+
+          <div className="mb-5">
+            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Peildatum</label>
+            <input
+              type="date"
+              value={vermogenDate}
+              onChange={(e) => setVermogenDate(e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-[var(--module-active-500)]"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => router.push(`/rapportages/vermogen?date=${vermogenDate}`)}
+            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+          >
+            <Layers className="h-4 w-4" />
+            Genereer vermogensoverzicht
+          </button>
+
+          <p
+            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Per asset-type gegroepeerd, met alle type-specifieke kenmerken. Verschijnt naast app-secties zodra er activatie is.
+          </p>
+        </div>
+      </CardEditorial>
+
+      {/* === V. Persoonlijk plan === */}
+      <CardEditorial accent className="mt-6">
+        <div className="p-6 sm:p-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Kicker size="small">
+              <Compass className="h-3 w-3" aria-hidden />
+              <span>Persoonlijk plan</span>
+            </Kicker>
+            <span
+              className="italic text-sm text-[var(--module-active-700)]"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              aria-hidden
+            >
+              v.
+            </span>
+          </div>
+
+          <EditorialHeadline level="h2" size="sm" emphasis="uitgangspunten" className="mb-2">
+            Jouw uitgangspunten op een rij
+          </EditorialHeadline>
+
+          <EditorialDeck className="mb-5">
+            De aannames waarmee TriFinity je toekomst doorrekent — demografie, inkomen, AOW, uitgaven, rendement, eindstrategie. Om te delen met partner of adviseur.
+          </EditorialDeck>
+
+          <button
+            type="button"
+            onClick={() => router.push('/rapportages/persoonlijk-plan')}
+            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+          >
+            <Compass className="h-4 w-4" />
+            Genereer persoonlijk plan
+          </button>
+
+          <p
+            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Geen prognoses — alleen de input-zijde, zodat je kunt controleren of de parameters nog kloppen.
           </p>
         </div>
       </CardEditorial>

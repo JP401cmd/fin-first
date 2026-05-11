@@ -33,6 +33,14 @@ import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { Debt } from '@/lib/debt-data'
+import { deriveNaturalMilestones, naturalMilestoneToLifeEvent, type NaturalMilestone } from '@/lib/natural-milestones'
+import {
+  lifeEventSide,
+  naturalMilestoneSide,
+  type ChartEventOverlay,
+} from '@/lib/chart-event-overlay'
+import { NaturalMilestoneSheet } from '@/components/app/horizon/natural-milestone-sheet'
+import { HorizonYearDetailsSheet } from '@/components/app/horizon/horizon-year-details-sheet'
 import { ActionCard } from '@/components/app/action-card'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import dynamic from 'next/dynamic'
@@ -205,6 +213,33 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
   const [ieViewMode, setIeViewMode] = useState<'lines' | 'breakdown'>('lines')
   const [chartMode, setChartMode] = useState<'vermogenspad' | 'vermogensopbouw'>('vermogenspad')
+
+  // Natuurlijke mijlpalen toggle — afgeleide events op de tijdlijn
+  // (hypotheek afgelost, autolening afgelost, vermogen op, eerste miljoen, etc.).
+  // Persistent via localStorage zodat de gebruiker zijn voorkeur niet
+  // bij elke refresh opnieuw moet aanvinken.
+  const [showNaturalMilestones, setShowNaturalMilestones] = useState(true)
+  // Levensgebeurtenissen toggle — handmatig aangemaakte life events tonen/verbergen.
+  // Default true. Persistent zoals natuurlijke mijlpalen.
+  const [showLifeEvents, setShowLifeEvents] = useState(true)
+  useEffect(() => {
+    try {
+      const storedNat = localStorage.getItem('horizon_show_natural_milestones')
+      if (storedNat !== null) setShowNaturalMilestones(storedNat === 'true')
+      const storedLife = localStorage.getItem('horizon_show_life_events')
+      if (storedLife !== null) setShowLifeEvents(storedLife === 'true')
+    } catch {
+      // ignore — localStorage kan disabled zijn (private mode)
+    }
+  }, [])
+  const persistNaturalMilestones = useCallback((val: boolean) => {
+    setShowNaturalMilestones(val)
+    try { localStorage.setItem('horizon_show_natural_milestones', String(val)) } catch { /* noop */ }
+  }, [])
+  const persistLifeEvents = useCallback((val: boolean) => {
+    setShowLifeEvents(val)
+    try { localStorage.setItem('horizon_show_life_events', String(val)) } catch { /* noop */ }
+  }, [])
 
   // Kassabon modal state
   const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
@@ -752,6 +787,112 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   }, [mcExpanded, simResult, input])
 
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
+
+  // ── Natuurlijke mijlpalen ───────────────────────────────────────────────
+  // Afgeleide events op de tijdlijn — hypotheek afgelost, autolening
+  // afgelost, vermogen op, eerste miljoen, etc. Geen DB-mutatie; puur
+  // berekend uit assets/debts/simResult. Toggle persisteert in localStorage.
+  const naturalMilestones = useMemo(() => {
+    if (!showNaturalMilestones) return []
+    return deriveNaturalMilestones({
+      debts,
+      assets: initialData.assets,
+      simResult: simResult ?? null,
+      dob: effectiveInput?.dateOfBirth ?? null,
+      hasPartner: initialData.hasPartner,
+    })
+  }, [showNaturalMilestones, debts, initialData.assets, simResult, effectiveInput?.dateOfBirth, initialData.hasPartner])
+
+  const naturalMilestonesAsEvents = useMemo<LifeEvent[]>(
+    () => naturalMilestones.map(naturalMilestoneToLifeEvent),
+    [naturalMilestones],
+  )
+
+  const eventsForTimeline = useMemo(() => {
+    const base = showLifeEvents ? events : []
+    return showNaturalMilestones ? [...base, ...naturalMilestonesAsEvents] : base
+  }, [showLifeEvents, showNaturalMilestones, events, naturalMilestonesAsEvents])
+
+  // ── Chart event-overlay (markers boven/onder de bar) ───────────────────
+  // Bouw één lijst met ChartEventOverlay-items uit gebruiker-events +
+  // natuurlijke mijlpalen. De chart bepaalt zelf side+positie via xScale;
+  // wij leveren alleen de raw lijst met side-hint en kleur.
+  const COLOR_LIFE_INCOME = 'var(--color-horizon-500, #c4a06b)'
+  const COLOR_LIFE_EXPENSE = 'var(--color-kern-500, #6b4339)'
+  const COLOR_NAT_ASSET = 'var(--color-horizon-500, #c4a06b)'
+  const COLOR_NAT_DEBT = 'var(--color-kern-500, #6b4339)'
+  const COLOR_NAT_SIM = 'var(--ink-2, #4a453d)'
+  const COLOR_NAT_DANGER = 'var(--negative, #b91c1c)'
+
+  const chartEventOverlay = useMemo<ChartEventOverlay[]>(() => {
+    const out: ChartEventOverlay[] = []
+    if (showLifeEvents) {
+      for (const ev of events) {
+        if (ev.target_age == null) continue
+        const side = lifeEventSide(ev)
+        out.push({
+          id: ev.id,
+          label: ev.name,
+          age: ev.target_age,
+          side,
+          color: side === 'above' ? COLOR_LIFE_INCOME : COLOR_LIFE_EXPENSE,
+          icon: ev.icon || 'Calendar',
+          kind: 'life_event',
+        })
+      }
+    }
+    if (showNaturalMilestones) {
+      for (const m of naturalMilestones) {
+        const side = naturalMilestoneSide(m)
+        const color =
+          m.kind === 'sim_out_of_cash'
+            ? COLOR_NAT_DANGER
+            : m.category === 'debt'
+              ? COLOR_NAT_DEBT
+              : m.category === 'asset'
+                ? COLOR_NAT_ASSET
+                : COLOR_NAT_SIM
+        out.push({
+          id: m.id,
+          label: m.name,
+          age: m.target_age,
+          side,
+          color,
+          icon: m.icon,
+          kind: 'natural',
+          sourceId: m.sourceId,
+        })
+      }
+    }
+    return out
+  }, [showLifeEvents, showNaturalMilestones, events, naturalMilestones])
+
+  // ── Natuurlijke-mijlpaal info-sheet state ─────────────────────────────
+  const [selectedNaturalMilestone, setSelectedNaturalMilestone] =
+    useState<NaturalMilestone | null>(null)
+
+  // ── Year-details sheet state — kassabon per jaar ──────────────────────
+  // Opent bij klik op een kolom in de WealthCompositionChart. Toont de
+  // opbouw van bezittingen, schulden, kosten/inkomsten + gebeurtenissen
+  // voor dat specifieke projectiejaar.
+  const [selectedYearAge, setSelectedYearAge] = useState<number | null>(null)
+
+  // Klik-handler voor markers op de chart. Life-events openen de EventPane
+  // (bestaande slide-in/stack-push flow), natuurlijke mijlpalen openen onze
+  // krant-stijl info-sheet.
+  const handleChartEventClick = useCallback(
+    (id: string, kind: 'life_event' | 'natural') => {
+      if (kind === 'life_event') {
+        setEventPaneEditingId(id)
+        setEventPaneMode('view')
+        setEventPaneOpen(true)
+        return
+      }
+      const m = naturalMilestones.find(x => x.id === id)
+      if (m) setSelectedNaturalMilestone(m)
+    },
+    [naturalMilestones],
+  )
   const baseFireStratOpts = fireStrategy ? { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge } : undefined
   const baseFire = effectiveInput ? computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr, undefined, baseFireStratOpts) : null
   const totalDelayMonths = impacts.reduce((s, i) => s + i.fireDelayMonths, 0)
@@ -2302,49 +2443,101 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     <span className="mx-0.5 h-4 w-px bg-[var(--border-ed)]" />
                   </>
                 )}
+                {/* Scenario- en Monte-Carlo-toggles zijn line-chart-overlays —
+                    niet zinvol op de vermogensopbouw-stack. Verbergen in
+                    barchart-mode i.p.v. uitgrijzen: minder visuele ruis,
+                    en de gebruiker kan altijd terug-toggelen naar 'Pad'. */}
+                {chartMode === 'vermogenspad' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setScenariosExpanded(prev => !prev)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        scenariosExpanded
+                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                      }`}
+                    >
+                      <BarChart3 className="h-3 w-3" />
+                      Scenario&apos;s
+                      {scenarioData && scenariosExpanded && (
+                        <span className="flex items-center gap-0.5">
+                          {scenarioData.map(s => (
+                            <span key={s.name} className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+                          ))}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMcExpanded(prev => !prev)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        mcExpanded
+                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                      }`}
+                    >
+                      <FlaskConical className="h-3 w-3" />
+                      Monte Carlo
+                      {mcData && mcExpanded && (
+                        <span className="font-mono text-[10px] tabular-nums opacity-75">
+                          {Math.round(mcData.fireProb * 100)}%
+                        </span>
+                      )}
+                    </button>
+                  </>
+                )}
+
+                {/* ── Levensgebeurtenissen toggle ── */}
                 <button
                   type="button"
-                  onClick={() => setScenariosExpanded(prev => !prev)}
+                  onClick={() => persistLifeEvents(!showLifeEvents)}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    scenariosExpanded
+                    showLifeEvents
                       ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
                       : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                   }`}
+                  aria-pressed={showLifeEvents}
+                  title="Toon je eigen levensgebeurtenissen op de tijdlijn"
                 >
-                  <BarChart3 className="h-3 w-3" />
-                  Scenario&apos;s
-                  {scenarioData && scenariosExpanded && (
-                    <span className="flex items-center gap-0.5">
-                      {scenarioData.map(s => (
-                        <span key={s.name} className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.color }} />
-                      ))}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMcExpanded(prev => !prev)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    mcExpanded
-                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                  }`}
-                >
-                  <FlaskConical className="h-3 w-3" />
-                  Monte Carlo
-                  {mcData && mcExpanded && (
-                    <span className="font-mono text-[10px] tabular-nums opacity-75">
-                      {Math.round(mcData.fireProb * 100)}%
+                  <Calendar className="h-3 w-3" />
+                  Levensgebeurtenissen
+                  {showLifeEvents && events.length > 0 && (
+                    <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                      {events.length}
                     </span>
                   )}
                 </button>
 
-                {/* ── Saved scenario overlay picker ── */}
-                <ScenarioOverlayPicker
-                  scenarios={savedScenarios}
-                  selectedId={selectedScenarioId}
-                  onSelect={setSelectedScenarioId}
-                />
+                {/* ── Natuurlijke mijlpalen toggle ── */}
+                <button
+                  type="button"
+                  onClick={() => persistNaturalMilestones(!showNaturalMilestones)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    showNaturalMilestones
+                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                  }`}
+                  aria-pressed={showNaturalMilestones}
+                  title="Toon automatisch afgeleide mijlpalen (hypotheek afgelost, eerste miljoen, vermogen op, …)"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Natuurlijke mijlpalen
+                  {showNaturalMilestones && naturalMilestones.length > 0 && (
+                    <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                      {naturalMilestones.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* ── Saved scenario overlay picker — ghost-lijn alleen op line-chart ── */}
+                {chartMode === 'vermogenspad' && (
+                  <ScenarioOverlayPicker
+                    scenarios={savedScenarios}
+                    selectedId={selectedScenarioId}
+                    onSelect={setSelectedScenarioId}
+                  />
+                )}
 
                 {/* ── Chart mode toggle (compact pill, right-aligned) ── */}
                 <div className="ml-auto flex items-center gap-1">
@@ -2507,6 +2700,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             fireAgeFractional={simResult.fireAgeFractional}
                             planningMode={planningMode}
                             aowAgeFractional={userAowAge.fractional}
+                            eventOverlay={chartEventOverlay}
+                            onEventClick={handleChartEventClick}
+                            onYearClick={(age) => setSelectedYearAge(age)}
                           />
                         </div>
                       </div>
@@ -2584,9 +2780,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       </div>
 
                       {/* Events timeline aligned to same age axis */}
-                      {events.length > 0 && (
+                      {eventsForTimeline.length > 0 && (
                         <EventsTimeline
-                          events={events}
+                          events={eventsForTimeline}
                           currentAge={currentAge ?? 30}
                           endAge={simResult.displayEndAge}
                           visibleMinAge={visibleMin}
@@ -2594,11 +2790,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           scenarioEvents={scenarioOverlayData?.events}
                           scenarioColor={scenarioOverlayData?.color}
                           onViewEvent={id => {
+                            // Natuurlijke mijlpalen hebben geen edit-pane; deeplink
+                            // naar bron-asset/debt indien beschikbaar.
+                            if (id.startsWith('nat-')) {
+                              const m = naturalMilestones.find(x => x.id === id)
+                              if (m?.category === 'debt') router.push('/core/debts')
+                              else if (m?.category === 'asset') router.push('/core/assets')
+                              return
+                            }
                             setEventPaneEditingId(id)
                             setEventPaneMode('view')
                             setEventPaneOpen(true)
                           }}
                           onEditEvent={id => {
+                            if (id.startsWith('nat-')) return // natuurlijke mijlpalen niet bewerkbaar
                             setEventPaneEditingId(id)
                             setEventPaneMode('edit')
                             setEventPaneOpen(true)
@@ -6342,6 +6547,37 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           onChanged={() => loadData()}
         />
       )}
+
+      {/*
+        Natuurlijke-mijlpaal info-sheet — opent bij klik op een natural-marker
+        in de chart. Geen edit-flow (afgeleide momenten zijn niet bewerkbaar);
+        wel kind-specifieke uitleg + deeplink naar de bron-asset/debt.
+      */}
+      <NaturalMilestoneSheet
+        open={selectedNaturalMilestone !== null}
+        milestone={selectedNaturalMilestone}
+        onClose={() => setSelectedNaturalMilestone(null)}
+      />
+
+      {/*
+        Year-details kassabon — opent bij klik op een jaar-kolom in de
+        WealthCompositionChart. Toont editorial breakdown van bezittingen,
+        schulden, kosten/inkomsten en gebeurtenissen voor dat specifieke
+        projectiejaar. Werkt direct op `unifiedRows` — geen aparte
+        sim-pipeline of conversie nodig.
+      */}
+      <HorizonYearDetailsSheet
+        open={selectedYearAge !== null}
+        age={selectedYearAge}
+        onClose={() => setSelectedYearAge(null)}
+        unifiedRows={unifiedRows ?? []}
+        currentAge={currentAge ?? 30}
+        inflationRate={fireParams.inflationRate}
+        debts={debts}
+        lifeEvents={events}
+        cashflows={simCashflows ?? []}
+        aowAge={userAowAge.fractional}
+      />
     </div>
   )
 }

@@ -209,6 +209,11 @@ export function FiguresStrip({
       : '[&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0'
   return (
     <div
+      // `data-figures-strip` is een print-hook: de compact-tier in
+      // `@media print` gebruikt deze attribuut om de strip in PDF te
+      // verkleinen (cell-padding, amount-font-size). Geen effect op
+      // schermweergave — puur een addressable target.
+      data-figures-strip
       className={`grid grid-cols-2 ${colsClass} border-t border-b border-[var(--ink)] my-5 ${className}`}
     >
       {figures.map((f, idx) => (
@@ -241,6 +246,9 @@ function FiguresStripCell({
         {figure.kicker}
       </div>
       <div
+        // `data-figure-amount` is print-hook: compact-tier verkleint
+        // amount-typografie naar 18pt voor PDF zonder schermweergave te raken.
+        data-figure-amount
         className="text-[22px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
         style={{ fontFamily: PLAYFAIR, color: colorMap[variant] }}
       >

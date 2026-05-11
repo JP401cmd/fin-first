@@ -83,6 +83,35 @@ export function EventsTimeline({
     return totalPositive > totalNegative ? 'income' : 'expense'
   }
 
+  /** Is dit event een automatisch afgeleide mijlpaal (geen DB-row)? */
+  function isNaturalEvent(ev: LifeEvent): boolean {
+    return ev.metadata?.isNatural === true
+  }
+
+  /** Categorie van een natuurlijke mijlpaal voor kleur-keuze. */
+  function naturalCategory(ev: LifeEvent): 'asset' | 'debt' | 'simulation' {
+    const cat = ev.metadata?.category
+    if (cat === 'asset' || cat === 'debt' || cat === 'simulation') return cat
+    return 'simulation'
+  }
+
+  /** Eén-regel-tooltip voor natuurlijke mijlpalen (geen edit-knop, geen amount-uitsplitsing). */
+  function naturalTooltipLine(ev: LifeEvent): string {
+    const kind = ev.metadata?.kind as string | undefined
+    const amount = ev.metadata?.amount as number | undefined
+    if (kind === 'sim_out_of_cash') return 'Vermogen op — overweeg langer doorwerken'
+    if (kind === 'sim_peak' && amount) return `Piek ${formatMaskedCurrency(amount, masked)}`
+    if (kind === 'sim_first_million') return 'Mijlpaal bereikt'
+    if (kind === 'sim_box3_threshold' && amount) return `Boven heffingsvrij ${formatMaskedCurrency(amount, masked)}`
+    if (kind === 'debt_payoff' && amount) return `Resterend bedrag ${formatMaskedCurrency(amount, masked)}`
+    if (kind === 'debt_free') return 'Alle schulden afgelost'
+    if (kind === 'fixed_rate_reset') return 'Rentevast eindigt — heronderhandel'
+    if (kind === 'asset_expiry' && amount) return `Uitkering ${formatMaskedCurrency(amount, masked)}`
+    if (kind === 'asset_maturity' && amount) return `Vrij beschikbaar ${formatMaskedCurrency(amount, masked)}`
+    if (kind === 'vehicle_runoff') return 'Volledig afgeschreven'
+    return 'Automatisch afgeleide mijlpaal'
+  }
+
   /** Build tooltip lines for each non-zero financial impact */
   function eventAmountLines(ev: LifeEvent): { label: string; color: string }[] {
     const lines: { label: string; color: string }[] = []
@@ -124,6 +153,21 @@ export function EventsTimeline({
   // Module-kleuren: Horizon voor positief/inkomen (toekomstige cashflow), Kern voor negatief/uitgaven
   const COLOR_INCOME = 'var(--color-horizon, #c4a06b)'
   const COLOR_EXPENSE = 'var(--color-kern, #6b4339)'
+  // Natuurlijke mijlpalen krijgen ingetogen kleuren — ze zijn afgeleid, niet door
+  // de gebruiker bewust geplaatst, dus mogen visueel minder schreeuwen.
+  const COLOR_NAT_ASSET = 'var(--color-horizon, #c4a06b)'      // payout/maturity: positief
+  const COLOR_NAT_DEBT = '#3b7a57'                              // afgelost/schuldenvrij: groen-accent
+  const COLOR_NAT_SIM = 'var(--ink-3)'                          // sim-momenten: neutraal
+  const COLOR_NAT_DANGER = '#c4584a'                            // out-of-cash: rood-accent
+
+  function naturalColor(ev: LifeEvent): string {
+    const kind = ev.metadata?.kind as string | undefined
+    if (kind === 'sim_out_of_cash') return COLOR_NAT_DANGER
+    const cat = naturalCategory(ev)
+    if (cat === 'debt') return COLOR_NAT_DEBT
+    if (cat === 'asset') return COLOR_NAT_ASSET
+    return COLOR_NAT_SIM
+  }
 
   return (
     <div ref={containerRef} className="relative w-full overflow-x-auto">
@@ -145,8 +189,10 @@ export function EventsTimeline({
         {visibleEvents.map((ev, i) => {
           const age = ev.target_age!
           const cx = xPositions[i]
-          const dir = eventDirection(ev)
-          const color = dir === 'income' ? COLOR_INCOME : COLOR_EXPENSE
+          const natural = isNaturalEvent(ev)
+          const color = natural
+            ? naturalColor(ev)
+            : (eventDirection(ev) === 'income' ? COLOR_INCOME : COLOR_EXPENSE)
           const isHovered = hoveredId === ev.id
           const row = rows[i]
           const labelY = Y_LINE + 14 + row * ROW_HEIGHT
@@ -161,19 +207,23 @@ export function EventsTimeline({
               role={onViewEvent ? 'button' : undefined}
               aria-label={onViewEvent ? `Bekijk ${ev.name}` : undefined}
             >
-              {/* Vertical tick from axis to icon */}
+              {/* Vertical tick from axis to icon — gestippeld voor natuurlijke mijlpalen */}
               <line
                 x1={cx} x2={cx}
                 y1={Y_LINE - 10} y2={Y_LINE + 2}
-                stroke={color} strokeWidth={1.5} opacity={0.6}
+                stroke={color} strokeWidth={1.5} opacity={natural ? 0.45 : 0.6}
+                strokeDasharray={natural ? '2 2' : undefined}
               />
 
-              {/* Icon circle */}
+              {/* Icon circle — outlined voor natuurlijke mijlpalen */}
               <circle
                 cx={cx} cy={Y_LINE - 14}
-                r={isHovered ? 10 : 8}
-                fill={color} opacity={isHovered ? 0.25 : 0.15}
-                stroke={color} strokeWidth={1}
+                r={isHovered ? (natural ? 8 : 10) : (natural ? 6 : 8)}
+                fill={natural ? 'var(--paper)' : color}
+                opacity={natural ? 1 : (isHovered ? 0.25 : 0.15)}
+                stroke={color}
+                strokeWidth={natural ? 1.5 : 1}
+                strokeDasharray={natural ? '3 1.5' : undefined}
                 style={{ transition: 'r 150ms ease, opacity 150ms ease' }}
               />
 
@@ -206,8 +256,10 @@ export function EventsTimeline({
 
               {/* Hover tooltip — amount lines per financial impact */}
               {isHovered && (() => {
-                const lines = eventAmountLines(ev)
-                const showEditBtn = !!onEditEvent
+                const lines = natural
+                  ? [{ label: naturalTooltipLine(ev), color: color }]
+                  : eventAmountLines(ev)
+                const showEditBtn = !natural && !!onEditEvent
                 const editBtnH = showEditBtn ? 16 : 0
                 const tooltipH = 14 + lines.length * 11 + editBtnH
                 const tooltipW = 140

@@ -646,6 +646,68 @@ body {
     background: white !important;
   }
 
+  /* ── Shell scroll-container reset for pagination ──
+     De nieuwe shell (mobile-stack-shell + desktop-sidebar-shell) wrapt content
+     in flex-1 + overflow-y-auto containers met 100vh-minHeight. Voor print
+     moeten die constraints weg zodat de browser kan pagineren door de hele
+     content i.p.v. alleen de viewport-hoogte. */
+  .tray-outgoing-push,
+  .tray-outgoing-pop,
+  .tray-incoming-push,
+  .tray-incoming-pop {
+    display: none !important;
+  }
+
+  [class*="overflow-y-auto"],
+  [class*="overflow-hidden"] {
+    overflow: visible !important;
+  }
+
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    flex: none !important;
+  }
+
+  /* Reset de minHeight: 100vh inline-styles op shell-wrappers.
+     Bredere [style*="100vh"]-match vangt OOK varianten waar de browser het
+     style-attribuut net iets anders serialiseert (geen spatie na colon,
+     extra semicolon, etc.) — anders schiet de oude specifieke selector mis
+     en blijft de shell-container één-viewport-hoog, waardoor de PDF op één
+     A4-pagina geclipt wordt. */
+  [style*="100vh"],
+  [style*="100dvh"] {
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Mobile-stack-shell wrapt content in twee niveaus `flex flex-col` +
+     `flex-1 overflow-hidden`. De overflow-reset hierboven werkt, maar de
+     `flex-1`-child blijft 1 viewport-hoog binnen z'n flex-parent. In print
+     willen we dat de flex-chain wordt opgeheven zodat de browser door de
+     volledige content kan pagineren. */
+  .flex-1 {
+    flex: none !important;
+  }
+  .flex.flex-col {
+    display: block !important;
+  }
+
+  /* Sidebar is position:fixed — al verborgen via aside selector hieronder,
+     maar we maken het expliciet */
+  aside[aria-label="Hoofdnavigatie"] {
+    display: none !important;
+  }
+
+  /* Desktop-sidebar-shell verwijdert de pl-[264px] padding zodat content
+     de volle breedte gebruikt */
+  main.lg\:pl-\[264px\] {
+    padding-left: 0 !important;
+  }
+
   /* ── Page break control ── */
   .report-section,
   .kassabon-block,
@@ -740,6 +802,122 @@ body {
   /* Links print as plain text */
   a[href]::after {
     content: none !important;
+  }
+
+  /* ── Compact-tier — alleen voor rapport-content (Vermogen + Persoonlijk plan) ──
+     Doel: ~30% verticale ruimte besparen op A4 zonder de editorial hiërarchie
+     te verliezen. Scoped op `.report-pdf-root` zodat balans/budget en het
+     periodieke rapport hun bestaande print-styling behouden. Spec §4.2. */
+
+  /* Typografische schaal — 10.5pt body is sweet-spot voor A4 met serif. */
+  .report-pdf-root,
+  .report-pdf-root p,
+  .report-pdf-root span,
+  .report-pdf-root li {
+    font-size: 10.5pt !important;
+    line-height: 1.35;
+  }
+  .report-pdf-root h1 { font-size: 22pt !important; line-height: 1.1; }
+  .report-pdf-root h2 { font-size: 13pt !important; line-height: 1.2; }
+  .report-pdf-root h3 { font-size: 11pt !important; line-height: 1.2; }
+
+  /* Kicker-tekst (uppercase-monos) zoals SectionLabel + masthead-kicker.
+     We targeten zowel een expliciete `.report-kicker` class (gereserveerd
+     voor toekomstige refactor) als de huidige class-string die op de
+     editorial-kicker-spans staat. */
+  .report-pdf-root .report-kicker,
+  .report-pdf-root [class*="text-[10px]"][class*="uppercase"] {
+    font-size: 8pt !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  /* Reduceer vertical rhythm — alle Tailwind margin/padding utility-classes
+     die het meest voorkomen in de rapport-pages. Geen breaking changes voor
+     schermweergave (alles binnen `@media print`). */
+  .report-pdf-root .mb-8 { margin-bottom: 14pt !important; }
+  .report-pdf-root .mt-8 { margin-top: 14pt !important; }
+  .report-pdf-root .mb-6 { margin-bottom: 10pt !important; }
+  .report-pdf-root .mt-6 { margin-top: 10pt !important; }
+  .report-pdf-root .mb-4 { margin-bottom: 8pt !important; }
+  .report-pdf-root .mt-4 { margin-top: 8pt !important; }
+  .report-pdf-root .py-6 {
+    padding-top: 8pt !important;
+    padding-bottom: 8pt !important;
+  }
+  .report-pdf-root .px-8 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .report-pdf-root .px-4 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* FiguresStrip: krappere kolom-heights + kleinere amount-typografie. De
+     editorial-component zet `data-figures-strip` op de outer grid en
+     `data-figure-amount` op het cijfer (toegevoegd in dezelfde sprint). */
+  .report-pdf-root [data-figures-strip] {
+    page-break-inside: avoid;
+    margin-top: 8pt !important;
+    margin-bottom: 12pt !important;
+  }
+  .report-pdf-root [data-figures-strip] [data-figure-amount] {
+    font-size: 18pt !important;
+  }
+
+  /* Tabellen — krap maar leesbaar. Vooral de hypotheekplanner-eerste-12-maanden. */
+  .report-pdf-root table {
+    font-size: 10pt !important;
+  }
+  .report-pdf-root td,
+  .report-pdf-root th {
+    padding-top: 2pt !important;
+    padding-bottom: 2pt !important;
+  }
+
+  /* Editorial dividers blijven dun maar zichtbaar in print. */
+  .report-pdf-root [style*="border-bottom: 4px double"] {
+    border-bottom-width: 2px !important;
+  }
+
+  /* ── Module-accent in print (spec §4.4) ──
+     Beide nieuwe rapporten zetten `data-report-module` op de outer container.
+     We overschrijven hier de `--module-active-*` CSS-variabelen zodat alle
+     editorial primitives (kicker, accent-streep, hero-titel, finale)
+     automatisch de juiste hex-fallback krijgen — geen per-class targeting
+     nodig. OKLCH-waarden komen uit de bestaande `.report-*-accent` regels. */
+  .report-pdf-root[data-report-module="kern"] {
+    --module-active-200: #d8b5a8;
+    --module-active-300: #b9806f;
+    --module-active-500: #6b4339;
+    --module-active-700: #6b4339;
+  }
+  .report-pdf-root[data-report-module="horizon"] {
+    --module-active-200: #e8d4b3;
+    --module-active-300: #d4b682;
+    --module-active-500: #c4a06b;
+    --module-active-700: #c4a06b;
+  }
+  .report-pdf-root[data-report-module="wil"] {
+    --module-active-200: #c5b8d2;
+    --module-active-300: #8d7ba1;
+    --module-active-500: #3d3048;
+    --module-active-700: #3d3048;
+  }
+  /* Expliciete fallback voor elementen die `[data-accent]` zetten of
+     direct een hex-kleur via CSS-variabele lezen — voor printers die
+     OKLCH niet ondersteunen. */
+  .report-pdf-root[data-report-module="kern"] [data-accent],
+  .report-pdf-root[data-report-module="kern"] .report-kicker {
+    color: #6b4339 !important;
+  }
+  .report-pdf-root[data-report-module="horizon"] [data-accent],
+  .report-pdf-root[data-report-module="horizon"] .report-kicker {
+    color: #c4a06b !important;
+  }
+  .report-pdf-root[data-report-module="wil"] [data-accent],
+  .report-pdf-root[data-report-module="wil"] .report-kicker {
+    color: #3d3048 !important;
   }
 }
 

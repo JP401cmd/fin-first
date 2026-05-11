@@ -147,6 +147,42 @@ export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   other: 'Overig',
 }
 
+// ── Asset Groups ─────────────────────────────────────────────
+//
+// Eigen woning gedraagt zich anders dan portfolio-assets (illiquide,
+// niet-compounding, sterk gekoppeld aan hypotheek). Daarom verdient
+// het een eigen sectie op `/core` naast Bezittingen en Schulden.
+//
+// `real_estate` (beleggingsvastgoed) blijft bij Bezittingen — het is een
+// belegging, niet "wonen". Toekomstige uitbreiding mogelijk.
+
+export type AssetGroup = 'bezittingen' | 'wonen'
+
+export const ASSET_GROUP_LABELS: Record<AssetGroup, string> = {
+  bezittingen: 'Bezittingen',
+  wonen: 'Wonen',
+}
+
+export const ASSET_GROUP_FOR_TYPE: Record<AssetType, AssetGroup> = {
+  cash: 'bezittingen',
+  savings: 'bezittingen',
+  investment: 'bezittingen',
+  retirement: 'bezittingen',
+  eigen_huis: 'wonen',
+  real_estate: 'bezittingen',
+  crypto: 'bezittingen',
+  vehicle: 'bezittingen',
+  physical: 'bezittingen',
+  deelneming: 'bezittingen',
+  levensverzekering: 'bezittingen',
+  vordering: 'bezittingen',
+  other: 'bezittingen',
+}
+
+export function getAssetGroup(type: AssetType): AssetGroup {
+  return ASSET_GROUP_FOR_TYPE[type] ?? 'bezittingen'
+}
+
 export const ASSET_TYPE_ICONS: Record<AssetType, string> = {
   cash: 'Wallet',
   savings: 'Landmark',

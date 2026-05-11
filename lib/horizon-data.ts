@@ -218,12 +218,38 @@ export interface AOWMetadata {
   jarenBuitenNL?: number   // years abroad (0 = full AOW)
 }
 
+/**
+ * Metadata voor een aanvullend pensioen-event. Drie pensioentypes worden expliciet
+ * onderscheiden i.v.m. wettelijke uitkeringskenmerken:
+ *
+ * 1. `lijfrente_levenslang` (verzekeraar) — pot vervalt bij overlijden tenzij
+ *    partneruitkering. Ca. €5.200/jr per €100K bij 70% partner-pct.
+ * 2. `lijfrente_bancair` (banksparen) — wettelijk minimaal 20 jr uitkering,
+ *    restant naar erfgenamen.
+ * 3. `tijdelijke_oudedagslijfrente` — minimaal 5 jr vanaf AOW, wettelijk plafond
+ *    €27.192/jr in 2026 indien looptijd < 20 jr (front-loaded).
+ *
+ * Legacy waarden 'lijfrente' en 'banksparen' blijven behouden voor backwards-
+ * compat in opgeslagen events; ze worden via `normalizePensionType()` gemapt.
+ */
 export interface PensionMetadata {
-  pensioenType?: 'bedrijf' | 'lijfrente' | 'banksparen'
+  pensioenType?:
+    | 'bedrijf'
+    | 'lijfrente_levenslang'
+    | 'lijfrente_bancair'
+    | 'tijdelijke_oudedagslijfrente'
+    /** @deprecated gebruik 'lijfrente_levenslang' — zie normalizePensionType() */
+    | 'lijfrente'
+    /** @deprecated gebruik 'lijfrente_bancair' — zie normalizePensionType() */
+    | 'banksparen'
   brutoBedrag?: number
   ingangLeeftijd?: number
   uitkeringsduur?: 'levenslang' | '20' | '10' | '5'
   isGeindexeerd?: boolean
+  /** Eenmalige inleg in euro's. Indien > 0 wordt brutoBedrag berekend via annuitizePension(). */
+  inlegBedrag?: number
+  /** Alleen bij 'lijfrente_levenslang': percentage van uitkering dat doorloopt voor partner. Default 70. */
+  partnerUitkeringPct?: number
 }
 
 export interface CarPurchaseMetadata {

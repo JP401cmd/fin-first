@@ -9,10 +9,12 @@ import {
   DEBT_LAYER_COLOR,
   DEBT_LAYER_LABEL,
 } from '@/lib/wealth-composition'
+import { ChartEventMarkers, topPaddingFor, bottomPaddingFor } from './chart-event-markers'
+import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
 
 // ── Constants (match SimChart) ──────────────────────────────
 
-const PAD = { top: 16, right: 16, bottom: 28, left: 60 }
+const PAD_BASE = { top: 16, right: 16, bottom: 28, left: 60 }
 
 const ALL_GROUPS: WealthGroup[] = ['spaargeld', 'beleggingen', 'pensioen', 'vastgoed', 'overig']
 
@@ -43,6 +45,9 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   forModal,
   planningMode = 'fire',
   aowAgeFractional,
+  eventOverlay,
+  onEventClick,
+  onYearClick,
 }: {
   stackedRows: StackedRow[]
   currentAge: number
@@ -56,6 +61,26 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   planningMode?: 'fire' | 'pensioen'
   /** AOW pension age as fractional value (e.g. 67.25 for 67j+3m) */
   aowAgeFractional?: number
+  /**
+   * Optionele event-markers (levensgebeurtenissen + natuurlijke mijlpalen)
+   * die boven of onder de bars worden gerenderd. Wanneer aanwezig vergroot
+   * de chart automatisch zijn top/bottom-padding zodat er ruimte is voor
+   * een stack van maximaal MAX_STACK_VISIBLE iconen per zijde.
+   */
+  eventOverlay?: ChartEventOverlay[]
+  /**
+   * Klik-handler voor een marker. `kind` is `'life_event'` (geopend in de
+   * EventPane door de parent) of `'natural'` (geopend in de
+   * NaturalMilestoneSheet). `sourceId` wijst naar de bron-asset/debt voor
+   * natuurlijke mijlpalen.
+   */
+  onEventClick?: (id: string, kind: ChartEventKind, sourceId?: string) => void
+  /**
+   * Klik-handler voor een jaar (kolom). Opent de kassabon-stijl
+   * HorizonYearDetailsSheet in de parent. Wanneer gezet wordt elke kolom
+   * een keyboard-bereikbare klik-zone met hover-accent.
+   */
+  onYearClick?: (age: number) => void
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredAge, setHoveredAge] = useState<number | null>(null)
@@ -75,7 +100,27 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
 
   const W = containerW
   const isDesktop = containerW >= 768
-  const H = isDesktop ? 260 : 180
+
+  // Dynamische extra-padding voor event-markers (boven/onder). Berekend uit
+  // de markers-zijde-count zodat de chart-area krimpt om de iconen aan beide
+  // randen kwijt te kunnen — geen overlay-overlap met bars of x-axis-labels.
+  const aboveCount = eventOverlay
+    ? eventOverlay.filter(e => e.side === 'above').length
+    : 0
+  const belowCount = eventOverlay
+    ? eventOverlay.filter(e => e.side === 'below').length
+    : 0
+  const extraTop = topPaddingFor(aboveCount)
+  const extraBottom = bottomPaddingFor(belowCount)
+  const PAD = {
+    top: PAD_BASE.top + extraTop,
+    right: PAD_BASE.right,
+    bottom: PAD_BASE.bottom + extraBottom,
+    left: PAD_BASE.left,
+  }
+
+  // Basis-H + extra ruimte voor marker-stacks
+  const H = (isDesktop ? 260 : 180) + extraTop + extraBottom
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
 
@@ -180,7 +225,8 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         overflow="visible"
-        aria-hidden="true"
+        role="img"
+        aria-label="Vermogensopbouw stacked-bar grafiek — klikbaar per jaar voor details"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
@@ -300,6 +346,52 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
                   style={{ transition: 'opacity 150ms ease, height 0.8s cubic-bezier(.22,1,.36,1)' }}
                 />
               )}
+
+              {/*
+                Transparante hover/click-rect — volledige kolom-hoogte zodat
+                de gebruiker makkelijk de tooltip triggert én op het hele
+                jaar kan klikken zonder precies op de bars te hoeven mikken.
+                Hover-fill in horizon-tint wanneer onYearClick beschikbaar
+                is, anders volledig transparant. Keyboard-bereikbaar via
+                tabIndex + Enter/Space.
+              */}
+              <rect
+                x={PAD.left + xScale(row.age) - yearStep / 2}
+                y={PAD.top}
+                width={Math.max(yearStep, 4)}
+                height={innerH}
+                fill={onYearClick && isHovered ? 'var(--color-horizon-100)' : 'transparent'}
+                fillOpacity={onYearClick && isHovered ? 0.35 : 1}
+                tabIndex={onYearClick ? 0 : -1}
+                role={onYearClick ? 'button' : undefined}
+                aria-label={
+                  onYearClick
+                    ? `Bekijk jaardetails voor leeftijd ${row.age}`
+                    : undefined
+                }
+                onMouseEnter={() => setHoveredAge(row.age)}
+                onFocus={() => setHoveredAge(row.age)}
+                onBlur={() => setHoveredAge(null)}
+                /* stopPropagation op pointerDown voorkomt dat de zoom-container
+                   setPointerCapture aanroept en zo onze click event afvangt. */
+                onPointerDown={onYearClick ? (e) => e.stopPropagation() : undefined}
+                onClick={onYearClick ? () => onYearClick(row.age) : undefined}
+                onKeyDown={
+                  onYearClick
+                    ? e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          onYearClick(row.age)
+                        }
+                      }
+                    : undefined
+                }
+                style={{
+                  cursor: onYearClick ? 'pointer' : 'default',
+                  outline: 'none',
+                  transition: 'fill 150ms ease, fill-opacity 150ms ease',
+                }}
+              />
             </g>
           )
         })}
@@ -394,7 +486,11 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
           const actualH = 32 + items.length * lineH + 14
 
           return (
-            <g>
+            // pointer-events: none zodat de tooltip de klik op de
+            // kolom-rect eronder niet onderbreekt (essentieel voor
+            // onYearClick — anders blokkeert de tooltip over de gehoverde
+            // kolom de muis-events).
+            <g style={{ pointerEvents: 'none' }}>
               {/* Tooltip background */}
               <rect
                 x={clampedX}
@@ -483,6 +579,27 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             </g>
           )
         })()}
+
+        {/* Event-markers (levensgebeurtenissen + natuurlijke mijlpalen) */}
+        {/*
+          Iconen boven de bar (positieve events, asset-uitkeringen,
+          vermogensmijlpalen) of onder de bar (negatieve events, schuld-
+          afgelost, out-of-cash). Stapelt verticaal bij meerdere events op
+          dezelfde leeftijd. Klik routeert naar EventPane (life events)
+          of NaturalMilestoneSheet (natuurlijke mijlpalen) via parent.
+        */}
+        {eventOverlay && eventOverlay.length > 0 && (
+          <ChartEventMarkers
+            events={eventOverlay}
+            xScale={xScale}
+            padLeft={PAD.left}
+            chartTopY={PAD.top}
+            chartBottomY={H - PAD.bottom}
+            visibleMinAge={minAge}
+            visibleMaxAge={maxAge}
+            onEventClick={onEventClick}
+          />
+        )}
       </svg>
 
       {/* Legend */}
