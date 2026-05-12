@@ -77,6 +77,19 @@ export const OVERLAY_QUERY_KEYS = {
   strategie:     'strategie',
   uitgaven:      'uitgaven',
   event:         'event',
+  // Trigger voor BudgetPlanEditorSheet binnen de Budgetteren-app. Wordt
+  // gezet door de in-app bottom-bar "Plan"-knop op `/core/assets/cash?tab=
+  // budgetteren&planEditor=true`. BudgetsClient leest dit en opent de sheet;
+  // bij close wordt de param weggehaald. Geen pane-overlay maar een sheet —
+  // daarom bewust niet in PANE_QUERY_KEYS opgenomen.
+  planEditor:    'planEditor',
+  // Trigger voor de uitgebreide BudgetForm in een pane (`<ShellOverlay
+  // kind="pane">`) op `/core/budgets?newBudget=true` en
+  // `/core/assets/cash?tab=budgetteren&newBudget=true`. Geopend vanuit de
+  // "+ Nieuw budget"-CTA in de planeditor-toolbar én vanuit de oude
+  // /core/budgets/new-route die nu een redirect is. Eigen sleutel (niet `new`)
+  // om collisies met toekomstige create-flows op andere pagina's te vermijden.
+  newBudget:     'newBudget',
   tab:           'tab',
   edit:          'edit',
   via:           'via',

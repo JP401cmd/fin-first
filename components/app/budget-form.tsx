@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, AlertTriangle, RefreshCw, Plus } from 'lucide-react'
@@ -34,12 +34,37 @@ type FormData = {
   goal_frequency: string
 }
 
+/**
+ * Save-state die de form exposeert aan een pane-wrapper. Wordt elke render
+ * gepubliceerd via `onActionsChange` zodat de pane-footer (primary "Opslaan"
+ * + secondary "Annuleren") realtime `disabled`/`loading` kan volgen zonder
+ * dubbele state-bron. Patroon overgenomen uit `event-pane-edit.tsx:379-392`.
+ */
+export type BudgetFormActionsState = {
+  canSave: boolean
+  saving: boolean
+  save: () => void
+}
+
 export function BudgetForm({
   budget,
   parentBudgets,
+  embedded = false,
+  onActionsChange,
+  onSaved,
 }: {
   budget?: Budget
   parentBudgets: Budget[]
+  /** Wanneer `true`: render geen eigen header en geen inline save-knop —
+   *  de pane-wrapper levert beide. */
+  embedded?: boolean
+  /** Publiceert save-state aan een pane-wrapper. Alleen relevant in
+   *  embedded-mode. */
+  onActionsChange?: (state: BudgetFormActionsState) => void
+  /** Aangeroepen na succesvolle save in plaats van `router.push`. Alleen
+   *  relevant in embedded-mode (pane-wrapper sluit zichzelf en handelt
+   *  toast/refresh). */
+  onSaved?: () => void
 }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -428,32 +453,72 @@ export function BudgetForm({
 
     // Clear draft on successful save
     try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
-    router.push('/core/budgets')
+    setSaving(false)
+    if (onSaved) {
+      onSaved()
+    } else {
+      router.push('/core/budgets')
+    }
   }
+
+  // ── Embedded-mode: publiceer save-state naar pane-wrapper ──────
+  // Ref-patroon vermijdt stale closures: de pane-wrapper roept altijd de
+  // meest recente handleSubmit aan zonder dat we callback-identity moeten
+  // invalideren bij elke state-mutatie. Ref-update via useEffect (lint-regel
+  // `react-hooks/refs` verbiedt schrijven tijdens render). Patroon
+  // overgenomen uit event-pane-edit.tsx:379-392.
+  const submitRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    submitRef.current = () => {
+      void handleSubmit({ preventDefault: () => {} } as unknown as React.FormEvent)
+    }
+  })
+
+  const canSave =
+    !saving &&
+    form.name.trim().length > 0 &&
+    (!needsAutoParent || categoryName.trim().length > 0)
+
+  useEffect(() => {
+    if (!onActionsChange) return
+    onActionsChange({
+      canSave,
+      saving,
+      save: () => submitRef.current(),
+    })
+  }, [onActionsChange, canSave, saving])
 
   const SelectedIcon = iconMap[form.icon] ?? iconMap['Circle']
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="mx-auto max-w-3xl px-6 py-8" data-testid="budget-form">
-      {/* Back */}
-      <div className="mb-6">
-        <a
-          href="/core/budgets"
-          onClick={(e) => handleNavClick(e, '/core/budgets')}
-          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
-        >
-          <ArrowLeft className="h-3 w-3" aria-hidden />
-          Terug naar budgetten
-        </a>
-      </div>
+    <form
+      onSubmit={handleSubmit}
+      className={embedded ? 'space-y-6' : 'mx-auto max-w-3xl px-6 py-8'}
+      data-testid="budget-form"
+    >
+      {!embedded && (
+        <>
+          {/* Back */}
+          <div className="mb-6">
+            <a
+              href="/core/budgets"
+              onClick={(e) => handleNavClick(e, '/core/budgets')}
+              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
+            >
+              <ArrowLeft className="h-3 w-3" aria-hidden />
+              Terug naar budgetten
+            </a>
+          </div>
 
-      <header className="mb-8 space-y-2">
-        <Kicker>{budget ? 'Bewerken' : 'Nieuw'} · Budget</Kicker>
-        <EditorialHeadline level="h1" emphasis={budget ? 'bewerken' : 'budget'} size="lg">
-          {budget ? `Budget ${form.name || 'bewerken'} bewerken` : 'Een nieuw budget'}
-        </EditorialHeadline>
-      </header>
+          <header className="mb-8 space-y-2">
+            <Kicker>{budget ? 'Bewerken' : 'Nieuw'} · Budget</Kicker>
+            <EditorialHeadline level="h1" emphasis={budget ? 'bewerken' : 'budget'} size="lg">
+              {budget ? `Budget ${form.name || 'bewerken'} bewerken` : 'Een nieuw budget'}
+            </EditorialHeadline>
+          </header>
+        </>
+      )}
 
       {/* Unsaved changes navigation warning */}
       {showNavWarning && (
@@ -1031,25 +1096,27 @@ export function BudgetForm({
         </div>
       </fieldset>
 
-      {/* Submit */}
-      <div className="flex items-center justify-end gap-3 border-t border-[var(--border-ed)] pt-6">
-        <a
-          href="/core/budgets"
-          onClick={(e) => handleNavClick(e, '/core/budgets')}
-          className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-        >
-          Annuleren
-        </a>
-        <button
-          type="submit"
-          disabled={saving}
-          className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-5 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-          data-testid="budget-submit-btn"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? 'Opslaan...' : 'Opslaan'}
-        </button>
-      </div>
+      {/* Submit — alleen in standalone-mode; pane-wrapper levert de footer-CTA */}
+      {!embedded && (
+        <div className="flex items-center justify-end gap-3 border-t border-[var(--border-ed)] pt-6">
+          <a
+            href="/core/budgets"
+            onClick={(e) => handleNavClick(e, '/core/budgets')}
+            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+          >
+            Annuleren
+          </a>
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-5 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            data-testid="budget-submit-btn"
+          >
+            <Save className="h-4 w-4" />
+            {saving ? 'Opslaan...' : 'Opslaan'}
+          </button>
+        </div>
+      )}
     </form>
 
     {showCreateGoal && (

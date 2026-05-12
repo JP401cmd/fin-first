@@ -23,7 +23,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Pencil, Save, Trash2,
   GitFork, CircleDot, AlertTriangle, CheckCircle2, Heart, LayoutGrid,
@@ -52,6 +52,8 @@ import { BudgetPlanEditorSheet } from '@/components/app/budget-plan-editor-sheet
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { BudgetForm, type BudgetFormActionsState } from '@/components/app/budget-form'
+import { useToast } from '@/components/app/toast-provider'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -638,6 +640,7 @@ function BudgetHub({
 export default function BudgetsPage({ initialBudgetId, initialData }: { initialBudgetId?: string; initialData?: BudgetsPageData } = {}) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
   const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
@@ -1120,36 +1123,114 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     if (!initialBudgetId) return
     if (hasInitialRedirected.current) return
     hasInitialRedirected.current = true
-    router.replace(`/core/budgets?${OVERLAY_QUERY_KEYS.budget}=${initialBudgetId}`, { scroll: false })
-  }, [initialBudgetId, router])
+    router.replace(`${pathname}?${OVERLAY_QUERY_KEYS.budget}=${initialBudgetId}`, { scroll: false })
+  }, [initialBudgetId, router, pathname])
 
   // Pane open/sluit/stap-toggle — alle drie schrijven naar de URL en triggeren
   // zo een re-render van deze component (selectedBudgetId/modalStep komen uit
   // searchParams). `router.replace` ipv `push` om history-vervuiling te voorkomen
   // (plan §8.2): de gebruiker moet één browser-back-klik = één pane-stap zien.
+  //
+  // Pathname-preserverend: BudgetsClient wordt zowel standalone (`/core/budgets`)
+  // als embedded (`/core/assets/cash?tab=budgetteren`) gerenderd. Hardcoded
+  // `/core/budgets`-redirects zouden bij embed de host-pagina ontmounten en
+  // de in-app bottom-bar wegvagen. Daarom: huidige pathname behouden en alleen
+  // de pane-gerelateerde query-params bijwerken.
+  const buildPaneUrl = useCallback((mutate: (params: URLSearchParams) => void) => {
+    const next = new URLSearchParams(searchParams.toString())
+    mutate(next)
+    const qs = next.toString()
+    return qs ? `${pathname}?${qs}` : pathname
+  }, [pathname, searchParams])
+
   const openBudgetModal = useCallback((id: string) => {
-    router.replace(`/core/budgets?${OVERLAY_QUERY_KEYS.budget}=${id}`, { scroll: false })
-  }, [router])
+    router.replace(buildPaneUrl((p) => {
+      p.set(OVERLAY_QUERY_KEYS.budget, id)
+      p.delete(OVERLAY_QUERY_KEYS.edit)
+    }), { scroll: false })
+  }, [router, buildPaneUrl])
 
   const closeBudgetModal = useCallback(() => {
-    router.replace('/core/budgets', { scroll: false })
-  }, [router])
+    router.replace(buildPaneUrl((p) => {
+      p.delete(OVERLAY_QUERY_KEYS.budget)
+      p.delete(OVERLAY_QUERY_KEYS.edit)
+    }), { scroll: false })
+  }, [router, buildPaneUrl])
+
+  // BudgetPlanEditorSheet — getriggerd door `?planEditor=true` (gezet door de
+  // in-app bottom-bar "Plan"-knop). Bij sluiten halen we alleen die ene param
+  // weg en behouden we de rest van de URL (zoals `?tab=budgetteren` op de
+  // cash-categorie-pagina). Geen vaste path-redirect zoals closeBudgetModal,
+  // want deze sheet kan vanuit meerdere routes geopend zijn.
+  const closePlanEditor = useCallback(() => {
+    setShowPlanEditor(false)
+    const next = new URLSearchParams(searchParams.toString())
+    if (!next.has(OVERLAY_QUERY_KEYS.planEditor)) return
+    next.delete(OVERLAY_QUERY_KEYS.planEditor)
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [router, pathname, searchParams])
+
+  // Open de sheet zodra `?planEditor=true` in de URL staat. De effect blijft
+  // idempotent: bij sluiten via `closePlanEditor` wordt de param verwijderd,
+  // dus deze effect heropent niets. Wel zichtbaar wanneer de gebruiker via
+  // de bottom-bar opnieuw op "Plan" tikt — searchParams wisselt en setShow
+  // wordt opnieuw aangeroepen.
+  useEffect(() => {
+    if (searchParams.get(OVERLAY_QUERY_KEYS.planEditor) === 'true') {
+      setShowPlanEditor(true)
+    }
+  }, [searchParams])
+
+  // "Nieuw budget" pane — getriggerd door `?newBudget=true`. Bron-of-truth:
+  // - "+ Nieuw budget"-CTA in de planeditor-toolbar
+  // - Redirect vanaf de oude /core/budgets/new route
+  // - Direct deeplink met de query-param
+  // Werkt zowel op /core/budgets als op /core/assets/cash?tab=budgetteren
+  // (waar BudgetsClient als embed draait) — ShellOverlay rendert via portal
+  // naar document.body, dus de host-context maakt visueel niet uit.
+  const newBudgetOpen = searchParams.get(OVERLAY_QUERY_KEYS.newBudget) === 'true'
+  const [budgetFormActions, setBudgetFormActions] = useState<BudgetFormActionsState | null>(null)
+  const { addToast } = useToast()
+
+  const closeNewBudgetPane = useCallback(() => {
+    const next = new URLSearchParams(searchParams.toString())
+    if (!next.has(OVERLAY_QUERY_KEYS.newBudget)) return
+    next.delete(OVERLAY_QUERY_KEYS.newBudget)
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    setBudgetFormActions(null)
+  }, [router, pathname, searchParams])
+
+  // Aangeroepen vanuit BudgetPlanEditorSheet's "+ Nieuw budget"-CTA. Sluit de
+  // planeditor-sheet eerst (sheet-over-pane stapelt focus-traps en geeft een
+  // visuele dubbele overlay), zet daarna de query-param zodat de pane opent.
+  const openNewBudgetPane = useCallback(() => {
+    setShowPlanEditor(false)
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete(OVERLAY_QUERY_KEYS.planEditor)
+    next.set(OVERLAY_QUERY_KEYS.newBudget, 'true')
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+  }, [router, pathname, searchParams])
 
   // Edit-toggle binnen pane (plan §6.4): pane blijft open, alleen `?edit=true`
   // wordt toegevoegd of verwijderd. De pane-content rendert detail vs edit
   // op basis van `modalStep`.
   const goToEditStep = useCallback(() => {
     if (!selectedBudgetId) return
-    router.replace(
-      `/core/budgets?${OVERLAY_QUERY_KEYS.budget}=${selectedBudgetId}&${OVERLAY_QUERY_KEYS.edit}=true`,
-      { scroll: false },
-    )
-  }, [router, selectedBudgetId])
+    router.replace(buildPaneUrl((p) => {
+      p.set(OVERLAY_QUERY_KEYS.budget, selectedBudgetId)
+      p.set(OVERLAY_QUERY_KEYS.edit, 'true')
+    }), { scroll: false })
+  }, [router, selectedBudgetId, buildPaneUrl])
 
   const goToDetailStep = useCallback(() => {
     if (!selectedBudgetId) return
-    router.replace(`/core/budgets?${OVERLAY_QUERY_KEYS.budget}=${selectedBudgetId}`, { scroll: false })
-  }, [router, selectedBudgetId])
+    router.replace(buildPaneUrl((p) => {
+      p.set(OVERLAY_QUERY_KEYS.budget, selectedBudgetId)
+      p.delete(OVERLAY_QUERY_KEYS.edit)
+    }), { scroll: false })
+  }, [router, selectedBudgetId, buildPaneUrl])
 
   // Find the selected budget (parent or child)
   const selectedBudget = selectedBudgetId
@@ -1167,9 +1248,12 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   // om een vroege false-negative tijdens initial-render te vermijden.
   useEffect(() => {
     if (selectedBudgetId && !selectedBudget && !loading) {
-      router.replace('/core/budgets', { scroll: false })
+      router.replace(buildPaneUrl((p) => {
+        p.delete(OVERLAY_QUERY_KEYS.budget)
+        p.delete(OVERLAY_QUERY_KEYS.edit)
+      }), { scroll: false })
     }
-  }, [selectedBudgetId, selectedBudget, loading, router])
+  }, [selectedBudgetId, selectedBudget, loading, router, buildPaneUrl])
   // Siblings for ordering: parents of same type, or children of same parent
   const selectedSiblings: Budget[] = selectedBudget
     ? selectedBudget.parent_id
@@ -1672,14 +1756,22 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowPlanEditor(true)}
-          className="inline-flex items-center gap-2 rounded-lg border border-kern-600 bg-[var(--paper)] px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
-        >
-          <Pencil className="h-4 w-4" />
-          Budgetten aanpassen
-        </button>
+        {/* Spiegelt de view-toggle pill-group: zelfde wrapper-shape
+            (rounded-lg border bg-paper p-0.5) met daarbinnen één pill in
+            de niet-actieve toggle-stijl. ink-2 tekst (tikje feller dan de
+            ink-3 op echte toggles) signaleert dat dit een ACTIE is, geen
+            toggle-state. Beide groups lezen nu als gelijkwaardige
+            control-strips naast elkaar. */}
+        <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
+          <button
+            type="button"
+            onClick={() => setShowPlanEditor(true)}
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Plan bewerken
+          </button>
+        </div>
       </div>
 
       {/* Budget groups */}
@@ -1783,12 +1875,13 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       {/* Budget allocation modal */}
       <BudgetPlanEditorSheet
         open={showPlanEditor}
-        onClose={() => setShowPlanEditor(false)}
+        onClose={closePlanEditor}
         onSaved={() => {
-          setShowPlanEditor(false)
+          closePlanEditor()
           loadBudgets()
           loadSpending()
         }}
+        onRequestNewBudget={openNewBudgetPane}
         budgets={budgets}
         budgetAmounts={budgetAmounts}
         rollovers={rollovers}
@@ -1796,6 +1889,42 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         monthDate={monthDate}
         monthlyAverages={initialData?.monthlyAverages ?? {}}
       />
+
+      {/* "Nieuw budget" pane — uitgebreide create-flow met alle parameters
+          (icoon, prioriteit, doeltype, eigendoms-keuze, …). Geopend vanuit
+          de planeditor-toolbar OR direct deeplink (/core/budgets/new
+          redirect). Footer-CTA wordt door BudgetForm gepubliceerd via
+          onActionsChange — patroon zoals event-pane-edit.tsx. */}
+      {newBudgetOpen && (
+        <ShellOverlay
+          open={newBudgetOpen}
+          onClose={closeNewBudgetPane}
+          kind="pane"
+          title="Nieuw budget"
+          primaryAction={budgetFormActions ? {
+            label: 'Opslaan',
+            onClick: budgetFormActions.save,
+            loading: budgetFormActions.saving,
+            disabled: !budgetFormActions.canSave,
+          } : undefined}
+          secondaryAction={{
+            label: 'Annuleren',
+            onClick: closeNewBudgetPane,
+          }}
+        >
+          <BudgetForm
+            embedded
+            parentBudgets={budgets.filter((b) => !b.parent_id)}
+            onActionsChange={setBudgetFormActions}
+            onSaved={() => {
+              closeNewBudgetPane()
+              loadBudgets()
+              loadSpending()
+              addToast({ type: 'success', title: 'Budget aangemaakt' })
+            }}
+          />
+        </ShellOverlay>
+      )}
 
       {/* AI categorize sheet — geopend vanuit de "ongecategoriseerd"-aandacht
           in de Budget Hub. We hergebruiken dezelfde flow als in

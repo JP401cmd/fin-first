@@ -1,46 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { BudgetForm } from '@/components/app/budget-form'
-import type { Budget } from '@/lib/budget-data'
-import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+/**
+ * Legacy-redirect — de uitgebreide BudgetForm-flow leeft sinds de UX-restyle
+ * (zie plan: wil-je-de-pagina-zazzy-melody.md) als pane binnen
+ * `/core/budgets?newBudget=true`. Deze route blijft bestaan voor backward-
+ * compat met deeplinks/notificaties/bookmarks die nog naar `/core/budgets/new`
+ * wijzen — gebruiker landt op de pane-flow zonder 404.
+ *
+ * Voor gebruikers die vanaf de cash-categorie-pagina komen wordt het pad
+ * niet hersteld (we redirecten altijd naar `/core/budgets`); dat is bewust —
+ * `/core/budgets/new` was nooit context-aware, en de embedded budgetteren-tab
+ * heeft zijn eigen "+ Nieuw budget"-CTA in de planeditor-toolbar.
+ */
 
-export default function NewBudgetPage() {
-  const [parentBudgets, setParentBudgets] = useState<Budget[]>([])
-  const [loading, setLoading] = useState(true)
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
+export default function NewBudgetRedirect() {
+  const router = useRouter()
   useEffect(() => {
-    async function load() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('budgets')
-        .select('*')
-        .is('parent_id', null)
-        .order('sort_order')
-
-      setParentBudgets((data as Budget[]) ?? [])
-      setLoading(false)
-    }
-
-    load()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
-        <NavStackMeta title="Nieuw budget" />
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <NavStackMeta title="Nieuw budget" />
-      <BudgetForm parentBudgets={parentBudgets} />
-    </>
-  )
+    router.replace('/core/budgets?newBudget=true')
+  }, [router])
+  return null
 }

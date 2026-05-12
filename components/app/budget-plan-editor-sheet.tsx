@@ -7,6 +7,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useToast } from '@/components/app/toast-provider'
+import { BudgetIcon } from '@/components/app/budget-shared'
 import {
   BUDGET_SLUGS,
   type Budget,
@@ -109,6 +110,7 @@ export function BudgetPlanEditorSheet({
   open,
   onClose,
   onSaved,
+  onRequestNewBudget,
   budgets,
   budgetAmounts,
   rollovers,
@@ -119,6 +121,11 @@ export function BudgetPlanEditorSheet({
   open: boolean
   onClose: () => void
   onSaved: () => void
+  /** Aangeroepen vanuit de "+ Nieuw budget"-CTA in de toolbar. De parent
+   *  (BudgetsClient) sluit de sheet en opent de uitgebreide BudgetForm-pane
+   *  via `?newBudget=true`. Bij dirty-state geeft de sheet eerst een
+   *  bevestigings-prompt. */
+  onRequestNewBudget?: () => void
   budgets: BudgetWithChildren[]
   budgetAmounts: BudgetAmountLite[]
   rollovers: BudgetRollover[]
@@ -128,6 +135,11 @@ export function BudgetPlanEditorSheet({
 }) {
   const effectiveFrom = useMemo(() => {
     return `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-01`
+  }, [monthDate])
+
+  // Krantstijl-datum-label voor de editorial-kicker: "Mei 2026" / "Jan. 2026".
+  const monthLabel = useMemo(() => {
+    return monthDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
   }, [monthDate])
 
   const [view, setView] = useState<EditorView>('tree')
@@ -423,9 +435,37 @@ export function BudgetPlanEditorSheet({
     onClose()
   }
 
+  function handleRequestNewBudget() {
+    if (!onRequestNewBudget) return
+    if (changes > 0 && !confirm('Je hebt nog niet-opgeslagen plan-wijzigingen. Doorgaan naar uitgebreid nieuw-budget formulier zonder opslaan?')) return
+    onRequestNewBudget()
+  }
+
   // ── Render ────────────────────────────────────────────────────
   return (
-    <BottomSheet open={open} onClose={handleClose} title="Budgetten aanpassen" size="full">
+    <BottomSheet open={open} onClose={handleClose} title="Plan bewerken" size="full">
+      {/* Editorial intro — kicker-met-streep + deck (italic Source Serif).
+          BottomSheet levert al de Playfair-titel in zijn header-bar; deze
+          intro geeft context (welke maand, wat je hier doet) zonder dubbele
+          kop. Alleen op de tree-view — template-flows hebben hun eigen
+          context-headers. */}
+      {view === 'tree' && (
+        <div className="border-b border-[var(--border-ed)] px-4 pb-3 pt-4 sm:px-6 sm:pt-5">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-block h-px w-7 bg-[var(--module-active-500)]" aria-hidden />
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+              Budgetplan · {monthLabel}
+            </span>
+          </div>
+          <p
+            className="mt-2 max-w-[60ch] border-l-2 border-[var(--module-active-500)] pl-3 text-sm italic text-[var(--ink-2)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Pas bedragen aan, voeg een rij toe per type, of klik op <em>Nieuw budget</em> voor de uitgebreide invoer met icoon, doeltype en prioriteit.
+          </p>
+        </div>
+      )}
+
       {/* Toolbar */}
       {view === 'tree' && (
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-ed)] bg-[var(--subtle)]/40 px-4 py-2.5 sm:px-6">
@@ -446,6 +486,23 @@ export function BudgetPlanEditorSheet({
             <RotateCcw className="h-3.5 w-3.5" />
             Wijzigingen terugdraaien
           </button>
+
+          {/* Uitgebreide create-flow — opent een pane met de volledige
+              BudgetForm (icoon, prioriteit, doeltype, eigendoms-keuze, …).
+              Onderscheidt zich visueel van de twee outline-knoppen via een
+              solid ink-fill, en staat rechts uitgelijnd zodat de toolbar
+              leest als "bulk-acties links · nieuwe entiteit rechts". */}
+          {onRequestNewBudget && (
+            <button
+              type="button"
+              onClick={handleRequestNewBudget}
+              className="ml-auto inline-flex items-center gap-1.5 bg-[var(--ink)] px-3 text-xs font-medium leading-none text-[var(--paper)] hover:bg-[var(--ink-2)] min-h-[44px]"
+              style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nieuw budget
+            </button>
+          )}
         </div>
       )}
 
@@ -530,7 +587,8 @@ export function BudgetPlanEditorSheet({
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] min-h-[44px]"
+                className="border border-[var(--ink)] bg-[var(--paper)] px-3 py-2 text-sm font-medium text-[var(--ink)] hover:bg-[var(--subtle)] min-h-[44px]"
+                style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
               >
                 Annuleren
               </button>
@@ -538,7 +596,8 @@ export function BudgetPlanEditorSheet({
                 type="button"
                 onClick={handleSave}
                 disabled={saving || changes === 0}
-                className="inline-flex items-center gap-1.5 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px] rounded-[var(--r)]"
+                className="inline-flex items-center gap-1.5 bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px]"
+                style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
               >
                 <Save className="h-4 w-4" />
                 {saving ? 'Opslaan…' : changes > 0 ? `Opslaan — ${changes} wijziging${changes === 1 ? '' : 'en'}` : 'Geen wijzigingen'}
@@ -622,14 +681,17 @@ function TreeSection({
     <div className="space-y-6">
       {grouped.map(({ type, parents, childrenBy }) => (
         <section key={type}>
-          <header className="mb-2 flex items-center justify-between border-b border-[var(--border-ed)] pb-2">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">
-              {TYPE_LABEL[type]}
-            </h3>
+          <header className="mb-3 flex items-center justify-between border-b border-[var(--ink)] pb-2">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-block h-px w-7 bg-[var(--module-active-500)]" aria-hidden />
+              <h3 className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-3)]">
+                {TYPE_LABEL[type]}
+              </h3>
+            </div>
             <button
               type="button"
               onClick={() => onAddTopLevel(type)}
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)] hover:text-kern-600 min-h-[32px]"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink)] min-h-[32px]"
             >
               <Plus className="h-3.5 w-3.5" />
               Hoofdbudget
@@ -742,6 +804,17 @@ function Row({
   return (
     <div className={`px-3 py-2 ${indent ? 'pl-6 sm:pl-10' : ''}`}>
       <div className="flex items-center gap-2">
+        {/* Budget-icoon — visuele herkenning per rij. Klikbaar wijzigen
+            niet in de planeditor (light-weight) — dat doet de uitgebreide
+            form via "+ Nieuw budget" of de detail-edit-flow. Temp-rows
+            tonen het default 'Circle'-icoon (uit makeTmpRow) zodat ook
+            ongesaved rijen visueel passen in het ritme. */}
+        <span
+          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center text-[var(--ink-2)] ${isTempId(row.id) ? 'text-[var(--ink-4)]' : ''}`}
+          aria-hidden
+        >
+          <BudgetIcon name={row.icon} className="h-4 w-4" />
+        </span>
         <input
           type="text"
           value={row.name}
