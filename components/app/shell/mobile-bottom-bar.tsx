@@ -44,10 +44,13 @@ import {
   RefreshCw,
   Settings,
   MoreHorizontal,
+  Wallet,
+  Home,
+  SlidersHorizontal,
 } from 'lucide-react'
-import type { ComponentType } from 'react'
+import type { ComponentType, CSSProperties } from 'react'
 import { BottomNavTabs } from '@/components/app/bottom-nav'
-import type { BottomBarConfig, BottomBarAction } from './nav-stack-provider'
+import type { BottomBarConfig, BottomBarAction, BottomBarAppTab } from './nav-stack-provider'
 import { useLiveBottomBar } from './nav-stack-provider'
 import { MobileAppStrip } from './mobile-app-strip'
 
@@ -93,6 +96,88 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   RefreshCw,
   Settings,
   MoreHorizontal,
+  Wallet,
+  Home,
+  SlidersHorizontal,
+}
+
+/**
+ * Lokale `--module-active-*` override voor één tap-target. Een `app-tabs`
+ * BottomBar kan per knop een afwijkende module-accent vragen (bv. de
+ * "home"-knop in het midden van de Budgetteren-bar verwijst naar Wil en
+ * krijgt daarom Wil-paars als accent, los van de omringende Kern-context).
+ *
+ * In plaats van hardcoded hex-waarden te kiezen mappen we naar de bestaande
+ * `--color-<module>-*` palet-vars zodat themes en a11y-contrast consistent
+ * blijven met de rest van de app.
+ */
+function moduleAccentVars(accent: BottomBarAppTab['moduleAccent']): CSSProperties {
+  if (!accent) return {}
+  const shades = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'] as const
+  return Object.fromEntries(
+    shades.map((s) => [`--module-active-${s}`, `var(--color-${accent}-${s})`]),
+  ) as CSSProperties
+}
+
+/**
+ * Eén tap-target in een `app-tabs` BottomBar. Drie gelijke kolommen, label
+ * altijd zichtbaar (geen icon-only zoals MobileAppStrip).
+ *
+ * Visueel identiek aan `BottomNavTabs` (bottom-nav.tsx:204) — zelfde icon-
+ * grootte (3.5×3.5), zelfde typografie (10px, medium, uppercase, tracking
+ * 0.06em), zelfde accent-pattern (`border-t-3` boven + module-bg + module-
+ * text wanneer active), zelfde hoogte. Active-state gebruikt de lokale
+ * `--module-active-*` variabelen die via `moduleAccentVars` per-tab kunnen
+ * worden overschreven — zodat een center-home-knop Wil-paars kan tonen
+ * binnen een verder amber Kern-context.
+ */
+function AppTab({ tab }: { tab: BottomBarAppTab }) {
+  const Icon = ICON_MAP[tab.icon] ?? null
+
+  // Inter font (UI-chrome) + optionele module-accent-override.
+  const style: CSSProperties = {
+    fontFamily: 'var(--font-inter, system-ui, sans-serif)',
+    height: 'var(--bottom-nav-height)',
+    ...moduleAccentVars(tab.moduleAccent),
+  }
+
+  const baseClasses =
+    'tap-highlight relative flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium uppercase tracking-[0.06em] transition-colors border-t-3'
+  const stateClasses = tab.active
+    ? 'text-[var(--module-active-700)] bg-[var(--module-active-50)]/40 border-[var(--module-active-500)] rounded-b-sm'
+    : 'text-[var(--ink-3)] border-transparent hover:text-[var(--ink-2)]'
+
+  const content = (
+    <>
+      {Icon ? <Icon className="relative h-3.5 w-3.5" /> : null}
+      <span className="relative">{tab.label}</span>
+    </>
+  )
+
+  if (tab.href) {
+    return (
+      <Link
+        href={tab.href}
+        aria-current={tab.active ? 'page' : undefined}
+        className={`${baseClasses} ${stateClasses}`}
+        style={style}
+      >
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={tab.onClick}
+      aria-current={tab.active ? 'page' : undefined}
+      className={`${baseClasses} ${stateClasses}`}
+      style={style}
+    >
+      {content}
+    </button>
+  )
 }
 
 /**
@@ -202,6 +287,25 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
           <BottomNavTabs />
         </nav>
       </>
+    )
+  }
+
+  if (kind === 'app-tabs' && effectiveConfig?.kind === 'app-tabs') {
+    // In-app tabs (Kern-app context). Geen MobileAppStrip ervoor — die hoort
+    // bij module-context en zou hier alleen ruis toevoegen. Drie kolommen,
+    // gelijk verdeeld; de tab-renderer regelt accent-overrides per kolom.
+    return (
+      <nav
+        role="navigation"
+        aria-label="App-navigatie"
+        className={`${wrapperClasses} flex items-stretch pb-[var(--safe-area-bottom)]`}
+        style={{ minHeight: 'var(--bottom-nav-height)' }}
+        data-mobile-bottom-nav="true"
+      >
+        <AppTab tab={effectiveConfig.left} />
+        <AppTab tab={effectiveConfig.center} />
+        <AppTab tab={effectiveConfig.right} />
+      </nav>
     )
   }
 

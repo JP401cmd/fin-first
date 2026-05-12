@@ -50,7 +50,7 @@ export type TopBarKind = 'rich' | 'simple' | 'hidden'
 export type TopBarConfig = { kind: TopBarKind }
 
 /** Soorten BottomBar die een stack-entry kan vereisen. */
-export type BottomBarKind = 'tabs' | 'action-bar' | 'context-actions' | 'hidden'
+export type BottomBarKind = 'tabs' | 'action-bar' | 'context-actions' | 'app-tabs' | 'hidden'
 
 /** Eén CTA in een action-bar of context-actions BottomBar. */
 export type BottomBarAction = {
@@ -66,10 +66,36 @@ export type BottomBarAction = {
 }
 
 /**
+ * Eén tap-target in een `app-tabs` BottomBar (in-app navigatie binnen één
+ * Kern-app zoals Budgetteren). Verschilt van `BottomBarAction` doordat de
+ * positie (left/center/right) vast is, het label altijd zichtbaar is, en de
+ * accent-kleur optioneel per-tab overgenomen kan worden van een andere
+ * module dan de omringende.
+ */
+export type BottomBarAppTab = {
+  label: string
+  /** ICON_MAP-key in mobile-bottom-bar.tsx (lucide). */
+  icon: string
+  href?: string
+  onClick?: () => void
+  /** Active-state: streep + filled icon. Alleen visueel — navigatie blijft mogelijk. */
+  active?: boolean
+  /**
+   * Forceer een module-kleurpalet voor dit tap-target los van de omringende
+   * module. Gebruikt voor de centrale "home"-knop in Kern-apps die naar Wil
+   * verwijst maar de Wil-accent behoudt.
+   */
+  moduleAccent?: 'kern' | 'wil' | 'horizon'
+}
+
+/**
  * BottomBar-configuratie per stack-entry. Zie plan §4.4.
  * - 'tabs' (default): module-tabs (Kern/Wil/Horizon), gating-aware.
  * - 'action-bar': primary + optionele secondary CTA.
  * - 'context-actions': 2-3 actie-knoppen.
+ * - 'app-tabs': drie vaste in-app-tabs (left/center/right) voor Kern-apps
+ *   zoals Budgetteren. Vervangt de module-tabs zolang de gebruiker binnen
+ *   één app navigeert.
  * - 'hidden': geen BottomBar — full-screen content.
  */
 export type BottomBarConfig =
@@ -82,6 +108,12 @@ export type BottomBarConfig =
   | {
       kind: 'context-actions'
       actions: BottomBarAction[]
+    }
+  | {
+      kind: 'app-tabs'
+      left: BottomBarAppTab
+      center: BottomBarAppTab
+      right: BottomBarAppTab
     }
   | { kind: 'hidden' }
 

@@ -1,9 +1,11 @@
 'use client'
 
+import { useEffect } from 'react'
 import BudgetsClient from '@/components/app/budgets-client'
 import type { BudgetsPageData } from '@/lib/budgets-data-loader'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
+import { useLiveBottomBar } from '@/components/app/shell/nav-stack-provider'
 
 // ── Component ────────────────────────────────────────────────
 
@@ -74,7 +76,47 @@ interface CashBudgetterenActiveProps {
  * `px-*` meer — host-padding van de category-tab-container voldoet. Wanneer
  * `initialData` ontbreekt valt BudgetsClient terug op zijn eigen client-side
  * fetch — geen losse skeleton hier nodig.
+ *
+ * App-bar registratie: zolang dit component gemount is, vervangt de mobile
+ * bottom-bar de standaard module-tabs door drie in-app-tabs (Budgetten /
+ * Home / Plan). Bij switch naar de items-tab, navigatie weg, of module-uit
+ * unmount dit component en valt de bar terug op zijn default. `useLiveBottomBar`
+ * geeft `null` buiten een `<NavStackProvider>` (legacy shell) — in dat geval
+ * is dit een no-op en gebeurt er niets.
  */
 function CashBudgetterenActive({ initialData }: CashBudgetterenActiveProps) {
+  // Isoleer de setter — de `live`-object identiteit wijzigt bij elke
+  // config-update (memoized op `liveBottomBarConfig`), dus `live` zélf als
+  // dep zou een infinite render-loop veroorzaken (setConfig → context-value
+  // wijzigt → effect refire → setConfig → …). Een useState-setter heeft
+  // wél een stabiele identiteit, dus die kunnen we veilig als dep gebruiken.
+  const setConfig = useLiveBottomBar()?.setConfig
+  useEffect(() => {
+    if (!setConfig) return
+    setConfig({
+      kind: 'app-tabs',
+      left: {
+        label: 'Budgetten',
+        icon: 'Wallet',
+        href: '/core/assets/cash?tab=budgetteren',
+        active: true,
+      },
+      center: {
+        label: 'Home',
+        icon: 'Home',
+        href: '/will',
+        moduleAccent: 'wil',
+      },
+      right: {
+        label: 'Plan',
+        icon: 'SlidersHorizontal',
+        href: '/core/assets/cash?tab=budgetteren&planEditor=true',
+      },
+    })
+    return () => {
+      setConfig(null)
+    }
+  }, [setConfig])
+
   return <BudgetsClient initialData={initialData} />
 }
