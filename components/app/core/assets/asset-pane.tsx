@@ -23,7 +23,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Trash2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ShellOverlay, type PaneAction } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
@@ -68,6 +68,7 @@ interface AssetPaneProps {
 
 export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { addToast } = useToast()
 
   const [mode, setMode] = useState<AssetPaneMode>('view')
@@ -91,13 +92,18 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
   const [cryptoHoldings, setCryptoHoldings] = useState<CryptoHoldingRow[]>([])
   const [investmentHoldings, setInvestmentHoldings] = useState<InvestmentHoldingRow[]>([])
 
-  // Sync extern asset → interne state. Reset mode naar 'view' bij wisseling.
-  // We willen alleen op asset-id-wisseling reageren — een nieuwe object-
-  // identity met dezelfde id (na server-refresh) mag de mode niet resetten.
+  // Sync extern asset → interne state. Bij wisseling van asset-id lezen we
+  // de URL-modifier-key `edit` om de initiële pane-state te zetten: de
+  // bewerk-knop op `<VermogenAssetCard>` zet `?asset=<id>&edit=1` zodat één
+  // klik direct in edit-mode landt. Herwaardering loopt NIET via deze pane —
+  // de actie-knop op de kaart opent direct de ValuationModal in de caller.
+  // We reageren alleen op asset-id-wisseling — een nieuwe object-identity
+  // met dezelfde id (na server-refresh) mag de mode niet resetten.
   useEffect(() => {
     setCurrentAsset(asset)
     if (asset) {
-      setMode('view')
+      const wantsEdit = searchParams.get('edit') === '1'
+      setMode(wantsEdit ? 'edit' : 'view')
       setEditActions(null)
       setRevaluationOpen(false)
     }

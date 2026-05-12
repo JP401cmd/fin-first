@@ -63,6 +63,7 @@ import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { Sidebar } from '@/components/app/shell/sidebar'
 import { MobileStackShell } from '@/components/app/shell/mobile-stack-shell'
 import { NavStackProvider } from '@/components/app/shell/nav-stack-provider'
+import { MobileAppStripProvider } from '@/components/app/shell/mobile-app-strip-state'
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import type { CategoryAppLink } from '@/lib/category-app-nav'
@@ -263,6 +264,7 @@ function NewShell({
   return (
     <NavStackProvider>
      <CategoryAppLinksContext.Provider value={categoryAppLinks}>
+      <MobileAppStripProvider>
       {/* Sidebar via portal naar document.body — omzeilt ChatLayoutWrapper's
           `contain: layout`. Onder lg:-breakpoint rendert Sidebar `null`
           (hidden lg:flex), dus de portal heeft daar geen visuele impact. */}
@@ -313,6 +315,7 @@ function NewShell({
           </div>
         </DailyExpenseProvider>
       </ChatLayoutWrapper>
+      </MobileAppStripProvider>
      </CategoryAppLinksContext.Provider>
     </NavStackProvider>
   )

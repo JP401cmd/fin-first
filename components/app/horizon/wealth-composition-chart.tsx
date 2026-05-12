@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, memo, useCallback } from 'react'
+import { useState, useEffect, memo, useCallback, useRef } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { StackedRow, WealthGroup } from '@/lib/wealth-composition'
 import {
@@ -84,6 +84,22 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredAge, setHoveredAge] = useState<number | null>(null)
+  const [hoveredEvent, setHoveredEvent] = useState<ChartEventOverlay | null>(null)
+
+  // Tap-handling voor jaar-klik. Op mobiel (iOS Safari in het bijzonder) zijn
+  // `onClick` events op SVG-rects onbetrouwbaar binnen een pointer-capture
+  // omgeving zoals ZoomableChartContainer — dus we triggeren primair via
+  // `onPointerUp` met motion-check (pan-vs-tap). De `lastTapRef` dedupe
+  // voorkomt dat onClick (mouse-synthese) hetzelfde jaar nog eens opent.
+  const tapStartRef = useRef<{ x: number; y: number; age: number; pointerId: number } | null>(null)
+  const lastTapRef = useRef<{ age: number; ts: number } | null>(null)
+  const triggerYearTap = useCallback((age: number) => {
+    const now = Date.now()
+    if (lastTapRef.current && lastTapRef.current.age === age && now - lastTapRef.current.ts < 250) return
+    lastTapRef.current = { age, ts: now }
+    setHoveredAge(null) // tooltip verbergen direct bij tap (mobile-friendly)
+    onYearClick?.(age)
+  }, [onYearClick])
 
   // ResizeObserver for responsive width (same pattern as SimChart)
   const [containerW, setContainerW] = useState(600)
@@ -212,15 +228,115 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
     ? PAD.left + xScale(aowAgeFractional)
     : null
 
-  // Tooltip data
+  // Tooltip data — gerendered als HTML-strip onder de chart (niet SVG-floating)
   const tooltipRow = hoveredAge != null ? visibleRows.find(r => r.age === hoveredAge) : null
-  const tooltipX = hoveredAge != null ? PAD.left + xScale(hoveredAge) : 0
   const tooltipPositiveTotal = tooltipRow
     ? tooltipRow.spaargeld + tooltipRow.beleggingen + tooltipRow.pensioen + tooltipRow.vastgoed + tooltipRow.overig
     : 0
+  const tooltipItems: { label: string; value: number; color: string }[] = tooltipRow
+    ? [
+        ...ALL_GROUPS
+          .filter(g => tooltipRow[g] > 0)
+          .map(g => ({ label: WEALTH_GROUP_LABELS[g], value: tooltipRow[g], color: WEALTH_GROUP_COLORS[g] })),
+        ...(tooltipRow.schulden < 0
+          ? [{ label: DEBT_LAYER_LABEL, value: tooltipRow.schulden, color: DEBT_LAYER_COLOR }]
+          : []),
+      ]
+    : []
+  const tooltipNetWorth = tooltipRow ? tooltipPositiveTotal + tooltipRow.schulden : 0
 
   return (
     <div ref={ref}>
+      {/* Hover-info-strip — vaste positie BOVEN de chart zodat ze nooit het
+          klikgebied van bars of event-markers overlapt. Toont event-info
+          wanneer een marker wordt gehoverd, anders de breakdown van het
+          gehoverde jaar, en een hint wanneer niets is gehoverd.
+          `min-height` voorkomt layout-shift bij hover-toggle.
+          Verborgen op mobiel (`hidden md:block`): daar bestaat geen hover —
+          alleen tap-to-open via de year-sheet en marker-pane. */}
+      <div
+        className="mb-2 hidden min-h-[58px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 md:block"
+        role="status"
+        aria-live="polite"
+      >
+        {hoveredEvent ? (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span
+                  className="inline-block h-2 w-2 rounded-sm shrink-0 self-center"
+                  style={{ backgroundColor: hoveredEvent.color }}
+                />
+                <p className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                  {hoveredEvent.kind === 'natural' ? 'Mijlpaal' : 'Gebeurtenis'}
+                </p>
+                <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
+                  {hoveredEvent.label}
+                </p>
+              </div>
+              <div className="flex items-baseline gap-1.5 shrink-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                  Leeftijd
+                </p>
+                <p className="font-mono text-[14px] font-semibold tabular-nums text-[var(--ink)]">
+                  {Math.round(hoveredEvent.age)}
+                </p>
+              </div>
+            </div>
+            {hoveredEvent.detail && (
+              <p className="mt-1.5 font-mono text-[11px] tabular-nums text-[var(--ink-2)]">
+                {hoveredEvent.detail}
+              </p>
+            )}
+          </>
+        ) : tooltipRow && hoveredAge != null ? (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="flex items-baseline gap-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                  Leeftijd
+                </p>
+                <p className="font-mono text-[14px] font-semibold tabular-nums text-[var(--ink)]">
+                  {hoveredAge}
+                </p>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                  Netto
+                </p>
+                <p className="font-mono text-[14px] font-semibold tabular-nums text-[var(--ink)]">
+                  {fmtEuro(tooltipNetWorth)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+              {tooltipItems.map(item => (
+                <span
+                  key={item.label}
+                  className="inline-flex items-center gap-1.5 text-[10px] text-[var(--ink-2)]"
+                >
+                  <span
+                    className="inline-block h-2 w-2 rounded-sm shrink-0"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span>{item.label}</span>
+                  <span className="font-mono tabular-nums text-[var(--ink-3)]">
+                    {fmtEuro(item.value)}
+                    {item.value > 0 && tooltipPositiveTotal > 0 && (
+                      <span className="text-[var(--ink-4)]"> · {pctStr(item.value, tooltipPositiveTotal)}</span>
+                    )}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="py-2 text-center font-serif text-[11px] italic text-[var(--ink-4)]">
+            Beweeg over een jaar voor de samenstelling — tik om alle details te zien
+          </p>
+        )}
+      </div>
+
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
@@ -373,15 +489,36 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
                 onFocus={() => setHoveredAge(row.age)}
                 onBlur={() => setHoveredAge(null)}
                 /* stopPropagation op pointerDown voorkomt dat de zoom-container
-                   setPointerCapture aanroept en zo onze click event afvangt. */
-                onPointerDown={onYearClick ? (e) => e.stopPropagation() : undefined}
-                onClick={onYearClick ? () => onYearClick(row.age) : undefined}
+                   setPointerCapture aanroept en zo onze click event afvangt.
+                   We slaan de pos op zodat onPointerUp tap-vs-pan kan checken. */
+                onPointerDown={onYearClick ? (e) => {
+                  e.stopPropagation()
+                  tapStartRef.current = { x: e.clientX, y: e.clientY, age: row.age, pointerId: e.pointerId }
+                } : undefined}
+                /* Touch-betrouwbare tap-detectie: pointerUp met motion-check.
+                   `onClick` blijft bestaan als desktop/keyboard-pad — `triggerYearTap`
+                   dedupliceert binnen 250ms zodat we niet twee keer openen. */
+                onPointerUp={onYearClick ? (e) => {
+                  const start = tapStartRef.current
+                  tapStartRef.current = null
+                  if (!start || start.pointerId !== e.pointerId) return
+                  const dx = e.clientX - start.x
+                  const dy = e.clientY - start.y
+                  if (Math.hypot(dx, dy) > 10) return // pan, geen tap
+                  if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+                    e.stopPropagation()
+                    triggerYearTap(row.age)
+                  }
+                } : undefined}
+                onPointerLeave={() => setHoveredAge(null)}
+                onPointerCancel={() => { tapStartRef.current = null }}
+                onClick={onYearClick ? () => triggerYearTap(row.age) : undefined}
                 onKeyDown={
                   onYearClick
                     ? e => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
-                          onYearClick(row.age)
+                          triggerYearTap(row.age)
                         }
                       }
                     : undefined
@@ -389,6 +526,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
                 style={{
                   cursor: onYearClick ? 'pointer' : 'default',
                   outline: 'none',
+                  touchAction: 'manipulation', // disable 300ms click delay + double-tap-zoom op deze rect
                   transition: 'fill 150ms ease, fill-opacity 150ms ease',
                 }}
               />
@@ -464,121 +602,11 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
           </g>
         )}
 
-        {/* Hover tooltip */}
-        {tooltipRow && hoveredAge != null && (() => {
-          const tooltipW = 150
-          const tooltipH = 100
-          // Position tooltip to left or right of bar depending on space
-          const rawX = tooltipX - tooltipW / 2
-          const clampedX = Math.max(PAD.left, Math.min(rawX, W - PAD.right - tooltipW))
-          const tooltipY = Math.max(PAD.top, PAD.top + 10)
-
-          const items: { label: string; value: number; color: string }[] = [
-            ...ALL_GROUPS
-              .filter(g => tooltipRow[g] > 0)
-              .map(g => ({ label: WEALTH_GROUP_LABELS[g], value: tooltipRow[g], color: WEALTH_GROUP_COLORS[g] })),
-            ...(tooltipRow.schulden < 0
-              ? [{ label: DEBT_LAYER_LABEL, value: tooltipRow.schulden, color: DEBT_LAYER_COLOR }]
-              : []),
-          ]
-          const netWorth = tooltipPositiveTotal + tooltipRow.schulden
-          const lineH = 13
-          const actualH = 32 + items.length * lineH + 14
-
-          return (
-            // pointer-events: none zodat de tooltip de klik op de
-            // kolom-rect eronder niet onderbreekt (essentieel voor
-            // onYearClick — anders blokkeert de tooltip over de gehoverde
-            // kolom de muis-events).
-            <g style={{ pointerEvents: 'none' }}>
-              {/* Tooltip background */}
-              <rect
-                x={clampedX}
-                y={tooltipY}
-                width={tooltipW}
-                height={actualH}
-                rx={5}
-                fill="var(--ink)"
-                opacity={0.94}
-              />
-              {/* Age header */}
-              <text
-                x={clampedX + 8}
-                y={tooltipY + 14}
-                fontSize={9}
-                fontWeight={700}
-                fill="var(--paper)"
-                fontFamily="var(--font-inter, sans-serif)"
-              >
-                Leeftijd {hoveredAge}
-              </text>
-              {/* Breakdown items */}
-              {items.map((item, i) => (
-                <g key={item.label}>
-                  <rect
-                    x={clampedX + 8}
-                    y={tooltipY + 22 + i * lineH}
-                    width={6}
-                    height={6}
-                    rx={1}
-                    fill={item.color}
-                  />
-                  <text
-                    x={clampedX + 18}
-                    y={tooltipY + 28 + i * lineH}
-                    fontSize={8}
-                    fill="var(--paper)"
-                    fontFamily="var(--font-inter, sans-serif)"
-                  >
-                    {item.label}
-                  </text>
-                  <text
-                    x={clampedX + tooltipW - 8}
-                    y={tooltipY + 28 + i * lineH}
-                    textAnchor="end"
-                    fontSize={8}
-                    fill="var(--paper)"
-                    fontFamily="var(--font-dm-mono, monospace)"
-                  >
-                    {fmtEuro(item.value)}
-                    {item.value > 0 ? ` (${pctStr(item.value, tooltipPositiveTotal)})` : ''}
-                  </text>
-                </g>
-              ))}
-              {/* Net worth total */}
-              <line
-                x1={clampedX + 8}
-                x2={clampedX + tooltipW - 8}
-                y1={tooltipY + 24 + items.length * lineH}
-                y2={tooltipY + 24 + items.length * lineH}
-                stroke="var(--paper)"
-                strokeWidth={0.5}
-                opacity={0.3}
-              />
-              <text
-                x={clampedX + 8}
-                y={tooltipY + 36 + items.length * lineH}
-                fontSize={8}
-                fontWeight={700}
-                fill="var(--paper)"
-                fontFamily="var(--font-inter, sans-serif)"
-              >
-                Netto vermogen
-              </text>
-              <text
-                x={clampedX + tooltipW - 8}
-                y={tooltipY + 36 + items.length * lineH}
-                textAnchor="end"
-                fontSize={8}
-                fontWeight={700}
-                fill="var(--paper)"
-                fontFamily="var(--font-dm-mono, monospace)"
-              >
-                {fmtEuro(netWorth)}
-              </text>
-            </g>
-          )
-        })()}
+        {/* (Hover-tooltip wordt BOVEN de chart als HTML-strip getoond — zie
+            de div vóór <svg> hierboven. Dat houdt het klikgebied van bars en
+            event-markers volledig vrij en voorkomt dat de tooltip de hover-
+            positie zelf overlapt. Event-markers spelen mee via hun
+            `onEventHover` callback in ChartEventMarkers.) */}
 
         {/* Event-markers (levensgebeurtenissen + natuurlijke mijlpalen) */}
         {/*
@@ -598,6 +626,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             visibleMinAge={minAge}
             visibleMaxAge={maxAge}
             onEventClick={onEventClick}
+            onEventHover={setHoveredEvent}
           />
         )}
       </svg>

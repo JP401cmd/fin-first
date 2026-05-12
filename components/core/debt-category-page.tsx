@@ -34,6 +34,10 @@ const DebtPane = dynamic(
   () => import('@/components/app/core/debts/debt-pane').then((m) => ({ default: m.DebtPane })),
   { ssr: false },
 )
+const DebtValuationModal = dynamic(
+  () => import('@/components/app/core/debts/debt-valuation-modal').then((m) => ({ default: m.ValuationModal })),
+  { ssr: false },
+)
 import type { Valuation } from '@/components/app/core/debts/debt-types'
 import type { Asset } from '@/lib/asset-data'
 import {
@@ -154,10 +158,12 @@ export function DebtCategoryPage({
   )
 
   const setSelectedDebtId = useCallback(
-    (id: string | null) => {
+    (id: string | null, editMode = false) => {
       const params = new URLSearchParams(searchParams.toString())
+      params.delete('edit')
       if (id) {
         params.set('debt', id)
+        if (editMode) params.set('edit', '1')
       } else {
         params.delete('debt')
       }
@@ -322,6 +328,26 @@ export function DebtCategoryPage({
     setSelectedDebtId(debtId)
   }, [setSelectedDebtId])
 
+  // Direct revaluation-target — gezet door de "Saldo bijwerken"-knop op een
+  // kaart. Opent uitsluitend de ValuationModal (sheet), zonder eerst de
+  // detail-pane.
+  const [revalueDebt, setRevalueDebt] = useState<Debt | null>(null)
+
+  // Snelle acties vanuit de kaart-actie-rij. Bewerken opent de detail-pane
+  // direct in edit-mode; Saldo bijwerken opent ALLEEN de ValuationModal als
+  // sibling-sheet, zonder de pane ertussen.
+  const handleDebtEdit = useCallback(
+    (debtId: string) => setSelectedDebtId(debtId, true),
+    [setSelectedDebtId],
+  )
+  const handleDebtRevalue = useCallback(
+    (debtId: string) => {
+      const debt = debts.find((d) => d.id === debtId)
+      if (debt) setRevalueDebt(debt)
+    },
+    [debts],
+  )
+
   return (
     <div className="mx-auto max-w-6xl">
       <DebtCategoryHero type={type} total={total} count={count} />
@@ -349,6 +375,8 @@ export function DebtCategoryPage({
                 connectionsByDebtId={initialConnectionsByDebtId}
                 sparklinesByDebtId={initialDebtSparklines}
                 onItemClick={openDebtDetail}
+                onEditClick={handleDebtEdit}
+                onRevalueClick={handleDebtRevalue}
                 onAddClick={() => setQuickAddOpen(true)}
               />
 
@@ -396,6 +424,25 @@ export function DebtCategoryPage({
           allDebts={debts}
           onClose={() => setSelectedDebtId(null)}
           onChanged={() => router.refresh()}
+        />
+      )}
+
+      {/* Direct saldo-bijwerken — geopend door de "Saldo bijwerken"-knop op
+          een kaart. Sibling sheet (driewegregel kind="sheet") die de detail-
+          pane bewust overslaat zodat één klik direct in de invoer-modal landt. */}
+      {revalueDebt && (
+        <DebtValuationModal
+          entityId={revalueDebt.id}
+          entityType="debt"
+          entityName={revalueDebt.name}
+          entitySubtype={revalueDebt.debt_type}
+          netWorthInclusionPct={revalueDebt.net_worth_inclusion_pct ?? 100}
+          currentValue={Number(revalueDebt.current_balance)}
+          onClose={() => setRevalueDebt(null)}
+          onSaved={() => {
+            setRevalueDebt(null)
+            router.refresh()
+          }}
         />
       )}
     </div>
@@ -513,6 +560,8 @@ interface DebtItemsTabProps {
   connectionsByDebtId?: Record<string, AssetConnectionSummary>
   sparklinesByDebtId?: Record<string, number[]>
   onItemClick: (debtId: string) => void
+  onEditClick: (debtId: string) => void
+  onRevalueClick: (debtId: string) => void
   onAddClick: () => void
 }
 
@@ -523,6 +572,8 @@ function DebtItemsTab({
   connectionsByDebtId,
   sparklinesByDebtId,
   onItemClick,
+  onEditClick,
+  onRevalueClick,
   onAddClick,
 }: DebtItemsTabProps) {
   if (debts.length === 0) {
@@ -539,6 +590,8 @@ function DebtItemsTab({
           connection={connectionsByDebtId?.[debt.id]}
           sparklineValues={sparklinesByDebtId?.[debt.id]}
           onClick={onItemClick}
+          onEditClick={onEditClick}
+          onRevalueClick={onRevalueClick}
           staggerIndex={idx}
         />
       ))}

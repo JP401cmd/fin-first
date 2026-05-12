@@ -8,6 +8,7 @@ import {
   GOAL_DEFAULT_SPEECH,
   GOAL_SPEECH_TEXT,
 } from '@/lib/goals/catalog'
+import { getGoalIcon } from '@/lib/goals/icons'
 import type { GoalSlug } from '@/lib/goals/types'
 
 // ── Props ──────────────────────────────────────────────────────
@@ -99,21 +100,26 @@ export function OnboardingGoal({
               }`}
             >
               <div className="flex items-start gap-3">
-                {/* Emoji icon */}
-                <div
-                  className={`flex shrink-0 items-center justify-center rounded-lg transition-colors ${
-                    isPrimary ? 'h-14 w-14 text-2xl' : 'h-10 w-10 text-xl'
-                  } ${
-                    isSelected
-                      ? 'bg-wil-100'
-                      : isPrimary
-                        ? 'bg-wil-100/60 group-hover:bg-wil-100'
-                        : 'bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]'
-                  }`}
-                  aria-hidden="true"
-                >
-                  {goal.emoji}
-                </div>
+                {/* Krant-monoline icoon — vervangt de OS-afhankelijke emoji.
+                    Kleur schakelt tussen --ink-3 (neutraal) en wil-700
+                    (selected/primary) zodat het visueel meeleeft met de
+                    tile-state zonder een grijs achtergrondvakje nodig. */}
+                {(() => {
+                  const Icon = getGoalIcon(goal.slug)
+                  return (
+                    <Icon
+                      aria-hidden
+                      className={`shrink-0 mt-0.5 transition-colors ${
+                        isPrimary ? 'h-7 w-7' : 'h-5 w-5'
+                      } ${
+                        isSelected || isPrimary
+                          ? 'text-wil-700'
+                          : 'text-[var(--ink-3)] group-hover:text-[var(--ink-2)]'
+                      }`}
+                      strokeWidth={1.75}
+                    />
+                  )
+                })()}
 
                 {/* Text content */}
                 <div className="min-w-0 flex-1">

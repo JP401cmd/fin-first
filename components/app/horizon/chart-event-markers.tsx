@@ -55,6 +55,7 @@ export function ChartEventMarkers({
   visibleMinAge,
   visibleMaxAge,
   onEventClick,
+  onEventHover,
 }: {
   events: ChartEventOverlay[]
   xScale: (age: number) => number
@@ -64,8 +65,17 @@ export function ChartEventMarkers({
   visibleMinAge: number
   visibleMaxAge: number
   onEventClick?: (id: string, kind: ChartEventKind, sourceId?: string) => void
+  /**
+   * Wanneer gezet wordt de in-SVG floating tooltip vervangen door een
+   * callback — de host-chart toont event-info zelf in een externe strip
+   * (boven de chart), zodat de tooltip de marker niet overlapt en het
+   * klikgebied vrij blijft. Geeft de volledige overlay door zodat de host
+   * label/detail/kleur/icoon kan renderen.
+   */
+  onEventHover?: (event: ChartEventOverlay | null) => void
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const showInlineTooltip = !onEventHover
 
   const filtered = events.filter(e => e.age >= visibleMinAge && e.age <= visibleMaxAge)
   if (filtered.length === 0) return null
@@ -96,8 +106,14 @@ export function ChartEventMarkers({
         return (
           <g
             key={p.id}
-            onMouseEnter={() => setHoveredId(p.id)}
-            onMouseLeave={() => setHoveredId(null)}
+            onMouseEnter={() => {
+              setHoveredId(p.id)
+              onEventHover?.(p)
+            }}
+            onMouseLeave={() => {
+              setHoveredId(null)
+              onEventHover?.(null)
+            }}
             /*
               stopPropagation op pointerDown is **kritiek**: de host-chart
               wordt typisch gewikkeld in een ZoomableChartContainer die
@@ -180,8 +196,10 @@ export function ChartEventMarkers({
               </g>
             )}
 
-            {/* Hover-tooltip — paper-card boven of onder de marker. Volgt EventsTimeline-stijl. */}
-            {isHovered && (() => {
+            {/* Hover-tooltip — paper-card boven of onder de marker. Volgt EventsTimeline-stijl.
+                Alleen actief als de host geen `onEventHover` callback aanlevert (legacy/standalone-modus).
+                In de bar-chart wordt de info in een vaste strip boven de chart getoond. */}
+            {isHovered && showInlineTooltip && (() => {
               const tooltipW = 168
               const tooltipH = p.detail ? 30 : 18
               const tx = Math.max(2, cx - tooltipW / 2)

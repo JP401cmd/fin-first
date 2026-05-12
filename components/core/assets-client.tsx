@@ -146,6 +146,9 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const [showForm, setShowForm] = useState(false)
   const [newAssetType, setNewAssetType] = useState<AssetType | null>(null)
   const [editAsset, setEditAsset] = useState<Asset | null>(null)
+  // Direct revaluation-target — gezet door de "Herwaarderen"-knop op een kaart.
+  // Opent uitsluitend de ValuationModal (sheet), zonder eerst de detail-pane.
+  const [revalueAsset, setRevalueAsset] = useState<Asset | null>(null)
   // URL-driven pane-state: `?asset=<id>` opent de slide-in pane voor die
   // asset. Consistent met `/core/assets/[type]` (asset-category-page.tsx)
   // en met deeplink-conventie uit `OVERLAY_QUERY_KEYS`.
@@ -375,13 +378,16 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
   const projectedGrowth = futureValue - totalValue
 
   // URL-state setter — pane-open/-close wisselt `?asset=<id>` via shallow
-  // route-replace. Consistent met asset-category-page.tsx zodat deeplinks
-  // en browser-back symmetrisch werken.
+  // route-replace. Optionele `editMode` zet de extra key `edit=1` zodat
+  // de bewerk-knop op de kaart één klik direct in edit-mode landt. Bij
+  // sluiten (`id === null`) worden alle keys gestript.
   const setSelectedAssetId = useCallback(
-    (id: string | null) => {
+    (id: string | null, editMode = false) => {
       const params = new URLSearchParams(searchParams.toString())
+      params.delete('edit')
       if (id) {
         params.set('asset', id)
+        if (editMode) params.set('edit', '1')
       } else {
         params.delete('asset')
       }
@@ -432,6 +438,16 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
     }
     setSelectedAssetId(asset.id)
   }
+
+  // Snelle acties vanuit de kaart-actie-rij. Bewerken opent de detail-pane
+  // in edit-mode op de huidige pagina (geen cash-deeplink — de gebruiker
+  // wil bewerken, niet de Budgetteren-app openen). Herwaarderen opent
+  // ALLEEN de ValuationModal als sibling-sheet, zonder de pane.
+  const handleAssetEdit = useCallback(
+    (asset: Asset) => setSelectedAssetId(asset.id, true),
+    [setSelectedAssetId],
+  )
+  const handleAssetRevalue = useCallback((asset: Asset) => setRevalueAsset(asset), [])
 
   if (loading) {
     return (
@@ -689,6 +705,8 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
                     connection={connectionsByAssetId[asset.id]}
                     sparklineValues={assetSparklines[asset.id]}
                     onClick={handleAssetClick}
+                    onEditClick={handleAssetEdit}
+                    onRevalueClick={handleAssetRevalue}
                     staggerIndex={idx}
                   />
                 ))}
@@ -720,6 +738,27 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           router.refresh()
         }}
       />
+
+      {/* Direct herwaardering — geopend door de "Herwaarderen"-knop op een
+          kaart. Sibling sheet (driewegregel kind="sheet"): single-form,
+          retour-context behouden. Slaat de pane bewust over zodat één klik
+          direct in de invoer-modal landt. */}
+      {revalueAsset && (
+        <ValuationModal
+          entityId={revalueAsset.id}
+          entityType="asset"
+          entityName={revalueAsset.name}
+          entitySubtype={revalueAsset.asset_type}
+          netWorthInclusionPct={revalueAsset.net_worth_inclusion_pct ?? 100}
+          currentValue={Number(revalueAsset.current_value)}
+          onClose={() => setRevalueAsset(null)}
+          onSaved={() => {
+            setRevalueAsset(null)
+            loadAssets()
+            router.refresh()
+          }}
+        />
+      )}
 
 
       {/* New asset form */}

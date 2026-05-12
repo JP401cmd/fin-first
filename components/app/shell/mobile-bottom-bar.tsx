@@ -198,7 +198,7 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
     return (
       <>
         <MobileAppStrip />
-        <nav className={wrapperClasses}>
+        <nav className={wrapperClasses} data-mobile-bottom-nav="true">
           <BottomNavTabs />
         </nav>
       </>

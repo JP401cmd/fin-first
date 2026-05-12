@@ -9,11 +9,6 @@
 // Beide voorwaarden zijn nodig: zonder module zou een teaser-link verwarren
 // (de app-tab toont dan alleen een uitleg-strip), zonder items is de pagina
 // een lege empty-state — dat hoort niet als first-class navigatie-doel.
-//
-// Uitzondering: `crypto` heeft geen `isItemTracked`-veld op asset-niveau
-// (de Holdings-app leest `crypto_holdings` per asset in plaats van een
-// boolean). Daarom telt `crypto` mee zodra er één crypto-asset bestaat —
-// hetzelfde gedrag als de bestaande category-card-app-strip.
 
 import type { AssetType, Asset } from '@/lib/asset-data'
 import { ASSET_TYPE_LABELS, ASSET_TYPE_ICONS } from '@/lib/asset-data'
@@ -80,8 +75,7 @@ function isAssetTracked(
     case 'real_estate':
       return asset.has_rental_tracking === true
     case 'crypto':
-      // Geen tracking-vlag op crypto-assets; aanwezigheid telt.
-      return true
+      return asset.has_holdings_tracking === true
     default:
       return false
   }
@@ -108,8 +102,6 @@ function isDebtTracked(debt: CategoryNavDebtInput): boolean {
  * Een entry levert geen link wanneer:
  * - de bijbehorende module niet in `activeModules` zit; OF
  * - er geen items in die categorie zijn die door de app gevolgd worden.
- *   `isItemTracked` valt terug op "asset bestaat" voor categorieën zonder
- *   tracking-vlag (crypto), zodat de gebruiker direct naar de app-tab kan.
  */
 export function buildCategoryAppLinks(
   assets: CategoryNavAssetInput[],
@@ -129,8 +121,7 @@ export function buildCategoryAppLinks(
       const itemsInCategory = assets.filter((a) => a.asset_type === type)
       if (itemsInCategory.length === 0) continue
 
-      // Tel items die actief gevolgd worden door deze app. Voor categorieën
-      // zonder tracking-vlag (crypto) telt de aanwezigheid van het item zelf.
+      // Tel items die actief gevolgd worden door deze app.
       const tracked = itemsInCategory.filter((a) => isAssetTracked(type, a))
       if (tracked.length === 0) continue
 

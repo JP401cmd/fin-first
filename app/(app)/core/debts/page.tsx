@@ -28,6 +28,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 // browser-back symmetrisch werken met de categorie-pagina's.
 import type { Valuation } from '@/components/app/core/debts/debt-types'
 import { DebtPane } from '@/components/app/core/debts/debt-pane'
+import { ValuationModal as DebtValuationModal } from '@/components/app/core/debts/debt-valuation-modal'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -216,12 +217,15 @@ export default function DebtsPage() {
 
   // URL-state setter — opent/sluit de pane via shallow route-replace zodat
   // deeplinks deelbaar zijn en browser-back de pane sluit zonder van pagina
-  // te wisselen. Symmetrisch met asset-category-page.tsx.
+  // te wisselen. Optionele `editMode` zet `edit=1` voor één-klik bewerken
+  // vanaf de kaart. Bij sluiten (`id === null`) worden alle keys gestript.
   const setSelectedDebtId = useCallback(
-    (id: string | null) => {
+    (id: string | null, editMode = false) => {
       const params = new URLSearchParams(searchParams.toString())
+      params.delete('edit')
       if (id) {
         params.set('debt', id)
+        if (editMode) params.set('edit', '1')
       } else {
         params.delete('debt')
       }
@@ -288,6 +292,26 @@ export default function DebtsPage() {
   function openDebtModal(debt: Debt) {
     setSelectedDebtId(debt.id)
   }
+
+  // Direct revaluation-target — gezet door de "Saldo bijwerken"-knop op een
+  // kaart. Opent uitsluitend de ValuationModal (sheet), zonder eerst de
+  // detail-pane.
+  const [revalueDebt, setRevalueDebt] = useState<Debt | null>(null)
+
+  // Snelle acties vanuit de kaart-actie-rij. Bewerken opent de detail-pane
+  // direct in edit-mode; Saldo bijwerken opent ALLEEN de ValuationModal als
+  // sibling-sheet, zonder de pane ertussen.
+  const handleDebtEdit = useCallback(
+    (debtId: string) => setSelectedDebtId(debtId, true),
+    [setSelectedDebtId],
+  )
+  const handleDebtRevalue = useCallback(
+    (debtId: string) => {
+      const debt = debts.find((d) => d.id === debtId)
+      if (debt) setRevalueDebt(debt)
+    },
+    [debts],
+  )
 
   // ── Afgeleide waarden ──────────────────────────────────────
 
@@ -531,6 +555,8 @@ export default function DebtsPage() {
                     kpiPair={kpiByDebtId.get(debt.id)}
                     sparklineValues={debtSparklines[debt.id]}
                     onClick={() => openDebtModal(debt)}
+                    onEditClick={handleDebtEdit}
+                    onRevalueClick={handleDebtRevalue}
                     staggerIndex={idx}
                   />
                 ))}
@@ -565,6 +591,28 @@ export default function DebtsPage() {
           router.refresh()
         }}
       />
+
+      {/* Direct saldo-bijwerken — geopend door de "Saldo bijwerken"-knop op
+          een kaart. Sibling sheet (driewegregel kind="sheet"): single-form,
+          retour-context behouden. Slaat de detail-pane bewust over zodat
+          één klik direct in de invoer-modal landt. */}
+      {revalueDebt && (
+        <DebtValuationModal
+          entityId={revalueDebt.id}
+          entityType="debt"
+          entityName={revalueDebt.name}
+          entitySubtype={revalueDebt.debt_type}
+          netWorthInclusionPct={revalueDebt.net_worth_inclusion_pct ?? 100}
+          currentValue={Number(revalueDebt.current_balance)}
+          onClose={() => setRevalueDebt(null)}
+          onSaved={() => {
+            setRevalueDebt(null)
+            loadDebts()
+            if (selectedDebt) loadValuations(selectedDebt.id)
+            router.refresh()
+          }}
+        />
+      )}
 
       <QuickAddWizard
         open={quickAddOpen}

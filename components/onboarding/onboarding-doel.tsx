@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { GOAL_CATALOG_ENTRIES } from '@/lib/goals/catalog'
+import { getGoalIcon } from '@/lib/goals/icons'
 import type { GoalSlug } from '@/lib/goals/types'
 
 /**
@@ -141,14 +142,24 @@ export function OnboardingDoel({
               )}
 
               <div className="flex items-start gap-3">
-                {/* Emoji als icoon — bewust, niet lucide. Catalog levert
-                    emoji die ook in andere goal-UI's wordt gebruikt. */}
-                <span
-                  aria-hidden
-                  className="flex h-10 w-10 shrink-0 items-center justify-center text-xl bg-[var(--subtle)]"
-                >
-                  {goal.emoji}
-                </span>
+                {/* Krant-monoline icoon — geen achtergrondvakje, kleur
+                    schakelt mee met selected-state via --module-active-700.
+                    Vervangt de OS-afhankelijke emoji die uit toon viel met
+                    de inkt-op-papier kicker-typografie. */}
+                {(() => {
+                  const Icon = getGoalIcon(goal.slug)
+                  return (
+                    <Icon
+                      aria-hidden
+                      className={`h-5 w-5 shrink-0 mt-0.5 transition-colors ${
+                        isSelected
+                          ? 'text-[var(--module-active-700)]'
+                          : 'text-[var(--ink-3)]'
+                      }`}
+                      strokeWidth={1.75}
+                    />
+                  )
+                })()}
 
                 <div className="min-w-0 flex-1">
                   <p

@@ -20,10 +20,12 @@ import {
   Heart,
   Building2,
   CircleDot,
+  Pencil,
 } from 'lucide-react'
 import { CardKpiStrip } from './card-kpi-strip'
 import { ConnectionIndicator } from './connection-indicator'
 import { CardTintOverlay } from './card-tint-overlay'
+import { VermogenCardActionButton } from './vermogen-card-action-button'
 import type { KpiPair } from '@/lib/asset-kpi'
 import type { AssetConnectionSummary } from '@/lib/connections-data'
 
@@ -72,6 +74,10 @@ interface VermogenDebtCardProps {
   sparklineValues?: number[]
   onClick: (debtId: string) => void
   staggerIndex?: number
+  /** Opent de detail-pane direct in edit-mode (URL: `?debt=<id>&edit=1`). */
+  onEditClick: (debtId: string) => void
+  /** Opent de detail-pane met de ValuationModal direct open (URL: `?debt=<id>&via=revalue`). */
+  onRevalueClick: (debtId: string) => void
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -93,6 +99,8 @@ export function VermogenDebtCard({
   sparklineValues,
   onClick,
   staggerIndex = 0,
+  onEditClick,
+  onRevalueClick,
 }: VermogenDebtCardProps) {
   const { flashClass } = useFlashChange(debt.current_balance)
   const Icon = DEBT_ICONS[debt.debt_type]
@@ -108,13 +116,9 @@ export function VermogenDebtCard({
   const subtitle = subtitleParts.join(' · ') // joined with middle dot
 
   return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onClick(debt.id) }}
-      className="card-editorial animate-fade-up relative w-full text-left"
-      style={
-        { '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties
-      }
+    <div
+      className="card-editorial animate-fade-up relative w-full"
+      style={{ '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties}
     >
       <CardTintOverlay variant="debt" sparklineValues={sparklineValues} />
 
@@ -124,7 +128,13 @@ export function VermogenDebtCard({
         style={{ backgroundColor: DEBT_ACCENT_COLOR }}
       />
 
-      <div className="relative z-10 flex items-center gap-3 p-3 sm:p-4">
+      {/* Hoofdregel — eigen <button>, opent de detail-pane in view-mode */}
+      <button
+        type="button"
+        onClick={() => onClick(debt.id)}
+        aria-label={`${debt.name} openen`}
+        className="relative z-10 flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-[var(--subtle)]/30 sm:p-4"
+      >
         {/* Left: icon + name + subtitle */}
         <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-red-100">
           <Icon className="h-4 w-4 text-red-600" />
@@ -172,28 +182,35 @@ export function VermogenDebtCard({
             </span>
           )}
         </div>
+      </button>
+
+      {/* Actie-rij — tussen hoofdregel en KPI-strip. Eigen interactieve regio
+          met aparte <button>s — geen nested buttons (a11y). Geen sync-pad:
+          schulden hebben in productie geen actieve API-koppelingen. */}
+      <div
+        role="group"
+        aria-label={`Acties voor ${debt.name}`}
+        className="relative z-10 flex items-center justify-end gap-2 border-t border-[var(--border-md)]/40 px-3 py-2 sm:px-4"
+      >
+        <VermogenCardActionButton
+          icon={RefreshCw}
+          label="Saldo bijwerken"
+          onClick={() => onRevalueClick(debt.id)}
+          ariaLabel={`Saldo van ${debt.name} bijwerken`}
+        />
+        <VermogenCardActionButton
+          icon={Pencil}
+          label="Bewerken"
+          onClick={() => onEditClick(debt.id)}
+          ariaLabel={`${debt.name} bewerken`}
+        />
       </div>
 
       {kpiPair && (kpiPair.primary || kpiPair.secondary) ? (
         <div className="relative z-10">
           <CardKpiStrip pair={kpiPair} variant="item" />
         </div>
-      ) : (
-        <>
-          {/* Alignment-placeholder: matcht hoogte van <CardKpiStrip variant="item">
-              zodat kaarten zonder KPI's op dezelfde y-as afsluiten in het grid. */}
-          <div
-            className="relative z-10 mx-3 h-px bg-[var(--border-md)]/40 sm:mx-4"
-            aria-hidden="true"
-          />
-          <div
-            className="relative z-10 flex items-center px-3 py-2 text-[11px] sm:px-4"
-            aria-hidden="true"
-          >
-            &nbsp;
-          </div>
-        </>
-      )}
-    </button>
+      ) : null}
+    </div>
   )
 }

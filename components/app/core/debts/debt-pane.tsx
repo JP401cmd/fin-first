@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Trash2 } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 import { ShellOverlay, type PaneAction } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
@@ -63,6 +64,7 @@ export function DebtPane({
   onClose,
   onChanged,
 }: DebtPaneProps) {
+  const searchParams = useSearchParams()
   const { addToast } = useToast()
   const [mode, setMode] = useState<DebtPaneMode>('view')
   const [revaluationOpen, setRevaluationOpen] = useState(false)
@@ -70,13 +72,18 @@ export function DebtPane({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Reset mode wanneer de geselecteerde debt wisselt — open altijd in
-  // view-mode bij een nieuwe selectie. We reageren alleen op id-wisseling,
-  // niet op object-identity (na refresh blijft mode behouden).
+  // Reset mode wanneer de geselecteerde debt wisselt. We lezen de
+  // URL-modifier-key `edit` zodat de bewerk-knop op `<VermogenDebtCard>`
+  // direct in edit-mode (`?debt=<id>&edit=1`) kan landen. Saldo bijwerken
+  // (herwaardering) loopt NIET via deze pane — die actie opent direct de
+  // ValuationModal in de caller-pagina.
   useEffect(() => {
-    if (debt) setMode('view')
-    setEditActions(null)
+    if (debt) {
+      const wantsEdit = searchParams.get('edit') === '1'
+      setMode(wantsEdit ? 'edit' : 'view')
+    }
     setRevaluationOpen(false)
+    setEditActions(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debt?.id])
 

@@ -1,5 +1,7 @@
 'use client'
 
+import { useCallback, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import {
@@ -22,14 +24,21 @@ import {
   Shield,
   HandCoins,
   Briefcase,
+  RefreshCw,
+  Pencil,
   type LucideIcon,
 } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { useToast } from '@/components/app/toast-provider'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { triggerAssetSync } from '@/lib/integrations/trigger-sync'
 import { findDeepenings } from './category-deepening-registry'
 import { AssetAppChip } from './asset-app-chip'
 import { CardKpiStrip } from './card-kpi-strip'
 import { ConnectionIndicator } from './connection-indicator'
 import { CardTintOverlay } from './card-tint-overlay'
+import { VermogenCardActionButton } from './vermogen-card-action-button'
 import type { KpiPair } from '@/lib/asset-kpi'
 import type { AssetConnectionSummary } from '@/lib/connections-data'
 
@@ -82,6 +91,10 @@ interface VermogenAssetCardProps {
    */
   sparklineValues?: number[]
   staggerIndex?: number
+  /** Opent de detail-pane direct in edit-mode (URL: `?asset=<id>&edit=1`). */
+  onEditClick: (asset: Asset) => void
+  /** Opent de detail-pane met de ValuationModal direct open (URL: `?asset=<id>&via=revalue`). */
+  onRevalueClick: (asset: Asset) => void
 }
 
 // ── Component ───────────────────────────────────────────────
@@ -93,7 +106,12 @@ export function VermogenAssetCard({
   connection,
   sparklineValues,
   staggerIndex = 0,
+  onEditClick,
+  onRevalueClick,
 }: VermogenAssetCardProps) {
+  const router = useRouter()
+  const { addToast } = useToast()
+  const { masked } = useMaskedAmounts()
   const { flashClass } = useFlashChange(asset.current_value)
   const { activeModules } = useFeatureAccess()
   const Icon = ASSET_ICONS[asset.asset_type]
@@ -115,21 +133,55 @@ export function VermogenAssetCard({
     : false
   const tracked = displayDeepening?.isItemTracked?.(asset) ?? false
 
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onClick(asset) }}
-      className="card-editorial animate-fade-up relative w-full text-left"
-      style={
-        { '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties
+  // Sync-state — actief alleen wanneer er een live-koppeling is.
+  const hasActiveConnection = !!(connection?.exchange?.id || connection?.wallet?.id)
+  const [syncing, setSyncing] = useState(false)
+
+  const handleSync = useCallback(async () => {
+    if (!connection || syncing) return
+    setSyncing(true)
+    try {
+      const result = await triggerAssetSync(connection)
+      if (!result.ok) {
+        addToast({
+          type: 'error',
+          title: 'Sync-fout',
+          message: result.error ?? 'Synchronisatie mislukt.',
+        })
+        return
       }
+      const totalEur =
+        typeof result.totalEur === 'number'
+          ? formatMaskedCurrency(result.totalEur, masked)
+          : null
+      addToast({
+        type: 'success',
+        title: 'Bijgewerkt',
+        message: totalEur ? `Saldo opgehaald — ${totalEur}.` : `${asset.name} is bijgewerkt.`,
+      })
+      router.refresh()
+    } finally {
+      setSyncing(false)
+    }
+  }, [connection, syncing, addToast, masked, asset.name, router])
+
+  return (
+    <div
+      className="card-editorial animate-fade-up relative w-full"
+      style={{ '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties}
     >
       <CardTintOverlay variant="asset" sparklineValues={sparklineValues} />
 
       {/* 3px top accent bar */}
       <div className="relative z-10 h-[3px] w-full" style={{ backgroundColor: accentColor }} />
 
-      <div className="relative z-10 flex items-center gap-3 p-3 sm:p-4">
+      {/* Hoofdregel — eigen <button>, opent de detail-pane in view-mode */}
+      <button
+        type="button"
+        onClick={() => onClick(asset)}
+        aria-label={`${asset.name} openen`}
+        className="relative z-10 flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-[var(--subtle)]/30 sm:p-4"
+      >
         {/* Left: icon + name + institution */}
         <div
           className="flex h-7 w-7 shrink-0 items-center justify-center bg-[var(--subtle)]"
@@ -175,28 +227,44 @@ export function VermogenAssetCard({
             </span>
           </p>
         </div>
+      </button>
+
+      {/* Actie-rij — tussen hoofdregel en KPI-strip. Eigen interactieve regio
+          met aparte <button>s — geen nested buttons (a11y). */}
+      <div
+        role="group"
+        aria-label={`Acties voor ${asset.name}`}
+        className="relative z-10 flex items-center justify-end gap-2 border-t border-[var(--border-md)]/40 px-3 py-2 sm:px-4"
+      >
+        {hasActiveConnection ? (
+          <VermogenCardActionButton
+            icon={RefreshCw}
+            label="Synchroniseren"
+            onClick={handleSync}
+            spinning={syncing}
+            ariaLabel={`${asset.name} synchroniseren`}
+          />
+        ) : (
+          <VermogenCardActionButton
+            icon={RefreshCw}
+            label="Herwaarderen"
+            onClick={() => onRevalueClick(asset)}
+            ariaLabel={`${asset.name} herwaarderen`}
+          />
+        )}
+        <VermogenCardActionButton
+          icon={Pencil}
+          label="Bewerken"
+          onClick={() => onEditClick(asset)}
+          ariaLabel={`${asset.name} bewerken`}
+        />
       </div>
 
       {kpiPair && (kpiPair.primary || kpiPair.secondary) ? (
         <div className="relative z-10">
           <CardKpiStrip pair={kpiPair} variant="item" />
         </div>
-      ) : (
-        <>
-          {/* Alignment-placeholder: matcht hoogte van <CardKpiStrip variant="item">
-              zodat kaarten zonder KPI's op dezelfde y-as afsluiten in het grid. */}
-          <div
-            className="relative z-10 mx-3 h-px bg-[var(--border-md)]/40 sm:mx-4"
-            aria-hidden="true"
-          />
-          <div
-            className="relative z-10 flex items-center px-3 py-2 text-[11px] sm:px-4"
-            aria-hidden="true"
-          >
-            &nbsp;
-          </div>
-        </>
-      )}
-    </button>
+      ) : null}
+    </div>
   )
 }

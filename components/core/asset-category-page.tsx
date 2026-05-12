@@ -49,6 +49,10 @@ const AssetPane = dynamic(
   () => import('@/components/app/core/assets/asset-pane').then((m) => ({ default: m.AssetPane })),
   { ssr: false },
 )
+const AssetValuationModal = dynamic(
+  () => import('@/components/core/assets-client').then((m) => ({ default: m.ValuationModal })),
+  { ssr: false },
+)
 import {
   findDeepenings,
   getDeepeningComponent,
@@ -308,10 +312,12 @@ export function AssetCategoryPage({
   )
 
   const setSelectedAssetId = useCallback(
-    (id: string | null) => {
+    (id: string | null, editMode = false) => {
       const params = new URLSearchParams(searchParams.toString())
+      params.delete('edit')
       if (id) {
         params.set('asset', id)
+        if (editMode) params.set('edit', '1')
       } else {
         params.delete('asset')
       }
@@ -487,6 +493,21 @@ export function AssetCategoryPage({
     [bankAccountByAssetId, router, setSelectedAssetId],
   )
 
+  // Direct revaluation-target — gezet door de "Herwaarderen"-knop op een
+  // kaart. Opent uitsluitend de ValuationModal (sheet), zonder eerst de
+  // detail-pane.
+  const [revalueAsset, setRevalueAsset] = useState<Asset | null>(null)
+
+  // Snelle acties vanuit de kaart-actie-rij. Bewerken opent de detail-pane
+  // direct in edit-mode (we slaan het cash-detail-routing-pad over want de
+  // gebruiker wil snel bewerken, niet de volledige transactie-pagina).
+  // Herwaarderen opent ALLEEN de ValuationModal als sibling-sheet.
+  const handleAssetEdit = useCallback(
+    (asset: Asset) => setSelectedAssetId(asset.id, true),
+    [setSelectedAssetId],
+  )
+  const handleAssetRevalue = useCallback((asset: Asset) => setRevalueAsset(asset), [])
+
   return (
     <div className="mx-auto max-w-6xl">
       <CategoryHero type={type} total={total} count={count} />
@@ -523,6 +544,8 @@ export function AssetCategoryPage({
                 connectionsByAssetId={initialConnectionsByAssetId}
                 sparklinesByAssetId={initialAssetSparklines}
                 onItemClick={openAssetDetail}
+                onEditClick={handleAssetEdit}
+                onRevalueClick={handleAssetRevalue}
                 onAddClick={() => setQuickAddOpen(true)}
               />
 
@@ -614,6 +637,25 @@ export function AssetCategoryPage({
           asset={selectedAsset}
           onClose={() => setSelectedAssetId(null)}
           onChanged={() => router.refresh()}
+        />
+      )}
+
+      {/* Direct herwaardering — geopend door de "Herwaarderen"-knop op een
+          kaart. Sibling sheet (driewegregel kind="sheet") die de detail-pane
+          bewust overslaat zodat één klik direct in de invoer-modal landt. */}
+      {revalueAsset && (
+        <AssetValuationModal
+          entityId={revalueAsset.id}
+          entityType="asset"
+          entityName={revalueAsset.name}
+          entitySubtype={revalueAsset.asset_type}
+          netWorthInclusionPct={revalueAsset.net_worth_inclusion_pct ?? 100}
+          currentValue={Number(revalueAsset.current_value)}
+          onClose={() => setRevalueAsset(null)}
+          onSaved={() => {
+            setRevalueAsset(null)
+            router.refresh()
+          }}
         />
       )}
     </div>
@@ -742,6 +784,8 @@ interface ItemsTabProps {
   connectionsByAssetId?: Record<string, AssetConnectionSummary>
   sparklinesByAssetId?: Record<string, number[]>
   onItemClick: (asset: Asset) => void
+  onEditClick: (asset: Asset) => void
+  onRevalueClick: (asset: Asset) => void
   onAddClick: () => void
 }
 
@@ -759,6 +803,8 @@ function ItemsTab({
   connectionsByAssetId,
   sparklinesByAssetId,
   onItemClick,
+  onEditClick,
+  onRevalueClick,
   onAddClick,
 }: ItemsTabProps) {
   if (assets.length === 0) {
@@ -775,6 +821,8 @@ function ItemsTab({
           connection={connectionsByAssetId?.[asset.id]}
           sparklineValues={sparklinesByAssetId?.[asset.id]}
           onClick={onItemClick}
+          onEditClick={onEditClick}
+          onRevalueClick={onRevalueClick}
           staggerIndex={idx}
         />
       ))}

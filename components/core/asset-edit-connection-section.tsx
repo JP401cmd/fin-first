@@ -24,6 +24,7 @@ import { AddWalletModal } from '@/components/connections/add-wallet-modal'
 import { useToast } from '@/components/app/toast-provider'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { triggerAssetSync } from '@/lib/integrations/trigger-sync'
 import {
   computeFreshness,
   type AssetConnectionSummary,
@@ -171,15 +172,9 @@ export function AssetEditConnectionSection({
     if (syncing || !connection) return
     setSyncing(true)
     try {
-      const isExchange = !!connection.exchange
-      const id = (connection.exchange?.id ?? connection.wallet?.id) as string
-      const endpoint = isExchange
-        ? `/api/integrations/exchanges/${id}/sync`
-        : `/api/integrations/wallets/${id}/sync`
-      const res = await fetch(endpoint, { method: 'POST' })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || json?.status === 'error') {
-        const message = typeof json?.error === 'string' ? json.error : 'Synchronisatie mislukt.'
+      const result = await triggerAssetSync(connection)
+      if (!result.ok) {
+        const message = result.error ?? 'Synchronisatie mislukt.'
         addToast({ type: 'error', title: 'Sync-fout', message })
         // Stamp local row so badge flips red zonder volledige refresh.
         setConnection((prev) => {
@@ -190,8 +185,8 @@ export function AssetEditConnectionSection({
         })
         return
       }
-      const lastSyncedAt = typeof json?.lastSyncedAt === 'string' ? json.lastSyncedAt : new Date().toISOString()
-      const totalEur = typeof json?.totalEur === 'number' ? formatMaskedCurrency(json.totalEur, masked) : null
+      const lastSyncedAt = result.lastSyncedAt ?? new Date().toISOString()
+      const totalEur = typeof result.totalEur === 'number' ? formatMaskedCurrency(result.totalEur, masked) : null
       addToast({
         type: 'success',
         title: 'Bijgewerkt',
@@ -211,9 +206,9 @@ export function AssetEditConnectionSection({
             wallet: {
               ...prev.wallet,
               lastSyncedAt,
-              lastBalanceEur: typeof json?.totalEur === 'number' ? json.totalEur : prev.wallet.lastBalanceEur,
+              lastBalanceEur: typeof result.totalEur === 'number' ? result.totalEur : prev.wallet.lastBalanceEur,
               lastBalanceNative:
-                typeof json?.nativeBalance === 'number' ? json.nativeBalance : prev.wallet.lastBalanceNative,
+                typeof result.nativeBalance === 'number' ? result.nativeBalance : prev.wallet.lastBalanceNative,
               lastSyncError: null,
             },
           }
@@ -221,12 +216,10 @@ export function AssetEditConnectionSection({
         return prev
       })
       refresh()
-    } catch {
-      addToast({ type: 'error', title: 'Netwerkfout', message: 'Sync kon niet worden uitgevoerd. Probeer opnieuw.' })
     } finally {
       setSyncing(false)
     }
-  }, [addToast, connection, refresh, syncing])
+  }, [addToast, connection, masked, refresh, syncing])
 
   // ── Disconnect-flow ──────────────────────────────────────
 

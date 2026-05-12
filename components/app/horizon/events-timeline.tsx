@@ -21,6 +21,7 @@ export function EventsTimeline({
   scenarioColor,
   onViewEvent,
   onEditEvent,
+  onClusterOpen,
 }: {
   events: LifeEvent[]
   currentAge: number
@@ -34,6 +35,8 @@ export function EventsTimeline({
   onViewEvent?: (eventId: string) => void
   /** Klik op bewerk-knopje in tooltip → opent edit-pane direct */
   onEditEvent?: (eventId: string) => void
+  /** Klik op een geclusterde +N marker → opent een sheet met de events in dat cluster. */
+  onClusterOpen?: (events: LifeEvent[], centerAge: number) => void
 }) {
   const { masked } = useMaskedAmounts()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -129,26 +132,73 @@ export function EventsTimeline({
     return lines
   }
 
-  // Prevent overlapping labels: assign y-offset rows for close events
-  const ROW_HEIGHT = 18
-  const MIN_X_GAP = 40
-  const rows: number[] = []
+  // Zoom-aware event-placement.
+  //
+  // Drie regimes, afgehankelijk van zoom-niveau:
+  //   1. Uitgezoomd (zoomLevel < SPLIT_ZOOM_THRESHOLD): pixel-pack clustering
+  //      — events binnen CLUSTER_THRESHOLD_PX worden gebundeld als +N marker.
+  //   2. Ingezoomd (zoomLevel ≥ SPLIT_ZOOM_THRESHOLD): elk event z'n eigen
+  //      slot, met een minimum pixel-gap-fan-out. Events op exact dezelfde
+  //      leeftijd worden zo automatisch horizontaal naast elkaar gezet — bij
+  //      flink inzoomen worden ze allemaal individueel zichtbaar.
+  //
+  // De zoomLevel-detectie kijkt naar visibleSpan vs. fullSpan (currentAge →
+  // endAge), zodat het regime mee-schaalt met de useChartZoom-state.
+  const CLUSTER_THRESHOLD_PX = 28 // icon-diameter (16) + minimale gap (12)
+  const SPLIT_ZOOM_THRESHOLD = 2  // ≥ 2× zoom → elk event z'n eigen slot
+  const SPLIT_MIN_GAP_PX = 18     // minimum horizontale afstand tussen markers in split-modus
   const xPositions = visibleEvents.map(ev => xScale(ev.target_age!))
 
-  for (let i = 0; i < visibleEvents.length; i++) {
-    let row = 0
-    // Check previous events for x-overlap at the same row
-    for (let j = 0; j < i; j++) {
-      if (rows[j] === row && Math.abs(xPositions[i] - xPositions[j]) < MIN_X_GAP) {
-        row++
-        j = -1 // restart check with new row
+  const fullSpan = Math.max(1, endAge - currentAge)
+  const visibleSpan = Math.max(0.001, rangeMax - rangeMin)
+  const zoomLevel = fullSpan / visibleSpan
+  const isSplitMode = zoomLevel >= SPLIT_ZOOM_THRESHOLD
+
+  type Slot = {
+    x: number              // (gemiddelde) pixel-x van events in dit slot
+    centerAge: number      // (gemiddelde) leeftijd voor sheet-titel
+    events: LifeEvent[]    // alle events in dit slot (1 = solo, ≥2 = cluster)
+    indices: number[]      // originele indices in visibleEvents
+  }
+  const slots: Slot[] = []
+
+  if (isSplitMode) {
+    // Split-modus: één slot per event, met minimum pixel-gap fan-out.
+    // Events op zelfde of bijna-zelfde leeftijd worden hierdoor zichtbaar
+    // naast elkaar geplaatst i.p.v. te clusteren.
+    let lastX = -Infinity
+    for (let i = 0; i < visibleEvents.length; i++) {
+      const ev = visibleEvents[i]
+      const baseX = xPositions[i]
+      const adjustedX = Math.max(baseX, lastX + SPLIT_MIN_GAP_PX)
+      slots.push({
+        x: adjustedX,
+        centerAge: ev.target_age!,
+        events: [ev],
+        indices: [i],
+      })
+      lastX = adjustedX
+    }
+  } else {
+    // Cluster-modus: pixel-pack groepering met +N marker.
+    for (let i = 0; i < visibleEvents.length; i++) {
+      const ev = visibleEvents[i]
+      const x = xPositions[i]
+      const age = ev.target_age!
+      const last = slots[slots.length - 1]
+      if (last && x - last.x < CLUSTER_THRESHOLD_PX) {
+        const n = last.events.length
+        last.x = (last.x * n + x) / (n + 1)
+        last.centerAge = (last.centerAge * n + age) / (n + 1)
+        last.events.push(ev)
+        last.indices.push(i)
+      } else {
+        slots.push({ x, centerAge: age, events: [ev], indices: [i] })
       }
     }
-    rows.push(row)
   }
 
-  const maxRow = Math.max(0, ...rows)
-  const totalH = H + maxRow * ROW_HEIGHT
+  const totalH = H
 
   // Module-kleuren: Horizon voor positief/inkomen (toekomstige cashflow), Kern voor negatief/uitgaven
   const COLOR_INCOME = 'var(--color-horizon, #c4a06b)'
@@ -185,84 +235,237 @@ export function EventsTimeline({
           stroke="var(--border-ed)" strokeWidth={1}
         />
 
-        {/* Event markers */}
-        {visibleEvents.map((ev, i) => {
-          const age = ev.target_age!
-          const cx = xPositions[i]
-          const natural = isNaturalEvent(ev)
-          const color = natural
-            ? naturalColor(ev)
-            : (eventDirection(ev) === 'income' ? COLOR_INCOME : COLOR_EXPENSE)
-          const isHovered = hoveredId === ev.id
-          const row = rows[i]
-          const labelY = Y_LINE + 14 + row * ROW_HEIGHT
+        {/* Slot markers — solo of cluster */}
+        {slots.map((slot, slotIdx) => {
+          const isCluster = slot.events.length >= 2
+          const cx = slot.x
+          const labelY = Y_LINE + 14
+
+          if (!isCluster) {
+            // ── Solo-event rendering (zelfde gedrag als voorheen) ──
+            const ev = slot.events[0]
+            const age = ev.target_age!
+            const natural = isNaturalEvent(ev)
+            const color = natural
+              ? naturalColor(ev)
+              : (eventDirection(ev) === 'income' ? COLOR_INCOME : COLOR_EXPENSE)
+            const isHovered = hoveredId === ev.id
+
+            return (
+              <g
+                key={ev.id}
+                onMouseEnter={() => setHoveredId(ev.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                onClick={() => onViewEvent?.(ev.id)}
+                style={{ cursor: onViewEvent ? 'pointer' : 'default' }}
+                role={onViewEvent ? 'button' : undefined}
+                aria-label={onViewEvent ? `Bekijk ${ev.name}` : undefined}
+              >
+                <line
+                  x1={cx} x2={cx}
+                  y1={Y_LINE - 10} y2={Y_LINE + 2}
+                  stroke={color} strokeWidth={1.5} opacity={natural ? 0.45 : 0.6}
+                  strokeDasharray={natural ? '2 2' : undefined}
+                />
+                <circle
+                  cx={cx} cy={Y_LINE - 14}
+                  r={isHovered ? (natural ? 8 : 10) : (natural ? 6 : 8)}
+                  fill={natural ? 'var(--paper)' : color}
+                  opacity={natural ? 1 : (isHovered ? 0.25 : 0.15)}
+                  stroke={color}
+                  strokeWidth={natural ? 1.5 : 1}
+                  strokeDasharray={natural ? '3 1.5' : undefined}
+                  style={{ transition: 'r 150ms ease, opacity 150ms ease' }}
+                />
+                <foreignObject x={cx - 8} y={Y_LINE - 22} width={16} height={16}>
+                  <div className="flex h-4 w-4 items-center justify-center" style={{ color }}>
+                    {EVENT_ICONS[ev.icon] || EVENT_ICONS['Calendar']}
+                  </div>
+                </foreignObject>
+                <text
+                  x={cx} y={labelY}
+                  textAnchor="middle" fontSize={8} fontWeight={500}
+                  fill={color}
+                  fontFamily="var(--font-inter, sans-serif)"
+                >
+                  {ev.name.length > 10 ? ev.name.slice(0, 9) + '…' : ev.name}
+                </text>
+                <text
+                  x={cx} y={labelY + 10}
+                  textAnchor="middle" fontSize={7}
+                  fill="var(--ink-4)"
+                  fontFamily="var(--font-dm-mono, monospace)"
+                >
+                  {age}j
+                </text>
+
+                {isHovered && (() => {
+                  const lines = natural
+                    ? [{ label: naturalTooltipLine(ev), color: color }]
+                    : eventAmountLines(ev)
+                  const showEditBtn = !natural && !!onEditEvent
+                  const editBtnH = showEditBtn ? 16 : 0
+                  const tooltipH = 14 + lines.length * 11 + editBtnH
+                  const tooltipW = 140
+                  const tx = Math.max(PAD.left, Math.min(cx - tooltipW / 2, W - PAD.right - tooltipW))
+                  const txCenter = Math.max(PAD.left + tooltipW / 2, Math.min(cx, W - PAD.right - tooltipW / 2))
+                  return (
+                    <g>
+                      <rect
+                        x={tx} y={0}
+                        width={tooltipW} height={tooltipH}
+                        rx={4}
+                        fill="var(--ink)" opacity={0.92}
+                      />
+                      <text
+                        x={txCenter} y={11}
+                        textAnchor="middle" fontSize={8} fontWeight={600}
+                        fill="var(--paper)"
+                        fontFamily="var(--font-inter, sans-serif)"
+                      >
+                        {ev.name}
+                      </text>
+                      {lines.map((line, li) => (
+                        <text
+                          key={li}
+                          x={txCenter} y={22 + li * 11}
+                          textAnchor="middle" fontSize={7}
+                          fill={line.color}
+                          fontFamily="var(--font-dm-mono, monospace)"
+                        >
+                          {line.label}
+                        </text>
+                      ))}
+                      {showEditBtn && (
+                        <g
+                          onClick={e => {
+                            e.stopPropagation()
+                            onEditEvent?.(ev.id)
+                          }}
+                          style={{ cursor: 'pointer' }}
+                          role="button"
+                          aria-label={`Bewerk ${ev.name}`}
+                        >
+                          <rect
+                            x={tx + tooltipW - 56}
+                            y={tooltipH - 14}
+                            width={52}
+                            height={11}
+                            rx={2}
+                            fill="var(--paper)"
+                            opacity={0.18}
+                          />
+                          <text
+                            x={tx + tooltipW - 30}
+                            y={tooltipH - 5}
+                            textAnchor="middle"
+                            fontSize={7}
+                            fontWeight={600}
+                            fill="var(--paper)"
+                            fontFamily="var(--font-inter, sans-serif)"
+                          >
+                            ✎ Bewerk
+                          </text>
+                        </g>
+                      )}
+                    </g>
+                  )
+                })()}
+              </g>
+            )
+          }
+
+          // ── Cluster-rendering (slot.events.length ≥ 2) ──
+          // Kleur: dominante richting in de bundel. Natuurlijke mijlpalen
+          // tellen mee als 'neutraal' — we pakken income vs expense van de
+          // niet-natuurlijke events; fallback op COLOR_EXPENSE.
+          let incomeCount = 0
+          let expenseCount = 0
+          for (const ev of slot.events) {
+            if (isNaturalEvent(ev)) continue
+            if (eventDirection(ev) === 'income') incomeCount++
+            else expenseCount++
+          }
+          const clusterColor = incomeCount > expenseCount ? COLOR_INCOME : COLOR_EXPENSE
+          const clusterId = `cluster-${slotIdx}`
+          const isHovered = hoveredId === clusterId
+          const n = slot.events.length
+          const firstEv = slot.events[0]
 
           return (
             <g
-              key={ev.id}
-              onMouseEnter={() => setHoveredId(ev.id)}
+              key={clusterId}
+              onMouseEnter={() => setHoveredId(clusterId)}
               onMouseLeave={() => setHoveredId(null)}
-              onClick={() => onViewEvent?.(ev.id)}
-              style={{ cursor: onViewEvent ? 'pointer' : 'default' }}
-              role={onViewEvent ? 'button' : undefined}
-              aria-label={onViewEvent ? `Bekijk ${ev.name}` : undefined}
+              onClick={() => onClusterOpen?.(slot.events, slot.centerAge)}
+              style={{ cursor: onClusterOpen ? 'pointer' : 'default' }}
+              role={onClusterOpen ? 'button' : undefined}
+              aria-label={onClusterOpen ? `${n} gebeurtenissen rond leeftijd ${Math.round(slot.centerAge)} — open lijst` : undefined}
             >
-              {/* Vertical tick from axis to icon — gestippeld voor natuurlijke mijlpalen */}
               <line
                 x1={cx} x2={cx}
                 y1={Y_LINE - 10} y2={Y_LINE + 2}
-                stroke={color} strokeWidth={1.5} opacity={natural ? 0.45 : 0.6}
-                strokeDasharray={natural ? '2 2' : undefined}
+                stroke={clusterColor} strokeWidth={1.5} opacity={0.6}
               />
-
-              {/* Icon circle — outlined voor natuurlijke mijlpalen */}
               <circle
                 cx={cx} cy={Y_LINE - 14}
-                r={isHovered ? (natural ? 8 : 10) : (natural ? 6 : 8)}
-                fill={natural ? 'var(--paper)' : color}
-                opacity={natural ? 1 : (isHovered ? 0.25 : 0.15)}
-                stroke={color}
-                strokeWidth={natural ? 1.5 : 1}
-                strokeDasharray={natural ? '3 1.5' : undefined}
+                r={isHovered ? 10 : 8}
+                fill={clusterColor}
+                opacity={isHovered ? 0.32 : 0.18}
+                stroke={clusterColor}
+                strokeWidth={1.5}
                 style={{ transition: 'r 150ms ease, opacity 150ms ease' }}
               />
-
-              {/* Icon (rendered as foreign object for React icons) */}
               <foreignObject x={cx - 8} y={Y_LINE - 22} width={16} height={16}>
-                <div className="flex h-4 w-4 items-center justify-center" style={{ color }}>
-                  {EVENT_ICONS[ev.icon] || EVENT_ICONS['Calendar']}
+                <div className="flex h-4 w-4 items-center justify-center" style={{ color: clusterColor }}>
+                  {EVENT_ICONS[firstEv.icon] || EVENT_ICONS['Calendar']}
                 </div>
               </foreignObject>
 
-              {/* Label below axis */}
+              {/* +N badge — consistent met chart-event-markers.tsx */}
+              <g style={{ pointerEvents: 'none' }}>
+                <circle
+                  cx={cx + 7} cy={Y_LINE - 14 - 6} r={6}
+                  fill="var(--ink)"
+                />
+                <text
+                  x={cx + 7} y={Y_LINE - 14 - 6 + 2.5}
+                  textAnchor="middle"
+                  fontSize={7}
+                  fontWeight={700}
+                  fill="var(--paper)"
+                  fontFamily="var(--font-dm-mono, monospace)"
+                >
+                  +{n - 1}
+                </text>
+              </g>
+
               <text
                 x={cx} y={labelY}
                 textAnchor="middle" fontSize={8} fontWeight={500}
-                fill={color}
+                fill={clusterColor}
                 fontFamily="var(--font-inter, sans-serif)"
               >
-                {ev.name.length > 10 ? ev.name.slice(0, 9) + '…' : ev.name}
+                {n} events
               </text>
-
-              {/* Age label */}
               <text
                 x={cx} y={labelY + 10}
                 textAnchor="middle" fontSize={7}
                 fill="var(--ink-4)"
                 fontFamily="var(--font-dm-mono, monospace)"
               >
-                {age}j
+                ~{Math.round(slot.centerAge)}j
               </text>
 
-              {/* Hover tooltip — amount lines per financial impact */}
+              {/* Hover tooltip — mini-lijst van events */}
               {isHovered && (() => {
-                const lines = natural
-                  ? [{ label: naturalTooltipLine(ev), color: color }]
-                  : eventAmountLines(ev)
-                const showEditBtn = !natural && !!onEditEvent
-                const editBtnH = showEditBtn ? 16 : 0
-                const tooltipH = 14 + lines.length * 11 + editBtnH
-                const tooltipW = 140
+                const MAX_LINES = 5
+                const shown = slot.events.slice(0, MAX_LINES)
+                const overflow = n - shown.length
+                const lineCount = shown.length + (overflow > 0 ? 1 : 0)
+                const hintLine = onClusterOpen ? 1 : 0
+                const tooltipH = 14 + lineCount * 11 + (hintLine ? 12 : 0)
+                const tooltipW = 168
                 const tx = Math.max(PAD.left, Math.min(cx - tooltipW / 2, W - PAD.right - tooltipW))
                 const txCenter = Math.max(PAD.left + tooltipW / 2, Math.min(cx, W - PAD.right - tooltipW / 2))
                 return (
@@ -279,50 +482,39 @@ export function EventsTimeline({
                       fill="var(--paper)"
                       fontFamily="var(--font-inter, sans-serif)"
                     >
-                      {ev.name}
+                      {n} gebeurtenissen rond {Math.round(slot.centerAge)}j
                     </text>
-                    {lines.map((line, li) => (
+                    {shown.map((ev, li) => (
                       <text
-                        key={li}
+                        key={ev.id}
                         x={txCenter} y={22 + li * 11}
                         textAnchor="middle" fontSize={7}
-                        fill={line.color}
-                        fontFamily="var(--font-dm-mono, monospace)"
+                        fill="var(--paper)" opacity={0.85}
+                        fontFamily="var(--font-inter, sans-serif)"
                       >
-                        {line.label}
+                        {ev.name.length > 28 ? ev.name.slice(0, 27) + '…' : ev.name} · {ev.target_age}j
                       </text>
                     ))}
-                    {showEditBtn && (
-                      <g
-                        onClick={e => {
-                          e.stopPropagation()
-                          onEditEvent?.(ev.id)
-                        }}
-                        style={{ cursor: 'pointer' }}
-                        role="button"
-                        aria-label={`Bewerk ${ev.name}`}
+                    {overflow > 0 && (
+                      <text
+                        x={txCenter} y={22 + shown.length * 11}
+                        textAnchor="middle" fontSize={7}
+                        fill="var(--paper)" opacity={0.6}
+                        fontFamily="var(--font-dm-mono, monospace)"
                       >
-                        <rect
-                          x={tx + tooltipW - 56}
-                          y={tooltipH - 14}
-                          width={52}
-                          height={11}
-                          rx={2}
-                          fill="var(--paper)"
-                          opacity={0.18}
-                        />
-                        <text
-                          x={tx + tooltipW - 30}
-                          y={tooltipH - 5}
-                          textAnchor="middle"
-                          fontSize={7}
-                          fontWeight={600}
-                          fill="var(--paper)"
-                          fontFamily="var(--font-inter, sans-serif)"
-                        >
-                          ✎ Bewerk
-                        </text>
-                      </g>
+                        + {overflow} meer…
+                      </text>
+                    )}
+                    {hintLine > 0 && (
+                      <text
+                        x={txCenter} y={tooltipH - 4}
+                        textAnchor="middle" fontSize={7}
+                        fill="var(--paper)" opacity={0.55}
+                        fontFamily="var(--font-inter, sans-serif)"
+                        fontStyle="italic"
+                      >
+                        Tik voor lijst
+                      </text>
                     )}
                   </g>
                 )

@@ -60,6 +60,7 @@ export function ScenarioOverlayPicker({
         }`}
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-label={selected ? `Scenario-overlay: ${selected.name}` : 'Scenario-overlay kiezen'}
       >
         {color && (
           <span
@@ -68,12 +69,12 @@ export function ScenarioOverlayPicker({
           />
         )}
         <Layers size={12} className={selected ? 'text-horizon-600' : 'text-[var(--ink-4)]'} />
-        <span className="max-w-[100px] truncate">
+        <span className="hidden sm:inline max-w-[100px] truncate">
           {selected ? selected.name : 'Overlay'}
         </span>
         <ChevronDown
           size={12}
-          className={`transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`hidden sm:inline-block transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
 

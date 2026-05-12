@@ -48,8 +48,8 @@ import {
   Hourglass, TrendingUp, Percent, Shield, Info,
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
-  DollarSign, TableProperties, RefreshCw,
-  ChevronDown, ChevronUp, Heart, Compass, ArrowLeftRight,
+  DollarSign, TableProperties, RefreshCw, GitBranch,
+  ChevronDown, ChevronUp, Heart, Compass,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -109,6 +109,7 @@ import { PensionPdfUpload, uploadPensionPdfToStorage, deletePensionPdfFromStorag
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
+import { EventClusterSheet } from '@/components/app/horizon/event-cluster-sheet'
 import { PhaseBar } from '@/components/app/horizon/phase-bar'
 import { CHART_PAD } from '@/lib/chart-constants'
 import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
@@ -121,14 +122,12 @@ import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
-import { HorizonCashflowSankey } from '@/components/app/horizon/horizon-cashflow-sankey'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import {
   getFireProjectionTips,
   getWealthCompositionTips,
   getIncomeExpenseTips,
-  getCashflowSankeyTips,
 } from '@/lib/chart-tips'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
@@ -247,6 +246,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
   const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view' | 'edit'>('catalog')
+  const [clusterSheet, setClusterSheet] = useState<{ events: LifeEvent[]; centerAge: number } | null>(null)
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
   const [showCountdownReceipt, setShowCountdownReceipt] = useState(false)
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
@@ -2423,9 +2423,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                       }`}
                       aria-pressed={aowStopToggle === 'doorgaan'}
+                      aria-label="Doorgaan met FIRE-pad"
+                      title="Doorgaan"
                     >
                       <TrendingUp className="h-3 w-3" />
-                      Doorgaan
+                      <span className="hidden sm:inline">Doorgaan</span>
                     </button>
                     <button
                       type="button"
@@ -2436,9 +2438,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-amber-200 hover:text-[var(--ink-2)]'
                       }`}
                       aria-pressed={aowStopToggle === 'stoppen'}
+                      aria-label="Stop op AOW-leeftijd"
+                      title="Stop op AOW"
                     >
                       <Landmark className="h-3 w-3" />
-                      Stop op AOW
+                      <span className="hidden sm:inline">Stop op AOW</span>
                     </button>
                     <span className="mx-0.5 h-4 w-px bg-[var(--border-ed)]" />
                   </>
@@ -2457,9 +2461,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
                           : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                       }`}
+                      aria-label="Scenario-lijnen tonen"
+                      title="Scenario's"
                     >
-                      <BarChart3 className="h-3 w-3" />
-                      Scenario&apos;s
+                      <GitBranch className="h-3 w-3" />
+                      <span className="hidden sm:inline">Scenario&apos;s</span>
                       {scenarioData && scenariosExpanded && (
                         <span className="flex items-center gap-0.5">
                           {scenarioData.map(s => (
@@ -2476,9 +2482,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
                           : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                       }`}
+                      aria-label="Monte Carlo simulatie tonen"
+                      title="Monte Carlo"
                     >
                       <FlaskConical className="h-3 w-3" />
-                      Monte Carlo
+                      <span className="hidden sm:inline">Monte Carlo</span>
                       {mcData && mcExpanded && (
                         <span className="font-mono text-[10px] tabular-nums opacity-75">
                           {Math.round(mcData.fireProb * 100)}%
@@ -2498,10 +2506,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                   }`}
                   aria-pressed={showLifeEvents}
+                  aria-label="Levensgebeurtenissen op de tijdlijn tonen"
                   title="Toon je eigen levensgebeurtenissen op de tijdlijn"
                 >
                   <Calendar className="h-3 w-3" />
-                  Levensgebeurtenissen
+                  <span className="hidden sm:inline">Levensgebeurtenissen</span>
                   {showLifeEvents && events.length > 0 && (
                     <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
                       {events.length}
@@ -2519,10 +2528,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                   }`}
                   aria-pressed={showNaturalMilestones}
+                  aria-label="Natuurlijke mijlpalen tonen"
                   title="Toon automatisch afgeleide mijlpalen (hypotheek afgelost, eerste miljoen, vermogen op, …)"
                 >
                   <Sparkles className="h-3 w-3" />
-                  Natuurlijke mijlpalen
+                  <span className="hidden sm:inline">Natuurlijke mijlpalen</span>
                   {showNaturalMilestones && naturalMilestones.length > 0 && (
                     <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
                       {naturalMilestones.length}
@@ -2539,21 +2549,30 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   />
                 )}
 
-                {/* ── Chart mode toggle (compact pill, right-aligned) ── */}
+                {/* ── Chart mode toggle (compact pill, right-aligned) ──
+                    Op mobiel: alleen icon. Op desktop: icon + label.
+                    TrendingUp = pad/line; BarChart3 = opbouw/stack. */}
                 <div className="ml-auto flex items-center gap-1">
                   {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setChartMode(mode)}
-                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
                         chartMode === mode
                           ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
                           : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                       }`}
                       aria-pressed={chartMode === mode}
+                      aria-label={mode === 'vermogenspad' ? 'Pad-modus' : 'Opbouw-modus'}
+                      title={mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
                     >
-                      {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
+                      {mode === 'vermogenspad'
+                        ? <TrendingUp className="h-3.5 w-3.5" />
+                        : <BarChart3 className="h-3.5 w-3.5" />}
+                      <span className="hidden sm:inline">
+                        {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -2635,7 +2654,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
-                  {(visibleMin, visibleMax) => (
+                  {(visibleMin, visibleMax, controls) => (
                     <>
                       <div className="relative">
                         {/* Vermogenspad (SimChart) */}
@@ -2779,8 +2798,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         />
                       </div>
 
-                      {/* Events timeline aligned to same age axis */}
-                      {eventsForTimeline.length > 0 && (
+                      {/* Events timeline aligned to same age axis.
+                          Alleen op line-chart (vermogenspad): de bar-chart
+                          (vermogensopbouw) toont events al inline boven/onder
+                          de bars via ChartEventMarkers — een aparte timeline
+                          eronder zou dubbele informatie zijn. */}
+                      {chartMode === 'vermogenspad' && eventsForTimeline.length > 0 && (
                         <EventsTimeline
                           events={eventsForTimeline}
                           currentAge={currentAge ?? 30}
@@ -2789,6 +2812,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           visibleMaxAge={visibleMax}
                           scenarioEvents={scenarioOverlayData?.events}
                           scenarioColor={scenarioOverlayData?.color}
+                          onClusterOpen={(clusterEvents, centerAge) => setClusterSheet({ events: clusterEvents, centerAge })}
                           onViewEvent={id => {
                             // Natuurlijke mijlpalen hebben geen edit-pane; deeplink
                             // naar bron-asset/debt indien beschikbaar.
@@ -2925,36 +2949,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           ) : null}
         </div>
       </section>
-
-      {/* === Geldstroom-Sankey (per jaar, scrubbable) === */}
-      {simResult && currentAge != null && simResult.rows.length > 0 && (
-        <section className="mt-5 sm:mt-8">
-          <CollapsibleSection
-            storageKey="horizon-cashflow-sankey"
-            title="Hoe stroomt jouw geld per jaar"
-            summary="Bekijk inkomstenbronnen en uitgaven-categorieën voor een specifiek jaar"
-            icon={<ArrowLeftRight className="h-4 w-4 text-[var(--ink-3)]" />}
-          >
-            <div className="mb-2 flex justify-end">
-              <ChartTips
-                storageKey="cashflow_sankey"
-                tips={getCashflowSankeyTips({
-                  fireAge: simResult.fireAge,
-                  currentAge: currentAge,
-                })}
-                align="right"
-              />
-            </div>
-            <HorizonCashflowSankey
-              simRows={simResult.rows}
-              unifiedRows={unifiedRows}
-              debts={debts}
-              currentAge={currentAge}
-              fireAge={simResult.fireAge}
-            />
-          </CollapsibleSection>
-        </section>
-      )}
 
       {/* Detail modal (enige interactiepunt voor simulatie) */}
       {simResult && (
@@ -6560,6 +6554,31 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       />
 
       {/*
+        Cluster-sheet — opent bij klik op een +N cluster-marker in de
+        EventsTimeline. Toont alle events in dat cluster gegroepeerd per type
+        (levensgebeurtenissen + natuurlijke mijlpalen). Klik op een rij volgt
+        dezelfde routing als de directe marker-klik: life-event opent EventPane,
+        natural milestone deeplinkt naar bron-asset/debt.
+      */}
+      <EventClusterSheet
+        open={clusterSheet !== null}
+        events={clusterSheet?.events ?? []}
+        centerAge={clusterSheet?.centerAge ?? 0}
+        onClose={() => setClusterSheet(null)}
+        onSelectEvent={(id) => {
+          if (id.startsWith('nat-')) {
+            const m = naturalMilestones.find(x => x.id === id)
+            if (m?.category === 'debt') router.push('/core/debts')
+            else if (m?.category === 'asset') router.push('/core/assets')
+            return
+          }
+          setEventPaneEditingId(id)
+          setEventPaneMode('view')
+          setEventPaneOpen(true)
+        }}
+      />
+
+      {/*
         Year-details kassabon — opent bij klik op een jaar-kolom in de
         WealthCompositionChart. Toont editorial breakdown van bezittingen,
         schulden, kosten/inkomsten en gebeurtenissen voor dat specifieke
@@ -6571,12 +6590,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         age={selectedYearAge}
         onClose={() => setSelectedYearAge(null)}
         unifiedRows={unifiedRows ?? []}
+        simRows={simResult?.rows ?? []}
         currentAge={currentAge ?? 30}
         inflationRate={fireParams.inflationRate}
         debts={debts}
         lifeEvents={events}
         cashflows={simCashflows ?? []}
         aowAge={userAowAge.fractional}
+        fireAge={simResult?.fireAge ?? null}
+        onChangeAge={(newAge) => {
+          const rows = simResult?.rows ?? []
+          if (rows.length === 0) return
+          const minA = rows[0].age
+          const maxA = rows[rows.length - 1].age
+          setSelectedYearAge(Math.max(minA, Math.min(newAge, maxA)))
+        }}
       />
     </div>
   )

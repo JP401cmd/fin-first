@@ -15,6 +15,19 @@ interface Props {
   debts?: Debt[] | null
   currentAge: number
   fireAge?: number | null
+  /**
+   * Optioneel: vaste leeftijd van het te tonen jaar. Wanneer gezet wordt de
+   * interne year-state genegeerd en het diagram toont dat ene jaar — handig
+   * voor embedding in een drilldown (bv. HorizonYearDetailsSheet) waar de
+   * gebruiker al een jaar geselecteerd heeft.
+   */
+  year?: number
+  /**
+   * Compacte modus voor embedding in een sheet/pane. Verbergt de
+   * year-slider en de leeftijd-info-strip onderaan (die context staat al
+   * elders in de sheet). Vereist `year` zodat het diagram weet wat te tonen.
+   */
+  embedded?: boolean
 }
 
 // Income shades — Horizon-palet (gold/warm).
@@ -92,15 +105,22 @@ export const HorizonCashflowSankey = memo(function HorizonCashflowSankey({
   debts,
   currentAge,
   fireAge,
+  year: controlledYear,
+  embedded = false,
 }: Props) {
   const { masked } = useMaskedAmounts()
 
   const minAge = simRows[0]?.age ?? Math.floor(currentAge)
   const maxAge = simRows[simRows.length - 1]?.age ?? Math.floor(currentAge) + 40
 
-  const [year, setYear] = useState<number>(() =>
+  const [internalYear, setYear] = useState<number>(() =>
     Math.max(minAge, Math.min(Math.floor(currentAge), maxAge)),
   )
+  // Controlled override — embedded gebruik (drilldown sheet) zet het jaar
+  // van buitenaf; standalone gebruik (hoofd-pagina) gebruikt interne state.
+  const year = controlledYear != null
+    ? Math.max(minAge, Math.min(Math.floor(controlledYear), maxAge))
+    : internalYear
 
   // Compute rich breakdown (gebruikt UnifiedProjectionRow voor debt-rente + per-asset Box 3).
   const breakdown = useMemo(() => {
@@ -156,6 +176,27 @@ export const HorizonCashflowSankey = memo(function HorizonCashflowSankey({
   )
   const saldo = incomeTotal - expenseTotal
 
+  // ── Sankey-structuur ────────────────────────────────────────────────
+  //
+  //   Inkomsten (col 0)  ──→  Vermogen (col 1)  ──→  Uitgaven (col 2)
+  //
+  // Center is een enkele "Vermogen"-sum-node — de optelling van alle flows
+  // die door dit jaar lopen. Elke inkomst-bron is één node die direct in
+  // het center stroomt; elke uitgave-bron is één node die direct uit het
+  // center stroomt. Er wordt niets proportioneel over meerdere targets
+  // verdeeld — elke flow is een 1-op-1 koppeling source → center → target.
+  //
+  // Saldo-flows:
+  //   - Surplus (income > expense)  → "Naar vermogen"-node (col 2, rechts)
+  //   - Tekort  (expense > income)  → "Uit vermogen"-node  (col 0, links)
+  //
+  // Bronnen worden gesorteerd op grootte (desc), zodat de grootste flows
+  // bovenaan staan en visueel matchen tussen kolommen (de grootste inkomst
+  // sluit aan op de grootste uitgave) — een impliciete "per stuk"-aansluiting
+  // zonder per-flow herverdeling.
+  const WEALTH_OUT_COLOR = '#a37a3a' // horizon-700 — opbouw, matching savings
+  const WEALTH_IN_COLOR = '#9e8a7a'  // warm grijs — onttrekking, sober
+
   const { nodes, links } = useMemo(() => {
     const nodes: SankeyNode[] = []
     const links: SankeyLink[] = []
@@ -164,52 +205,82 @@ export const HorizonCashflowSankey = memo(function HorizonCashflowSankey({
       return { nodes, links }
     }
 
-    const centerValue = Math.max(incomeTotal, expenseTotal, 1)
-    const centerNode: SankeyNode = {
-      id: 'flow-center',
-      label: 'Vermogen',
-      value: centerValue,
-      color: CENTER_COLOR,
-      column: 1,
-    }
+    const incSorted = [...incomeItems].sort((a, b) => b.amount - a.amount)
+    const expSorted = [...expenseItems].sort((a, b) => b.amount - a.amount)
 
-    incomeItems.forEach((item, idx) => {
-      const color = colorForIncome(item.id, idx)
-      const nodeId = `inc-${item.id}-${idx}`
+    const saldoLocal = incomeTotal - expenseTotal
+    // Center-node-hoogte schaalt met de grootste flow-zijde. Bij surplus is
+    // dat de inkomsten-zijde (income volume = expense + surplus = income);
+    // bij tekort is dat de uitgaven-zijde (expense volume = income + tekort).
+    const centerValue = Math.max(incomeTotal, expenseTotal, 1)
+
+    // ── Tekort-stream (col 0) ── moet vóór income-items komen zodat hij
+    // bovenaan de left-kolom staat en visueel duidelijk is dat het EXTRA
+    // bovenop de inkomsten is. Label "Onttrekking": geld dat uit het
+    // bestaande vermogen wordt onttrokken om de uitgaven te dekken.
+    if (saldoLocal < 0) {
+      const tekort = -saldoLocal
       nodes.push({
-        id: nodeId,
-        label: item.label,
-        value: item.amount,
-        color,
+        id: 'wealth-in',
+        label: 'Onttrekking',
+        value: tekort,
+        color: WEALTH_IN_COLOR,
         column: 0,
       })
       links.push({
-        source: nodeId,
+        source: 'wealth-in',
         target: 'flow-center',
-        value: item.amount,
-        color,
+        value: tekort,
+        color: WEALTH_IN_COLOR,
       })
+    }
+
+    // ── Inkomsten (col 0) ──
+    incSorted.forEach((item, idx) => {
+      const color = colorForIncome(item.id, idx)
+      const nodeId = `inc-${item.id}`
+      nodes.push({ id: nodeId, label: item.label, value: item.amount, color, column: 0 })
+      links.push({ source: nodeId, target: 'flow-center', value: item.amount, color })
     })
 
-    nodes.push(centerNode)
+    // ── Center (col 1) — optelling van de som ──
+    // Leeg label voor sobere look (Boldin-stijl): het center is een visueel
+    // samenkomstpunt, niet zelf een informatie-knooppunt. De totalen staan
+    // al in de KPI-strip erboven.
+    nodes.push({
+      id: 'flow-center',
+      label: '',
+      value: centerValue,
+      color: CENTER_COLOR,
+      column: 1,
+    })
 
-    expenseItems.forEach((item, idx) => {
+    // ── Uitgaven (col 2) ──
+    expSorted.forEach((item, idx) => {
       const color = colorForExpense(item.id, idx)
-      const nodeId = `exp-${item.id}-${idx}`
+      const nodeId = `exp-${item.id}`
+      nodes.push({ id: nodeId, label: item.label, value: item.amount, color, column: 2 })
+      links.push({ source: 'flow-center', target: nodeId, value: item.amount, color })
+    })
+
+    // ── Surplus-stream (col 2) ── onderaan de right-kolom. Label "Opbouw":
+    // het deel van de cashflow dat ná uitgaven over is en aan het vermogen
+    // wordt toegevoegd (savings & contributions in Boldin-terminologie).
+    if (saldoLocal > 0) {
       nodes.push({
-        id: nodeId,
-        label: item.label,
-        value: item.amount,
-        color,
+        id: 'wealth-out',
+        label: 'Opbouw',
+        value: saldoLocal,
+        color: WEALTH_OUT_COLOR,
         column: 2,
       })
       links.push({
         source: 'flow-center',
-        target: nodeId,
-        value: item.amount,
-        color,
+        target: 'wealth-out',
+        value: saldoLocal,
+        color: WEALTH_OUT_COLOR,
       })
-    })
+    }
 
     return { nodes, links }
   }, [incomeItems, expenseItems, incomeTotal, expenseTotal])
@@ -285,7 +356,10 @@ export const HorizonCashflowSankey = memo(function HorizonCashflowSankey({
             nodes={nodes}
             links={links}
             aspectRatio={2.0}
-            showAnimatedCoins={false}
+            showAnimatedCoins={true}
+            centerScale={0.7}
+            fitToContent
+            minBarHeight={9}
           />
         ) : (
           <div className="flex h-[200px] items-center justify-center text-center px-6">
@@ -296,47 +370,51 @@ export const HorizonCashflowSankey = memo(function HorizonCashflowSankey({
         )}
       </div>
 
-      {/* ── Year-slider ────────────────────────────────────────────── */}
-      <div>
-        <input
-          type="range"
-          min={minAge}
-          max={maxAge}
-          step={1}
-          value={year}
-          onChange={(e) => setYear(parseInt(e.target.value, 10))}
-          className="slider-module"
-          aria-label="Selecteer leeftijd"
-          aria-valuemin={minAge}
-          aria-valuemax={maxAge}
-          aria-valuenow={year}
-          aria-valuetext={`Leeftijd ${year}, jaar ${yearLabel}`}
-        />
-        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <div className="flex items-baseline gap-2">
-            <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)] font-mono">
-              <span className="inline-block w-7 h-px bg-[var(--module-active-500)] mr-2.5 align-middle" />
-              Leeftijd
-            </p>
-            <p className="font-mono tabular-nums text-sm text-[var(--ink)]">
-              {year}
-              {isCurrent && (
-                <span className="ml-2 text-[10px] text-[var(--ink-3)] uppercase tracking-[0.1em]">
-                  vandaag
-                </span>
-              )}
-              {isFire && !isCurrent && (
-                <span className="ml-2 text-[10px] text-[var(--module-active-700)] uppercase tracking-[0.1em]">
-                  fire
-                </span>
-              )}
+      {/* ── Year-slider + leeftijd-strip ──────────────────────────────
+          Verborgen in embedded-modus: de host (bv. year-details-sheet)
+          toont de leeftijd-context al elders. */}
+      {!embedded && (
+        <div>
+          <input
+            type="range"
+            min={minAge}
+            max={maxAge}
+            step={1}
+            value={year}
+            onChange={(e) => setYear(parseInt(e.target.value, 10))}
+            className="slider-module"
+            aria-label="Selecteer leeftijd"
+            aria-valuemin={minAge}
+            aria-valuemax={maxAge}
+            aria-valuenow={year}
+            aria-valuetext={`Leeftijd ${year}, jaar ${yearLabel}`}
+          />
+          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <div className="flex items-baseline gap-2">
+              <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)] font-mono">
+                <span className="inline-block w-7 h-px bg-[var(--module-active-500)] mr-2.5 align-middle" />
+                Leeftijd
+              </p>
+              <p className="font-mono tabular-nums text-sm text-[var(--ink)]">
+                {year}
+                {isCurrent && (
+                  <span className="ml-2 text-[10px] text-[var(--ink-3)] uppercase tracking-[0.1em]">
+                    vandaag
+                  </span>
+                )}
+                {isFire && !isCurrent && (
+                  <span className="ml-2 text-[10px] text-[var(--module-active-700)] uppercase tracking-[0.1em]">
+                    fire
+                  </span>
+                )}
+              </p>
+            </div>
+            <p className="font-serif italic text-[12px] text-[var(--ink-3)]">
+              jaar {yearLabel} · {phaseLabel}
             </p>
           </div>
-          <p className="font-serif italic text-[12px] text-[var(--ink-3)]">
-            jaar {yearLabel} · {phaseLabel}
-          </p>
         </div>
-      </div>
+      )}
     </div>
   )
 })

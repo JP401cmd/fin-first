@@ -34,7 +34,31 @@ interface SankeyDiagramProps {
   onNodeClick?: (nodeId: string) => void
   /** Show animated euro coins (default true). Budget view sets this to false. */
   showAnimatedCoins?: boolean
+  /**
+   * Visuele schaal-factor voor de center-kolom (column 1) — heights worden
+   * met deze factor vermenigvuldigd, zodat het samenkomstpunt visueel
+   * smaller wordt dan de income/expense kolommen. Default 1.0 (gelijke
+   * hoogte). Gebruik bv 0.7 om een knijp-effect in het midden te krijgen.
+   */
+  centerScale?: number
+  /**
+   * Wanneer true berekent het component zelf de chart-hoogte op basis van de
+   * data: de smallest non-zero bar krijgt minstens `minBarHeight` pixels
+   * verticaal, zodat alle flows visueel onderscheidbaar blijven. De
+   * resulterende hoogte overrulet de aspectRatio-default als die kleiner is.
+   * Clamped tussen `[MIN_AUTO_HEIGHT, MAX_AUTO_HEIGHT]`.
+   */
+  fitToContent?: boolean
+  /**
+   * Minimum pixel-hoogte voor de smallest visible bar wanneer `fitToContent`
+   * actief is. Default 18. Hogere waarde → chart wordt hoger zodat zelfs
+   * kleine flows als duidelijke band zichtbaar zijn.
+   */
+  minBarHeight?: number
 }
+
+const MIN_AUTO_HEIGHT = 140
+const MAX_AUTO_HEIGHT = 360
 
 const NODE_PAD = 8
 const NODE_WIDTH = 14
@@ -74,7 +98,8 @@ function computeLayout(
   nodes: SankeyNode[],
   links: SankeyLink[],
   width: number,
-  height: number
+  height: number,
+  centerScale: number = 1,
 ): { layoutNodes: LayoutNode[]; layoutLinks: LayoutLink[] } {
   if (nodes.length === 0) return { layoutNodes: [], layoutLinks: [] }
 
@@ -99,12 +124,14 @@ function computeLayout(
     const colTotal = colNodes.reduce((s, n) => s + n.value, 0)
     const availableHeight = height - (colNodes.length - 1) * NODE_PAD
     const x = COLUMN_POSITIONS[colIdx] * width
+    // Centermast knijp-factor — alleen voor middenkolom (col 1).
+    const scale = colIdx === 1 ? centerScale : 1
 
-    let y = (height - (colTotal / maxColumnValue) * availableHeight - (colNodes.length - 1) * NODE_PAD) / 2
+    let y = (height - (colTotal / maxColumnValue) * availableHeight * scale - (colNodes.length - 1) * NODE_PAD) / 2
     if (y < 0) y = 0
 
     for (const n of colNodes) {
-      const nodeHeight = Math.max((n.value / maxColumnValue) * availableHeight, 4)
+      const nodeHeight = Math.max((n.value / maxColumnValue) * availableHeight * scale, 4)
       layoutNodeMap.set(n.id, {
         id: n.id,
         label: n.label,
@@ -492,7 +519,7 @@ function EuroCoin({
   )
 }
 
-export const SankeyDiagram = memo(function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio = 2.5, onNodeClick, showAnimatedCoins = true }: SankeyDiagramProps) {
+export const SankeyDiagram = memo(function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio = 2.5, onNodeClick, showAnimatedCoins = true, centerScale = 1, fitToContent = false, minBarHeight = 18 }: SankeyDiagramProps) {
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
@@ -512,12 +539,43 @@ export const SankeyDiagram = memo(function SankeyDiagram({ nodes, links, height:
     return () => observer.disconnect()
   }, [])
 
-  // Derive height from width via aspect ratio, or use fixed height if provided
-  const height = fixedHeight ?? Math.round(containerWidth / aspectRatio)
+  // Derive height from width via aspect ratio, or use fixed height if provided.
+  // In fitToContent-modus berekent de Sankey zelf hoeveel verticale ruimte de
+  // data nodig heeft: het kleinste niet-nul bar-segment moet minstens
+  // `minBarHeight` pixels hoog zijn. De totale benodigde availableHeight
+  // schaalt dan met de ratio max-column-total / smallest-bar-value, plus de
+  // padding tussen nodes in de kolom met de meeste items.
+  const aspectHeight = Math.round(containerWidth / aspectRatio)
+  const requiredHeight = useMemo(() => {
+    if (!fitToContent || nodes.length === 0) return 0
+    const columnTotals = new Map<number, number>()
+    const columnNodeCounts = new Map<number, number>()
+    let smallestNonZero = Infinity
+    for (const n of nodes) {
+      columnTotals.set(n.column, (columnTotals.get(n.column) ?? 0) + n.value)
+      columnNodeCounts.set(n.column, (columnNodeCounts.get(n.column) ?? 0) + 1)
+      if (n.value > 0 && n.value < smallestNonZero) smallestNonZero = n.value
+    }
+    const maxColTotal = Math.max(0, ...columnTotals.values())
+    if (smallestNonZero === Infinity || smallestNonZero === 0 || maxColTotal === 0) return 0
+    const maxNodesInCol = Math.max(...columnNodeCounts.values())
+    const paddingTotal = Math.max(0, maxNodesInCol - 1) * NODE_PAD
+    const requiredAvailable = (maxColTotal / smallestNonZero) * minBarHeight
+    return Math.round(requiredAvailable + paddingTotal)
+  }, [nodes, fitToContent, minBarHeight])
+
+  // In fitToContent-modus negeren we de aspectRatio-vloer: de chart-hoogte
+  // wordt pure dictated door de inhoud, geclampt tussen [MIN_AUTO_HEIGHT,
+  // MAX_AUTO_HEIGHT]. Anders zou een brede container automatisch een hoge
+  // chart opleveren, ook als de flow zelf weinig verticale ruimte vraagt.
+  const height = fixedHeight
+    ?? (fitToContent
+      ? Math.min(MAX_AUTO_HEIGHT, Math.max(MIN_AUTO_HEIGHT, requiredHeight))
+      : aspectHeight)
 
   const { layoutNodes, layoutLinks } = useMemo(
-    () => computeLayout(nodes, links, containerWidth, height),
-    [nodes, links, containerWidth, height]
+    () => computeLayout(nodes, links, containerWidth, height, centerScale),
+    [nodes, links, containerWidth, height, centerScale]
   )
 
   const highlightedLinkSet = useMemo(() => {

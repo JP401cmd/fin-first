@@ -35,7 +35,7 @@ export interface StandardGuideStep extends ModuleGuideStep {
 
 // ── Default Steps ──────────────────────────────────────────────────────
 
-export const STANDARD_GUIDE_STEPS: readonly StandardGuideStep[] = [
+export const DEFAULT_STANDARD_GUIDE_STEPS: readonly StandardGuideStep[] = [
   {
     key: 'sg_assets',
     label: 'Vul je bezittingen aan',
@@ -62,6 +62,36 @@ export const STANDARD_GUIDE_STEPS: readonly StandardGuideStep[] = [
     // Geen autoComplete — bewuste actie van de gebruiker.
   },
 ] as const
+
+// ── Back-compat alias ──────────────────────────────────────────────────
+// `STANDARD_GUIDE_STEPS` blijft de bron-van-waarheid voor user-facing
+// rendering en alle completion-helpers. Admin-overrides leven in
+// `app_settings.standard_guide_steps` en worden via `getStandardGuideSteps()`
+// teruggelezen door de API-route. Deze const zijn de defaults — wil je
+// admin-overrides in een server-component renderen, gebruik dan de getter
+// hieronder met een passende `overrides`-arg.
+export const STANDARD_GUIDE_STEPS = DEFAULT_STANDARD_GUIDE_STEPS
+
+// ── Override-getter (defaults + admin-overrides via app_settings) ─────
+
+/**
+ * Get standard-guide steps met optionele override-array uit app_settings.
+ * Returnt de override wanneer aanwezig en valide, anders de defaults.
+ *
+ * Spiegelt het patroon van `getGoalGuideSteps()`. Admin-API-route
+ * (`/api/standard-guide/steps`) gebruikt deze getter om de actuele lijst
+ * terug te geven. User-facing (`StandaardStappenplanCard`) gebruikt
+ * vooralsnog de defaults — gelijk aan goal/module-guide bestaande
+ * gedrag — totdat overrides server-side worden gepiped.
+ */
+export function getStandardGuideSteps(
+  overrides?: StandardGuideStep[],
+): readonly StandardGuideStep[] {
+  if (Array.isArray(overrides) && overrides.length > 0) {
+    return overrides
+  }
+  return DEFAULT_STANDARD_GUIDE_STEPS
+}
 
 // ── Completion helper ──────────────────────────────────────────────────
 

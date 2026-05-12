@@ -5,6 +5,12 @@ import { Minus, Plus, RotateCcw } from 'lucide-react'
 
 // ── ZoomableChartContainer ──────────────────────────────────────────────────
 
+export type ZoomControls = {
+  zoomBy: (factor: number, centerAge?: number) => void
+  resetZoom: () => void
+  isZoomed: boolean
+}
+
 export function ZoomableChartContainer({
   currentAge,
   endAge,
@@ -12,7 +18,7 @@ export function ZoomableChartContainer({
 }: {
   currentAge: number
   endAge: number
-  children: (visibleMin: number, visibleMax: number) => React.ReactNode
+  children: (visibleMin: number, visibleMax: number, controls: ZoomControls) => React.ReactNode
 }) {
   const {
     containerRef,
@@ -25,13 +31,14 @@ export function ZoomableChartContainer({
   } = useChartZoom({ minAge: currentAge, maxAge: endAge })
 
   const isZoomed = zoomLevel > 1.01
+  const controls: ZoomControls = { zoomBy, resetZoom, isZoomed }
   const prefersReducedMotion =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
   return (
     <div ref={containerRef} {...containerProps} className="relative">
-      {children(visibleMin, visibleMax)}
+      {children(visibleMin, visibleMax, controls)}
 
       {/* Zoom indicator badge — top right */}
       {isZoomed && (

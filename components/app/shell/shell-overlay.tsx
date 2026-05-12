@@ -42,7 +42,10 @@ type ShellOverlayProps = {
    *  `onBack` mee als je een eigen back-handler nodig hebt (bv. naar een
    *  voorafgaande sub-mode binnen de pane). */
   onBack?: () => void
-  /** Pane-header actions (rechts naast titel). Alleen voor kind="pane". */
+  /** Header actions (rechts naast titel). Beschikbaar voor kind="pane" en
+   *  kind="sheet". Wordt doorgegeven aan BottomSheet (resp. SlideInPane) zodat
+   *  consumers compacte controls — bv. navigatie-pijlen of share-icons — in
+   *  de sticky title-bar kunnen plaatsen. */
   actions?: ReactNode
   /** Standaard pane-footer — primary action (links, solid). Alleen voor
    *  kind="pane". Wanneer minimaal één van primary/secondary is doorgegeven
@@ -155,9 +158,10 @@ export function ShellOverlay({
 
   if (kind === 'sheet') {
     // BottomSheet is al responsive (mobile detents + desktop `md:max-w-*`).
-    // Een refactor zou dit vereenvoudigen tot een directe pass-through.
+    // `actions` worden in de sticky title-bar gerendered — handig voor
+    // bv. pijl-navigatie of share-icons binnen een sheet.
     return (
-      <BottomSheet open={open} onClose={onClose} title={title} size={size}>
+      <BottomSheet open={open} onClose={onClose} title={title} size={size} actions={actions}>
         {children}
       </BottomSheet>
     )

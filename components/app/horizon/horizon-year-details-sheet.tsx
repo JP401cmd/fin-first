@@ -47,8 +47,9 @@ import {
   type Debt,
 } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
-import type { SimCashflow } from '@/lib/fire-simulation'
+import type { SimCashflow, SimRow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import { HorizonCashflowSankey } from '@/components/app/horizon/horizon-cashflow-sankey'
 
 // ── Privacy-aware EUR-formatter (custom hook keeps the masked-toggle live) ──
 
@@ -418,6 +419,12 @@ export interface HorizonYearDetailsSheetProps {
   /** De geselecteerde leeftijd — `null` als geen jaar geselecteerd is. */
   age: number | null
   unifiedRows: UnifiedProjectionRow[]
+  /**
+   * Simulatie-rijen — vereist voor de geldstroom-Sankey-sectie. Bevatten
+   * de jaarlijkse income/expense-totalen uit `runSimulation`. Wanneer leeg
+   * wordt de Sankey-sectie verborgen (geen breakdown mogelijk).
+   */
+  simRows: SimRow[]
   currentAge: number
   inflationRate: number
   debts: Debt[]
@@ -425,6 +432,14 @@ export interface HorizonYearDetailsSheetProps {
   cashflows: SimCashflow[]
   /** Optionele AOW-leeftijd om AOW-inkomen apart te tonen. */
   aowAge?: number
+  /** Optionele FIRE-leeftijd voor Sankey-context (toont 'fire' label). */
+  fireAge?: number | null
+  /**
+   * Callback om naar een andere leeftijd te springen. Wanneer gezet worden
+   * pijl-knoppen (vorige/volgende jaar) in de sticky title-bar getoond. Bij
+   * de eerste/laatste leeftijd in `simRows` wordt de relevante pijl gedimd.
+   */
+  onChangeAge?: (newAge: number) => void
 }
 
 export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
@@ -432,12 +447,15 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   onClose,
   age,
   unifiedRows,
+  simRows,
   currentAge,
   inflationRate,
   debts,
   lifeEvents,
   cashflows,
   aowAge,
+  fireAge,
+  onChangeAge,
 }: HorizonYearDetailsSheetProps) {
   const fc = useFc()
 
@@ -539,8 +557,36 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   const totalAssets = row?.totalAssets ?? 0
   const totalDebts = row?.totalDebts ?? 0
 
+  // ── Pijl-navigatie: vorige / volgende leeftijd binnen simRows-bereik ──
+  const minNavAge = simRows[0]?.age ?? null
+  const maxNavAge = simRows[simRows.length - 1]?.age ?? null
+  const canPrev = onChangeAge != null && age != null && minNavAge != null && age > minNavAge
+  const canNext = onChangeAge != null && age != null && maxNavAge != null && age < maxNavAge
+  const headerActions = onChangeAge != null && age != null ? (
+    <div className="flex items-center gap-0.5" role="group" aria-label="Navigeer tussen jaren">
+      <button
+        type="button"
+        onClick={() => canPrev && onChangeAge(age - 1)}
+        disabled={!canPrev}
+        aria-label="Vorig jaar"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+      >
+        <Lucide.ChevronLeft className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => canNext && onChangeAge(age + 1)}
+        disabled={!canNext}
+        aria-label="Volgend jaar"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+      >
+        <Lucide.ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  ) : undefined
+
   return (
-    <ShellOverlay open={open} onClose={onClose} kind="sheet" size="md" title={title}>
+    <ShellOverlay open={open} onClose={onClose} kind="sheet" size="md" title={title} actions={headerActions}>
       <article className="px-5 pb-6 pt-2 sm:px-7">
         {/* ── Editorial kicker met streep + fase-badge ────────────── */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -802,6 +848,28 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     </li>
                   ))}
                 </ul>
+              </section>
+            )}
+
+            {/* ── Sectie 5: Geldstroom-Sankey ──────────────────────
+                Visualisatie van inkomsten- en uitgaven-bronnen voor dit
+                specifieke jaar. `embedded`-modus verbergt de slider — de
+                drilldown context (jaar/leeftijd) wordt al elders in de
+                sheet duidelijk gecommuniceerd. */}
+            {simRows.length > 0 && age != null && (
+              <section className="pt-1">
+                <SectionHead label="Geldstroom" />
+                <div className="mt-2">
+                  <HorizonCashflowSankey
+                    simRows={simRows}
+                    unifiedRows={unifiedRows}
+                    debts={debts}
+                    currentAge={currentAge}
+                    fireAge={fireAge}
+                    year={age}
+                    embedded
+                  />
+                </div>
               </section>
             )}
 
