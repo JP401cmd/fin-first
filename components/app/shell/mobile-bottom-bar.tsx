@@ -49,6 +49,7 @@ import type { ComponentType } from 'react'
 import { BottomNavTabs } from '@/components/app/bottom-nav'
 import type { BottomBarConfig, BottomBarAction } from './nav-stack-provider'
 import { useLiveBottomBar } from './nav-stack-provider'
+import { MobileAppStrip } from './mobile-app-strip'
 
 type MobileBottomBarProps = {
   /**
@@ -189,10 +190,18 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
     'border-t-2 border-[var(--ink)] bg-[var(--paper)]/90 backdrop-blur-md'
 
   if (kind === 'tabs') {
+    // Secundaire app-strip (icon-only) verschijnt BOVEN de bottom-nav voor
+    // modules met actieve category-apps (vandaag: alleen Kern). De strip
+    // beslist zelf of hij rendert (pathname-detectie + lege-state filter) —
+    // op /will, /horizon en op brand-new accounts rendert hij `null` zonder
+    // dat we hier hoeven te gaten.
     return (
-      <nav className={wrapperClasses}>
-        <BottomNavTabs />
-      </nav>
+      <>
+        <MobileAppStrip />
+        <nav className={wrapperClasses}>
+          <BottomNavTabs />
+        </nav>
+      </>
     )
   }
 

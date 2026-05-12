@@ -20,6 +20,11 @@ import { PHASES } from '@/lib/feature-phases'
 import { ALL_MODULES } from '@/lib/module-registry'
 import type { ModuleId } from '@/lib/module-registry'
 import { getActiveAppKeys } from '@/components/core/category-deepening-registry'
+import {
+  buildCategoryAppLinks,
+  projectAssetForCategoryNav,
+  projectDebtForCategoryNav,
+} from '@/lib/category-app-nav'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
@@ -177,6 +182,16 @@ export default async function AppLayout({
     assetRows as unknown as Asset[],
     debtRows as unknown as Debt[],
   )
+  // Mobile-shell app-strip data: één rij `CategoryAppLink` per actieve
+  // category-app (cash → Budgetteren, investment → Aandelen holdings, etc.).
+  // Bron is identiek aan het Will-dashboard (`CategoryAppNavBar`), zodat de
+  // iconen en labels 1-op-1 matchen. Strip rendert pas client-side; hier
+  // bouwen we alleen de data zodat de mobile-bottom-bar deze via context kan lezen.
+  const sidebarCategoryAppLinks = buildCategoryAppLinks(
+    (assetRows as unknown as Asset[]).map(projectAssetForCategoryNav),
+    (debtRows as unknown as Debt[]).map(projectDebtForCategoryNav),
+    activeModules,
+  )
   const sidebarTotalAssetsRaw = assetRows.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
   const sidebarTotalDebtsRaw = debtRows.reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
   const sidebarCashOnlyAssets = assetRows
@@ -251,6 +266,7 @@ export default async function AppLayout({
                               netWorth: sidebarNetWorth,
                               actionCount: sidebarActionCount,
                               activeAppKeys: sidebarActiveAppKeys,
+                              categoryAppLinks: sidebarCategoryAppLinks,
                             }}
                           >
                             {children}

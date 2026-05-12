@@ -53,7 +53,7 @@
  */
 'use client'
 
-import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Suspense, createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AppHeader } from '@/components/app/app-header'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
@@ -65,6 +65,7 @@ import { MobileStackShell } from '@/components/app/shell/mobile-stack-shell'
 import { NavStackProvider } from '@/components/app/shell/nav-stack-provider'
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
+import type { CategoryAppLink } from '@/lib/category-app-nav'
 
 export type SidebarMetrics = {
   /** Netto vermogen (assets − debts, gewogen volgens inclusion-pct). */
@@ -77,6 +78,26 @@ export type SidebarMetrics = {
    * wanneer de gebruiker ze daadwerkelijk gebruikt.
    */
   activeAppKeys: string[]
+  /**
+   * Klikbare app-deeplinks per actieve categorie. Bron is dezelfde server-
+   * builder die het Will-dashboard voedt (`buildCategoryAppLinks`), zodat
+   * iconen + labels exact matchen tussen dashboard en mobile shell.
+   * Mobile-only consumer: `MobileAppStrip` boven de bottom-nav.
+   */
+  categoryAppLinks: CategoryAppLink[]
+}
+
+// ── CategoryAppLinks context ────────────────────────────────────────────────
+//
+// Door de tree heen prop-drillen van `MobileStackShell → Tray → MobileBottomBar`
+// zou Tray dwingen om iets van app-strip-data af te weten. Een lichte context
+// houdt het slot-component-patroon zuiver — MobileBottomBar leest direct, Tray
+// blijft puur over visuele transitie gaan. Sidebar zit elders in de tree
+// (portal) en behoudt zijn bestaande prop-API.
+const CategoryAppLinksContext = createContext<CategoryAppLink[]>([])
+
+export function useCategoryAppLinks(): CategoryAppLink[] {
+  return useContext(CategoryAppLinksContext)
 }
 
 export type ResponsiveShellProps = {
@@ -226,6 +247,7 @@ function NewShell({
   const netWorth = sidebarMetrics?.netWorth ?? 0
   const actionCount = sidebarMetrics?.actionCount ?? 0
   const activeAppKeys = sidebarMetrics?.activeAppKeys ?? []
+  const categoryAppLinks = sidebarMetrics?.categoryAppLinks ?? []
 
   // Media-query-gated single-mount: pre-hydratie blijven beide shells in de
   // boom (SSR-output matcht, geen flash op eerste paint). Direct na de eerste
@@ -240,6 +262,7 @@ function NewShell({
 
   return (
     <NavStackProvider>
+     <CategoryAppLinksContext.Provider value={categoryAppLinks}>
       {/* Sidebar via portal naar document.body — omzeilt ChatLayoutWrapper's
           `contain: layout`. Onder lg:-breakpoint rendert Sidebar `null`
           (hidden lg:flex), dus de portal heeft daar geen visuele impact. */}
@@ -290,6 +313,7 @@ function NewShell({
           </div>
         </DailyExpenseProvider>
       </ChatLayoutWrapper>
+     </CategoryAppLinksContext.Provider>
     </NavStackProvider>
   )
 }
