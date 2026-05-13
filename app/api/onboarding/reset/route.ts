@@ -57,6 +57,34 @@ export async function POST() {
       .eq('id', user.id)
       // Ignore errors — columns may not exist yet
 
+    // Reset stappenplan- en onboarding-metadata. Deze leven in optionele
+    // kolommen die mogelijk ontbreken op pre-migration databases, dus we
+    // proberen ze één voor één en strippen op schema-cache-miss. Reden:
+    // zonder deze reset blijft de StappenplannenStrook op /will de oude
+    // afgevinkte/weggeklikte staat tonen na een data-wipe.
+    const STAPPENPLAN_RESET_FIELDS: Record<string, unknown> = {
+      module_guide_state: {},
+      primary_goal_slug: null,
+      selected_goal_slugs: null,
+      onboarding_intent: null,
+      completed_onboarding_steps: null,
+      news_description: null,
+      financial_context: null,
+    }
+    const stappenplanPayload: Record<string, unknown> = { ...STAPPENPLAN_RESET_FIELDS }
+    for (let attempt = 0; attempt < Object.keys(STAPPENPLAN_RESET_FIELDS).length + 1; attempt++) {
+      const { error } = await supabase
+        .from('profiles')
+        .update(stappenplanPayload)
+        .eq('id', user.id)
+      if (!error) break
+      const missing = Object.keys(STAPPENPLAN_RESET_FIELDS).find(
+        (col) => error.message?.includes(`'${col}'`) || error.message?.includes(`"${col}"`),
+      )
+      if (!missing || !(missing in stappenplanPayload)) break
+      delete stappenplanPayload[missing]
+    }
+
     return Response.json({ success: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'

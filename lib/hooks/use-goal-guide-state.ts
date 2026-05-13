@@ -20,6 +20,8 @@ interface ProgressApiResponse {
   state: ProgressState
   hasOnboardingIntent: boolean
   primaryGoalSlug: string | null
+  /** Multi-select doel-slugs uit onboarding fase 3 (mei 2026). Mag leeg zijn. */
+  selectedGoalSlugs?: string[]
 }
 
 // ── Hook ───────────────────────────────────────────────────────
@@ -35,7 +37,12 @@ interface ProgressApiResponse {
  */
 export function useGoalGuideState() {
   const [state, setState] = useState<ProgressState>({})
-  const [primaryGoalSlug, setPrimaryGoalSlug] = useState<GoalSlug | null>(null)
+  // selectedGoalSlugs is de canonical bron sinds fase 3 (mei 2026): de
+  // gebruiker mag meerdere doelen kiezen in onboarding-stap "doel" en de
+  // strook op /will rendert per-slug een GoalStappenplanCard. primaryGoalSlug
+  // blijft afgeleid als `selectedGoalSlugs[0] ?? null` voor backward-compat
+  // met consumers als briefing-card-grid die nog op één slug leunen.
+  const [selectedGoalSlugs, setSelectedGoalSlugs] = useState<GoalSlug[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fetchedRef = useRef(false)
@@ -52,8 +59,19 @@ export function useGoalGuideState() {
         if (!res.ok) throw new Error('Failed to fetch')
         const data = (await res.json()) as ProgressApiResponse
         setState(data?.state ?? {})
-        const slug = data?.primaryGoalSlug
-        setPrimaryGoalSlug(isGoalSlug(slug) ? slug : null)
+        // Prefer de array uit fase-3 responses. Fallback: ouder server-deploy
+        // dat alleen primaryGoalSlug stuurt — construeer single-item array
+        // zodat één goal-kaart blijft renderen.
+        const rawArray = Array.isArray(data?.selectedGoalSlugs) ? data.selectedGoalSlugs : null
+        const filteredArray = rawArray
+          ? rawArray.filter((s): s is GoalSlug => isGoalSlug(s))
+          : null
+        if (filteredArray && filteredArray.length > 0) {
+          setSelectedGoalSlugs(filteredArray)
+        } else {
+          const primary = data?.primaryGoalSlug
+          setSelectedGoalSlugs(isGoalSlug(primary) ? [primary] : [])
+        }
       } catch {
         setError('Kon doelvoortgang niet laden')
       } finally {
@@ -63,6 +81,10 @@ export function useGoalGuideState() {
 
     fetchState()
   }, [])
+
+  // Afgeleide primaryGoalSlug — eerste in de array of null. Bewust geen
+  // aparte state-veld om out-of-sync te voorkomen.
+  const primaryGoalSlug: GoalSlug | null = selectedGoalSlugs[0] ?? null
 
   // ── Send action to API ─────────────────────────────────────────
 
@@ -187,6 +209,7 @@ export function useGoalGuideState() {
   return {
     state,
     primaryGoalSlug,
+    selectedGoalSlugs,
     loading,
     error,
     toggleStep,

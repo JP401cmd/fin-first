@@ -19,6 +19,7 @@ const NEW_ACTIVE_ORDER = [
   'identity',
   'inkomen',
   'bezittingen',
+  'spaardoel',
   'klaar',
   'saving',
   'success',
@@ -297,6 +298,154 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     })
     expect(result.step).toBe('identity')
     expect(warnSpy).toHaveBeenCalledOnce()
+  })
+})
+
+describe('onboarding _reducer — SET_SPAARDOEL', () => {
+  it('replaces the spaardoel substate with the dispatched payload', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_SPAARDOEL',
+      data: {
+        presetKey: 'noodfonds',
+        name: 'Mijn buffer',
+        target_value: '7500',
+        target_date: '2027-01',
+        skipped: false,
+      },
+    })
+    expect(result.spaardoel).toEqual({
+      presetKey: 'noodfonds',
+      name: 'Mijn buffer',
+      target_value: '7500',
+      target_date: '2027-01',
+      skipped: false,
+    })
+  })
+
+  it('marks the spaardoel as skipped without persisting a partial entry', () => {
+    // Skip-flow dispatch — wis pre-fill velden zodat handleSaveOwnData
+    // niet alsnog een onboardingGoal-payload bouwt.
+    const result = _reducer(_initialState, {
+      type: 'SET_SPAARDOEL',
+      data: {
+        presetKey: null,
+        name: '',
+        target_value: '',
+        target_date: '',
+        skipped: true,
+      },
+    })
+    expect(result.spaardoel.skipped).toBe(true)
+    expect(result.spaardoel.presetKey).toBeNull()
+    expect(result.spaardoel.name).toBe('')
+  })
+
+  it('does not affect other state fields', () => {
+    // Start vanuit een state met goals + identity, dispatch spaardoel, check
+    // dat selectedGoals / identity / quickAssets ongemoeid blijven.
+    const withGoal = _reducer(_initialState, {
+      type: 'SET_GOAL',
+      goals: ['noodfonds'],
+    })
+    const result = _reducer(withGoal, {
+      type: 'SET_SPAARDOEL',
+      data: {
+        presetKey: 'vakantie',
+        name: 'Zomer',
+        target_value: '2500',
+        target_date: '',
+        skipped: false,
+      },
+    })
+    expect(result.selectedGoals).toEqual(['noodfonds'])
+    expect(result.activeModules).toEqual(withGoal.activeModules)
+  })
+})
+
+describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
+  it('keeps a klaar lastStep on klaar without retroactively routing to spaardoel', () => {
+    // Belangrijke check: een gebruiker die de vorige flow op `klaar` had
+    // afgesloten moet daar landen, niet stilzwijgend terug naar de nieuwe
+    // tussenstap `spaardoel`. De membership-check in active-order matched
+    // direct op `klaar`, dus geen healing nodig.
+    const result = _resolveRestoredStep('klaar', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'klaar', healed: false })
+  })
+
+  it('restores a draft saved on spaardoel without warning', () => {
+    const result = _resolveRestoredStep('spaardoel', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'spaardoel', healed: false })
+  })
+})
+
+describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
+  const baseIdentity = {
+    full_name: 'Jan Paul',
+    date_of_birth: '1986-04-05',
+    household_type: 'solo',
+    number_of_children: 0,
+    net_monthly_income: '3500',
+    estimated_monthly_expenses: '2200',
+  }
+  const baseHorizon = _initialState.horizon
+
+  let warnSpy: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    warnSpy.mockRestore()
+  })
+
+  it('restores a saved spaardoel substate verbatim', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: ['noodfonds'],
+        activeModules: ['budgetteren', 'inzicht_acties'],
+        horizon: baseHorizon,
+        newsDescription: '',
+        extraction: null,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        spaardoel: {
+          presetKey: 'vakantie',
+          name: 'Italië 2027',
+          target_value: '3500',
+          target_date: '2027-06',
+          skipped: false,
+        },
+        lastStep: 'spaardoel',
+      },
+    })
+    expect(result.step).toBe('spaardoel')
+    expect(result.spaardoel.presetKey).toBe('vakantie')
+    expect(result.spaardoel.name).toBe('Italië 2027')
+  })
+
+  it('falls back to the initial spaardoel state when missing from a legacy draft', () => {
+    // Een draft van vóór de spaardoel-stap kent het veld niet. RESTORE_STATE
+    // moet dan terugvallen op `_initialState.spaardoel`.
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: ['grip-uitgaven'],
+        activeModules: ['budgetteren'],
+        horizon: baseHorizon,
+        newsDescription: '',
+        extraction: null,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        // spaardoel ontbreekt bewust — legacy draft simulatie
+        lastStep: 'klaar',
+      },
+    })
+    expect(result.step).toBe('klaar')
+    expect(result.spaardoel).toEqual(_initialState.spaardoel)
   })
 })
 

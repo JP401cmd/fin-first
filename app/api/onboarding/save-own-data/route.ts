@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getDefaultBudgets } from '@/lib/budget-data'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
@@ -88,6 +89,41 @@ async function applyModuleTrackingFlags(
       .update({ has_holdings_tracking: true })
       .eq('user_id', userId)
       .eq('asset_type', 'investment')
+  }
+}
+
+/**
+ * Insert het onboarding-spaardoel als één rij in de `goals`-tabel. Wordt
+ * aangeroepen in zowel het RPC-pad als het multi-step-fallback-pad nadat
+ * de profile-write klaar is — onze RLS-policy vereist dat `user_id` (de
+ * profile-id) gelijk is aan `auth.uid()`.
+ *
+ * Non-blocking: bij een fout loggen we maar throwen niet. Onboarding mag
+ * niet stilvallen op een goal-insert die mislukt, conform spec.
+ */
+async function insertOnboardingGoal(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  goal: NonNullable<z.infer<typeof bodySchema>['onboardingGoal']>,
+) {
+  const { error } = await supabase.from('goals').insert({
+    user_id: userId,
+    name: goal.name,
+    description: null,
+    goal_type: goal.goal_type,
+    target_value: goal.target_value,
+    current_value: 0,
+    target_date: goal.target_date ?? null,
+    linked_asset_id: null,
+    linked_debt_id: null,
+    icon: goal.icon,
+    color: goal.color,
+    custom_unit: null,
+    ownership: 'personal',
+    household_id: null,
+  })
+  if (error) {
+    console.error('[onboarding-save] goal insert failed:', error.message)
   }
 }
 
@@ -321,6 +357,30 @@ const bodySchema = z.object({
     'eerder-stoppen',
     'bewust-leven',
   ])).optional(),
+  /**
+   * Spaardoel-keuze van onboarding-stap v. Optioneel — gebruiker mag skippen.
+   * Wanneer aanwezig wordt één rij in de `goals`-tabel geïnserteerd na de
+   * profile-write (RLS-check faalt anders op de FK). Faalt deze insert om
+   * welke reden dan ook, dan wordt de fout gelogd en gaat de save door —
+   * onboarding mag niet stilvallen op een goal-insert error.
+   *
+   * Constraints spiegelen `goals`-tabel: `target_value > 0`, `name` niet
+   * leeg. `goal_type` is voor alle presets 'savings'; de Shield-icoon +
+   * naam dragen de semantiek "Noodfonds", niet de enum (zie
+   * `lib/onboarding-presets.ts` voor de motivatie).
+   */
+  onboardingGoal: z.object({
+    name: z.string().min(1).max(200),
+    target_value: z.number().positive(),
+    target_date: z.string().nullable().optional(),
+    goal_type: z.enum([
+      'savings', 'debt_payoff', 'net_worth', 'freedom_days',
+      'savings_rate', 'invested_assets', 'passive_income',
+      'emergency_fund', 'salary', 'custom',
+    ]),
+    icon: z.string().min(1).max(40),
+    color: z.enum(['teal', 'amber', 'purple', 'emerald', 'red', 'blue']),
+  }).optional(),
   /** Pre-extracted data from client-side review (avoids re-running AI extraction) */
   extractionData: z.object({
     assets: z.array(z.object({
@@ -378,6 +438,7 @@ export async function POST(req: Request) {
     intent: rawIntent,
     selectedGoalSlug: rawSelectedGoalSlug,
     selectedGoalSlugs: rawSelectedGoalSlugs,
+    onboardingGoal,
   } = parsed.data
 
   // Normaliseer de goal-input: de fase-3 client stuurt zowel een array
@@ -460,6 +521,7 @@ export async function POST(req: Request) {
         const updates: Record<string, unknown> = {}
         if (intent) updates.onboarding_intent = intent
         if (primaryGoalSlug) updates.primary_goal_slug = primaryGoalSlug
+        if (selectedGoalSlugs.length > 0) updates.selected_goal_slugs = selectedGoalSlugs
         await supabase.from('profiles').update(updates).eq('id', user.id)
       }
       return Response.json({ success: true, alreadyCompleted: true })
@@ -614,6 +676,7 @@ export async function POST(req: Request) {
           completed_onboarding_steps: completedSteps,
           onboarding_intent: intent ?? null,
           primary_goal_slug: primaryGoalSlug ?? null,
+          selected_goal_slugs: selectedGoalSlugs.length > 0 ? selectedGoalSlugs : null,
         }
         // budgeting_active follows the intent's preset so onboarding-flow gating
         // (e.g. "show budgets step") stays in sync. Tracking on individual
@@ -700,7 +763,19 @@ export async function POST(req: Request) {
         // zetten ze hier expliciet aan zodat de Budgetteren- en Holdings-
         // apps direct een rekening hebben om mee te werken.
         await applyModuleTrackingFlags(supabase, user.id, activeModules)
+
+        // Onboarding-spaardoel (stap v.) — non-blocking insert. Faalt deze,
+        // dan slaat de gebruiker hem later handmatig aan via /will.
+        if (onboardingGoal) {
+          await insertOnboardingGoal(supabase, user.id, onboardingGoal)
+        }
       }
+      // Invalideer de server-cache voor de eerste pagina's die de gebruiker
+      // na onboarding bezoekt — voorkomt dat een Next.js-cache de oude
+      // stappenplan-staat blijft tonen na een data-reset + her-onboarding.
+      revalidatePath('/will')
+      revalidatePath('/core')
+      revalidatePath('/dashboard')
       return Response.json({ success: true, alreadyCompleted: result.already_completed ?? false })
     }
 
@@ -756,6 +831,7 @@ export async function POST(req: Request) {
     if (newsDescription) profileData.news_description = newsDescription
     if (intent) profileData.onboarding_intent = intent
     if (primaryGoalSlug) profileData.primary_goal_slug = primaryGoalSlug
+    if (selectedGoalSlugs.length > 0) profileData.selected_goal_slugs = selectedGoalSlugs
     profileData.completed_onboarding_steps = completedSteps
     // Server-controlled: leeg dashboard na onboarding. Zie buildRpcPayload.
     profileData.widget_prefs = { widgets: [] }
@@ -774,6 +850,7 @@ export async function POST(req: Request) {
       'news_description',
       'onboarding_intent',
       'primary_goal_slug',
+      'selected_goal_slugs',
       'onboarding_idempotency_key',
       'completed_onboarding_steps',
       'expected_return',
@@ -1102,6 +1179,15 @@ export async function POST(req: Request) {
       if (error) console.error('AI-extracted life events insert error:', error)
     }
 
+    // 6d. Onboarding-spaardoel (stap v.) — non-blocking insert. Mag falen
+    // zonder dat onboarding daarop afhaakt; gebruiker maakt het anders
+    // later handmatig aan via /will. Bewust hier na assets/debts en vóór
+    // de completed-flag: een gefaalde profile-write zou ons hier nooit
+    // brengen, dus user.id is gegarandeerd persistent.
+    if (onboardingGoal) {
+      await insertOnboardingGoal(supabase, user.id, onboardingGoal)
+    }
+
     // 7. Mark onboarding as completed LAST — only after all data is saved successfully
     // This ensures the idempotency guard doesn't block retries after partial failures
     const { error: completeErr } = await supabase
@@ -1115,6 +1201,12 @@ export async function POST(req: Request) {
       .from('profiles')
       .update({ last_known_phase: 'recovery' })
       .eq('id', user.id)
+
+    // Invalideer de server-cache voor de eerste pagina's die de gebruiker
+    // na onboarding bezoekt — zelfde semantiek als het RPC-success-pad.
+    revalidatePath('/will')
+    revalidatePath('/core')
+    revalidatePath('/dashboard')
 
     return Response.json({ success: true })
   } catch (err) {

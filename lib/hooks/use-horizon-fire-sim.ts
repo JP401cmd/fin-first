@@ -73,10 +73,15 @@ interface HorizonFireSimInput {
   hasPartner?: boolean
   /** Totaal saldo van ontkoppelde bankrekeningen (niet gekoppeld aan assets) */
   bankAccountCash?: number
+  /** Handmatige spaargeld-override uit profiles.monthly_savings_override.
+   *  Indien gezet (non-null), wordt deze waarde × 12 gebruikt als annualSavings
+   *  in plaats van het asset-contributie-aggregaat. Fallback voor users met
+   *  Budgetteren-module uit of zonder asset-contributies. */
+  monthlySavingsOverride?: number | null
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
   const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[] } | null>(() => {
@@ -92,8 +97,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const yearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : 0
     if (yearlyExpenses <= 0) return null
 
-    // annualSavings
-    const annualSavings = (monthlyContributions ?? 0) * 12
+    // annualSavings — override wint over asset-aggregaat zodat users zonder
+    // monthly_contribution op assets (bv. Budgetteren-module uit) een
+    // werkende prognose krijgen.
+    const effectiveMonthlyContrib = monthlySavingsOverride != null && monthlySavingsOverride >= 0
+      ? monthlySavingsOverride
+      : (monthlyContributions ?? 0)
+    const annualSavings = effectiveMonthlyContrib * 12
 
     const grossReturn = grossReturnParam ?? DEFAULT_RETURN
     const inflationRate = inflationParam ?? INFLATION
@@ -127,7 +137,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       endAge: simEndAge,
       yearlyExpenses,
       annualSavings,
-      monthlySurplus: (monthlyContributions ?? 0),
+      monthlySurplus: effectiveMonthlyContrib,
       monthlyIncome: monthlyIncome ?? 0,
       incomeGrowthRate: 0,  // conservatief: geen inkomensgroei in FIRE simulatie
       grossReturn,
@@ -167,7 +177,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     }
 
     return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: unifiedResult.rows }
-  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner])
+  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)

@@ -35,12 +35,27 @@ export async function GET() {
     }
   }
 
+  // monthly_savings_override — aparte maybeSingle() zodat ontbrekende kolom
+  // op legacy DBs (migratie 20260513000001 nog niet gerund) graceful null
+  // returnt ipv 500.
+  let monthlySavingsOverride: number | null = null
+  const { data: overrideData, error: overrideError } = await supabase
+    .from('profiles')
+    .select('monthly_savings_override')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (!overrideError && overrideData) {
+    const raw = (overrideData as { monthly_savings_override?: number | string | null }).monthly_savings_override
+    monthlySavingsOverride = raw == null ? null : Number(raw)
+  }
+
   return NextResponse.json({
     retirement_expense_method: data?.retirement_expense_method ?? 'essential_budgets',
     retirement_expense_custom_amount: data?.retirement_expense_custom_amount ?? null,
     fire_end_strategy: strategy,
     fire_end_age: data?.fire_end_age ?? 90,
     fire_legacy_amount: data?.fire_legacy_amount ?? null,
+    monthly_savings_override: monthlySavingsOverride,
   })
 }
 
@@ -86,6 +101,14 @@ export async function PUT(request: NextRequest) {
     updatePayload.retirement_expense_custom_amount = body.retirement_expense_custom_amount != null ? Number(body.retirement_expense_custom_amount) : null
   }
 
+  // monthly_savings_override — alleen meenemen als expliciet aanwezig in body.
+  // Apart bijgewerkt na de hoofd-update zodat een ontbrekende kolom (legacy DBs
+  // zonder migratie 20260513000001) niet de hele save laat falen.
+  const overrideInBody = 'monthly_savings_override' in body
+  const overrideValue = overrideInBody
+    ? (body.monthly_savings_override == null ? null : Number(body.monthly_savings_override))
+    : undefined
+
   // First attempt — try saving directly to profiles
   const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id)
 
@@ -108,7 +131,19 @@ export async function PUT(request: NextRequest) {
         await supabase.from('profiles').update({ feature_preferences: fp }).eq('id', user.id)
       }
     }
-    return NextResponse.json({ success: true, ...updatePayload })
+    // monthly_savings_override — defensieve aparte update zodat een ontbrekende
+    // kolom op legacy DBs niet de hele save laat falen. Bij missing-column-error
+    // loggen we maar retourneren we nog steeds success voor de andere velden.
+    if (overrideInBody) {
+      const { error: overrideError } = await supabase
+        .from('profiles')
+        .update({ monthly_savings_override: overrideValue })
+        .eq('id', user.id)
+      if (overrideError) {
+        console.warn('[fire-settings] monthly_savings_override update failed (column may be missing):', overrideError.message)
+      }
+    }
+    return NextResponse.json({ success: true, ...updatePayload, monthly_savings_override: overrideValue })
   }
 
   // If CHECK constraint violation (code 23514), use feature_preferences fallback

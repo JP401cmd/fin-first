@@ -129,6 +129,8 @@ import {
   getWealthCompositionTips,
   getIncomeExpenseTips,
 } from '@/lib/chart-tips'
+import { HorizonFireIntroCard } from '@/components/app/horizon/horizon-fire-intro-card'
+import { HorizonSetupPane } from '@/components/app/horizon/horizon-setup-pane'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
@@ -258,6 +260,19 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null)
 
+  // ── Horizon FIRE-prognose setup-pane state ──────────────────────
+  // hasCompletedHorizonSetup: true zodra de gebruiker de setup-pane
+  // heeft doorlopen + opgeslagen. Server-loader vult de initiële waarde,
+  // lokaal updaten we direct na succesvolle save zodat de chart
+  // verschijnt zonder reload.
+  const [hasCompletedHorizonSetup, setHasCompletedHorizonSetup] = useState<boolean>(initialData.hasCompletedHorizonSetup)
+  const [setupPaneOpen, setSetupPaneOpen] = useState(false)
+  // monthlySavingsOverride wordt doorgegeven aan useHorizonFireSim zodat
+  // de prognose de override-waarde gebruikt boven het asset-aggregaat.
+  // We houden lokaal state aan zodat een save in de pane direct doorwerkt.
+  const [monthlySavingsOverride, setMonthlySavingsOverride] = useState<number | null>(initialData.monthlySavingsOverride)
+  const kernEmpty = (initialData.assets?.length ?? 0) === 0 && (initialData.debts?.length ?? 0) === 0
+
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -301,6 +316,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         setEventPaneMode(eventEditParam === 'true' ? 'edit' : 'view')
         setEventPaneOpen(true)
       }
+      shouldReplace = true
+    }
+
+    // Support ?horizonSetup=open — geopend vanuit HorizonFireIntroCard.
+    const horizonSetupParam = searchParams.get('horizonSetup')
+    if (horizonSetupParam === 'open') {
+      setSetupPaneOpen(true)
       shouldReplace = true
     }
 
@@ -362,6 +384,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           box3Method: initialData.box3Method,
           hasPartner: initialData.hasPartner,
           bankAccountCash: initialData.unlinkedCash,
+          monthlySavingsOverride,
         }
       : null,
   )
@@ -2375,8 +2398,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </div>
           )}
 
-          {/* Grafiekgedeelte — fallback UI als simResult niet beschikbaar is */}
-          {!simResult && !loading ? (
+          {/* Grafiekgedeelte — vervangen door intro-card zolang de gebruiker
+              de setup-pane niet heeft doorlopen + opgeslagen. */}
+          {!hasCompletedHorizonSetup ? (
+            <HorizonFireIntroCard kernEmpty={kernEmpty} />
+          ) : !simResult && !loading ? (
             <div className="flex flex-col items-center justify-center rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] px-6 py-16 text-center" style={{ minHeight: 320 }}>
               <AlertTriangle className="mb-3 h-8 w-8 text-[var(--ink-4)]" />
               <p className="font-sans text-sm font-medium text-[var(--ink-2)]">
@@ -6605,6 +6631,33 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           const maxA = rows[rows.length - 1].age
           setSelectedYearAge(Math.max(minA, Math.min(newAge, maxA)))
         }}
+      />
+
+      {/*
+        HorizonSetupPane — basis-instellingen voor de FIRE-prognose.
+        Opent vanuit HorizonFireIntroCard (CTA "Stel je prognose-voorkeuren in")
+        of via deep-link ?horizonSetup=open. Na succesvolle save vervangt de
+        chart de intro-card direct (lokale state-update, geen reload).
+        Key forceert remount per open zodat initial-values uit props
+        opnieuw worden geinitialiseerd na een eerdere annulering.
+      */}
+      <HorizonSetupPane
+        key={setupPaneOpen ? 'horizonSetup-open' : 'horizonSetup-closed'}
+        open={setupPaneOpen}
+        onClose={() => setSetupPaneOpen(false)}
+        onCompleted={(saved) => {
+          setHasCompletedHorizonSetup(true)
+          setMonthlySavingsOverride(saved.monthlySavingsOverride)
+        }}
+        initialMonthlySavingsOverride={monthlySavingsOverride}
+        monthlyContributionFromAssets={initialData.monthlyContributionFromAssets}
+        monthlySurplusFromBudget={initialData.monthlySurplusFromBudget}
+        budgetingActive={initialData.budgetingActive}
+        initialEndStrategy={initialData.fireStrategy.strategy}
+        initialEndAge={initialData.fireStrategy.endAge}
+        initialLegacyAmount={initialData.fireStrategy.legacyAmount}
+        initialRetirementMethod={initialData.retirementExpenseMethod}
+        initialRetirementCustomAmount={initialData.retirementExpenseCustomAmount}
       />
     </div>
   )

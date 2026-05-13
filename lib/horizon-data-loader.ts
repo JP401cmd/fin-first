@@ -68,6 +68,22 @@ export interface HorizonPageData {
   unlinkedCash: number
   /** Number of children from profile (for erfgenamen calculation) */
   numberOfChildren: number
+  /** Of de gebruiker de Horizon-prognose setup-pane heeft doorlopen + opgeslagen.
+   *  Bepaalt of de intro-card de hoofd-grafiek vervangt op /horizon. */
+  hasCompletedHorizonSetup: boolean
+  /** Maandelijks spaar-override uit profiles.monthly_savings_override.
+   *  NULL = gebruik asset-aggregaat (monthlyContributionFromAssets). */
+  monthlySavingsOverride: number | null
+  /** Maandelijkse asset-contributie-aggregaat (assets.monthly_contribution).
+   *  Voor weergave in setup-pane als "berekende waarde". */
+  monthlyContributionFromAssets: number
+  /** Maandelijks surplus uit budget-data (avgIncome6m - avgExpenses6m), null
+   *  als budgetteren-module uit staat of geen surplus. Voor setup-pane summary. */
+  monthlySurplusFromBudget: number | null
+  /** Retirement-expense methode uit profile (raw, mogelijk null bij nieuwe users). */
+  retirementExpenseMethod: RetirementExpenseMethod | null
+  /** Retirement-expense custom amount uit profile (null als methode != custom_amount). */
+  retirementExpenseCustomAmount: number | null
 }
 
 /**
@@ -99,6 +115,12 @@ function computeCumulativeImpacts(
   })
 }
 
+/** Feature slug used to track whether the user has completed the Horizon
+ *  prognose setup-pane. Stored in user_feature_visits. Shared with
+ *  components/app/horizon/horizon-setup-pane.tsx so the POST after save
+ *  matches the slug the loader reads. */
+export const HORIZON_SETUP_COMPLETED_SLUG = 'horizon_setup_completed'
+
 /** Default profile fallback values when profile query fails */
 const PROFILE_DEFAULTS = {
   date_of_birth: null as string | null,
@@ -117,6 +139,7 @@ const PROFILE_DEFAULTS = {
   guardrail_ceiling: 1.20,
   guardrail_cut_step: WITHDRAWAL_DEFAULTS.guardrailCutStep,
   guardrail_raise_step: WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
+  monthly_savings_override: null as number | null,
 }
 
 export async function loadHorizonData(supabase: SupabaseClient): Promise<HorizonPageData> {
@@ -143,6 +166,8 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     tx6mResult,
     bankAccountsResult,
     wsResult,
+    horizonSetupVisitResult,
+    savingsOverrideResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     // Single assets query: returns full rows (typed as Asset[]) used for both
@@ -181,6 +206,23 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     supabase
       .from('profiles')
       .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
+      .maybeSingle(),
+    // Horizon-setup-pane voltooid-marker. Wordt geschreven door
+    // components/app/horizon/horizon-setup-pane.tsx na een succesvolle save.
+    // Bepaalt of de intro-card de hoofd-grafiek vervangt op /horizon.
+    // .maybeSingle() + try/catch downstream — table kan ontbreken op legacy DBs.
+    supabase
+      .from('user_feature_visits')
+      .select('feature_slug')
+      .eq('feature_slug', HORIZON_SETUP_COMPLETED_SLUG)
+      .maybeSingle(),
+    // monthly_savings_override profile-kolom. Aparte .maybeSingle()-query
+    // zodat een ontbrekende kolom op legacy DBs (migratie 20260513000001
+    // nog niet gerund) graceful null returnt ipv het hele profile-query
+    // te laten falen.
+    supabase
+      .from('profiles')
+      .select('monthly_savings_override')
       .maybeSingle(),
   ])
 
@@ -476,6 +518,30 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
   const numberOfChildren = Number((profile as Record<string, unknown>).number_of_children ?? 0)
 
+  // ── Horizon setup-pane state ──────────────────────────────────────
+  // hasCompletedHorizonSetup: true zodra de gebruiker de Horizon-prognose-
+  // setup-pane heeft doorlopen + opgeslagen. Bepaalt of de hoofd-grafiek
+  // wordt vervangen door de intro-card.
+  const hasCompletedHorizonSetup = !horizonSetupVisitResult.error
+    && horizonSetupVisitResult.data?.feature_slug === HORIZON_SETUP_COMPLETED_SLUG
+
+  // monthlySavingsOverride: handmatige override uit profiles. Null = geen
+  // override, simulator gebruikt monthlyContributionFromAssets.
+  const overrideRaw = savingsOverrideResult.error
+    ? null
+    : (savingsOverrideResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override ?? null
+  const monthlySavingsOverride = overrideRaw == null ? null : Number(overrideRaw)
+
+  // monthlyContributionFromAssets: raw asset-aggregaat (identiek aan
+  // monthlyContributions hierboven, geëxporteerd voor de setup-pane).
+  const monthlyContributionFromAssets = monthlyContributions
+
+  // monthlySurplusFromBudget: surplus uit 6m gemiddelde transacties als
+  // Budgetteren-module actief is. Null als module uit of geen surplus.
+  const monthlySurplusFromBudget = budgetingActive && avgIncome6m > 0 && avgExpenses6m > 0
+    ? Math.max(0, avgIncome6m - avgExpenses6m)
+    : null
+
   return {
     effectiveInput,
     events: loadedEvents,
@@ -500,5 +566,11 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
       : null,
     unlinkedCash,
     numberOfChildren,
+    hasCompletedHorizonSetup,
+    monthlySavingsOverride,
+    monthlyContributionFromAssets,
+    monthlySurplusFromBudget,
+    retirementExpenseMethod: (profile.retirement_expense_method as RetirementExpenseMethod | null) ?? null,
+    retirementExpenseCustomAmount: profile.retirement_expense_custom_amount ?? null,
   }
 }

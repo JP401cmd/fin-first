@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { shouldAlert } from '@/lib/budget-alerts'
 import { getActiveNudges, type NudgeDataState, type NudgeOverrides } from '@/lib/nudge-definitions'
 import type { ModuleId } from '@/lib/module-registry'
+import { shouldSendWozReminder, WOZ_REMINDER_TEMPLATE } from '@/lib/notifications/woz-reminder'
+import { shouldSendPensionReminder, PENSION_REMINDER_TEMPLATE } from '@/lib/notifications/pension-reminder'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -297,6 +299,86 @@ export async function GET(request: NextRequest) {
           aiContext: `Mijn bankrekening ${label} is al ${daysSince} dagen niet gesynchroniseerd. Wat moet ik doen?`,
         })
       }
+    }
+
+    // ── 4b. Jaarlijkse onderhouds-reminders (WOZ + pensioen) ─────────
+    // Pure beslislogica leeft in `lib/notifications/{woz,pension}-reminder.ts`.
+    // State per gebruiker in `app_settings.{woz,pension}_reminder_last_sent_*`
+    // zorgt dat de reminder maximaal 1× per kalenderjaar verschijnt.
+
+    try {
+      const { data: reminderAssetRows } = await supabase
+        .from('assets')
+        .select('asset_type')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .in('asset_type', ['eigen_huis', 'retirement'])
+
+      const reminderAssets = reminderAssetRows ?? []
+      const eigenHuisCount = reminderAssets.filter((a) => a.asset_type === 'eigen_huis').length
+      const retirementCount = reminderAssets.filter((a) => a.asset_type === 'retirement').length
+
+      if (eigenHuisCount > 0 || retirementCount > 0) {
+        const wozKey = `woz_reminder_last_sent_${user.id}`
+        const pensionKey = `pension_reminder_last_sent_${user.id}`
+
+        const [wozLastRes, pensionLastRes] = await Promise.all([
+          eigenHuisCount > 0
+            ? supabase.from('app_settings').select('value').eq('key', wozKey).maybeSingle()
+            : Promise.resolve({ data: null as { value: string } | null }),
+          retirementCount > 0
+            ? supabase.from('app_settings').select('value').eq('key', pensionKey).maybeSingle()
+            : Promise.resolve({ data: null as { value: string } | null }),
+        ])
+
+        const currentYear = new Date().getUTCFullYear()
+
+        if (
+          eigenHuisCount > 0 &&
+          shouldSendWozReminder({
+            profile: { eigenHuisAssetCount: eigenHuisCount },
+            lastSentAt: wozLastRes.data?.value ?? null,
+          })
+        ) {
+          await supabase
+            .from('app_settings')
+            .upsert({ key: wozKey, value: now }, { onConflict: 'key' })
+
+          const id = `woz_reminder_${currentYear}`
+          notifications.push({
+            id,
+            ...WOZ_REMINDER_TEMPLATE,
+            createdAt: now,
+            read: readIds.includes(id),
+            aiContext:
+              'Mijn gemeente publiceert deze maanden nieuwe WOZ-waarden. Hoe werk ik de waarde van mijn eigen huis bij?',
+          })
+        }
+
+        if (
+          retirementCount > 0 &&
+          shouldSendPensionReminder({
+            profile: { retirementAssetCount: retirementCount },
+            lastSentAt: pensionLastRes.data?.value ?? null,
+          })
+        ) {
+          await supabase
+            .from('app_settings')
+            .upsert({ key: pensionKey, value: now }, { onConflict: 'key' })
+
+          const id = `pension_reminder_${currentYear}`
+          notifications.push({
+            id,
+            ...PENSION_REMINDER_TEMPLATE,
+            createdAt: now,
+            read: readIds.includes(id),
+            aiContext:
+              'Hoe werk ik mijn pensioenwaarde bij vanuit Mijnpensioenoverzicht?',
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Yearly reminder notification error:', err)
     }
 
     // ── 5. Level-up notifications ───────────────────────────────────

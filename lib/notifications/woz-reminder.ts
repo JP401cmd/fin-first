@@ -6,14 +6,11 @@
  * één `eigen_huis` asset, mits er nog geen reminder is verstuurd in dit
  * kalenderjaar.
  *
- * Deze module levert pure beslislogica — een cron-job of de bestaande
- * `/api/notifications` aggregator kan `shouldSendWozReminder` aanroepen
- * en op basis van de uitkomst de notificatie inschieten + `lastSentAt`
- * persisteren in `app_settings` (key: `woz_reminder_last_sent_${user_id}`).
- *
- * TODO: nog geen cron-trigger ingehaakt — wordt opgepikt in een vervolg-PR
- * zodra het algemene scheduling-systeem (zie `app/api/notifications/route.ts`
- * runtime-aggregatie vs. echte cron) is uitgewerkt.
+ * Deze module levert pure beslislogica. Gewired in
+ * `app/api/notifications/route.ts` (sectie 4b): de aggregator roept
+ * `shouldSendWozReminder` aan, schiet de notificatie in als de uitkomst
+ * `true` is en persisteert `lastSentAt` in `app_settings` (key:
+ * `woz_reminder_last_sent_${user_id}`).
  */
 
 export interface WozReminderProfile {

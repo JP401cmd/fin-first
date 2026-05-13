@@ -54,11 +54,31 @@ export async function GET() {
     ? null
     : ((goalData as Record<string, unknown> | null)?.primary_goal_slug as string | null) ?? null
 
+  // Selected goal slugs (multi-select uit onboarding fase 3, mei 2026).
+  // Aparte fetch zodat een ontbrekende kolom de andere queries niet meesleurt.
+  // Bij column-missing of leeg array: val terug op de single-goal-list afgeleid
+  // van primary_goal_slug zodat pre-migration profielen hun ene kaart behouden.
+  const { data: slugsData, error: slugsError } = await supabase
+    .from('profiles')
+    .select('selected_goal_slugs')
+    .eq('id', user.id)
+    .single()
+  const rawSlugs = isColumnMissing(slugsError)
+    ? null
+    : ((slugsData as Record<string, unknown> | null)?.selected_goal_slugs as string[] | null) ?? null
+  const selectedGoalSlugs: string[] =
+    Array.isArray(rawSlugs) && rawSlugs.length > 0
+      ? rawSlugs
+      : primaryGoalSlug
+        ? [primaryGoalSlug]
+        : []
+
   if (!error) {
     return NextResponse.json({
       state: data?.module_guide_state ?? {},
       hasOnboardingIntent: hasIntent,
       primaryGoalSlug,
+      selectedGoalSlugs,
     })
   }
 
@@ -71,7 +91,7 @@ export async function GET() {
       .single()
 
     if (fbError) {
-      return NextResponse.json({ state: {}, hasOnboardingIntent: hasIntent, primaryGoalSlug })
+      return NextResponse.json({ state: {}, hasOnboardingIntent: hasIntent, primaryGoalSlug, selectedGoalSlugs })
     }
 
     const prefs = (fbData?.feature_preferences ?? {}) as Record<string, unknown>
@@ -79,6 +99,7 @@ export async function GET() {
       state: (prefs[FALLBACK_KEY] as ModuleGuideState) ?? {},
       hasOnboardingIntent: hasIntent,
       primaryGoalSlug,
+      selectedGoalSlugs,
     })
   }
 

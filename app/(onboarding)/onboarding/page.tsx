@@ -13,7 +13,9 @@ import { OnboardingDoel } from '@/components/onboarding/onboarding-doel'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingInkomen } from '@/components/onboarding/onboarding-inkomen'
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
+import { OnboardingSpaardoel } from '@/components/onboarding/onboarding-spaardoel'
 import { OnboardingKlaar } from '@/components/onboarding/onboarding-klaar'
+import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
@@ -50,8 +52,13 @@ const SAVING_MESSAGES = [
 
 /**
  * Active step union sinds de onboarding-redesign (mei 2026, fase 3):
- * 5 content-stappen (doel → identity → inkomen → bezittingen → klaar)
- * plus de twee terminal-stappen `saving`/`success`, en het news-only-pad.
+ * 6 content-stappen (doel → identity → inkomen → bezittingen → spaardoel
+ * → klaar) plus de twee terminal-stappen `saving`/`success`, en het
+ * news-only-pad.
+ *
+ * Stap `spaardoel` is in mei 2026 toegevoegd tussen `bezittingen` en
+ * `klaar`: laagdrempelig één spaardoel laten kiezen vlak voor de afronding
+ * (zie `components/onboarding/onboarding-spaardoel.tsx`).
  *
  * Legacy step-namen (`intro`, `goal`, `budgets`, `horizon`) zijn uit de
  * actieve flow verwijderd — ze leven nog in `CANONICAL_STEP_ORDER` zodat
@@ -62,6 +69,7 @@ type Step =
   | 'identity'
   | 'inkomen'
   | 'bezittingen'
+  | 'spaardoel'
   | 'klaar'
   | 'nieuws_only'
   | 'saving'
@@ -83,6 +91,7 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
   'goal',        // → doel (legacy)
   'inkomen',
   'bezittingen',
+  'spaardoel',   // toegevoegd mei 2026 — laagdrempelige spaardoel-keuze
   'budgets',     // → klaar (legacy)
   'horizon',     // → klaar (legacy)
   'klaar',
@@ -213,7 +222,22 @@ function computeStepOrder(selectedModules: ModuleId[]): Step[] {
     return ['doel', 'nieuws_only', 'saving', 'success']
   }
 
-  return ['doel', 'identity', 'inkomen', 'bezittingen', 'klaar', 'saving', 'success']
+  return ['doel', 'identity', 'inkomen', 'bezittingen', 'spaardoel', 'klaar', 'saving', 'success']
+}
+
+/**
+ * Spaardoel-keuze van stap v. — orchestrator-state. De child-component
+ * (`OnboardingSpaardoel`) bezit z'n eigen logica voor pre-fill en
+ * validatie; orchestrator slaat alleen de complete shape op.
+ */
+interface SpaardoelState {
+  presetKey: SpaardoelPresetKey | null
+  name: string
+  target_value: string
+  /** 'YYYY-MM' of '' wanneer leeg. */
+  target_date: string
+  /** True wanneer de gebruiker bewust heeft geskipt — gating voor insert. */
+  skipped: boolean
 }
 
 interface State {
@@ -233,6 +257,8 @@ interface State {
   budgetAmounts: Record<string, number>
   quickAssets: AssetQuickInput[]
   quickDebts: DebtQuickInput[]
+  /** Stap v. — spaardoel-keuze. Skipped + presetKey=null = niet weggeschreven. */
+  spaardoel: SpaardoelState
 }
 
 /** Data portion of state that gets persisted to localStorage (excludes step/direction) */
@@ -255,6 +281,8 @@ interface PersistedData {
   budgetAmounts: Record<string, number>
   quickAssets: AssetQuickInput[]
   quickDebts: DebtQuickInput[]
+  /** Spaardoel-keuze van stap v. — optioneel zodat oude drafts blijven werken. */
+  spaardoel?: SpaardoelState
   /** Last step the user was on (to restore position) */
   lastStep?: Step
 }
@@ -276,6 +304,11 @@ type Action =
   | { type: 'SET_BUDGET_AMOUNTS'; amounts: Record<string, number> }
   | { type: 'SET_QUICK_ASSETS'; items: AssetQuickInput[] }
   | { type: 'SET_QUICK_DEBTS'; items: DebtQuickInput[] }
+  /**
+   * Vervang de complete spaardoel-substate per dispatch — eenvoudiger dan
+   * partial-update-acties want de child levert telkens de volledige shape.
+   */
+  | { type: 'SET_SPAARDOEL'; data: SpaardoelState }
   | { type: 'RESTORE_STATE'; data: PersistedData }
 
 export const _initialState: State = {
@@ -297,6 +330,13 @@ export const _initialState: State = {
   budgetAmounts: {},
   quickAssets: [],
   quickDebts: [],
+  spaardoel: {
+    presetKey: null,
+    name: '',
+    target_value: '',
+    target_date: '',
+    skipped: false,
+  },
 }
 
 /**
@@ -374,6 +414,8 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, quickAssets: action.items }
     case 'SET_QUICK_DEBTS':
       return { ...state, quickDebts: action.items }
+    case 'SET_SPAARDOEL':
+      return { ...state, spaardoel: action.data }
     case 'RESTORE_STATE': {
       const restoredModules = action.data.activeModules ?? action.data.selectedModules ?? []
       // Recompute the active step order for the restored module selection so
@@ -416,6 +458,10 @@ export function _reducer(state: State, action: Action): State {
         budgetAmounts: action.data.budgetAmounts,
         quickAssets: action.data.quickAssets,
         quickDebts: action.data.quickDebts,
+        // Ontbrekend `spaardoel` in een legacy draft → val terug op de
+        // _initialState-shape. Geen migratie nodig — het is een nieuw veld
+        // dat oude drafts gewoon niet kennen.
+        spaardoel: action.data.spaardoel ?? _initialState.spaardoel,
       }
     }
     default:
@@ -450,6 +496,7 @@ function saveToLocalStorage(state: State) {
       budgetAmounts: state.budgetAmounts,
       quickAssets: state.quickAssets,
       quickDebts: state.quickDebts,
+      spaardoel: state.spaardoel,
       lastStep: state.step,
     }
     localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data))
@@ -511,6 +558,29 @@ function loadFromLocalStorage(): PersistedData | null {
     // op de nieuwe 3-velden-input zonder data te verzinnen — dus we droppen
     // ze. De gebruiker voegt opnieuw toe via de wizard. Acceptabel voor
     // onboarding (transient draft, geen permanente data).
+    //
+    // Spaardoel: oude drafts kennen het veld niet — defensieve parse die
+    // alleen overneemt wat we exact verwachten (presetKey-validatie tegen
+    // de bekende set). Faalt validatie, dan landt RESTORE_STATE op de
+    // _initialState-shape.
+    const validPresetKeys: ReadonlyArray<SpaardoelPresetKey> = [
+      'noodfonds', 'vakantie', 'auto', 'aanbetaling', 'groei', 'custom',
+    ]
+    let spaardoel: SpaardoelState | undefined = undefined
+    if (parsed.spaardoel && typeof parsed.spaardoel === 'object') {
+      const raw = parsed.spaardoel as Record<string, unknown>
+      const presetKey = typeof raw.presetKey === 'string' && (validPresetKeys as readonly string[]).includes(raw.presetKey)
+        ? (raw.presetKey as SpaardoelPresetKey)
+        : null
+      spaardoel = {
+        presetKey,
+        name: typeof raw.name === 'string' ? raw.name : '',
+        target_value: typeof raw.target_value === 'string' ? raw.target_value : '',
+        target_date: typeof raw.target_date === 'string' ? raw.target_date : '',
+        skipped: raw.skipped === true,
+      }
+    }
+
     const data: PersistedData = {
       identity,
       selectedGoals,
@@ -525,6 +595,7 @@ function loadFromLocalStorage(): PersistedData | null {
       budgetAmounts: parsed.budgetAmounts && typeof parsed.budgetAmounts === 'object' ? parsed.budgetAmounts : {},
       quickAssets: Array.isArray(parsed.quickAssets) ? parsed.quickAssets : [],
       quickDebts: Array.isArray(parsed.quickDebts) ? parsed.quickDebts : [],
+      spaardoel,
       lastStep: parsed.lastStep,
     }
 
@@ -544,6 +615,21 @@ function clearLocalStorage() {
   } catch {
     // silently ignore
   }
+}
+
+/**
+ * Parse de spaardoel-target_value string (NL-locale display met thousand-
+ * separators) naar een Number. Wordt in twee plekken gebruikt:
+ *   1. Bij het samenstellen van de recap-prop voor `OnboardingKlaar`.
+ *   2. Bij het samenstellen van de API-payload in `handleSaveOwnData`.
+ * Eén helper voorkomt duplicate-parsing met afwijkende regex tussen UI en
+ * server-call.
+ */
+function parseSpaardoelAmount(s: string): number {
+  if (!s) return 0
+  const cleaned = s.replace(/\./g, '').replace(',', '.')
+  const n = Number(cleaned)
+  return isFinite(n) && n > 0 ? n : 0
 }
 
 // ── Module-tint wrapper-style ───────────────────────────────
@@ -771,6 +857,33 @@ export default function OnboardingPage() {
         body.selectedGoalSlug = state.selectedGoals[0]
       }
 
+      // Add spaardoel-keuze van stap v. — alleen wanneer de gebruiker
+      // bewust een preset heeft gekozen, een naam heeft ingevuld, en een
+      // positief bedrag heeft. Skip-flow zet `skipped: true` en wist de
+      // velden, dus dit blok wordt dan automatisch overgeslagen.
+      if (
+        !state.spaardoel.skipped
+        && state.spaardoel.presetKey
+        && state.spaardoel.name.trim()
+      ) {
+        const amount = parseSpaardoelAmount(state.spaardoel.target_value)
+        if (amount > 0) {
+          const preset = SPAARDOEL_PRESETS[state.spaardoel.presetKey]
+          body.onboardingGoal = {
+            name: state.spaardoel.name.trim(),
+            target_value: amount,
+            // `<input type="month">` levert 'YYYY-MM' — voeg '-01' toe voor
+            // een geldige ISO-date die Supabase `date`-kolom accepteert.
+            target_date: state.spaardoel.target_date
+              ? `${state.spaardoel.target_date}-01`
+              : null,
+            goal_type: preset.goalType,
+            icon: preset.icon,
+            color: preset.color,
+          }
+        }
+      }
+
       // Add news description if present
       if (state.newsDescription) {
         body.newsDescription = state.newsDescription
@@ -826,15 +939,17 @@ export default function OnboardingPage() {
       // landingspad is — anders is de pagina leeg bij eerste bezoek.
       const aiPregenGoals: GoalSlug[] = ['bewust-leven', 'noodfonds']
       if (state.selectedGoals.some((g) => aiPregenGoals.includes(g))) {
-        try {
-          const res = await fetch('/api/ai/recommendations/initial', { method: 'POST' })
-          if (!res.ok) {
-            console.error('[onboarding] AI pre-generation returned', res.status, res.statusText)
-          }
-        } catch (err) {
-          // Non-blocking: log but don't prevent onboarding from completing
-          console.error('[onboarding] AI pre-generation failed:', err)
-        }
+        // Fire-and-forget: AI-recommendations renderen progressief op de Wil-pagina
+        // via polling. Blokkeer onboarding-success niet op deze LLM-call (typisch 5-15s).
+        fetch('/api/ai/recommendations/initial', { method: 'POST' })
+          .then((res) => {
+            if (!res.ok) {
+              console.error('[onboarding] AI pre-generation returned', res.status, res.statusText)
+            }
+          })
+          .catch((err) => {
+            console.error('[onboarding] AI pre-generation failed:', err)
+          })
       }
 
       // Complete the progress bar
@@ -1091,11 +1206,55 @@ export default function OnboardingPage() {
             />
           )}
 
+          {state.step === 'spaardoel' && (
+            <OnboardingSpaardoel
+              data={state.spaardoel}
+              onChange={(data) => dispatch({ type: 'SET_SPAARDOEL', data })}
+              onNext={goToNext}
+              onBack={goToBack}
+              onSkip={() => {
+                // Skip = één klik, geen confirm. Zet `skipped: true` en
+                // wis pre-fill-velden zodat een per ongeluk eerder
+                // ingevulde naam/bedrag niet alsnog wordt weggeschreven
+                // door handleSaveOwnData.
+                dispatch({
+                  type: 'SET_SPAARDOEL',
+                  data: {
+                    presetKey: null,
+                    name: '',
+                    target_value: '',
+                    target_date: '',
+                    skipped: true,
+                  },
+                })
+                goToNext()
+              }}
+              monthlyIncome={netMonthlyIncomeForKlaar}
+              monthlyExpenses={
+                Number(state.identity.estimated_monthly_expenses) || 0
+              }
+              selectedGoals={state.selectedGoals}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
+          )}
+
           {state.step === 'klaar' && (
             <OnboardingKlaar
               selectedGoals={state.selectedGoals}
               netMonthlyIncome={netMonthlyIncomeForKlaar}
               netWorth={netWorthForKlaar}
+              spaardoel={
+                state.spaardoel.skipped
+                  || !state.spaardoel.presetKey
+                  || !state.spaardoel.name.trim()
+                  ? null
+                  : {
+                      presetKey: state.spaardoel.presetKey,
+                      label: state.spaardoel.name.trim(),
+                      amount: parseSpaardoelAmount(state.spaardoel.target_value),
+                    }
+              }
               onAddMore={() => dispatch({ type: 'SET_STEP', step: 'bezittingen' })}
               onFinish={handleSaveOwnData}
               onBack={goToBack}
@@ -1156,7 +1315,12 @@ export default function OnboardingPage() {
                 const destination = primaryGoal
                   ? getGoalFirstWinPath(primaryGoal)
                   : getHomePath(state.activeModules)
-                router.push(destination + '?welcome=1')
+                // Hard navigation: voorkomt stale-read redirect-loop in (app)/layout.tsx
+                // direct na het wegschrijven van `onboarding_completed = true`. Bij een
+                // soft-navigation kan de server-layout de nét-geschreven row missen en
+                // redirecten naar /onboarding, wat de Suspense-fallback laat knipperen
+                // tot een browser-refresh de sessie opnieuw aligneert.
+                window.location.assign(destination + '?welcome=1')
               }}
               activeModules={state.activeModules}
               goal={state.selectedGoals[0]}

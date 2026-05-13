@@ -90,6 +90,12 @@ export const OVERLAY_QUERY_KEYS = {
   // /core/budgets/new-route die nu een redirect is. Eigen sleutel (niet `new`)
   // om collisies met toekomstige create-flows op andere pagina's te vermijden.
   newBudget:     'newBudget',
+  // Trigger voor de Horizon-prognose setup-pane (ShellOverlay kind="pane")
+  // op `/horizon?horizonSetup=open`. Geopend vanuit de intro-card die de
+  // hoofd-grafiek vervangt zolang de gebruiker de basis-instellingen-pane
+  // nog niet doorlopen + opgeslagen heeft. Bij close wordt de param
+  // weggehaald (horizon-client cleant URL na mount).
+  horizonSetup:  'horizonSetup',
   tab:           'tab',
   edit:          'edit',
   via:           'via',
@@ -99,4 +105,4 @@ export const OVERLAY_QUERY_KEYS = {
 export type OverlayQueryKey = keyof typeof OVERLAY_QUERY_KEYS
 
 /** Welke keys daadwerkelijk een pane-overlay openen. `tab` is in-page; `edit/via/month` zijn modifier/transient. */
-export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'cryptoHolding', 'holding', 'strategie', 'uitgaven', 'event'] as const satisfies readonly OverlayQueryKey[]
+export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'cryptoHolding', 'holding', 'strategie', 'uitgaven', 'event', 'horizonSetup'] as const satisfies readonly OverlayQueryKey[]

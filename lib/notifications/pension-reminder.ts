@@ -10,14 +10,11 @@
  * waarde moet handmatig worden bijgewerkt — deze reminder is het
  * UX-handvat dat de gebruiker eraan herinnert om dat te doen.
  *
- * Deze module levert pure beslislogica — een cron-job of de bestaande
- * `/api/notifications` aggregator kan `shouldSendPensionReminder` aanroepen
- * en op basis van de uitkomst de notificatie inschieten + `lastSentAt`
- * persisteren in `app_settings` (key: `pension_reminder_last_sent_${user_id}`).
- *
- * TODO: nog geen cron-trigger ingehaakt — wordt opgepikt in een vervolg-PR
- * zodra het algemene scheduling-systeem (zie `app/api/notifications/route.ts`
- * runtime-aggregatie vs. echte cron) is uitgewerkt.
+ * Deze module levert pure beslislogica. Gewired in
+ * `app/api/notifications/route.ts` (sectie 4b): de aggregator roept
+ * `shouldSendPensionReminder` aan, schiet de notificatie in als de uitkomst
+ * `true` is en persisteert `lastSentAt` in `app_settings` (key:
+ * `pension_reminder_last_sent_${user_id}`).
  */
 
 export interface PensionReminderProfile {

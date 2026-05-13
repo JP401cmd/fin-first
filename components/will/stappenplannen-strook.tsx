@@ -244,9 +244,17 @@ function CardSkeleton({ accent }: { accent: Accent }) {
 
 // ── Goal-card ───────────────────────────────────────────────────────────
 
-function GoalStappenplanCard() {
+interface GoalCardProps {
+  /**
+   * GoalSlug waarvoor deze kaart de stappen toont. Sinds de multi-select doel-
+   * stap (fase 3, mei 2026) krijgen we per kaart een eigen slug van de
+   * orchestrator — niet meer de primaire-goal uit de hook.
+   */
+  slug: GoalSlug
+}
+
+function GoalStappenplanCard({ slug }: GoalCardProps) {
   const {
-    primaryGoalSlug,
     isCardVisible: isGoalCardVisible,
     isStepComplete,
     toggleStep,
@@ -258,10 +266,8 @@ function GoalStappenplanCard() {
   // ── Completion celebration state ────────────────────────────────────
   // Hooks moeten altijd in dezelfde volgorde — daarom alle hook-aanroepen
   // boven de runtime-checks houden.
-  const slug: GoalSlug | null =
-    primaryGoalSlug && isGoalSlug(primaryGoalSlug) ? (primaryGoalSlug as GoalSlug) : null
-  const allComplete = slug ? isAllComplete(slug) : false
-  const visible = slug ? isGoalCardVisible(slug) : false
+  const allComplete = isAllComplete(slug)
+  const visible = isGoalCardVisible(slug)
 
   const [fadingOut, setFadingOut] = useState(false)
   const [hidden, setHidden] = useState(false)
@@ -277,7 +283,6 @@ function GoalStappenplanCard() {
 
   const fadeAndDismiss = useCallback(
     (fadeDelay: number) => {
-      if (!slug) return
       fadeTimerRef.current = setTimeout(() => {
         setFadingOut(true)
       }, fadeDelay)
@@ -306,7 +311,6 @@ function GoalStappenplanCard() {
   }
 
   // ── Bail-outs (ná alle hooks) ───────────────────────────────────────
-  if (!slug) return null
   if (!visible) return null
   if (hidden) return null
 
@@ -613,21 +617,26 @@ function CarouselItem({ children }: { children: ReactNode }) {
  * achterblijft.
  */
 export function StappenplannenStrook({ data }: Props) {
-  const { loading: goalLoading, primaryGoalSlug, isCardVisible, isAllComplete } = useGoalGuideState()
+  const {
+    loading: goalLoading,
+    selectedGoalSlugs,
+    isCardVisible,
+    isAllComplete,
+  } = useGoalGuideState()
   const { loading: stdLoading, isCardDismissed, manuallyCompletedKeys } = useStandardGuideState()
 
-  // Bepaal of beide kaarten zouden renderen — zo niet, niets tonen.
-  const hasGoalCard = (() => {
-    if (!primaryGoalSlug) return false
-    if (!isGoalSlug(primaryGoalSlug)) return false
-    const slug = primaryGoalSlug as GoalSlug
-    if (!isCardVisible(slug)) return false
-    return true
-  })()
+  // Filter naar de slugs die daadwerkelijk een zichtbare kaart opleveren:
+  // valide slug + niet weggeklikt. Volgorde uit selectedGoalSlugs blijft
+  // behouden (eerste = primaire goal, zoals afgesproken in onboarding-doel).
+  const visibleGoalSlugs: GoalSlug[] = selectedGoalSlugs.filter(
+    (slug) => isGoalSlug(slug) && isCardVisible(slug),
+  )
 
   const hasStdCard = !isCardDismissed()
 
-  // Loading: render skeletons in dezelfde flex-layout (geen CLS).
+  // Loading: render skeletons in dezelfde flex-layout (geen CLS). We weten
+  // hier nog niet hoeveel goal-kaarten er komen — toon één goal-skeleton
+  // als placeholder; na fetch verschijnen de werkelijke N kaarten.
   if (goalLoading || stdLoading) {
     return (
       <section aria-label="Stappenplannen" className="px-4 sm:px-6 mb-6">
@@ -644,33 +653,28 @@ export function StappenplannenStrook({ data }: Props) {
     )
   }
 
-  const goalAllDone =
-    primaryGoalSlug && isGoalSlug(primaryGoalSlug)
-      ? isAllComplete(primaryGoalSlug as GoalSlug)
-      : false
-
+  const anyGoalRemaining = visibleGoalSlugs.some((slug) => !isAllComplete(slug))
   const stdAllDone = isAllStandardComplete(data, manuallyCompletedKeys)
 
-  if (!hasGoalCard && !hasStdCard) return null
+  if (visibleGoalSlugs.length === 0 && !hasStdCard) return null
 
   // Intro alleen tonen zolang minstens één zichtbare kaart nog open stappen
   // heeft. Tijdens de 4s celebration-window van de laatste kaart is de
   // toelichting overbodig en zou ze redundant boven "Doel volbracht!" hangen.
   // Daarna ruimt de orchestrator de hele section sowieso op (return null
   // hierboven zodra dismissCard heeft gepersisteerd).
-  const remainingGoalCard = hasGoalCard && !goalAllDone
   const remainingStdCard = hasStdCard && !stdAllDone
-  const showIntro = remainingGoalCard || remainingStdCard
+  const showIntro = anyGoalRemaining || remainingStdCard
 
   return (
     <section aria-label="Stappenplannen" className="px-4 sm:px-6 mb-6">
       {showIntro && <StrookIntro />}
       <StrookCarousel>
-        {hasGoalCard && (
-          <CarouselItem>
-            <GoalStappenplanCard />
+        {visibleGoalSlugs.map((slug) => (
+          <CarouselItem key={slug}>
+            <GoalStappenplanCard slug={slug} />
           </CarouselItem>
-        )}
+        ))}
         {hasStdCard && (
           <CarouselItem>
             <StandaardStappenplanCard data={data} />

@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { OnboardingShell } from './onboarding-shell'
 import { GOAL_CATALOG } from '@/lib/goals/catalog'
 import type { GoalSlug } from '@/lib/goals/types'
+import type { SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { formatCurrency } from '@/lib/format'
 
 /**
@@ -30,16 +31,35 @@ import { formatCurrency } from '@/lib/format'
  * shell (zodat de grid niet uit balans valt op desktop). De caller kan
  * later kiezen om hier alsnog een "tip"-paneel in te zetten.
  */
+/**
+ * Compact spaardoel-recap voor cel 4 van de figures-strip. Wanneer aanwezig
+ * vervangt deze de standaard "Voortgang 100%"-cel met de gekozen label en
+ * het streefbedrag. Skip-flow zet deze prop op `null` — dan blijft de
+ * voortgangs-cel zichtbaar zoals altijd.
+ */
+export interface OnboardingKlaarSpaardoelRecap {
+  presetKey: SpaardoelPresetKey
+  /** Uiteindelijke label die de gebruiker invulde (na trim). */
+  label: string
+  /** Streefbedrag in euro's. */
+  amount: number
+}
+
 export interface OnboardingKlaarProps {
   selectedGoals: GoalSlug[]
   netMonthlyIncome: number
   netWorth: number | null
+  /**
+   * Spaardoel-recap van stap v. — `null` wanneer de gebruiker geskipt of
+   * niets ingevuld heeft. Caller (orchestrator) bepaalt deze gating.
+   */
+  spaardoel?: OnboardingKlaarSpaardoelRecap | null
   /** "Voeg nog iets toe →" — terug naar stap 4. */
   onAddMore: () => void
   /** Primaire CTA — orchestrator triggert save + redirect. */
   onFinish: () => void
   onBack: () => void
-  /** 1-indexed stap-nummer voor de voortgangsbalk (default 5). */
+  /** 1-indexed stap-nummer voor de voortgangsbalk (default 6 sinds stap v.). */
   currentStep?: number
   totalSteps?: number
 }
@@ -48,11 +68,12 @@ export function OnboardingKlaar({
   selectedGoals,
   netMonthlyIncome,
   netWorth,
+  spaardoel = null,
   onAddMore,
   onFinish,
   onBack,
-  currentStep = 5,
-  totalSteps = 5,
+  currentStep = 6,
+  totalSteps = 6,
 }: OnboardingKlaarProps) {
   // Doel-labels — bij meerdere doelen voegen we ze samen met komma.
   // De gebruiker ziet de eerste twee in volle; bij ≥3 tonen we "+N" als
@@ -173,26 +194,53 @@ export function OnboardingKlaar({
           }
         />
 
-        {/* Cel 4: Voortgang — winnaar/uitkomst, krijgt highlight-marker */}
-        <RecapCell
-          kicker="Voortgang"
-          value={
-            <span
-              className="block text-[22px] sm:text-[28px] font-black leading-none italic tabular-nums tracking-[-0.02em]"
-              style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--ink)' }}
-            >
+        {/* Cel 4: Spaardoel (indien aanwezig) óf Voortgang als fallback. */}
+        {spaardoel ? (
+          <RecapCell
+            kicker="Spaardoel"
+            value={
               <span
-                className="inline px-1"
+                className="block text-[16px] sm:text-[18px] italic leading-tight"
                 style={{
-                  backgroundImage:
-                    'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                  fontFamily: 'var(--font-playfair, Georgia, serif)',
+                  color: 'var(--ink)',
                 }}
               >
-                100%
+                {spaardoel.label}
+                <span className="not-italic text-[var(--ink-3)]"> · </span>
+                <span
+                  className="tabular-nums px-1"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                  }}
+                >
+                  {formatCurrency(spaardoel.amount)}
+                </span>
               </span>
-            </span>
-          }
-        />
+            }
+          />
+        ) : (
+          <RecapCell
+            kicker="Voortgang"
+            value={
+              <span
+                className="block text-[22px] sm:text-[28px] font-black leading-none italic tabular-nums tracking-[-0.02em]"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--ink)' }}
+              >
+                <span
+                  className="inline px-1"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                  }}
+                >
+                  100%
+                </span>
+              </span>
+            }
+          />
+        )}
       </div>
 
       {/* Subtiele uitleg onder de strip — krant-italic, optioneel. */}
