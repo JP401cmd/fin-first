@@ -47,6 +47,15 @@ import { NL_AOW_AGE } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { resolveDepreciation, type Asset } from '@/lib/asset-data'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import {
+  parseHousingStrategy,
+  deriveHousingContext,
+  getFireEligibleNetWorth,
+  filterAssetsForFire,
+  applyHousingStrategy,
+  DEFAULT_HOUSING_STRATEGY,
+  type HousingStrategyConfig,
+} from '@/lib/housing-strategy'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
@@ -146,7 +155,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('*').eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -534,10 +543,26 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
   const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
 
-  // FIRE projection
+  // FIRE projection — housing strategy bepaalt of eigen woning meedoet in
+  // de FIRE-pot. Voor display-doel houdt totalAssets/totalDebts (en netWorth)
+  // de gebruiker's volledige situatie aan; voor sim-doel gebruiken we de
+  // FIRE-eligible variant.
+  const housingStrategyCfg: HousingStrategyConfig = parseHousingStrategy(
+    (profileResult.data as Record<string, unknown> | null | undefined)?.housing_strategy_config,
+  )
+  const dashboardAssetsArr = (assetsResult.data ?? []) as Asset[]
+  const dashboardDebtsArr = (debtsResult.data ?? []) as Debt[]
+  const housingContext = deriveHousingContext(dashboardAssetsArr, dashboardDebtsArr)
+  const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategyCfg)
+  const fireAssetsDelta = fireEligibleNetWorth - netWorth // negatief bij exclude/downsize
+
   const horizonInput: FinancialInput = {
-    totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
-    monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses,
+    totalAssets: totalAssets + fireAssetsDelta, // FIRE-pot, niet display-totaal
+    totalDebts,
+    monthlyIncome: effectiveMonthlyIncome,
+    monthlyExpenses: effectiveMonthlyExpenses,
+    monthlyContributions,
+    yearlyMustExpenses: yearlyRetirementExpenses,
     dateOfBirth: profileResult.data?.date_of_birth ?? null,
   }
   const strategyOpts = { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge }
@@ -555,7 +580,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   if (dob && netWorth > 0) {
     try {
       const currentAge = ageAtDate(dob)
-      const simCashflows = lifeEventsToCashflows((eventsResult.data ?? []) as LifeEvent[])
+      const baseSimCashflows = lifeEventsToCashflows((eventsResult.data ?? []) as LifeEvent[])
       // Look up actual AOW age from aow_leeftijden table (consistent with horizon page)
       const userAowAge = lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob)
       const isPensioen = fireStrategy.strategy === 'pensioen'
@@ -571,12 +596,30 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
       // Resolve withdrawal strategy from profile (consistent with horizon page)
       const withdrawalStrategy = resolveWithdrawalStrategy(profileResult.data as Record<string, unknown> ?? {})
-      const unifiedInput: UnifiedProjectionInput = {
-        assets: (assetsResult.data ?? []) as unknown as Asset[],
-        debts: (debtsResult.data ?? []) as unknown as Debt[],
+      // Housing strategy: filter eigen_huis + linked mortgage indien van toepassing,
+      // en voeg synthetische cashflows toe voor downsize/reverse_mortgage.
+      const dashboardYearlyExpenses = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12
+      const { assets: filteredAssets, debts: filteredDebts } = filterAssetsForFire(
+        housingStrategyCfg,
+        dashboardAssetsArr,
+        dashboardDebtsArr,
+      )
+      const dashboardLiquidEstimate = Math.max(0, netWorth - (housingContext.eigenHuisValue - housingContext.mortgageBalance))
+      const housingAdj = applyHousingStrategy({
+        config: housingStrategyCfg,
+        context: housingContext,
         currentAge,
         endAge: effectiveStrategy.endAge,
-        yearlyExpenses: yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12,
+        yearlyExpenses: dashboardYearlyExpenses,
+        currentLiquidPortfolio: dashboardLiquidEstimate,
+      })
+      const simCashflows = [...baseSimCashflows, ...housingAdj.cashflows]
+      const unifiedInput: UnifiedProjectionInput = {
+        assets: filteredAssets,
+        debts: filteredDebts,
+        currentAge,
+        endAge: effectiveStrategy.endAge,
+        yearlyExpenses: dashboardYearlyExpenses,
         annualSavings: monthlyContributions * 12,
         monthlySurplus: monthlyContributions,
         monthlyIncome: effectiveMonthlyIncome,

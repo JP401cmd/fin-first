@@ -27,6 +27,13 @@ import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
+import {
+  parseHousingStrategy,
+  deriveHousingContext,
+  getFireEligibleNetWorth,
+  type HousingStrategyConfig,
+  type HousingContext,
+} from '@/lib/housing-strategy'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -84,6 +91,14 @@ export interface HorizonPageData {
   retirementExpenseMethod: RetirementExpenseMethod | null
   /** Retirement-expense custom amount uit profile (null als methode != custom_amount). */
   retirementExpenseCustomAmount: number | null
+  /** Housing strategy uit profiles.housing_strategy_config (default include_full). */
+  housingStrategy: HousingStrategyConfig
+  /** Afgeleide context (eigen woning + linked mortgage aggregates). */
+  housingContext: HousingContext
+  /** Belegbaar vermogen voor pensioen — totaal vermogen minus equity bij relevante strategieën. */
+  fireEligibleNetWorth: number
+  /** ISO-timestamp wanneer de housing-strategy nudge-sheet is gedismist; null = nog niet getoond. */
+  housingStrategyDismissedAt: string | null
 }
 
 /**
@@ -176,7 +191,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     // duplicate pair on the same table.
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
@@ -509,6 +524,18 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   const debts = (fullDebtsResult.data ?? []) as Debt[]
   const assets = (fullAssetsResult.data ?? []) as Asset[]
 
+  // ── Housing strategy ──────────────────────────────────────────
+  // Parse strategy uit profile (default include_full bij missing/legacy users).
+  // Context aggregeert eigen_huis + linked mortgage. fireEligibleNetWorth =
+  // netWorth minus equity bij strategieën waar het huis niet meedoet.
+  const housingStrategy = parseHousingStrategy(
+    (profile as Record<string, unknown>).housing_strategy_config,
+  )
+  const housingContext = deriveHousingContext(assets, debts)
+  const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategy)
+  const housingStrategyDismissedAt =
+    ((profile as Record<string, unknown>).housing_strategy_dismissed_at as string | null) ?? null
+
   // Cumulative impacts
   const impacts = computeCumulativeImpacts(effectiveInput, loadedEvents)
 
@@ -572,5 +599,9 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     monthlySurplusFromBudget,
     retirementExpenseMethod: (profile.retirement_expense_method as RetirementExpenseMethod | null) ?? null,
     retirementExpenseCustomAmount: profile.retirement_expense_custom_amount ?? null,
+    housingStrategy,
+    housingContext,
+    fireEligibleNetWorth,
+    housingStrategyDismissedAt,
   }
 }

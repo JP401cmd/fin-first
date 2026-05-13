@@ -65,6 +65,18 @@ const FAQ_ITEMS: FaqItem[] = [
       'Niet iedereen streeft naar vroeg stoppen met werken \u2014 en dat hoeft ook niet. Schakel de pensioen-modus in via de strategie-instellingen op De Horizon. In deze modus berekent TriFinity je verwachte vermogen op je AOW-leeftijd en hoeveel je daaruit maandelijks kunt onttrekken. Je kunt altijd wisselen tussen FIRE en Pensioen \u2014 je data blijft bewaard.',
     link: { label: 'Strategie-instellingen', href: '/horizon?strategie=open' },
   },
+  {
+    question: 'Telt mijn eigen woning mee in de FIRE-berekening?',
+    answer:
+      'Standaard wel \u2014 maar dat is niet helemaal eerlijk: je woont in dat geld en kunt er niet zomaar uit putten. Internationale FIRE-canon sluit het primaire huis vaak uit. TriFinity laat je kiezen uit vier strategie\u00ebn: volledig meetellen (huidig), uitsluiten, verkopen op een gekozen leeftijd (downsizen), of een opeethypotheek/verzilverhypotheek. Bij downsizen of opeethypotheek wordt ook de nieuwe woonlast meegerekend, zodat het plaatje realistisch blijft.',
+    link: { label: 'Stel je eigen-woning-strategie in', href: '/identity/instellingen#housing-strategy' },
+  },
+  {
+    question: 'Wat is een opeethypotheek / verzilverhypotheek?',
+    answer:
+      'Met een opeethypotheek leen je een deel (meestal 35\u201365%) van de overwaarde van je huis terwijl je blijft wonen. Je krijgt maandelijks een uitkering of een bedrag in \u00e9\u00e9n keer. Je betaalt geen maandlast \u2014 de rente stapelt zich op tegen je toekomstige schuld, die wordt afgelost bij verkoop of overlijden. Voordeel: je verzilvert je vermogen zonder te verhuizen. Nadeel: je teert in op de erfenis en de rente ligt vaak hoger dan een gewone hypotheek. TriFinity modelleert deze optie via de eigen-woning-strategie.',
+    link: { label: 'Strategie instellen', href: '/identity/instellingen#housing-strategy' },
+  },
 ]
 
 /* ── FAQ accordion item ──────────────────────── */

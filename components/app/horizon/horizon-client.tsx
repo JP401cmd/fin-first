@@ -52,6 +52,7 @@ import {
   ChevronDown, ChevronUp, Heart, Compass,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { HousingStrategyNudgeSheet } from '@/components/app/horizon/housing-strategy-nudge-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -182,6 +183,25 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [healthScore, setHealthScore] = useState<HealthScore | null>(() => initialData.healthScore)
   const [healthScoreInput, setHealthScoreInput] = useState<HealthScoreInput>(initialData.healthScoreInput)
   const [budgetingActive] = useState(initialData.budgetingActive)
+
+  // Eigen-woning-strategie nudge: toon eenmaal bij eerste Horizon-bezoek
+  // voor users met een eigen woning + include_full + niet eerder dismissed.
+  // Server bevestigt dismiss via PUT /api/housing-strategy { mark_dismissed }.
+  const shouldShowHousingNudge =
+    initialData.housingContext.hasEigenHuis &&
+    initialData.housingStrategy.mode === 'include_full' &&
+    initialData.housingStrategyDismissedAt === null
+  const [housingNudgeOpen, setHousingNudgeOpen] = useState(shouldShowHousingNudge)
+  function dismissHousingNudge() {
+    setHousingNudgeOpen(false)
+    // Fire-and-forget — UX heeft geen waarde bij failure (worst case: sheet
+    // verschijnt nog een keer bij volgende bezoek).
+    fetch('/api/housing-strategy', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mark_dismissed: true }),
+    }).catch(() => {})
+  }
   const [avgIncome6m, setAvgIncome6m] = useState<number | null>(initialData.avgIncome6m)
   const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(initialData.avgExpenses6m)
   const [snapshotResilience, setSnapshotResilience] = useState<number | null>(initialData.snapshotResilience)
@@ -385,6 +405,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           hasPartner: initialData.hasPartner,
           bankAccountCash: initialData.unlinkedCash,
           monthlySavingsOverride,
+          housingStrategy: initialData.housingStrategy,
         }
       : null,
   )
@@ -6031,6 +6052,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <span className="font-sans text-sm text-[var(--ink-2)]">Huidig netto vermogen</span>
                 <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={(effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)} tone="horizon" />}</span>
               </div>
+              {initialData.housingStrategy.mode !== 'include_full' &&
+                initialData.housingContext.hasEigenHuis && (
+                  <div className="flex justify-between py-0.5">
+                    <span
+                      className="font-sans text-sm text-[var(--ink-2)]"
+                      title="Het deel van je vermogen dat de FIRE-engine gebruikt — eigen woning telt niet automatisch mee."
+                    >
+                      Belegbaar voor pensioen
+                    </span>
+                    <span className="tabular-nums text-[var(--ink)]">
+                      <MaskedAmount value={initialData.fireEligibleNetWorth} tone="horizon" />
+                    </span>
+                  </div>
+                )}
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Jaarlijkse besparing</span>
                 <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={(fire?.monthlySavings ?? 0) * 12} tone="horizon" />}</span>
@@ -6658,6 +6693,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         initialLegacyAmount={initialData.fireStrategy.legacyAmount}
         initialRetirementMethod={initialData.retirementExpenseMethod}
         initialRetirementCustomAmount={initialData.retirementExpenseCustomAmount}
+      />
+
+      {/* Eigen-woning-strategie nudge — verschijnt eenmaal bij eerste bezoek. */}
+      <HousingStrategyNudgeSheet
+        open={housingNudgeOpen}
+        onDismiss={dismissHousingNudge}
       />
     </div>
   )

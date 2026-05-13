@@ -28,6 +28,7 @@ import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/
 import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { FireEndStrategyPanel } from '@/components/horizon/fire-end-strategy-panel'
 import { FireRetirementExpensePanel } from '@/components/horizon/fire-retirement-expense-panel'
+import { HousingStrategySection } from '@/components/identity/instellingen/housing-strategy-section'
 
 // ── Typography helpers ────────────────────────────────────────────────────
 
@@ -1293,6 +1294,11 @@ export default function InstellingenPage() {
             </span>
           )}
         </div>
+
+        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
+
+        {/* Eigen woning in FIRE-pot — strategie + parameters */}
+        <HousingStrategySection />
 
         <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
 
