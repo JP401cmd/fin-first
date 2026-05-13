@@ -690,10 +690,32 @@ export async function POST(req: Request) {
           if (aiIncomeEstimate != null) profileUpdates.net_monthly_income = aiIncomeEstimate
           if (aiExpensesEstimate != null) profileUpdates.estimated_monthly_expenses = aiExpensesEstimate
         }
-        await supabase
+        const { error: profileUpdateError } = await supabase
           .from('profiles')
           .update(profileUpdates)
           .eq('id', user.id)
+        // Graceful degradation: als `selected_goal_slugs` nog niet bestaat op
+        // de remote DB (migratie 20260513000001 niet toegepast), retry zonder
+        // dat veld. Anders zou de hele update silent falen — inclusief
+        // primary_goal_slug en intent. Zie ook isColumnMissing() in
+        // app/api/module-guide/progress/route.ts.
+        if (
+          profileUpdateError &&
+          (profileUpdateError.code === '42703' ||
+            profileUpdateError.message?.includes('selected_goal_slugs'))
+        ) {
+          const { selected_goal_slugs: _drop, ...retryUpdates } = profileUpdates
+          void _drop
+          const { error: retryError } = await supabase
+            .from('profiles')
+            .update(retryUpdates)
+            .eq('id', user.id)
+          if (retryError) {
+            console.error('Profile update retry failed:', retryError)
+          }
+        } else if (profileUpdateError) {
+          console.error('Profile update failed:', profileUpdateError)
+        }
 
         // News-only: insert AI-extracted assets, debts, and life events
         // These are persisted outside the RPC transaction since the RPC
