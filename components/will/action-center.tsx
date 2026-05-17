@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Sparkles, CheckCircle } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Plus, Sparkles, CheckCircle, Landmark, CreditCard, ArrowUpDown, Receipt } from 'lucide-react'
 import { RecommendationList } from '@/components/app/recommendation-list'
 import { ActionBoard } from '@/components/app/action-board'
 import { WillEditorialHeader } from '@/components/will/will-editorial-header'
 import type { Recommendation, Action } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
+import { tagToLever, LEVER_LABELS } from '@/lib/lever-mapping'
+import type { LeverId } from '@/lib/lever-mapping'
+import type { LucideIcon } from 'lucide-react'
 
 interface ActionCenterProps {
   recommendations: Recommendation[]
@@ -22,6 +25,35 @@ interface ActionCenterProps {
   avgGoalProgress?: number
   /** Doorgegeven vanuit WillLanding voor het tonen van Doelvoortgang-cel */
   doelenEnabled?: boolean
+}
+
+// ── Lever filter config ─────────────────────────────────────────────────────
+
+type LeverFilterOption = {
+  key: LeverId
+  label: string
+  Icon: LucideIcon
+}
+
+const LEVER_FILTERS: LeverFilterOption[] = [
+  { key: 'cashflow', label: LEVER_LABELS.cashflow, Icon: ArrowUpDown },
+  { key: 'assets', label: LEVER_LABELS.assets, Icon: Landmark },
+  { key: 'debts', label: LEVER_LABELS.debts, Icon: CreditCard },
+  { key: 'tax', label: LEVER_LABELS.tax, Icon: Receipt },
+]
+
+/** Get the lever for a recommendation based on its type. */
+function getRecommendationLever(rec: Recommendation): LeverId {
+  return tagToLever(rec.recommendation_type)
+}
+
+/** Get the lever for an action based on its linked recommendation type. */
+function getActionLever(action: Action): LeverId {
+  if (action.recommendation?.recommendation_type) {
+    return tagToLever(action.recommendation.recommendation_type)
+  }
+  // Actions without a recommendation type fall back to cashflow
+  return 'cashflow'
 }
 
 /**
@@ -52,6 +84,36 @@ export function ActionCenter({
   const [activeTab, setActiveTab] = useState<'inzicht' | 'actie'>('actie')
   const [generateTrigger, setGenerateTrigger] = useState(0)
   const [addTrigger, setAddTrigger] = useState(0)
+  const [leverFilter, setLeverFilter] = useState<LeverId | null>(null)
+
+  // ── Lever counts (for filter chip badges) ───────────────────────────────
+  const leverCounts = useMemo(() => {
+    const counts: Record<LeverId, number> = { assets: 0, debts: 0, cashflow: 0, tax: 0 }
+    // Count pending recommendations per lever
+    for (const rec of recommendations) {
+      if (rec.status === 'pending' || (rec.status === 'postponed' && rec.postponed_until && new Date(rec.postponed_until) <= new Date())) {
+        counts[getRecommendationLever(rec)]++
+      }
+    }
+    // Count open/postponed actions per lever
+    for (const action of actions) {
+      if (action.status === 'open' || action.status === 'postponed') {
+        counts[getActionLever(action)]++
+      }
+    }
+    return counts
+  }, [recommendations, actions])
+
+  // ── Filtered lists ──────────────────────────────────────────────────────
+  const filteredRecommendations = useMemo(() => {
+    if (!leverFilter) return recommendations
+    return recommendations.filter(rec => getRecommendationLever(rec) === leverFilter)
+  }, [recommendations, leverFilter])
+
+  const filteredActions = useMemo(() => {
+    if (!leverFilter) return actions
+    return actions.filter(action => getActionLever(action) === leverFilter)
+  }, [actions, leverFilter])
 
   const pendingCount = openRecommendationCount ?? recommendations.filter(r => r.status === 'pending').length
 
@@ -100,6 +162,52 @@ export function ActionCenter({
       <div className="px-5 sm:px-6 pt-6 pb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
         <span aria-hidden className="inline-block h-px w-7" style={{ background: 'var(--module-active-500)' }} />
         Het werk · Voorstellen ↔ Acties
+      </div>
+
+      {/* ── Hefboom-filter chips ─────────────────────────────────────────── */}
+      <div className="px-5 sm:px-6 pb-4" role="toolbar" aria-label="Filter op hefboom">
+        <div className="flex flex-wrap gap-1.5">
+          {/* "Alle" chip */}
+          <button
+            type="button"
+            onClick={() => setLeverFilter(null)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors min-h-[32px] ${
+              leverFilter === null
+                ? 'bg-[var(--module-active-100)] text-[var(--module-active-700)] ring-1 ring-[var(--module-active-300)]'
+                : 'bg-[var(--subtle)] text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+            }`}
+            aria-pressed={leverFilter === null}
+          >
+            Alle
+          </button>
+
+          {/* Per-lever chips */}
+          {LEVER_FILTERS.map(({ key, label, Icon }) => {
+            const count = leverCounts[key]
+            const isActive = leverFilter === key
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setLeverFilter(isActive ? null : key)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors min-h-[32px] ${
+                  isActive
+                    ? 'bg-[var(--module-active-100)] text-[var(--module-active-700)] ring-1 ring-[var(--module-active-300)]'
+                    : 'bg-[var(--subtle)] text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+                }`}
+                aria-pressed={isActive}
+              >
+                <Icon className="h-3 w-3" />
+                {label}
+                <span className={`inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[9px] font-bold tabular-nums ${
+                  isActive ? 'bg-[var(--module-active-200)] text-[var(--module-active-800)]' : 'bg-[var(--paper)] text-[var(--ink-3)]'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Mobile tab bar (< lg) — desktop toont beide kolommen naast elkaar */}
@@ -151,7 +259,7 @@ export function ActionCenter({
             </button>
           </div>
           <RecommendationList
-            initialRecommendations={recommendations}
+            initialRecommendations={filteredRecommendations}
             hideHeader
             generateTrigger={generateTrigger}
             onDataChanged={onDataChanged}
@@ -181,7 +289,7 @@ export function ActionCenter({
             </button>
           </div>
           <ActionBoard
-            initialActions={actions}
+            initialActions={filteredActions}
             partnerInfo={partnerInfo}
             currentUserId={currentUserId}
             onCancellationOpen={onCancellationOpen}
