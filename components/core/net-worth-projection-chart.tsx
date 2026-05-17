@@ -193,6 +193,38 @@ export function NetWorthProjectionChart({
       ? toY(fireTarget)
       : null
 
+  // FIRE intersection: find the point where the nominal line crosses the fire target
+  const fireIntersection = (() => {
+    if (!fireTarget || fireTarget <= 0) return null
+    // Find first point where nominal >= fireTarget
+    for (let i = 1; i < points.length; i++) {
+      if (points[i].nominal >= fireTarget && points[i - 1].nominal < fireTarget) {
+        // Linear interpolation between points i-1 and i
+        const ratio =
+          (fireTarget - points[i - 1].nominal) /
+          (points[i].nominal - points[i - 1].nominal)
+        const fractionalIdx = i - 1 + ratio
+        const intersectAge = points[i - 1].age + ratio * (points[i].age - points[i - 1].age)
+        return {
+          x: PAD.left + (fractionalIdx / (points.length - 1)) * CHART_W,
+          y: toY(fireTarget),
+          age: Math.round(intersectAge),
+          yearsFromNow: Math.round(intersectAge - points[0].age),
+        }
+      }
+    }
+    // If already above fire target at start
+    if (points[0].nominal >= fireTarget) {
+      return {
+        x: toX(0),
+        y: toY(fireTarget),
+        age: points[0].age,
+        yearsFromNow: 0,
+      }
+    }
+    return null // Never reaches fire target within projection
+  })()
+
   // Summary values
   const pensionAge = currentAge != null
     ? Math.round(aowAge > 0 ? aowAge : NL_AOW_AGE)
@@ -278,7 +310,7 @@ export function NetWorthProjectionChart({
               </g>
             ))}
 
-            {/* Fire target line */}
+            {/* Fire target line — "Volledige vrijheid" */}
             {fireTargetY != null && (
               <g>
                 <line
@@ -302,7 +334,50 @@ export function NetWorthProjectionChart({
                   opacity={hasEntered ? 0.8 : 0}
                   style={{ transition: 'opacity 400ms ease-out 400ms' }}
                 >
-                  FIRE doel
+                  Volledige vrijheid
+                </text>
+              </g>
+            )}
+
+            {/* Fire intersection marker — dot + age label */}
+            {fireIntersection != null && fireTargetY != null && (
+              <g
+                opacity={hasEntered ? 1 : 0}
+                style={{ transition: 'opacity 400ms ease-out 600ms' }}
+              >
+                {/* Vertical dashed line at intersection */}
+                <line
+                  x1={fireIntersection.x}
+                  x2={fireIntersection.x}
+                  y1={fireIntersection.y}
+                  y2={PAD.top + CHART_H}
+                  stroke="var(--color-horizon-400)"
+                  strokeWidth="1"
+                  strokeDasharray="3 2"
+                  opacity={0.5}
+                />
+                {/* Intersection dot */}
+                <circle
+                  cx={fireIntersection.x}
+                  cy={fireIntersection.y}
+                  r="5"
+                  fill="var(--color-horizon-500)"
+                  stroke="var(--paper)"
+                  strokeWidth="2"
+                />
+                {/* Age label below the dot */}
+                <text
+                  x={fireIntersection.x}
+                  y={fireIntersection.y + 16}
+                  textAnchor="middle"
+                  fill="var(--color-horizon-700)"
+                  fontSize="10"
+                  fontWeight="600"
+                  fontFamily="var(--font-mono, monospace)"
+                >
+                  {currentAge != null
+                    ? `${fireIntersection.age} jaar`
+                    : `+${fireIntersection.yearsFromNow}j`}
                 </text>
               </g>
             )}
@@ -430,7 +505,7 @@ export function NetWorthProjectionChart({
           {fireTarget != null && fireTarget > 0 && (
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block h-[2px] w-4" style={{ backgroundImage: 'repeating-linear-gradient(90deg, var(--color-horizon-400) 0 6px, transparent 6px 10px)' }} />
-              FIRE doel
+              Volledige vrijheid
             </span>
           )}
         </div>
