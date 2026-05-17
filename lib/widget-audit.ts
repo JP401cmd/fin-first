@@ -13,6 +13,26 @@
 //   - Insight widgets WITHOUT a link in WIDGET_HREFS fail the audit.
 //   - Observation widgets need no action link (but having one is fine).
 //   - No widget may be unclassified (neither observation nor insight).
+//
+// ── Why observation widgets are legitimate ──────────────────────────────────
+//
+// Observation widgets (14 total) serve a critical UX purpose: they provide
+// context and overview without demanding user action. Examples:
+//
+//   - Netto Vermogen: shows the total net worth as the primary financial
+//     metric. Its value IS the insight — no button needed.
+//   - Jouw Pad (fase-bar): shows sovereignty level progress. The bar itself
+//     communicates trajectory — forcing a CTA would be noise.
+//   - Trend widgets: show historical lines. The shape IS the information.
+//   - Vermogensgrafiek: the net-worth-projection-chart on /core is a pure
+//     SVG observation with no interactive elements at all.
+//
+// These widgets optionally accept `href?: string` for "see more" navigation
+// but function correctly without it. The WidgetShell renders them as plain
+// <div> elements (not clickable) when no href/onClick is provided.
+//
+// DO NOT add forced action buttons to observation widgets. If a user needs
+// to act, they navigate via insight widgets or module navigation.
 
 import { WIDGET_CATALOG, WIDGET_HREFS } from './widget-catalog'
 
