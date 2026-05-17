@@ -10,8 +10,60 @@ import { WillDots } from '@/components/app/will-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff } from 'lucide-react'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
+
+/* ── Wft Disclaimer ───────────────────────────────────────────────── */
+
+const WFT_ACCEPTED_KEY = 'trifinity-chat-wft-accepted'
+
+function WftDisclaimer({ onAccept }: { onAccept: () => void }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-8">
+      <div className="mx-auto max-w-sm text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
+          <ShieldCheck className="h-6 w-6 text-amber-600" />
+        </div>
+
+        <h2 className="text-base font-semibold text-[var(--ink)]">
+          Belangrijke mededeling
+        </h2>
+
+        <div className="mt-4 rounded-[var(--r-lg)] border border-amber-200 bg-amber-50/50 px-4 py-3 text-left text-sm leading-relaxed text-[var(--ink-2)]">
+          <p className="font-medium text-amber-800">
+            TriFinity geeft geen financieel advies.
+          </p>
+          <ul className="mt-2 space-y-1.5 text-xs text-[var(--ink-3)]">
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+              Alle informatie is uitsluitend educatief en informatief bedoeld.
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+              TriFinity beschikt niet over een Wft-vergunning en verleent geen beleggings-, verzekerings- of ander financieel advies.
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+              Je bent zelf verantwoordelijk voor je financiële beslissingen. Raadpleeg bij twijfel een erkend financieel adviseur.
+            </li>
+          </ul>
+        </div>
+
+        <button
+          type="button"
+          onClick={onAccept}
+          className="mt-5 w-full rounded-[var(--r-lg)] bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:scale-[0.98]"
+        >
+          Ik begrijp het
+        </button>
+
+        <p className="mt-3 text-[10px] text-[var(--ink-4)]">
+          Deze melding verschijnt eenmalig.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 /* ── Domain config per module ─────────────────────────────────────── */
 
@@ -121,6 +173,24 @@ export function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [input, setInput] = useState('')
+
+  // Wft disclaimer state — one-time acceptance persisted in localStorage
+  const [wftAccepted, setWftAccepted] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    try {
+      const accepted = localStorage.getItem(WFT_ACCEPTED_KEY)
+      setWftAccepted(accepted === 'true')
+    } catch {
+      // localStorage not available — allow through
+      setWftAccepted(true)
+    }
+  }, [])
+
+  const handleWftAccept = useCallback(() => {
+    setWftAccepted(true)
+    try { localStorage.setItem(WFT_ACCEPTED_KEY, 'true') } catch {}
+  }, [])
 
   // Will is the sole assistant — no domain switching
   const config = WILL_CONFIG
@@ -407,7 +477,14 @@ export function ChatPanel() {
           </div>
         </div>
 
+        {/* Wft Disclaimer (first-time only) */}
+        {wftAccepted === false && (
+          <WftDisclaimer onAccept={handleWftAccept} />
+        )}
+
         {/* Messages */}
+        {wftAccepted !== false && (
+        <>
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -529,6 +606,8 @@ export function ChatPanel() {
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Action edit modal */}
