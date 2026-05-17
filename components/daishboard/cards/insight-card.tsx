@@ -1,7 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { BriefingCard } from '../briefing-card'
 import type { InsightCardSpec } from '@/lib/briefing/types'
+import { ArrowRight } from 'lucide-react'
 
 interface Props {
   spec: InsightCardSpec
@@ -18,8 +20,11 @@ export function InsightCard({ spec }: Props) {
   const emphasis = spec.emphasis ?? 'observation'
   const styles = EMPHASIS_STYLES[emphasis] ?? EMPHASIS_STYLES.observation
 
+  // When there's a ctaLabel but no href, link to /core/assets as default
+  const ctaHref = spec.href ?? (spec.ctaLabel ? '/core/assets' : undefined)
+
   return (
-    <BriefingCard module={spec.module ?? 'wil'}>
+    <BriefingCard module={spec.module ?? 'wil'} href={!spec.ctaLabel ? spec.href : undefined}>
       <div className={`${styles.border} ${styles.bg} ${styles.border ? 'pl-3 py-1' : ''}`}>
         {styles.label && (
           <p className="label-editorial text-[var(--ink-4)] mb-1">{styles.label}</p>
@@ -27,6 +32,17 @@ export function InsightCard({ spec }: Props) {
         <p className="font-serif italic text-base leading-relaxed text-[var(--ink-2)]">
           {spec.text}
         </p>
+        {spec.ctaLabel && ctaHref && (
+          <Link
+            href={ctaHref}
+            className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors group/cta"
+          >
+            <span className="underline decoration-[var(--border-md)] underline-offset-2 group-hover/cta:decoration-[var(--ink-2)]">
+              {spec.ctaLabel}
+            </span>
+            <ArrowRight className="h-3 w-3 transition-transform group-hover/cta:translate-x-0.5" />
+          </Link>
+        )}
       </div>
     </BriefingCard>
   )

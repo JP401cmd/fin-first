@@ -95,6 +95,10 @@ export interface InsightCardSpec {
   text: string
   emphasis?: InsightEmphasis
   module?: CardModule
+  /** Optional deep-link to a related page or visualization */
+  href?: string
+  /** CTA label shown as a clickable link below the text (e.g. "Bekijk fee-erosie →") */
+  ctaLabel?: string
 }
 
 export interface ChecklistCardSpec {

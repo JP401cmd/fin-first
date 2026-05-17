@@ -343,6 +343,20 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     lines.push(`Terugkerende transacties: ${data.recurringTransactions ?? 0}`)
   }
 
+  // Fee / TER analysis
+  if (data.feeAnalysis && data.feeAnalysis.weightedTER > 0 && data.feeAnalysis.totalPortfolioValue > 0) {
+    const terPct = (data.feeAnalysis.weightedTER * 100).toFixed(2)
+    const annualFee = formatCurrency(data.feeAnalysis.totalAnnualFee)
+    const impactMonths = data.feeImpactMonths ?? 0
+    lines.push(`FONDSKOSTEN: gewogen TER ${terPct}%, jaarlijks ${annualFee}`)
+    lines.push(`  Portfolio: ${formatCurrency(data.feeAnalysis.totalPortfolioValue)}, ${data.feeAnalysis.holdingsWithTER} holdings met TER, ${data.feeAnalysis.holdingsWithoutTER} zonder`)
+    if (impactMonths > 0) {
+      lines.push(`  FIRE-impact: ${impactMonths} maanden vertraging door fondskosten`)
+    }
+    lines.push(`  TIP: Gebruik showInsight met href="/core/assets" en ctaLabel="Bekijk fee-erosie" om gebruiker naar de fee-erosie visualisatie te leiden`)
+    lines.push('')
+  }
+
   // Recommendations (detailed)
   lines.push(`AANBEVELINGEN: ${data.recommendations ?? 0} totaal`)
   if (data.topRecommendations && data.topRecommendations.length > 0) {

@@ -134,6 +134,39 @@ export function composeBriefingFallback(
     })
   }
 
+  // 8c. Fee-erosion insight (for users with fund holdings + TER data)
+  if (data.feeAnalysis && data.feeAnalysis.weightedTER > 0 && data.feeAnalysis.totalPortfolioValue > 0) {
+    const terPct = (data.feeAnalysis.weightedTER * 100).toFixed(2).replace('.', ',')
+    const annualFee = formatCurrency(data.feeAnalysis.totalAnnualFee)
+    const impactMonths = data.feeImpactMonths ?? 0
+
+    if (impactMonths > 0) {
+      const impactYears = Math.floor(impactMonths / 12)
+      const impactRemainingMonths = impactMonths % 12
+      const parts: string[] = []
+      if (impactYears > 0) parts.push(`${impactYears} jaar`)
+      if (impactRemainingMonths > 0) parts.push(`${impactRemainingMonths} maand${impactRemainingMonths > 1 ? 'en' : ''}`)
+      const timeStr = parts.join(' en ')
+      cards.push({
+        type: 'insight',
+        text: `Je fondsbeheer van ${annualFee}/jaar (${terPct}% TER) kost je ${timeStr} vrijheid. Lagere kosten maken een dramatisch verschil over 30 jaar.`,
+        emphasis: 'tip',
+        module: 'kern',
+        href: '/core/assets',
+        ctaLabel: 'Bekijk fee-erosie',
+      })
+    } else {
+      cards.push({
+        type: 'insight',
+        text: `Je fondskosten bedragen ${annualFee}/jaar (${terPct}% TER). Bekijk hoe zelfs kleine kostenverschillen oplopen over 30 jaar.`,
+        emphasis: 'observation',
+        module: 'kern',
+        href: '/core/assets',
+        ctaLabel: 'Bekijk fee-erosie',
+      })
+    }
+  }
+
   // 9. Countdown — salary or tax deadline
   if (temporal.month === 3 || temporal.month === 4) {
     const taxDeadlineDay = temporal.month === 3 ? 31 + 30 : 30 // days until May 1

@@ -58,6 +58,7 @@ Kies bewust: wat is nu het belangrijkst voor deze gebruiker?
 - Alle bedragen boven 100 euro moeten een vrijheidstijd-equivalent tonen
 - module parameter is altijd "kern", "wil", "horizon", of "cross"
 - BELANGRIJK: Vul ALTIJD de href parameter in bij cards die een href ondersteunen. Elke card moet klikbaar zijn naar de relevante pagina.
+- Bij fondskosten/TER-inzichten: gebruik showInsight met href="/core/assets" en ctaLabel="Bekijk fee-erosie" om de gebruiker naar de fee-erosie visualisatie te leiden. De CTA wordt als klikbare link onder het inzicht getoond.
 
 == CARD TYPE RICHTLIJNEN ==
 showRecurring: Toon vaste lasten/abonnementen overzicht. Gebruik als de gebruiker significante terugkerende kosten heeft.
@@ -501,11 +502,13 @@ export const briefingTools = {
   }),
 
   showInsight: tool({
-    description: 'Toon een redactioneel inzicht. Gebruik meerdere keren per briefing voor observaties verspreid door de pagina.',
+    description: 'Toon een redactioneel inzicht. Gebruik meerdere keren per briefing voor observaties verspreid door de pagina. Optioneel een CTA-link naar een gerelateerde visualisatie of pagina.',
     inputSchema: z.object({
       text: z.string().describe('Inzicht tekst (max 2 zinnen, concreet, met getal)'),
       emphasis: z.enum(['greeting', 'observation', 'celebration', 'tip']).optional().describe('Type nadruk'),
       module: moduleEnum.optional().describe('Kleurmodule (default: wil)'),
+      href: z.string().optional().describe('Deep-link naar gerelateerde pagina of visualisatie (bijv. /core/assets)'),
+      ctaLabel: z.string().optional().describe('CTA-label dat als klikbare link verschijnt (bijv. "Bekijk fee-erosie →")'),
     }),
   }),
 
