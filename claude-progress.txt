@@ -1,3 +1,37 @@
+## Session 2026-05-18 - Features #779, #780
+
+### Feature #779: Briefing als hoofdwidget op /will - PASSING
+- Moved DAIshboard from inside conditional widget grid section to its own prominent Sectie 0
+- Briefing is now always visible at the top of /will (not behind dashboardType toggle)
+- Removed showDashboardTypeToggle prop from DraggableWidgetGrid on /will
+- Widget grid remains as separate Sectie 1 below briefing
+- Verified: briefing renders at top with accent bar, streaming works, error handling intact
+- Zero new console errors
+- Commit: e0d2ae2a
+
+### Feature #780: Briefing cadence toggle dagelijks/wekelijks - PASSING
+- Added BriefingCadence type (daily/weekly) to lib/briefing/user-preferences.ts
+- Added readBriefingCadence/saveBriefingCadence/getStaleThresholdMs functions
+- Added cadence toggle pill in BriefingHeader (always visible, next to date line)
+- Added cadence toggle in BriefingFooter (visible after successful briefing)
+- Updated DAIshboard: cadence state + useLayoutEffect init from localStorage
+- Updated BriefingStaleBanner: cadence-aware isStale check (daily=24h, weekly=7d)
+- Removed hardcoded STALE_MS constant from DAIshboard
+- Verified: toggle works both ways, persists across page reload, visual state correct
+- Zero new console errors
+- Commit: 3f45bd74
+
+### Files Modified
+- components/will/will-landing.tsx - briefing moved to top, toggle removed
+- components/daishboard/daishboard.tsx - cadence state + cadence-based stale check
+- components/daishboard/briefing-header.tsx - cadence toggle + props
+- components/daishboard/briefing-footer.tsx - cadence toggle + props
+- components/daishboard/briefing-stale-banner.tsx - cadence-aware isStale
+- lib/briefing/user-preferences.ts - BriefingCadence type + read/save/threshold
+
+### Current Status
+- 2 features completed this session (#779, #780)
+
 ## Session 2026-04-13 - Features #743, #744
 
 ### Feature #743: Module-guide-card dismiss via kruisje is permanent - PASSING
@@ -23902,3 +23936,79 @@ Current status: 425/431 passing (98.6%)
 ### Current Status
 - 2 features completed this session (#763, #731)
 - Overall progress: 756/762 passing (99.2%)
+
+## Session 2026-05-17 - Features #844, #845
+
+### Feature #844: Vier-hefbomen-kompas compact in shell header - PASSING
+- Created `components/app/shell/lever-scores.ts` (server-safe, no 'use client')
+  - Types: LeverStatus, LeverEntry, LeverScores
+  - computeLeverScores() with 4 indicators: assets, debts, cashflow, tax
+  - statusFromScore(): green (≥60), amber (30-59), red (<30), neutral (null)
+- Created `components/app/shell/lever-compass.tsx` ('use client')
+  - LeverCompassDots (AppHeader compact), LeverCompassExpanded (sidebar open), LeverCompassCollapsed (sidebar collapsed)
+  - Icons: Landmark, CreditCard, ArrowUpDown, Receipt
+- Modified `responsive-shell.tsx`: LeverScoresContext + useLeverScores() hook
+- Modified `sidebar.tsx`: compass between OverigeSection and FooterSection
+- Modified `app-header.tsx`: LeverCompassDots before PerspectiveSwitcher
+- Modified `app/(app)/layout.tsx`: computeLeverScores() from existing layout data
+  - Asset diversification score, debt-to-asset ratio, 3-month savings rate, box3 exposure
+  - BOX3_TYPES set, €57,684 vrijstelling threshold
+- Commit: 76f66736
+
+### Feature #845: Bezittingen-indicator detail-tooltip en neutral state - PASSING
+- Added `detail` field to LeverEntry type with descriptive strings per lever
+- Created MiniTooltip component: CSS hover/tap tooltip with status-colored bg/border
+- Changed asset score from 0 to null when 0 asset types (neutral/grey instead of red)
+- fmtShort() helper: "€ 142k", "€ 1,2M" formatting
+- Detail strings: "4 typen · € 834k", "Schuldenvrij", "Spaarquote 30%", "Onder vrijstelling"
+- Updated DEFAULT_LEVER_SCORES in responsive-shell.tsx and sidebar.tsx
+- Verified: tooltips show on hover/tap, neutral state for empty assets, clean page load no new errors
+- Commit: ad77e226
+
+### Files Modified
+- components/app/shell/lever-scores.ts — NEW: types, computeLeverScores, fmtShort, detail strings
+- components/app/shell/lever-compass.tsx — NEW: MiniTooltip, 3 compass variants (dots/expanded/collapsed)
+- components/app/shell/responsive-shell.tsx — LeverScoresContext, DEFAULT_LEVER_SCORES with detail
+- components/app/shell/sidebar.tsx — compass rendering, leverScores prop
+- components/app/app-header.tsx — LeverCompassDots in utility area
+- app/(app)/layout.tsx — computeLeverScores call with asset/debt/cashflow/tax data
+
+### Current Status
+- 2 features completed this session (#844, #845)
+- Both features verified with browser automation (Playwright CLI)
+
+## Session 2026-05-18 - Features #828, #829
+
+### Feature #828: Onboarding minimaal verplichte velden per stap gereduceerd - PASSING
+- Made net_monthly_income optional in onboarding-inkomen.tsx (validation only when non-empty)
+- Removed asterisk from "Huishouden" label (has default 'solo')
+- Added "(optioneel)" marker to income field label
+- Updated Zod schema in save-own-data route: `z.number().min(0).default(0)`
+- Updated serialization in page.tsx: fallback to 0 when income empty
+- Updated regression tests to match new optional behavior
+- Changed deck text "4 minuten" → "2 minuten" in onboarding-doel.tsx
+- Commit: 02e512e7
+
+### Feature #829: Onboarding later-invullen defer-pad per optioneel veld - PASSING
+- Added `onSkipIncome` prop to OnboardingInkomen component
+- Added "Later invullen →" button below income field (shown when field empty)
+- Styled with Source Serif italic, ink-3 color, underline-on-hover (consistent with other skip links)
+- Wired `onSkipIncome` in orchestrator page.tsx (clears income + advances step)
+- Renamed "Sla over →" to "Later invullen →" in onboarding-bezittingen.tsx
+- Renamed "Sla over →" to "Later invullen →" in onboarding-spaardoel.tsx
+- Changed bezittingen footer button "Overslaan" → "Later invullen" when no items
+- Updated test page with onSkipIncome prop
+- Commit: 29d8b31e
+
+### Files Modified
+- components/onboarding/onboarding-inkomen.tsx — optional income, onSkipIncome prop, defer link
+- components/onboarding/onboarding-bezittingen.tsx — "Later invullen" language + italic style
+- components/onboarding/onboarding-spaardoel.tsx — "Later invullen" language
+- app/(onboarding)/onboarding/page.tsx — onSkipIncome handler, income serialization fallback
+- app/api/onboarding/save-own-data/route.ts — Zod schema accepts 0 income
+- app/test-onboarding-inkomen/page.tsx — NEW test page for inkomen step
+- lib/regression-tests/suites/onboarding-identity.ts — updated validation tests
+- components/onboarding/onboarding-doel.tsx — "2 minuten" deck text
+
+### Current Status
+- 2 features completed this session (#828, #829)
