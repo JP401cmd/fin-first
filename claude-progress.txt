@@ -1,3 +1,48 @@
+## Session 2026-05-18 - Features #852, #853
+
+### Feature #852: Wat zie ik hier info-knop op alle hoofdpaginas - PASSING
+- Created `components/editorial/page-info-button.tsx` — reusable info popover component
+- Created `lib/page-info-content.ts` — PAGE_INFO registry with descriptions for 15 routes
+- Added PageInfoButton to 12 page components across all main pages:
+  /core, /will, /horizon, /core/budgets, /core/assets, /core/debts,
+  /core/belasting, /core/checkin, /horizon/whatif, /identity, /nieuws, /rapportages
+- Fixed CSS position conflict: separated absolute-positioning wrapper from relative popover anchor
+- Consistent top-right position across all pages (absolute right-4 top-0)
+- Editorial styling: mono uppercase header, serif body, module-active borders
+- Popover closes on outside click, tap, and Escape key
+- Verified with browser automation: button visible and functional on /core, /will, /horizon, /dashboard
+- Zero new console errors
+- Commit: 741d8e2b
+
+### Feature #853: Wat zie ik hier popover toont pagina-specifieke uitleg - PASSING
+- Verified all 15 page descriptions are unique and page-specific
+- /core shows Kern-specific text (bezittingen, schulden, netto vermogen, schuldgraad, FIRE)
+- /horizon shows Horizon-specific text (financiële toekomst, vrijheid, scenario's, levensgebeurtenissen)
+- /will shows Wil-specific text (briefing, aanbevelingen, acties, widgets)
+- All texts follow 3-sentence structure: what it shows, what you see, what you can do
+- Language is accessible for financial laypeople (plain Dutch, no unexplained jargon)
+- No code changes needed (verification only — content implemented as part of #852)
+
+### Files Modified
+- components/editorial/page-info-button.tsx — NEW: reusable info popover component
+- components/editorial/index.tsx — re-export PageInfoButton
+- lib/page-info-content.ts — NEW: PAGE_INFO content registry (15 routes)
+- components/core/core-landing.tsx — added PageInfoButton to /core header
+- components/will/will-landing.tsx — added PageInfoButton to /will header
+- components/app/horizon/horizon-client.tsx — added PageInfoButton to /horizon header
+- components/app/budgets-client.tsx — added PageInfoButton to /core/budgets header
+- components/core/assets-client.tsx — added PageInfoButton to /core/assets header
+- app/(app)/core/debts/page.tsx — added PageInfoButton to /core/debts header
+- app/(app)/core/belasting/page.tsx — added PageInfoButton to /core/belasting header
+- app/(app)/core/checkin/page.tsx — added PageInfoButton to /core/checkin header
+- components/app/horizon/whatif-header.tsx — added PageInfoButton to /horizon/whatif header
+- components/identity/identity-client.tsx — added PageInfoButton to /identity header
+- components/berichten/nieuws-only-client.tsx — added PageInfoButton to /nieuws
+- app/(app)/rapportages/page.tsx — added PageInfoButton to /rapportages header
+
+### Current Status
+- 2 features completed this session (#852, #853)
+
 ## Session 2026-05-18 - Features #789, #792
 
 ### Feature #789: Coach-bubble verschijnt na onboarding voltooiing - PASSING
