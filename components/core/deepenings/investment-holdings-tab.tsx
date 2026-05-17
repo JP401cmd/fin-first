@@ -4,6 +4,8 @@ import HoldingsPage from '@/components/core/holdings-client'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
+import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
+import { useIsAppSetupCompleted } from '@/components/app/app-setup/use-is-setup-completed'
 
 // ── Component ────────────────────────────────────────────────
 
@@ -74,5 +76,20 @@ interface InvestmentHoldingsActiveProps {
  * fetch — geen losse skeleton hier nodig.
  */
 function InvestmentHoldingsActive({ initialData }: InvestmentHoldingsActiveProps) {
+  const setupCompleted = useIsAppSetupCompleted('aandelen_holdings')
+  if (setupCompleted === null) return <AppSetupSkeleton />
+  if (setupCompleted === false) return <AppSetupGate appKey="aandelen_holdings" />
   return <HoldingsPage initialData={initialData} />
+}
+
+// ── Skeleton tijdens setup-check ─────────────────────────────
+
+function AppSetupSkeleton() {
+  return (
+    <div className="space-y-8" aria-busy="true" aria-live="polite">
+      <div className="h-[120px] animate-pulse border-t border-b border-[var(--ink)] bg-[var(--paper)]" />
+      <div className="h-[180px] animate-pulse border border-[var(--border-ed)] bg-[var(--subtle)]/40" />
+      <span className="sr-only">Setup-status wordt gecheckt…</span>
+    </div>
+  )
 }

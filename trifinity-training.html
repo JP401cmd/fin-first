@@ -1,0 +1,1412 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TriFinity — Interactieve training door drie levens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500;1,8..60,600&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ════════ TriFinity tokens — uit globals.css ════════ */
+:root{
+  --bg:#f5efe2;
+  --paper:#fbf7ec;
+  --subtle:#f3ead9;
+  --border-ed:#e3dac8;
+  --border-md:#ccc1aa;
+  --rule-soft:rgba(26,25,22,.18);
+  --ink:#1a1916;
+  --ink-2:#4a4840;
+  --ink-3:#888070;
+  --ink-4:#bbb8b0;
+
+  --kern-100:oklch(0.855 0.0088 34.7);
+  --kern-200:oklch(0.771 0.0175 34.7);
+  --kern-400:oklch(0.538 0.0467 34.7);
+  --kern-500:oklch(0.427 0.0584 34.7);
+  --kern-600:oklch(0.386 0.0649 34.7);
+
+  --wil-100:oklch(0.82 0.0067 308.8);
+  --wil-200:oklch(0.721 0.0134 308.8);
+  --wil-400:oklch(0.46 0.0357 308.8);
+  --wil-500:oklch(0.334 0.0446 308.8);
+  --wil-600:oklch(0.308 0.0496 308.8);
+
+  --horizon-100:oklch(0.968 0.0123 76.6);
+  --horizon-200:oklch(0.93 0.0246 76.6);
+  --horizon-400:oklch(0.791 0.0655 76.6);
+  --horizon-500:oklch(0.726 0.0819 76.6);
+  --horizon-600:oklch(0.639 0.091 76.6);
+
+  --positive:oklch(0.50 0.09 162);
+  --negative:oklch(0.50 0.09 25);
+
+  --font-display:'Playfair Display',Georgia,serif;
+  --font-serif:'Source Serif 4','Source Serif Pro',Georgia,serif;
+  --font-sans:'Inter',system-ui,sans-serif;
+  --font-mono:'DM Mono','SF Mono',ui-monospace,monospace;
+
+  --max:1180px;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);font-size:16px;line-height:1.55}
+a{color:inherit}
+
+/* ════════ Nav ════════ */
+.topnav{
+  position:sticky;top:0;z-index:50;
+  background:rgba(245,239,226,.92);
+  backdrop-filter:saturate(140%) blur(8px);
+  border-bottom:1px solid var(--rule-soft);
+}
+.topnav-inner{max-width:var(--max);margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:32px;flex-wrap:wrap}
+.brand{font-family:var(--font-display);font-weight:700;font-size:22px;letter-spacing:-.01em}
+.brand sup{font-size:11px;font-weight:500;color:var(--ink-3);margin-left:6px;letter-spacing:.04em;text-transform:uppercase;font-family:var(--font-sans)}
+.nav-links{display:flex;gap:4px;flex-wrap:wrap;font-size:13.5px}
+.nav-links a{
+  padding:6px 12px;
+  text-decoration:none;
+  color:var(--ink-2);
+  border:1px solid transparent;
+  transition:color .15s, border-color .15s;
+}
+.nav-links a:hover{color:var(--ink);border-color:var(--rule-soft)}
+.nav-links a.active{color:var(--ink);border-color:var(--ink-2)}
+
+/* ════════ Hero ════════ */
+.hero{padding:88px 28px 64px;border-bottom:1px solid var(--rule-soft)}
+.hero-inner{max-width:var(--max);margin:0 auto}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:18px}
+.h1{font-family:var(--font-display);font-weight:700;font-size:clamp(40px,6vw,72px);line-height:1.05;letter-spacing:-.02em;margin:0 0 24px}
+.h1 em{font-style:italic;color:var(--ink-2)}
+.lead{font-family:var(--font-serif);font-size:clamp(18px,2vw,22px);line-height:1.45;color:var(--ink-2);max-width:760px;margin:0 0 36px}
+
+/* ════════ Persona-filter ════════ */
+.persona-bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px;align-items:stretch}
+.persona-bar .label{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);align-self:center;margin-right:6px}
+.persona-chip{
+  background:var(--paper);
+  border:1px solid var(--border-md);
+  padding:14px 18px;
+  cursor:pointer;
+  font-family:var(--font-sans);
+  font-size:14px;
+  text-align:left;
+  min-width:200px;
+  transition:transform .12s, border-color .15s, background .15s;
+}
+.persona-chip:hover{transform:translateY(-1px);border-color:var(--ink-2)}
+.persona-chip.active{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.persona-chip .name{font-weight:700;display:block;margin-bottom:2px;font-size:15px}
+.persona-chip .meta{font-size:12.5px;color:var(--ink-3)}
+.persona-chip.active .meta{color:var(--ink-4)}
+
+/* Tags + dots */
+.persona-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle}
+.dot-sanne{background:#c47a5a}
+.dot-mark{background:#7a8a5a}
+.dot-hans{background:#5a6a8a}
+
+/* ════════ Sections ════════ */
+section.training{padding:84px 28px;border-bottom:1px solid var(--rule-soft)}
+section.training:nth-of-type(odd){background:var(--paper)}
+.section-inner{max-width:var(--max);margin:0 auto}
+.section-num{font-family:var(--font-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:14px}
+.section-num .dot-section{display:inline-block;width:6px;height:6px;background:var(--ink);margin-right:10px;vertical-align:middle}
+.h2{font-family:var(--font-display);font-weight:700;font-size:clamp(32px,4.2vw,52px);line-height:1.08;letter-spacing:-.015em;margin:0 0 18px}
+.h2 em{font-style:italic;color:var(--ink-2)}
+.intro{font-family:var(--font-serif);font-size:19px;line-height:1.55;color:var(--ink-2);max-width:760px;margin:0 0 44px}
+
+.h3{font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.2;margin:48px 0 16px;letter-spacing:-.01em}
+.h4{font-family:var(--font-sans);font-weight:600;font-size:15px;margin:24px 0 10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+
+/* Module-color hooks per section */
+section#kern .accent{color:var(--kern-500)}
+section#kern .accent-bg{background:var(--kern-100)}
+section#apps .accent{color:var(--kern-600)}
+section#wil .accent{color:var(--wil-500)}
+section#wil .accent-bg{background:var(--wil-100)}
+section#horizon .accent{color:var(--horizon-600)}
+section#horizon .accent-bg{background:var(--horizon-100)}
+section#identity .accent{color:var(--ink)}
+section#nieuws .accent{color:var(--ink)}
+
+/* ════════ Grids ════════ */
+.four-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin:32px 0}
+.card{
+  background:var(--paper);
+  border:1px solid var(--border-ed);
+  padding:22px;
+  transition:transform .15s, border-color .15s, box-shadow .2s;
+}
+section.training:nth-of-type(odd) .card{background:var(--bg)}
+.card-num{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase;margin-bottom:10px}
+.card-title{font-family:var(--font-display);font-weight:700;font-size:22px;margin-bottom:8px;letter-spacing:-.01em}
+.card-body{font-family:var(--font-serif);font-size:15px;color:var(--ink-2);line-height:1.5}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;font-family:var(--font-mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--border-md);padding:4px 10px;margin:0 6px 6px 0;color:var(--ink-2);background:var(--paper)}
+.pill.is-active{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* Type-grid (asset/debt types) */
+.type-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0;margin:14px 0 8px;border-top:1px solid var(--rule-soft);border-left:1px solid var(--rule-soft)}
+.type-cell{padding:14px 16px;border-right:1px solid var(--rule-soft);border-bottom:1px solid var(--rule-soft);background:var(--paper)}
+section.training:nth-of-type(odd) .type-cell{background:var(--bg)}
+.type-cell .t-name{font-weight:600;font-size:14.5px;margin-bottom:3px}
+.type-cell .t-desc{font-size:12.5px;color:var(--ink-3);line-height:1.4}
+
+/* ════════ Case-accordion ════════ */
+.cases{margin:36px 0 8px;display:flex;flex-direction:column;gap:14px}
+.case{
+  border:1px solid var(--border-ed);
+  background:var(--paper);
+}
+section.training:nth-of-type(odd) .case{background:var(--bg)}
+.case-head{
+  display:flex;align-items:center;gap:14px;
+  width:100%;padding:18px 22px;
+  background:none;border:none;font:inherit;color:inherit;
+  cursor:pointer;text-align:left;
+}
+.case-head:hover{background:var(--subtle)}
+.case-marker{flex-shrink:0;font-family:var(--font-mono);font-size:11px;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;min-width:96px}
+.case-title{flex:1;font-family:var(--font-serif);font-size:17px;font-weight:500;color:var(--ink)}
+.case-title strong{font-weight:600}
+.case-caret{transition:transform .25s ease;color:var(--ink-3)}
+.case[open] .case-caret{transform:rotate(90deg);color:var(--ink)}
+.case-body{padding:6px 22px 26px;border-top:1px dashed var(--rule-soft);display:none}
+.case[open] .case-body{display:block}
+.case-body p{font-family:var(--font-serif);font-size:15.5px;line-height:1.6;margin:14px 0;color:var(--ink-2)}
+.case-body p strong{color:var(--ink);font-weight:600}
+.case-body ul{margin:10px 0 16px;padding-left:18px;font-family:var(--font-serif);font-size:15px;color:var(--ink-2)}
+.case-body ul li{margin:6px 0;line-height:1.5}
+.case-body .stage{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);margin:18px 0 6px;border-top:1px solid var(--rule-soft);padding-top:14px;
+}
+.case-body .stage:first-of-type{border-top:none;padding-top:0;margin-top:8px}
+.case-body .stage .step-n{display:inline-block;background:var(--ink);color:var(--bg);padding:2px 7px;margin-right:8px;font-weight:500}
+
+/* Persona filter — hides non-active case via class */
+body[data-persona="sanne"] .case[data-persona="mark"],
+body[data-persona="sanne"] .case[data-persona="hans"],
+body[data-persona="mark"] .case[data-persona="sanne"],
+body[data-persona="mark"] .case[data-persona="hans"],
+body[data-persona="hans"] .case[data-persona="sanne"],
+body[data-persona="hans"] .case[data-persona="mark"]{display:none}
+
+/* ════════ Mock-screens binnen case ════════ */
+.mock{
+  margin:18px 0;
+  background:var(--bg);
+  border:1px solid var(--border-md);
+  padding:18px 20px;
+  font-family:var(--font-sans);
+  font-size:14px;
+}
+section.training:nth-of-type(odd) .mock{background:var(--paper)}
+.mock .mock-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:1px solid var(--rule-soft);padding-bottom:10px;margin-bottom:12px;
+}
+.mock .mock-head .mock-title{font-family:var(--font-display);font-weight:600;font-size:18px;letter-spacing:-.005em}
+.mock .mock-head .mock-meta{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em}
+.mock-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--rule-soft);font-size:14px}
+.mock-row:last-child{border-bottom:none}
+.mock-row .k{color:var(--ink-2)}
+.mock-row .v{font-family:var(--font-mono);font-weight:500}
+.mock-row .v.pos{color:var(--positive)}
+.mock-row .v.neg{color:var(--negative)}
+.mock-big{font-family:var(--font-display);font-weight:700;font-size:32px;letter-spacing:-.01em;margin:4px 0}
+.mock-cap{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+
+/* Bars */
+.bar{height:8px;background:var(--subtle);position:relative;margin:10px 0 4px;border:1px solid var(--rule-soft)}
+.bar-fill{position:absolute;left:0;top:0;height:100%;background:var(--ink)}
+.bar-fill.pos{background:var(--positive)}
+.bar-fill.neg{background:var(--negative)}
+.bar-fill.kern{background:var(--kern-500)}
+.bar-fill.wil{background:var(--wil-500)}
+.bar-fill.horizon{background:var(--horizon-500)}
+.bar-cap{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+
+/* Pie via conic gradient */
+.pie{display:flex;align-items:center;gap:18px;margin:14px 0}
+.pie .disc{width:120px;height:120px;border-radius:50%;flex-shrink:0;border:1px solid var(--rule-soft)}
+.pie .legend{font-family:var(--font-mono);font-size:12px;color:var(--ink-2)}
+.pie .legend div{margin:3px 0}
+.pie .legend .sw{display:inline-block;width:10px;height:10px;margin-right:8px;vertical-align:middle}
+
+/* Waarde-blok */
+.value{
+  margin:22px 0 10px;
+  border-left:3px solid var(--ink);
+  padding:6px 0 6px 18px;
+  font-family:var(--font-serif);font-size:16px;color:var(--ink-2);font-style:italic;
+}
+.value strong{font-style:normal;color:var(--ink)}
+
+/* ════════ Quiz ════════ */
+.quiz{
+  margin:48px 0 0;
+  background:var(--subtle);
+  border:1px solid var(--rule-soft);
+  padding:26px 28px;
+}
+section.training:nth-of-type(odd) .quiz{background:var(--paper)}
+.quiz-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px}
+.quiz-q{font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.25;margin:0 0 18px;letter-spacing:-.005em}
+.quiz-options{display:flex;flex-direction:column;gap:8px}
+.quiz-opt{
+  display:block;width:100%;text-align:left;
+  font:inherit;color:inherit;
+  background:var(--paper);border:1px solid var(--border-md);
+  padding:13px 18px;cursor:pointer;
+  transition:background .15s, border-color .15s;
+}
+section.training:nth-of-type(odd) .quiz-opt{background:var(--bg)}
+.quiz-opt:hover{border-color:var(--ink-2)}
+.quiz-opt.correct{background:oklch(0.93 0.05 145);border-color:var(--positive);color:var(--ink)}
+.quiz-opt.wrong{background:oklch(0.92 0.04 25);border-color:var(--negative);color:var(--ink)}
+.quiz-opt.disabled{cursor:default;opacity:.65}
+.quiz-feedback{margin-top:16px;font-family:var(--font-serif);font-size:15px;line-height:1.55;color:var(--ink-2);min-height:1.5em}
+.quiz-feedback strong{color:var(--ink)}
+
+/* ════════ Trifinity Post (Nieuws) ════════ */
+.post-masthead{
+  border-top:3px solid var(--ink);
+  border-bottom:1px solid var(--ink);
+  padding:14px 0 10px;
+  margin:24px 0 30px;
+  display:flex;justify-content:space-between;align-items:baseline;
+}
+.post-name{font-family:var(--font-display);font-weight:800;font-size:42px;letter-spacing:-.02em}
+.post-meta{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em}
+.post-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:28px;margin:8px 0}
+.post-article .post-eyebrow{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.post-article .post-title{font-family:var(--font-display);font-weight:700;font-size:22px;line-height:1.2;letter-spacing:-.01em;margin-bottom:8px}
+.post-article .post-deck{font-family:var(--font-serif);font-style:italic;font-size:15px;color:var(--ink-2);margin-bottom:12px;line-height:1.4}
+.post-article .post-body{font-family:var(--font-serif);font-size:15px;line-height:1.55;color:var(--ink-2)}
+.post-article .post-tag{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);letter-spacing:.05em;margin-top:10px;text-transform:uppercase}
+
+/* ════════ CTA / footer ════════ */
+.cta{padding:84px 28px;background:var(--ink);color:var(--bg);text-align:center}
+.cta .h2{color:var(--bg)}
+.cta .lead{color:var(--ink-4);margin:0 auto 28px}
+.cta-actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap}
+.btn{
+  display:inline-block;padding:14px 26px;
+  font-family:var(--font-sans);font-weight:600;font-size:14px;letter-spacing:.02em;
+  text-decoration:none;border:1px solid var(--bg);color:var(--bg);
+  transition:background .15s, color .15s;
+}
+.btn:hover{background:var(--bg);color:var(--ink)}
+.btn.primary{background:var(--bg);color:var(--ink)}
+.btn.primary:hover{background:transparent;color:var(--bg)}
+
+footer.foot{padding:36px 28px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em;border-top:1px solid var(--rule-soft)}
+
+/* ════════ Util ════════ */
+.muted{color:var(--ink-3)}
+.dim{opacity:.45;pointer-events:none}
+
+@media (max-width: 720px){
+  .hero{padding:60px 22px 44px}
+  section.training{padding:60px 22px}
+  .post-name{font-size:32px}
+  .nav-links{font-size:12.5px}
+}
+</style>
+</head>
+<body data-persona="all">
+
+<header class="topnav">
+  <div class="topnav-inner">
+    <div class="brand">TriFinity<sup>training</sup></div>
+    <nav class="nav-links" aria-label="Hoofdstukken">
+      <a href="#intro" data-nav="intro">01 · Intro</a>
+      <a href="#kern" data-nav="kern">02 · Kern</a>
+      <a href="#apps" data-nav="apps">03 · Apps</a>
+      <a href="#wil" data-nav="wil">04 · Wil</a>
+      <a href="#horizon" data-nav="horizon">05 · Horizon</a>
+      <a href="#identity" data-nav="identity">06 · Identity</a>
+      <a href="#nieuws" data-nav="nieuws">07 · Post</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ════════════════════════ HERO ════════════════════════ -->
+<section class="hero" id="top">
+  <div class="hero-inner">
+    <div class="eyebrow">Interactieve training · v0.1 · mei 2026</div>
+    <h1 class="h1">Trifinity, <em>door drie levens.</em></h1>
+    <p class="lead">
+      Een training waarin elke functie van de app wordt uitgelegd aan de hand van een echte situatie.
+      Kies hieronder een persoon en loop met ze mee door de zeven hoofdstukken — van de eerste registratie
+      tot het moment dat ze hun toekomst kunnen narekenen.
+    </p>
+
+    <div class="persona-bar" role="group" aria-label="Kies een persoon">
+      <span class="label">Volg</span>
+      <button class="persona-chip" data-persona="all" aria-pressed="true">
+        <span class="name">Alle drie</span>
+        <span class="meta">Zie elk verhaal naast elkaar</span>
+      </button>
+      <button class="persona-chip" data-persona="sanne" aria-pressed="false">
+        <span class="name"><span class="persona-dot dot-sanne"></span>Sanne · 32</span>
+        <span class="meta">Starter, koopwoning, beginnende crypto</span>
+      </button>
+      <button class="persona-chip" data-persona="mark" aria-pressed="false">
+        <span class="name"><span class="persona-dot dot-mark"></span>Mark &amp; Lisa · 42 / 40</span>
+        <span class="meta">Gezin, twee inkomens, vaste lasten</span>
+      </button>
+      <button class="persona-chip" data-persona="hans" aria-pressed="false">
+        <span class="name"><span class="persona-dot dot-hans"></span>Hans · 54</span>
+        <span class="meta">Vermogen opgebouwd, FIRE in zicht</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════ 01 · INTRO ════════════════════════ -->
+<section class="training" id="intro">
+  <div class="section-inner">
+    <div class="section-num"><span class="dot-section"></span>Hoofdstuk 01 · Wat is trifinity?</div>
+    <h2 class="h2">Vier secties, één <em>verhaal</em>.</h2>
+    <p class="intro">
+      Trifinity is opgebouwd rond een eenvoudig idee: financieel inzicht ontstaat als <strong>registratie</strong>,
+      <strong>inzicht</strong>, <strong>toekomst</strong> en <strong>reflectie</strong> in één plek samenkomen.
+      Dat zijn de vier secties van de app. Daaromheen zitten schakelbare modules — je kiest zelf wat aan staat.
+    </p>
+
+    <div class="four-cards">
+      <div class="card">
+        <div class="card-num">Sectie 1</div>
+        <div class="card-title">Kern</div>
+        <div class="card-body">Wat heb je, en wat ben je schuldig. Geen module nodig — fundament voor alles.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Sectie 2</div>
+        <div class="card-title">Wil</div>
+        <div class="card-body">Inzicht en acties. Dashboard, signalen, doelen, AI-aanbevelingen.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Sectie 3</div>
+        <div class="card-title">Horizon</div>
+        <div class="card-body">Waar ga je naartoe. FIRE-fases, what-if scenario's, levensgebeurtenissen.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Sectie 4</div>
+        <div class="card-title">Identity</div>
+        <div class="card-body">Wie ben je financieel. Check-ins, doelen, jaaroverzicht, instellingen.</div>
+      </div>
+    </div>
+
+    <h3 class="h3">Schakelbare modules</h3>
+    <p class="intro" style="margin-bottom:18px">
+      Niet iedereen heeft dezelfde behoefte. Daarom is trifinity gelaagd in modules die je per stuk aan of uit zet.
+      Modules die uit staan zijn niet verborgen — ze blijven gedimd zichtbaar zodat je ziet wat de app nog meer kan.
+    </p>
+    <div>
+      <span class="pill is-active">Budgetteren</span>
+      <span class="pill is-active">Vermogensregistratie</span>
+      <span class="pill is-active">Aandelenregistratie</span>
+      <span class="pill is-active">Inzicht &amp; Acties</span>
+      <span class="pill is-active">Toekomstplannen</span>
+      <span class="pill is-active">Trifinity Post</span>
+    </div>
+
+    <!-- Quiz -->
+    <div class="quiz" data-quiz="intro">
+      <div class="quiz-eyebrow">Mini-vraag</div>
+      <div class="quiz-q">Wat doet een module die <em>uit</em> staat in trifinity?</div>
+      <div class="quiz-options">
+        <button class="quiz-opt" data-correct="false">Verdwijnt volledig uit het menu</button>
+        <button class="quiz-opt" data-correct="true">Wordt gedimd getoond met een hint om hem te activeren</button>
+        <button class="quiz-opt" data-correct="false">Werkt op de achtergrond door, maar zonder dashboard</button>
+        <button class="quiz-opt" data-correct="false">Wordt automatisch aangezet bij eerste gebruik</button>
+      </div>
+      <div class="quiz-feedback" data-feedback>
+        <strong>Klopt.</strong> Trifinity verbergt geen functies — ze blijven zichtbaar in de zijbalk, alleen
+        gedimd. Eén tik en je activeert ze in Instellingen. Dat is bewust: anders zou je nooit ontdekken wat
+        de app nog meer voor je kan doen.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════ 02 · KERN ════════════════════════ -->
+<section class="training" id="kern">
+  <div class="section-inner">
+    <div class="section-num"><span class="dot-section"></span>Hoofdstuk 02 · Kern</div>
+    <h2 class="h2"><em>Eerlijk beginnen:</em> wat heb je en wat ben je schuldig.</h2>
+    <p class="intro">
+      De Kern is een pure registratie. Hier voer je je bezittingen en je schulden op. Een hypotheek koppel je
+      aan je woning, beleggingen krijgen een eigen lijst, crypto telt mee. Box 3 loopt automatisch mee.
+      Geen analyse, geen module — gewoon: wat is er.
+    </p>
+
+    <h3 class="h3"><span class="accent">●</span> Bezittingen</h3>
+    <div class="type-grid">
+      <div class="type-cell"><div class="t-name">Cash</div><div class="t-desc">Betaalrekening(en), gekoppeld of handmatig</div></div>
+      <div class="type-cell"><div class="t-name">Spaargeld</div><div class="t-desc">Spaarrekeningen, deposito's</div></div>
+      <div class="type-cell"><div class="t-name">Beleggingen</div><div class="t-desc">ETF's, aandelen, fondsen</div></div>
+      <div class="type-cell"><div class="t-name">Pensioen</div><div class="t-desc">Aanvullend, lijfrente, DC-pot</div></div>
+      <div class="type-cell"><div class="t-name">Crypto</div><div class="t-desc">Per coin, per wallet/exchange</div></div>
+      <div class="type-cell"><div class="t-name">Eigen woning</div><div class="t-desc">WOZ + marktwaarde, valt buiten Box 3</div></div>
+      <div class="type-cell"><div class="t-name">Vastgoed (belegging)</div><div class="t-desc">Verhuurpand, vakantiewoning</div></div>
+      <div class="type-cell"><div class="t-name">Voertuig</div><div class="t-desc">Auto, motor, boot — restwaarde</div></div>
+      <div class="type-cell"><div class="t-name">Fysieke bezittingen</div><div class="t-desc">Inboedel, kunst, sieraden</div></div>
+      <div class="type-cell"><div class="t-name">Deelneming / AB</div><div class="t-desc">Aandelen eigen BV, holding</div></div>
+      <div class="type-cell"><div class="t-name">Levensverzekering</div><div class="t-desc">Met kapitaalsuitkering</div></div>
+      <div class="type-cell"><div class="t-name">Vordering</div><div class="t-desc">Uitgeleend geld, openstaande betaling</div></div>
+    </div>
+
+    <h3 class="h3"><span class="accent">●</span> Schulden</h3>
+    <div class="type-grid">
+      <div class="type-cell"><div class="t-name">Hypotheek</div><div class="t-desc">Annuïteit, lineair, aflossingsvrij</div></div>
+      <div class="type-cell"><div class="t-name">Belastingschuld</div><div class="t-desc">IB, voorlopige aanslag</div></div>
+      <div class="type-cell"><div class="t-name">DGA-schuld</div><div class="t-desc">Rekening-courant eigen BV</div></div>
+      <div class="type-cell"><div class="t-name">Persoonlijke lening</div><div class="t-desc">Vast bedrag, vaste looptijd</div></div>
+      <div class="type-cell"><div class="t-name">Studielening</div><div class="t-desc">DUO, prestatiebeurs</div></div>
+      <div class="type-cell"><div class="t-name">Autolening</div><div class="t-desc">Financial lease, private lease</div></div>
+      <div class="type-cell"><div class="t-name">Creditcard</div><div class="t-desc">Doorlopend krediet</div></div>
+      <div class="type-cell"><div class="t-name">Revolving credit</div><div class="t-desc">Flexibele kredietruimte</div></div>
+      <div class="type-cell"><div class="t-name">Familielening</div><div class="t-desc">Onderhands, met of zonder rente</div></div>
+      <div class="type-cell"><div class="t-name">Afbetalingsregeling</div><div class="t-desc">Aankoop in termijnen</div></div>
+    </div>
+
+    <!-- Cases -->
+    <h3 class="h3">In de praktijk</h3>
+    <div class="cases">
+
+      <!-- Sanne: eigen woning + crypto registreren -->
+      <details class="case" data-persona="sanne">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-sanne"></span>Sanne · 32</span>
+          <span class="case-title">Registreert haar <strong>eerste koopwoning</strong>, koppelt de hypotheek, en voert haar <strong>crypto</strong> op.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Sanne koopt haar eerste woning voor €385.000. WOZ €340.000. Ze sluit een annuïteitenhypotheek van €350.000 af tegen 4,2% rente, 30 jaar. Naast de woning heeft ze €4.000 in Bitcoin, €1.500 in Ethereum, en wat altcoins.</p>
+
+          <div class="stage"><span class="step-n">1</span> Bezitting toevoegen — Eigen woning</div>
+          <p>Op <code>/core</code> tikt ze "Bezitting toevoegen", kiest type <strong>Eigen woning</strong>, vult adres, marktwaarde €385.000, WOZ €340.000 in. Klaar.</p>
+
+          <div class="stage"><span class="step-n">2</span> Schuld toevoegen — Hypotheek, gekoppeld</div>
+          <p>Direct daarna: schuld toevoegen, type <strong>Hypotheek</strong>. Bij "Gekoppeld aan bezitting" selecteert ze de woning die ze net heeft toegevoegd. Rente 4,2%, looptijd 30 jaar, aflossingsvorm annuïteit, startdatum 1 juni 2026.</p>
+
+          <div class="stage"><span class="step-n">3</span> Crypto toevoegen</div>
+          <p>Nieuwe bezitting, type <strong>Crypto</strong>. Ze zet "Holdings bijhouden" aan. Vier coins toegevoegd met aankoopkoers en wallet/exchange-label.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Netto vermogen</span>
+              <span class="mock-meta">Direct na registratie</span>
+            </div>
+            <div class="mock-cap">Bezittingen</div>
+            <div class="mock-row"><span class="k">Eigen woning</span><span class="v">€385.000</span></div>
+            <div class="mock-row"><span class="k">Crypto (4 coins)</span><span class="v">€5.840</span></div>
+            <div class="mock-row"><span class="k">Cash + spaar</span><span class="v">€2.300</span></div>
+            <div class="mock-cap" style="margin-top:14px">Schulden</div>
+            <div class="mock-row"><span class="k">Hypotheek</span><span class="v neg">−€350.000</span></div>
+            <div class="mock-big">€43.140</div>
+            <div class="mock-cap">Netto vermogen vandaag</div>
+          </div>
+
+          <p class="value"><strong>Wat heeft ze gewonnen?</strong> Voor het eerst ziet Sanne haar grootste financiële beslissing — die woning — als één bedrag, naast haar crypto en haar spaarpot. Geen Excel meer, geen drie apps. Eén plek.</p>
+        </div>
+      </details>
+
+      <!-- Mark & Lisa: cash via PSD2 -->
+      <details class="case" data-persona="mark">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-mark"></span>Mark &amp; Lisa</span>
+          <span class="case-title">Koppelen hun <strong>betaalrekening</strong> via PSD2 en zien voor het eerst alles bij elkaar.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Twee inkomens, samen €7.200 netto per maand. Twee kinderen, een hypotheek van €240.000 op een woning van €420.000. Ze voelen dat het krap zit, maar weten niet waaraan het ligt.</p>
+
+          <div class="stage"><span class="step-n">1</span> Cash-rekening koppelen</div>
+          <p>Op <code>/core/cash/connect</code> kiezen ze hun bank, doorlopen de PSD2-flow. Trifinity haalt 24 maanden transactiehistorie binnen.</p>
+
+          <div class="stage"><span class="step-n">2</span> Eigen woning + hypotheek</div>
+          <p>Marktwaarde €420.000, WOZ €395.000. Hypotheek €240.000 annuïteit, 2,1% (afgesloten in 2019). Trifinity vult de huidige restschuld zelf bij op basis van de looptijd.</p>
+
+          <div class="stage"><span class="step-n">3</span> Box 3 wordt automatisch ingevuld</div>
+          <p>Hun spaargeld (€18.000) en kleine ETF-positie (€7.500) komen in Box 3. Eigen woning niet — die zit in Box 1. Trifinity rekent direct de fictieve Box 3-grondslag uit.</p>
+
+          <p class="value"><strong>Het schrik-moment.</strong> Het netto vermogen is positief — €210.000 — maar de maandstroom voelt anders. Dat onderzoeken ze in Hoofdstuk 03.</p>
+        </div>
+      </details>
+
+      <!-- Hans: vermogen opgebouwd -->
+      <details class="case" data-persona="hans">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-hans"></span>Hans · 54</span>
+          <span class="case-title">Voert <strong>beleggingsportefeuille, pensioen en deelneming</strong> op — vermogen verspreid over zes plekken.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Hans is mede-eigenaar van een installatiebedrijf, heeft de holding-BV met aanmerkelijk belang, twee beleggingsrekeningen (DEGIRO en MeesPierson), een aanvullend pensioen (lijfrentepolis), spaargeld op drie rekeningen, en zijn afgeloste woning.</p>
+
+          <div class="stage"><span class="step-n">1</span> Deelneming registreren</div>
+          <p>Bezitting toevoegen, type <strong>Deelneming / AB</strong>. Hij voert de huidige waardering van zijn 40%-belang in (€680.000) en de soort (Box 2).</p>
+
+          <div class="stage"><span class="step-n">2</span> Twee beleggingsrekeningen, één app</div>
+          <p>Beide brokers krijgen een eigen bezitting (type Beleggingen). Hij zet "Holdings bijhouden" aan zodat hij individuele ETF's en aandelen kan invoeren — handig voor de Holdings-app in Hoofdstuk 03.</p>
+
+          <div class="stage"><span class="step-n">3</span> Pensioen en woning</div>
+          <p>Lijfrentepolis met waarde + uitkeringsmoment. Eigen woning marktwaarde €620.000, géén hypotheek meer. Trifinity weet: woning telt niet voor Box 3 maar wél voor netto vermogen.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Vermogen verdeeld</span>
+              <span class="mock-meta">Hans · 6 plekken</span>
+            </div>
+            <div class="pie">
+              <div class="disc" style="background:conic-gradient(var(--horizon-500) 0 40%, var(--kern-500) 40% 60%, var(--wil-500) 60% 78%, var(--ink-2) 78% 92%, var(--ink-3) 92% 100%)"></div>
+              <div class="legend">
+                <div><span class="sw" style="background:var(--horizon-500)"></span>Deelneming · 40%</div>
+                <div><span class="sw" style="background:var(--kern-500)"></span>Woning · 20%</div>
+                <div><span class="sw" style="background:var(--wil-500)"></span>Beleggingen · 18%</div>
+                <div><span class="sw" style="background:var(--ink-2)"></span>Pensioen · 14%</div>
+                <div><span class="sw" style="background:var(--ink-3)"></span>Spaargeld · 8%</div>
+              </div>
+            </div>
+          </div>
+
+          <p class="value"><strong>Concentratierisico zichtbaar.</strong> 40% van zijn vermogen zit in één onderneming. Voor Hans, die richting FIRE denkt, is dat het belangrijkste cijfer dat hij nu ziet — en het zou hem in een normale bank-app nooit zo getoond worden.</p>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- Quiz Kern -->
+    <div class="quiz" data-quiz="kern">
+      <div class="quiz-eyebrow">Mini-vraag</div>
+      <div class="quiz-q">Onder welke Box valt de eigen woning waarin je zelf woont?</div>
+      <div class="quiz-options">
+        <button class="quiz-opt" data-correct="false">Box 3 — overige bezittingen</button>
+        <button class="quiz-opt" data-correct="true">Box 1 — inkomen uit werk en woning</button>
+        <button class="quiz-opt" data-correct="false">Box 2 — aanmerkelijk belang</button>
+        <button class="quiz-opt" data-correct="false">Geen — privé-woning valt buiten de aangifte</button>
+      </div>
+      <div class="quiz-feedback" data-feedback>
+        <strong>Precies.</strong> De eigen woning valt onder Box 1 (eigenwoningforfait minus hypotheekrenteaftrek).
+        Pas een tweede woning of verhuurpand komt in Box 3 terecht. Trifinity scheidt dat automatisch, zodat je
+        netto vermogen klopt en je Box 3-belasting niet te hoog of te laag wordt geschat.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════ 03 · APPS ════════════════════════ -->
+<section class="training" id="apps">
+  <div class="section-inner">
+    <div class="section-num"><span class="dot-section"></span>Hoofdstuk 03 · Apps binnen categorieën</div>
+    <h2 class="h2">Verdieping waar het ertoe doet — <em>geen los menu</em>.</h2>
+    <p class="intro">
+      Een "app" in trifinity is een tweede tab op een categoriepagina. Geen losse plek in de navigatie, geen
+      duplicatie van data — gewoon: naast je lijst met cash-rekeningen verschijnt <em>Budgetteren</em>, naast je
+      eigen woning verschijnt <em>Hypotheekplanner</em>. Eén-op-één gekoppeld aan de categorie waar het thuishoort.
+    </p>
+
+    <div class="four-cards">
+      <div class="card">
+        <div class="card-num">Op cash</div>
+        <div class="card-title">Budgetteren</div>
+        <div class="card-body">Vaste lasten herkennen, spaarquote, noodfonds-doel, abonnementenscan.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Op beleggingen + crypto</div>
+        <div class="card-title">Holdings</div>
+        <div class="card-body">Per coin / per aandeel — live koers, rendement, allocatie, CSV-import.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Op eigen woning + hypotheek</div>
+        <div class="card-title">Hypotheekplanner</div>
+        <div class="card-body">Equity-opbouw, aflossen vs. beleggen, oversluitscenario's.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Op vastgoed</div>
+        <div class="card-title">Verhuurrendement</div>
+        <div class="card-body">Cashflow per pand, bruto/netto ROI, Box 3-vergelijking.</div>
+      </div>
+    </div>
+
+    <h3 class="h3">In de praktijk</h3>
+    <div class="cases">
+
+      <!-- Sanne: Hypotheekplanner + Crypto holdings -->
+      <details class="case" data-persona="sanne">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-sanne"></span>Sanne · 32</span>
+          <span class="case-title">Opent de <strong>Hypotheekplanner</strong> en speelt met "extra aflossen of beleggen?".</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Omdat Sanne in Hoofdstuk 02 haar woning aan haar hypotheek heeft gekoppeld, verschijnt op de pagina <code>/core/assets/eigen_huis</code> automatisch een tweede tab: <strong>Hypotheekplanner</strong>.</p>
+
+          <div class="stage"><span class="step-n">1</span> Equity-opbouw zien</div>
+          <p>De planner laat zien hoe haar aandeel in de woning groeit: aflossing + (instelbare) WOZ-stijging. Op jaar 10 is het deel-eigen €119.000.</p>
+
+          <div class="stage"><span class="step-n">2</span> Wat als ik €200 per maand extra aflos?</div>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Aflossen vs. beleggen</span>
+              <span class="mock-meta">€200/m · 15 jaar</span>
+            </div>
+            <div class="mock-row"><span class="k">Extra aflossen</span><span class="v pos">+€48.200 eindwaarde</span></div>
+            <div class="mock-row"><span class="k">Beleggen (indexfonds, 6%)</span><span class="v pos">+€58.300 eindwaarde</span></div>
+            <div class="mock-row"><span class="k">Verschil</span><span class="v">+€10.100 belegging</span></div>
+            <div class="mock-cap" style="margin-top:10px">Excl. risico-correctie · rente 4,2% · belegging na Box 3</div>
+          </div>
+
+          <p>De planner geeft niet alleen het cijfer, maar ook context: "Bij een rente van 4,2% is het verschil klein. Bij rente 5,5% kantelt het richting aflossen."</p>
+
+          <div class="stage"><span class="step-n">3</span> Crypto holdings — apart maar in beeld</div>
+          <p>Op <code>/core/assets/crypto</code> opent ze de tab <strong>Crypto holdings</strong>. Allocatie per coin, rendement sinds aankoop, CSV-import vanaf Bitvavo.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Crypto-allocatie</span>
+              <span class="mock-meta">Sanne · 4 coins · €5.840</span>
+            </div>
+            <div class="pie">
+              <div class="disc" style="background:conic-gradient(#f7931a 0 60%, #627eea 60% 85%, #c47a5a 85% 95%, var(--ink-3) 95% 100%)"></div>
+              <div class="legend">
+                <div><span class="sw" style="background:#f7931a"></span>BTC · 60%</div>
+                <div><span class="sw" style="background:#627eea"></span>ETH · 25%</div>
+                <div><span class="sw" style="background:#c47a5a"></span>SOL · 10%</div>
+                <div><span class="sw" style="background:var(--ink-3)"></span>Overig · 5%</div>
+              </div>
+            </div>
+            <div class="mock-row"><span class="k">Crypto t.o.v. totaal vermogen</span><span class="v">14%</span></div>
+            <div class="mock-row"><span class="k">Risicoprofiel-suggestie</span><span class="v">5–10%</span></div>
+          </div>
+
+          <p class="value"><strong>Eén beslissing, drie kanten zichtbaar.</strong> Of ze nu €200/m extra aflost, belegt of in crypto stopt — Sanne ziet ze in dezelfde valuta, met dezelfde tijdshorizon. Beslissen wordt vergelijken, niet gokken.</p>
+        </div>
+      </details>
+
+      <!-- Mark & Lisa: Budgetteren -->
+      <details class="case" data-persona="mark">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-mark"></span>Mark &amp; Lisa</span>
+          <span class="case-title">Openen <strong>Budgetteren</strong> en zien dat 60% van hun inkomen al vast staat.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Omdat hun cash-rekening gekoppeld is en de transacties twee jaar terug gaan, hoeft Trifinity weinig te vragen — categorieën zijn al herkend, terugkerende uitgaven gemarkeerd als vaste lasten.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Maandbeeld · gemiddeld</span>
+              <span class="mock-meta">12-maands gemiddelde</span>
+            </div>
+            <div class="mock-row"><span class="k">Netto-inkomen</span><span class="v">€7.200</span></div>
+            <div class="mock-row"><span class="k">Vaste lasten</span><span class="v neg">−€4.350</span></div>
+            <div class="mock-row"><span class="k">Variabele uitgaven</span><span class="v neg">−€1.900</span></div>
+            <div class="mock-row"><span class="k">Restant (spaarquote)</span><span class="v pos">+€950 · 13%</span></div>
+            <div class="bar"><div class="bar-fill kern" style="width:60.4%"></div></div>
+            <div class="bar-cap"><span>Vaste lasten aandeel</span><span>60% van inkomen</span></div>
+          </div>
+
+          <div class="stage"><span class="step-n">1</span> Abonnementenscan</div>
+          <p>Trifinity merkt drie overlappende of vergeten abonnementen op: twee streamingdiensten, een telefooncontract dat nog op €52/m staat terwijl bundels nu €28/m kosten, en een dubbele energievergelijker.</p>
+          <ul>
+            <li>Streaming-overlap (Netflix + Disney) — €18,99/m, te kiezen</li>
+            <li>Lisa's telefoonabonnement op €52/m — gem. marktprijs €28/m</li>
+            <li>Energievergelijker-service · €9,95/m — nooit gebruikt</li>
+          </ul>
+
+          <div class="stage"><span class="step-n">2</span> Noodfonds-doel</div>
+          <p>Op basis van vaste lasten stelt trifinity automatisch een noodfonds-doel voor: <strong>3 × €4.350 = €13.050</strong>. Hun spaarpot staat op €4.000. De gap is zichtbaar als balk.</p>
+
+          <div class="mock">
+            <div class="mock-cap">Noodfonds-doel</div>
+            <div class="mock-big">€4.000 <span style="color:var(--ink-3);font-size:18px;font-weight:400">/ €13.050</span></div>
+            <div class="bar"><div class="bar-fill pos" style="width:30.6%"></div></div>
+            <div class="bar-cap"><span>31% gevuld</span><span>Doel: 3 maanden lasten</span></div>
+          </div>
+
+          <p class="value"><strong>Het verborgen percentage.</strong> "60%" is voor Mark &amp; Lisa de schrik die ze nodig hadden. Zonder budget-app weet je niet welk aandeel van je inkomen al vergeven is. En dat ene cijfer voedt straks ook hun FIRE-projectie in Horizon — de spaarquote is de motor.</p>
+        </div>
+      </details>
+
+      <!-- Hans: Holdings (aandelen) -->
+      <details class="case" data-persona="hans">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-hans"></span>Hans · 54</span>
+          <span class="case-title">Bekijkt zijn <strong>Holdings</strong> en ziet dat één positie 28% van de portefeuille is.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Op <code>/core/assets/investment</code> opent Hans de <strong>Holdings</strong>-tab. Zijn twee broker-accounts staan eronder, met alle individuele posities samengevoegd.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Top-5 posities</span>
+              <span class="mock-meta">DEGIRO + MeesPierson · €312.400</span>
+            </div>
+            <div class="mock-row"><span class="k">VWRL (Vanguard World)</span><span class="v">28% · €87.500</span></div>
+            <div class="mock-row"><span class="k">ASML (NL)</span><span class="v">14% · €43.700</span></div>
+            <div class="mock-row"><span class="k">VUSA (S&amp;P 500)</span><span class="v">12% · €37.500</span></div>
+            <div class="mock-row"><span class="k">IEFA (ex-US developed)</span><span class="v">8% · €25.000</span></div>
+            <div class="mock-row"><span class="k">Overig (12 posities)</span><span class="v">38% · €118.700</span></div>
+          </div>
+
+          <p>Voor het eerst ziet Hans dat zijn "veilige" VWRL al 28% van zijn beleggingsportefeuille is, en dat hij daarnaast een single-stock-positie (ASML) heeft die 14% beslaat. Twee posities samen = 42%.</p>
+
+          <p class="value"><strong>Concentratie blootgesteld.</strong> Voor iemand die binnen 6 jaar wil stoppen met werken, is dit het cijfer waar het over moet gaan. Niet "wat doet de markt vandaag" — maar "hoeveel rust ik op te weinig dingen".</p>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- Quiz Apps -->
+    <div class="quiz" data-quiz="apps">
+      <div class="quiz-eyebrow">Mini-vraag</div>
+      <div class="quiz-q">Waarom is Budgetteren in trifinity géén losse pagina maar een tab op de cash-categorie?</div>
+      <div class="quiz-options">
+        <button class="quiz-opt" data-correct="false">Om plaats te besparen in het menu</button>
+        <button class="quiz-opt" data-correct="true">Omdat budgetteren onlosmakelijk hoort bij de cash-rekening waar de transacties vandaan komen — context en data wonen samen</button>
+        <button class="quiz-opt" data-correct="false">Omdat budget-data niet wordt opgeslagen</button>
+        <button class="quiz-opt" data-correct="false">Omdat het een bètafunctie is</button>
+      </div>
+      <div class="quiz-feedback" data-feedback>
+        <strong>Klopt.</strong> Trifinity's architectuur is "Kern → Categorie → App": een app verdiept altijd één
+        specifieke categorie. Budgetteren zonder cash heeft geen data. Holdings zonder beleggingen heeft niets
+        te tonen. Door context en functie samen te houden, voorkomt de app dat je tussen schermen moet schakelen
+        om één beslissing te kunnen nemen.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════ 04 · WIL ════════════════════════ -->
+<section class="training" id="wil">
+  <div class="section-inner">
+    <div class="section-num"><span class="dot-section"></span>Hoofdstuk 04 · Wil</div>
+    <h2 class="h2"><em>Inzicht zonder zoeken.</em> De app merkt het, niet jij.</h2>
+    <p class="intro">
+      In de Kern en in de Apps registreer en analyseer je. In <strong>Wil</strong> draait het om wat je niet uit
+      jezelf zou zien: trends, afwijkingen, kansen. Het dashboard verzamelt widgets (vermogen, vaste lasten,
+      doelen). AI-aanbevelingen leggen er duiding op. Doelen houden je richting vast.
+    </p>
+
+    <h3 class="h3">In de praktijk</h3>
+    <div class="cases">
+
+      <!-- Sanne: hypotheek-signaal -->
+      <details class="case" data-persona="sanne">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-sanne"></span>Sanne · 32</span>
+          <span class="case-title">Krijgt een signaal: <strong>haar rente staat 0,4% boven marktconform</strong>.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Drie maanden na afsluiten verschijnt op haar dashboard een kaart:</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Inzicht · oversluitkans</span>
+              <span class="mock-meta">Wil · AI-aanbeveling</span>
+            </div>
+            <p style="margin:6px 0;font-family:var(--font-serif);font-size:15px;color:var(--ink-2)">
+              Je rente (4,2%) ligt momenteel 0,4 procentpunt boven het marktgemiddelde voor jouw LTV en looptijd.
+              Een oversluiting kost gemiddeld €3.200 aan eenmalige kosten en bespaart je over 30 jaar
+              <strong>€21.400</strong> aan rente. Terugverdientijd: 4,1 jaar.
+            </p>
+            <div class="mock-row"><span class="k">Huidige rente</span><span class="v">4,20%</span></div>
+            <div class="mock-row"><span class="k">Markt voor jouw LTV</span><span class="v pos">3,80%</span></div>
+            <div class="mock-row"><span class="k">Levensduur-besparing</span><span class="v pos">+€21.400</span></div>
+          </div>
+
+          <p class="value"><strong>De signaal-economie.</strong> Sanne zou nooit zelf checken of haar rente nog marktconform is. Trifinity doet het op de achtergrond, en zegt het op het moment dat het ertoe doet.</p>
+        </div>
+      </details>
+
+      <!-- Mark & Lisa: vaste lasten gestegen -->
+      <details class="case" data-persona="mark">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-mark"></span>Mark &amp; Lisa</span>
+          <span class="case-title">Zien een nudge: <strong>vaste lasten zijn 8% gestegen</strong> ten opzichte van vorig kwartaal.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Geen alarm-kleur, geen rode banner. Een rustige kaart op het dashboard:</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Trend · vaste lasten</span>
+              <span class="mock-meta">Q1 → Q2 2026</span>
+            </div>
+            <div class="mock-row"><span class="k">Q1 2026 (gem.)</span><span class="v">€4.030/m</span></div>
+            <div class="mock-row"><span class="k">Q2 2026 (gem.)</span><span class="v neg">€4.350/m</span></div>
+            <div class="mock-row"><span class="k">Verschil</span><span class="v neg">+€320 · +8%</span></div>
+            <p style="margin:10px 0 0;font-family:var(--font-serif);font-size:14px;color:var(--ink-2)">
+              Stijging komt vooral uit <strong>energiecontract</strong> (+€140, contract verlengd in maart) en
+              <strong>kinderopvang</strong> (+€180, uurprijs-stijging). Twee andere categorieën daalden licht.
+            </p>
+          </div>
+
+          <p class="value"><strong>Onderbouwing, geen paniek.</strong> Trifinity zegt niet alleen wát er veranderde, maar wáár het door komt. Twee acties zijn meteen denkbaar: energiecontract opnieuw vergelijken, of de spaarquote tijdelijk neerwaarts bijstellen.</p>
+        </div>
+      </details>
+
+      <!-- Hans: doel-tracking -->
+      <details class="case" data-persona="hans">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-hans"></span>Hans · 54</span>
+          <span class="case-title">Volgt zijn <strong>FIRE-doel</strong> — 87% bereikt, nog 2,1 jaar bij huidige tempo.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Op zijn dashboard staat één kaart die voor hem het grootst is. Geen koers, geen rendement — een datum.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">FIRE-doel</span>
+              <span class="mock-meta">Wil · Doelen</span>
+            </div>
+            <div class="mock-cap">Bereikt</div>
+            <div class="mock-big">€1.215.000 <span style="color:var(--ink-3);font-size:18px;font-weight:400">/ €1.400.000</span></div>
+            <div class="bar"><div class="bar-fill horizon" style="width:86.8%"></div></div>
+            <div class="bar-cap"><span>87% bereikt</span><span>Doel: 25× jaarlasten</span></div>
+            <div class="mock-row" style="margin-top:10px"><span class="k">Bij huidige spaartempo</span><span class="v">nog 2,1 jaar</span></div>
+            <div class="mock-row"><span class="k">Bij 0% rendement (stress)</span><span class="v">nog 3,4 jaar</span></div>
+          </div>
+
+          <p class="value"><strong>Eén cijfer om bij wakker te worden.</strong> Voor Hans is "87%" het belangrijkste getal in zijn leven nu. Trifinity zet het bovenaan zijn dashboard. Niet als spelletje, maar als kompas.</p>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- Quiz Wil -->
+    <div class="quiz" data-quiz="wil">
+      <div class="quiz-eyebrow">Mini-vraag</div>
+      <div class="quiz-q">Wat maakt een goede AI-aanbeveling in trifinity verschillend van een willekeurige financiële tip?</div>
+      <div class="quiz-options">
+        <button class="quiz-opt" data-correct="false">De aanbeveling komt van een gecertificeerd financieel adviseur</button>
+        <button class="quiz-opt" data-correct="true">Hij is gebaseerd op jouw eigen geregistreerde data — rente, LTV, looptijd, vaste lasten — niet op een algemeen advies</button>
+        <button class="quiz-opt" data-correct="false">De aanbeveling is gegarandeerd correct voor 95% van de gebruikers</button>
+        <button class="quiz-opt" data-correct="false">Hij wordt elke maand handmatig bijgewerkt</button>
+      </div>
+      <div class="quiz-feedback" data-feedback>
+        <strong>Inderdaad.</strong> Trifinity's signalen rekenen op jouw cijfers. "Je rente staat 0,4% boven markt"
+        is een uitspraak over jouw lening, niet een algemeen advies om over te sluiten. Daardoor klopt het, en
+        durf je iets met de tip te doen.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════ 05 · HORIZON ════════════════════════ -->
+<section class="training" id="horizon">
+  <div class="section-inner">
+    <div class="section-num"><span class="dot-section"></span>Hoofdstuk 05 · Horizon</div>
+    <h2 class="h2"><em>Wanneer ben ik klaar?</em> Drie fases, één antwoord.</h2>
+    <p class="intro">
+      Horizon is de FIRE-module van trifinity. Niet alleen "wanneer kan ik stoppen", maar drie fases naast elkaar:
+      <strong>Opbouw</strong> (je werkt en spaart), <strong>Overgang</strong> (deeltijd, sabbatical, eerder
+      stoppen met onzekerheid), <strong>Onttrekking</strong> (je leeft van je vermogen). Plus een speeltuin om
+      scenario's te bouwen en levensgebeurtenissen door te rekenen.
+    </p>
+
+    <div class="four-cards">
+      <div class="card">
+        <div class="card-num">Fase 1</div>
+        <div class="card-title">Opbouw</div>
+        <div class="card-body">Spaarquote, rendement, looptijd. Hier woont de meeste tijd voor de meeste mensen.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Fase 2</div>
+        <div class="card-title">Overgang</div>
+        <div class="card-body">Deeltijd of sabbatical. Hoe lang houd je het vol bij gedeeltelijk inkomen?</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Fase 3</div>
+        <div class="card-title">Onttrekking</div>
+        <div class="card-body">Veilige onttrekking. NL-gecorrigeerde SWR ≈ 2,88% na Box 3 en inflatie.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">Speeltuin</div>
+        <div class="card-title">What-if</div>
+        <div class="card-body">Sliders voor spaarquote, rendement, pensioenleeftijd. Plus levens-events.</div>
+      </div>
+    </div>
+
+    <h3 class="h3">In de praktijk</h3>
+    <div class="cases">
+
+      <!-- Sanne: woning als FIRE-versneller -->
+      <details class="case" data-persona="sanne">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-sanne"></span>Sanne · 32</span>
+          <span class="case-title">Ziet hoe de <strong>aflossing van haar woning</strong> haar vrijheidsdatum verschuift.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Sanne's woning telt mee in netto vermogen maar staat buiten Box 3. Dat maakt aflossen relatief sterk: elke euro aflossing verlaagt haar maandlasten in de toekomst.</p>
+
+          <div class="stage">Strategie A · alleen aflossen volgens schema</div>
+          <p>Bij standaard aflossing: hypotheek volledig afbetaald op haar 62e. FIRE-bedrag op haar 58e (gebaseerd op spaarquote 18%, rendement 5%).</p>
+
+          <div class="stage">Strategie B · €200/m extra aflossen</div>
+          <p>Hypotheek weg op 56e. FIRE-bedrag op 60e — twee jaar later, want het geld zit in stenen in plaats van in beleggingen.</p>
+
+          <div class="stage">Strategie C · €200/m beleggen</div>
+          <p>Hypotheek volgens schema, beleggingsportefeuille extra €58k op haar 58e. FIRE-bedrag op haar 56e — twee jaar eerder.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">FIRE-datum per strategie</span>
+              <span class="mock-meta">€200/m extra · gelijk uitgangspunt</span>
+            </div>
+            <div class="mock-row"><span class="k">A · alleen schema</span><span class="v">58 jaar</span></div>
+            <div class="mock-row"><span class="k">B · extra aflossen</span><span class="v">60 jaar</span></div>
+            <div class="mock-row"><span class="k">C · beleggen</span><span class="v pos">56 jaar</span></div>
+            <div class="mock-cap" style="margin-top:8px">Excl. risico — strategie C heeft hogere volatiliteit</div>
+          </div>
+
+          <p class="value"><strong>Een keuze met getallen.</strong> Sanne kan nu de afweging maken op basis van twee assen: hoeveel risico ze accepteert, en hoeveel jaar vrijheid het haar oplevert.</p>
+        </div>
+      </details>
+
+      <!-- Mark & Lisa: spaarquote → FIRE -->
+      <details class="case" data-persona="mark">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-mark"></span>Mark &amp; Lisa</span>
+          <span class="case-title">Hun spaarquote uit Budgetteren <strong>voedt automatisch de FIRE-projectie</strong>.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Omdat ze in Hoofdstuk 03 Budgetteren actief hebben gezet, weet Horizon hun werkelijke spaarquote (13%). Geen schatting, geen invuldwang.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">FIRE-projectie · huidig tempo</span>
+              <span class="mock-meta">Spaarquote 13% · rendement 5%</span>
+            </div>
+            <div class="mock-row"><span class="k">FIRE-bedrag (25× lasten)</span><span class="v">€1.305.000</span></div>
+            <div class="mock-row"><span class="k">Bereikt op</span><span class="v">2056 (61 jaar)</span></div>
+            <div class="bar"><div class="bar-fill horizon" style="width:16%"></div></div>
+            <div class="bar-cap"><span>Huidige voortgang 16%</span><span>Doel: 100%</span></div>
+          </div>
+
+          <div class="stage">What-if · drie abonnementen opgezegd</div>
+          <p>Stel ze zeggen die €81/m aan abonnementen op (uit Hoofdstuk 03). Spaarquote stijgt naar 14,1%. De FIRE-datum schuift met 11 maanden naar voren.</p>
+
+          <p class="value"><strong>Klein gedrag, grote tijdseffecten.</strong> Voor Mark &amp; Lisa is dit het inzicht dat budgetteren aantrekkelijk maakt — niet "elk dubbeltje omdraaien", maar "11 maanden eerder vrij".</p>
+        </div>
+      </details>
+
+      <!-- Hans: scenario's + Monte Carlo -->
+      <details class="case" data-persona="hans">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-hans"></span>Hans · 54</span>
+          <span class="case-title">Speelt drie scenario's: <strong>stoppen op 60, 62 of 64</strong> — met stress-test.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Hans bouwt drie scenario's in de What-if speeltuin. Elk scenario krijgt een naam, kleur en een set overrides (pensioenleeftijd, jaarbestedingen). Onder Monte Carlo: 10.000 paden door verschillende beurs-uitkomsten.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Slagingskans per scenario</span>
+              <span class="mock-meta">Monte Carlo · 10.000 paden</span>
+            </div>
+            <div class="mock-row"><span class="k">Stop op 60 · €55k/jaar</span><span class="v">78%</span></div>
+            <div class="mock-row"><span class="k">Stop op 62 · €55k/jaar</span><span class="v pos">91%</span></div>
+            <div class="mock-row"><span class="k">Stop op 64 · €55k/jaar</span><span class="v pos">97%</span></div>
+            <div class="mock-row"><span class="k">Stop op 60 · €45k/jaar</span><span class="v pos">93%</span></div>
+          </div>
+
+          <div class="stage">Stress-test · sequence-of-returns risk</div>
+          <p>"Wat als de eerste 5 onttrekkingsjaren een gemiddeld rendement van −2% geven?" Slagingskans daalt naar 64% voor het 60-scenario. Daarmee weet Hans: de eerste vijf jaar van zijn pensioen zijn de gevoeligste.</p>
+
+          <div class="stage">Levensgebeurtenis · klein-kind hulp</div>
+          <p>Hij voegt een event toe: "€15k bijdrage aan kleinkind op leeftijd 65". Slagingskans daalt 2 punten. Manageable.</p>
+
+          <p class="value"><strong>Geen losse berekeningen, maar één leven naast elkaar.</strong> Trifinity laat Hans zien dat het niet gaat om "hoeveel heb ik nodig" maar om "welke combinatie van keuzes geeft welk percentage gemoedsrust".</p>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- Quiz Horizon -->
+    <div class="quiz" data-quiz="horizon">
+      <div class="quiz-eyebrow">Mini-vraag</div>
+      <div class="quiz-q">Waarom hanteert trifinity een Safe Withdrawal Rate (SWR) van circa <em>2,88%</em> in plaats van de bekende 4%?</div>
+      <div class="quiz-options">
+        <button class="quiz-opt" data-correct="false">Omdat 4% een Amerikaanse vuistregel is en in Nederland nooit gold</button>
+        <button class="quiz-opt" data-correct="true">Omdat 4% al gecorrigeerd is voor onttrekking, maar voor Nederland nog Box 3-belasting en inflatie moet worden afgetrokken — dat brengt het netto-veilig percentage lager</button>
+        <button class="quiz-opt" data-correct="false">Omdat de Nederlandse beurs historisch slechter heeft gepresteerd</button>
+        <button class="quiz-opt" data-correct="false">Omdat trifinity een conservatieve veiligheidsmarge ingebouwd heeft</button>
+      </div>
+      <div class="quiz-feedback" data-feedback>
+        <strong>Goed.</strong> De 4%-regel (Trinity Study) is een Amerikaans bruto-cijfer voor onttrekking. In de
+        Nederlandse context komt Box 3-vermogensbelasting eraf (drukt het effectieve rendement met circa 0,8–1,2
+        procentpunt). Trifinity rekent dat al door — anders zou je je vrijheidsdatum systematisch te vroeg
+        plannen.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════ 06 · IDENTITY ════════════════════════ -->
+<section class="training" id="identity">
+  <div class="section-inner">
+    <div class="section-num"><span class="dot-section"></span>Hoofdstuk 06 · Identity</div>
+    <h2 class="h2"><em>Reflectie als gewoonte.</em> Niet een dashboard. Een ritme.</h2>
+    <p class="intro">
+      Identity is het ritueel-deel van trifinity. Hier gebeurt wat dashboards niet doen: terugkijken,
+      benoemen, voortgang verankeren. De maandelijkse <strong>Check-in</strong> stelt één AI-vraag,
+      legt een snapshot vast (vermogen, spaarquote, doelen, aandachtspunten). Het jaaroverzicht maakt er
+      een verhaal van.
+    </p>
+
+    <h3 class="h3">In de praktijk</h3>
+    <div class="cases">
+
+      <!-- Sanne: eerste check-in -->
+      <details class="case" data-persona="sanne">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-sanne"></span>Sanne · 32</span>
+          <span class="case-title">Doet haar <strong>eerste check-in</strong> — vraag: "wat voelt anders sinds vorige maand?"</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Op de 1e van de maand komt er een rustige notificatie. Op <code>/core/checkin</code> wacht één vraag, gegenereerd op basis van wat er die maand veranderde.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Check-in mei 2026</span>
+              <span class="mock-meta">Identity · 1e van de maand</span>
+            </div>
+            <p style="font-family:var(--font-serif);font-style:italic;font-size:17px;color:var(--ink);margin:8px 0">
+              "Je netto vermogen is met €1.420 gestegen sinds april. Wat herken je daarin terug uit je eigen
+              gedrag — en wat voelt als toeval?"
+            </p>
+            <div class="mock-cap" style="margin-top:14px">Snapshot vastgelegd</div>
+            <div class="mock-row"><span class="k">Vermogen</span><span class="v">€44.560</span></div>
+            <div class="mock-row"><span class="k">Spaarquote (maand)</span><span class="v">19%</span></div>
+            <div class="mock-row"><span class="k">Aandachtspunten</span><span class="v">Oversluitkans hypotheek</span></div>
+          </div>
+
+          <p class="value"><strong>De maand wordt een verhaal.</strong> Drie maanden later kan Sanne terugbladeren door haar eigen reflecties. Niet alleen "wat had ik", maar "wat dacht ik toen, en klopte dat".</p>
+        </div>
+      </details>
+
+      <!-- Mark & Lisa: opgezegde abonnementen terug in beeld -->
+      <details class="case" data-persona="mark">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-mark"></span>Mark &amp; Lisa</span>
+          <span class="case-title">Zien hun <strong>opgezegde abonnementen</strong> terug in het maandbeeld — €81/m extra spaarruimte.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Twee maanden na de abonnementenscan staan er twee opgezegde diensten in hun snapshot, met een direct effect op de spaarquote.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Maand-snapshot · juli 2026</span>
+              <span class="mock-meta">Identity</span>
+            </div>
+            <div class="mock-row"><span class="k">Spaarquote mei</span><span class="v">13,1%</span></div>
+            <div class="mock-row"><span class="k">Spaarquote juli</span><span class="v pos">14,2%</span></div>
+            <div class="mock-row"><span class="k">Concrete wijzigingen</span><span class="v">2 abonnementen op</span></div>
+            <p style="font-family:var(--font-serif);font-style:italic;font-size:15px;color:var(--ink-2);margin:14px 0 0">
+              "Klein gedrag is zichtbaar geworden. Jullie FIRE-datum is intussen met 11 maanden naar voren
+              verschoven — niet door een loonsverhoging."
+            </p>
+          </div>
+
+          <p class="value"><strong>Verandering wordt zichtbaar.</strong> Zonder check-in zou de besparing in de ruis verdwijnen. Door 'm vast te leggen, blijft het effect zichtbaar — en daarmee blijft het gedrag.</p>
+        </div>
+      </details>
+
+      <!-- Hans: jaaroverzicht -->
+      <details class="case" data-persona="hans">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-hans"></span>Hans · 54</span>
+          <span class="case-title">Opent zijn <strong>jaaroverzicht 2026</strong> — vier momenten die er het meest toe deden.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Eind december, op <code>/identity/jaaroverzicht</code>, krijgt Hans een gestructureerd verhaal: vermogensgroei, top-3 gebeurtenissen, scenario-evolutie, koerswijzigingen in doelen.</p>
+
+          <div class="mock">
+            <div class="mock-head">
+              <span class="mock-title">Jaaroverzicht 2026 · samenvatting</span>
+              <span class="mock-meta">Identity</span>
+            </div>
+            <div class="mock-row"><span class="k">Vermogen 1 jan</span><span class="v">€1.142.000</span></div>
+            <div class="mock-row"><span class="k">Vermogen 31 dec</span><span class="v pos">€1.215.000</span></div>
+            <div class="mock-row"><span class="k">FIRE-voortgang</span><span class="v">82% → 87%</span></div>
+            <div class="mock-row"><span class="k">Sleutelmoment van het jaar</span><span class="v">Concentratierisico VWRL+ASML herkend</span></div>
+            <div class="mock-row"><span class="k">Belangrijkste check-in</span><span class="v">"Geen 60, maar 62"</span></div>
+          </div>
+
+          <p class="value"><strong>Een jaar als verhaal, niet als cijferreeks.</strong> Voor Hans, die in de eindfase van zijn opbouwperiode zit, is dit overzicht waardevoller dan elke maand opnieuw rekenen. Het verankert wat er werkelijk gebeurde.</p>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- Quiz Identity -->
+    <div class="quiz" data-quiz="identity">
+      <div class="quiz-eyebrow">Mini-vraag</div>
+      <div class="quiz-q">Wat is het verschil tussen Wil en Identity in trifinity?</div>
+      <div class="quiz-options">
+        <button class="quiz-opt" data-correct="false">Wil is voor inkomsten, Identity is voor uitgaven</button>
+        <button class="quiz-opt" data-correct="true">Wil signaleert continu en actiegericht (nu); Identity vraagt om terugkijken en betekenis geven (ritmisch)</button>
+        <button class="quiz-opt" data-correct="false">Wil draait op AI, Identity niet</button>
+        <button class="quiz-opt" data-correct="false">Ze doen hetzelfde, het zijn twee namen voor dezelfde module</button>
+      </div>
+      <div class="quiz-feedback" data-feedback>
+        <strong>Klopt.</strong> Wil is real-time inzicht en aanbevelingen — dingen die nu actie vragen. Identity
+        is de gewoonte van reflectie — wat is er in de afgelopen periode veranderd, en wat betekent dat voor
+        wie ik wil zijn. Een goed financieel leven heeft beide nodig.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════ 07 · NIEUWS · TRIFINITY POST ════════════════════════ -->
+<section class="training" id="nieuws">
+  <div class="section-inner">
+    <div class="section-num"><span class="dot-section"></span>Hoofdstuk 07 · Nieuws · Trifinity Post</div>
+    <h2 class="h2"><em>Geen koersen-feed.</em> Een krant die jou kent.</h2>
+    <p class="intro">
+      De meeste financiële nieuwsbronnen schrijven voor iedereen tegelijk. Trifinity Post draait het om: het
+      nieuws wordt gefilterd door <em>jouw</em> portefeuille, jouw doelen en jouw situatie. Een renteverandering
+      komt alleen voorbij als je een hypotheek hebt. Een Box 3-uitspraak alleen als die jouw vermogen raakt.
+    </p>
+
+    <div class="post-masthead">
+      <div class="post-name">Trifinity Post</div>
+      <div class="post-meta">Editie · jouw portefeuille · 14 mei 2026</div>
+    </div>
+
+    <h3 class="h3">In de praktijk</h3>
+    <div class="cases">
+
+      <!-- Sanne: NHG + bitcoin -->
+      <details class="case" data-persona="sanne">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-sanne"></span>Sanne · 32</span>
+          <span class="case-title">Krijgt op de voorpagina: <strong>NHG-grens 2027 verhoogd</strong> + een Bitcoin-update.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Trifinity weet: Sanne heeft een hypotheek dichtbij de NHG-grens, en haar grootste crypto-positie is BTC. De voorpagina laat dat terugkomen.</p>
+
+          <div class="post-cols">
+            <div class="post-article">
+              <div class="post-eyebrow">Hypotheek</div>
+              <div class="post-title">NHG-grens 2027 verhoogd naar €455.000</div>
+              <div class="post-deck">Voor Sanne relevant: ze zit op €350k bij een woning van €385k, ruim binnen de nieuwe grens. Bij oversluiting in 2027 kan ze NHG-tarief krijgen.</div>
+              <div class="post-body">Het kabinet heeft de NHG-grens aangepast vanwege gestegen woningprijzen. Hypotheken onder de grens kennen historisch een rentekorting van 0,15–0,25%. <strong>Wat dit voor jou betekent:</strong> als je in 2027 oversluit, valt jouw lening binnen de grens — een rentekorting kan jaarlijks €620 schelen.</div>
+              <div class="post-tag">Bron · NHG · Actie · oversluiten 2027</div>
+            </div>
+            <div class="post-article">
+              <div class="post-eyebrow">Crypto</div>
+              <div class="post-title">Bitcoin breekt door $70.000 — wat doet dat met jouw allocatie?</div>
+              <div class="post-deck">Jouw BTC-positie is met 12% in waarde gestegen sinds vorige maand. Dat tilt je crypto-aandeel binnen je vermogen naar 14%.</div>
+              <div class="post-body">Sinds eind april stijgt BTC fors. Bij jou betekent dat: crypto is nu 14% van je netto vermogen. Je risicoprofiel-suggestie ligt op 5–10%. <strong>Mogelijke actie:</strong> herbalanceren of bewust afwijken.</div>
+              <div class="post-tag">Bron · Bitvavo + ECB · Actie · herbalanceren</div>
+            </div>
+          </div>
+
+          <p class="value"><strong>Algemeen nieuws, persoonlijk gemaakt.</strong> Sanne leest niet "de NHG-grens gaat omhoog" en denkt: en wat dan nog. Ze leest "voor jou betekent dit X" — en daar kan ze iets mee.</p>
+        </div>
+      </details>
+
+      <!-- Mark & Lisa: energie + inflatie -->
+      <details class="case" data-persona="mark">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-mark"></span>Mark &amp; Lisa</span>
+          <span class="case-title">Lezen: <strong>energiebelasting 2027 daalt 4%</strong> + een notitie over kinderopvangtoeslag.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Hun grootste vaste-lasten-stijging dit jaar kwam uit energie en kinderopvang. Trifinity Post pikt nieuws op dat juist díe twee posten raakt.</p>
+
+          <div class="post-cols">
+            <div class="post-article">
+              <div class="post-eyebrow">Energie</div>
+              <div class="post-title">Energiebelasting daalt in 2027 met 4% — €14/m voor jullie verbruik</div>
+              <div class="post-deck">Jullie gemiddelde energierekening is €218/m. De aangekondigde belasting-verlaging scheelt circa €14/m, of €168/jaar.</div>
+              <div class="post-body">De Tweede Kamer heeft de energiebelasting-verlaging goedgekeurd. <strong>Wat dit voor jullie betekent:</strong> als jullie energiecontract per 1 januari verlengt, valt de verlaging in jullie kosten. Vergelijk dat met een nieuwe leverancier — de besparing kan oplopen tot €40/m.</div>
+              <div class="post-tag">Bron · Rijksoverheid · Actie · contract vergelijken</div>
+            </div>
+            <div class="post-article">
+              <div class="post-eyebrow">Toeslagen</div>
+              <div class="post-title">Kinderopvangtoeslag-bandbreedte verbreed in 2027</div>
+              <div class="post-deck">Met twee inkomens en de huidige uurprijs vallen jullie in een hogere band, maar de aangepaste schalen kunnen jullie netto-bijdrage met €60/m verlagen.</div>
+              <div class="post-body">Het Belastingplan 2027 verbreedt de bandbreedte voor kinderopvangtoeslag. <strong>Jullie situatie:</strong> bij ongewijzigd inkomen en gebruik kunnen jullie een hogere toeslag verwachten.</div>
+              <div class="post-tag">Bron · Belastingdienst · Actie · proefberekening</div>
+            </div>
+          </div>
+
+          <p class="value"><strong>Twee artikelen, twee acties.</strong> Geen algemeen nieuws over Tweede Kamer-debatten — alleen wat hun specifieke situatie raakt. Dat is het verschil tussen "krant" en "Trifinity Post".</p>
+        </div>
+      </details>
+
+      <!-- Hans: Box 3 + beurs-stress -->
+      <details class="case" data-persona="hans">
+        <summary class="case-head">
+          <span class="case-marker"><span class="persona-dot dot-hans"></span>Hans · 54</span>
+          <span class="case-title">Krijgt: <strong>Box 3-uitspraak Hoge Raad</strong> + "stress-test je plan" notitie.</span>
+          <span class="case-caret">›</span>
+        </summary>
+        <div class="case-body">
+          <p>Voor Hans is Box 3 een serieuze post — €312k aan beleggingen, €68k aan spaargeld. Een uitspraak die de berekeningswijze raakt, is voor hem voorpagina-nieuws.</p>
+
+          <div class="post-cols">
+            <div class="post-article">
+              <div class="post-eyebrow">Belasting · Box 3</div>
+              <div class="post-title">Hoge Raad: vermogensrendementsheffing moet werkelijk rendement volgen</div>
+              <div class="post-deck">Voor Hans, met €380k in beleggingen + spaargeld, kan dit jaarlijks tot €1.400 schelen — afhankelijk van hoe het kabinet de uitspraak vertaalt.</div>
+              <div class="post-body">De Hoge Raad heeft bepaald dat in jaren met laag rendement het werkelijke rendement leidend is. <strong>Wat dit voor jou betekent:</strong> je Box 3-projectie in trifinity is geüpdatet met een conservatieve correctie. Als de wetswijziging in 2027 ingaat, herrekenen we automatisch.</div>
+              <div class="post-tag">Bron · Hoge Raad · Actie · jaaraangifte 2026</div>
+            </div>
+            <div class="post-article">
+              <div class="post-eyebrow">Markt</div>
+              <div class="post-title">Beurs 12% gestegen sinds januari — tijd om te stress-testen</div>
+              <div class="post-deck">Jouw beleggingsportefeuille is harder gegroeid dan je FIRE-aanname. Trifinity stelt voor: stress-test je plan met een 20%-correctie-scenario.</div>
+              <div class="post-body">De S&amp;P 500 staat 12% boven de stand van 1 januari. <strong>In jouw context:</strong> sequence-of-returns risico is hoger naarmate je dichter bij je FIRE-datum komt. Een directe stress-test in What-if laat zien hoeveel marge je hebt.</div>
+              <div class="post-tag">Bron · marktdata · Actie · What-if simulatie</div>
+            </div>
+          </div>
+
+          <p class="value"><strong>Nieuws dat tot een actie leidt.</strong> Voor Hans is een Box 3-uitspraak geen abstract debat — het zit direct in zijn FIRE-rekensom. Trifinity Post maakt die verbinding zonder dat hij erom hoeft te vragen.</p>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- Quiz Nieuws -->
+    <div class="quiz" data-quiz="nieuws">
+      <div class="quiz-eyebrow">Mini-vraag</div>
+      <div class="quiz-q">Wat onderscheidt Trifinity Post van een gemiddelde financiële nieuwsbron?</div>
+      <div class="quiz-options">
+        <button class="quiz-opt" data-correct="false">Het is gratis en bevat geen advertenties</button>
+        <button class="quiz-opt" data-correct="true">Elk artikel is gefilterd op of het jouw portefeuille, doelen of situatie raakt — en eindigt met "wat dit voor jou betekent"</button>
+        <button class="quiz-opt" data-correct="false">Het wordt door financieel adviseurs geschreven</button>
+        <button class="quiz-opt" data-correct="false">Het bevat live koersen op de voorpagina</button>
+      </div>
+      <div class="quiz-feedback" data-feedback>
+        <strong>Precies.</strong> Trifinity Post draait nieuws om naar betekenis. Niet "de NHG-grens gaat omhoog"
+        maar "dit is wat het voor jouw hypotheek doet". Daardoor is informatie geen ruis meer, maar handelings-grond.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════ CTA ════════════════════════ -->
+<section class="cta">
+  <div class="hero-inner" style="max-width:760px">
+    <div class="eyebrow" style="color:var(--ink-4)">Klaar om verder te gaan?</div>
+    <h2 class="h2"><em>Drie levens, één app.</em></h2>
+    <p class="lead">
+      Sanne, Mark &amp; Lisa, en Hans zijn niet één doelgroep — ze zijn drie momenten in financieel leven.
+      Trifinity ondersteunt alle drie, in dezelfde plek, met dezelfde architectuur. Begin waar jij bent;
+      de rest schaal je mee als je leven verandert.
+    </p>
+    <div class="cta-actions">
+      <a class="btn primary" href="#top">Terug naar de personas</a>
+      <a class="btn" href="#intro">Begin van het verhaal</a>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  Trifinity · Interactieve training · v0.1 · mei 2026
+</footer>
+
+<script>
+(function(){
+  // ────── Persona-filter ──────
+  const body = document.body;
+  const chips = document.querySelectorAll('.persona-chip');
+  function setPersona(p){
+    body.setAttribute('data-persona', p);
+    chips.forEach(c => {
+      const active = c.dataset.persona === p;
+      c.classList.toggle('active', active);
+      c.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    // 'all' shows all cases
+    if (p === 'all') {
+      document.querySelectorAll('.case').forEach(el => el.style.display = '');
+    } else {
+      document.querySelectorAll('.case').forEach(el => {
+        el.style.display = (el.dataset.persona === p) ? '' : 'none';
+      });
+    }
+  }
+  chips.forEach(c => c.addEventListener('click', () => setPersona(c.dataset.persona)));
+  // Default: all
+  setPersona('all');
+
+  // ────── Case accordion (vanille details) ──────
+  // Native <details> handles open/close. We add caret-rotate via [open] in CSS.
+
+  // ────── Quiz ──────
+  document.querySelectorAll('[data-quiz]').forEach(q => {
+    const opts = q.querySelectorAll('.quiz-opt');
+    const fb = q.querySelector('[data-feedback]');
+    // Verberg feedback initieel
+    fb.style.display = 'none';
+    opts.forEach(opt => {
+      opt.addEventListener('click', () => {
+        const isCorrect = opt.dataset.correct === 'true';
+        opts.forEach(o => {
+          o.classList.add('disabled');
+          if (o.dataset.correct === 'true') o.classList.add('correct');
+        });
+        if (!isCorrect) opt.classList.add('wrong');
+        fb.style.display = '';
+      });
+    });
+  });
+
+  // ────── Active section in topnav (intersection observer) ──────
+  const navLinks = document.querySelectorAll('.nav-links a');
+  const sections = document.querySelectorAll('section.training, section.hero');
+  const sectionById = {};
+  sections.forEach(s => { if (s.id) sectionById[s.id] = s; });
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting){
+        const id = e.target.id;
+        navLinks.forEach(a => {
+          const matchId = a.getAttribute('href').slice(1);
+          a.classList.toggle('active', matchId === id);
+        });
+      }
+    });
+  }, { rootMargin: '-40% 0px -50% 0px', threshold: 0 });
+  sections.forEach(s => obs.observe(s));
+})();
+</script>
+
+</body>
+</html>

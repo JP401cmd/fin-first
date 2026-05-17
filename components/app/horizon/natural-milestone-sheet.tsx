@@ -56,7 +56,7 @@ function copyFor(kind: NaturalMilestoneKind): MilestoneCopy {
         body:
           'Berekend op basis van je huidige saldo, rente en maandelijkse betaling. ' +
           'Verandert wanneer je extra aflost of de looptijd aanpast.',
-        amountLabel: 'Resterend saldo nu',
+        amountLabel: 'Nog af te lossen',
       }
     case 'debt_free':
       return {

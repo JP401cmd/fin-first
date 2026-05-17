@@ -205,22 +205,16 @@ describe('PhaseBar buildSegments — segment properties', () => {
 
 // ── Tests: persona validation ──────────────────────────────────
 
-describe('PhaseBar buildSegments — all 10 personas', () => {
+describe('PhaseBar buildSegments — all 4 personas', () => {
   const personaConfigs: Record<PersonaKey, {
     totalAssets: number
     totalDebts: number
     description: string
   }> = {
-    roos: { totalAssets: 0, totalDebts: 18500, description: 'schuld, FIRE onbereikbaar' },
     daan: { totalAssets: 9700, totalDebts: 13900, description: 'starter, perpetual' },
-    lisa: { totalAssets: 462050, totalDebts: 350000, description: '100K milestone, legacy' },
+    lisa: { totalAssets: 498500, totalDebts: 368270, description: 'gezinsverdeler, legacy' },
     willem: { totalAssets: 1619700, totalDebts: 0, description: 'near-FI, deplete' },
-    rashid: { totalAssets: 904000, totalDebts: 654000, description: 'no-budget, deplete' },
     marijke: { totalAssets: 820200, totalDebts: 0, description: 'retired, pensioen' },
-    ronald: { totalAssets: 820200, totalDebts: 0, description: 'pensioenplanner, ALL_MODULES' },
-    bas: { totalAssets: 462050, totalDebts: 350000, description: 'vermogensverdeler, ALL_MODULES' },
-    leo: { totalAssets: 12215, totalDebts: 18500, description: 'budgetteerder, recovery' },
-    jochen: { totalAssets: 1619700, totalDebts: 0, description: 'FIRE-strijder, ALL_MODULES' },
   }
 
   for (const key of PERSONA_KEYS) {
@@ -265,14 +259,13 @@ describe('PhaseBar buildSegments — all 10 personas', () => {
     })
   }
 
-  it('Roos (schuld): only Opbouw (FIRE unreachable)', () => {
-    const p = PERSONAS.roos
-    const currentAge = ageAtDate(p.profile.date_of_birth)
+  it('FIRE unreachable scenario: only Opbouw', () => {
+    // Synthetic edge case: deep debt, FIRE not reachable
     const segments = buildSegments({
-      currentAge,
+      currentAge: 38,
       fireAge: null,
       aowAge: NL_AOW_AGE,
-      endAge: p.profile.fire_end_age ?? 85,
+      endAge: 85,
       fireReachable: false,
       isPensioenMode: false,
     })

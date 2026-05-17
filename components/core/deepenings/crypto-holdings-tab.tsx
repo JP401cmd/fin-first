@@ -28,6 +28,8 @@ import type {
 import { CryptoHoldingsPage } from './crypto-holdings/crypto-holdings-page'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
+import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
+import { useIsAppSetupCompleted } from '@/components/app/app-setup/use-is-setup-completed'
 
 // ── Initial-data shape ─────────────────────────────────────────────────
 //
@@ -76,6 +78,18 @@ export function CryptoHoldingsTab({ moduleActive, initialData }: DeepeningTabPro
   if (!moduleActive) {
     return <CryptoHoldingsTeaser />
   }
+  return <CryptoHoldingsActive initialData={initialData} />
+}
+
+// ── Actieve tak (module aan) ───────────────────────────────────────────
+
+function CryptoHoldingsActive({ initialData }: { initialData: unknown }) {
+  // Onafhankelijk van de aandelen-setup — crypto en aandelen-holdings
+  // hebben elk een eigen gate-marker.
+  const setupCompleted = useIsAppSetupCompleted('crypto_holdings')
+  if (setupCompleted === null) return <AppSetupSkeleton />
+  if (setupCompleted === false) return <AppSetupGate appKey="crypto_holdings" />
+
   // Cast op het eindpunt: registry-laag is generiek (`unknown`); hier weten
   // we welke shapes legitiem zijn.
   const data = initialData as CryptoInitialData
@@ -98,6 +112,16 @@ export function CryptoHoldingsTab({ moduleActive, initialData }: DeepeningTabPro
     )
   }
   return <CryptoHoldingsPage holdings={data ?? []} />
+}
+
+function AppSetupSkeleton() {
+  return (
+    <div className="space-y-8" aria-busy="true" aria-live="polite">
+      <div className="h-[120px] animate-pulse border-t border-b border-[var(--ink)] bg-[var(--paper)]" />
+      <div className="h-[180px] animate-pulse border border-[var(--border-ed)] bg-[var(--subtle)]/40" />
+      <span className="sr-only">Setup-status wordt gecheckt…</span>
+    </div>
+  )
 }
 
 // ── Teaser-tak (module uit) ────────────────────────────────────────────

@@ -57,6 +57,12 @@ type ShellOverlayProps = {
    *  outline). Alleen voor kind="pane". Zie `primaryAction` voor
    *  render-strategie. */
   secondaryAction?: PaneAction
+  /** Optionele context-info naast de footer-knoppen (alleen kind="pane").
+   *  Render-strategie volgt de pane-footer: desktop SlideInPane plaatst de
+   *  info naast de knoppen, mobile BottomSheet-fallback toont het direct
+   *  boven de knoppen-rij zodat de info altijd zichtbaar blijft naast de
+   *  primaire actie. Gebruikt voor live-preview-bedragen e.d. */
+  footerInfo?: ReactNode
   children: ReactNode
 }
 
@@ -75,6 +81,7 @@ export function ShellOverlay({
   actions,
   primaryAction,
   secondaryAction,
+  footerInfo,
   children,
 }: ShellOverlayProps) {
   // SSR-safe matchMedia hook — bepaalt voor `kind="pane"` of we de SlideInPane
@@ -103,29 +110,40 @@ export function ShellOverlay({
     // niet om overlap-redenen — alleen voor consistentie.
     // Touch-target ≥44px via `min-h-11`.
     const hasFooter = Boolean(primaryAction || secondaryAction)
-    const mobileFooterSlot = hasFooter ? (
-      <div className="flex items-center gap-2">
-        {primaryAction && (
-          <button
-            type="button"
-            onClick={primaryAction.onClick}
-            disabled={primaryAction.disabled || primaryAction.loading}
-            className="inline-flex flex-1 min-h-11 items-center justify-center bg-[var(--ink)] px-4 text-sm font-medium leading-none text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-          >
-            {primaryAction.loading ? `${primaryAction.label} …` : primaryAction.label}
-          </button>
+    // Op mobile (BottomSheet-fallback) plaatsen we `footerInfo` als eigen rij
+    // BOVEN de knoppen — de knoppen zijn `flex-1` full-width en zouden de
+    // info anders wegduwen. Visueel resultaat: amount/label op één regel,
+    // knoppen-rij eronder, beide binnen dezelfde sticky-footer-container.
+    const mobileFooterSlot = (hasFooter || footerInfo) ? (
+      <div className="flex flex-col gap-2">
+        {footerInfo && (
+          <div className="text-[var(--ink-2)]">{footerInfo}</div>
         )}
-        {secondaryAction && (
-          <button
-            type="button"
-            onClick={secondaryAction.onClick}
-            disabled={secondaryAction.disabled}
-            className="inline-flex flex-1 min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-4 text-sm font-medium leading-none text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-          >
-            {secondaryAction.label}
-          </button>
+        {hasFooter && (
+          <div className="flex items-center gap-2">
+            {primaryAction && (
+              <button
+                type="button"
+                onClick={primaryAction.onClick}
+                disabled={primaryAction.disabled || primaryAction.loading}
+                className="inline-flex flex-1 min-h-11 items-center justify-center bg-[var(--ink)] px-4 text-sm font-medium leading-none text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+              >
+                {primaryAction.loading ? `${primaryAction.label} …` : primaryAction.label}
+              </button>
+            )}
+            {secondaryAction && (
+              <button
+                type="button"
+                onClick={secondaryAction.onClick}
+                disabled={secondaryAction.disabled}
+                className="inline-flex flex-1 min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-4 text-sm font-medium leading-none text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+              >
+                {secondaryAction.label}
+              </button>
+            )}
+          </div>
         )}
       </div>
     ) : undefined
@@ -139,6 +157,7 @@ export function ShellOverlay({
           actions={actions}
           primaryAction={primaryAction}
           secondaryAction={secondaryAction}
+          footerInfo={footerInfo}
         >
           {children}
         </SlideInPane>

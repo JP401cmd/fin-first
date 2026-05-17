@@ -873,5 +873,51 @@ export async function seedPersonaData(
     onProgress('App-instellingen toevoegen...', 'phase5', 'insert', appSettingsCount)
   }
 
+  // ── Phase 6: App-setup feature-visit markers ─────────────────
+  // Personas met content voor een app worden als-voltooid gemarkeerd zodat
+  // ze geen verplichte setup-gate krijgen na seeding. Symmetrisch met de
+  // backfill-logica in `lib/app-setup-status.ts`: aanwezigheid van content
+  // ⇒ setup-completed. Slugs zijn de constanten uit APP_SETUP_SLUGS;
+  // hard-coded hier om een import-cycle met de UI-laag te vermijden.
+  const markerRows: { user_id: string; feature_slug: string }[] = []
+  if (persona.budgets.length > 0) {
+    markerRows.push({ user_id: userId, feature_slug: 'budgetteren_setup_completed' })
+  }
+  const hasAandelenTracking = persona.assets.some(
+    (a) => a.asset_type === 'investment' && a.has_holdings_tracking === true,
+  )
+  if (hasAandelenTracking) {
+    markerRows.push({ user_id: userId, feature_slug: 'aandelen_holdings_setup_completed' })
+  }
+  const hasCryptoTracking = persona.assets.some(
+    (a) => a.asset_type === 'crypto' && a.has_holdings_tracking === true,
+  )
+  if (hasCryptoTracking) {
+    markerRows.push({ user_id: userId, feature_slug: 'crypto_holdings_setup_completed' })
+  }
+  const hasHypotheekplannerTracking = persona.debts.some(
+    (d) => d.debt_type === 'mortgage' && d.has_hypotheekplanner_tracking === true,
+  )
+  if (hasHypotheekplannerTracking) {
+    markerRows.push({ user_id: userId, feature_slug: 'hypotheekplanner_setup_completed' })
+  }
+  const hasRentalTracking = persona.assets.some(
+    (a) => a.asset_type === 'real_estate' && a.has_rental_tracking === true,
+  )
+  if (hasRentalTracking) {
+    markerRows.push({ user_id: userId, feature_slug: 'verhuurrendement_setup_completed' })
+  }
+  if (markerRows.length > 0) {
+    const { error: visitErr } = await supabase
+      .from('user_feature_visits')
+      .upsert(markerRows, { onConflict: 'user_id,feature_slug', ignoreDuplicates: true })
+    if (visitErr) {
+      // Tabel kan ontbreken op legacy DBs — niet fataal voor persona-seed.
+      console.warn(`[seed-persona] feature-visit markers niet geschreven: ${visitErr.message}`)
+    } else {
+      summary.user_feature_visits = markerRows.length
+    }
+  }
+
   return summary
 }

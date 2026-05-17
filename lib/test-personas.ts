@@ -1,13 +1,11 @@
 /**
  * Test persona definitions for superadmin testdata seeding.
  *
- * 6 personas at different financial life stages:
- * 1. Roos van Dijk — "In de rode cijfers" (deep in debt)
- * 2. Daan Bakker — "De starter" (young professional starting out)
- * 3. Lisa de Groot — "De 100K milestone" (family, hit 100K net worth)
- * 4. Willem Jansen — "Bijna binnen" (near financial independence)
- * 5. Rashid Dimohammed — "De Genieter" (no budgets, no transactions, check-in based)
- * 6. Marijke Vermeer — "De Gepensioneerde" (retired, pensioen strategy)
+ * 4 personas at different financial life stages:
+ * 1. Daan Bakker — "De starter" (young professional starting out)
+ * 2. Lisa de Groot — "De gezinsverdeler" (family, complex wealth across 13 assets + 10 debts)
+ * 3. Willem Jansen — "Bijna binnen" (near financial independence)
+ * 4. Marijke Vermeer — "De gepensioneerde" (retired, pensioen strategy + legacy planning)
  */
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'
@@ -35,7 +33,7 @@ function monthsAgo(months: number, day = 1): string {
 
 // ── Types ─────────────────────────────────────────────────────
 
-export type PersonaKey = 'roos' | 'daan' | 'lisa' | 'willem' | 'rashid' | 'marijke' | 'ronald' | 'bas' | 'leo' | 'jochen'
+export type PersonaKey = 'daan' | 'lisa' | 'willem' | 'marijke'
 
 export type SovereigntyPhase = 'recovery' | 'stability' | 'momentum' | 'mastery'
 
@@ -123,6 +121,10 @@ export interface PersonaAsset {
   address_postcode?: string
   address_house_number?: string
   has_holdings_tracking?: boolean
+  /** Voor real_estate-assets: verhuur-app tracking actief. */
+  has_rental_tracking?: boolean
+  /** Voor eigen_huis-assets: woonbalans-app tracking actief. */
+  has_woonbalans_tracking?: boolean
 }
 
 export interface PersonaDebt {
@@ -144,6 +146,8 @@ export interface PersonaDebt {
   repayment_type?: string
   draagkrachtmeting_date?: string
   linked_asset_name?: string
+  /** Voor mortgage-debts: hypotheekplanner-app tracking actief. */
+  has_hypotheekplanner_tracking?: boolean
 }
 
 export interface PersonaBudget {
@@ -592,228 +596,7 @@ function generateBalanceSnapshots(
 }
 
 // ══════════════════════════════════════════════════════════════
-// PERSONA 1: Roos van Dijk — "In de rode cijfers"
-// ══════════════════════════════════════════════════════════════
-
-const rooseTransactions: PersonaTransactionTemplate[] = [
-  ...generateMonthlyTransactions(15, [
-    // Inkomen
-    { day: 25, amount: 2800, description: 'Salaris', counterparty_name: 'Logistiek Centrum BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.SALARIS_UITKERING, is_income: true },
-    // Vaste lasten (no jitter)
-    { day: 1, amount: -950, description: 'Huur', counterparty_name: 'Vestia Woningen', counterparty_iban: 'NL39RABO0300065264', budgetSlug: S.HUUR_HYPOTHEEK, is_income: false },
-    { day: 1, amount: -220, description: 'Energie', counterparty_name: 'Eneco', counterparty_iban: 'NL20INGB0001234567', budgetSlug: S.GAS_WATER_LICHT, is_income: false, jitterPct: 0.15 },
-    { day: 1, amount: -135, description: 'Zorgverzekering', counterparty_name: 'CZ', counterparty_iban: 'NL93ABNA0585927836', budgetSlug: S.VERZEKERINGEN_WONEN, is_income: false },
-    { day: 1, amount: -40, description: 'Inboedelverzekering', counterparty_name: 'Centraal Beheer', counterparty_iban: 'NL75ABNA0500100200', budgetSlug: S.VERZEKERINGEN_WONEN, is_income: false },
-    { day: 15, amount: -55, description: 'Gemeentelijke lasten', counterparty_name: 'Gemeente Rotterdam', counterparty_iban: 'NL45BNGH0285000522', budgetSlug: S.GEMEENTELIJKE_LASTEN, is_income: false },
-    // Vervoer
-    { day: 1, amount: -180, description: 'Private lease auto', counterparty_name: 'LeasePlan', counterparty_iban: 'NL02ABNA0450884700', budgetSlug: S.AUTO_VASTE_LASTEN, is_income: false },
-    { day: 10, amount: -85, description: 'Brandstof', counterparty_name: 'Shell', counterparty_iban: null, budgetSlug: S.BRANDSTOF_OV, is_income: false, jitterPct: 0.20 },
-    { day: 25, amount: -55, description: 'Brandstof', counterparty_name: 'TotalEnergies', counterparty_iban: null, budgetSlug: S.BRANDSTOF_OV, is_income: false, jitterPct: 0.20 },
-    // Leuke dingen (te veel!)
-    { day: 5, amount: -65, description: 'Thuisbezorgd', counterparty_name: 'Thuisbezorgd', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.25 },
-    { day: 12, amount: -85, description: 'Uit eten restaurant', counterparty_name: 'Restaurant De Hoek', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.25 },
-    { day: 20, amount: -45, description: 'Uber Eats', counterparty_name: 'Uber Eats', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.25 },
-    { day: 7, amount: -12.99, description: 'Netflix', counterparty_name: 'Netflix', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { day: 7, amount: -10.99, description: 'Spotify', counterparty_name: 'Spotify', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { day: 7, amount: -13.99, description: 'Disney+', counterparty_name: 'Disney+', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { day: 18, amount: -75, description: 'Kleding', counterparty_name: 'Zalando', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false, jitterPct: 0.30 },
-    // Huishouden
-    { day: 8, amount: -25, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.20 },
-    { day: 22, amount: -30, description: 'Action', counterparty_name: 'Action', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.25 },
-    // Medisch
-    { day: 14, amount: -15, description: 'Apotheek', counterparty_name: 'Apotheek Rotterdam', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false, jitterPct: 0.40 },
-    // Schulden aflossing (minimum)
-    { day: 28, amount: -75, description: 'Minimum betaling creditcard', counterparty_name: 'ICS Visa', counterparty_iban: 'NL20INGB0001234568', budgetSlug: S.SCHULDEN_AFLOSSINGEN, is_income: false },
-    { day: 1, amount: -200, description: 'Aflossing persoonlijke lening', counterparty_name: 'Santander', counterparty_iban: 'NL86INGB0002445500', budgetSlug: S.SCHULDEN_AFLOSSINGEN, is_income: false },
-  ]),
-  ...generateGroceryTransactions(15, 95, 25), // High grocery spending
-  // Irregular/seasonal transactions
-  ...generateIrregularTransactions([
-    { monthsAgo: 2, day: 18, amount: -289, description: 'Kerstinkopen Bijenkorf', counterparty_name: 'De Bijenkorf', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 3, day: 22, amount: -167, description: 'Zalando Black Friday uitverkoop', counterparty_name: 'Zalando', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 5, day: 10, amount: -185, description: 'Tandarts controle + behandeling', counterparty_name: 'Tandarts Rotterdam', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
-    { monthsAgo: 8, day: 3, amount: -95, description: 'Verkeersboete', counterparty_name: 'CJIB', counterparty_iban: 'NL13RBOS0569990960', budgetSlug: S.AUTO_ONDERHOUD, is_income: false },
-    { monthsAgo: 4, day: 15, amount: -249, description: 'Apple AirPods Pro', counterparty_name: 'Apple Store', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 6, day: 5, amount: -890, description: 'Vakantie Tenerife vlucht + hotel', counterparty_name: 'TUI Nederland', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
-    { monthsAgo: 6, day: 12, amount: -245, description: 'Vakantie Tenerife uitgaven', counterparty_name: 'iDEAL betaling buitenland', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
-    { monthsAgo: 9, day: 20, amount: -79, description: 'Spotify Wrapped merchandise', counterparty_name: 'Spotify', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { monthsAgo: 1, day: 8, amount: -55, description: 'Nieuwjaarsborrel kroeg', counterparty_name: 'Cafe De Unie', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
-    { monthsAgo: 7, day: 25, amount: -129, description: 'Zomerkleding H&M', counterparty_name: 'H&M', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 11, day: 5, amount: -35, description: 'Paracetamol + medicijnen', counterparty_name: 'Etos', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
-    { monthsAgo: 3, day: 28, amount: -68, description: 'Sinterklaas cadeaus', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 8, day: 18, amount: -42, description: 'Parkeerboete Rotterdam', counterparty_name: 'Gemeente Rotterdam', counterparty_iban: null, budgetSlug: S.AUTO_ONDERHOUD, is_income: false },
-    // Uitgebreide periode (jan–mrt 2025)
-    { monthsAgo: 12, day: 15, amount: -55, description: 'Lente-opruiming kleding Primark', counterparty_name: 'Primark', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 13, day: 14, amount: -45, description: 'Valentijnsdag diner', counterparty_name: 'Restaurant De Hoek', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
-    { monthsAgo: 14, day: 8, amount: -129, description: 'Nieuwjaarsuitverkoop Mediamarkt', counterparty_name: 'Mediamarkt', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    // Ongekoppelde transacties — bewust een niet-bestaande slug zodat
-    // seedPersonaData ze met budget_id = NULL inserteert. Gebruikt om de
-    // "X transacties zonder categorie"-flow + scope-toggle ("Deze maand" vs
-    // "Alle tijden") te testen op een seeded persona.
-    { monthsAgo: 0, day: 8, amount: -67.50, description: 'PAYP*OBSCURE-MERCHANT', counterparty_name: 'PAYP*OBSCURE', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
-    { monthsAgo: 1, day: 4, amount: -23.95, description: 'CARDLINK PAYMENT', counterparty_name: '', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
-    { monthsAgo: 1, day: 19, amount: -41.20, description: 'iDEAL ONBEKEND-WEBSHOP', counterparty_name: 'OnbekendShop BV', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
-    { monthsAgo: 2, day: 3, amount: -89.99, description: 'SEPA INCASSO ABONNEMENT', counterparty_name: 'SubscribeCo', counterparty_iban: 'NL44INGB0009988776', budgetSlug: '__none__', is_income: false },
-    { monthsAgo: 2, day: 22, amount: -12.40, description: 'BUITENLANDSE BETALING USD', counterparty_name: '', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
-    { monthsAgo: 3, day: 11, amount: -34.50, description: 'PIN BETALING WINKEL', counterparty_name: 'Lokale Winkel', counterparty_iban: null, budgetSlug: '__none__', is_income: false },
-    { monthsAgo: 3, day: 27, amount: -156.00, description: 'OVERBOEKING ONBEKEND', counterparty_name: 'J. Pietersen', counterparty_iban: 'NL55RABO0123456789', budgetSlug: '__none__', is_income: false },
-  ]),
-]
-
-const roosData: PersonaData = {
-  meta: {
-    name: 'Roos van Dijk',
-    subtitle: 'In de rode cijfers',
-    description: 'Na een scheiding en jarenlang onbewust consumeren zit Roos diep in de schulden. Uitgaven overstijgen haar inkomen.',
-    color: 'red',
-    avatarColor: '#EF4444',
-    netWorth: -6000,
-    income: 2800,
-    expenses: 3200,
-    backgroundStory: 'Na haar scheiding in 2024 raakte Roos het financieel overzicht volledig kwijt. Jarenlang emotioneel kopen — bezorgmaaltijden als troost, kleding als afleiding — en nu drie schulden die samen bijna twee jaar van haar levenstijd vertegenwoordigen. Als logistiek medewerker verdient ze €2.800, maar geeft ze €3.200 uit. Elke maand verliest ze 4 dagen vrijheid.',
-    challenges: ['Uitgaven overstijgen inkomen met €400/mnd — elke maand 4 vrijheidsdagen verlies', 'Creditcard schuld van €4.800 op 14% rente vreet aan haar toekomst', 'Geen noodfonds — één tegenslag betekent meer schulden'],
-    currentSituation: 'Diep in de rode cijfers — netto vermogen -€6.000 met drie actieve schulden. Haar financiële klok loopt achteruit.',
-    firstGoal: 'Noodfonds aanleggen en uit de schulden komen',
-    sovereignty: 'recovery',
-    modules: ['budgetteren'],
-  },
-  profile: {
-    full_name: 'Roos van Dijk',
-    date_of_birth: '1986-03-15',
-    household_type: 'solo',
-    temporal_balance: 1,
-    expected_return: 0.07,
-    inflation_rate: 0.02,
-    fire_end_strategy: 'deplete',
-    fire_end_age: 85,
-    retirement_expense_method: 'current_income',
-    withdrawal_strategy: 'static',
-    widget_prefs: makeWidgetPrefs([
-      'netto_vermogen', { id: 'schulden', size: 'full' }, 'cash_flow',
-      'budgetten', 'acties', 'spaarquote', 'vrijheidsdagen_maand',
-    ]),
-    active_modules: ['budgetteren'],
-  },
-  bank_accounts: [
-    { name: 'Betaalrekening ING', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 245, is_active: true, sort_order: 0 },
-    { name: 'Tweede rekening ABN', iban: 'NL02ABNA0450884700', bank_name: 'ABN AMRO', account_type: 'checking', balance: -180, is_active: true, sort_order: 1 },
-    { name: 'Contant geld thuis', iban: '', bank_name: '', account_type: 'contant_geld', balance: 150, is_active: true, sort_order: 2 },
-  ],
-  assets: [
-    { name: 'Auto (private lease)', asset_type: 'vehicle', current_value: 0, purchase_value: 0, purchase_date: '2024-01-01', expected_return: 0, monthly_contribution: 0, institution: 'LeasePlan', subtype: 'auto_financial_lease', depreciation_rate: 15 },
-    { name: 'Inboedel', asset_type: 'physical', current_value: 3500, purchase_value: 8000, purchase_date: '2020-01-01', expected_return: -10, monthly_contribution: 0, institution: '', subtype: 'inboedel' },
-    { name: 'Pensioen vorige werkgever', asset_type: 'retirement', current_value: 8500, purchase_value: 0, purchase_date: '2018-01-01', expected_return: 4, monthly_contribution: 0, institution: 'Nationale-Nederlanden', retirement_provider_type: 'verzekeraar' },
-  ],
-  debts: [
-    { name: 'Creditcard ICS Visa', debt_type: 'credit_card', original_amount: 5000, current_balance: 4800, interest_rate: 14.0, minimum_payment: 75, monthly_payment: 75, start_date: '2024-06-01', creditor: 'ICS', subtype: 'regulier', credit_limit: 5000, repayment_type: 'annuiteit' },
-    { name: 'Persoonlijke lening Santander', debt_type: 'personal_loan', original_amount: 15000, current_balance: 12500, interest_rate: 7.9, minimum_payment: 200, monthly_payment: 200, start_date: '2023-01-01', creditor: 'Santander', subtype: 'aflopend', repayment_type: 'lineair' },
-    { name: 'Achterstallige energierekening', debt_type: 'payment_plan', original_amount: 1500, current_balance: 1200, interest_rate: 0, minimum_payment: 50, monthly_payment: 50, start_date: '2025-06-01', creditor: 'Eneco', repayment_type: 'lineair' },
-  ],
-  budgets: makeBudgets({
-    [S.INKOMEN]: 2800, [S.SALARIS_UITKERING]: 2800,
-    [S.TOESLAGEN_KINDERBIJSLAG]: 0, [S.TERUGGAVE_BELASTING]: 0, [S.OVERIGE_INKOMSTEN]: 0,
-    [S.VASTE_LASTEN_WONEN]: 1400, [S.HUUR_HYPOTHEEK]: 950, [S.GAS_WATER_LICHT]: 220,
-    [S.VERZEKERINGEN_WONEN]: 175, [S.GEMEENTELIJKE_LASTEN]: 55,
-    [S.DAGELIJKSE_UITGAVEN]: 530, [S.BOODSCHAPPEN]: 380, [S.HUISHOUDEN_VERZORGING]: 55,
-    [S.KINDEREN_SCHOOL]: 0, [S.MEDISCHE_KOSTEN]: 95,
-    [S.VERVOER]: 390, [S.BRANDSTOF_OV]: 140, [S.AUTO_VASTE_LASTEN]: 180,
-    [S.AUTO_ONDERHOUD]: 50, [S.FIETS_DEELVERVOER]: 20,
-    [S.LEUKE_DINGEN]: 555, [S.UIT_ETEN_HORECA]: 195, [S.VRIJE_TIJD_SPORT]: 100,
-    [S.VAKANTIE]: 150, [S.KLEDING_OVERIGE]: 110,
-    [S.SPAREN_SCHULDEN]: 0, [S.SPAREN_NOODBUFFER]: 0, [S.INVESTEREN_FIRE]: 0,
-    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 325, [S.SCHULDEN_AFLOSSINGEN]: 325, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
-  }),
-  transactions: rooseTransactions,
-  goals: [
-    { name: 'Creditcard schuld aflossen', description: 'Creditcard schuld van ICS Visa volledig aflossen', goal_type: 'debt_payoff', target_value: 4800, current_value: 200, target_date: monthsAgo(-24), icon: 'CreditCard', color: 'red', is_completed: false },
-    { name: 'Noodfonds opbouwen', description: 'Een noodfonds van 1 maand uitgaven opbouwen', goal_type: 'savings', target_value: 3200, current_value: 0, target_date: monthsAgo(-18), icon: 'ShieldCheck', color: 'amber', is_completed: false },
-  ],
-  life_events: [
-    { name: 'Scheiding afgerond', event_type: 'custom', target_age: 38, target_date: '2024-03-15', one_time_cost: 3500, monthly_cost_change: 400, monthly_income_change: 0, duration_months: 0, icon: 'HeartCrack', is_active: false, sort_order: 0 },
-    { name: 'Schuldhulpverlening overwegen', event_type: 'custom', target_age: null, target_date: monthsAgo(-6), one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 12, icon: 'LifeBuoy', is_active: true, sort_order: 1, metadata: { maandelijksBedrag: 200 } },
-    { name: 'AOW', event_type: 'aow', target_age: 69, target_date: '2055-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1380, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'alleenstaand' } },
-    { name: 'Schuldhulp afgerond', event_type: 'custom', target_age: 40, target_date: '2026-03-15', one_time_cost: 0, monthly_cost_change: -250, monthly_income_change: 0, duration_months: 24, icon: 'ShieldCheck', is_active: true, sort_order: 3, metadata: { reden: 'Na afronding schuldhulptraject vallen maandlasten weg' } },
-  ],
-  recommendations: [
-    {
-      title: 'Stop onnodige streaming abonnementen',
-      description: 'Je betaalt voor Netflix, Spotify en Disney+. Door 2 van de 3 op te zeggen bespaar je direct. Kies 1 dienst en wissel eventueel per kwartaal.',
-      recommendation_type: 'budget_optimization',
-      euro_impact_monthly: 24,
-      euro_impact_yearly: 288,
-      freedom_days_per_year: 3,
-      related_budget_slug: S.VRIJE_TIJD_SPORT,
-      priority_score: 3,
-      status: 'pending',
-      suggested_actions: [
-        { title: 'Zeg Disney+ op', freedom_days_impact: 1, euro_impact_monthly: 14 },
-        { title: 'Zeg Spotify op (gebruik gratis versie)', freedom_days_impact: 1, euro_impact_monthly: 11 },
-      ],
-      actions: [
-        { source: 'ai', title: 'Zeg Disney+ op', description: 'Ga naar je Disney+ account en zeg het abonnement op', freedom_days_impact: 1, euro_impact_monthly: 14, status: 'open', priority_score: 3, scheduled_week: getCurrentWeek() },
-        { source: 'ai', title: 'Zeg Spotify op', description: 'Schakel over naar de gratis versie van Spotify', freedom_days_impact: 1, euro_impact_monthly: 11, status: 'open', priority_score: 3, scheduled_week: getNextWeek() },
-      ],
-    },
-    {
-      title: 'Verminder bezorgmaaltijden',
-      description: 'Je geeft gemiddeld 195 per maand uit aan horeca en bezorging. Door zelf te koken en maximaal 1x per week te bestellen kun je dit halveren.',
-      recommendation_type: 'budget_optimization',
-      euro_impact_monthly: 100,
-      euro_impact_yearly: 1200,
-      freedom_days_per_year: 13,
-      related_budget_slug: S.UIT_ETEN_HORECA,
-      priority_score: 4,
-      status: 'pending',
-      suggested_actions: [
-        { title: 'Stel een weekmenu samen', freedom_days_impact: 5, euro_impact_monthly: 50 },
-        { title: 'Beperk bezorging tot 1x per week', freedom_days_impact: 4, euro_impact_monthly: 50 },
-      ],
-      actions: [
-        { source: 'ai', title: 'Stel een weekmenu samen', description: 'Plan je maaltijden voor de week en doe 1 grote boodschap', freedom_days_impact: 5, euro_impact_monthly: 50, status: 'open', priority_score: 4, scheduled_week: getCurrentWeek() },
-        { source: 'ai', title: 'Verwijder bezorgapps van je telefoon', description: 'Verwijder Thuisbezorgd en Uber Eats van je telefoon om impulsbestellingen te voorkomen', freedom_days_impact: 4, euro_impact_monthly: 50, status: 'open', priority_score: 4 },
-      ],
-    },
-    {
-      title: 'Creditcard schuld prioriteren boven lening',
-      description: 'Je creditcard heeft 14% rente versus 7.9% op je persoonlijke lening. Los eerst de creditcard af door elke euro extra daar naartoe te sturen.',
-      recommendation_type: 'debt_acceleration',
-      euro_impact_monthly: 35,
-      euro_impact_yearly: 420,
-      freedom_days_per_year: 4,
-      related_budget_slug: null,
-      priority_score: 5,
-      status: 'pending',
-      suggested_actions: [
-        { title: 'Verhoog creditcard aflossing naar 150/mnd', freedom_days_impact: 4 },
-      ],
-      actions: [
-        { source: 'ai', title: 'Verhoog creditcard aflossing', description: 'Verhoog de maandelijkse aflossing van je ICS Visa creditcard van 75 naar minimaal 150', freedom_days_impact: 4, euro_impact_monthly: 35, status: 'open', priority_score: 5 },
-      ],
-    },
-  ],
-  net_worth_snapshots: [
-    // Snapshot rekent met sum(assets+banks)-debts. Huidige sum: 12000 (assets) + 215 (banks) - 18500 (debts) = -6285.
-    // Trend: ~€500/mnd verslechtering door overspending €400/mnd + asset depreciatie + boetes.
-    { monthsAgo: 14, total_assets: 12500, total_debts: 11700, net_worth: 800 },
-    { monthsAgo: 13, total_assets: 12450, total_debts: 12200, net_worth: 250 },
-    { monthsAgo: 12, total_assets: 12400, total_debts: 12700, net_worth: -300 },
-    { monthsAgo: 11, total_assets: 12380, total_debts: 13280, net_worth: -900 },
-    { monthsAgo: 10, total_assets: 12360, total_debts: 13800, net_worth: -1440 },
-    { monthsAgo: 9, total_assets: 12340, total_debts: 14380, net_worth: -2040 },
-    { monthsAgo: 8, total_assets: 12320, total_debts: 14900, net_worth: -2580 },
-    { monthsAgo: 7, total_assets: 12300, total_debts: 15500, net_worth: -3200 },
-    { monthsAgo: 6, total_assets: 12280, total_debts: 16080, net_worth: -3800 },
-    { monthsAgo: 5, total_assets: 12260, total_debts: 16660, net_worth: -4400 },
-    { monthsAgo: 4, total_assets: 12240, total_debts: 17240, net_worth: -5000 },
-    { monthsAgo: 3, total_assets: 12230, total_debts: 17730, net_worth: -5500 },
-    { monthsAgo: 2, total_assets: 12220, total_debts: 18020, net_worth: -5800 },
-    { monthsAgo: 1, total_assets: 12215, total_debts: 18215, net_worth: -6000 },
-    { monthsAgo: 0, total_assets: 12215, total_debts: 18500, net_worth: -6285 },
-  ],
-}
-
-// ══════════════════════════════════════════════════════════════
-// PERSONA 2: Daan Bakker — "De starter"
+// PERSONA 1: Daan Bakker — "De starter"
 // ══════════════════════════════════════════════════════════════
 
 const daanTransactions: PersonaTransactionTemplate[] = [
@@ -1093,7 +876,7 @@ const daanData: PersonaData = {
 }
 
 // ══════════════════════════════════════════════════════════════
-// PERSONA 3: Lisa de Groot — "De 100K milestone"
+// PERSONA 2: Lisa de Groot — "De gezinsverdeler"
 // ══════════════════════════════════════════════════════════════
 
 const lisaTransactions: PersonaTransactionTemplate[] = [
@@ -1470,7 +1253,7 @@ const lisaData: PersonaData = {
 }
 
 // ══════════════════════════════════════════════════════════════
-// PERSONA 4: Willem Jansen — "Bijna binnen"
+// PERSONA 3: Willem Jansen — "Bijna binnen"
 // ══════════════════════════════════════════════════════════════
 
 const willemTransactions: PersonaTransactionTemplate[] = [
@@ -1806,214 +1589,7 @@ const willemData: PersonaData = {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Persona 5 — Rashid Dimohammed ("De Genieter")
-// Uniek: GEEN budgetten, GEEN transacties — puur check-in gebaseerd
-// ══════════════════════════════════════════════════════════════
-
-const rashidData: PersonaData = {
-  meta: {
-    name: 'Rashid Dimohammed',
-    subtitle: 'De Genieter',
-    description: 'Freelance IT-consultant, financieel bewust maar niet micro-managerend. Geniet van het leven met €250K netto vermogen — zonder budgetten of transacties.',
-    color: 'orange',
-    avatarColor: '#E07A5F',
-    netWorth: 250000,
-    income: 5500,
-    expenses: 4200,
-    backgroundStory: 'Rashid is een freelance IT-consultant die goed verdient maar niet van spreadsheets en categorieën houdt. Hij heeft een pragmatische kijk op geld: genoeg opzijzetten voor de toekomst, maar ook nu genieten. Hij is 10 jaar geleden begonnen met beleggen op advies van een vriend en heeft zijn portefeuille langzaam laten groeien. Zijn huis kocht hij 3 jaar geleden — de hypotheek is daarom nog hoog. De studielening sleept hij bewust mee vanwege de lage rente. Rashid houdt van reizen, lekker eten en goede wijn.',
-    challenges: ['Geen grip op waar z\'n geld precies naartoe gaat (geen budgettering)', 'Hypotheek/waarde ratio nog hoog (95%)', 'Studielening nog open', 'Wil meer sparen maar niet ten koste van levensstijl'],
-    currentSituation: 'Financieel stabiel met positieve cashflow, maar geen gedetailleerd inzicht in uitgavenpatronen. Gebruikt de app puur voor vermogensoverzicht en maandelijkse check-ins.',
-    firstGoal: '€500K netto vermogen',
-    sovereignty: 'momentum',
-    modules: ['vermogensregistratie', 'aandelenregistratie', 'toekomstplannen', 'inzicht_acties', 'nieuws'],
-  },
-  profile: {
-    full_name: 'Rashid Dimohammed',
-    date_of_birth: '1983-09-14',
-    household_type: 'solo',
-    temporal_balance: 2,
-    expected_return: 0.07,
-    inflation_rate: 0.02,
-    fire_end_strategy: 'deplete',
-    fire_end_age: 90,
-    retirement_expense_method: 'current_income',
-    withdrawal_strategy: 'static',
-    rebalance_threshold: 5, // gebalanceerd — standaard drempel
-    net_monthly_income: 5500,
-    estimated_monthly_expenses: 4200,
-    widget_prefs: makeWidgetPrefs([
-      'netto_vermogen', 'fire_prognose', 'vrijheidsscenarios', 'acties', 'doelen',
-    ]),
-    active_modules: ['vermogensregistratie', 'aandelenregistratie', 'toekomstplannen', 'inzicht_acties', 'nieuws'],
-  },
-  bank_accounts: [
-    { name: 'Betaalrekening ING', iban: 'NL91INGB0006543210', bank_name: 'ING', account_type: 'checking', balance: 40000, is_active: true, sort_order: 0 },
-    { name: 'Spaarrekening ING', iban: 'NL91INGB0006543211', bank_name: 'ING', account_type: 'savings', balance: 20000, is_active: true, sort_order: 1 },
-  ],
-  assets: [
-    { name: 'Beleggingsrekening DEGIRO', asset_type: 'investment', current_value: 170000, purchase_value: 130000, purchase_date: '2016-01-01', expected_return: 7, monthly_contribution: 800, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel', has_holdings_tracking: true },
-    { name: 'Eigen woning', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 630000, purchase_date: '2023-03-01', expected_return: 3, monthly_contribution: 0, institution: '' },
-    { name: 'Auto (Audi A4)', asset_type: 'vehicle', current_value: 24000, purchase_value: 38000, purchase_date: '2022-06-01', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },
-  ],
-  debts: [
-    {
-      name: 'Hypotheek', debt_type: 'mortgage', original_amount: 630000, current_balance: 620000,
-      interest_rate: 3.8, minimum_payment: 2100, monthly_payment: 2100,
-      start_date: '2023-03-01', creditor: 'Rabobank',
-      is_tax_deductible: true, repayment_type: 'annuiteit',
-      linked_asset_name: 'Eigen woning',
-    },
-    {
-      name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 42000, current_balance: 34000,
-      interest_rate: 0.46, minimum_payment: 180, monthly_payment: 180,
-      start_date: '2007-09-01', creditor: 'DUO',
-      subtype: 'oud_stelsel', draagkrachtmeting_date: '2025-09-01',
-      repayment_type: 'aflossingsvrij',
-    },
-  ],
-  budgets: [],       // Kern van Rashid: GEEN budgettering
-  transactions: [],  // Geen transacties — check-in gebaseerd
-  goals: [
-    { name: '€500K netto vermogen', description: 'Half miljoen netto vermogen bereiken — een grote mijlpaal richting financiële vrijheid', goal_type: 'net_worth', target_value: 500000, current_value: 250000, target_date: '2033-12-31', icon: 'Mountain', color: 'amber', is_completed: false },
-    { name: 'Sabbatical fonds', description: '6 maanden reizen — een sabbatical fonds opbouwen om de wereld te ontdekken', goal_type: 'savings', target_value: 30000, current_value: 8000, target_date: '2028-06-30', icon: 'Plane', color: 'teal', is_completed: false },
-  ],
-  life_events: [
-    { name: 'Sabbatical (6 mnd reizen)', event_type: 'sabbatical', target_age: 45, target_date: '2028-09-14', one_time_cost: 5000, monthly_cost_change: 2000, monthly_income_change: -5500, duration_months: 6, icon: 'Plane', is_active: true, sort_order: 0, metadata: { nettoInkomen: 5500, doorbetalingsPct: 0, extraKosten: 8000 } },
-    { name: 'Freelance tarief omhoog', event_type: 'career_change', target_age: 47, target_date: '2030-09-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 500, duration_months: 0, icon: 'TrendingUp', is_active: true, sort_order: 1 },
-    { name: 'AOW', event_type: 'aow', target_age: 69, target_date: '2052-06-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1350, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'alleenstaand' } },
-    { name: 'Belastingteruggave ZZP', event_type: 'custom', target_age: 44, target_date: '2027-04-01', one_time_cost: 3500, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Receipt', is_active: true, sort_order: 3, metadata: { reden: 'Zelfstandigenaftrek + MKB-winstvrijstelling over vorig boekjaar' } },
-  ],
-  recommendations: [
-    {
-      title: 'Start met budgetteren',
-      description: 'Je hebt geen inzicht in waar je geld naartoe gaat. Door budgetten aan te maken krijg je grip op je uitgaven en kun je makkelijker €400/maand extra sparen.',
-      recommendation_type: 'budget_optimization',
-      euro_impact_monthly: 400,
-      euro_impact_yearly: 4800,
-      freedom_days_per_year: 10,
-      related_budget_slug: null,
-      priority_score: 4,
-      status: 'pending',
-      suggested_actions: [
-        { title: 'Maak je eerste budgetten aan in De Kern', freedom_days_impact: 5, euro_impact_monthly: 200 },
-        { title: 'Koppel je bankrekening voor automatisch inzicht', freedom_days_impact: 5, euro_impact_monthly: 200 },
-      ],
-      actions: [
-        { source: 'ai', title: 'Maak je eerste budgetten aan', description: 'Ga naar De Kern → Budgetten en stel je eerste categorieën in. Begin simpel: vaste lasten, boodschappen en leuke dingen.', freedom_days_impact: 5, euro_impact_monthly: 200, status: 'open', priority_score: 4, scheduled_week: getCurrentWeek() },
-        { source: 'ai', title: 'Koppel je ING rekening', description: 'Koppel je betaalrekening voor automatische transactie-import, zodat je zonder moeite inzicht krijgt.', freedom_days_impact: 5, euro_impact_monthly: 200, status: 'open', priority_score: 4 },
-      ],
-    },
-    {
-      title: 'Noodbuffer aanvullen naar 6 maanden',
-      description: 'Als freelancer heb je een grotere buffer nodig. Met €4.200/mnd uitgaven is 6 maanden = €25.200. Je hebt nu €20.000 op je spaarrekening.',
-      recommendation_type: 'savings_boost',
-      euro_impact_monthly: 0,
-      euro_impact_yearly: 0,
-      freedom_days_per_year: 0,
-      related_budget_slug: null,
-      priority_score: 3,
-      status: 'pending',
-      suggested_actions: [
-        { title: 'Verhoog spaarrekening naar €25.200', freedom_days_impact: 0 },
-      ],
-      actions: [
-        { source: 'ai', title: 'Zet maandelijks €500 extra opzij', description: 'Stel een automatische overboeking in van je betaalrekening naar je spaarrekening.', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 3 },
-      ],
-    },
-    {
-      title: 'Studielening versneld aflossen',
-      description: 'Je studielening heeft slechts 0,46% rente. Versneld aflossen levert weinig op — maar het geeft mentale rust en verlaagt je schuldenlast.',
-      recommendation_type: 'debt_acceleration',
-      euro_impact_monthly: 0,
-      euro_impact_yearly: 200,
-      freedom_days_per_year: 0,
-      related_budget_slug: null,
-      priority_score: 2,
-      status: 'pending',
-      suggested_actions: [
-        { title: 'Verhoog maandelijkse aflossing met €100', freedom_days_impact: 0, euro_impact_monthly: 0 },
-      ],
-      actions: [
-        { source: 'ai', title: 'Overweeg extra aflossing', description: 'De rente is laag, dus financieel is het slimmer om te beleggen. Maar als je mentale rust wilt, kun je €100/mnd extra aflossen.', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 2 },
-      ],
-    },
-  ],
-  net_worth_snapshots: [
-    // Stabiele groei ~€2.300/mnd: beleggingsrendement + hypotheekaflossing
-    // total_assets ≈ spaar (20K) + belegging (groeiend) + woning (groeiend) + auto (dalend) + checking (40K)
-    // total_debts = hypotheek (dalend) + studielening (dalend)
-    { monthsAgo: 14, total_assets: 872000, total_debts: 657000, net_worth: 215000 },
-    { monthsAgo: 13, total_assets: 875000, total_debts: 656500, net_worth: 218500 },
-    { monthsAgo: 12, total_assets: 878000, total_debts: 656000, net_worth: 222000 },
-    { monthsAgo: 11, total_assets: 881000, total_debts: 655500, net_worth: 225500 },
-    { monthsAgo: 10, total_assets: 884000, total_debts: 655000, net_worth: 229000 },
-    { monthsAgo: 9, total_assets:  887500, total_debts: 654500, net_worth: 233000 },
-    { monthsAgo: 8, total_assets:  890500, total_debts: 654000, net_worth: 236500 },
-    { monthsAgo: 7, total_assets:  893000, total_debts: 653500, net_worth: 239500 },
-    { monthsAgo: 6, total_assets:  895500, total_debts: 653000, net_worth: 242500 },
-    { monthsAgo: 5, total_assets:  897000, total_debts: 652500, net_worth: 244500 },
-    { monthsAgo: 4, total_assets:  899000, total_debts: 652200, net_worth: 246800 },
-    { monthsAgo: 3, total_assets:  900500, total_debts: 652000, net_worth: 248500 },
-    { monthsAgo: 2, total_assets:  901500, total_debts: 651700, net_worth: 249800 },
-    { monthsAgo: 1, total_assets:  903000, total_debts: 653500, net_worth: 249500 },
-    { monthsAgo: 0, total_assets:  904000, total_debts: 654000, net_worth: 250000 },
-  ],
-  valuations: [
-    // DEGIRO portefeuille: 14 maandelijkse snapshots (€142K → €170K)
-    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 14, value: 142000 },
-    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 12, value: 148000 },
-    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 10, value: 152000 },
-    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 8, value: 157000 },
-    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 6, value: 160000 },
-    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 4, value: 163000 },
-    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 2, value: 166000 },
-    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 0, value: 170000 },
-    // Woning: 4 kwartaalwaarderingen (€635K → €650K)
-    { assetName: 'Eigen woning', entity_type: 'asset', monthsAgo: 12, value: 635000 },
-    { assetName: 'Eigen woning', entity_type: 'asset', monthsAgo: 9, value: 640000 },
-    { assetName: 'Eigen woning', entity_type: 'asset', monthsAgo: 6, value: 645000 },
-    { assetName: 'Eigen woning', entity_type: 'asset', monthsAgo: 0, value: 650000 },
-  ],
-  holdings: [
-    {
-      assetName: 'Beleggingsrekening DEGIRO',
-      ticker: null,
-      isin: 'NL0011225305',
-      name: 'Northern Trust World Custom ESG Index',
-      units: 950,
-      avg_purchase_price: 136,
-      current_price: 178.95,
-      purchase_date_monthsAgo: 36,
-      asset_class: 'equity',
-      sector: null,
-      geography: 'global',
-      currency: 'EUR',
-      ter: 0.0030,           // NT World Custom ESG gemiddelde TER 0.30%
-      ter_source: 'manual',
-      transactions: [
-        { type: 'buy', units: 300, price_per_unit: 128.00, total_amount: 38400, monthsAgo: 36, notes: 'Eerste grote inleg' },
-        { type: 'buy', units: 200, price_per_unit: 132.00, total_amount: 26400, monthsAgo: 30, notes: null },
-        { type: 'buy', units: 150, price_per_unit: 138.00, total_amount: 20700, monthsAgo: 24, notes: null },
-        { type: 'buy', units: 100, price_per_unit: 142.00, total_amount: 14200, monthsAgo: 18, notes: null },
-        { type: 'buy', units: 100, price_per_unit: 148.00, total_amount: 14800, monthsAgo: 12, notes: null },
-        { type: 'buy', units: 100, price_per_unit: 155.00, total_amount: 15500, monthsAgo: 6, notes: 'Maandelijkse inleg opgehoogd' },
-        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 1200, monthsAgo: 9, notes: 'Halfjaarlijks dividend' },
-        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 1350, monthsAgo: 3, notes: 'Halfjaarlijks dividend' },
-      ],
-    },
-  ],
-  // Gebalanceerd target: 60% aandelen, 20% obligaties, 10% vastgoed, 10% cash
-  // Bewuste drift: Rashid is 100% equity — 40% boven target, grote afwijking
-  target_allocations: [
-    { view_mode: 'asset_class', category: 'equity', target_pct: 60 },
-    { view_mode: 'asset_class', category: 'bonds', target_pct: 20 },
-    { view_mode: 'asset_class', category: 'real_estate', target_pct: 10 },
-    { view_mode: 'asset_class', category: 'cash', target_pct: 10 },
-  ],
-}
-
-// ══════════════════════════════════════════════════════════════
-// Persona 6 — Marijke Vermeer ("De Gepensioneerde")
+// PERSONA 4: Marijke Vermeer — "De gepensioneerde"
 // Uniek: al met pensioen, uitkeringsfase, pensioen strategie
 // ══════════════════════════════════════════════════════════════
 
@@ -2296,172 +1872,14 @@ const marijkeData: PersonaData = {
   ],
 }
 
-// ══════════════════════════════════════════════════════════════
-// ══════════════════════════════════════════════════════════════
-// Landing page testpersona's — gebaseerd op bestaande seeds
-// Elk vertegenwoordigt een gebruikersgroep van de landing page
-//
-// LET OP: deze personas erven via spread (...marijkeData / ...lisaData / ...) en
-// overriden alleen meta + profile (+ budgets bij Ronald). Inherited transactions,
-// life_events, assets, debts en net_worth_snapshots dragen de DOB en levensfase
-// van de basispersoon — voor Ronald (DOB 1962 vs Marijke 1955) en Jochen (DOB
-// 1974 vs Willem 1968) leveren de inherited life_events.target_date dus
-// inconsistente leeftijden op. Bewuste keuze: snelle vulling van landingspagina-
-// scenario's; vervang met eigen data zodra een persona meer detail nodig heeft.
-// ══════════════════════════════════════════════════════════════
-
-const ronaldData: PersonaData = {
-  ...marijkeData,
-  meta: {
-    name: 'Ronald Hoekstra',
-    subtitle: 'De pensioenplanner',
-    description: 'Bijna met pensioen op 64. Wil het pensioengat in kaart brengen en weten of AOW + werkgeverspensioen + eigen vermogen samen genoeg zijn. Gebruikersgroep: pensioenplanner.',
-    color: 'emerald',
-    avatarColor: '#4A7A5B',
-    netWorth: 820000,
-    income: 5200,
-    expenses: 3950,
-    backgroundStory: 'Ronald was 30 jaar technisch manager bij Tata Steel in IJmuiden. Samen met zijn vrouw Anja (62) heeft hij een hypotheekvrij huis in Beverwijk. Over een jaar gaat hij met pensioen. Hij wil precies weten of het ABP-pensioen, de AOW en zijn beleggingsportefeuille samen genoeg zijn om hun levensstijl voort te zetten. Zijn grootste vraag: hoeveel mag hij onttrekken zonder dat het geld opraakt?',
-    challenges: ['Pensioengat berekenen: is het genoeg?', 'Onttrekkingsstrategie bepalen (guardrails vs. vast percentage)', 'Portefeuille verschuiven naar minder risico', 'Stijgende zorgkosten inplannen'],
-    currentSituation: 'Nog 1 jaar werkzaam, daarna volledig pensioen. Comfortabel vermogen opgebouwd, maar onzeker over de onttrekkingsfase.',
-    firstGoal: 'Campertrip door Noorwegen na pensioen',
-    sovereignty: 'mastery',
-    modules: ALL_MODULES,
-  },
-  profile: {
-    ...marijkeData.profile,
-    full_name: 'Ronald Hoekstra',
-    date_of_birth: '1962-03-15',
-    net_monthly_income: 5200,
-    estimated_monthly_expenses: 3950,
-    retirement_expense_method: 'essential_budgets' as const,
-    active_modules: ALL_MODULES,
-  },
-  // Realistische essenti\u00eble budgetten voor stel met eigen huis, ~\u20ac3.950/mnd (\u20ac47.400/jaar)
-  budgets: makeBudgets({
-    [S.INKOMEN]: 5200, [S.SALARIS_UITKERING]: 4800,
-    [S.TOESLAGEN_KINDERBIJSLAG]: 0, [S.TERUGGAVE_BELASTING]: 0, [S.OVERIGE_INKOMSTEN]: 400,
-    [S.VASTE_LASTEN_WONEN]: 850, [S.HUUR_HYPOTHEEK]: 0, [S.GAS_WATER_LICHT]: 280,
-    [S.VERZEKERINGEN_WONEN]: 450, [S.GEMEENTELIJKE_LASTEN]: 120,
-    [S.DAGELIJKSE_UITGAVEN]: 780, [S.BOODSCHAPPEN]: 480, [S.HUISHOUDEN_VERZORGING]: 80,
-    [S.KINDEREN_SCHOOL]: 0, [S.MEDISCHE_KOSTEN]: 220,
-    [S.VERVOER]: 320, [S.BRANDSTOF_OV]: 120, [S.AUTO_VASTE_LASTEN]: 110,
-    [S.AUTO_ONDERHOUD]: 60, [S.FIETS_DEELVERVOER]: 30,
-    [S.LEUKE_DINGEN]: 700, [S.UIT_ETEN_HORECA]: 180, [S.VRIJE_TIJD_SPORT]: 120,
-    [S.VAKANTIE]: 300, [S.KLEDING_OVERIGE]: 100,
-    [S.SPAREN_SCHULDEN]: 300, [S.SPAREN_NOODBUFFER]: 300, [S.INVESTEREN_FIRE]: 0,
-    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 0, [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
-  }),
-  // Eigen life_events met dates afgestemd op Ronald's DOB 1962-03-15.
-  // Marijke's events kloppen niet voor Ronald (5 jaar leeftijdsverschil).
-  life_events: [
-    { name: 'Pensioen', event_type: 'early_retirement', target_age: 65, target_date: '2027-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: -5200, duration_months: 0, icon: 'Sunset', is_active: true, sort_order: 0, metadata: { gewensteMaandinkomen: 3950, pensioenUitkering: 2400 } },
-    { name: 'ABP-pensioen', event_type: 'custom', target_age: 65, target_date: '2027-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 2400, duration_months: 0, icon: 'Building2', is_active: true, sort_order: 1, metadata: { reden: 'Werkgeverspensioen na 30 jaar Tata Steel' } },
-    { name: 'AOW', event_type: 'aow', target_age: 67, target_date: '2029-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 940, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
-    { name: 'Campertrip Noorwegen', event_type: 'custom', target_age: 65, target_date: '2027-08-01', one_time_cost: -8500, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Mountain', is_active: true, sort_order: 3, metadata: { reden: 'Eerste reis na pensioen' } },
-  ],
-}
-
-const basData: PersonaData = {
-  ...lisaData,
-  meta: {
-    name: 'Bas Mulder',
-    subtitle: 'De vermogensverdeler',
-    description: 'Financieel analist met €100K+ vermogen verspreid over spaargeld, beleggingen, hypotheek en een bedrijfsdeel. Wil alles bij elkaar zien en begrijpen hoe het samenhangt. Gebruikersgroep: vermogensverdeler.',
-    color: 'amber',
-    avatarColor: '#8B6914',
-    netWorth: 100000,
-    income: 5200,
-    expenses: 4700,
-    backgroundStory: 'Bas is financieel analist bij een middelgroot accountantskantoor in Utrecht. Met zijn vrouw Sophie (43) en twee kinderen (8 en 11) woont hij in een rijtjeshuis in De Meern. Ze hebben net de €100K nettovermogen-grens gepasseerd. Beleggingen bij Meesman, hypotheek bij Obvion, spaargeld bij ASN. Bas wil overzicht: wat bezitten ze precies, hoe hangt het samen, en hoe presteert de portefeuille? Hij is analytisch ingesteld en wil data, geen vage dashboards.',
-    challenges: ['Overzicht over 6+ financiële producten bij verschillende partijen', 'Vermogensallocatie optimaliseren (te veel in spaar, te weinig in indexfondsen)', 'Box 3 belasting berekenen en minimaliseren', 'Hypotheek vs. beleggen afweging'],
-    currentSituation: 'Net de €100K gepasseerd. Vermogen groeit door compound interest, maar verspreid over te veel partijen voor goed overzicht.',
-    firstGoal: 'Vermogen naar €250K en kinderekening opzetten',
-    sovereignty: 'momentum',
-    modules: ALL_MODULES,
-  },
-  profile: {
-    ...lisaData.profile,
-    full_name: 'Bas Mulder',
-    date_of_birth: '1981-09-22',
-    active_modules: ALL_MODULES,
-  },
-}
-
-const leoData: PersonaData = {
-  ...roosData,
-  meta: {
-    name: 'Leo Pietersen',
-    subtitle: 'De budgetteerder',
-    description: 'Grafisch vormgever die na een impulsieve periode grip wil krijgen op zijn uitgaven. Geeft meer uit dan er binnenkomt en wil patronen herkennen. Gebruikersgroep: budgetteerder.',
-    color: 'red',
-    avatarColor: '#9B4D4D',
-    netWorth: -6000,
-    income: 2800,
-    expenses: 3200,
-    backgroundStory: 'Leo is freelance grafisch vormgever in Rotterdam. Na een jaar van grote uitgaven — nieuwe MacBook Pro, designmeubels, festivals — zit hij met een creditcardschuld en een privélease die hij liever kwijt was. Zijn inkomsten zijn goed maar onregelmatig, en hij heeft geen idee waar het geld naartoe gaat. Zijn bankrekening is een zwart gat. Leo wil geen streng budget, maar wél inzicht: hoeveel gaat er naar abonnementen? Hoeveel naar uit eten? En hoeveel kost die impulsiviteit hem aan vrijheidstijd?',
-    challenges: ['Uitgaven > inkomsten: €400/maand negatief', 'Creditcardschuld van €4.500 met hoge rente', 'Geen noodfonds, geen buffer', 'Abonnementen-wildgroei (streaming, software, gym)'],
-    currentSituation: 'Elke maand dieper in het rood. Weet dat het anders moet maar mist de tools om patronen te herkennen.',
-    firstGoal: 'Creditcardschuld aflossen en 1 maand buffer opbouwen',
-    sovereignty: 'recovery',
-    modules: ['budgetteren', 'vermogensregistratie', 'inzicht_acties'],
-  },
-  profile: {
-    ...roosData.profile,
-    full_name: 'Leo Pietersen',
-    date_of_birth: '1991-01-08',
-    active_modules: ['budgetteren', 'vermogensregistratie', 'inzicht_acties'],
-  },
-}
-
-const jochenData: PersonaData = {
-  ...willemData,
-  meta: {
-    name: 'Jochen Brouwer',
-    subtitle: 'De FIRE-strijder',
-    description: 'Software architect met €1.4M vermogen die actief werkt naar financiële onafhankelijkheid op 55. Maximaliseert spaarquote en optimaliseert rendement. Gebruikersgroep: fire_strijder.',
-    color: 'sky',
-    avatarColor: '#2A6B8A',
-    netWorth: 1460000,
-    income: 6500,
-    expenses: 3000,
-    backgroundStory: 'Jochen is lead software architect bij Adyen in Amsterdam. Met zijn vrouw Maren (50) en twee studerende kinderen woont hij in een afbetaald huis in Haarlem. Al 15 jaar bezig met FIRE: maximale spaarquote (53%), indexfondsen bij DeGiro, en elk jaar een stap dichter bij de streep. De hypotheek is afgelost, de kinderen studeren op eigen beurs. Jochen telt af: nog 3 jaar. Hij wil de precieze datum weten, Monte Carlo-simulaties draaien, en elke optimalisatie pakken die er nog is.',
-    challenges: ['Exacte FIRE-datum bepalen (doel: 55 jaar)', 'Sequence-of-returns risk managen in laatste opbouwjaren', 'Portefeuille optimaliseren: kosten verlagen, allocatie finetunen', 'Overgang van opbouw- naar onttrekkingsfase plannen'],
-    currentSituation: 'Op 92% van FIRE-doel. €705K belegbaar vermogen, target €900K. 53% spaarquote. Nog ~3 jaar als rendementen meezitten.',
-    firstGoal: 'Financieel onafhankelijk op 55',
-    sovereignty: 'mastery',
-    modules: ALL_MODULES,
-  },
-  profile: {
-    ...willemData.profile,
-    full_name: 'Jochen Brouwer',
-    date_of_birth: '1974-07-03',
-    active_modules: ALL_MODULES,
-  },
-  // Eigen life_events met dates afgestemd op Jochen's DOB 1974-07-03.
-  // Willem's events kloppen niet voor Jochen (6 jaar leeftijdsverschil).
-  life_events: [
-    { name: 'Hypotheek afgelost', event_type: 'custom', target_age: 50, target_date: '2024-07-01', one_time_cost: 0, monthly_cost_change: -1400, monthly_income_change: 0, duration_months: 0, icon: 'PartyPopper', is_active: false, sort_order: 0 },
-    { name: 'FIRE — financieel onafhankelijk', event_type: 'early_retirement', target_age: 55, target_date: '2029-07-03', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: -6500, duration_months: 0, icon: 'Sunset', is_active: true, sort_order: 1, metadata: { gewensteMaandinkomen: 3000, pensioenUitkering: 0 } },
-    { name: 'AOW', event_type: 'aow', target_age: 68, target_date: '2042-07-03', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 940, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
-    { name: 'Kinderen klaar met studie', event_type: 'custom', target_age: 56, target_date: '2030-09-01', one_time_cost: 0, monthly_cost_change: -800, monthly_income_change: 0, duration_months: 0, icon: 'GraduationCap', is_active: true, sort_order: 3, metadata: { reden: 'Studiekosten ouders vallen weg' } },
-  ],
-}
-
 // Export
 // ══════════════════════════════════════════════════════════════
 
 export const PERSONAS: Record<PersonaKey, PersonaData> = {
-  roos: roosData,
   daan: daanData,
   lisa: lisaData,
   willem: willemData,
-  rashid: rashidData,
   marijke: marijkeData,
-  ronald: ronaldData,
-  bas: basData,
-  leo: leoData,
-  jochen: jochenData,
 }
 
-export const PERSONA_KEYS: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem', 'rashid', 'marijke', 'ronald', 'bas', 'leo', 'jochen']
+export const PERSONA_KEYS: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke']

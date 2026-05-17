@@ -10,7 +10,7 @@
  *  - Active-module via `usePathname()` ipv hardcoded `kern`.
  *  - Module-fallback via `useModuleAccess`: gedimde rij + tooltip-CTA.
  *  - Sub-tag-strip toont alleen *categorieën* (Bezittingen/Schulden,
- *    Wat-Als/Doorrekening) — geen apps, conform plan §3.3.
+ *    Wat-Als/Strategieën) — geen apps, conform plan §3.3.
  *  - Echte routes (Link) ipv mock-buttons.
  *  - Echte data via props (netto-vermogen, acties, badge).
  */
@@ -162,7 +162,7 @@ const MODULES: ModuleEntry[] = [
     subTags: [
       { label: 'Uitgave na pensioen', href: '/horizon?uitgaven=open' },
       { label: 'Wat-Als', href: '/horizon/whatif' },
-      { label: 'Doorrekening', href: '/horizon/doorrekening-test' },
+      { label: 'Strategieën', href: '/horizon?strategie=open' },
     ],
   },
 ]

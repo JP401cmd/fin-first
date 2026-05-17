@@ -18,14 +18,14 @@ const tests: TestCase[] = [
   // ──────────────── Persona seeding: data completeness ────────────────
   {
     id: 'td-personas-available',
-    name: 'Alle 6 persona\'s beschikbaar',
+    name: 'Alle 4 persona\'s beschikbaar',
     category: CAT,
-    description: 'PERSONA_KEYS bevat alle 6 persona sleutels',
+    description: 'PERSONA_KEYS bevat alle 4 persona sleutels',
     priority: 'critical',
     estimatedDurationMs: 10,
     fn() {
-      assertEqual(PERSONA_KEYS.length, 6, '6 persona keys')
-      const expected: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem', 'rashid', 'marijke']
+      assertEqual(PERSONA_KEYS.length, 4, '4 persona keys')
+      const expected: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke']
       for (const key of expected) {
         assert(PERSONA_KEYS.includes(key), `${key} in PERSONA_KEYS`)
         assertNotNull(PERSONAS[key], `PERSONAS[${key}] bestaat`)
@@ -126,11 +126,6 @@ const tests: TestCase[] = [
     fn() {
       for (const key of PERSONA_KEYS) {
         const txns = PERSONAS[key].transactions
-        // Rashid has no transactions (check-in based)
-        if (key === 'rashid') {
-          assertEqual(txns.length, 0, 'rashid heeft geen transacties')
-          continue
-        }
         assertGreaterThan(txns.length, 0, `${key} heeft transacties`)
         for (const t of txns.slice(0, 5)) {
           assert(typeof t.dayOffset === 'number', `${key} txn dayOffset is number`)
@@ -170,14 +165,13 @@ const tests: TestCase[] = [
   // ──────────────── Bevestigingsdialoog: destructieve operatie ────────────────
   {
     id: 'td-persona-sovereignty-phases',
-    name: 'Persona\'s dekken alle sovereignty fases',
+    name: 'Persona\'s dekken stability/momentum/mastery sovereignty fases',
     category: CAT,
-    description: 'De 6 persona\'s samen dekken recovery, stability, momentum en mastery',
+    description: 'De 4 lifecycle-personas dekken stability, momentum en mastery (recovery valt buiten testset)',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
       const phases = new Set(PERSONA_KEYS.map((k) => PERSONAS[k].meta.sovereignty))
-      assert(phases.has('recovery'), 'recovery fase gedekt')
       assert(phases.has('stability'), 'stability fase gedekt')
       assert(phases.has('momentum'), 'momentum fase gedekt')
       assert(phases.has('mastery'), 'mastery fase gedekt')
@@ -365,7 +359,7 @@ const tests: TestCase[] = [
     fn() {
       for (const key of PERSONA_KEYS) {
         const budgets = PERSONAS[key].budgets
-        if (budgets.length === 0) continue // Rashid has no budgets
+        if (budgets.length === 0) continue // skip personas without budgets (none in current set)
         const types = new Set(budgets.map((b) => b.budget_type))
         assert(types.has('income'), `${key} heeft income budget`)
         assert(types.has('expense'), `${key} heeft expense budget`)

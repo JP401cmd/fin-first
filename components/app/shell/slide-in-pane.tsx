@@ -63,6 +63,12 @@ type SlideInPaneProps = {
    *  weggelaten = geen footer (geen lege bar). */
   primaryAction?: PaneAction
   secondaryAction?: PaneAction
+  /** Optionele context-info in de footer-bar, gerenderd vóór de actie-knoppen
+   *  (links). Gebruikt om bv. een live-preview-bedrag of validatie-status naast
+   *  Opslaan/Annuleren te tonen, zodat de gebruiker bij het bedienen van de
+   *  primaire actie direct ziet welk resultaat ze opslaat. Geen footer als
+   *  zowel acties als info weggelaten zijn. */
+  footerInfo?: ReactNode
 }
 
 const SLIDE_DURATION_MS = 240
@@ -77,6 +83,7 @@ export function SlideInPane({
   actions,
   primaryAction,
   secondaryAction,
+  footerInfo,
 }: SlideInPaneProps) {
   // `mounted` controleert of we überhaupt in de portal renderen. Tijdens de
   // exit-animatie blijven we gemount totdat de transitionend-callback klaar is,
@@ -276,22 +283,28 @@ export function SlideInPane({
         </div>
       </div>
 
-      {/* Standaard footer-bar — alleen renderen wanneer minimaal één actie is
-          doorgegeven (geen lege bar bij read-only panes). De footer staat
-          BUITEN de scroll-div en is daardoor altijd zichtbaar onderaan de
-          pane (sticky-gedrag via flex-column-layout: header + flex-1 scroll-
-          body + footer). De pane-flex-column zorgt dat de footer geen
-          padding nodig heeft op de body — die kan tot onder de footer
-          doorscrollen omdat ze in een aparte flex-row leven. */}
-      {(primaryAction || secondaryAction) && (
+      {/* Standaard footer-bar — alleen renderen wanneer minimaal één actie of
+          context-info is doorgegeven (geen lege bar bij read-only panes). De
+          footer staat BUITEN de scroll-div en is daardoor altijd zichtbaar
+          onderaan de pane (sticky-gedrag via flex-column-layout: header +
+          flex-1 scroll-body + footer). De pane-flex-column zorgt dat de
+          footer geen padding nodig heeft op de body — die kan tot onder de
+          footer doorscrollen omdat ze in een aparte flex-row leven. */}
+      {(primaryAction || secondaryAction || footerInfo) && (
         // Knoppen LINKS uitgelijnd (`justify-start`) — bewust afwijkend van
         // platform-conventie (rechts) om visuele overlap met de zwevende
-        // chat-FAB rechtsonderin te voorkomen. Volgorde: primary EERST
-        // (links), secondary erna. Reden: primary blijft het eerste vaste
-        // visuele anker en valt nog verder weg van de FAB; secondary
-        // ("Annuleren") komt ernaast en blijft eveneens ruim links van de
-        // bubble.
+        // chat-FAB rechtsonderin (z-50, pane is z-40) te voorkomen.
+        // Volgorde: footerInfo EERST (links, bv. live preview-bedrag),
+        // dan primary, dan secondary. Reden: alle elementen blijven links
+        // van de FAB-zone (rechts) gegroepeerd; de info-rail leest als
+        // context-anker waarna de actie-knoppen direct ernaast staan.
+        // `shrink-0` op info voorkomt dat de tekst inkrimpt onder druk van
+        // de knoppen — bij echt smalle panes (lg:560px) staat de hele rij
+        // gewoon links uitgelijnd binnen de gap-3 spacing.
         <div className="flex shrink-0 items-center justify-start gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)] px-7 py-4 lg:px-8">
+          {footerInfo && (
+            <div className="shrink-0 text-[var(--ink-2)]">{footerInfo}</div>
+          )}
           {primaryAction && (
             <button
               type="button"

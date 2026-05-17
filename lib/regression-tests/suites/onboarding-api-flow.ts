@@ -66,7 +66,7 @@ const tests: TestCase[] = [
       const noAuthRes = await unauthenticatedFetch('/api/onboarding/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'persona', persona: 'roos' }),
+        body: JSON.stringify({ type: 'persona', persona: 'daan' }),
       })
       assert(
         noAuthRes.status === 401 || noAuthRes.status === 403,
@@ -74,10 +74,10 @@ const tests: TestCase[] = [
       )
 
       // Test 2: Request body must have type='persona' and valid persona key
-      const validBody = { type: 'persona', persona: 'roos' }
+      const validBody = { type: 'persona', persona: 'daan' }
       assertEqual(validBody.type, 'persona', 'Request type is "persona"')
       assertIncludes(
-        ['roos', 'daan', 'lisa', 'willem', 'rashid', 'marijke'],
+        ['daan', 'lisa', 'willem', 'marijke'],
         validBody.persona,
         'Persona key is geldig',
       )

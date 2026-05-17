@@ -53,6 +53,12 @@ import {
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { HousingStrategyNudgeSheet } from '@/components/app/horizon/housing-strategy-nudge-sheet'
+import {
+  HOUSING_STRATEGY_LABELS,
+  isHousingStrategyEvent,
+  projectMortgageStateAt,
+  resolveTriggerAge,
+} from '@/lib/housing-strategy'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -637,16 +643,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       setInput(horizonInput)
 
       const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
-      setEvents(loadedEvents)
+      // Virtuele housing-strategy events leven in initialData (server-side
+      // gegenereerd) en hebben geen DB-row. Plak ze achter de echte events
+      // zodat ze blijven verschijnen na een loadData() refresh.
+      const housingFromInitial = initialData.events.filter(isHousingStrategyEvent)
+      const merged: LifeEvent[] = [...loadedEvents, ...housingFromInitial]
+      setEvents(merged)
       setActions((actionsResult.data ?? []) as Action[])
       setDebts((fullDebtsResult.data ?? []) as Debt[])
 
-      const cumImpacts = computeCumulativeImpacts(horizonInput, loadedEvents)
+      const cumImpacts = computeCumulativeImpacts(horizonInput, merged)
       setImpacts(cumImpacts)
     } catch (err) {
       console.error('Error reloading horizon data:', err)
     }
-  }, [])
+  }, [initialData.events])
 
   // Lightweight refetch used after life-event CRUD, so a single failing parallel
   // query in `loadData` cannot silently block the events update.
@@ -662,11 +673,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       return
     }
     const loaded = (data ?? []) as LifeEvent[]
-    setEvents(loaded)
+    // Behoud virtuele housing-strategy events (geen DB-rij — komen via
+    // initialData.events server-side).
+    const housingFromInitial = initialData.events.filter(isHousingStrategyEvent)
+    const merged: LifeEvent[] = [...loaded, ...housingFromInitial]
+    setEvents(merged)
     if (input) {
-      setImpacts(computeCumulativeImpacts(input, loaded))
+      setImpacts(computeCumulativeImpacts(input, merged))
     }
-  }, [input])
+  }, [input, initialData.events])
 
   // Fetch household/partner FIRE data when perspective changes
   useEffect(() => {
@@ -1127,8 +1142,55 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const wealthCompositionRows: StackedRow[] = useMemo(() => {
     if (chartMode !== 'vermogensopbouw') return []
     if (!unifiedRows?.length) return []
-    return unifiedRowsToStackedRows(unifiedRows)
-  }, [chartMode, unifiedRows])
+    const baseRows = unifiedRowsToStackedRows(unifiedRows)
+
+    // Housing-strategy injectie: bij exclude_from_fire en downsize zit de
+    // eigen-huis-hypotheek NIET in de engine-projectie (filterAssetsForFire
+    // haalt 'm weg voor de FIRE-pot-berekening). Voor de chart-weergave
+    // willen we de schuld wel zien — anders verdwijnt de hypotheek-bar.
+    // Projecteer per jaar het uitstaand saldo en plak het bij `schulden`.
+    const housingCfg = initialData.housingStrategy
+    const mortgages = initialData.housingContext.eigenHuisMortgages
+    const shouldInjectMortgage =
+      (housingCfg.mode === 'exclude_from_fire' || housingCfg.mode === 'downsize') &&
+      mortgages.length > 0
+    if (!shouldInjectMortgage) return baseRows
+
+    const currentAge = initialData.effectiveInput.dateOfBirth
+      ? Math.floor(ageAtDate(initialData.effectiveInput.dateOfBirth))
+      : null
+    if (currentAge === null) return baseRows
+
+    // Voor downsize: hypotheek is na trigger volledig afgelost (sale-event
+    // tapt de verkoopopbrengst). Geen schuld meer in chart vanaf trigger.
+    let triggerAge: number | null = null
+    if (housingCfg.mode === 'downsize') {
+      const yearlyExp =
+        initialData.effectiveInput.yearlyMustExpenses > 0
+          ? initialData.effectiveInput.yearlyMustExpenses
+          : (initialData.effectiveInput.monthlyExpenses ?? 0) * 12
+      const netWorth = initialData.effectiveInput.totalAssets - initialData.effectiveInput.totalDebts
+      const equity =
+        initialData.housingContext.eigenHuisValue - initialData.housingContext.mortgageBalance
+      const liquidEstimate = Math.max(0, netWorth - equity)
+      triggerAge = resolveTriggerAge(
+        housingCfg.trigger,
+        housingCfg.triggerAge,
+        housingCfg.depletionThresholdYears,
+        currentAge,
+        yearlyExp,
+        liquidEstimate,
+      )
+    }
+
+    return baseRows.map((row) => {
+      if (triggerAge !== null && row.age >= triggerAge) return row
+      const monthsForward = Math.max(0, (row.age - currentAge) * 12)
+      const projected = projectMortgageStateAt(mortgages, monthsForward)
+      if (projected.balance <= 0) return row
+      return { ...row, schulden: row.schulden - Math.round(projected.balance) }
+    })
+  }, [chartMode, unifiedRows, initialData])
 
   // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode
   const ieBreakdownResult = useMemo(() => {
@@ -3039,6 +3101,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               const evCatalog = LIFE_EVENT_CATALOG[ev.event_type]
               const evImpactIdx = events.findIndex(e => e.id === ev.id)
               const evImpact = evImpactIdx >= 0 ? impacts[evImpactIdx] : null
+              const isHousing = isHousingStrategyEvent(ev)
               return (
                 <div
                   key={ev.id}
@@ -3054,13 +3117,23 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     className="flex flex-1 items-center gap-3 text-left min-w-0"
                     aria-label={`Bekijk ${ev.name}`}
                   >
-                    <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
+                    <div className="relative flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
                       {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[evCatalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
+                      {isHousing && (
+                        <span
+                          aria-hidden
+                          className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--paper)] bg-horizon-700 text-[var(--paper)]"
+                          title="Beheerd via Eigen-woning-strategie"
+                        >
+                          <Sparkles className="h-2 w-2" />
+                        </span>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm font-medium text-[var(--ink)] truncate">{ev.name}</p>
                       <p className="text-[11px] sm:text-xs text-[var(--ink-3)]">
                         {ev.target_age != null ? `Leeftijd ${ev.target_age}` : 'Geen leeftijd'}
+                        {isHousing && <span className="italic"> · Eigen-woning-strategie</span>}
                         {evImpact && evImpact.fireDelayMonths !== 0 && (
                           <span className={evImpact.fireDelayMonths > 0 ? ' text-negative' : ' text-positive'}>
                             {' · '}{evImpact.fireDelayMonths > 0 ? '+' : ''}{evImpact.fireDelayMonths} mnd
@@ -3072,19 +3145,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-4)]">{ev.target_age}j</span>
                     )}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEventPaneEditingId(ev.id)
-                      setEventPaneMode('edit')
-                      setEventPaneOpen(true)
-                    }}
-                    className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] opacity-60 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                    aria-label={`Bewerk ${ev.name}`}
-                    title="Bewerken"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" />
-                  </button>
+                  {!isHousing && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEventPaneEditingId(ev.id)
+                        setEventPaneMode('edit')
+                        setEventPaneOpen(true)
+                      }}
+                      className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] opacity-60 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                      aria-label={`Bewerk ${ev.name}`}
+                      title="Bewerken"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               )
             }
@@ -3551,6 +3626,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <p className="text-xs font-medium text-[var(--ink-3)]">Toekomst instellingen</p>
                 <p className="text-sm font-semibold text-[var(--ink)]">{fireStrategy ? STRATEGY_LABELS[fireStrategy.strategy].name : 'Niet ingesteld'}</p>
                 <p className="text-sm text-[var(--ink-2)]">{wsConfig ? ({ static: 'Vast (SWR)', guardrails: 'Guardrails', vpw: 'VPW', bucket: 'Bucket' } as Record<WithdrawalStrategyType, string>)[wsConfig.strategy] + (wsConfig.strategy === 'guardrails' ? ` ${Math.round(wsConfig.floor * 100)}–${Math.round(wsConfig.ceiling * 100)}%` : '') : 'Geen opnamestrategie'}</p>
+                {initialData.housingContext.hasEigenHuis && (
+                  <p className="text-xs text-[var(--ink-3)]">
+                    Eigen woning: {HOUSING_STRATEGY_LABELS[initialData.housingStrategy.mode]}
+                  </p>
+                )}
               </div>
             </div>
           </button>
@@ -6583,7 +6663,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           />
         </>
       )}
-      <StrategieModal open={activeModal === 'strategie'} onClose={() => { setActiveModal(null); loadData() }} />
+      <StrategieModal
+        open={activeModal === 'strategie'}
+        onClose={() => { setActiveModal(null); loadData(); router.refresh() }}
+        housingStrategy={initialData.housingStrategy}
+      />
       <UitgavenPane open={uitgavenPaneOpen} onClose={() => { setUitgavenPaneOpen(false); loadData() }} />
       {input && fireParams && fireStrategy && withdrawalStrategyConfig && (
         <EventPane

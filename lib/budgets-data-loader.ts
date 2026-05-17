@@ -117,7 +117,7 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
   // ── Build budget tree ───────────────────────────────────────
   const allBudgets = (budgetsRes.data ?? []) as Budget[]
   const parents = allBudgets.filter((b) => !b.parent_id)
-  const children = allBudgets.filter((b) => b.parent_id && Number(b.default_limit) > 0)
+  const children = allBudgets.filter((b) => !!b.parent_id)
 
   const budgets: BudgetWithChildren[] = parents.map((parent) => ({
     ...parent,

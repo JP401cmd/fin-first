@@ -53,6 +53,11 @@ export interface UitgavenPaneActionsState {
   isCustom: boolean
   /** Aanroepbaar door de pane-footer wanneer de gebruiker op "Opslaan" klikt. */
   save: () => void
+  /** Live-bedrag (handmatige override of berekend totaal) dat na opslaan
+   *  als doelbedrag wordt vastgelegd. Door dit aan de pane-wrapper te leveren
+   *  kan die het in de footer náást de Opslaan/Annuleren-knoppen tonen, zodat
+   *  gebruikers tijdens het bedienen van settings direct het effect zien. */
+  finalAmount: number
 }
 
 interface Props {
@@ -69,6 +74,12 @@ interface Props {
   /** Wanneer aanwezig: child rapporteert save-state aan de pane-wrapper, en het
    *  inline save-blok wordt onderdrukt zodat de pane-footer de enige CTA is. */
   onActionsChange?: (state: UitgavenPaneActionsState) => void
+  /** Optionele callback die wordt aangeroepen ná een succesvolle save. De
+   *  pane-wrapper gebruikt dit om bij Opslaan-klik óók direct te sluiten — de
+   *  pane-sluiting is dan zelf de success-feedback. Niet gezet vanuit de
+   *  standalone route, daar blijft het inline save-blok met "Klaar ✓"-flash
+   *  het feedback-kanaal. */
+  onSaved?: () => void
 }
 
 /** Merge bewaarde JSON met defaults zodat nieuwe keys altijd een fallback hebben. */
@@ -177,6 +188,15 @@ export default function UitgavenNaPensioenClient(props: Props) {
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 2400)
       router.refresh()
+      // In pane-context: laat de wrapper weten dat opslaan klaar is, zodat
+      // de pane direct sluit. De sluiting zelf is de success-feedback. We
+      // roepen dit ALLEEN aan in de custom-flow (Opslaan-knop) en NIET in
+      // de directe methode-pick-flow (`pickMethod` → `save(m, null, null)`),
+      // omdat de gebruiker daar nog op de methode-kaart moet kunnen blijven
+      // om het preview-bedrag te zien zonder dat de pane wegvalt.
+      if (targetMethod === 'custom_amount' && aspirationsToPersist) {
+        props.onSaved?.()
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Onbekende fout')
     } finally {
@@ -215,6 +235,7 @@ export default function UitgavenNaPensioenClient(props: Props) {
       // Wrapper-fn houdt de identiteit stabiel maar roept altijd de laatste
       // save-handler aan (state-snapshots zouden anders verouderen).
       save: () => saveCustomRef.current(),
+      finalAmount,
     })
   }, [method, finalAmount, saving, savedFlash, props.onActionsChange])
 

@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ShellOverlay, type PaneAction } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
+import { isHousingStrategyEvent } from '@/lib/housing-strategy'
 import {
   type LifeEvent,
   type FinancialInput,
@@ -58,6 +60,7 @@ export function EventPane({
   onChanged,
 }: Props) {
   const [mode, setMode] = useState<EventPaneMode>(initialMode)
+  const router = useRouter()
   const [formState, setFormState] = useState<EditFormState | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -247,6 +250,11 @@ export function EventPane({
   // (UI/UX skill: "Geen inline action-knoppen — ALLE actie-knoppen in de
   // footer-bar"). Catalog-mode heeft geen footer; klik op tegel = direct
   // overgang naar edit en daar verschijnt de footer.
+  // Virtuele housing-strategy events hebben geen DB-row — geen edit/delete.
+  // In plaats daarvan: deeplink naar instellingen waar de strategie te
+  // wijzigen is.
+  const isHousingEvent = editingEvent != null && isHousingStrategyEvent(editingEvent)
+
   const primaryAction: PaneAction | undefined =
     mode === 'edit' && editActions
       ? {
@@ -256,10 +264,18 @@ export function EventPane({
           loading: editActions.saving,
         }
       : mode === 'view' && editingEvent
-        ? {
-            label: 'Bewerken',
-            onClick: handleSwitchToEdit,
-          }
+        ? isHousingEvent
+          ? {
+              label: 'Beheer in instellingen',
+              onClick: () => {
+                onClose()
+                router.push('/identity/instellingen#housing-strategy')
+              },
+            }
+          : {
+              label: 'Bewerken',
+              onClick: handleSwitchToEdit,
+            }
         : undefined
   const secondaryAction: PaneAction | undefined =
     mode === 'edit' && editActions
@@ -267,7 +283,7 @@ export function EventPane({
           label: 'Annuleren',
           onClick: onClose,
         }
-      : mode === 'view' && editingEvent
+      : mode === 'view' && editingEvent && !isHousingEvent
         ? {
             label: 'Verwijderen',
             onClick: () => setConfirmDelete(true),

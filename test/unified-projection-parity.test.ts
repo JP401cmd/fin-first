@@ -284,7 +284,7 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
 
   describe('runUnifiedProjection — basiswerking', () => {
     it('produceert UnifiedProjectionResult met alle verplichte velden', () => {
-      const input = buildUnifiedInput('rashid')
+      const input = buildUnifiedInput('marijke')
       const result = runUnifiedProjection(input)
 
       expect(result).toHaveProperty('rows')
@@ -334,7 +334,7 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
 
   describe('runSimulationUnified — deprecated wrapper', () => {
     it('produceert geldige SimResult met dezelfde signature als runSimulation()', () => {
-      const params = buildOldSimParams('rashid')
+      const params = buildOldSimParams('marijke')
       const result = runSimulationUnified(
         params.currentAge,
         params.endAge,
@@ -418,20 +418,14 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
 
   describe('parity: FIRE-leeftijd oude engine vs unified wrapper', () => {
     // Tolerance per persona: the unified engine uses per-type Box 3 with heffingsvrij
-    // vermogen exemption (€59,357). For small portfolios (Daan, Roos), the heffingsvrij
+    // vermogen exemption (€59,357). For small portfolios (Daan), the heffingsvrij
     // eliminates Box 3 drag for years, causing larger differences vs the old engine's
     // flat BOX3_DRAG. Large portfolios (Willem, Lisa) are within 1 year.
     const TOLERANCE: Record<PersonaKey, number> = {
-      roos: 2,      // small/negative portfolio, heffingsvrij has outsized effect
       daan: 8,      // starter with tiny portfolio, heffingsvrij eliminates drag for years
       lisa: 3,      // moderate portfolio; per-bucket waterfall + withdraw-before-grow order
       willem: 1,    // large portfolio (1.46M), heffingsvrij negligible
-      rashid: 1,    // unreachable in both engines
       marijke: 1,   // pensioen mode, forcedFireAge
-      ronald: 2,    // near-retirement, large portfolio, pensioen + beleggingen
-      bas: 3,       // moderate portfolio (~100K), mixed asset types
-      leo: 5,       // diverse portfolio, per-asset Box 3 differences
-      jochen: 5,    // varied portfolio, Box 3 heffingsvrij effects
     }
 
     for (const key of PERSONA_KEYS) {
@@ -583,7 +577,7 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     })
 
     it('transition fase mapt naar accumulation in SimRow', () => {
-      const input = buildUnifiedInput('rashid')
+      const input = buildUnifiedInput('daan')
       const unifiedResult = runUnifiedProjection(input)
 
       // Check if there are transition rows
@@ -661,16 +655,10 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     // - Per-type Box 3 with heffingsvrij exemption changes effective drag
     // These are CORRECT differences — the per-asset engine is more accurate.
     const FIRE_AGE_TOLERANCE: Record<PersonaKey, number> = {
-      roos: 3,      // Small portfolio, per-asset Box 3 heffingsvrij has outsized effect
       daan: 10,     // Tiny portfolio, heffingsvrij eliminates all Box 3 for years
       lisa: 15,     // Multiple asset types (eigen_huis, vehicle) — per-asset returns diverge significantly from flat grossReturn
       willem: 15,   // Large diverse portfolio (1.46M) — per-asset returns differ from flat 7%
-      rashid: 5,    // No-budget persona, moderate portfolio
       marijke: 5,   // Pensioen strategy, diverse assets (eigen_huis, investment, physical)
-      ronald: 5,    // Near-retirement, large portfolio with pensioen + beleggingen
-      bas: 15,      // Moderate portfolio (~100K), mixed asset types — per-asset returns diverge significantly from flat grossReturn
-      leo: 10,      // Diverse portfolio, per-asset returns differ from flat rate
-      jochen: 10,   // Varied portfolio, Box 3 and asset-type differences
     }
 
     for (const key of PERSONA_KEYS) {

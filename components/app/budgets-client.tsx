@@ -996,7 +996,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       }
 
       const parents = filteredBudgetData.filter((b) => !b.parent_id)
-      const children = filteredBudgetData.filter((b) => b.parent_id && Number(b.default_limit) > 0)
+      const children = filteredBudgetData.filter((b) => !!b.parent_id)
 
       const tree: BudgetWithChildren[] = parents.map((parent) => ({
         ...parent,

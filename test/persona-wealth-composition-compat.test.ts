@@ -5,7 +5,7 @@
  * for every persona. Checks:
  * - All personas have at least 1 asset (non-empty chart)
  * - Asset types correctly map to WEALTH_GROUPS
- * - Personas with debts (Lisa, Rashid) produce a negative schulden layer
+ * - Personas with debts (Daan, Lisa) produce a negative schulden layer
  * - Marijke (retired, high age) gives valid projection despite short horizon
  * - No NaN or undefined values in any projection
  *
@@ -28,7 +28,7 @@ import type { Debt } from '@/lib/debt-data'
 // ── Helpers ────────────────────────────────────────────────────
 
 /** Convert persona assets to full Asset objects (add missing fields) */
-function toAssets(personaAssets: typeof PERSONAS['roos']['assets']): Asset[] {
+function toAssets(personaAssets: typeof PERSONAS['daan']['assets']): Asset[] {
   return personaAssets.map((a, i) => ({
     id: `test-asset-${i}`,
     user_id: 'test-user',
@@ -77,7 +77,7 @@ function toAssets(personaAssets: typeof PERSONAS['roos']['assets']): Asset[] {
 }
 
 /** Convert persona debts to full Debt objects */
-function toDebts(personaDebts: typeof PERSONAS['roos']['debts']): Debt[] {
+function toDebts(personaDebts: typeof PERSONAS['daan']['debts']): Debt[] {
   return personaDebts.map((d, i) => ({
     id: `test-debt-${i}`,
     user_id: 'test-user',
@@ -273,7 +273,7 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
 
   // Step 3: Personas with mortgage should show a debt layer
   describe('Personas with debts produce a schulden layer', () => {
-    const personasWithDebts: PersonaKey[] = ['roos', 'daan', 'lisa', 'rashid']
+    const personasWithDebts: PersonaKey[] = ['daan', 'lisa']
 
     for (const key of personasWithDebts) {
       it(`${key}: has negative schulden values`, () => {
@@ -294,8 +294,8 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
       })
     }
 
-    // Personas with mortgages specifically (Lisa & Rashid)
-    for (const key of ['lisa', 'rashid'] as PersonaKey[]) {
+    // Personas with mortgages specifically (Lisa)
+    for (const key of ['lisa'] as PersonaKey[]) {
       it(`${key}: mortgage produces significant debt layer`, () => {
         const p = PERSONAS[key]
         const currentAge = ageAtDate(p.profile.date_of_birth)
@@ -388,13 +388,6 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
 
   // Step 6: Document asset type grouping per persona
   describe('Asset type grouping correctness', () => {
-    it('roos: physical + vehicle → overig, retirement → pensioen', () => {
-      const assets = PERSONAS.roos.assets
-      const groups = new Set(assets.map(a => WEALTH_GROUPS[a.asset_type as keyof typeof WEALTH_GROUPS]))
-      expect(groups.has('overig')).toBe(true)
-      expect(groups.has('pensioen')).toBe(true)
-    })
-
     it('daan: investment → beleggingen, retirement → pensioen', () => {
       const assets = PERSONAS.daan.assets
       const groups = new Set(assets.map(a => WEALTH_GROUPS[a.asset_type as keyof typeof WEALTH_GROUPS]))
@@ -593,7 +586,7 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
 
     it('stacked rows from unified match persona debt direction', () => {
       // Personas with debts should have negative schulden
-      for (const key of ['roos', 'daan', 'lisa', 'rashid'] as PersonaKey[]) {
+      for (const key of ['daan', 'lisa'] as PersonaKey[]) {
         const p = PERSONAS[key]
         if (p.debts.length === 0) continue
 

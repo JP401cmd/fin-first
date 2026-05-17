@@ -8,8 +8,8 @@ const CAT = 'onboarding.persona-seed'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const TOTAL_PERSONAS = 6
-const EXPECTED_KEYS: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem', 'rashid', 'marijke']
+const TOTAL_PERSONAS = 4
+const EXPECTED_KEYS: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke']
 
 /** Tables cleaned by deleteAllUserData (ordered by batch) */
 const DELETE_BATCH_0 = [
@@ -54,7 +54,7 @@ const tests: TestCase[] = [
       const noAuthRes = await unauthenticatedFetch('/api/onboarding/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'persona', persona: 'roos' }),
+        body: JSON.stringify({ type: 'persona', persona: 'daan' }),
       })
       assert(
         noAuthRes.status === 401 || noAuthRes.status === 403,
@@ -74,7 +74,7 @@ const tests: TestCase[] = [
       assertEqual(validTypes.length, 1, 'Alleen type "persona" is geldig')
 
       // Test 4: Request body structure
-      const requestBody = { type: 'persona', persona: 'roos' }
+      const requestBody = { type: 'persona', persona: 'daan' }
       assertEqual(requestBody.type, 'persona', 'Request type is "persona"')
       assertIncludes(EXPECTED_KEYS, requestBody.persona as PersonaKey, 'Persona key is geldig')
 
@@ -408,13 +408,13 @@ const tests: TestCase[] = [
         }
       }
 
-      // Verify specific personas that had the bug (events without metadata)
-      // Roos: "Scheiding afgerond" has no metadata
-      const roos = PERSONAS.roos
-      const scheiding = roos.life_events.find((e) => e.name.toLowerCase().includes('scheiding'))
-      if (scheiding) {
-        const meta = scheiding.metadata ?? {}
-        assert(typeof meta === 'object', 'Roos scheiding event: metadata defaults to {}')
+      // Verify events without metadata still resolve to {} via the fallback.
+      // Daan's "Eerste baan gestart" is een goed voorbeeld (geen metadata gedefinieerd).
+      const daan = PERSONAS.daan
+      const eersteBaan = daan.life_events.find((e) => e.name.toLowerCase().includes('eerste baan'))
+      if (eersteBaan) {
+        const meta = eersteBaan.metadata ?? {}
+        assert(typeof meta === 'object', 'Daan eerste-baan event: metadata defaults to {}')
       }
 
       // Also verify is_indexed has a default
@@ -453,11 +453,6 @@ const tests: TestCase[] = [
           `${key}: has ${persona.holdings.length} holdings but no asset with has_holdings_tracking=true`,
         )
       }
-
-      // Verify Roos (no holdings, no tracking) — defaults correctly
-      const roos = PERSONAS.roos
-      const roosTracked = roos.assets.filter(a => a.has_holdings_tracking === true)
-      assertEqual(roosTracked.length, 0, 'Roos: geen tracked assets (geen holdings)')
 
       // Verify seed-persona uses ?? false fallback
       // This ensures assets without explicit has_holdings_tracking get false in DB

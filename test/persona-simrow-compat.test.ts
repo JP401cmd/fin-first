@@ -132,12 +132,12 @@ function assertValidSimRow(row: SimRow, label: string) {
 
 describe('Persona seed data × SimRow compatibility (#356)', () => {
   // Step 1: seed-persona.ts and test-personas.ts don't need changes (SimRow is runtime)
-  it('should have 6 persona keys defined', () => {
-    expect(PERSONA_KEYS).toHaveLength(6)
+  it('should have 4 persona keys defined', () => {
+    expect(PERSONA_KEYS).toHaveLength(4)
+    expect(PERSONA_KEYS).toContain('daan')
     expect(PERSONA_KEYS).toContain('lisa')
+    expect(PERSONA_KEYS).toContain('willem')
     expect(PERSONA_KEYS).toContain('marijke')
-    expect(PERSONA_KEYS).toContain('roos')
-    expect(PERSONA_KEYS).toContain('rashid')
   })
 
   // Run simulation for each persona
@@ -394,24 +394,21 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
     })
 
     it('simulation with negative portfolio (deep debt) works', () => {
-      // Like Roos: negative net worth
-      const params = buildSimParams('roos')
+      // Synthetic negative-net-worth scenario: high debt, expenses > income
       const result = runSimulation(
-        params.currentAge,
-        params.endAge,
-        params.portfolio,
-        params.yearlyExpenses,
-        params.annualSavings,
-        params.grossReturn,
+        38,     // currentAge
+        85,     // endAge
+        -6285,  // negative portfolio
+        38400,  // yearlyExpenses (€3.200/mnd)
+        -4800,  // annualSavings (negative: spending more than income)
+        0.07,
         'nl_box3',
-        params.inflation,
-        params.cashflows,
-        params.strategyConfig,
-        params.wConfig,
+        0.02,
+        [],
       )
 
       for (const row of result.rows) {
-        assertValidSimRow(row, `roos-debt age=${row.age}`)
+        assertValidSimRow(row, `negative-portfolio age=${row.age}`)
       }
     })
 

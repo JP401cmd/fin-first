@@ -31,6 +31,7 @@ import {
   parseHousingStrategy,
   deriveHousingContext,
   getFireEligibleNetWorth,
+  getHousingLifeEvents,
   type HousingStrategyConfig,
   type HousingContext,
 } from '@/lib/housing-strategy'
@@ -519,7 +520,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   const healthScore = computeHealthScoreFromInputs(healthScoreInput, budgetingActive)
 
   // Events, actions, debts, assets
-  const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
+  const realEvents = (eventsResult.data ?? []) as LifeEvent[]
   const actions = (actionsResult.data ?? []) as Action[]
   const debts = (fullDebtsResult.data ?? []) as Debt[]
   const assets = (fullAssetsResult.data ?? []) as Asset[]
@@ -535,6 +536,43 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategy)
   const housingStrategyDismissedAt =
     ((profile as Record<string, unknown>).housing_strategy_dismissed_at as string | null) ?? null
+
+  // ── Virtuele housing-strategy LifeEvents ─────────────────────
+  // Maken downsize/reverse_mortgage zichtbaar op de tijdlijn. Worden door de
+  // bestaande LifeEvent → SimCashflow-pipeline opgepikt voor de simulatie.
+  // Read-only — UI markeert ze via metadata.source = 'housing-strategy'.
+  const currentAgeForHousing = dob ? ageAtDate(dob) : 40
+  const liquidEstimate = Math.max(
+    0,
+    netWorth - (housingContext.eigenHuisValue - housingContext.mortgageBalance),
+  )
+  // Annual savings = monthly_contribution × 12 (aggregaat over alle assets,
+  // of override uit profile). Wordt nog meegegeven als fallback maar de
+  // phase-gate gebruikt nu primair `currentNetCashflowYearly` (income −
+  // expenses) — robuuster wanneer asset-contributions niet zijn ingevuld.
+  const housingOverrideRaw = savingsOverrideResult.error
+    ? null
+    : (savingsOverrideResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override ?? null
+  const housingMonthlyOverride = housingOverrideRaw == null ? null : Number(housingOverrideRaw)
+  const effectiveMonthlyContribForHousing =
+    housingMonthlyOverride != null && housingMonthlyOverride >= 0
+      ? housingMonthlyOverride
+      : monthlyContributions
+  const annualSavingsForHousing = effectiveMonthlyContribForHousing * 12
+  // Phase-detectie: gebruiker zit in opbouw zolang z'n huidige cashflow
+  // (income − expenses) positief is. Komt uit transacties of profile-fallback.
+  const currentNetCashflowYearly = (effectiveMonthlyIncome - effectiveMonthlyExpenses) * 12
+  const housingEvents = getHousingLifeEvents({
+    config: housingStrategy,
+    context: housingContext,
+    currentAge: currentAgeForHousing,
+    endAge: fireStrategy.endAge,
+    yearlyExpenses: yearlyRetirementExpenses,
+    currentLiquidPortfolio: liquidEstimate,
+    annualSavings: annualSavingsForHousing,
+    currentNetCashflowYearly,
+  })
+  const loadedEvents: LifeEvent[] = [...realEvents, ...housingEvents]
 
   // Cumulative impacts
   const impacts = computeCumulativeImpacts(effectiveInput, loadedEvents)

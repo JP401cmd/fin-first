@@ -33,6 +33,11 @@ import {
   type RetirementExpenseMethod,
 } from '@/lib/budget-utils'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { HousingStrategySection } from '@/components/identity/instellingen/housing-strategy-section'
+import {
+  HOUSING_STRATEGY_LABELS,
+  type HousingStrategyConfig,
+} from '@/lib/housing-strategy'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { ArrowLeft, Shield, TrendingUp, Landmark, Settings, Info, Check, CircleDot, Loader2, AlertTriangle, Banknote, Heart, Infinity as InfinityIcon } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -407,9 +412,15 @@ function CompatibilityMatrix({ selectedWithdrawal, activeWithdrawal, activeEnd }
 interface StrategieModalProps {
   open: boolean
   onClose: () => void
+  /** Initiele eigen-woning-strategie voor het header-badge. Het paneel zelf
+   *  laadt/saveert via /api/housing-strategy onafhankelijk. */
+  housingStrategy?: HousingStrategyConfig
 }
 
-export function StrategieModal({ open, onClose }: StrategieModalProps) {
+type StrategyTab = 'eind' | 'onttrekking' | 'woning'
+
+export function StrategieModal({ open, onClose, housingStrategy }: StrategieModalProps) {
+  const [activeTab, setActiveTab] = useState<StrategyTab>('eind')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -880,9 +891,9 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
       <div>
 
         {/* ── Subtitle + active badges ────────────────────────────── */}
-        <header className="mb-6">
+        <header className="mb-4">
           <p className="mt-1 font-sans text-sm text-[var(--ink-3)]">
-            Kies je planningshorizon, eindstrategie en onttrekkingsmethode. De combinatie bepaalt hoe je portefeuille zich ontwikkelt na FIRE.
+            Kies je planningshorizon, eindstrategie, eigen-woning-aanpak en onttrekkingsmethode. De combinatie bepaalt hoe je portefeuille zich ontwikkelt na FIRE.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
@@ -897,8 +908,47 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
                 {STRATEGY_INFO[withdrawalConfig.strategy].label}
               </span>
             </div>
+            {housingStrategy && (
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
+                <span className="font-sans text-[10px] font-medium uppercase tracking-wider text-horizon-500">Eigen woning</span>
+                <span className="font-sans text-xs font-semibold text-horizon-700">
+                  {HOUSING_STRATEGY_LABELS[housingStrategy.mode]}
+                </span>
+              </div>
+            )}
           </div>
         </header>
+
+        {/* ── Tab-strip: 3 strategie-keuzes ──────────────────────── */}
+        <div
+          role="tablist"
+          aria-label="Strategie-keuzes"
+          className="mb-5 flex border-b border-[var(--border-ed)]"
+        >
+          {([
+            { id: 'eind' as const, label: 'Eindstrategie' },
+            { id: 'onttrekking' as const, label: 'Onttrekking' },
+            { id: 'woning' as const, label: 'Eigen woning' },
+          ]).map((tab) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(tab.id)}
+                className={`min-h-[44px] flex-1 px-3 py-2 text-center text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'border-b-[3px] border-horizon-500 bg-horizon-50/40 text-horizon-700'
+                    : 'border-b-[3px] border-transparent text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
 
         {/* ── Strategy warning (columns not loaded) ────────────────── */}
         {strategyWarning && (
@@ -908,6 +958,7 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
         )}
 
         {/* ── End strategy selection (LEIDEND) ─────────────────────── */}
+        {activeTab === 'eind' && (
         <section className="mb-6">
           <div className="card-editorial overflow-hidden">
             <div className="h-[3px] bg-horizon-500" />
@@ -1020,7 +1071,10 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
             </div>
           </div>
         </section>
+        )}
 
+        {activeTab === 'onttrekking' && (
+        <>
         {/* ── Incompatibility warning when current withdrawal + new end strategy clash ── */}
         {(() => {
           const endStrat = localEndStrategy
@@ -1331,30 +1385,6 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
           />
         </section>
 
-        {/* ── Incompatibility warning (when selected combo is incompatible) ── */}
-        {(() => {
-          const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[localEndStrategy]
-          if (!entry || entry.status !== 'incompatible') return null
-          return (
-            <div className="mb-6 flex items-start gap-2.5 rounded-[var(--r)] border-2 border-red-300 bg-red-50 px-4 py-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-              <div>
-                <p className="font-sans text-sm font-semibold text-red-700">
-                  Onverenigbare combinatie
-                </p>
-                <p className="mt-0.5 font-sans text-xs text-red-600">
-                  {entry.explanation}
-                </p>
-                {entry.suggestion && (
-                  <p className="mt-1 font-sans text-xs font-medium text-red-700">
-                    💡 {entry.suggestion}
-                  </p>
-                )}
-              </div>
-            </div>
-          )
-        })()}
-
         {/* ── Strategy explanation cards ──────────────────────── */}
         <section className="mb-6">
           <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
@@ -1454,6 +1484,20 @@ export function StrategieModal({ open, onClose }: StrategieModalProps) {
             })}
           </div>
         </section>
+        </>
+        )}
+
+        {/* ── Eigen-woning-strategie (kapitaal-input) ─────────────── */}
+        {activeTab === 'woning' && (
+        <section className="mb-6">
+          <div className="card-editorial overflow-hidden">
+            <div className="h-[3px] bg-horizon-500" />
+            <div className="px-4 py-3">
+              <HousingStrategySection />
+            </div>
+          </div>
+        </section>
+        )}
 
         {/* ── Secondary link to full settings (guardrail parameters etc.) ── */}
         <Link

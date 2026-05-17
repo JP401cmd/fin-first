@@ -29,7 +29,7 @@ import {
 import {
   BUDGET_TEMPLATES,
   buildTemplateAmounts,
-} from '@/components/onboarding/onboarding-budgets'
+} from '@/lib/budget-templates/onboarding-presets'
 
 const CAT = 'kern.budget-plan-editor'
 

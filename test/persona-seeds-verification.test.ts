@@ -1,9 +1,9 @@
 /**
  * Persona seeds × Unified Projection Engine verification
  *
- * Verifies that all 6 test personas work correctly with the unified
- * projection engine, covering edge cases like negative net worth,
- * heffingsvrij elimination, per-asset returns, and life events.
+ * Verifies that all 4 test personas work correctly with the unified
+ * projection engine, covering edge cases like heffingsvrij elimination,
+ * per-asset returns, and life events.
  *
  * Feature #506
  */
@@ -187,33 +187,6 @@ describe('Persona seeds × Unified Projection verification (#506)', () => {
     }
   })
 
-  // Step 4 — Roos: negative net worth
-  describe('Step 4 — Roos: negative net worth handled correctly', () => {
-    const input = buildUnifiedInputForPersona('roos')
-    const result = runUnifiedProjection(input)
-
-    it('initial net worth is negative', () => {
-      expect(result.rows[0].totalAssets - result.rows[0].totalDebts).toBeLessThan(0)
-    })
-
-    it('all rows have finite values', () => {
-      for (const row of result.rows) assertRowFinite(row, `roos age=${row.age}`)
-    })
-
-    it('engine completes all rows to endAge (no crash on negative netWorth)', () => {
-      expect(result.rows.length).toBeGreaterThan(0)
-      expect(result.rows[result.rows.length - 1].age).toBeGreaterThanOrEqual(input.endAge - 2)
-    })
-
-    it('fireReachable is false or FIRE age is very late', () => {
-      if (result.fireReachable) {
-        expect(result.fireAge!).toBeGreaterThanOrEqual(70)
-      } else {
-        expect(result.fireAge).toBeNull()
-      }
-    })
-  })
-
   // Step 5 — Daan: heffingsvrij eliminates Box 3
   describe('Step 5 — Daan: heffingsvrij eliminates Box 3 completely', () => {
     const input = buildUnifiedInputForPersona('daan')
@@ -340,31 +313,4 @@ describe('Persona seeds × Unified Projection verification (#506)', () => {
     })
   })
 
-  // Step 9 — Rashid: correct FIRE age with per-asset returns
-  describe('Step 9 — Rashid: FIRE age with per-asset returns', () => {
-    const input = buildUnifiedInputForPersona('rashid')
-    const result = runUnifiedProjection(input)
-
-    it('FIRE is reachable', () => {
-      expect(result.fireReachable).toBe(true)
-    })
-
-    it('FIRE age is reasonable (between 45 and 75)', () => {
-      expect(result.fireAge).not.toBeNull()
-      expect(result.fireAge!).toBeGreaterThanOrEqual(45)
-      expect(result.fireAge!).toBeLessThanOrEqual(75)
-    })
-
-    it('per-asset returns are used (not just flat grossReturn)', () => {
-      const row0 = result.rows[0]
-      expect(Object.keys(row0.assetBuckets).length).toBeGreaterThanOrEqual(1)
-      const inv = row0.assetBuckets['investment']
-      if (inv && inv.startValue > 0) {
-        const invAsset = input.assets.find(a => a.asset_type === 'investment')
-        if (invAsset && invAsset.expected_return > 0) {
-          expect(inv.growth).toBeGreaterThan(0)
-        }
-      }
-    })
-  })
 })

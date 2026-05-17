@@ -18,7 +18,7 @@ import {
   BUDGET_TEMPLATES,
   buildTemplateAmounts,
   type BudgetTemplateId,
-} from '@/components/onboarding/onboarding-budgets'
+} from '@/lib/budget-templates/onboarding-presets'
 import {
   computeBudgetPlanDiff,
   countDiff,
@@ -265,7 +265,7 @@ export function BudgetPlanEditorSheet({
         sortOrder,
         interval: 'monthly',
         rolloverType: 'reset',
-        amount: null,
+        amount: 0,
       }
       return [...prev, row]
     })

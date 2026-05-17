@@ -30,93 +30,9 @@ interface ScenarioGroup {
 
 const GROUPS: ScenarioGroup[] = [
   {
-    title: 'De pensioenplanner',
-    persona: 'Ronald Hoekstra',
-    subtitle: 'AOW-leeftijd, pensioengat, onttrekkingsstrategie',
-    icon: Target,
-    accentClass: 'text-horizon-600',
-    accentBgClass: 'bg-horizon-500/10',
-    borderClass: 'border-l-horizon-500',
-    barClass: 'bg-horizon-500',
-    scenarios: [
-      {
-        title: 'Bekijk je AOW-leeftijd en pensioengat',
-        description: 'Ga naar De Horizon en bekijk je pensioenprognose. Vergelijk je verwachte AOW-leeftijd met je gewenste stopmoment.',
-        insight: 'Hoeveel jaar zit er tussen stoppen met werken en je AOW-datum?',
-        href: '/horizon',
-      },
-      {
-        title: 'Haal je eigen huis uit je nettovermogen',
-        description: 'Ga naar De Kern \u2192 Bezittingen en markeer je eigen woning als niet-liquide. Bekijk hoe je nettovermogen er zonder steen uitziet.',
-        insight: 'Hoeveel belegbaar vermogen heb je als je je huis en hypotheek weglaat?',
-        href: '/core',
-      },
-      {
-        title: 'Stel je onttrekkingsstrategie in',
-        description: 'Ga naar Instellingen \u2192 FIRE en kies tussen guardrails, vast percentage of kapitaalbehoud.',
-        insight: 'Welke strategie past bij jouw pensioeninkomen?',
-        href: '/identity/instellingen',
-      },
-      {
-        title: 'Analyseer je passief inkomen',
-        description: 'Bekijk het passief inkomen widget op je dashboard. Klik op het bedrag voor de kassabon.',
-        insight: 'Hoeveel dividend, rente en pensioen ontvang je per maand?',
-        href: '/dashboard',
-      },
-      {
-        title: 'Plan een grote uitgave na pensioen',
-        description: 'Ga naar De Horizon en voeg een levensgebeurtenis toe (bijv. campertrip of verbouwing). Bekijk het effect op je vermogenspad.',
-        insight: 'Kun je die droomreis betalen zonder je pensioeninkomen aan te tasten?',
-        href: '/horizon',
-      },
-    ],
-  },
-  {
-    title: 'De vermogensverdeler',
-    persona: 'Bas Mulder',
-    subtitle: 'Overzicht bezittingen, schulden, allocatie',
-    icon: PiggyBank,
-    accentClass: 'text-kern-600',
-    accentBgClass: 'bg-kern-500/10',
-    borderClass: 'border-l-kern-500',
-    barClass: 'bg-kern-500',
-    scenarios: [
-      {
-        title: 'Bekijk je nettovermogen',
-        description: 'Ga naar De Kern en bekijk je totale vermogen. Klik op het bedrag voor de uitsplitsing.',
-        insight: 'Hoeveel bezit je minus je schulden?',
-        href: '/core',
-      },
-      {
-        title: 'Controleer je vermogensallocatie',
-        description: 'Bekijk je holdings en de verdeling over asset classes (aandelen, obligaties, cash).',
-        insight: 'Is je portefeuille in balans met je risicoprofiel?',
-        href: '/core',
-      },
-      {
-        title: 'Bereken je Box 3 belasting',
-        description: 'Bekijk het Box 3 widget op je dashboard. Klik voor de volledige berekening.',
-        insight: 'Hoeveel belasting betaal je over je vermogen dit jaar?',
-        href: '/dashboard',
-      },
-      {
-        title: 'Voeg een belegging toe',
-        description: 'Ga naar bezittingen en voeg een nieuw fonds of ETF toe met koers en aantal stuks.',
-        insight: 'Hoe verandert je nettovermogen en allocatie?',
-        href: '/core',
-      },
-      {
-        title: 'Vergelijk hypotheek vs. beleggen',
-        description: 'Bekijk je hypotheek naast je beleggingen. Bereken het rendementsverschil.',
-        insight: 'Loont het om extra af te lossen of juist te beleggen?',
-        href: '/dashboard',
-      },
-    ],
-  },
-  {
-    title: 'De budgetteerder',
-    persona: 'Leo Pietersen',
-    subtitle: 'Grip op uitgaven, patronen, abonnementen',
+    title: 'De starter',
+    persona: 'Daan Bakker',
+    subtitle: 'Eerste budget, eerste belegging, eerste spaardoel',
     icon: Wallet,
     accentClass: 'text-wil-600',
     accentBgClass: 'bg-wil-500/10',
@@ -142,29 +58,77 @@ const GROUPS: ScenarioGroup[] = [
         href: '/core/budgets',
       },
       {
+        title: 'Stel je eerste spaardoel in',
+        description: 'Ga naar De Horizon en doorloop de FIRE-setup. Bij de spaardoel-stap kies je tussen een noodfonds, vermogen-overzicht of eerder-stoppen-doel.',
+        insight: 'Welk doel motiveert jou het meest om vol te houden?',
+        href: '/horizon',
+      },
+      {
+        title: 'Voeg je eerste belegging toe',
+        description: 'Ga naar De Kern \u2192 Bezittingen en voeg een fonds of ETF toe met koers en aantal stuks. Begin klein, bijvoorbeeld een indexfonds bij Meesman.',
+        insight: 'Hoe verandert je nettovermogen wanneer je startkapitaal aan het werk zet?',
+        href: '/core',
+      },
+      {
+        title: 'Bekijk je TER op je fondsen',
+        description: 'Open een fonds in je holdings en zoek het TER-veld (Total Expense Ratio). Lage kosten compounden net zo hard als rendement.',
+        insight: 'Wat kost jouw fonds per jaar in procenten en hoeveel scheelt dat over 10 jaar?',
+        href: '/core',
+      },
+    ],
+  },
+  {
+    title: 'De gezinsverdeler',
+    persona: 'Lisa de Groot',
+    subtitle: 'Overzicht bezittingen, schulden, hypotheek vs. beleggen',
+    icon: PiggyBank,
+    accentClass: 'text-kern-600',
+    accentBgClass: 'bg-kern-500/10',
+    borderClass: 'border-l-kern-500',
+    barClass: 'bg-kern-500',
+    scenarios: [
+      {
+        title: 'Bekijk je nettovermogen',
+        description: 'Ga naar De Kern en bekijk je totale vermogen. Klik op het bedrag voor de uitsplitsing.',
+        insight: 'Hoeveel bezit je minus je schulden?',
+        href: '/core',
+      },
+      {
+        title: 'Controleer je vermogensallocatie',
+        description: 'Bekijk je holdings en de verdeling over asset classes (aandelen, obligaties, cash). Bij 13 verschillende bezittingen kan de mix snel afwijken van je target.',
+        insight: 'Is je portefeuille in balans met je risicoprofiel?',
+        href: '/core',
+      },
+      {
+        title: 'Bereken je Box 3 belasting',
+        description: 'Bekijk het Box 3 widget op je dashboard. Klik voor de volledige berekening per asset-categorie.',
+        insight: 'Hoeveel belasting betaal je over je vermogen dit jaar?',
+        href: '/dashboard',
+      },
+      {
         title: 'Onderzoek een te hoog budget',
         description: 'Zoek een budget dat over de limiet zit. Klik door naar de transacties en bekijk de tegenpartij-analyse: welke winkels of bedrijven drijven de kosten op?',
         insight: 'Welke tegenpartij is verantwoordelijk voor het grootste deel van de overschrijding?',
         href: '/core/budgets',
       },
       {
-        title: 'Dashboard aanpassen en favorieten',
-        description: 'Bewerk twee budgetten en markeer ze als favoriet via het hartje. Ga daarna naar je dashboard en bekijk of je favorieten zichtbaar zijn.',
-        insight: 'Heb je snel toegang tot de budgetten die er het meest toe doen?',
-        href: '/core/budgets',
+        title: 'Vergelijk hypotheek vs. beleggen',
+        description: 'Open je hypotheek en bekijk de aflossingsstrategie. Vergelijk extra aflossen met inleggen in je indexfonds.',
+        insight: 'Loont het om extra af te lossen of levert beleggen netto meer op?',
+        href: '/core/debts/mortgage',
       },
       {
-        title: 'Maak een budget rapportage',
-        description: 'Ga naar Rapportages en genereer een maandoverzicht van de huidige maand. De AI analyseert je budgetprestaties en highlights.',
-        insight: 'Welke budgetten springen eruit en waar liggen bespaarkansen?',
+        title: 'Bekijk je persoonlijk-plan rapport',
+        description: 'Ga naar Rapportages en genereer een persoonlijk plan. De AI analyseert je vermogensopbouw, schulden en lange-termijn pad.',
+        insight: 'Welke acties heeft de AI ge\u00efdentificeerd om je plan te versnellen?',
         href: '/rapportages',
       },
     ],
   },
   {
-    title: 'De FIRE-strijder',
-    persona: 'Jochen Brouwer',
-    subtitle: 'Spaarquote, rendement, FIRE-datum',
+    title: 'Bijna binnen',
+    persona: 'Willem Jansen',
+    subtitle: 'FIRE-parameters, Monte Carlo, onttrekkingsstrategie',
     icon: TrendingUp,
     accentClass: 'text-horizon-600',
     accentBgClass: 'bg-horizon-500/10',
@@ -173,33 +137,87 @@ const GROUPS: ScenarioGroup[] = [
     scenarios: [
       {
         title: 'Bereken je spaarquote',
-        description: 'Ga naar De Kern en vergelijk je inkomen met je uitgaven.',
+        description: 'Ga naar De Kern en vergelijk je inkomen met je uitgaven. De spaarquote is de motor van je FIRE-datum.',
         insight: 'Wat is je maandelijkse spaarquote in procenten?',
         href: '/core',
       },
       {
-        title: 'Draai een Monte Carlo simulatie',
-        description: 'Ga naar De Horizon en bekijk de backtesting score. Deze simuleert duizenden scenario\u2019s.',
-        insight: 'Hoe groot is de kans dat je vermogen toereikend is?',
+        title: 'Draai een Monte Carlo backtest',
+        description: 'Ga naar De Horizon en bekijk de backtesting score. Deze simuleert duizenden historische scenario\u2019s om je plan te stress-testen.',
+        insight: 'Hoe groot is de kans dat je vermogen toereikend is in een slecht decennium?',
         href: '/horizon',
       },
       {
         title: 'Optimaliseer je fondskosten',
-        description: 'Bekijk de TER (Total Expense Ratio) van je fondsen in je holdings overzicht.',
-        insight: 'Welk fonds is het duurst en hoeveel scheelt overstappen?',
+        description: 'Bekijk de TER van VWRL en je andere ETF\u2019s in je holdings overzicht. Bij grote portefeuilles tikken kosten zwaar door.',
+        insight: 'Welk fonds is het duurst en hoeveel scheelt overstappen op jaarbasis?',
         href: '/core',
       },
       {
         title: 'Stel je FIRE-parameters in',
-        description: 'Ga naar Instellingen \u2192 FIRE en pas je verwacht rendement en inflatie aan.',
+        description: 'Ga naar Instellingen \u2192 FIRE en pas je verwacht rendement en inflatie aan. Kleine aanpassingen verschuiven je FIRE-datum jaren.',
         insight: 'Hoe verandert je FIRE-datum bij andere aannames?',
         href: '/identity/instellingen',
       },
       {
         title: 'Plan je Coast FIRE',
-        description: 'Bekijk de vrijheidsmijlpalen widget. Coast FIRE is het punt waarop je kunt stoppen met inleggen.',
+        description: 'Bekijk de vrijheidsmijlpalen widget. Coast FIRE is het punt waarop je bestaand vermogen alleen al genoeg compoundt tot pensioen.',
         insight: 'Bij welk vermogen hoef je niet meer bij te leggen?',
         href: '/dashboard',
+      },
+      {
+        title: 'Stel je onttrekkingsstrategie in',
+        description: 'Ga naar Instellingen \u2192 FIRE en kies tussen guardrails, vast percentage of kapitaalbehoud. Dit bepaalt hoe je vermogen tijdens pensioen wordt verbruikt.',
+        insight: 'Welke strategie past bij jouw risicoprofiel en gewenste pensioeninkomen?',
+        href: '/identity/instellingen',
+      },
+    ],
+  },
+  {
+    title: 'De gepensioneerde',
+    persona: 'Marijke Vermeer',
+    subtitle: 'AOW + ABP-pensioen, decumulatie, legacy-planning',
+    icon: Target,
+    accentClass: 'text-horizon-600',
+    accentBgClass: 'bg-horizon-500/10',
+    borderClass: 'border-l-horizon-500',
+    barClass: 'bg-horizon-500',
+    scenarios: [
+      {
+        title: 'Bekijk je AOW + ABP-pensioen + lijfrente',
+        description: 'Ga naar De Horizon en open je levensgebeurtenissen. AOW, ABP-pensioen en lijfrente vormen samen je gegarandeerde inkomen.',
+        insight: 'Hoeveel maandelijks inkomen is gedekt v\u00f3\u00f3rdat je je beleggingen aanspreekt?',
+        href: '/horizon',
+      },
+      {
+        title: 'Analyseer je passief inkomen',
+        description: 'Bekijk het passief inkomen widget op je dashboard. Klik op het bedrag voor de kassabon.',
+        insight: 'Hoeveel dividend, rente en pensioen ontvang je per maand?',
+        href: '/dashboard',
+      },
+      {
+        title: 'Plan een grote uitgave na pensioen',
+        description: 'Ga naar De Horizon en voeg een levensgebeurtenis toe (bijv. wereldcruise of verbouwing badkamer). Bekijk het effect op je vermogenspad.',
+        insight: 'Kun je die droomreis betalen zonder je pensioeninkomen aan te tasten?',
+        href: '/horizon',
+      },
+      {
+        title: 'Stel je onttrekkingsstrategie in',
+        description: 'Ga naar Instellingen \u2192 FIRE en kies tussen kapitaalbehoud (legacy nalaten) of guardrails (flexibel onttrekken). Dit bepaalt wat er overblijft voor de kinderen.',
+        insight: 'Welke balans tussen genieten en nalaten past bij jou?',
+        href: '/identity/instellingen',
+      },
+      {
+        title: 'Markeer eigen woning als niet-liquide',
+        description: 'Ga naar De Kern \u2192 Bezittingen en markeer je eigen woning als niet-liquide. Bekijk hoe je belegbaar vermogen er zonder steen uitziet.',
+        insight: 'Hoeveel belegbaar vermogen heb je als je je huis en hypotheek weglaat?',
+        href: '/core',
+      },
+      {
+        title: 'Plan stacaravan verkopen',
+        description: 'Open de levensgebeurtenis "Stacaravan verkopen" in De Horizon. Bekijk hoe het verkoopmoment je vermogenspad en cashflow be\u00efnvloedt.',
+        insight: 'Wanneer is het beste moment om de stacaravan om te zetten in liquide vermogen?',
+        href: '/horizon',
       },
     ],
   },
@@ -235,6 +253,18 @@ const GENERAL_SCENARIOS: Scenario[] = [
     description: 'Ga naar Identiteit \u2192 Instellingen \u2192 Weergave en pas je moduleKleuren en lettertype aan. Bekijk hoe de app er met jouw keuzes uitziet.',
     insight: 'Voelt de app meer \u201cvan jou\u201d met je eigen kleuren en typografie?',
     href: '/identity/instellingen',
+  },
+  {
+    title: 'Probeer \u2318K command-palette',
+    description: 'Druk op \u2318K (Mac) of Ctrl+K (Windows) om de command-palette te openen. Zoek pagina\u2019s, entiteiten en acties in \u00e9\u00e9n veld.',
+    insight: 'Hoeveel sneller navigeer je door de app met de palette dan met de sidebar?',
+    href: '/dashboard',
+  },
+  {
+    title: 'Verken het stappenplan in Beheer',
+    description: 'Ga naar Beheer en open het stappenplan. Hier zie je hoe modules samenhangen en welke volgende stappen logisch zijn na onboarding.',
+    insight: 'Welke modules zijn voor jouw situatie de volgende logische stap?',
+    href: '/beheer',
   },
 ]
 
@@ -308,7 +338,7 @@ export default function TestScenariosPage() {
         </p>
         <div className="mt-5 flex items-center gap-6 text-xs text-[var(--ink-4)]">
           <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">4</span> gebruikersgroepen</span>
-          <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">26</span> opdrachten</span>
+          <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">31</span> opdrachten</span>
           <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-2)]">5</span> modules</span>
         </div>
 

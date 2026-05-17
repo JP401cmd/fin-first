@@ -1,0 +1,2389 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TriFinity — Vrijheid door inzicht en grip</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Editorial palet — FT-geïnspireerd, warm-zalm */
+    --bg: #f5efe2;
+    --paper: #fbf7ec;
+    --subtle: #f3ead9;
+    --border-ed: #e3dac8;
+    --border-md: #ccc1aa;
+    --ink: #1a1916;
+    --ink-2: #4a4840;
+    --ink-3: #888070;
+    --ink-4: #bbb8b0;
+
+    /* Module-kleuren */
+    --kern: #6b4339;
+    --kern-light: #f0e8e5;
+    --kern-soft: #d4b8b0;
+    --wil: #3d3048;
+    --wil-light: #ebe7ef;
+    --wil-soft: #b0a5be;
+    --horizon: #c4a06b;
+    --horizon-light: #f7f0e4;
+    --horizon-soft: #e0c89a;
+
+    /* Status-kleuren */
+    --good: #2d6a4f;
+    --good-light: #d8ebde;
+    --warn: #b8860b;
+    --warn-light: #f5e9c8;
+    --bad: #8b3a3a;
+    --bad-light: #ebd5d5;
+
+    --shadow-s: 0 1px 3px rgba(26,25,22,.05);
+    --shadow-m: 0 2px 10px rgba(26,25,22,.07), 0 1px 3px rgba(26,25,22,.04);
+    --shadow-l: 0 4px 24px rgba(26,25,22,.09), 0 1px 4px rgba(26,25,22,.05);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.55;
+    font-size: 17px;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .editorial {
+    font-family: 'Fraunces', 'Georgia', serif;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Nav */
+  .nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(245, 239, 226, 0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-ed);
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: padding 0.3s;
+  }
+  .nav-logo {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+  .nav-logo span { color: var(--horizon); }
+  .nav-links {
+    display: flex;
+    gap: 28px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .nav-links a {
+    color: var(--ink-2);
+    text-decoration: none;
+    transition: color 0.2s;
+    cursor: pointer;
+  }
+  .nav-links a:hover { color: var(--ink); }
+  @media (max-width: 768px) {
+    .nav-links { display: none; }
+  }
+
+  /* Sections */
+  section {
+    padding: 120px 32px;
+    max-width: 1280px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .section-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-3);
+    margin-bottom: 24px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--ink-3);
+  }
+  .section-title {
+    font-size: clamp(36px, 5vw, 64px);
+    margin-bottom: 24px;
+    max-width: 900px;
+  }
+  .section-lead {
+    font-size: 20px;
+    color: var(--ink-2);
+    max-width: 720px;
+    line-height: 1.5;
+    margin-bottom: 64px;
+  }
+
+  /* Hero */
+  .hero {
+    min-height: 100vh;
+    padding-top: 140px;
+    padding-bottom: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+  .hero-content { max-width: 980px; }
+  .hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: var(--paper);
+    border: 1px solid var(--border-ed);
+    border-radius: 100px;
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-bottom: 32px;
+    font-weight: 500;
+  }
+  .hero-kicker .dot {
+    width: 6px;
+    height: 6px;
+    background: var(--horizon);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+  .hero-title {
+    font-size: clamp(48px, 9vw, 120px);
+    font-weight: 400;
+    line-height: 0.95;
+    margin-bottom: 32px;
+    letter-spacing: -0.04em;
+  }
+  .hero-title em {
+    font-style: italic;
+    color: var(--horizon);
+    font-weight: 500;
+  }
+  .hero-sub {
+    font-size: clamp(20px, 2.4vw, 28px);
+    color: var(--ink-2);
+    max-width: 780px;
+    line-height: 1.4;
+    margin-bottom: 56px;
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+  }
+  .hero-cta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 28px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s;
+    letter-spacing: 0.01em;
+  }
+  .btn-primary {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .btn-primary:hover {
+    background: var(--kern);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-l);
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--border-md);
+  }
+  .btn-secondary:hover {
+    background: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    margin-top: 96px;
+    padding-top: 48px;
+    border-top: 1px solid var(--border-ed);
+  }
+  .hero-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .hero-stat-num {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(32px, 4vw, 48px);
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .hero-stat-num em {
+    font-style: italic;
+    color: var(--horizon);
+  }
+  .hero-stat-label {
+    font-size: 13px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  @media (max-width: 768px) {
+    .hero-stats { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* Het probleem */
+  .problem-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-bottom: 64px;
+  }
+  .problem-card {
+    background: var(--paper);
+    border: 1px solid var(--border-ed);
+    padding: 36px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .problem-card:hover {
+    border-color: var(--border-md);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-l);
+  }
+  .problem-card-num {
+    position: absolute;
+    top: 24px;
+    right: 28px;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 48px;
+    color: var(--horizon-soft);
+    line-height: 1;
+  }
+  .problem-card h3 {
+    font-size: 24px;
+    margin-bottom: 12px;
+    padding-right: 60px;
+  }
+  .problem-card p {
+    color: var(--ink-2);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .problem-card .quote {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border-md);
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+  @media (max-width: 768px) {
+    .problem-grid { grid-template-columns: 1fr; }
+  }
+
+  /* De 4 hefbomen — interactive */
+  .hefbomen-section {
+    background: var(--paper);
+    margin: 0 -32px;
+    padding: 120px 32px;
+    border-top: 1px solid var(--border-ed);
+    border-bottom: 1px solid var(--border-ed);
+  }
+  .hefbomen-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .hefbomen-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+  .hefboom {
+    background: var(--bg);
+    border: 1px solid var(--border-ed);
+    padding: 32px 24px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .hefboom::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s;
+  }
+  .hefboom.active::before,
+  .hefboom:hover::before { transform: scaleX(1); }
+  .hefboom.active {
+    background: var(--paper);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-l);
+  }
+  .hefboom-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    color: var(--accent);
+  }
+  .hefboom-icon svg { width: 22px; height: 22px; }
+  .hefboom h4 {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .hefboom-status {
+    font-size: 13px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .hefboom-status .indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--good);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .hefboom.warn .hefboom-status .indicator { background: var(--warn); }
+  .hefboom.bad .hefboom-status .indicator { background: var(--bad); }
+
+  .hefboom-detail {
+    background: var(--bg);
+    border: 1px solid var(--border-ed);
+    padding: 40px;
+    min-height: 200px;
+  }
+  .hefboom-detail h3 {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+  .hefboom-detail p {
+    color: var(--ink-2);
+    margin-bottom: 16px;
+    max-width: 700px;
+  }
+  .hefboom-detail .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .hefboom-detail .chip {
+    padding: 6px 14px;
+    background: var(--paper);
+    border: 1px solid var(--border-ed);
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+
+  @media (max-width: 768px) {
+    .hefbomen-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* De reis — 4 stappen */
+  .journey {
+    position: relative;
+  }
+  .journey-track {
+    position: relative;
+    padding: 40px 0;
+  }
+  .journey-track::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    right: 5%;
+    height: 1px;
+    background: var(--border-md);
+    z-index: 0;
+  }
+  .journey-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    position: relative;
+    z-index: 1;
+  }
+  .journey-step {
+    background: var(--bg);
+    border: 1px solid var(--border-ed);
+    padding: 32px 24px;
+    text-align: center;
+    transition: all 0.3s;
+    position: relative;
+  }
+  .journey-step:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-l);
+    border-color: var(--horizon);
+  }
+  .journey-step-num {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin: -56px auto 16px;
+    box-shadow: 0 0 0 8px var(--bg);
+  }
+  .journey-step h4 {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .journey-step p {
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .journey-step .time {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border-md);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--horizon);
+    letter-spacing: 0.05em;
+  }
+  @media (max-width: 768px) {
+    .journey-track::before { display: none; }
+    .journey-steps { grid-template-columns: 1fr; gap: 60px; }
+  }
+
+  /* Doelgroep — 3 niveaus */
+  .persona-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 48px;
+  }
+  .persona {
+    background: var(--paper);
+    border: 1px solid var(--border-ed);
+    padding: 40px 32px;
+    position: relative;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  .persona:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-l);
+  }
+  .persona-letter {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 96px;
+    line-height: 1;
+    color: var(--accent-soft);
+    position: absolute;
+    top: 20px;
+    right: 32px;
+    font-weight: 300;
+    opacity: 0.6;
+  }
+  .persona-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 20px;
+    font-weight: 500;
+  }
+  .persona h3 {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .persona .archetype {
+    color: var(--ink-3);
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    margin-bottom: 24px;
+  }
+  .persona-list {
+    list-style: none;
+    margin-top: 24px;
+  }
+  .persona-list li {
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--border-ed);
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+  }
+  .persona-list li:last-child { border-bottom: none; }
+  .persona-list .key { color: var(--ink-3); }
+  .persona-list .val { color: var(--ink); font-weight: 500; }
+  .persona-aha {
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    color: var(--ink-2);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .persona-aha::before {
+    content: '"';
+    font-size: 32px;
+    color: var(--accent);
+    vertical-align: -10px;
+    margin-right: 4px;
+  }
+
+  .persona.a { --accent: var(--kern); --accent-light: var(--kern-light); --accent-soft: var(--kern-soft); }
+  .persona.b { --accent: var(--wil); --accent-light: var(--wil-light); --accent-soft: var(--wil-soft); }
+  .persona.c { --accent: var(--horizon); --accent-light: var(--horizon-light); --accent-soft: var(--horizon-soft); }
+
+  @media (max-width: 900px) {
+    .persona-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Feature showcase met mock-ups */
+  .feature-block {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 80px;
+    align-items: center;
+    margin-bottom: 120px;
+  }
+  .feature-block.reverse {
+    grid-template-columns: 1.2fr 1fr;
+  }
+  .feature-block.reverse .feature-content { order: 2; }
+  .feature-block.reverse .feature-mock { order: 1; }
+  .feature-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: var(--paper);
+    border: 1px solid var(--border-ed);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-2);
+    margin-bottom: 24px;
+    font-weight: 500;
+  }
+  .feature-tag .num { color: var(--horizon); font-family: 'JetBrains Mono', monospace; }
+  .feature-content h3 {
+    font-size: clamp(32px, 4vw, 48px);
+    margin-bottom: 20px;
+    line-height: 1.1;
+  }
+  .feature-content > p {
+    color: var(--ink-2);
+    font-size: 18px;
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+  .feature-bullets {
+    list-style: none;
+    margin-top: 24px;
+  }
+  .feature-bullets li {
+    padding: 12px 0;
+    padding-left: 32px;
+    position: relative;
+    color: var(--ink-2);
+    border-bottom: 1px dotted var(--border-ed);
+  }
+  .feature-bullets li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--horizon);
+    font-weight: 600;
+  }
+  .feature-bullets li strong { color: var(--ink); }
+
+  @media (max-width: 900px) {
+    .feature-block, .feature-block.reverse {
+      grid-template-columns: 1fr;
+      gap: 40px;
+    }
+    .feature-block.reverse .feature-content { order: 1; }
+    .feature-block.reverse .feature-mock { order: 2; }
+  }
+
+  /* Mockup — Gezondheidsscore */
+  .mock-app {
+    background: var(--paper);
+    border: 1px solid var(--border-ed);
+    padding: 32px;
+    box-shadow: var(--shadow-l);
+    border-radius: 4px;
+    position: relative;
+  }
+  .mock-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-ed);
+    margin-bottom: 24px;
+  }
+  .mock-header-title {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .mock-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .mock-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-md);
+  }
+
+  /* Score gauge */
+  .score-wrap {
+    text-align: center;
+    padding: 24px 0;
+  }
+  .score-gauge {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    margin: 0 auto 24px;
+  }
+  .score-gauge svg {
+    transform: rotate(-90deg);
+    width: 100%;
+    height: 100%;
+  }
+  .score-bg-ring { fill: none; stroke: var(--border-ed); stroke-width: 12; }
+  .score-ring {
+    fill: none;
+    stroke: var(--good);
+    stroke-width: 12;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .score-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .score-num {
+    font-family: 'Fraunces', serif;
+    font-size: 72px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  .score-label {
+    font-size: 12px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-top: 4px;
+  }
+  .score-status {
+    display: inline-block;
+    padding: 4px 14px;
+    background: var(--good-light);
+    color: var(--good);
+    font-size: 13px;
+    margin-top: 8px;
+    font-weight: 500;
+  }
+  .score-breakdown {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    margin-top: 24px;
+  }
+  .score-pill {
+    background: var(--bg);
+    border: 1px solid var(--border-ed);
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .score-pill-bar {
+    height: 4px;
+    background: var(--border-ed);
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .score-pill-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 1.2s;
+  }
+  .score-pill-val {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .score-pill-name {
+    font-size: 10px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+  }
+
+  /* Tijdslijn mockup */
+  .timeline-mock {
+    height: 320px;
+    padding: 24px 0;
+    position: relative;
+  }
+  .timeline-svg {
+    width: 100%;
+    height: 100%;
+  }
+  .timeline-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-ed);
+    flex-wrap: wrap;
+  }
+  .timeline-event {
+    padding: 6px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border-ed);
+    font-size: 12px;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .timeline-event:hover {
+    background: var(--horizon-light);
+    border-color: var(--horizon);
+  }
+  .timeline-event.active {
+    background: var(--horizon);
+    color: var(--bg);
+    border-color: var(--horizon);
+  }
+  .timeline-event .icon { font-size: 14px; }
+
+  /* Kompas mockup */
+  .compass-mock {
+    text-align: center;
+    padding: 20px;
+  }
+  .compass-ring {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    max-width: 360px;
+    margin: 0 auto;
+  }
+  .compass-item {
+    background: var(--bg);
+    border: 1px solid var(--border-ed);
+    padding: 20px 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .compass-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-m);
+  }
+  .compass-item .icon {
+    width: 32px;
+    height: 32px;
+    background: var(--accent-light);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+  .compass-item .name {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+  .compass-item .val {
+    font-size: 13px;
+    color: var(--ink-3);
+  }
+  .compass-item .dot {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .compass-item.good .dot { background: var(--good); }
+  .compass-item.warn .dot { background: var(--warn); }
+  .compass-item.bad .dot { background: var(--bad); }
+
+  /* Briefing mockup */
+  .briefing-mock {
+    padding: 8px 0;
+  }
+  .briefing-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+  .briefing-title {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    margin-bottom: 16px;
+    line-height: 1.25;
+  }
+  .briefing-text {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink-2);
+    margin-bottom: 20px;
+  }
+  .briefing-text strong { color: var(--ink); font-weight: 600; }
+  .briefing-action {
+    margin-top: 24px;
+    padding: 16px 20px;
+    background: var(--horizon-light);
+    border-left: 3px solid var(--horizon);
+  }
+  .briefing-action .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--horizon);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .briefing-action .text {
+    color: var(--ink);
+    font-size: 15px;
+    margin-bottom: 12px;
+  }
+  .briefing-action .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .mini-btn {
+    padding: 6px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border-md);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mini-btn.primary {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+  .mini-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Marktanalyse */
+  .market-section {
+    background: var(--ink);
+    color: var(--bg);
+    margin: 0 -32px;
+    padding: 120px 32px;
+  }
+  .market-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .market-section .section-eyebrow { color: var(--ink-4); }
+  .market-section .section-eyebrow::before { background: var(--ink-4); }
+  .market-section .section-title { color: var(--bg); }
+  .market-section .section-lead { color: var(--ink-4); }
+
+  .competitor-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 64px;
+  }
+  .competitor {
+    background: rgba(245, 239, 226, 0.05);
+    border: 1px solid rgba(245, 239, 226, 0.1);
+    padding: 24px;
+    transition: all 0.3s;
+  }
+  .competitor:hover {
+    background: rgba(245, 239, 226, 0.08);
+    border-color: var(--horizon);
+  }
+  .competitor h4 {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .competitor .region {
+    font-size: 11px;
+    color: var(--horizon);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+  .competitor p {
+    font-size: 13px;
+    color: var(--ink-4);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .competitor .lesson {
+    padding-top: 12px;
+    border-top: 1px dotted rgba(245, 239, 226, 0.15);
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--horizon-soft);
+  }
+  @media (max-width: 900px) {
+    .competitor-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .competitor-grid { grid-template-columns: 1fr; }
+  }
+
+  .market-positioning {
+    margin-top: 80px;
+    padding: 48px;
+    background: rgba(245, 239, 226, 0.05);
+    border-left: 3px solid var(--horizon);
+  }
+  .market-positioning h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    margin-bottom: 24px;
+    color: var(--bg);
+    line-height: 1.2;
+  }
+  .market-positioning h3 em {
+    font-style: italic;
+    color: var(--horizon);
+  }
+  .market-positioning p {
+    font-size: 18px;
+    color: var(--ink-4);
+    max-width: 800px;
+    line-height: 1.6;
+  }
+
+  /* Roadmap */
+  .roadmap-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin-top: 48px;
+  }
+  .tier {
+    background: var(--paper);
+    border: 1px solid var(--border-ed);
+    padding: 40px 32px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .tier:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-l);
+  }
+  .tier-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  .tier h3 {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .tier .timing {
+    font-size: 13px;
+    color: var(--ink-3);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 20px;
+  }
+  .tier > p {
+    color: var(--ink-2);
+    margin-bottom: 24px;
+    font-size: 15px;
+  }
+  .tier-features {
+    list-style: none;
+  }
+  .tier-features li {
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--border-ed);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  .tier-features li:last-child { border-bottom: none; }
+  .tier-features .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+    margin-top: 2px;
+    min-width: 24px;
+  }
+
+  .tier.t1 { --accent: var(--kern); }
+  .tier.t2 { --accent: var(--wil); }
+  .tier.t3 { --accent: var(--horizon); }
+
+  @media (max-width: 900px) {
+    .roadmap-grid { grid-template-columns: 1fr; }
+  }
+
+  /* End-to-end scenario */
+  .scenario-section {
+    background: var(--paper);
+    margin: 0 -32px;
+    padding: 120px 32px;
+    border-top: 1px solid var(--border-ed);
+    border-bottom: 1px solid var(--border-ed);
+  }
+  .scenario-inner {
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  .scenario-list {
+    margin-top: 48px;
+    counter-reset: step;
+    list-style: none;
+  }
+  .scenario-item {
+    padding: 32px 0;
+    border-bottom: 1px solid var(--border-ed);
+    display: grid;
+    grid-template-columns: 60px 1fr 120px;
+    gap: 24px;
+    align-items: start;
+  }
+  .scenario-item:last-child { border-bottom: none; }
+  .scenario-item .num {
+    counter-increment: step;
+    font-family: 'Fraunces', serif;
+    font-size: 36px;
+    font-weight: 400;
+    color: var(--horizon);
+    line-height: 1;
+  }
+  .scenario-item .num::before { content: counter(step, decimal-leading-zero); }
+  .scenario-item h4 {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .scenario-item p {
+    color: var(--ink-2);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .scenario-item .time {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-3);
+    background: var(--bg);
+    padding: 6px 12px;
+    border: 1px solid var(--border-ed);
+    align-self: start;
+  }
+  @media (max-width: 768px) {
+    .scenario-item {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .scenario-item .time { text-align: left; justify-self: start; }
+  }
+
+  /* Metrics */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 48px;
+  }
+  .metric-card {
+    background: var(--paper);
+    border: 1px solid var(--border-ed);
+    padding: 32px 28px;
+    transition: all 0.3s;
+  }
+  .metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-m);
+  }
+  .metric-card .label {
+    font-size: 12px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+  .metric-card .target {
+    font-family: 'Fraunces', serif;
+    font-size: 36px;
+    color: var(--ink);
+    margin-bottom: 8px;
+    line-height: 1;
+    font-weight: 500;
+  }
+  .metric-card .target em {
+    font-style: italic;
+    color: var(--horizon);
+  }
+  .metric-card p {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.5;
+    margin-top: 12px;
+  }
+  @media (max-width: 768px) {
+    .metrics-grid { grid-template-columns: 1fr; }
+  }
+
+  /* CTA / Slot */
+  .cta-section {
+    text-align: center;
+    padding: 160px 32px;
+    background: linear-gradient(180deg, var(--bg) 0%, var(--horizon-light) 100%);
+    border-top: 1px solid var(--border-ed);
+  }
+  .cta-section h2 {
+    font-size: clamp(48px, 7vw, 96px);
+    max-width: 900px;
+    margin: 0 auto 32px;
+    line-height: 1;
+  }
+  .cta-section h2 em {
+    font-style: italic;
+    color: var(--horizon);
+  }
+  .cta-section p {
+    font-size: 20px;
+    color: var(--ink-2);
+    max-width: 680px;
+    margin: 0 auto 48px;
+    line-height: 1.5;
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+  }
+  .cta-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  footer {
+    background: var(--ink);
+    color: var(--ink-4);
+    padding: 48px 32px;
+    text-align: center;
+    font-size: 13px;
+  }
+  footer strong {
+    color: var(--bg);
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+  }
+
+  /* Animation utilities */
+  .fade-up {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.8s, transform 0.8s;
+  }
+  .fade-up.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Quote bar */
+  .promise-bar {
+    background: var(--ink);
+    color: var(--bg);
+    padding: 80px 32px;
+    margin: 0 -32px;
+    text-align: center;
+  }
+  .promise-bar blockquote {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(28px, 4vw, 48px);
+    font-weight: 300;
+    max-width: 900px;
+    margin: 0 auto;
+    line-height: 1.3;
+    font-style: italic;
+  }
+  .promise-bar blockquote em {
+    color: var(--horizon);
+    font-weight: 500;
+    font-style: normal;
+  }
+  .promise-bar .attribution {
+    margin-top: 32px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink-4);
+    font-style: normal;
+  }
+
+  /* Calculator interactive */
+  .calc-section {
+    margin: 48px 0;
+    background: var(--paper);
+    padding: 40px;
+    border: 1px solid var(--border-ed);
+  }
+  .calc-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+  .calc-sub {
+    font-size: 14px;
+    color: var(--ink-3);
+    margin-bottom: 24px;
+  }
+  .calc-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .calc-row label {
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  .calc-row input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border-ed);
+    height: 4px;
+    border-radius: 2px;
+    outline: none;
+  }
+  .calc-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--horizon);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+  .calc-row input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--horizon);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+  .calc-row .val-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--ink);
+    min-width: 100px;
+    text-align: right;
+  }
+  .calc-result {
+    margin-top: 24px;
+    padding: 24px;
+    background: var(--bg);
+    border-left: 3px solid var(--horizon);
+  }
+  .calc-result-label {
+    font-size: 12px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  .calc-result-value {
+    font-family: 'Fraunces', serif;
+    font-size: 36px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .calc-result-value em {
+    font-style: italic;
+    color: var(--horizon);
+  }
+  .calc-result-sub {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-logo">tri<span>finity</span></div>
+  <div class="nav-links">
+    <a onclick="document.getElementById('belofte').scrollIntoView({behavior:'smooth'})">Belofte</a>
+    <a onclick="document.getElementById('hefbomen').scrollIntoView({behavior:'smooth'})">Hefbomen</a>
+    <a onclick="document.getElementById('reis').scrollIntoView({behavior:'smooth'})">De reis</a>
+    <a onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">Features</a>
+    <a onclick="document.getElementById('roadmap').scrollIntoView({behavior:'smooth'})">Roadmap</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-content fade-up">
+    <div class="hero-kicker"><span class="dot"></span> Marketing & sales · Mei 2026</div>
+    <h1 class="hero-title">
+      Vrijheid<br>door <em>inzicht</em><br>en grip.
+    </h1>
+    <p class="hero-sub">
+      Eén plek waar je je financiële situatie registreert, in één blik begrijpt waar je staat, persoonlijke tips ontvangt, en je toekomst kunt zien én bijsturen — voor de Nederlandse volwassene, in gewone taal.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" onclick="document.getElementById('belofte').scrollIntoView({behavior:'smooth'})">
+        Ontdek de belofte
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+      </a>
+      <a class="btn btn-secondary" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">
+        Bekijk de features
+      </a>
+    </div>
+  </div>
+
+  <div class="hero-stats fade-up">
+    <div class="hero-stat">
+      <div class="hero-stat-num"><em>4</em></div>
+      <div class="hero-stat-label">Hefbomen voor grip</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num"><em>5</em><span style="font-size:0.6em">min</span></div>
+      <div class="hero-stat-label">Tot eerste inzicht</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num"><em>100</em></div>
+      <div class="hero-stat-label">Score, één getal</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num"><em>0</em></div>
+      <div class="hero-stat-label">FIRE-jargon</div>
+    </div>
+  </div>
+</section>
+
+<!-- Promise bar -->
+<div class="promise-bar">
+  <blockquote>
+    "Vrijheid door met <em>inzicht en grip</em> keuzes te kunnen maken."
+    <div class="attribution">— De kernbelofte van TriFinity</div>
+  </blockquote>
+</div>
+
+<!-- De belofte uitgelegd -->
+<section id="belofte">
+  <div class="section-eyebrow fade-up">De belofte</div>
+  <h2 class="section-title fade-up">Van overdaad naar gerichte vrijheid.</h2>
+  <p class="section-lead fade-up">
+    Iedereen weet dát hij iets met geld moet doen. Niemand weet wát precies — en dat is geen kennisprobleem, het is een ontwerp-probleem. TriFinity ontwerpt de weg van versplinterde data naar één duidelijk antwoord.
+  </p>
+
+  <div class="problem-grid">
+    <div class="problem-card fade-up">
+      <span class="problem-card-num">01</span>
+      <h3>Registreren wordt een muur</h3>
+      <p>40+ velden vóórdat de gebruiker iets nuttigs ziet. Gemiddelde gebruiker weet de helft niet en haakt af. <strong>Wij: 3 verplichte velden + slimme defaults.</strong></p>
+      <div class="quote">"Ik haakte af bij de pensioenpot-vraag"</div>
+    </div>
+    <div class="problem-card fade-up">
+      <span class="problem-card-num">02</span>
+      <h3>Inzicht ontbreekt synthese</h3>
+      <p>Netto vermogen, spaarquote, FIRE-jaar, scores — alles zichtbaar, maar nergens één antwoord op "hoe sta ik er voor?" <strong>Wij: één Gezondheidsscore (0–100).</strong></p>
+      <div class="quote">"Een tijdlijn zegt me meer dan vijf cijfers"</div>
+    </div>
+    <div class="problem-card fade-up">
+      <span class="problem-card-num">03</span>
+      <h3>Tips zonder actie zijn lawaai</h3>
+      <p>"Spaarquote 8%" zonder "...verhoog door X" is informatie, geen tip. <strong>Wij: elke tip is gekoppeld aan een hefboom én een directe actie.</strong></p>
+      <div class="quote">"Vertel me wat ik kan doen, niet wat ik ben"</div>
+    </div>
+    <div class="problem-card fade-up">
+      <span class="problem-card-num">04</span>
+      <h3>De toekomst verstopt in formulieren</h3>
+      <p>Wat-als-scenario's gebeuren in mentale ruimte op een tijdas — niet in een parametermenu. <strong>Wij: horizon-tijdas met directe manipulatie.</strong></p>
+      <div class="quote">"Sleep het tweede kind naar 2027, zie wat er gebeurt"</div>
+    </div>
+  </div>
+</section>
+
+<!-- De 4 hefbomen -->
+<section id="hefbomen" class="hefbomen-section" style="padding-left:0;padding-right:0;">
+  <div class="hefbomen-inner" style="padding: 0 32px;">
+    <div class="section-eyebrow fade-up">De vier hefbomen</div>
+    <h2 class="section-title fade-up">Vier knoppen waarmee je je financiële toekomst draait.</h2>
+    <p class="section-lead fade-up">
+      Geen abstracte modules. Vier domeinen die de gebruiker mentaal begrijpt en die persistent zichtbaar zijn als <em>kompas</em> bovenaan elk scherm.
+    </p>
+
+    <div class="hefbomen-grid">
+      <div class="hefboom active" data-hef="bezittingen" style="--accent:var(--kern); --accent-light:var(--kern-light);">
+        <div class="hefboom-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
+        </div>
+        <h4>Bezittingen</h4>
+        <div class="hefboom-status"><span class="indicator"></span>Op koers</div>
+      </div>
+      <div class="hefboom warn" data-hef="schulden" style="--accent:var(--wil); --accent-light:var(--wil-light);">
+        <div class="hefboom-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>
+        </div>
+        <h4>Schulden</h4>
+        <div class="hefboom-status"><span class="indicator"></span>Aandacht</div>
+      </div>
+      <div class="hefboom" data-hef="cashflow" style="--accent:var(--horizon); --accent-light:var(--horizon-light);">
+        <div class="hefboom-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3v18M7 7l10 10M17 7L7 17"/></svg>
+        </div>
+        <h4>Cashflow</h4>
+        <div class="hefboom-status"><span class="indicator"></span>Op koers</div>
+      </div>
+      <div class="hefboom" data-hef="belasting" style="--accent:var(--ink); --accent-light:#e8e2d2;">
+        <div class="hefboom-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        </div>
+        <h4>Belasting</h4>
+        <div class="hefboom-status"><span class="indicator"></span>Op koers</div>
+      </div>
+    </div>
+
+    <div class="hefboom-detail" id="hefboomDetail">
+      <h3 id="hefDetailTitle">Bezittingen</h3>
+      <p id="hefDetailDesc">Wat je hebt — van betaalrekening tot eigen huis, van ETF tot pensioenpot. Eerlijk gevisualiseerd: een netto vermogen van €600k waar €500k in stenen zit is een ander verhaal dan €600k aan ETFs.</p>
+      <div class="examples" id="hefDetailExamples">
+        <span class="chip">Spaargeld</span>
+        <span class="chip">Beleggingen</span>
+        <span class="chip">Eigen huis</span>
+        <span class="chip">Pensioenpot</span>
+        <span class="chip">UPO-import</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- De reis -->
+<section id="reis" class="journey">
+  <div class="section-eyebrow fade-up">De vier reisstappen</div>
+  <h2 class="section-title fade-up">Eén belofte, vier soepele stappen.</h2>
+  <p class="section-lead fade-up">
+    Registreren → inzicht → tips → toekomst. Op elke stap meten we de tijd-tot-aha en bouwen we elke wrijving weg.
+  </p>
+
+  <div class="journey-track">
+    <div class="journey-steps">
+      <div class="journey-step fade-up">
+        <div class="journey-step-num">1</div>
+        <h4>Registreren</h4>
+        <p>Drie velden + slimme defaults. Bank-koppeling (PSD2) of UPO-upload voor de rest. Geen wizard, een geleide eerste sessie.</p>
+        <div class="time">≤ 5 min</div>
+      </div>
+      <div class="journey-step fade-up">
+        <div class="journey-step-num">2</div>
+        <h4>Inzicht</h4>
+        <p>Eén Gezondheidsscore + tijdlijn-eerst. Vier-hefbomen-kompas altijd zichtbaar. Antwoord op "hoe sta ik er voor?" in één blik.</p>
+        <div class="time">≤ 30 sec</div>
+      </div>
+      <div class="journey-step fade-up">
+        <div class="journey-step-num">3</div>
+        <h4>Tips</h4>
+        <p>Wekelijkse briefing in natuurlijke taal. Eén concrete actie, gekoppeld aan een hefboom, één-klik-uitvoerbaar waar mogelijk.</p>
+        <div class="time">≤ 1 min lezen</div>
+      </div>
+      <div class="journey-step fade-up">
+        <div class="journey-step-num">4</div>
+        <h4>Toekomst</h4>
+        <p>Horizon-tijdas met directe manipulatie. Sleep "tweede kind 2027" op de lijn, zie pensioen 3 jaar later — geen formulier.</p>
+        <div class="time">≤ 2 min/scenario</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Doelgroep -->
+<section>
+  <div class="section-eyebrow fade-up">Doelgroep</div>
+  <h2 class="section-title fade-up">Eén gebruiker, drie diepteniveaus.</h2>
+  <p class="section-lead fade-up">
+    Niet drie segmenten met aparte features. Eén Nederlandse volwassene (28–55) in drie levensfasen. De app groeit met haar gebruiker mee.
+  </p>
+
+  <div class="persona-grid">
+    <div class="persona a fade-up">
+      <span class="persona-letter">A</span>
+      <span class="persona-tag">Niveau A</span>
+      <h3>Beginnen</h3>
+      <div class="archetype">Mo, 31 · Linda, 28</div>
+      <p style="color:var(--ink-2);font-size:14px;">Wil grip krijgen, registreert net. Zoekt eerste overzicht en de vraag "Hoe sta ik er voor?" beantwoord zien.</p>
+      <ul class="persona-list">
+        <li><span class="key">Sessieritme</span><span class="val">5–15 min/week</span></li>
+        <li><span class="key">Engagement</span><span class="val">Wekelijks</span></li>
+        <li><span class="key">Tijd-tot-aha</span><span class="val">5 min</span></li>
+      </ul>
+      <div class="persona-aha">Eindelijk weet ik waar ik sta.</div>
+    </div>
+
+    <div class="persona b fade-up">
+      <span class="persona-letter">B</span>
+      <span class="persona-tag">Niveau B</span>
+      <h3>Verdiepen</h3>
+      <div class="archetype">Sanne, 38 · Erik, 44</div>
+      <p style="color:var(--ink-2);font-size:14px;">Basis is op orde, wil optimaliseren. Tips, scenario's, projecties — invloed uitoefenen op de toekomst.</p>
+      <ul class="persona-list">
+        <li><span class="key">Sessieritme</span><span class="val">30–60 min/maand</span></li>
+        <li><span class="key">Engagement</span><span class="val">Maandelijks</span></li>
+        <li><span class="key">Tijd-tot-aha</span><span class="val">15 min</span></li>
+      </ul>
+      <div class="persona-aha">Ik heb invloed op mijn toekomst.</div>
+    </div>
+
+    <div class="persona c fade-up">
+      <span class="persona-letter">C</span>
+      <span class="persona-tag">Niveau C</span>
+      <h3>Plannen</h3>
+      <div class="archetype">Anouk & Jasper, 41</div>
+      <p style="color:var(--ink-2);font-size:14px;">Maakt grote levenskeuzes. Tweede kind, groter huis, ZZP — what-if-scenario's op een tijdas.</p>
+      <ul class="persona-list">
+        <li><span class="key">Sessieritme</span><span class="val">1–2 uur/scenario</span></li>
+        <li><span class="key">Engagement</span><span class="val">Per gebeurtenis</span></li>
+        <li><span class="key">Tijd-tot-aha</span><span class="val">30 min</span></li>
+      </ul>
+      <div class="persona-aha">Ik beslis op basis van data, niet onderbuik.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Features showcase -->
+<section id="features" style="padding-top:60px;">
+  <div class="section-eyebrow fade-up">Vijf vlaggenschip-features</div>
+  <h2 class="section-title fade-up">De belofte, levendig gemaakt.</h2>
+  <p class="section-lead fade-up">
+    Vijf bouwstenen die samen de vier reisstappen leveren. Probeer ze — elke mock-up reageert.
+  </p>
+
+  <!-- Feature 1: Gezondheidsscore -->
+  <div class="feature-block">
+    <div class="feature-content fade-up">
+      <div class="feature-tag"><span class="num">01</span> Gezondheidsscore</div>
+      <h3>Eén getal dat alles vertelt.</h3>
+      <p>Composite 0–100 score uit vijf sub-scores: bezittingen-groei, schuld-ratio, cashflow-buffer, FIRE-voortgang, belasting-efficiëntie. Wordt hero-metric op de hoofdpagina.</p>
+      <ul class="feature-bullets">
+        <li><strong>Drill-down</strong> per sub-score — klik en zie waar het knelt</li>
+        <li><strong>Fallback</strong> per ontbrekende module (CLAUDE.md-regel)</li>
+        <li><strong>Verifieerbaar</strong> — uitlegbaar in 50 woorden</li>
+      </ul>
+    </div>
+
+    <div class="feature-mock fade-up">
+      <div class="mock-app">
+        <div class="mock-header">
+          <div class="mock-header-title">Mijn financiële gezondheid</div>
+          <div class="mock-dots"><span></span><span></span><span></span></div>
+        </div>
+        <div class="score-wrap">
+          <div class="score-gauge">
+            <svg viewBox="0 0 200 200">
+              <circle class="score-bg-ring" cx="100" cy="100" r="80" />
+              <circle class="score-ring" id="scoreRing" cx="100" cy="100" r="80"
+                stroke-dasharray="502.6" stroke-dashoffset="502.6" />
+            </svg>
+            <div class="score-center">
+              <div class="score-num" id="scoreNum">0</div>
+              <div class="score-label">Gezondheid</div>
+              <div class="score-status">Op koers</div>
+            </div>
+          </div>
+          <div class="score-breakdown">
+            <div class="score-pill" style="--accent:var(--kern);">
+              <div class="score-pill-bar"><div class="score-pill-fill" style="width:0%" data-w="82"></div></div>
+              <div class="score-pill-val">82</div>
+              <div class="score-pill-name">Bezit</div>
+            </div>
+            <div class="score-pill" style="--accent:var(--wil);">
+              <div class="score-pill-bar"><div class="score-pill-fill" style="width:0%" data-w="65"></div></div>
+              <div class="score-pill-val">65</div>
+              <div class="score-pill-name">Schuld</div>
+            </div>
+            <div class="score-pill" style="--accent:var(--horizon);">
+              <div class="score-pill-bar"><div class="score-pill-fill" style="width:0%" data-w="78"></div></div>
+              <div class="score-pill-val">78</div>
+              <div class="score-pill-name">Cash</div>
+            </div>
+            <div class="score-pill" style="--accent:var(--good);">
+              <div class="score-pill-bar"><div class="score-pill-fill" style="width:0%" data-w="71"></div></div>
+              <div class="score-pill-val">71</div>
+              <div class="score-pill-name">FIRE</div>
+            </div>
+            <div class="score-pill" style="--accent:var(--ink-2);">
+              <div class="score-pill-bar"><div class="score-pill-fill" style="width:0%" data-w="68"></div></div>
+              <div class="score-pill-val">68</div>
+              <div class="score-pill-name">Tax</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature 2: Horizon-tijdas -->
+  <div class="feature-block reverse">
+    <div class="feature-content fade-up">
+      <div class="feature-tag"><span class="num">02</span> Horizon-tijdas</div>
+      <h3>Direct manipuleren, niet invullen.</h3>
+      <p>De gebruiker denkt in gebeurtenissen ("over 2 jaar kind"), niet in parameters. Een horizontale tijdas vervangt het wat-als-formulier. Klik & sleep om scenario's te bouwen.</p>
+      <ul class="feature-bullets">
+        <li><strong>Opbouw én afbouw</strong> gelijkwaardig — pensioen-fase is geen sub-tab</li>
+        <li><strong>Scenario-bibliotheek</strong> — kind, huis, ZZP, deeltijd, AOW</li>
+        <li><strong>Confidence-band</strong> P10–P90 inline (Monte Carlo, zonder formulier)</li>
+      </ul>
+    </div>
+
+    <div class="feature-mock fade-up">
+      <div class="mock-app">
+        <div class="mock-header">
+          <div class="mock-header-title">Mijn horizon · 2026 → 2080</div>
+          <div class="mock-dots"><span></span><span></span><span></span></div>
+        </div>
+        <div class="timeline-mock">
+          <svg class="timeline-svg" viewBox="0 0 600 280" preserveAspectRatio="none">
+            <!-- Grid -->
+            <line x1="0" y1="240" x2="600" y2="240" stroke="#e3dac8" stroke-width="1" />
+            <line x1="0" y1="180" x2="600" y2="180" stroke="#e3dac8" stroke-width="1" stroke-dasharray="2,3" />
+            <line x1="0" y1="120" x2="600" y2="120" stroke="#e3dac8" stroke-width="1" stroke-dasharray="2,3" />
+            <line x1="0" y1="60" x2="600" y2="60" stroke="#e3dac8" stroke-width="1" stroke-dasharray="2,3" />
+
+            <!-- Confidence band -->
+            <path id="confBand" d="M0,200 Q150,180 300,140 T600,40 L600,80 Q450,120 300,160 T0,220 Z"
+                  fill="#c4a06b" fill-opacity="0.12" />
+
+            <!-- Net worth line - opbouw -->
+            <path id="growLine" d="M0,210 Q150,190 300,150 T600,50"
+                  fill="none" stroke="#6b4339" stroke-width="3" stroke-linecap="round" />
+
+            <!-- Afbouw (dashed) -->
+            <path d="M450,90 Q480,100 520,130 T600,180"
+                  fill="none" stroke="#c4a06b" stroke-width="2.5" stroke-dasharray="6,4" stroke-linecap="round" />
+
+            <!-- Events as dots -->
+            <g id="events">
+              <circle cx="80" cy="205" r="6" fill="#3d3048" />
+              <circle cx="80" cy="205" r="12" fill="#3d3048" fill-opacity="0.2" />
+              <text x="80" y="230" text-anchor="middle" font-size="10" fill="#888070" font-family="Inter">Vandaag</text>
+
+              <circle cx="200" cy="180" r="6" fill="#c4a06b" id="evKind" style="cursor:pointer;" />
+              <text x="200" y="170" text-anchor="middle" font-size="10" fill="#4a4840" font-family="Inter">Kind '28</text>
+
+              <circle cx="320" cy="140" r="6" fill="#c4a06b" />
+              <text x="320" y="130" text-anchor="middle" font-size="10" fill="#4a4840" font-family="Inter">Huis '32</text>
+
+              <circle cx="450" cy="85" r="8" fill="#6b4339" stroke="#fbf7ec" stroke-width="2" />
+              <text x="450" y="72" text-anchor="middle" font-size="11" fill="#1a1916" font-family="Fraunces" font-weight="500">Vrijheid 2049</text>
+            </g>
+
+            <!-- Year markers -->
+            <text x="40" y="270" font-size="10" fill="#888070" font-family="JetBrains Mono">2026</text>
+            <text x="200" y="270" font-size="10" fill="#888070" font-family="JetBrains Mono">2035</text>
+            <text x="360" y="270" font-size="10" fill="#888070" font-family="JetBrains Mono">2045</text>
+            <text x="540" y="270" font-size="10" fill="#888070" font-family="JetBrains Mono">2065</text>
+
+            <!-- Y axis labels -->
+            <text x="8" y="65" font-size="9" fill="#bbb8b0" font-family="JetBrains Mono">€1M</text>
+            <text x="8" y="185" font-size="9" fill="#bbb8b0" font-family="JetBrains Mono">€250k</text>
+          </svg>
+        </div>
+        <div class="timeline-controls">
+          <div class="timeline-event active" onclick="toggleScenario(this, 'kind')"><span class="icon">👶</span> Kind in 2028</div>
+          <div class="timeline-event active" onclick="toggleScenario(this, 'huis')"><span class="icon">🏡</span> Groter huis 2032</div>
+          <div class="timeline-event" onclick="toggleScenario(this, 'zzp')"><span class="icon">💼</span> ZZP starten</div>
+          <div class="timeline-event" onclick="toggleScenario(this, 'deeltijd')"><span class="icon">⏱</span> 4-dagen werken</div>
+          <div class="timeline-event" onclick="toggleScenario(this, 'aow')"><span class="icon">🏖</span> Vroeger met pensioen</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature 3: Vier-hefbomen kompas -->
+  <div class="feature-block">
+    <div class="feature-content fade-up">
+      <div class="feature-tag"><span class="num">03</span> Hefbomen-kompas</div>
+      <h3>Altijd zien welke knop je kunt draaien.</h3>
+      <p>Een persistente mini-rij rechtsboven elk scherm met de vier hefbomen en hun status (groen / oranje / rood). Klik door naar het domein dat aandacht vraagt.</p>
+      <ul class="feature-bullets">
+        <li><strong>Status in één oogopslag</strong> — geen scroll, geen tabs</li>
+        <li><strong>Direct doorklikken</strong> — kompas is navigatie én diagnose</li>
+        <li><strong>Mentale map matchen</strong> — vier knoppen die je echt hebt</li>
+      </ul>
+    </div>
+
+    <div class="feature-mock fade-up">
+      <div class="mock-app">
+        <div class="mock-header">
+          <div class="mock-header-title">Hefbomen-status · vandaag</div>
+          <div class="mock-dots"><span></span><span></span><span></span></div>
+        </div>
+        <div class="compass-mock">
+          <div class="compass-ring">
+            <div class="compass-item good" style="--accent:var(--kern); --accent-light:var(--kern-light);">
+              <div class="dot"></div>
+              <div class="icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14"/></svg>
+              </div>
+              <div class="name">Bezittingen</div>
+              <div class="val">€312k · +3.2%</div>
+            </div>
+            <div class="compass-item warn" style="--accent:var(--wil); --accent-light:var(--wil-light);">
+              <div class="dot"></div>
+              <div class="icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>
+              </div>
+              <div class="name">Schulden</div>
+              <div class="val">€185k · oversluiten?</div>
+            </div>
+            <div class="compass-item good" style="--accent:var(--horizon); --accent-light:var(--horizon-light);">
+              <div class="dot"></div>
+              <div class="icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3v18"/></svg>
+              </div>
+              <div class="name">Cashflow</div>
+              <div class="val">+€820 / mnd</div>
+            </div>
+            <div class="compass-item good" style="--accent:var(--ink); --accent-light:#e8e2d2;">
+              <div class="dot"></div>
+              <div class="icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+              </div>
+              <div class="name">Belasting</div>
+              <div class="val">Box 3 geoptimaliseerd</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature 4: Wekelijkse briefing -->
+  <div class="feature-block reverse">
+    <div class="feature-content fade-up">
+      <div class="feature-tag"><span class="num">04</span> Wekelijkse briefing</div>
+      <h3>Inzicht én tip in vier zinnen.</h3>
+      <p>Server-side gerendered natuurlijke taal-samenvatting. Vier zinnen, twee inzichten, één concrete actie. De cognitieve sprong van data naar betekenis maakt de app, niet de gebruiker.</p>
+      <ul class="feature-bullets">
+        <li><strong>Geen jargon</strong> — "wanneer hoef je niet meer te werken" i.p.v. "FIRE"</li>
+        <li><strong>Eén actie per week</strong> — "doe dit nu / negeer / later"</li>
+        <li><strong>Deeplink waar mogelijk</strong> — opzeggen via één klik</li>
+      </ul>
+    </div>
+
+    <div class="feature-mock fade-up">
+      <div class="mock-app">
+        <div class="mock-header">
+          <div class="mock-header-title">Briefing · week 20</div>
+          <div class="mock-dots"><span></span><span></span><span></span></div>
+        </div>
+        <div class="briefing-mock">
+          <div class="briefing-date">16 mei 2026 · weekoverzicht</div>
+          <div class="briefing-title">Goed weekend, je staat €280 vóór op je budget.</div>
+          <div class="briefing-text">
+            Vorige week gaf je <strong>€420 minder</strong> uit dan begroot, vooral door minder boodschappen en geen restaurantbezoek. Je netto vermogen steeg met <strong>1,2%</strong> door een goede beursweek.
+            Aandachtspunt: je <strong>streamingsabonnementen</strong> zijn dit jaar gestegen naar €52/maand — dat is €624 op jaarbasis.
+          </div>
+          <div class="briefing-action">
+            <div class="label">Voorgestelde actie</div>
+            <div class="text">Zeg minimaal één streamingdienst op. Bespaart €18–€25 per maand.</div>
+            <div class="actions">
+              <button class="mini-btn primary">Open opzeg-deeplinks</button>
+              <button class="mini-btn">Later</button>
+              <button class="mini-btn">Negeer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature 5: FIRE-calculator (interactief) -->
+  <div class="feature-block">
+    <div class="feature-content fade-up">
+      <div class="feature-tag"><span class="num">05</span> Slimme defaults</div>
+      <h3>Reken nu zelf — zonder jargon, zonder formulier.</h3>
+      <p>Klassieke FIRE-tools vragen 12 parameters. Wij vragen drie. Probeer de schuif hieronder: zie meteen wanneer je niet meer hoeft te werken voor geld.</p>
+      <ul class="feature-bullets">
+        <li><strong>3 sliders, 1 antwoord</strong> — geen waarschuwingen, geen tabbladen</li>
+        <li><strong>Realtime herberekening</strong> — directe feedback bij elke beweging</li>
+        <li><strong>Defaults uit CBS</strong> — 6% rendement, 2.5% inflatie, 4% opname</li>
+      </ul>
+    </div>
+
+    <div class="feature-mock fade-up">
+      <div class="mock-app">
+        <div class="mock-header">
+          <div class="mock-header-title">Wanneer ben je vrij? · interactief</div>
+          <div class="mock-dots"><span></span><span></span><span></span></div>
+        </div>
+        <div class="calc-section" style="margin:8px 0; padding:24px;">
+          <div class="calc-row">
+            <div>
+              <label>Hoeveel heb je nu?</label>
+              <input type="range" id="calcNow" min="0" max="500000" step="5000" value="80000" />
+            </div>
+            <div class="val-display" id="calcNowVal">€ 80.000</div>
+          </div>
+          <div class="calc-row">
+            <div>
+              <label>Hoeveel zet je per maand opzij?</label>
+              <input type="range" id="calcMonth" min="0" max="3000" step="50" value="600" />
+            </div>
+            <div class="val-display" id="calcMonthVal">€ 600</div>
+          </div>
+          <div class="calc-row">
+            <div>
+              <label>Hoeveel heb je per maand nodig (later)?</label>
+              <input type="range" id="calcNeed" min="1500" max="6000" step="100" value="3000" />
+            </div>
+            <div class="val-display" id="calcNeedVal">€ 3.000</div>
+          </div>
+          <div class="calc-result">
+            <div class="calc-result-label">Je hoeft niet meer te werken voor geld in</div>
+            <div class="calc-result-value">jaar <em id="calcYear">2049</em></div>
+            <div class="calc-result-sub" id="calcSub">Over 23 jaar, op 54-jarige leeftijd</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Marktanalyse -->
+<section class="market-section">
+  <div class="market-inner">
+    <div class="section-eyebrow fade-up">Marktpositionering</div>
+    <h2 class="section-title fade-up">11 apps deden elk één ding goed. Wij doen ze samen.</h2>
+    <p class="section-lead fade-up">
+      Geen enkele bestaande app levert alle vier de reisstappen optimaal. Origin doet inzicht, Cleo doet tips, PocketSmith doet toekomst, Copilot doet registratie. <strong style="color:var(--horizon);">TriFinity is de eerste die ze samenbrengt op de Nederlandse markt.</strong>
+    </p>
+
+    <div class="competitor-grid">
+      <div class="competitor fade-up">
+        <h4>Monarch Money</h4>
+        <div class="region">US · $99/jr</div>
+        <p>Tijdslijn-eerst: netto vermogen over tijd als hoofdview.</p>
+        <div class="lesson">→ Hoofdgrafiek = tijdlijn, niet snapshot</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Copilot</h4>
+        <div class="region">US · iOS · $95/jr</div>
+        <p>Zero-question onboarding. Bank koppelen, klaar.</p>
+        <div class="lesson">→ Registratie kan nul vragen zijn</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>YNAB</h4>
+        <div class="region">Wereldwijd · $109/jr</div>
+        <p>"Age of money" — één composite metric die alles samenvat.</p>
+        <div class="lesson">→ Eén composite metric > vijf KPI's</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Origin</h4>
+        <div class="region">US · $13/mnd</div>
+        <p>"Money Score" 0–100 met drill-down per component.</p>
+        <div class="lesson">→ Gezondheidsscore + drill-down</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Empower</h4>
+        <div class="region">US · Gratis</div>
+        <p>"Retirement Fee Analyzer" toont dramatic impact van fees.</p>
+        <div class="lesson">→ Dramatic visualization &gt; losse tips</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>PocketSmith</h4>
+        <div class="region">NZ · $20–30/mnd</div>
+        <p>Tijdas met directe manipulatie van events. Vertrek-punt voor onze horizon.</p>
+        <div class="lesson">→ Toekomst = tijdas, geen formulier</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Peaks</h4>
+        <div class="region">NL · Freemium</div>
+        <p>"Rust en geen jargon" als merkpijler — Nederlandse toon.</p>
+        <div class="lesson">→ NL-context, geen Amerikaans FIRE</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Bunq</h4>
+        <div class="region">EU · neobank</div>
+        <p>"Pots" — fysieke metafoor i.p.v. abstracte categorie.</p>
+        <div class="lesson">→ Metafoor verslaat vakterm</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Cleo</h4>
+        <div class="region">US/UK · freemium</div>
+        <p>Natuurlijke taal in plaats van dashboards.</p>
+        <div class="lesson">→ Briefing-laag in natuurlijke taal</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Bitvavo</h4>
+        <div class="region">NL · neobroker</div>
+        <p>Geen settings-tab in bottom-nav. Alles contextueel.</p>
+        <div class="lesson">→ Settings-pagina is een symptoom</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Frollo</h4>
+        <div class="region">AU · B2B2C</div>
+        <p>Tips altijd één klik weg van uitvoerbare actie.</p>
+        <div class="lesson">→ Tips = actie of niets</div>
+      </div>
+      <div class="competitor fade-up">
+        <h4>Lunch Money</h4>
+        <div class="region">US · $40/jr</div>
+        <p>Standaard ondiep, optioneel diep — legitieme keuze.</p>
+        <div class="lesson">→ Modus "Kijken" vs "Plannen"</div>
+      </div>
+    </div>
+
+    <div class="market-positioning fade-up">
+      <h3>TriFinity = <em>tijdslijn + Score + briefing + tijdas</em> — alles in het Nederlands.</h3>
+      <p>De NL-markt heeft niemand die alle vier de reisstappen optimaal levert. TriFinity heeft de bouwstenen al; nu moeten ze samen in één lijn op één scherm verschijnen, met de cognitieve last terug naar het niveau van Peaks of Copilot.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Roadmap -->
+<section id="roadmap">
+  <div class="section-eyebrow fade-up">Implementatie-roadmap</div>
+  <h2 class="section-title fade-up">24 features. Drie tiers. Eén belofte.</h2>
+  <p class="section-lead fade-up">
+    Gerangschikt naar impact ÷ inspanning voor het leveren van de kernbelofte.
+  </p>
+
+  <div class="roadmap-grid">
+    <div class="tier t1 fade-up">
+      <div class="tier-badge">Tier 1</div>
+      <h3>Quick wins</h3>
+      <div class="timing">≤ 1 week per feature · 7 features</div>
+      <p>Merkbare belofte-verbetering met minimale inspanning.</p>
+      <ul class="tier-features">
+        <li><span class="num">01</span>Onboarding tot 3 verplichte velden</li>
+        <li><span class="num">02</span>Smart defaults voor FIRE/Box 3</li>
+        <li><span class="num">03</span>Jargon-vervanging in UI-copy</li>
+        <li><span class="num">04</span>Vier-hefbomen-kompas (mini-rij)</li>
+        <li><span class="num">05</span>"Wat zie ik hier?"-knop per pagina</li>
+        <li><span class="num">06</span>Lege staten met één voorbeeld-CTA</li>
+        <li><span class="num">07</span>Module-naam verbergen voor gebruiker</li>
+      </ul>
+    </div>
+
+    <div class="tier t2 fade-up">
+      <div class="tier-badge">Tier 2</div>
+      <h3>Structureel</h3>
+      <div class="timing">1–3 weken per feature · 8 features</div>
+      <p>Structurele verbeteringen die de ervaring transformeren.</p>
+      <ul class="tier-features">
+        <li><span class="num">08</span>Financiële Gezondheidsscore als hero</li>
+        <li><span class="num">09</span>Netto-vermogen-tijdslijn op /core</li>
+        <li><span class="num">10</span>Inline micro-uitleg voor jargon</li>
+        <li><span class="num">11</span>Settings ontmantelen</li>
+        <li><span class="num">12</span>Insights-actie-koppeling audit</li>
+        <li><span class="num">13</span>Modus-toggle "Kijken / Plannen"</li>
+        <li><span class="num">14</span>Cashflow als hoofd-domein</li>
+        <li><span class="num">15</span>Tips visueel gekoppeld aan hefbomen</li>
+      </ul>
+    </div>
+
+    <div class="tier t3 fade-up">
+      <div class="tier-badge">Tier 3</div>
+      <h3>Strategisch</h3>
+      <div class="timing">3+ weken per feature · 9 features</div>
+      <p>Transformatieve investeringen die de markt verleggen.</p>
+      <ul class="tier-features">
+        <li><span class="num">16</span>Wekelijkse briefing (natuurlijke taal)</li>
+        <li><span class="num">17</span>Horizon-tijdas als hoofdcomponent</li>
+        <li><span class="num">18</span>Geleide eerste sessie (coach-bubble)</li>
+        <li><span class="num">19</span>Scenario-bibliotheek</li>
+        <li><span class="num">20</span>UPO-/Mijnpensioenoverzicht-import</li>
+        <li><span class="num">21</span>Bank-koppeling (PSD2)</li>
+        <li><span class="num">22</span>Monte Carlo confidence-band inline</li>
+        <li><span class="num">23</span>Coach-chat (natuurlijke taal)</li>
+        <li><span class="num">24</span>Dramatic visualization-set</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- End-to-end scenario -->
+<section class="scenario-section">
+  <div class="scenario-inner">
+    <div class="section-eyebrow fade-up">End-to-end scenario</div>
+    <h2 class="section-title fade-up">De belofte in 8 minuten geleverd.</h2>
+    <p class="section-lead fade-up">
+      Na Tier 1 + Tier 2: een nieuwe gebruiker doorloopt deze flow, en heeft binnen één sessie het inzicht waar de oude app niet binnen tien sessies aan toe kwam.
+    </p>
+
+    <ol class="scenario-list">
+      <li class="scenario-item fade-up">
+        <div class="num"></div>
+        <div>
+          <h4>Welkom in drie vragen</h4>
+          <p>Opent de app → ziet welkom met drie vragen (naam, geboortejaar, doel-keuze). Geen wizard, geen 40 velden.</p>
+        </div>
+        <div class="time">≤ 1 min</div>
+      </li>
+      <li class="scenario-item fade-up">
+        <div class="num"></div>
+        <div>
+          <h4>Eerste rekening, eerste cijfer</h4>
+          <p>Landt op /core met coach-bubble → voegt 1 rekening toe → ziet eerste netto vermogen.</p>
+        </div>
+        <div class="time">≤ 4 min</div>
+      </li>
+      <li class="scenario-item fade-up">
+        <div class="num"></div>
+        <div>
+          <h4>Het kompas verschijnt</h4>
+          <p>Ziet Financiële Gezondheidsscore + vier-hefbomen-kompas → begrijpt waar hij staat.</p>
+        </div>
+        <div class="time">≤ 30 sec</div>
+      </li>
+      <li class="scenario-item fade-up">
+        <div class="num"></div>
+        <div>
+          <h4>Naar de horizon</h4>
+          <p>Klikt door naar /horizon → ziet tijdslijn tot pensioen met huidige projectie.</p>
+        </div>
+        <div class="time">≤ 15 sec</div>
+      </li>
+      <li class="scenario-item fade-up">
+        <div class="num"></div>
+        <div>
+          <h4>Eerste scenario</h4>
+          <p>Voegt event "kind in 2027" toe aan tijdas → ziet pensioen 3 jaar later. Geen formulier ingevuld.</p>
+        </div>
+        <div class="time">≤ 2 min</div>
+      </li>
+      <li class="scenario-item fade-up">
+        <div class="num"></div>
+        <div>
+          <h4>De briefing landt</h4>
+          <p>Ontvangt op dag 7 eerste briefing in natuurlijke taal → vier zinnen, één concrete actie.</p>
+        </div>
+        <div class="time">≤ 1 min</div>
+      </li>
+    </ol>
+
+    <div style="text-align:center; margin-top:48px;">
+      <div style="display:inline-block; padding:16px 32px; background:var(--ink); color:var(--bg); font-family:'Fraunces',serif; font-size:24px; font-weight:500;">
+        Totaal: <em style="color:var(--horizon); font-style:italic;">8 minuten</em> voor stap 1–5.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Metrics -->
+<section>
+  <div class="section-eyebrow fade-up">Succes-meting</div>
+  <h2 class="section-title fade-up">Hoe weten we dat de belofte geland is?</h2>
+  <p class="section-lead fade-up">
+    Zes harde metrics. Geen vanity. Elke metric heeft een doel en een huidige nulmeting.
+  </p>
+
+  <div class="metrics-grid">
+    <div class="metric-card fade-up">
+      <div class="label">Time-to-aha · Niveau A</div>
+      <div class="target">≤ <em>5</em> min</div>
+      <p>Van eerste opening tot "eindelijk weet ik waar ik sta".</p>
+    </div>
+    <div class="metric-card fade-up">
+      <div class="label">Onboarding-completion</div>
+      <div class="target">≥ <em>80</em>%</div>
+      <p>Van eerste opening tot eerste netto-vermogen-zicht. Vandaag een fractie hiervan.</p>
+    </div>
+    <div class="metric-card fade-up">
+      <div class="label">Settings-bezoek</div>
+      <div class="target">↓ <em>daalt</em></div>
+      <p>Mag geen top-3 bezochte pagina meer zijn. Verklikt slechte architectuur.</p>
+    </div>
+    <div class="metric-card fade-up">
+      <div class="label">Jargon-audit per scherm</div>
+      <div class="target">≤ <em>2</em></div>
+      <p>Onuitgelegde vaktermen per scherm. Vandaag gemiddeld 5–7.</p>
+    </div>
+    <div class="metric-card fade-up">
+      <div class="label">Briefing-engagement</div>
+      <div class="target">≥ <em>40</em>%</div>
+      <p>Wekelijkse opening-rate. Industrie-benchmark voor financiële digests.</p>
+    </div>
+    <div class="metric-card fade-up">
+      <div class="label">Scenario-frequentie · Niveau C</div>
+      <div class="target">≥ <em>30</em>%</div>
+      <p>Aandeel niveau-C-gebruikers dat maandelijks minstens één scenario bouwt.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA / slot -->
+<section class="cta-section">
+  <h2 class="fade-up">De Nederlandse markt wacht.<br>Op <em>jou</em>.</h2>
+  <p class="fade-up">
+    De bouwstenen zijn er. De analyse is gedaan. Drie meest impactvolle ingrepen — registratie tot drie velden, Gezondheidsscore + tijdslijn op /core, horizon-tijdas met directe manipulatie — leveren de belofte aanzienlijk beter dan vandaag.
+  </p>
+  <div class="cta-buttons fade-up">
+    <a class="btn btn-primary" onclick="document.getElementById('roadmap').scrollIntoView({behavior:'smooth'})">
+      Bekijk de roadmap
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+    </a>
+    <a class="btn btn-secondary" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+      Terug naar begin
+    </a>
+  </div>
+</section>
+
+<footer>
+  <p><strong>TriFinity</strong> · Marketing &amp; sales presentatie · Mei 2026</p>
+  <p style="margin-top:8px; opacity:0.6;">Gebaseerd op het UX-onderzoek "Van overdaad naar gerichte vrijheid".</p>
+</footer>
+
+<script>
+  // Hefbomen interactie
+  const hefData = {
+    bezittingen: {
+      title: 'Bezittingen',
+      desc: 'Wat je hebt — van betaalrekening tot eigen huis, van ETF tot pensioenpot. Eerlijk gevisualiseerd: een netto vermogen van €600k waar €500k in stenen zit is een ander verhaal dan €600k aan ETFs.',
+      examples: ['Spaargeld', 'Beleggingen', 'Eigen huis', 'Pensioenpot', 'UPO-import']
+    },
+    schulden: {
+      title: 'Schulden',
+      desc: 'Wat je nog moet aflossen — hypotheek, studieschuld, leningen, creditcard-saldo. De app rekent door: wat als je oversluit, extra aflost, of de hypotheekvorm verandert?',
+      examples: ['Hypotheek', 'Studieschuld', 'Persoonlijke lening', 'Roodstand', 'Aflossingsstrategie']
+    },
+    cashflow: {
+      title: 'Cashflow',
+      desc: 'Wat er binnenkomt en wat er uitgaat. Geen sub-feature van "Cash", maar een gelijkwaardige hefboom. Budget, vaste lasten, abonnementen, opzeg-deeplinks waar mogelijk.',
+      examples: ['Inkomen', 'Vaste lasten', 'Variabele uitgaven', 'Abonnementen', 'Spaarquote']
+    },
+    belasting: {
+      title: 'Belasting',
+      desc: 'De vergeten hefboom. Box 1, 2, 3 forfaitair vs werkelijk, hypotheekrenteaftrek, jubelton, schenken, pensioenaftrek. Eén pagina met "wat kost belasting jou — en wat kun je doen?"',
+      examples: ['Box 3', 'Hypotheekrenteaftrek', 'Pensioenpremie-aftrek', 'Schenken/erven', 'Wat-als 2027']
+    }
+  };
+
+  document.querySelectorAll('.hefboom').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.hefboom').forEach(h => h.classList.remove('active'));
+      el.classList.add('active');
+      const key = el.dataset.hef;
+      const data = hefData[key];
+      document.getElementById('hefDetailTitle').textContent = data.title;
+      document.getElementById('hefDetailDesc').textContent = data.desc;
+      document.getElementById('hefDetailExamples').innerHTML =
+        data.examples.map(e => `<span class="chip">${e}</span>`).join('');
+    });
+  });
+
+  // Score-animatie bij scrollen in view
+  const scoreObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        animateScore();
+        scoreObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.4 });
+  scoreObserver.observe(document.getElementById('scoreRing').closest('.feature-block'));
+
+  function animateScore() {
+    const target = 73;
+    const circ = 502.6;
+    const offset = circ - (target/100) * circ;
+    document.getElementById('scoreRing').style.strokeDashoffset = offset;
+    let cur = 0;
+    const interval = setInterval(() => {
+      cur += 1;
+      document.getElementById('scoreNum').textContent = cur;
+      if (cur >= target) clearInterval(interval);
+    }, 18);
+    document.querySelectorAll('.score-pill-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  }
+
+  // Calc interactief
+  const calcNow = document.getElementById('calcNow');
+  const calcMonth = document.getElementById('calcMonth');
+  const calcNeed = document.getElementById('calcNeed');
+  const calcNowVal = document.getElementById('calcNowVal');
+  const calcMonthVal = document.getElementById('calcMonthVal');
+  const calcNeedVal = document.getElementById('calcNeedVal');
+  const calcYear = document.getElementById('calcYear');
+  const calcSub = document.getElementById('calcSub');
+
+  function fmtEuro(n) { return '€ ' + Math.round(n).toLocaleString('nl-NL'); }
+
+  function recalc() {
+    const start = +calcNow.value;
+    const monthly = +calcMonth.value;
+    const need = +calcNeed.value;
+
+    calcNowVal.textContent = fmtEuro(start);
+    calcMonthVal.textContent = fmtEuro(monthly);
+    calcNeedVal.textContent = fmtEuro(need);
+
+    // Target: 25x jaarlijkse uitgaven (4% rule)
+    const target = need * 12 * 25;
+
+    // FV-berekening: vermogen na N jaar bij 5% rendement (na inflatie), maandelijkse inleg
+    // FV = P*(1+r)^N + PMT*((1+r)^N - 1)/r, met r=jaarrente, PMT=jaarinleg
+    const r = 0.05;
+    let years = 0;
+    let bal = start;
+    while (bal < target && years < 60) {
+      bal = bal * (1+r) + monthly * 12;
+      years++;
+    }
+    const now = new Date();
+    const targetYear = now.getFullYear() + years;
+    calcYear.textContent = targetYear;
+    const age = 32 + years; // veronderstel ~32 nu
+    if (years >= 60) {
+      calcSub.textContent = 'Met deze parameters duurt het meer dan 60 jaar — verhoog je maandinleg.';
+    } else {
+      calcSub.textContent = `Over ${years} jaar, op ${age}-jarige leeftijd. Doel: ${fmtEuro(target)}.`;
+    }
+  }
+  [calcNow, calcMonth, calcNeed].forEach(el => el.addEventListener('input', recalc));
+  recalc();
+
+  // Scenario toggle voor tijdas
+  function toggleScenario(el, scenario) {
+    el.classList.toggle('active');
+    // Hier zou je in een echte app de SVG dynamisch updaten — voor de demo voldoende.
+    const allActive = document.querySelectorAll('.timeline-event.active').length;
+    const growLine = document.getElementById('growLine');
+    if (growLine) {
+      if (allActive >= 3) {
+        growLine.setAttribute('d', 'M0,210 Q150,200 300,170 T600,80');
+      } else if (allActive === 2) {
+        growLine.setAttribute('d', 'M0,210 Q150,190 300,150 T600,50');
+      } else if (allActive === 1) {
+        growLine.setAttribute('d', 'M0,210 Q150,180 300,135 T600,30');
+      } else {
+        growLine.setAttribute('d', 'M0,210 Q150,170 300,120 T600,20');
+      }
+    }
+  }
+
+  // Intersection observer voor fade-up
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

@@ -1203,6 +1203,7 @@ export default function OnboardingPage() {
               onBack={goToBack}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
+              requireCashAccount={state.activeModules.includes('budgetteren')}
             />
           )}
 

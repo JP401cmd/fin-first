@@ -6,6 +6,8 @@ import UitgavenNaPensioenClient, {
   type UitgavenPaneActionsState,
 } from '@/app/(app)/horizon/uitgaven-na-pensioen/uitgaven-client'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 interface UitgavenPaneProps {
   open: boolean
@@ -32,6 +34,7 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
   // Default = `null` → footer wordt niet gerenderd zolang de child nog niet
   // gepubliceerd heeft (eerste render of niet-custom flow).
   const [actions, setActions] = useState<UitgavenPaneActionsState | null>(null)
+  const { masked } = useMaskedAmounts()
 
   // Bewust setState-in-effect voor data-fetching: we synchroniseren externe
   // state (HTTP) met React. De alternatieve patronen (Suspense / SWR) zouden
@@ -95,6 +98,25 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
         }
       : undefined
 
+  // Live preview-bedrag náást de Opslaan/Annuleren-knoppen — alleen tijdens
+  // custom-flow zinvol (de andere methoden saven direct bij methode-klik en
+  // hebben geen knoppen-rij). Toont dezelfde berekening die de pane na
+  // opslaan vastlegt, met privacy-masking voor consistente UX.
+  const footerInfo =
+    actions && actions.isCustom ? (
+      <div className="flex flex-col leading-tight">
+        <span className="text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
+          Voorlopig totaal
+        </span>
+        <span
+          className="font-mono tabular-nums text-base font-bold text-[var(--ink)]"
+        >
+          {formatMaskedCurrency(actions.finalAmount, masked)}
+          <span className="text-[var(--ink-3)] font-normal text-xs ml-1">/ jr</span>
+        </span>
+      </div>
+    ) : undefined
+
   return (
     <ShellOverlay
       open={open}
@@ -103,6 +125,7 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
       title="Uitgave na pensioen"
       primaryAction={primaryAction}
       secondaryAction={secondaryAction}
+      footerInfo={footerInfo}
     >
       {loading && !ctx ? (
         <div className="px-6 py-12 text-center text-sm text-[var(--ink-3)]">Laden…</div>
@@ -139,6 +162,7 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
           savedAspirations={ctx.savedAspirations}
           inPane
           onActionsChange={handleActionsChange}
+          onSaved={onClose}
         />
       ) : null}
     </ShellOverlay>

@@ -49,23 +49,6 @@ const tests: TestCase[] = [
   // ── Step 1: seedPersonaData per persona ─────────────────────────────
 
   {
-    id: 'tp-roos-complete-data',
-    name: 'Roos (schulden): complete persona data',
-    category: CAT,
-    description: 'Roos has negative net worth, debts, and recovery sovereignty',
-    priority: 'critical',
-    estimatedDurationMs: 200,
-    fn() {
-      const roos = p('roos')
-      assertEqual(roos.meta.name, 'Roos van Dijk', 'name')
-      assertEqual(roos.meta.sovereignty, 'recovery', 'sovereignty phase')
-      assertLessThan(roos.meta.netWorth, 0, 'negative net worth')
-      assertGreaterThan(roos.debts.length, 0, 'has debts')
-      assertGreaterThan(roos.meta.expenses, roos.meta.income, 'expenses > income (in debt)')
-    },
-  },
-
-  {
     id: 'tp-daan-complete-data',
     name: 'Daan (starter): complete persona data',
     category: CAT,
@@ -115,25 +98,6 @@ const tests: TestCase[] = [
   },
 
   {
-    id: 'tp-rashid-complete-data',
-    name: 'Rashid (genieter): complete persona data — no budgets/transactions',
-    category: CAT,
-    description: 'Rashid has no budgets or transactions, uses check-in based approach',
-    priority: 'critical',
-    estimatedDurationMs: 200,
-    fn() {
-      const rashid = p('rashid')
-      assertEqual(rashid.meta.name, 'Rashid Dimohammed', 'name')
-      assertEqual(rashid.meta.sovereignty, 'momentum', 'sovereignty = momentum')
-      assertEqual(rashid.budgets.length, 0, 'no budgets (genieter)')
-      assertEqual(rashid.transactions.length, 0, 'no transactions')
-      // But still has income/expenses in profile estimates
-      assertDefined(rashid.profile.net_monthly_income, 'has income estimate')
-      assertDefined(rashid.profile.estimated_monthly_expenses, 'has expense estimate')
-    },
-  },
-
-  {
     id: 'tp-marijke-complete-data',
     name: 'Marijke (gepensioneerd): complete persona data',
     category: CAT,
@@ -150,84 +114,17 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Landing-page persona's (spread van basis-persona's) ─────────────
-
-  {
-    id: 'tp-ronald-complete-data',
-    name: 'Ronald (pensioenplanner): complete persona data',
-    category: CAT,
-    description: 'Ronald is approaching retirement, all modules active',
-    priority: 'high',
-    estimatedDurationMs: 200,
-    fn() {
-      const ronald = p('ronald')
-      assertEqual(ronald.meta.name, 'Ronald Hoekstra', 'name')
-      assertEqual(ronald.meta.sovereignty, 'mastery', 'sovereignty = mastery')
-      assertGreaterThan(ronald.meta.netWorth, 500000, 'substantial net worth')
-      assertEqual(ronald.profile.full_name, 'Ronald Hoekstra', 'profile name overridden')
-      assertEqual(ronald.profile.date_of_birth, '1962-03-15', 'DOB overridden')
-    },
-  },
-
-  {
-    id: 'tp-bas-complete-data',
-    name: 'Bas (vermogensverdeler): complete persona data',
-    category: CAT,
-    description: 'Bas hit 100K with diversified portfolio',
-    priority: 'high',
-    estimatedDurationMs: 200,
-    fn() {
-      const bas = p('bas')
-      assertEqual(bas.meta.name, 'Bas Mulder', 'name')
-      assertGreaterThanOrEqual(bas.meta.netWorth, 100000, 'net worth >= 100K')
-      assertEqual(bas.profile.full_name, 'Bas Mulder', 'profile name overridden')
-      assertEqual(bas.profile.date_of_birth, '1981-09-22', 'DOB overridden')
-    },
-  },
-
-  {
-    id: 'tp-leo-complete-data',
-    name: 'Leo (budgetteerder): complete persona data',
-    category: CAT,
-    description: 'Leo has negative net worth, needs grip on spending',
-    priority: 'high',
-    estimatedDurationMs: 200,
-    fn() {
-      const leo = p('leo')
-      assertEqual(leo.meta.name, 'Leo Pietersen', 'name')
-      assertEqual(leo.meta.sovereignty, 'recovery', 'sovereignty = recovery')
-      assertLessThan(leo.meta.netWorth, 0, 'negative net worth')
-      assertEqual(leo.profile.full_name, 'Leo Pietersen', 'profile name overridden')
-    },
-  },
-
-  {
-    id: 'tp-jochen-complete-data',
-    name: 'Jochen (FIRE-strijder): complete persona data',
-    category: CAT,
-    description: 'Jochen is near FIRE with large portfolio',
-    priority: 'high',
-    estimatedDurationMs: 200,
-    fn() {
-      const jochen = p('jochen')
-      assertEqual(jochen.meta.name, 'Jochen Brouwer', 'name')
-      assertEqual(jochen.meta.sovereignty, 'mastery', 'sovereignty = mastery')
-      assertGreaterThan(jochen.meta.netWorth, 1000000, 'substantial net worth >1M')
-      assertEqual(jochen.profile.full_name, 'Jochen Brouwer', 'profile name overridden')
-    },
-  },
-
   // ── Step 2: Alle persona velden aanwezig ────────────────────────────
 
   {
     id: 'tp-all-personas-have-profile',
-    name: 'Alle 10 personas: profiel compleet',
+    name: 'Alle 4 personas: profiel compleet',
     category: CAT,
     description: 'Every persona has required profile fields',
     priority: 'critical',
     estimatedDurationMs: 300,
     fn() {
-      assertEqual(PERSONA_KEYS.length, 10, '10 personas')
+      assertEqual(PERSONA_KEYS.length, 4, '4 personas')
       for (const key of PERSONA_KEYS) {
         const persona = PERSONAS[key]
         assertNotNull(persona.profile.full_name, `${key}: full_name`)
@@ -461,7 +358,7 @@ const tests: TestCase[] = [
     fn() {
       for (const key of PERSONA_KEYS) {
         const persona = PERSONAS[key]
-        if (persona.budgets.length === 0) continue // Rashid has no budgets
+        if (persona.budgets.length === 0) continue // skip personas without budgets
 
         // Income budgets should exist
         const incomeBudgets = persona.budgets.filter(b => b.budget_type === 'income')
@@ -642,7 +539,7 @@ const tests: TestCase[] = [
     fn() {
       for (const key of PERSONA_KEYS) {
         const persona = PERSONAS[key]
-        if (persona.budgets.length === 0) continue // Rashid
+        if (persona.budgets.length === 0) continue // skip personas without budgets
 
         const slugs: string[] = []
         for (const parent of persona.budgets) {
@@ -935,28 +832,6 @@ const tests: TestCase[] = [
   },
 
   {
-    id: 'tp-health-score-5pillar-candidate',
-    name: 'Gezondheids score: 5-pilaren modus kandidaat (zonder budgetten)',
-    category: CAT,
-    description: 'Rashid has no budgets — natural 5-pillar candidate. Note: gezondheids_score not in his widget_prefs (recommendation for future)',
-    priority: 'medium',
-    estimatedDurationMs: 200,
-    fn() {
-      const rashid = p('rashid')
-      assertEqual(rashid.budgets.length, 0, 'Rashid: no budgets (5-pillar candidate)')
-      // Rashid has the financial data needed for 5 pillars (everything except budget discipline)
-      assertGreaterThan(rashid.assets.length, 0, 'Rashid: has assets')
-      assertGreaterThan(rashid.meta.income, 0, 'Rashid: has income')
-      assertGreaterThan(rashid.bank_accounts.length, 0, 'Rashid: has bank accounts')
-      // Note: gezondheids_score not in Rashid's widget_prefs — 5-pillar persona coverage is recommended
-      const prefs = rashid.profile.widget_prefs
-      const hasHealthWidget = prefs?.widgets?.some((w: { id: string; enabled: boolean }) => w.id === 'gezondheids_score' && w.enabled) ?? false
-      // This is informational — not a failure, just documentation
-      assert(true, `Rashid gezondheids_score widget: ${hasHealthWidget ? 'enabled' : 'not enabled (recommendation: add for 5-pillar coverage)'}`)
-    },
-  },
-
-  {
     id: 'tp-health-score-widget-prefs-consistent',
     name: 'Gezondheids score: widget_prefs consistent met widget catalog',
     category: CAT,
@@ -1007,33 +882,6 @@ const tests: TestCase[] = [
   },
 
   {
-    id: 'tp-holdings-tracking-roos-no-tracking',
-    name: 'Roos: geen assets met has_holdings_tracking=true',
-    category: CAT,
-    description: 'Roos (schulden persona) should NOT have any assets with holdings tracking enabled',
-    priority: 'high',
-    estimatedDurationMs: 200,
-    fn() {
-      const roos = p('roos')
-      const trackedAssets = roos.assets.filter(a => a.has_holdings_tracking === true)
-      assertEqual(
-        trackedAssets.length, 0,
-        `Roos should have 0 tracked assets, found ${trackedAssets.length}: ${trackedAssets.map(a => a.name).join(', ')}`,
-      )
-
-      // Roos's assets are: vehicle (private lease), physical (inboedel), retirement (pensioen)
-      // None of these are actively managed investment portfolios
-      assertGreaterThan(roos.assets.length, 0, 'Roos has assets (but none tracked)')
-      for (const asset of roos.assets) {
-        assert(
-          asset.has_holdings_tracking !== true,
-          `Roos asset "${asset.name}" should not have holdings tracking`,
-        )
-      }
-    },
-  },
-
-  {
     id: 'tp-holdings-tracking-investment-personas',
     name: 'Holdings tracking: investment personas hebben tracked assets',
     category: CAT,
@@ -1042,8 +890,8 @@ const tests: TestCase[] = [
     estimatedDurationMs: 200,
     fn() {
       // These personas are known to have investment assets with holdings tracking:
-      // daan, lisa, willem, rashid, marijke
-      const investmentPersonas: PersonaKey[] = ['daan', 'lisa', 'willem', 'rashid', 'marijke']
+      // daan, lisa, willem, marijke
+      const investmentPersonas: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke']
       for (const key of investmentPersonas) {
         const persona = PERSONAS[key]
         const investmentAssets = persona.assets.filter(
@@ -1069,7 +917,7 @@ export function register() {
   registerCategory({
     id: CAT,
     label: 'Data — Testdata',
-    description: 'Persona seed validatie: 10 personas, financiële consistentie, metadata constraints, idempotentie, gezondheids score',
+    description: 'Persona seed validatie: 4 personas, financiële consistentie, metadata constraints, idempotentie, gezondheids score',
     icon: 'Users',
     testCount: 0,
   })

@@ -39,8 +39,6 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import {
-  applyHousingStrategy,
-  deriveHousingContext,
   filterAssetsForFire,
   DEFAULT_HOUSING_STRATEGY,
   type HousingStrategyConfig,
@@ -135,38 +133,21 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     // forcedFireAge: skip binary-search, force accumulation→retirement at AOW
     const forcedFireAge = isPensioen ? aowAgeInt : undefined
 
-    // Kasstromen — base list uit life events
-    const baseCashflows = lifeEventsToCashflows(lifeEvents ?? [])
-
     // ── Housing strategy pre-processing ───────────────────────────────
-    // Filtert eigen_huis + linked mortgage uit bij exclude/downsize, en
-    // voegt synthetische cashflows toe (sale proceeds, mortgage saved,
-    // new rent, opeethypotheek-uitkering) afhankelijk van de mode.
+    // Filter eigen_huis + linked mortgage uit bij exclude/downsize-modes.
+    // De virtuele LifeEvents voor downsize/reverse_mortgage (verkoop, einde
+    // hypotheek, nieuwe woonkost, opeethypotheek-uitkering) zitten al in de
+    // `lifeEvents`-array — toegevoegd door horizon-data-loader. Ze worden
+    // hieronder via lifeEventsToCashflows in cashflows omgezet.
     const housingCfg = housingStrategy ?? DEFAULT_HOUSING_STRATEGY
-    const housingContext = deriveHousingContext(assets ?? [], debts ?? [])
     const { assets: effectiveAssets, debts: effectiveDebts } = filterAssetsForFire(
       housingCfg,
       assets ?? [],
       debts ?? [],
     )
-    // Schatting van liquide deel voor on_depletion-trigger: totaal vermogen
-    // minus eigen woning equity. Onnauwkeurig maar voldoende voor MVP.
-    const totalNetWorthEstimate =
-      (assets ?? []).reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0) -
-      (debts ?? []).reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
-    const liquidPortfolioEstimate = Math.max(
-      0,
-      totalNetWorthEstimate - (housingContext.eigenHuisValue - housingContext.mortgageBalance),
-    )
-    const housingAdjustment = applyHousingStrategy({
-      config: housingCfg,
-      context: housingContext,
-      currentAge,
-      endAge: simEndAge,
-      yearlyExpenses,
-      currentLiquidPortfolio: liquidPortfolioEstimate,
-    })
-    const cashflows: SimCashflow[] = [...baseCashflows, ...housingAdjustment.cashflows]
+
+    // Kasstromen — uit life events (incl. virtuele housing-strategy events)
+    const cashflows: SimCashflow[] = lifeEventsToCashflows(lifeEvents ?? [])
 
     // ── Build UnifiedProjectionInput ──────────────────────────────────
     const unifiedInput: UnifiedProjectionInput = {

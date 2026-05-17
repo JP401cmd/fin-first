@@ -38,6 +38,8 @@ import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
+import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
+import { useIsAppSetupCompleted } from '@/components/app/app-setup/use-is-setup-completed'
 import { WaardestijgingSlider } from './hypotheekplanner/waardestijging-slider'
 import { RentalROICard } from './verhuurrendement/rental-roi-card'
 import { Box3Comparison } from './verhuurrendement/box3-comparison'
@@ -52,6 +54,15 @@ export function VerhuurrendementTab({ moduleActive }: DeepeningTabProps) {
   if (!moduleActive) {
     return <VerhuurrendementTeaser />
   }
+  return <VerhuurrendementGated />
+}
+
+// ── Gate-laag (setup-check) ──────────────────────────────────
+
+function VerhuurrendementGated() {
+  const setupCompleted = useIsAppSetupCompleted('verhuurrendement')
+  if (setupCompleted === null) return <SkeletonBox />
+  if (setupCompleted === false) return <AppSetupGate appKey="verhuurrendement" />
   return <VerhuurrendementActive />
 }
 

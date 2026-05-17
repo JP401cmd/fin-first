@@ -6,6 +6,8 @@ import type { BudgetsPageData } from '@/lib/budgets-data-loader'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
 import { useLiveBottomBar } from '@/components/app/shell/nav-stack-provider'
+import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
+import { useIsAppSetupCompleted } from '@/components/app/app-setup/use-is-setup-completed'
 
 // ── Component ────────────────────────────────────────────────
 
@@ -85,14 +87,22 @@ interface CashBudgetterenActiveProps {
  * is dit een no-op en gebeurt er niets.
  */
 function CashBudgetterenActive({ initialData }: CashBudgetterenActiveProps) {
+  // Gate-check: eerst-keer-bezoek vereist setup-completion. Bestaande
+  // gebruikers (met budgets in de tabel) krijgen lazy marker geseed en
+  // zien geen gate. Zie `useIsAppSetupCompleted`.
+  const setupCompleted = useIsAppSetupCompleted('budgetteren')
+
   // Isoleer de setter — de `live`-object identiteit wijzigt bij elke
   // config-update (memoized op `liveBottomBarConfig`), dus `live` zélf als
   // dep zou een infinite render-loop veroorzaken (setConfig → context-value
   // wijzigt → effect refire → setConfig → …). Een useState-setter heeft
   // wél een stabiele identiteit, dus die kunnen we veilig als dep gebruiken.
+  //
+  // Bottom-bar app-tabs alleen mounten wanneer de echte budget-content draait;
+  // tijdens setup-gate of skeleton wil je de standaard module-tabs zien.
   const setConfig = useLiveBottomBar()?.setConfig
   useEffect(() => {
-    if (!setConfig) return
+    if (!setConfig || setupCompleted !== true) return
     setConfig({
       kind: 'app-tabs',
       left: {
@@ -116,7 +126,22 @@ function CashBudgetterenActive({ initialData }: CashBudgetterenActiveProps) {
     return () => {
       setConfig(null)
     }
-  }, [setConfig])
+  }, [setConfig, setupCompleted])
 
+  if (setupCompleted === null) return <AppSetupSkeleton />
+  if (setupCompleted === false) return <AppSetupGate appKey="budgetteren" />
   return <BudgetsClient initialData={initialData} />
+}
+
+// ── Skeleton tijdens setup-check ─────────────────────────────
+
+function AppSetupSkeleton() {
+  return (
+    <div className="space-y-8" aria-busy="true" aria-live="polite">
+      <div className="h-[120px] animate-pulse border-t border-b border-[var(--ink)] bg-[var(--paper)]" />
+      <div className="h-[180px] animate-pulse border border-[var(--border-ed)] bg-[var(--subtle)]/40" />
+      <div className="h-[160px] animate-pulse border border-[var(--border-ed)] bg-[var(--subtle)]/40" />
+      <span className="sr-only">Setup-status wordt gecheckt…</span>
+    </div>
+  )
 }

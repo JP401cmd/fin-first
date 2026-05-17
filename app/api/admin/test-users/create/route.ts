@@ -4,10 +4,10 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
 
 const TEST_USERS = [
-  { email: 'ronald@test.trifinity.nl', persona: 'ronald', name: 'Ronald Hoekstra' },
-  { email: 'bas@test.trifinity.nl', persona: 'bas', name: 'Bas Mulder' },
-  { email: 'leo@test.trifinity.nl', persona: 'leo', name: 'Leo Pietersen' },
-  { email: 'jochen@test.trifinity.nl', persona: 'jochen', name: 'Jochen Brouwer' },
+  { email: 'daan@test.trifinity.nl', persona: 'daan', name: 'Daan Bakker' },
+  { email: 'lisa@test.trifinity.nl', persona: 'lisa', name: 'Lisa de Groot' },
+  { email: 'willem@test.trifinity.nl', persona: 'willem', name: 'Willem Jansen' },
+  { email: 'marijke@test.trifinity.nl', persona: 'marijke', name: 'Marijke Vermeer' },
 ]
 
 /** POST — create test users via Supabase Admin API (GoTrue) */

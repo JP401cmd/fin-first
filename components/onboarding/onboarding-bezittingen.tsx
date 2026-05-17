@@ -75,6 +75,14 @@ export interface OnboardingBezittingenProps {
   /** 1-indexed stap-nummer voor de voortgangsbalk (default 4). */
   currentStep?: number
   totalSteps?: number
+  /**
+   * Forceer ≥1 cash-asset voordat doorgaan toegestaan is. Aan-gezet wanneer
+   * de gebruiker in de doel-stap een doel koos waar Budgetteren bij hoort —
+   * een cash-rekening is dan structureel nodig om transacties tegen
+   * budgetten af te zetten. Conform CLAUDE.md fallback-regel: een module
+   * mag niet stilzwijgend leeg starten.
+   */
+  requireCashAccount?: boolean
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -88,7 +96,12 @@ export function OnboardingBezittingen({
   onBack,
   currentStep = 4,
   totalSteps = 5,
+  requireCashAccount = false,
 }: OnboardingBezittingenProps) {
+  // Bij budgetteren-doel moet er minstens één cash-asset zijn. Zonder
+  // cash-rekening valt de Budgetteren-app om — daarom dwingen we het hier af.
+  const hasCashAccount = quickAssets.some((a) => a.asset_type === 'cash')
+  const cashRequirementMet = !requireCashAccount || hasCashAccount
   // Drie modale-states. Ze sluiten elkaar uit (je opent er maar één tegelijk
   // omdat de tiles disabled worden zodra er één open is — onnodig in praktijk,
   // de wizard/pane zelf dimt de achtergrond). We houden ze separaat zodat de
@@ -234,13 +247,23 @@ export function OnboardingBezittingen({
         totalSteps={totalSteps}
         onBack={onBack}
         footer={
-          <button
-            type="button"
-            onClick={onNext}
-            className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
-          >
-            {hasAnyItem ? 'Verder' : 'Overslaan'}
-          </button>
+          <div className="space-y-2">
+            {requireCashAccount && !hasCashAccount && (
+              <p className="border-l-2 border-[var(--ink-3)] bg-[var(--subtle)]/60 px-3 py-2 text-[12px] leading-snug text-[var(--ink-2)]">
+                Voor Budgetteren is een cash-rekening nodig zodat we
+                transacties tegen je budgetten kunnen afzetten. Voeg een
+                bankrekening of spaarrekening toe om verder te gaan.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={!cashRequirementMet}
+              className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {hasAnyItem ? 'Verder' : 'Overslaan'}
+            </button>
+          </div>
         }
       >
         <div className="space-y-7">

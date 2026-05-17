@@ -705,36 +705,6 @@ const tests: TestCase[] = [
   // ── Persona-validatie door fasebalk-logica ──────────────────────────────────
 
   {
-    id: 'fasebalk-persona-roos-schuld',
-    name: 'Persona Roos (schuld) door fasebalk',
-    category: CAT,
-    description: 'Roos: deep in debt, FIRE unreachable → only Opbouw',
-    priority: 'high', estimatedDurationMs: 50,
-    fn() {
-      const p = PERSONAS.roos
-      const currentAge = ageAtDate(p.profile.date_of_birth)
-      const input: FinancialInput = {
-        totalAssets: 0, totalDebts: 15000, monthlyIncome: p.meta.income,
-        monthlyExpenses: p.meta.expenses, yearlyMustExpenses: 0,
-        monthlyContributions: Math.max(0, p.meta.income - p.meta.expenses),
-        dateOfBirth: p.profile.date_of_birth,
-      }
-      const proj = computeFireProjection(input)
-      const fireReachable = proj.fireAge !== null && proj.fireAge > currentAge
-      const segments = buildSegments({
-        currentAge,
-        fireAge: proj.fireAge,
-        aowAge: NL_AOW_AGE,
-        endAge: p.profile.fire_end_age ?? 85,
-        fireReachable: fireReachable && proj.fireAge !== null,
-        isPensioenMode: p.profile.fire_end_strategy === 'pensioen',
-      })
-      // Roos has negative net worth and expenses > income → FIRE unreachable
-      assertGreaterThan(segments.length, 0, 'Roos: at least 1 segment')
-      assertEqual(segments[0].id, 'opbouw', 'Roos: starts with opbouw')
-    },
-  },
-  {
     id: 'fasebalk-persona-daan-starter',
     name: 'Persona Daan (starter) door fasebalk',
     category: CAT,
@@ -833,40 +803,6 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'fasebalk-persona-rashid-no-budget',
-    name: 'Persona Rashid (no-budget) door fasebalk',
-    category: CAT,
-    description: 'Rashid: no budgets, deplete strategy, valid segments',
-    priority: 'high', estimatedDurationMs: 50,
-    fn() {
-      const p = PERSONAS.rashid
-      const currentAge = ageAtDate(p.profile.date_of_birth)
-      const input: FinancialInput = {
-        totalAssets: 250000, totalDebts: 0,
-        monthlyIncome: p.profile.net_monthly_income ?? p.meta.income,
-        monthlyExpenses: p.profile.estimated_monthly_expenses ?? p.meta.expenses,
-        yearlyMustExpenses: 0,
-        monthlyContributions: (p.profile.net_monthly_income ?? p.meta.income) - (p.profile.estimated_monthly_expenses ?? p.meta.expenses),
-        dateOfBirth: p.profile.date_of_birth,
-      }
-      const proj = computeFireProjection(input)
-      const fireReachable = proj.fireAge !== null && proj.fireAge > currentAge
-      const segments = buildSegments({
-        currentAge,
-        fireAge: fireReachable ? proj.fireAge : null,
-        aowAge: NL_AOW_AGE,
-        endAge: p.profile.fire_end_age ?? 90,
-        fireReachable,
-        isPensioenMode: p.profile.fire_end_strategy === 'pensioen',
-      })
-      assertGreaterThan(segments.length, 0, 'Rashid: at least 1 segment')
-      // Rashid has positive net worth → should eventually reach FIRE
-      if (fireReachable) {
-        assertEqual(segments[0].id, 'opbouw', 'Rashid: starts with opbouw')
-      }
-    },
-  },
-  {
     id: 'fasebalk-persona-marijke-retired',
     name: 'Persona Marijke (retired/pensioen) door fasebalk',
     category: CAT,
@@ -896,24 +832,18 @@ const tests: TestCase[] = [
   },
   {
     id: 'fasebalk-alle-personas-geen-errors',
-    name: 'Alle 6 personas door fasebalk-logica zonder errors',
+    name: 'Alle 4 personas door fasebalk-logica zonder errors',
     category: CAT,
-    description: 'Validate all 6 personas produce valid non-empty segment arrays',
+    description: 'Validate all 4 personas produce valid non-empty segment arrays',
     priority: 'critical', estimatedDurationMs: 100,
     fn() {
       const personaConfigs: Record<PersonaKey, {
         totalAssets: number, totalDebts: number, fireAge: number | null, fireReachable: boolean
       }> = {
-        roos: { totalAssets: 0, totalDebts: 15000, fireAge: null, fireReachable: false },
         daan: { totalAssets: 2850, totalDebts: 13900, fireAge: 55, fireReachable: true },
         lisa: { totalAssets: 100000, totalDebts: 0, fireAge: 60, fireReachable: true },
         willem: { totalAssets: 1457000, totalDebts: 0, fireAge: ageAtDate('1968-11-30'), fireReachable: true },
-        rashid: { totalAssets: 250000, totalDebts: 0, fireAge: 55, fireReachable: true },
         marijke: { totalAssets: 850000, totalDebts: 0, fireAge: ageAtDate('1957-06-20'), fireReachable: true },
-        ronald: { totalAssets: 850000, totalDebts: 0, fireAge: ageAtDate('1962-03-15'), fireReachable: true },
-        bas: { totalAssets: 100000, totalDebts: 0, fireAge: 60, fireReachable: true },
-        leo: { totalAssets: 0, totalDebts: 15000, fireAge: null, fireReachable: false },
-        jochen: { totalAssets: 1457000, totalDebts: 0, fireAge: 55, fireReachable: true },
       }
 
       for (const key of PERSONA_KEYS) {

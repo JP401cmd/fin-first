@@ -52,8 +52,7 @@ import {
   deriveHousingContext,
   getFireEligibleNetWorth,
   filterAssetsForFire,
-  applyHousingStrategy,
-  DEFAULT_HOUSING_STRATEGY,
+  getHousingLifeEvents,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -580,7 +579,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   if (dob && netWorth > 0) {
     try {
       const currentAge = ageAtDate(dob)
-      const baseSimCashflows = lifeEventsToCashflows((eventsResult.data ?? []) as LifeEvent[])
       // Look up actual AOW age from aow_leeftijden table (consistent with horizon page)
       const userAowAge = lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob)
       const isPensioen = fireStrategy.strategy === 'pensioen'
@@ -597,7 +595,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       // Resolve withdrawal strategy from profile (consistent with horizon page)
       const withdrawalStrategy = resolveWithdrawalStrategy(profileResult.data as Record<string, unknown> ?? {})
       // Housing strategy: filter eigen_huis + linked mortgage indien van toepassing,
-      // en voeg synthetische cashflows toe voor downsize/reverse_mortgage.
+      // en voeg virtuele LifeEvents toe voor downsize/reverse_mortgage zodat
+      // de tijdlijn ze toont en lifeEventsToCashflows ze meeneemt in de sim.
       const dashboardYearlyExpenses = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12
       const { assets: filteredAssets, debts: filteredDebts } = filterAssetsForFire(
         housingStrategyCfg,
@@ -605,15 +604,22 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         dashboardDebtsArr,
       )
       const dashboardLiquidEstimate = Math.max(0, netWorth - (housingContext.eigenHuisValue - housingContext.mortgageBalance))
-      const housingAdj = applyHousingStrategy({
+      const housingEvents = getHousingLifeEvents({
         config: housingStrategyCfg,
         context: housingContext,
         currentAge,
         endAge: effectiveStrategy.endAge,
         yearlyExpenses: dashboardYearlyExpenses,
         currentLiquidPortfolio: dashboardLiquidEstimate,
+        annualSavings: monthlyContributions * 12,
+        // Cashflow-gebaseerde phase-detectie (zie horizon-data-loader).
+        currentNetCashflowYearly: (effectiveMonthlyIncome - effectiveMonthlyExpenses) * 12,
       })
-      const simCashflows = [...baseSimCashflows, ...housingAdj.cashflows]
+      const allEventsForSim: LifeEvent[] = [
+        ...((eventsResult.data ?? []) as LifeEvent[]),
+        ...housingEvents,
+      ]
+      const simCashflows = lifeEventsToCashflows(allEventsForSim)
       const unifiedInput: UnifiedProjectionInput = {
         assets: filteredAssets,
         debts: filteredDebts,
